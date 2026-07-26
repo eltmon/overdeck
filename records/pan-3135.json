@@ -37,9 +37,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T14:09:57.627Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T14:12Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T14:12:49.145Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T14:12:49Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3135\n\n# Review Synthesis — PAN-3135 — 2026-07-26T14:12:11Z\n\n## Verdict: CHANGES REQUESTED — deferred verification still bypasses the quality gate, deferred merges still lose scheduling, and deadline escalation remains incomplete\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-6680864c/context.json\n- Branch: feature/pan-3135\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3135\n- HEAD reviewed: 6680864c8f13ec69ba20911801160e2233e65a3a\n- Cycle number: 2\n- Prior cycle SHA: 27f89adb9576474823407bf0fba3f7d03d8d46e2\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-6680864c/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-6680864c/correctness.md | 2 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-6680864c/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-6680864c/requirements.md | 1 |\n\n## Blocking Findings\n\n### [correctness] Deferred verification can dispatch review without re-running the quality gate — `src/lib/cloister/verification-runner.ts:387`\nThe queue admission branch leaves verification pending and returns `deferred`, while the route callers preserve the durable `reviewRequestedAt` request. A later status read invokes `maybeAutoDispatchReviewHostSide()` in `src/lib/review-status.ts`, which calls `spawnReviewRoleForIssue()` directly and bypasses the verification-first continuation. That entry point assumes verification already ran and, in `review.mode = none`, can immediately mark review skipped. A queued deploy can therefore advance a branch that never completed the required quality gates. Durable review recovery must re-enter one canonical verification → push → review path, with an integration test covering status reads before queue clearance and verification-before-review afterward.\n\n### [correctness] Post-rebase verification deferral is terminal to auto-merge and removes persistent queue scheduling — `src/lib/cloister/merge-verification.ts:39`\n`handlePostRebaseVerificationDeferral()` returns an unsuccessful 409 without a distinct deferred state or `retryable` marker. `tickAutoMergeExecutor()` consequently marks the entry failed, and `triggerMerge()` unconditionally calls `advanceQueue()` in `finally`, removing the current persistent merge-queue item. Restoring the visible status to `queued` does not restore either scheduler, so the merge may never retry despite the operator message. The deferral needs an explicit non-terminal result handled by both schedulers without consuming retry budget, plus tests for auto-merge and persistent merge-queue attempts.\n\n### [requirements] Deadline escalation misses queues blocked before the deploy-window check — `src/lib/cloister/deploy-patrol.ts:324`\nFR-6 and the updated SOP promise escalation whenever a queued deploy remains blocked past `queue_deadline_minutes`, but the deadline check still runs only inside the final deploy-window-block branch. Debounce, spawn cooldown, unknown origin SHA, and pending, failed, or unreadable CI all return before escalation is evaluated, so those queues can remain stuck indefinitely without the required error activity or TTS warning. Evaluate overdue escalation through one helper on every blocking exit while preserving the one-shot latch, and add focused tests for overdue CI and pre-CI blockers.\n\n## Non-blocking Findings\n\n### [correctness] Dead-owner lock recovery can reject queue mutations for about 30 seconds — `src/lib/deploy/deploy-queue.ts:90`\nThe acquisition loop waits for less than one second, but stale-lock recovery can refuse to reclaim a dead or ownerless lock until its timestamp reaches 30 seconds. A process crash in the lock-creation window can therefore make restart-gate and patrol mutations fail temporarily. Reclaim a lock immediately when its recorded owner is proven dead, or wait through the stale threshold, and add a dead-owner fixture.\n\n### [performance] Blocked deploy handling loads all review statuses twice — `src/lib/deploy/agent-restart-gate.ts:33`\nBoth restart gating and deploy patrol call `getDeployBlockReason()` and then independently call `listVerifyingIssues()`, repeating the full review-status and status-history load. Reuse one snapshot or return the reason and verifying issue IDs from one canonical deploy-window assessment.\n\n## Resolved Since Prior Cycle\n- The prior synchronous-filesystem blocker is fixed: deploy-queue reads and mutations now use `node:fs/promises`, and all changed server call sites await them.\n- The prior cross-process lost-update advisory is fixed under normal concurrent operation: queue mutations are serialized and tests cover concurrent registration and escalation.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3135/.pan/review/agent-pan-3135-review-6680864c/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3135 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/cloister/merge-verification.ts",
@@ -101,7 +114,7 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T14:12:48.491Z",
+  "updated": "2026-07-26T14:12:49.146Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "blocked",
