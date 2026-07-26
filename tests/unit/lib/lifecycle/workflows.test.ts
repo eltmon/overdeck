@@ -429,9 +429,122 @@ describe('workflows', () => {
       expect(verifyStep.error).toBe('Feature branch is absent; positive merge evidence is required');
     });
 
+    it('accepts a squash-merged strike branch when the feature branch retains superseded commits', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command === 'git branch --list "strike/pan-100" 2>/dev/null || true') {
+          return { stdout: '  strike/pan-100\n', stderr: '' };
+        }
+        if (command.startsWith('git merge-base --is-ancestor')) {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command.startsWith('git diff main...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/feature.ts b/src/feature.ts\n', stderr: '' };
+        }
+        if (command.startsWith('git diff main...strike/pan-100')) {
+          return { stdout: 'diff --git a/src/strike.ts b/src/strike.ts\n', stderr: '' };
+        }
+        if (command.includes('--head "feature/pan-100"')) {
+          return { stdout: '[]', stderr: '' };
+        }
+        if (command.includes('--head "strike/pan-100"')) {
+          return {
+            stdout: '[{"number":3152,"mergedAt":"2026-07-26T12:00:00Z","headRefOid":"strike-head","url":"https://github.com/eltmon/overdeck/pull/3152"}]',
+            stderr: '',
+          };
+        }
+        if (command === 'git rev-parse strike/pan-100 2>/dev/null') {
+          return { stdout: 'strike-head\n', stderr: '' };
+        }
+        if (command === 'git log main..feature/pan-100 --oneline 2>/dev/null || true') {
+          return { stdout: 'feature-a\nfeature-b\n', stderr: '' };
+        }
+        if (command.startsWith('gh issue view')) {
+          return { stdout: 'OPEN\n', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const ctx = {
+        issueId: 'PAN-100',
+        projectPath: testDir,
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
+      };
+      const verifyStep = await Effect.runPromise(__testInternals.verifyBranchMerged(ctx));
+
+      expect(verifyStep.success).toBe(true);
+      expect(verifyStep.details).toEqual([
+        'PR #3152 is squash-merged and strike/pan-100 matches the merged PR head',
+        'Superseded feature/pan-100 residual: 2 unmerged commit(s) on feature/pan-100. Merge before closing out.',
+      ]);
+    });
+
+    it('preserves the feature-branch failure when the strike branch is absent', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command.startsWith('git merge-base --is-ancestor feature/pan-100')) {
+          throw new Error('feature is not merged');
+        }
+        if (command.startsWith('git diff main...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/feature.ts b/src/feature.ts\n', stderr: '' };
+        }
+        if (command.includes('--head "feature/pan-100"')) {
+          return { stdout: '[]', stderr: '' };
+        }
+        if (command === 'git log main..feature/pan-100 --oneline 2>/dev/null || true') {
+          return { stdout: 'feature-a\nfeature-b\n', stderr: '' };
+        }
+        if (command.startsWith('gh issue view')) {
+          return { stdout: 'OPEN\n', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const ctx = {
+        issueId: 'PAN-100',
+        projectPath: testDir,
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
+      };
+      const verifyStep = await Effect.runPromise(__testInternals.verifyBranchMerged(ctx));
+
+      expect(verifyStep.success).toBe(false);
+      expect(verifyStep.error).toBe('2 unmerged commit(s) on feature/pan-100. Merge before closing out.');
+    });
+
+    it('returns the branch-absence sentinel when both convention branches are absent', async () => {
+      mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const verifyStep = await Effect.runPromise(__testInternals.verifyBranchMerged(ctx));
+
+      expect(verifyStep.success).toBe(false);
+      expect(verifyStep.error).toBe('Feature branch is absent; positive merge evidence is required');
+    });
+
+    it('does not inspect the strike branch after the feature branch passes', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const verifyStep = await Effect.runPromise(__testInternals.verifyBranchMerged(ctx));
+
+      expect(verifyStep.success).toBe(true);
+      expect(mockExecAsync.mock.calls.map(([command]) => command)).not.toEqual(
+        expect.arrayContaining([expect.stringContaining('strike/pan-100')]),
+      );
+    });
+
     it('accepts a squash-merged GitHub PR when the branch tip matches the merged PR head', async () => {
       mockExecAsync.mockImplementation(async (command: string) => {
-        if (command.startsWith('git branch --list')) {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
           return { stdout: '  feature/pan-100\n', stderr: '' };
         }
         if (command.startsWith('git merge-base --is-ancestor')) {
@@ -469,7 +582,7 @@ describe('workflows', () => {
 
     it('rejects a squash-merged GitHub PR when the branch tip no longer matches the merged PR head', async () => {
       mockExecAsync.mockImplementation(async (command: string) => {
-        if (command.startsWith('git branch --list')) {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
           return { stdout: '  feature/pan-100\n', stderr: '' };
         }
         if (command.startsWith('git merge-base --is-ancestor')) {
@@ -518,7 +631,7 @@ describe('workflows', () => {
 
     it('accepts a squash-merged PR when the branch later merged commits already on main', async () => {
       mockExecAsync.mockImplementation(async (command: string) => {
-        if (command.startsWith('git branch --list')) {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
           return { stdout: '  feature/pan-100\n', stderr: '' };
         }
         if (command.startsWith('git merge-base --is-ancestor feature/pan-100 main')) {
@@ -560,7 +673,7 @@ describe('workflows', () => {
 
     it('rejects local squash-merge success when the remote branch has advanced past the merged PR head', async () => {
       mockExecAsync.mockImplementation(async (command: string) => {
-        if (command.startsWith('git branch --list')) {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
           return { stdout: '  feature/pan-100\n', stderr: '' };
         }
         if (command.startsWith('git merge-base --is-ancestor')) {
@@ -578,7 +691,7 @@ describe('workflows', () => {
         if (command.startsWith('git rev-parse feature/pan-100')) {
           return { stdout: 'merged-head\n', stderr: '' };
         }
-        if (command.startsWith('git ls-remote --heads origin')) {
+        if (command === 'git ls-remote --heads origin "feature/pan-100" 2>/dev/null || true') {
           return { stdout: 'remote-sha\trefs/heads/feature/pan-100\n', stderr: '' };
         }
         if (command.startsWith('git fetch origin feature/pan-100')) {
