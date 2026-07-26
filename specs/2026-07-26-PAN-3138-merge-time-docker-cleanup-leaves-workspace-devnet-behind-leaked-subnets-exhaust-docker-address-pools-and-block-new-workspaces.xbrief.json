@@ -4,17 +4,17 @@
     "created": "2026-07-26T13:51:58Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3138: Merge-time Docker cleanup leaves workspace devnet behind — leaked subnets exhaust Docker address pools and block new workspaces",
-    "updated": "2026-07-26T13:56:43.605Z"
+    "updated": "2026-07-26T20:22:42.731Z"
   },
   "plan": {
     "id": "pan-3138",
     "title": "Merge-time Docker cleanup leaves workspace devnet behind — leaked subnets exhaust Docker address pools and block new workspaces",
-    "status": "running",
+    "status": "completed",
     "uid": "f5bd9a78-c1ed-4774-812f-2e411dfeb87d",
     "author": "agent:k3[1m]",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-26T13:51:58Z",
-    "updated": "2026-07-26T13:56:43.605Z",
+    "updated": "2026-07-26T20:22:42.731Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3138",
@@ -309,5 +309,5 @@
       "canonicalFilename": "2026-07-26-PAN-3138-merge-time-docker-cleanup-leaves-workspace-devnet-behind-leaked-subnets-exhaust-docker-address-pools-and-block-new-workspaces.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
