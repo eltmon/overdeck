@@ -21,11 +21,17 @@ import {
   type ReadyFeature,
 } from '../../../lib/cloister/uat-generation-engine.js';
 import {
+  buildPolyrepoGitDeps,
   buildUatGenerationGitDeps,
   buildUatGenerationStore,
   buildUatGenerationCleanupGit,
   listRemoteUatBranches,
 } from '../../../lib/cloister/uat-generation-deps.js';
+import {
+  assemblePolyrepoUatGeneration,
+  compositeAnchor,
+  compositeMemberAnchor,
+} from '../../../lib/cloister/uat-polyrepo-engine.js';
 import { buildConflictAgentHook } from '../../../lib/cloister/uat-conflict-agent.js';
 import { reconcileUatGenerations, type ReconcileResult } from '../../../lib/cloister/uat-reconciler.js';
 import { ensureUatStack, probeUatStack, teardownUatStack } from '../../../lib/cloister/uat-stack.js';
@@ -44,7 +50,11 @@ import {
 import { listEligibleCandidatesByProject } from '../../../lib/flywheel-merge-order.js';
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
 import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
-import { findProjectByPathSync } from '../../../lib/projects.js';
+import { findProjectByPathSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import {
+  resolveProjectReposFromResolvedIssueSync,
+  type ResolvedProjectRepo,
+} from '../../../lib/project-repos.js';
 import { getDashboardIdentity } from '../identity.js';
 
 const RECONCILE_INTERVAL_MS = 60_000;
@@ -84,13 +94,6 @@ function codenameLabel(features: readonly ReadyFeature[]): string {
   return (prefix ?? 'uat').toLowerCase();
 }
 
-class PolyrepoAssemblyUnsupported extends Error {
-  constructor() {
-    super('polyrepo UAT assembly not yet supported');
-    this.name = 'PolyrepoAssemblyUnsupported';
-  }
-}
-
 /**
  * PAN-1696 reconciler-decouple: Per-project cleanup function factory.
  */
@@ -123,12 +126,6 @@ async function runUatTrainReconcileForProject(
     return { action: 'no-queue', invalidated: [] };
   }
 
-  // PAN-1696: polyrepo assembly not yet supported — skip before git operations
-  if (projectConfig.workspace?.type === 'polyrepo') {
-    console.log(`[uat-train] polyrepo project type not supported for UAT assembly — skipping`);
-    return { action: 'no-queue', invalidated: [] };
-  }
-
   // Check if enabled before building git deps (fail closed on null config)
   if (!isMergeTrainEnabledForProject(projectConfig)) {
     return { action: 'disabled', invalidated: [] };
@@ -143,6 +140,26 @@ async function runUatTrainReconcileForProject(
   });
   if (candidates.length === 0 && liveGenerations.length === 0) {
     return { action: 'idle', invalidated: [] };
+  }
+
+  // A polyrepo project has no git repo at its own path, so every git dep must
+  // be per member repo and staleness must compare composite anchors.
+  if (projectConfig.workspace?.type === 'polyrepo') {
+    return reconcileUatGenerations(projectPath, {
+      isEnabled: () => true,  // Already checked above
+      getReadySet: () => getPolyrepoReadySetForProject(projectPath),
+      // Unused on this path — getBaseAnchor/getFeatureAnchor take over — but
+      // the deps contract still requires them.
+      getMainHeadSha: async () => '',
+      getBranchHeadSha: async () => '',
+      getBaseAnchor: () => getPolyrepoBaseAnchor(projectPath),
+      getFeatureAnchor: (feature) => getPolyrepoFeatureAnchor(feature),
+      store: buildUatGenerationStore(),
+      assemble: (features) => assemblePolyrepoFromReadySetForProject(projectPath, features),
+      teardownStack: (gen) => teardownUatStack(gen),
+      cleanup: makeCleanupForProject(projectPath),
+      log: (msg) => console.log(msg),
+    }, options);
   }
 
   const gitDeps = buildUatGenerationGitDeps(projectPath);
@@ -188,6 +205,117 @@ async function getReadySetForProject(projectPath: string): Promise<ReadyFeature[
 }
 
 /**
+ * Member repos configured for an issue in a polyrepo project. Resolution goes
+ * through the canonical repo resolver, which collapses monorepo to one
+ * synthetic entry — so this is the same door the rest of the pipeline uses.
+ */
+function resolveReposForIssue(issueId: string): ResolvedProjectRepo[] {
+  const resolvedProject = resolveProjectFromIssueSync(issueId);
+  if (!resolvedProject) return [];
+  return resolveProjectReposFromResolvedIssueSync(issueId, resolvedProject) ?? [];
+}
+
+/**
+ * The project's configured member repos, resolved through the issue door using
+ * any eligible candidate. Every issue in a project resolves the same repo set;
+ * only the per-issue branch names differ, and callers here use the branches
+ * from each feature's own contributions rather than these.
+ */
+function resolveProjectRepos(projectPath: string, preferredIssueId?: string): ResolvedProjectRepo[] {
+  const issueId = preferredIssueId ?? listEligibleCandidatesByProject(projectPath)[0]?.issueId;
+  return issueId ? resolveReposForIssue(issueId) : [];
+}
+
+/** Polyrepo ready set: per-candidate contributions across member repos. */
+async function getPolyrepoReadySetForProject(projectPath: string): Promise<ReadyFeature[] | null> {
+  const { computePolyrepoMergeQueueFromCandidates, listEligibleCandidatesByProject, resolveMergeQueuePrUrl } =
+    await import('../../../lib/flywheel-merge-order.js');
+
+  const candidates = listEligibleCandidatesByProject(projectPath);
+  if (candidates.length === 0) return [];
+
+  const reposByIssue = new Map(candidates.map((c) => [c.issueId, resolveReposForIssue(c.issueId)]));
+
+  const queue = await Effect.runPromise(
+    computePolyrepoMergeQueueFromCandidates(candidates, reposByIssue, projectPath, {
+      getPrUrl: resolveMergeQueuePrUrl,
+      onExcluded: (issueId, reason) =>
+        console.log(`[uat-train] ${issueId} excluded from the polyrepo ready set: ${reason}`),
+    }).pipe(Effect.provide(nodeServicesLayer)),
+  );
+
+  return queue.map((item) => ({
+    issueId: item.issueId,
+    title: item.title,
+    branch: item.branchName,
+    ...(item.pr !== undefined ? { pr: item.pr } : {}),
+    ...(item.prUrl !== undefined ? { prUrl: item.prUrl } : {}),
+    conflictsWith: item.conflictsWith,
+    repoContributions: item.repoContributions,
+  }));
+}
+
+/**
+ * Composite base anchor across every configured member repo. Must be built by
+ * the same helper assembly uses, since staleness is string equality.
+ */
+async function getPolyrepoBaseAnchor(projectPath: string): Promise<string> {
+  const repos = resolveProjectRepos(projectPath);
+  if (repos.length === 0) return '';
+  const gitByRepo = buildPolyrepoGitDeps(repos);
+
+  const entries = await Promise.all(
+    repos.map(async (repo) => ({
+      repoKey: repo.repoKey,
+      sha: await gitByRepo.get(repo.repoKey)!.fetchMain().catch(() => 'unknown'),
+      mergeOrder: repo.mergeOrder,
+    })),
+  );
+  return compositeAnchor(entries);
+}
+
+/** Composite anchor over the repos one feature currently contributes to. */
+async function getPolyrepoFeatureAnchor(feature: ReadyFeature): Promise<string> {
+  const contributions = feature.repoContributions ?? [];
+  if (contributions.length === 0) return 'unknown';
+
+  const entries = await Promise.all(
+    contributions.map(async (c) => {
+      const git = buildUatGenerationGitDeps(c.repoPath, { targetBranch: c.targetBranch });
+      return { repoKey: c.repoKey, headSha: await git.branchHeadSha(c.branch).catch(() => 'unknown') };
+    }),
+  );
+  return compositeMemberAnchor(entries);
+}
+
+/** Assemble a polyrepo UAT generation for a project's ready set. */
+async function assemblePolyrepoFromReadySetForProject(
+  projectPath: string,
+  features: readonly ReadyFeature[],
+): Promise<UatGeneration> {
+  const repos = resolveProjectRepos(projectPath, features[0]?.issueId);
+  if (repos.length === 0) {
+    throw new Error(`[uat-train] no member repos resolved for the polyrepo project at ${projectPath}`);
+  }
+
+  return assemblePolyrepoUatGeneration(
+    {
+      projectRoot: projectPath,
+      label: codenameLabel(features),
+      dateIso: new Date().toISOString(),
+      features,
+      repos,
+    },
+    {
+      repoGit: buildPolyrepoGitDeps(repos),
+      store: buildUatGenerationStore(),
+      resolveConflict: buildConflictAgentHook(),
+      log: (msg) => console.log(msg),
+    },
+  );
+}
+
+/**
  * Assemble UAT generation for a specific project's ready set.
  */
 async function assembleFromReadySetForProject(
@@ -211,8 +339,6 @@ async function assembleFromReadySetForProject(
     },
   );
 }
-
-// Removed PolyrepoAssemblyUnsupported class — polyrepo guard moved to runUatTrainReconcileForProject
 
 /**
  * PAN-1696 reconciler-decouple: Single-project reconciliation (used by forced-rebuild endpoint).

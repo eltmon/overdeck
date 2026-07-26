@@ -94,11 +94,44 @@ interface AssemblyPass {
 
 const SHORT_SHA_LENGTH = 7;
 
-/** `fe@abc1234 api@def5678` — the composite base anchor for a polyrepo row. */
+/**
+ * `fe@abc1234 api@def5678` — the one anchor format for every per-repo SHA
+ * tuple. Base anchors, member anchors, and the reconciler's live anchors are
+ * all built here: the reconciler decides staleness by STRING EQUALITY against
+ * what assembly stored, so any two producers that disagree on ordering or SHA
+ * length would make every generation look permanently stale and reassemble
+ * forever.
+ */
+export function compositeAnchor(
+  entries: ReadonlyArray<{ repoKey: string; sha: string; mergeOrder: number }>,
+): string {
+  return [...entries]
+    .sort((a, b) => a.mergeOrder - b.mergeOrder || a.repoKey.localeCompare(b.repoKey))
+    .map((e) => `${e.repoKey}@${e.sha.slice(0, SHORT_SHA_LENGTH)}`)
+    .join(' ');
+}
+
+/** The generation's base anchor, across the repos it branched. */
 export function compositeBaseAnchor(repos: readonly UatGenerationRepo[]): string {
+  return compositeAnchor(repos.map((r) => ({ repoKey: r.repoKey, sha: r.baseSha, mergeOrder: r.mergeOrder })));
+}
+
+/**
+ * One member's anchor, across the repos it contributed to, ordered by repoKey.
+ *
+ * Deliberately NOT ordered by merge order: assembly knows `mergeOrderInRepo`
+ * (position within one repo's own sequence) while the reconciler only has the
+ * repo's configured order, and those are different numbers. Sorting on a field
+ * only one side can compute would silently yield two different strings for the
+ * same state, so every generation would read stale and reassemble forever.
+ * repoKey is available to both and is stable.
+ */
+export function compositeMemberAnchor(
+  repos: ReadonlyArray<{ repoKey: string; headSha: string }>,
+): string {
   return [...repos]
-    .sort((a, b) => a.mergeOrder - b.mergeOrder)
-    .map((r) => `${r.repoKey}@${r.baseSha.slice(0, SHORT_SHA_LENGTH)}`)
+    .sort((a, b) => a.repoKey.localeCompare(b.repoKey))
+    .map((r) => `${r.repoKey}@${r.headSha.slice(0, SHORT_SHA_LENGTH)}`)
     .join(' ');
 }
 
@@ -435,9 +468,11 @@ function collectMembers(
       issueId: feature.issueId,
       title: feature.title,
       branch: feature.branch,
-      // The generation row keeps one headSha per member for staleness; per-repo
-      // SHAs live in `repos`. Use the first contributing repo in merge order.
-      headSha: outcomes[0]!.headSha,
+      // The generation row keeps ONE headSha per member, which the reconciler
+      // compares by string equality to decide staleness — so for a polyrepo
+      // member it must be the composite anchor over every repo it touched, not
+      // one repo's SHA. Per-repo SHAs are also kept individually in `repos`.
+      headSha: compositeMemberAnchor(repos),
       mergeOrder: members.length + 1,
       ...(feature.pr !== undefined ? { pr: feature.pr } : {}),
       ...(feature.prUrl !== undefined ? { prUrl: feature.prUrl } : {}),

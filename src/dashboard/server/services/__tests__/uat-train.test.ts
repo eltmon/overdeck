@@ -9,7 +9,9 @@ import {
   getUatGenerationsPayload,
   postUatGenerationPromotePayload,
   resolveUatProjectRoot,
+  runUatTrainReconcile,
 } from '../uat-train.js';
+import type { UatReconcilerDeps } from '../../../../lib/cloister/uat-reconciler.js';
 import type { UatGeneration } from '../../../../lib/overdeck/merge-types.js';
 import type { PromoteResult, UatPromoteDeps } from '../../../../lib/cloister/uat-promote.js';
 
@@ -29,6 +31,13 @@ const mocks = vi.hoisted(() => ({
   findXBriefByIssue: vi.fn(),
   readXBriefDocument: vi.fn(),
   reviewRecordEligibility: vi.fn(),
+  isMergeTrainEnabledForProject: vi.fn(),
+  listEligibleCandidatesByProject: vi.fn(),
+  reconcileUatGenerations: vi.fn(),
+  assemblePolyrepoUatGeneration: vi.fn(),
+  buildPolyrepoGitDeps: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
+  resolveProjectReposFromResolvedIssueSync: vi.fn(),
 }));
 
 vi.mock('../../../../lib/projects.js', async (importOriginal) => {
@@ -36,6 +45,31 @@ vi.mock('../../../../lib/projects.js', async (importOriginal) => {
   return {
     ...original,
     findProjectByPathSync: mocks.findProjectByPathSync,
+    resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync,
+  };
+});
+
+vi.mock('../../../../lib/project-repos.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../lib/project-repos.js')>();
+  return {
+    ...original,
+    resolveProjectReposFromResolvedIssueSync: mocks.resolveProjectReposFromResolvedIssueSync,
+  };
+});
+
+vi.mock('../../../../lib/cloister/uat-reconciler.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../lib/cloister/uat-reconciler.js')>();
+  return {
+    ...original,
+    reconcileUatGenerations: mocks.reconcileUatGenerations,
+  };
+});
+
+vi.mock('../../../../lib/cloister/uat-polyrepo-engine.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../lib/cloister/uat-polyrepo-engine.js')>();
+  return {
+    ...original,
+    assemblePolyrepoUatGeneration: mocks.assemblePolyrepoUatGeneration,
   };
 });
 
@@ -58,14 +92,7 @@ vi.mock('../../../../lib/overdeck/merge-sync.js', async (importOriginal) => {
     ...original,
     getUatGenerationSync: mocks.getUatGenerationSync,
     listUatGenerationsSync: mocks.listUatGenerationsSync,
-  };
-});
-
-vi.mock('../../../../lib/cloister/uat-generation-deps.js', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../../../../lib/cloister/uat-generation-deps.js')>();
-  return {
-    ...original,
-    buildUatGenerationStore: mocks.buildUatGenerationStore,
+    isMergeTrainEnabledForProject: mocks.isMergeTrainEnabledForProject,
   };
 });
 
@@ -100,6 +127,16 @@ vi.mock('../../../../lib/flywheel-merge-order.js', async (importOriginal) => {
   return {
     ...original,
     reviewRecordEligibility: mocks.reviewRecordEligibility,
+    listEligibleCandidatesByProject: mocks.listEligibleCandidatesByProject,
+  };
+});
+
+vi.mock('../../../../lib/cloister/uat-generation-deps.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../lib/cloister/uat-generation-deps.js')>();
+  return {
+    ...original,
+    buildUatGenerationStore: mocks.buildUatGenerationStore,
+    buildPolyrepoGitDeps: mocks.buildPolyrepoGitDeps,
   };
 });
 
@@ -382,5 +419,103 @@ describe('postUatGenerationPromotePayload', () => {
     mocks.notifyFlywheelOfUatPromote.mockRejectedValue(new Error('delivery failed'));
 
     await expect(postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn())).resolves.toBe(result);
+  });
+});
+
+// PAN-3093: polyrepo projects used to be skipped outright by a guard in
+// runUatTrainReconcileForProject. Now they route to the polyrepo ready set,
+// polyrepo assembly, and composite staleness anchors.
+describe('runUatTrainReconcile — polyrepo routing', () => {
+  const POLY_ROOT = '/repos/myn';
+  const MONO_ROOT = '/repos/overdeck';
+
+  /** Deps handed to the (mocked) reconciler by the last call. */
+  function capturedDeps(): UatReconcilerDeps {
+    return mocks.reconcileUatGenerations.mock.calls.at(-1)![1] as UatReconcilerDeps;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.isMergeTrainEnabledForProject.mockReturnValue(true);
+    mocks.listEligibleCandidatesByProject.mockReturnValue([
+      { issueId: 'MIN-901', title: 'MIN-901' },
+    ]);
+    mocks.listUatGenerationsSync.mockReturnValue([]);
+    mocks.buildUatGenerationStore.mockReturnValue({});
+    mocks.buildPolyrepoGitDeps.mockReturnValue(new Map());
+    mocks.reconcileUatGenerations.mockResolvedValue({ action: 'idle', invalidated: [] });
+    mocks.resolveProjectFromIssueSync.mockReturnValue({
+      projectKey: 'mind-your-now', projectName: 'MYN', projectPath: POLY_ROOT,
+    });
+    mocks.resolveProjectReposFromResolvedIssueSync.mockReturnValue([
+      {
+        projectKey: 'mind-your-now', projectPath: POLY_ROOT, repoKey: 'fe',
+        repoPath: `${POLY_ROOT}/fe`, forge: 'github', sourceBranch: 'feature/min-901',
+        targetBranch: 'main', mergeOrder: 0, required: true,
+      },
+    ]);
+  });
+
+  // The removed guard returned no-queue before any git work; reaching the
+  // reconciler at all is the runtime proof that it is gone.
+  it('reconciles a polyrepo project instead of skipping it', async () => {
+    mocks.findProjectByPathSync.mockReturnValue({
+      name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
+    });
+
+    const result = await runUatTrainReconcile({ projectRoot: POLY_ROOT });
+
+    expect(mocks.reconcileUatGenerations).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ action: 'idle', invalidated: [] });
+  });
+
+  it('gives the polyrepo path composite anchor deps', async () => {
+    mocks.findProjectByPathSync.mockReturnValue({
+      name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
+    });
+
+    await runUatTrainReconcile({ projectRoot: POLY_ROOT });
+
+    const deps = capturedDeps();
+    expect(deps.getBaseAnchor).toBeTypeOf('function');
+    expect(deps.getFeatureAnchor).toBeTypeOf('function');
+  });
+
+  it('invokes polyrepo assembly, not the monorepo engine, for a polyrepo project', async () => {
+    mocks.findProjectByPathSync.mockReturnValue({
+      name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
+    });
+    mocks.assemblePolyrepoUatGeneration.mockResolvedValue({ name: 'uat/min-otter-0727' });
+
+    await runUatTrainReconcile({ projectRoot: POLY_ROOT });
+
+    // Drive the assemble hook the reconciler was handed.
+    await capturedDeps().assemble([
+      {
+        issueId: 'MIN-901',
+        title: 'One',
+        branch: 'feature/min-901',
+        repoContributions: [{
+          repoKey: 'fe', repoPath: `${POLY_ROOT}/fe`, branch: 'feature/min-901',
+          targetBranch: 'main', mergeOrder: 0,
+        }],
+      },
+    ]);
+
+    expect(mocks.assemblePolyrepoUatGeneration).toHaveBeenCalledTimes(1);
+    const [assembleInput] = mocks.assemblePolyrepoUatGeneration.mock.calls[0]!;
+    expect(assembleInput.projectRoot).toBe(POLY_ROOT);
+    expect(assembleInput.repos.map((r: { repoKey: string }) => r.repoKey)).toEqual(['fe']);
+  });
+
+  it('leaves the monorepo path on single-SHA staleness with no anchor deps', async () => {
+    mocks.findProjectByPathSync.mockReturnValue({ name: 'overdeck', path: MONO_ROOT });
+
+    await runUatTrainReconcile({ projectRoot: MONO_ROOT });
+
+    const deps = capturedDeps();
+    expect(deps.getBaseAnchor).toBeUndefined();
+    expect(deps.getFeatureAnchor).toBeUndefined();
+    expect(mocks.assemblePolyrepoUatGeneration).not.toHaveBeenCalled();
   });
 });
