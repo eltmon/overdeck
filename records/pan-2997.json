@@ -306,19 +306,19 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T11:30:07.490Z",
+  "updated": "2026-07-26T11:31:12.453Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:57:04.635Z",
-    "updatedAt": "2026-07-26T11:30:07.325Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed the cycle-14 blocker and the sync conflict: every clearPoisonVerified failure (clear command, post-clear verification read, surviving breadcrumb) is now KeyedMarkerVerificationError with the cause preserved — a repair that stops before any delivery keeps the outbox pending instead of recording terminal 'failed' (local + remote repair-time tests, recovery-on-retry proven). Also resolved the no-loss-matrix merge conflict (kept the accurate pane-choice door) and deflaked the real-tmux test setup against stale socket files.",
+    "updatedAt": "2026-07-26T11:31:12.344Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed the cycle-15 blocker: the initial strict POISON read is now wrapped in KeyedMarkerVerificationError (cause preserved), locally and remotely — a transient read failure before any side effect keeps the outbox pending instead of recording terminal 'failed'. Missing targets stay classified upstream (messageAgent stopped/zombie → resume). Local and remote failed-poison-read tests assert the class; the wake-level regression proves the class leaves the outbox pending with no notified event until retry succeeds.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "4cdeddfe137f2baf82a463230ca972820e69ac68",
     "reviewSpawnedAt": "2026-07-26T11:29:59.296Z",
@@ -471,7 +471,7 @@
       },
       "costAtCloseOut": {
         "usd": 357.0030766,
-        "pricingAsOf": "2026-07-26T11:30:07.427Z"
+        "pricingAsOf": "2026-07-26T11:31:12.425Z"
       }
     },
     "merges": [
