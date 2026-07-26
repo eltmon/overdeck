@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-26T13:26:07.462Z",
+  "updated": "2026-07-26T13:44:51.834Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "started-by-field-plumbing": {
-        "writerId": "agent-pan-3111",
-        "agentId": "agent-pan-3111",
-        "pid": 2464554,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T13:26:07.462Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3111",
@@ -115,6 +107,17 @@
         "outcome": "completed",
         "reason": "Persisted the normalized flywheel run id into both spawnAgent and spawnRun AgentState saves, verified undefined behavior without a run, and confirmed the existing database mapper carries the value.",
         "releasedAt": "2026-07-26T13:25:54.467Z"
+      },
+      {
+        "writerId": "agent-pan-3111",
+        "agentId": "agent-pan-3111",
+        "pid": 2464554,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:26:07.462Z",
+        "itemId": "started-by-field-plumbing",
+        "outcome": "completed",
+        "reason": "Added startedBy across AgentState, spawn options and both state literals; preserved flywheel provenance through state.json cleaning; added both database schemas, migrations, writers, readers, backfill, and round-trip/no-loss tests.",
+        "releasedAt": "2026-07-26T13:44:51.834Z"
       }
     ],
     "statusReasons": {
@@ -133,6 +136,10 @@
       "persist-flywheel-run-id": {
         "reason": "Persisted the normalized flywheel run id into both spawnAgent and spawnRun AgentState saves, verified undefined behavior without a run, and confirmed the existing database mapper carries the value.",
         "updatedAt": "2026-07-26T13:25:54.467Z"
+      },
+      "started-by-field-plumbing": {
+        "reason": "Added startedBy across AgentState, spawn options and both state literals; preserved flywheel provenance through state.json cleaning; added both database schemas, migrations, writers, readers, backfill, and round-trip/no-loss tests.",
+        "updatedAt": "2026-07-26T13:44:51.834Z"
       }
     }
   },
@@ -151,6 +158,9 @@
     "persist-flywheel-run-id": "completed",
     "persist-flywheel-run-id.persist-flywheel-run-id.ac1": "completed",
     "persist-flywheel-run-id.persist-flywheel-run-id.ac2": "completed",
-    "started-by-field-plumbing": "running"
+    "started-by-field-plumbing": "completed",
+    "started-by-field-plumbing.started-by-field-plumbing.ac1": "completed",
+    "started-by-field-plumbing.started-by-field-plumbing.ac2": "completed",
+    "started-by-field-plumbing.started-by-field-plumbing.ac3": "completed"
   }
 }
