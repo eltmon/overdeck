@@ -19,6 +19,7 @@ const {
   mockWriteCloseOutDodGateSync,
   mockSweepOrphanedTasks,
   mockEvaluateDodGate,
+  mockHealUatPromotionVerification,
   mockCapturePipelineStage,
   mockResolvePipelineTelemetryContext,
 } = vi.hoisted(() => ({
@@ -29,12 +30,17 @@ const {
   mockWriteCloseOutDodGateSync: vi.fn(),
   mockSweepOrphanedTasks: vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }),
   mockEvaluateDodGate: vi.fn(),
+  mockHealUatPromotionVerification: vi.fn(),
   mockCapturePipelineStage: vi.fn(),
   mockResolvePipelineTelemetryContext: vi.fn(async () => null),
 }));
 
 vi.mock('../../../../src/lib/lifecycle/dod-gate.js', () => ({
   evaluateDodGate: mockEvaluateDodGate,
+}));
+
+vi.mock('../../../../src/lib/cloister/uat-promote-verification.js', () => ({
+  healUatPromotionVerification: mockHealUatPromotionVerification,
 }));
 
 vi.mock('../../../../src/lib/telemetry/pipeline.js', () => ({
@@ -182,6 +188,7 @@ describe('workflows', () => {
     mkdirSync(OVERDECK_HOME, { recursive: true });
 
     vi.clearAllMocks();
+    mockHealUatPromotionVerification.mockResolvedValue(null);
     mockEvaluateDodGate.mockResolvedValue({
       passed: true,
       misses: [],
@@ -286,6 +293,62 @@ describe('workflows', () => {
   });
 
   describe('closeOut', () => {
+    it('heals UAT promotion evidence before evaluating the verification row', async () => {
+      const callOrder: string[] = [];
+      mockHealUatPromotionVerification.mockImplementationOnce(async () => {
+        callOrder.push('heal');
+        return { generation: 'uat/pan-cedar-0726', mergeSha: '546d05b989abcdef' };
+      });
+      mockEvaluateDodGate.mockImplementationOnce(async () => {
+        callOrder.push('gate');
+        return {
+          passed: true,
+          misses: [],
+          accepted: [],
+          rows: [{
+            id: 'verification', num: 3, title: 'Verification', expected: 'recorded verdict',
+            observed: 'verificationStatus: passed', status: 'pass',
+          }],
+        };
+      });
+
+      const result = await closeOut(
+        { issueId: 'PAN-3037', projectPath: testDir },
+        { tracker: successfulTracker() },
+      );
+
+      expect(callOrder).toEqual(['heal', 'gate']);
+      expect(result.steps.find(step => step.step === 'dod:uat-promotion-evidence')).toMatchObject({
+        success: true,
+        skipped: false,
+        details: expect.arrayContaining([
+          'Recorded verification from uat/pan-cedar-0726',
+          'Promoted to main at 546d05b98',
+        ]),
+      });
+      expect(result.steps.find(step => step.step === 'dod:verification')).toMatchObject({ success: true });
+      expect(mockEvaluateDodGate).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        acceptedRows: undefined,
+      }));
+    });
+
+    it('continues to the DoD gate when UAT evidence recovery fails', async () => {
+      mockHealUatPromotionVerification.mockRejectedValueOnce(new Error('generation store unavailable'));
+
+      const result = await closeOut(
+        { issueId: 'PAN-100', projectPath: testDir },
+        { tracker: successfulTracker() },
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.steps.find(step => step.step === 'dod:uat-promotion-evidence')).toMatchObject({
+        success: true,
+        skipped: true,
+        details: [expect.stringContaining('generation store unavailable')],
+      });
+      expect(mockEvaluateDodGate).toHaveBeenCalledOnce();
+    });
+
     it('blocks before cleanup when the Definition-of-Done gate misses', async () => {
       mockEvaluateDodGate.mockResolvedValueOnce({
         passed: false,
@@ -882,12 +945,12 @@ describe('workflows', () => {
       }
     });
 
-    it('closeOut should run the Definition-of-Done gate first', async () => {
+    it('closeOut should heal UAT evidence before the Definition-of-Done rows', async () => {
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx);
 
-      expect(result.steps[0].step).toBe('dod:review');
-      expect(result.steps.slice(0, 7).map(step => step.step)).toEqual([
+      expect(result.steps.slice(0, 8).map(step => step.step)).toEqual([
+        'dod:uat-promotion-evidence',
         'dod:review',
         'dod:tests',
         'dod:verification',

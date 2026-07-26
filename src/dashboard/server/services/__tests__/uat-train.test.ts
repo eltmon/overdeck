@@ -11,7 +11,7 @@ import {
   resolveUatProjectRoot,
 } from '../uat-train.js';
 import type { UatGeneration } from '../../../../lib/overdeck/merge-types.js';
-import type { PromoteResult } from '../../../../lib/cloister/uat-promote.js';
+import type { PromoteResult, UatPromoteDeps } from '../../../../lib/cloister/uat-promote.js';
 
 const mocks = vi.hoisted(() => ({
   findProjectByPathSync: vi.fn(),
@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   buildUatGenerationStore: vi.fn(),
   getUatGenerationSync: vi.fn(),
   notifyFlywheelOfUatPromote: vi.fn(),
+  recordUatPromotionVerdicts: vi.fn(),
   findXBriefByIssue: vi.fn(),
   readXBriefDocument: vi.fn(),
   reviewRecordEligibility: vi.fn(),
@@ -88,6 +89,10 @@ vi.mock('../../../../lib/cloister/uat-promote.js', async (importOriginal) => {
 
 vi.mock('../../../../lib/cloister/uat-promote-notify.js', () => ({
   notifyFlywheelOfUatPromote: mocks.notifyFlywheelOfUatPromote,
+}));
+
+vi.mock('../../../../lib/cloister/uat-promote-verification.js', () => ({
+  recordUatPromotionVerdicts: mocks.recordUatPromotionVerdicts,
 }));
 
 vi.mock('../../../../lib/flywheel-merge-order.js', async (importOriginal) => {
@@ -281,6 +286,27 @@ describe('postUatGenerationPromotePayload', () => {
     mocks.buildUatPromoteGitDeps.mockReturnValue({ git: 'deps' });
     mocks.buildUatGenerationStore.mockReturnValue({ listChain: vi.fn(), update: vi.fn() });
     mocks.notifyFlywheelOfUatPromote.mockResolvedValue(undefined);
+  });
+
+  it('wires UAT promotion verdict recording into the promote dependencies', async () => {
+    const result: PromoteResult = {
+      success: true,
+      generation: 'uat/pan-cobalt-0703',
+      mergeSha: 'abc123',
+      members: ['PAN-2294'],
+      postMergeStarted: ['PAN-2294'],
+      invalidated: [],
+    };
+    const generation = gen([
+      { issueId: 'PAN-2294', title: 'Feature', branch: 'feature/pan-2294', headSha: 'head-sha', mergeOrder: 1 },
+    ]);
+    mocks.promoteUatGeneration.mockResolvedValue(result);
+
+    await postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn());
+
+    const deps = mocks.promoteUatGeneration.mock.calls[0]![2] as UatPromoteDeps;
+    deps.recordVerification?.(generation, 'abc123');
+    expect(mocks.recordUatPromotionVerdicts).toHaveBeenCalledWith(generation, 'abc123');
   });
 
   it('passes the promote result to notifyFlywheelOfUatPromote', async () => {
