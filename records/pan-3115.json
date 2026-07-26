@@ -82,10 +82,10 @@
     "recordedAt": "2026-07-26T11:22:12.725Z"
   },
   "created": "2026-07-26T08:56:03.309Z",
-  "updated": "2026-07-26T12:00:02.614Z",
+  "updated": "2026-07-26T12:00:04.789Z",
   "pipeline": {
     "issueId": "PAN-3115",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -93,13 +93,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T11:26:32.738Z",
-    "updatedAt": "2026-07-26T12:00:02.427Z",
+    "updatedAt": "2026-07-26T12:00:03.379Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "AC1: MEMBERSHIP_UNAVAILABLE_REASONS in packages/contracts/src/types.ts:15-22 holds exactly the six documented reasons and MembershipUnavailableReason derives from it via typeof[number]; reachable through 'export * from ./types' in index.ts. AC2: PipelineMembershipUnavailableError (src/lib/pipeline-membership-gather.ts:237-245) sets name, readonly reason, and passes message to super, so new(...'repo_unavailable','msg') reads back correctly. AC3: contracts change is type-only plus one const array and the gather import is 'import type', so no runtime cycle or emit hazard; build/typecheck left to the verification gate. PipelineMembershipUnavailableBody added as specified. Locking test added at tests/unit/lib/pipeline-membership-gather.test.ts:67-87.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3134",
     "reviewedAtCommit": "54706977dbec3ef9409b23c7973f6c31b30f9f9e",
     "lastVerifiedCommit": "54706977dbec3ef9409b23c7973f6c31b30f9f9e",
-    "reviewSpawnedAt": "2026-07-26T11:53:57.685Z",
+    "reviewSpawnedAt": "2026-07-26T12:00:03.377Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "tests/unit/dashboard/routes/registered-projects-route.test.ts"
@@ -185,7 +185,7 @@
       },
       "costAtCloseOut": {
         "usd": 85.16914799999999,
-        "pricingAsOf": "2026-07-26T12:00:02.607Z"
+        "pricingAsOf": "2026-07-26T12:00:03.455Z"
       }
     },
     "merges": [
