@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T12:53:30.171Z",
+  "updated": "2026-07-26T12:54:44.666Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T12:53:30.157Z",
-    "inspectNotes": "Inspecting item build-from-clean-worktree"
+    "updatedAt": "2026-07-26T12:54:44.527Z",
+    "inspectNotes": "All 5 ACs verified: installAndBuild only ever receives the detached worktree (asserted across clean/dirty/ahead/behind); dirty + HEAD-divergence emit notes and continue; build failure propagates with 'old dashboard left running' -> exitCode 1 and removes worktree + dist.incoming in finally; grep merge-base on reload.ts returns no matches; typecheck clean and build-from-origin.test.ts 7/7 pass."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 405687,
-            "output": 49899,
-            "cacheRead": 9380864,
+            "input": 431026,
+            "output": 58081,
+            "cacheRead": 11398656,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 405687,
-          "output": 49899,
-          "cacheRead": 9380864,
+          "input": 431026,
+          "output": 58081,
+          "cacheRead": 11398656,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 8.215837,
-        "pricingAsOf": "2026-07-26T12:53:30.164Z"
+        "usd": 9.596888,
+        "pricingAsOf": "2026-07-26T12:54:44.640Z"
       }
     },
     "merges": [],
