@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
+import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
+import { shortName, useMergeTrainData } from '../merge-train/MergeTrainView';
 
 /** PAN-1693/1695: per-project settings in the cockpit — currently the auto-merge default. */
 function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
@@ -17,6 +19,28 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
   const value = data?.value ?? null;
   const { data: swarmData } = useQuery({ queryKey: ['project-swarm-policy', projectKey], queryFn: async () => (await fetch(`/api/projects/${encodeURIComponent(projectKey)}/swarm-policy`)).json() as Promise<{ configured: { mode?: 'off' | 'auto' | 'always' } | null }> });
   const swarmMutation = useMutation({ mutationFn: async (mode: 'off' | 'auto' | 'always' | null) => { const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/swarm-policy`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: mode ? { mode } : null }) }); if (!res.ok) throw new Error('Failed to save swarm policy'); }, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project-swarm-policy', projectKey] }) });
+  const { data: mergeTrainData } = useQuery({
+    queryKey: ['project-merge-train', projectKey],
+    queryFn: async (): Promise<{ value: 'enabled' | 'disabled' | null; effective: boolean }> => {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/merge-train`);
+      if (!res.ok) return { value: null, effective: false };
+      return res.json();
+    },
+    enabled: !!projectKey,
+  });
+  const mergeTrainMutation = useMutation({
+    mutationFn: async (next: 'enabled' | 'disabled' | null) => {
+      const headers = await dashboardMutationJsonHeaders();
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/merge-train`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ value: next }),
+      });
+      if (!res.ok) throw new Error('Failed to save merge-train setting');
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project-merge-train', projectKey] }),
+  });
   const mutation = useMutation({
     mutationFn: async (next: 'auto' | 'hold' | null) => {
       const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/auto-merge-default`, {
@@ -46,6 +70,11 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
               <button
                 key={String(o.v)}
                 type="button"
+                // Both this group and the merge-train group below offer a
+                // "Global default" option; without a scoped accessible name the
+                // two are indistinguishable to a screen reader (and to a query).
+                aria-label={`Auto-merge default: ${o.label}`}
+                aria-pressed={active}
                 disabled={mutation.isPending}
                 onClick={() => mutation.mutate(o.v)}
                 style={{
@@ -70,6 +99,89 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
         Applies to this project's issues that have no explicit per-issue auto-merge setting.
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-border pt-3"><span className="text-[13px] text-foreground">Automatic swarming</span><select aria-label="Project swarm policy" className="rounded-md border border-input bg-background px-2 py-1.5 text-xs" value={swarmData?.configured?.mode ?? ''} onChange={e => { const value = e.target.value; swarmMutation.mutate(value === 'off' || value === 'auto' || value === 'always' ? value : null); }}><option value="">Inherit global</option><option value="off">Off</option><option value="auto">Auto</option><option value="always">Always</option></select><span className="text-[11px] text-muted-foreground">Future dispatches only</span></div>
+      <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-border pt-3"><span className="text-[13px] text-foreground">Merge train</span><div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+        {[
+          { v: 'enabled' as const, label: 'Enabled' },
+          { v: 'disabled' as const, label: 'Disabled' },
+          { v: null, label: 'Global default' },
+        ].map((o, i) => {
+          const active = mergeTrainData?.value === o.v;
+          return (
+            <button
+              key={String(o.v)}
+              type="button"
+              aria-label={`Merge train: ${o.label}`}
+              aria-pressed={active}
+              disabled={mergeTrainMutation.isPending}
+              onClick={() => mergeTrainMutation.mutate(o.v)}
+              style={{
+                appearance: 'none',
+                border: 0,
+                borderLeft: i === 0 ? 0 : '1px solid var(--border)',
+                padding: '6px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                background: active ? 'color-mix(in srgb, var(--primary) 16%, transparent)' : 'transparent',
+                color: active ? 'var(--primary)' : 'var(--muted-foreground)',
+              }}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+      {/* PAN-1696 ac1: "Global default" alone does not tell the operator whether
+          the train is actually running here, so resolve it from the endpoint's
+          effective field. An explicit Enabled/Disabled needs no gloss. */}
+      {mergeTrainData && mergeTrainData.value === null && (
+        <span className="text-[11px] text-muted-foreground" data-testid="merge-train-effective">
+          Following the global default — currently {mergeTrainData.effective ? 'on' : 'off'} for this project.
+        </span>
+      )}
+      </div>
+      <MergeTrainSummary projectKey={projectKey} />
+    </div>
+  );
+}
+
+/** SPA navigation to a tab: the router keys off the path and listens for popstate. */
+function goToAwaitingMerge(event: React.MouseEvent): void {
+  event.preventDefault();
+  window.history.pushState({}, '', '/awaiting-merge');
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
+/**
+ * PAN-1696 ac3: the expanded panel's merge-train line. The count, batch name,
+ * status, and the Awaiting Merge link all live on the COLLAPSED <summary> (see
+ * ProjectSettingsSummary) because that is the surface the operator sees without
+ * opening anything; this repeats the detail in context and deliberately does NOT
+ * duplicate the link.
+ */
+function MergeTrainSummary({ projectKey }: { projectKey: string }) {
+  // Reuse the merge-train view's own reads instead of redeclaring queries under
+  // the same react-query keys: duplicate definitions on one key mean whichever
+  // component mounts first decides the fetcher and the polling interval, and the
+  // two copies disagreed on error handling. One hook, one contract.
+  const { sections, isLoading } = useMergeTrainData(false);
+  const section = sections.find((s) => s.projectKey === projectKey);
+  const readyCount = section?.queue.length ?? 0;
+  const chain = section?.generations ?? [];
+  // Newest testable batch first — the same precedence the merge-train view uses.
+  const current = chain.find((g) => g.status === 'ready')
+    ?? chain.find((g) => g.status === 'assembling')
+    ?? chain.find((g) => g.status === 'superseded');
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-[11px]" data-testid="merge-train-summary">
+      <span className="text-muted-foreground">
+        {isLoading
+          ? 'Loading the merge train…'
+          : `${readyCount} feature${readyCount === 1 ? '' : 's'} ready${
+              current ? ` · batch ${shortName(current.name)} (${current.status})` : ' · no batch assembled'
+            }`}
+      </span>
     </div>
   );
 }
@@ -86,6 +198,12 @@ function ProjectSettingsSummary({ projectKey }: { projectKey: string }) {
   });
   const { data: swarmData } = useQuery({ queryKey: ['project-swarm-policy', projectKey], queryFn: async () => (await fetch(`/api/projects/${encodeURIComponent(projectKey)}/swarm-policy`)).json() as Promise<{ configured: { mode?: 'off' | 'auto' | 'always' } | null }> });
 
+  // PAN-1696 ac3: the merge-train state has to be legible while the disclosure is
+  // COLLAPSED. The expanded panel's summary is invisible until the operator opens
+  // it, so "the cockpit shows the ready-feature count" was only half true.
+  const { sections } = useMergeTrainData(false);
+  const trainSection = sections.find((sec) => sec.projectKey === projectKey);
+
   if (!data || !swarmData) return null;
 
   const autoMergeLabel = data.value === 'auto'
@@ -101,9 +219,32 @@ function ProjectSettingsSummary({ projectKey }: { projectKey: string }) {
         ? 'Swarm always'
         : 'Swarm inherit';
 
+  const readyCount = trainSection?.queue.length ?? 0;
+  const currentBatch = trainSection?.generations.find((g) => g.status === 'ready')
+    ?? trainSection?.generations.find((g) => g.status === 'assembling')
+    ?? trainSection?.generations.find((g) => g.status === 'superseded');
+  // ac3 wants the ready count AND the current generation's STATUS legible without
+  // opening the disclosure — a batch name alone does not say whether it is ready to
+  // test, still assembling, or superseded.
+  const trainLabel = trainSection && !trainSection.enabled
+    ? 'Train off'
+    : `Train ${readyCount} ready${currentBatch ? ` · ${shortName(currentBatch.name)} (${currentBatch.status})` : ' · no batch'}`;
+
   return (
-    <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted-foreground)' }}>
-      {autoMergeLabel} · {swarmLabel}
+    <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted-foreground)', display: 'inline-flex', gap: 6, minWidth: 0 }} data-testid="project-settings-collapsed-summary">
+      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {autoMergeLabel} · {swarmLabel} · {trainLabel}
+      </span>
+      {/* The link lives in the <summary> so it works while collapsed. Clicking
+          anything inside a <summary> toggles the disclosure, so stop propagation
+          as well as the default navigation. */}
+      <a
+        href="/awaiting-merge"
+        onClick={(event) => { event.stopPropagation(); goToAwaitingMerge(event); }}
+        className="shrink-0 font-medium text-primary hover:underline"
+      >
+        Awaiting Merge →
+      </a>
     </span>
   );
 }

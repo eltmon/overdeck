@@ -4,7 +4,7 @@ import { mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promi
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Schema } from 'effect';
-import { FlywheelRunId, FlywheelStatus, type OrderBook } from '@overdeck/contracts';
+import { FlywheelRunId, FlywheelStatus, type FlywheelScopeValue, type OrderBook } from '@overdeck/contracts';
 import {
   getFlywheelActiveRunId,
   isFlywheelGloballyPaused,
@@ -45,6 +45,8 @@ export interface FlywheelRunSummary {
 export interface FlywheelRunDetail extends FlywheelRunSummary {
   latest: FlywheelStatus | null;
   orders?: FlywheelStatus['orders'];
+  /** PAN-1696: orchestrator scope this run was started/resumed with. */
+  scope?: FlywheelStatus['scope'];
   paths: {
     latest: string;
     report?: string;
@@ -60,6 +62,12 @@ export interface FlywheelLaunchMetadata {
   briefDisplayPath: string;
   briefOverlayPath?: string;
   orders?: { bookId: string };
+  /**
+   * PAN-1696: the orchestrator scope baked into this run's prompt at spawn.
+   * Launch metadata is the right home rather than the status file, because the
+   * orchestrator itself POSTs status updates and would otherwise overwrite it.
+   */
+  scope?: FlywheelScopeValue;
 }
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
@@ -224,8 +232,13 @@ async function mechanicallyEnrichOrdersStatus(
   options: FlywheelRunStateOptions,
 ): Promise<FlywheelStatus> {
   const launch = await readFlywheelLaunchMetadata(status.runId, options);
+  // PAN-1696: scope is server-owned. Always restamp it from launch metadata,
+  // dropping whatever the payload claimed, so a status POST from the
+  // orchestrator can neither forge a scope nor silently erase the real one.
+  const { scope: _claimedScope, ...unscoped } = status;
+  const scoped: FlywheelStatus = launch?.scope ? { ...unscoped, scope: launch.scope } : unscoped;
   if (!launch?.orders) {
-    const { orders: _untrustedOrders, ...booklessStatus } = status;
+    const { orders: _untrustedOrders, ...booklessStatus } = scoped;
     return booklessStatus;
   }
   const stateRoot = options.orderStateRoot?.(launch.workspace) ?? (() => {
@@ -239,7 +252,7 @@ async function mechanicallyEnrichOrdersStatus(
   if (progress.drained && book.status === 'running') {
     await (options.setOrderStatus ?? setOrderBookStatus)(stateRoot, book.id, 'drained', { runId: book.runId });
   }
-  return enrichFlywheelStatusWithOrders(status, book, progress);
+  return enrichFlywheelStatusWithOrders(scoped, book, progress);
 }
 
 export async function writeLatestFlywheelStatus(status: FlywheelStatus, options: FlywheelRunStateOptions = {}): Promise<string> {
@@ -265,6 +278,9 @@ function decodeLaunchMetadata(payload: unknown): FlywheelLaunchMetadata {
     if (!orders || typeof orders !== 'object' || typeof orders.bookId !== 'string' || !orders.bookId) {
       throw new Error('Invalid Flywheel launch metadata: orders.bookId');
     }
+  }
+  if (record.scope !== undefined && record.scope !== 'pan-only' && record.scope !== 'all-tracked-projects') {
+    throw new Error('Invalid Flywheel launch metadata: scope');
   }
   return record as unknown as FlywheelLaunchMetadata;
 }
@@ -406,6 +422,9 @@ export async function getFlywheelRunDetail(runId: string, options: FlywheelCurre
     status,
     latest: withLiveAgentsActive(latest, liveCount),
     ...(latest.orders ? { orders: latest.orders } : {}),
+    // PAN-1696: surface the run's own scope on the detail payload too, so a
+    // consumer reading run detail does not have to dig into `latest`.
+    ...(latest.scope ? { scope: latest.scope } : {}),
     paths: {
       latest: join(runDir, 'latest.json'),
       ...((await fileExists(reportPath)) ? { report: reportPath } : {}),

@@ -1,14 +1,14 @@
 import { Effect } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
 import type { FlywheelPipelineItem } from '@overdeck/contracts';
-import { getReviewStatusSync, mergeGateEligibility, type MergeGateEligibility } from './review-status.js';
+import { getReviewStatusSync, loadReviewStatuses, mergeGateEligibility, type MergeGateEligibility } from './review-status.js';
 import { resolveGitHubIssueSync } from './tracker-utils.js';
 import type { SequenceNode } from './backlog/types.js';
 import { classifyIssue, isAutoPickable, type ClassifyLookups } from './backlog/pickup.js';
 import { compileGlob, type CompiledGlob } from './xbrief/dag.js';
 import { computeIssueFootprint } from './xbrief/swarm-readiness.js';
 import type { XBriefDocument } from './xbrief/types.js';
-import { findProjectByPathSync, getProjectSwarmHotspots } from './projects.js';
+import { findProjectByPathSync, getProjectSwarmHotspots, resolveProjectFromIssueSync } from './projects.js';
 
 export interface MergeQueueItem {
   issueId: string;
@@ -198,19 +198,10 @@ export const changedFilesVsMain = (branch: string, cwd: string, base = 'main') =
     );
   });
 
-/**
- * Verbs that mean "at the merge gate" (PAN-1736). Orchestrators have
- * legitimately emitted both 'shipping' and 'merging' for merge-ready issues;
- * filtering on one alone silently rendered an empty queue with five ready
- * items in RUN-18. Contract documented next to FlywheelPipelineVerb in
- * packages/contracts/src/flywheel.ts — extend BOTH places together.
- */
-export const MERGE_GATE_VERBS: ReadonlySet<FlywheelPipelineItem['verb']> = new Set(['shipping', 'merging']);
-
 export const MERGE_QUEUE_GIT_CONCURRENCY = 4;
 
 export interface ComputeMergeQueueOptions {
-  getPrUrl?: (item: FlywheelPipelineItem) => string | undefined;
+  getPrUrl?: (item: { issueId: string; pr?: number }) => string | undefined;
   gitConcurrency?: number;
   /**
    * Authoritative merge eligibility per issue (PAN-1759). Defaults to the
@@ -248,22 +239,49 @@ export function resolveMergeQueuePrUrl(item: { issueId: string; pr?: number }): 
   return `https://github.com/${githubIssue.owner}/${githubIssue.repo}/pull/${prNumber}`;
 }
 
-export const computeMergeQueue = (
-  items: ReadonlyArray<FlywheelPipelineItem>,
+/**
+ * PAN-1696 ready-set-source: List all merge-eligible candidates from review-status DB for a given project.
+ * No flywheel run required — sources directly from persistent pipeline state.
+ * Returns an array of candidate items compatible with computeMergeQueueFromCandidates.
+ */
+export function listEligibleCandidatesByProject(projectRoot: string): Array<{ issueId: string; title: string; pr?: number }> {
+  const project = findProjectByPathSync(projectRoot);
+  if (!project) return [];
+
+  const candidates: Array<{ issueId: string; title: string; pr?: number }> = [];
+  const allStatuses = loadReviewStatuses();
+
+  for (const [issueId, rs] of Object.entries(allStatuses)) {
+    // Check if this issue belongs to this project
+    const issueProject = resolveProjectFromIssueSync(issueId);
+    if (!issueProject || issueProject.projectPath !== project.path) continue;
+
+    // Exclude deacon-ignored issues (AC 8)
+    if (rs.deaconIgnored === true) continue;
+
+    // Check if it's merge-eligible
+    if (rs.readyForMerge !== true) continue;
+    const eligibility = mergeGateEligibility(rs);
+    if (!eligibility.eligible) continue;
+
+    // AC 10: title resolved downstream by computeMergeQueueFromCandidates; here use issue ID
+    candidates.push({ issueId, title: issueId, pr: rs.prNumber });
+  }
+
+  return candidates;
+}
+
+/**
+ * PAN-1696 ready-set-source: Compute merge queue from a pre-filtered candidate list.
+ * Accepts candidates from review-status or flywheel pipeline — decouples the source.
+ * This refactored version extracts the core conflict-analysis logic from computeMergeQueue.
+ */
+export const computeMergeQueueFromCandidates = (
+  candidates: ReadonlyArray<{ issueId: string; title: string; pr?: number }>,
   projectRoot: string,
   options: ComputeMergeQueueOptions = {},
 ) =>
   Effect.gen(function*() {
-    const eligibility = options.eligibility ?? reviewRecordEligibility;
-    const candidates = items.filter((item) => {
-      if (!MERGE_GATE_VERBS.has(item.verb)) return false;
-      const gate = eligibility(item.issueId);
-      if (!gate.eligible) {
-        options.onIneligible?.(item.issueId, gate.reason ?? 'not eligible');
-        return false;
-      }
-      return true;
-    });
     if (candidates.length === 0) return [] as MergeQueueItem[];
     const gitConcurrency = Math.max(1, Math.floor(options.gitConcurrency ?? MERGE_QUEUE_GIT_CONCURRENCY));
 
@@ -292,11 +310,6 @@ export const computeMergeQueue = (
     const signalByIssue = new Map(conflictSignals.map(signal => [signal.issueId, signal]));
     const conflictsMap = new Map(conflictSignals.map(signal => [signal.issueId, new Set(signal.conflictsWith)]));
 
-    // PAN-1691: conflict-aware order. Disjoint (no-conflict) items go first so
-    // they can batch through in a single verification pass; then conflicting
-    // items broadest-file-footprint first, so the remaining cluster members
-    // rebase once onto the worst offender instead of repeatedly. Issue number
-    // is the stable tiebreak within each tier.
     const sorted = orderMergeCandidates(
       existing.map((e, i) => ({
         item: e.item,

@@ -21,9 +21,12 @@ function buildPromoteNudge(result: Extract<PromoteResult, { success: true }>): s
   return (
     `The operator just promoted UAT generation ${result.generation} to main at ${result.mergeSha}. ` +
     `Run a fresh Observe->Act loop NOW. Fetch GET /api/registered-projects, then for every returned ` +
-    `project key call GET /api/pipeline/membership?project=<URL-encoded-project-key>. Combine the responses ` +
-    `and re-derive activePipeline from only rows where inPipeline === true; clean_terminal rows are audit-only ` +
-    `and excluded. EXCLUDE ` +
+    `project key call GET /api/pipeline/membership?project=<URL-encoded-project-key>. A bare array is a ` +
+    `successful answer: combine arrays and re-derive activePipeline from only rows where inPipeline === true; ` +
+    `clean_terminal rows are audit-only and excluded. An object with status:'unavailable' is a typed blind spot: ` +
+    `emit an investigate suggestion naming projectKey, reason, and message, and NEVER derive membership from ` +
+    `tracker, agent, tmux, workspace, or review-status state. membershipQueryable:false from the registered-projects ` +
+    `response is an upfront missing_issue_prefix hint, not permission to skip the read door. EXCLUDE ` +
     `the merged member(s): ${members}. Re-assemble a clean UAT batch with only members that are currently ` +
     `review+test passed, close out the promoted issue(s), emit a fresh status snapshot, and re-arm the next ` +
     `tick. Do NOT ask the operator a question, do NOT pause, and do NOT reuse the stale pre-promote ready set.`

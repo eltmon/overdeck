@@ -10,6 +10,7 @@ import { RunningAgentsPill } from '../components/RunningAgentsPill';
 import { OrphanTestAgentsSurface } from '../components/OrphanTestAgentsSurface';
 import { CodexAuthBanner } from '../components/CodexAuthBanner';
 import { InotifyPressureBanner } from '../components/InotifyPressureBanner';
+import { LinearMcpAuthBanner } from '../components/LinearMcpAuthBanner';
 import { SetupChecklistBanner } from '../components/SetupChecklistBanner';
 import { SyncRequiredBanner } from '../components/SyncRequiredBanner';
 import { SystemHealthPill } from '../components/SystemHealthPill';
@@ -91,6 +92,9 @@ export function AppChrome({
         {/* inotify file-watcher budget nearly exhausted — new dev servers
             would fail with ENOSPC (PAN-3063) */}
         <InotifyPressureBanner />
+
+        {/* Linear MCP Auth Banner — shown when agents are blocked on Linear OAuth (PAN-2997) */}
+        <LinearMcpAuthBanner />
       </div>
 
       {/* Dashboard Restart Banner — shown during a planned restart (post-merge deploy, pan restart) */}

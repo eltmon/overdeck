@@ -29,7 +29,7 @@ tree once, continuously, and automatically.
 
 | Term | Meaning |
 | --- | --- |
-| **Ready set** | All features at the merge gate, in merge order — the flywheel merge queue (`computeMergeQueue`, filtered to `MERGE_GATE_VERBS = {shipping, merging}`, see [PAN-1736](https://github.com/eltmon/overdeck/issues/1736)). |
+| **Ready set** | **Per project**, every feature the review pipeline has cleared, in merge order. Sourced from that project's review-status records — `listEligibleCandidatesByProject` (review passed, tests passed/skipped, verification not failed, not deacon-ignored) ordered by `computeMergeQueueFromCandidates` in [`flywheel-merge-order.ts`](../src/lib/flywheel-merge-order.ts). **No flywheel run required.** Until [PAN-1696](https://github.com/eltmon/overdeck/issues/1696) this was derived from a live run's `activePipeline` filtered on pipeline verbs, so a ready issue whose verb the orchestrator reported differently vanished from the queue ([PAN-1736](https://github.com/eltmon/overdeck/issues/1736)) and nothing assembled without a run at all. |
 | **Generation** | A throwaway `uat/<label>-<codename>-<MMDD>` branch off current main containing **as many ready features as possible, in merge order, with cross-feature conflicts resolved inside the batch**. |
 | **Assembly agent** | A timeboxed headless `claude -p` run (acceptEdits, no shell) that resolves a merge conflict *on the branch* when one feature collides with an already-merged member. Verification, staging, and the merge commit happen in code — the agent only edits files. |
 | **Held out** | A feature excluded from a generation because its conflict could not be resolved confidently (or the agent timed out). Shown on the card with the reason; retried in later generations once the conflicting predecessor merges or its branch changes. |
@@ -140,12 +140,19 @@ past the cap), and invalidation/promotion always tear a generation's stack down
 
 | Route | Purpose |
 | --- | --- |
-| `GET /api/flywheel/uat-generations` | The generation chain, newest first: per generation the members (with PR links and **per-member acceptance criteria** from the shared xBRIEF extractor `src/lib/xbrief/acceptance-criteria.ts` — the same source as the AwaitingMerge UAT plan, no second parser), held-out reasons, conflict resolutions, and live-stack `{status, frontendUrl}`. Returns `[]` when no flywheel run is active. |
-| `POST /api/flywheel/uat-generations/:name/stack` | Ensure the generation's live stack (idempotent); returns the frontend URL and any evicted stacks. |
-| `POST /api/flywheel/uat-generations/:name/promote` | Promote (merge) the tested generation to main. |
-| `POST /api/flywheel/assemble-uat` | Force a reconcile/rebuild of the current generation (repurposed from the PAN-1691 one-shot assemble). |
-| `GET /api/flywheel/merge-queue` | The ready set (reference data), each row carrying `branchName` and `prUrl`. |
-| `POST /api/flywheel/merge-next` | The single-feature escape hatch — merge N queue items to main one at a time, stopping on first failure. Unchanged from PAN-1691. |
+PAN-1696 moved every route below out of the `/api/flywheel/*` namespace into the
+aggregate `/api/merge-train/*` one, and each read now answers for **all tracked
+projects** with no flywheel run involved. The old `/api/flywheel` merge-train
+routes were deleted, not aliased.
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/merge-train/generations` | One entry per tracked project — `{ projectKey, projectName, enabled, generations }` — where `generations` is that project's chain newest-first: per generation the members (with PR links and **per-member acceptance criteria** from the shared xBRIEF extractor `src/lib/xbrief/acceptance-criteria.ts` — the same source as the AwaitingMerge UAT plan, no second parser), held-out reasons, conflict resolutions, and live-stack `{status, frontendUrl}`. |
+| `GET /api/merge-train/queues` | One entry per tracked project — `{ projectKey, projectName, enabled, queue }` — the ready set as reference data, each row carrying `branchName` and `prUrl`. A project with the merge train off reports `enabled: false` and an empty queue rather than being omitted, so "off" and "nothing ready" stay distinguishable. |
+| `POST /api/merge-train/generations/:name/stack` | Ensure the generation's live stack (idempotent); returns the frontend URL and any evicted stacks. |
+| `POST /api/merge-train/generations/:name/promote` | Promote (merge) the tested generation to main — into the generation's **own** project repo, resolved from its stored `projectRoot`. |
+| `POST /api/merge-train/assemble` | Force a reconcile/rebuild. Body `{ project }` rebuilds one project; an empty body reconciles every merge-train-enabled project and returns a per-project result. |
+| `POST /api/merge-train/merge-next` | The single-feature escape hatch — body `{ n, project }` merges N of that project's ready set to main one at a time, stopping on first failure. An unknown project key is a 4xx, never a silent no-op. |
 
 ## The card — "UAT batches"
 
@@ -163,12 +170,35 @@ consequences. The string "Ship batch" no longer appears anywhere in the frontend
 
 ## Operating it
 
-Batch trains are gated **per tick** on `flywheel.merge_train_enabled` (the same
-flag PAN-1691 introduced) **and** an active flywheel run — so batches only
-assemble while a run is live. They are inert otherwise. The reconciler is a 60s
-dashboard-server interval, independent of the deacon; nothing assembles or merges
-without the merge-train flag on. Enabling the flag and starting a run is all the
-setup required.
+Batch trains are gated **per tick, per project** on the effective merge-train
+flag: the project's own `merge_train: enabled|disabled` override in
+`projects.yaml` when set, otherwise the global `merge_train.enabled` setting
+(which still falls back to the legacy `flywheel.merge_train_enabled` key so an
+existing ON value survives the rename). The reconciler is a 60s dashboard-server
+interval, independent of the deacon and — since PAN-1696 — independent of the
+flywheel: **no run is required**, and batches assemble for every enabled project.
+Turning the flag on is the whole setup. Nothing assembles or merges for a project
+whose effective flag is off.
+
+A project with a live generation but an empty ready set is still reconciled, so
+invalidation runs when its last ready feature merges elsewhere. A project with
+neither skips the tick before doing any git work, which is what keeps the sweep
+from touching every tracked repo every 60 seconds.
+
+### Multi-project shape
+
+Batches are always **per project** — a generation contains one project's work and
+nothing else; cross-project batches do not exist. Generation labels use the
+project's issue prefix (`uat/pan-…`, `uat/min-…`), which is what keeps names
+distinct in the globally-keyed `uat_generations` table. What spans projects is the
+**view and control surface**: the merge-train view on the Awaiting Merge page
+renders one section per project with a persisted project filter, and the Flywheel
+rail card is a second viewer of that same component. Per-project enablement lives
+in the project cockpit's settings; the global default lives on Awaiting Merge and
+in Settings → Roles → Flywheel.
+
+The Flywheel orchestrator's `scope` (which projects it inventories) is a separate
+axis and does **not** gate any of this — see [`FLYWHEEL.md`](./FLYWHEEL.md).
 
 ## Relationship to the per-issue merge path
 

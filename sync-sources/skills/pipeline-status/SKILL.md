@@ -86,7 +86,11 @@ don't appear via `/api/issues` filtering.
 ### 1. Generate the table
 
 Run this script. It gets the row universe from `GET /api/pipeline/membership`,
-then joins issue titles, review status, tmux, and agent state as annotations.
+then joins issue titles, review status, tmux, and agent state as annotations. A
+bare array is a successful answer. An HTTP 200 object with
+`status: "unavailable"` is a typed blind spot; show its `projectKey`, `reason`,
+and `message`, then stop instead of deriving membership from another source.
+HTTP 503 means the first snapshot is still loading and may be retried later.
 
 ```bash
 python3 - <<'PY'
@@ -100,6 +104,11 @@ issues_data = json.loads(subprocess.check_output(['curl','-s','http://localhost:
 membership = json.loads(subprocess.check_output([
     'curl','-s','http://localhost:3011/api/pipeline/membership?project=overdeck'
 ]))
+if isinstance(membership, dict) and membership.get('status') == 'unavailable':
+    raise SystemExit(
+        'PIPELINE MEMBERSHIP UNAVAILABLE: '
+        f"{membership.get('projectKey')} — {membership.get('reason')}: {membership.get('message')}"
+    )
 issues_by_id = {(i.get('identifier') or '').upper(): i for i in issues_data}
 panissues = []
 for member in membership:

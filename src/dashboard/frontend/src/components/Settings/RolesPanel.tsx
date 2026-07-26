@@ -711,10 +711,26 @@ export function RolesPanel() {
                           <option value="pan-only">PAN only</option>
                           <option value="all-tracked-projects">All tracked projects</option>
                         </select>
+                        {/* PAN-1696: name what each value actually does, and say
+                            plainly that this is not the merge-train switch —
+                            operators conflated the two. */}
+                        <span className="block text-[11px] leading-snug text-muted-foreground" data-testid="flywheel-scope-help">
+                          {flywheelConfig.scope === 'all-tracked-projects'
+                            ? 'Inventory and adopt ready work across every registered project (same author/assignee safety rules).'
+                            : "Orchestrate only the Panopticon repo's issues."}
+                        </span>
+                        <span className="block text-[11px] leading-snug text-muted-foreground" data-testid="flywheel-scope-not-merge-train">
+                          This is which projects the orchestrator watches. It is separate from whether the merge train is
+                          enabled for a project — trains assemble per project either way.
+                        </span>
                       </label>
                     </div>
                     <p className="mt-3 text-[11px] leading-snug text-muted-foreground">
-                      Changes apply on the next tick — no restart needed.
+                      Effort and max agents apply on the next tick — no restart needed.{' '}
+                      <span data-testid="flywheel-scope-timing">
+                        Scope is baked into the orchestrator prompt, so a scope change applies at the next run start or
+                        resume.
+                      </span>
                     </p>
                   </div>
                 )}

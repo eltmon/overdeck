@@ -163,6 +163,14 @@ export interface ProjectConfig {
    * Unset = fall through to the global require-UAT setting.
    */
   auto_merge_default?: 'auto' | 'hold';
+  /**
+   * PAN-1696: per-project merge-train enable/disable override. When set to
+   * 'enabled' or 'disabled', this value overrides the global merge_train.enabled
+   * flag for this project only. Unset/absent = fall through to the global setting
+   * (default OFF). Merge-train reconciles ready siblings after a merge by
+   * rebasing onto the new main.
+   */
+  merge_train?: 'enabled' | 'disabled';
   /** Quality gates run by merge-agent before pushing (lint, typecheck, prod build, etc.) */
   quality_gates?: Record<string, QualityGateConfig>;
   /** Release components and rollout checks for coordinated post-merge release. */
@@ -386,6 +394,19 @@ export function setProjectSwarmPolicySync(key: string, value: Omit<SwarmConfig, 
   const hotspots = config.swarm?.hotspots;
   if (value === null && !hotspots?.length) delete updated.swarm;
   else updated.swarm = { ...(hotspots?.length ? { hotspots } : {}), ...(value ?? {}) };
+  registerProjectSync(key, updated);
+}
+
+/**
+ * PAN-1696: Set or clear the per-project merge-train override.
+ * Pass 'enabled' or 'disabled' to override the global flag, or null to use the global setting.
+ */
+export function setProjectMergeTrainSync(key: string, value: 'enabled' | 'disabled' | null): void {
+  const config = getProjectSync(key);
+  if (!config) throw new Error(`Unknown project: ${key}`);
+  const updated: ProjectConfig = { ...config };
+  if (value === null) delete updated.merge_train;
+  else updated.merge_train = value;
   registerProjectSync(key, updated);
 }
 

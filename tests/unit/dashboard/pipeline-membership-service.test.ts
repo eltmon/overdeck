@@ -13,7 +13,10 @@ import {
   refreshMembershipSnapshotsForProjects,
   summarizePipelineMembership,
 } from '../../../src/dashboard/server/services/pipeline-membership.js';
-import { PIPELINE_PROJECT_CONCURRENCY } from '../../../src/lib/pipeline-membership-gather.js';
+import {
+  PipelineMembershipUnavailableError,
+  PIPELINE_PROJECT_CONCURRENCY,
+} from '../../../src/lib/pipeline-membership-gather.js';
 
 describe('pipeline membership service', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -133,7 +136,10 @@ describe('pipeline membership service', () => {
     try {
       const project = { name: 'cold-failure', path: '/cold-failure', github_repo: 'owner/cold-failure' };
       const getMembership = Object.assign(
-        vi.fn().mockRejectedValue(new Error('Linear 503 connection termination')),
+        vi.fn().mockRejectedValue(new PipelineMembershipUnavailableError(
+          'forge_unavailable',
+          'Linear 503 connection termination',
+        )),
         { invalidate: vi.fn() },
       );
 
@@ -148,12 +154,34 @@ describe('pipeline membership service', () => {
       expect((read?.error as Error).message).toBe(
         'Pipeline membership refresh failed: Linear 503 connection termination',
       );
+      expect(read?.unavailableReason).toBe('forge_unavailable');
 
       // A later successful refresh clears the recorded failure.
       getMembership.mockResolvedValue([{ issueId: 'PAN-1' }]);
       await refreshMembershipSnapshotsForProjects([project], getMembership);
-      expect(readPipelineMembershipSnapshotsForProjects([project])[0]?.memberships)
-        .toEqual([{ issueId: 'PAN-1' }]);
+      const recovered = readPipelineMembershipSnapshotsForProjects([project])[0];
+      expect(recovered?.memberships).toEqual([{ issueId: 'PAN-1' }]);
+      expect(recovered?.unavailableReason).toBeUndefined();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('classifies untyped snapshot failures as gather_failed', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const project = { name: 'plain-failure', path: '/plain-failure', github_repo: 'owner/plain-failure' };
+      const getMembership = Object.assign(
+        vi.fn().mockRejectedValue(new Error('unexpected failure')),
+        { invalidate: vi.fn() },
+      );
+
+      await refreshMembershipSnapshotsForProjects([project], getMembership);
+
+      expect(readPipelineMembershipSnapshotsForProjects([project])[0]).toMatchObject({
+        unavailableReason: 'gather_failed',
+        error: expect.objectContaining({ message: expect.stringContaining('unexpected failure') }),
+      });
     } finally {
       warn.mockRestore();
     }

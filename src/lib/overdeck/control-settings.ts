@@ -32,7 +32,7 @@ const issuePolicy = sqliteTable('issue_policy', {
 export const FlywheelConfig = Schema.Struct({
   autoPickupBacklog: Schema.Boolean,      // flywheel.auto_pickup_backlog (app_settings)
   requireUatBeforeMerge: Schema.Boolean,  // flywheel.require_uat_before_merge — default TRUE
-  mergeTrainEnabled: Schema.Boolean,      // flywheel.merge_train_enabled
+  mergeTrainEnabled: Schema.Boolean,      // merge_train.enabled (with fallback to flywheel.merge_train_enabled)
 });
 export type FlywheelConfig = typeof FlywheelConfig.Type;
 
@@ -99,11 +99,22 @@ export const SettingsResolverLive = Layer.effect(
     const isDeaconPaused = () => Effect.promise(() => readFlag('deacon.globally_paused', false));
 
     const getFlywheelConfig = () =>
-      Effect.promise(async () => ({
-        autoPickupBacklog: await readFlag('flywheel.auto_pickup_backlog', false),
-        requireUatBeforeMerge: await readFlag('flywheel.require_uat_before_merge', true),
-        mergeTrainEnabled: await readFlag('flywheel.merge_train_enabled', false),
-      }));
+      Effect.promise(async () => {
+        // Read merge-train enabled with new key and fallback to legacy
+        const [newRow] = await q.select().from(appSettings).where(eq(appSettings.key, 'merge_train.enabled'));
+        let mergeTrainEnabled: boolean;
+        if (newRow?.value !== undefined && newRow.value !== null) {
+          mergeTrainEnabled = Boolean(newRow.value);
+        } else {
+          // Fall back to legacy key
+          mergeTrainEnabled = await readFlag('flywheel.merge_train_enabled', false);
+        }
+        return {
+          autoPickupBacklog: await readFlag('flywheel.auto_pickup_backlog', false),
+          requireUatBeforeMerge: await readFlag('flywheel.require_uat_before_merge', true),
+          mergeTrainEnabled,
+        };
+      });
 
     const getFlywheelRuntime = () =>
       Effect.promise(async () => {
@@ -174,11 +185,22 @@ export const SettingsWriterLive = Layer.effect(
       return row?.value === undefined || row.value === null ? dflt : Boolean(row.value);
     };
 
-    const readFlywheelConfig = async (): Promise<FlywheelConfig> => ({
-      autoPickupBacklog: await readFlag('flywheel.auto_pickup_backlog', false),
-      requireUatBeforeMerge: await readFlag('flywheel.require_uat_before_merge', true),
-      mergeTrainEnabled: await readFlag('flywheel.merge_train_enabled', false),
-    });
+    const readFlywheelConfig = async (): Promise<FlywheelConfig> => {
+      // Read merge-train enabled with new key and fallback to legacy
+      const [newRow] = await q.select().from(appSettings).where(eq(appSettings.key, 'merge_train.enabled'));
+      let mergeTrainEnabled: boolean;
+      if (newRow?.value !== undefined && newRow.value !== null) {
+        mergeTrainEnabled = Boolean(newRow.value);
+      } else {
+        // Fall back to legacy key
+        mergeTrainEnabled = await readFlag('flywheel.merge_train_enabled', false);
+      }
+      return {
+        autoPickupBacklog: await readFlag('flywheel.auto_pickup_backlog', false),
+        requireUatBeforeMerge: await readFlag('flywheel.require_uat_before_merge', true),
+        mergeTrainEnabled,
+      };
+    };
 
     const readPolicy = async (id: IssueId): Promise<IssuePolicy> => {
       const [row] = await q.select().from(issuePolicy).where(eq(issuePolicy.issueId, id));
@@ -204,7 +226,8 @@ export const SettingsWriterLive = Layer.effect(
           if (patch.requireUatBeforeMerge !== undefined)
             await setFlag('flywheel.require_uat_before_merge', patch.requireUatBeforeMerge);
           if (patch.mergeTrainEnabled !== undefined)
-            await setFlag('flywheel.merge_train_enabled', patch.mergeTrainEnabled);
+            // Write to new key only; never write to legacy key
+            await setFlag('merge_train.enabled', patch.mergeTrainEnabled);
         });
         const next = yield* Effect.promise(readFlywheelConfig);
         yield* bus.emit({ type: 'settings.flywheel_config', payload: next });
@@ -364,6 +387,7 @@ export const FLYWHEEL_ACTIVE_RUN_ID_KEY = 'flywheel.active_run_id';
 export const FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY = 'flywheel.auto_pickup_backlog';
 export const FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY = 'flywheel.require_uat_before_merge';
 export const FLYWHEEL_MERGE_TRAIN_ENABLED_KEY = 'flywheel.merge_train_enabled';
+export const MERGE_TRAIN_ENABLED_KEY = 'merge_train.enabled';
 export const BOOT_RECONCILIATION_DECISION_KEY = 'boot_reconciliation.decision';
 export const BOOT_RECONCILIATION_PER_AGENT_KEY = 'boot_reconciliation.per_agent';
 export const BOOT_RECONCILIATION_DECIDED_AT_KEY = 'boot_reconciliation.decided_at';
@@ -573,12 +597,18 @@ export function setFlywheelRequireUatBeforeMerge(enabled: boolean): void {
 
 /** Drop-in for isMergeTrainEnabled() from app-settings.ts. */
 export function isMergeTrainEnabled(): boolean {
+  const newKey = getSetting(MERGE_TRAIN_ENABLED_KEY);
+  if (newKey !== null) {
+    return newKey === 'true';
+  }
+  // Fall back to legacy key for backward compatibility
   return getSetting(FLYWHEEL_MERGE_TRAIN_ENABLED_KEY) === 'true';
 }
 
 /** Drop-in for setMergeTrainEnabled() from app-settings.ts. */
 export function setMergeTrainEnabled(enabled: boolean): void {
-  setSetting(FLYWHEEL_MERGE_TRAIN_ENABLED_KEY, enabled ? 'true' : 'false');
+  // Write to new key only; never write to legacy key
+  setSetting(MERGE_TRAIN_ENABLED_KEY, enabled ? 'true' : 'false');
 }
 
 export const ConfigApi = HttpApiGroup.make('config')

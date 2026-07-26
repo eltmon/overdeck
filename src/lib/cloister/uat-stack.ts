@@ -25,6 +25,7 @@ import {
   setUatGenerationStackStartedAtSync,
   type UatGeneration,
 } from '../overdeck/merge-sync.js';
+import { findProjectByPathSync } from '../projects.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -124,7 +125,7 @@ function composeProjectName(gen: UatGeneration): string {
 /**
  * The frontend URL the generation's stack serves (or will serve). Prefers the
  * Host(`…`) Traefik label in the rendered compose file; falls back to the
- * FEATURE_FOLDER convention.
+ * FEATURE_FOLDER convention using the project's DNS domain (PAN-1696, D8, FR-10).
  */
 export async function uatFrontendUrl(gen: UatGeneration, deps: Partial<UatStackDeps> = {}): Promise<string> {
   const d = { ...defaultDeps(), ...deps };
@@ -137,7 +138,10 @@ export async function uatFrontendUrl(gen: UatGeneration, deps: Partial<UatStackD
       if (hostMatch?.[1]) return `https://${hostMatch[1]}`;
     } catch { /* fall through to convention */ }
   }
-  return `https://${folder}.overdeck.localhost`;
+  // Resolve project config to get DNS domain (PAN-1696)
+  const project = findProjectByPathSync(gen.projectRoot);
+  const domain = project?.workspace?.dns?.domain ?? 'pan.localhost';
+  return `https://${folder}.${domain}`;
 }
 
 export type UatStackStatus = 'running' | 'absent';

@@ -137,6 +137,11 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // ── commands.ts ───────────────────────────────────────────────────────────
   { surface: 'GET /api/commands',                                      kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Composer command catalog from generated module state; no canonical state store' },
 
+  // ── linear-mcp-auth.ts (PAN-2997) ─────────────────────────────────────────
+  { surface: 'GET /api/linear-mcp-auth',                  kind: 'http', disposition: 'READ',        door: 'linear-mcp-auth event fold (resolveLinearMcpAuthIntervention)' },
+  { surface: 'POST /api/linear-mcp-auth/callback',        kind: 'http', disposition: 'WRITE',       door: 'linear-mcp-auth events + messageAgent delivery door' },
+  { surface: 'POST /api/linear-mcp-auth/complete',        kind: 'http', disposition: 'WRITE',       door: 'linear-mcp-auth events (appendLinearMcpAuthHealthyEvent)' },
+
   // ── command-deck.ts ───────────────────────────────────────────────────────
   { surface: 'GET /api/command-deck/activity/:issueId',                  kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + events' },
   { surface: 'GET /api/command-deck/planning/:issueId',                  kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents planning detail' },
@@ -168,7 +173,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/conversations/:name/delete-image',               kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.removeAttachment' },
   { surface: 'POST /api/conversations/:name/message',                    kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.deliver' },
   { surface: 'POST /api/conversations/:id/codex-approval',               kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.approve' },
-  { surface: 'POST /api/conversations/:id/pane-choice',                  kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.answerPaneChoice (pane keystrokes; no durable state)' },
+  { surface: 'POST /api/conversations/:id/pane-choice',                  kind: 'http', disposition: 'RELOCATE',    door: 'handleConversationPaneChoiceAnswer (lib/overdeck/conversation-pane-choice)' },
   { surface: 'POST /api/conversations/:name/delivery-method',            kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.setDeliveryMethod' },
   { surface: 'POST /api/conversations/:name/thinking-level',             kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.setEffort + ConversationRuntime.controlChannel' },
   { surface: 'POST /api/conversations/:name/compact',                    kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.controlChannel.compact' },
@@ -251,7 +256,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/flywheel/merge-blockers',                    kind: 'http', disposition: 'READ',        door: 'MergeResolver.listBlockers' },
   { surface: 'GET /api/flywheel/merge-backend',                     kind: 'http', disposition: 'READ',        door: 'MergeResolver.getMergeBackendStatus' },
   { surface: 'POST /api/flywheel/auto-merge/schedule',              kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.scheduleAutoMerge' },
-  { surface: 'POST /api/flywheel/merge-next',                       kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.mergeNext' },
+  { surface: 'POST /api/flywheel/merge-next',                       kind: 'http', disposition: 'RELOCATE',    door: 'REMOVED by PAN-1696 → POST /api/merge-train/merge-next (takes { n, project }; ready set from review-status, no flywheel run)' },
   { surface: 'DELETE /api/flywheel/auto-merge/:id',                 kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.cancelAutoMerge' },
   { surface: 'POST /api/flywheel/status',                           kind: 'http', disposition: 'RELOCATE',    door: 'flywheel run-state telemetry write' },
   { surface: 'POST /api/flywheel/start',                            kind: 'http', disposition: 'WRITE',       door: 'SettingsWriter.startFlywheel + AgentWriter.spawn' },
@@ -262,12 +267,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/flywheel/report/open',                      kind: 'http', disposition: 'RELOCATE',    door: 'Orchestration' },
   { surface: 'GET /api/flywheel/brief',                             kind: 'http', disposition: 'RELOCATE',    door: 'Orchestration' },
   { surface: 'POST /api/flywheel/brief',                            kind: 'http', disposition: 'RELOCATE',    door: 'Orchestration' },
-  { surface: 'GET /api/flywheel/merge-queue',                       kind: 'http', disposition: 'READ',        door: 'MergeResolver.listQueues (duplicate of /api/merge-queue)' },
+  { surface: 'GET /api/flywheel/merge-queue',                       kind: 'http', disposition: 'RELOCATE',    door: 'REMOVED by PAN-1696 → GET /api/merge-train/queues (one entry per tracked project, no flywheel run)' },
   { surface: 'GET /api/flywheel/uat-candidate',                     kind: 'http', disposition: 'READ',        door: 'MergeResolver.getActiveUatCandidate' },
-  { surface: 'GET /api/flywheel/uat-generations',                   kind: 'http', disposition: 'READ',        door: 'MergeResolver.listUatGenerations' },
-  { surface: 'POST /api/flywheel/uat-generations/:name/stack',      kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.startUatStack' },
-  { surface: 'POST /api/flywheel/uat-generations/:name/promote',    kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.promoteUat' },
-  { surface: 'POST /api/flywheel/assemble-uat',                     kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.assembleUat' },
+  { surface: 'GET /api/flywheel/uat-generations',                   kind: 'http', disposition: 'RELOCATE',    door: 'REMOVED by PAN-1696 → GET /api/merge-train/generations (per-project chains)' },
+  { surface: 'POST /api/flywheel/uat-generations/:name/stack',      kind: 'http', disposition: 'RELOCATE',    door: 'REMOVED by PAN-1696 → POST /api/merge-train/generations/:name/stack (same handler and auth gate)' },
+  { surface: 'POST /api/flywheel/uat-generations/:name/promote',    kind: 'http', disposition: 'RELOCATE',    door: 'REMOVED by PAN-1696 → POST /api/merge-train/generations/:name/promote (same handler, auth gate, and firePostMergeLifecycle wiring)' },
+  { surface: 'POST /api/flywheel/assemble-uat',                     kind: 'http', disposition: 'RELOCATE',    door: 'REMOVED by PAN-1696 → POST /api/merge-train/assemble (one project via { project }, or every enabled project)' },
   { surface: 'GET /api/flywheel/state',                             kind: 'http', disposition: 'AGGREGATE',   door: 'SettingsResolver.getFlywheelRuntime + run-state' },
   { surface: 'GET /api/flywheel/substrate-bug-weights',             kind: 'http', disposition: 'AGGREGATE',   door: 'SubstrateBugWeightsService.listSubstrateBugWeights + FlywheelStats' },
 
@@ -396,6 +401,16 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/projects/:projectKey/auto-merge-default',    kind: 'http', disposition: 'READ',        door: 'ConfigResolver.getProject (autoMergeDefault field)' },
   { surface: 'POST /api/projects/:projectKey/auto-merge-default',   kind: 'http', disposition: 'RELOCATE',    door: 'Config (ConfigWriter.setAutoMergeDefault, to be designed)' },
   { surface: 'POST /api/projects/:projectKey/rename',               kind: 'http', disposition: 'WRITE',       door: 'Project registry rename write door (renameProject)' },
+  { surface: 'GET /api/projects/:projectKey/merge-train',           kind: 'http', disposition: 'READ',        door: 'ConfigResolver.getProject (merge_train override + effective state, PAN-1696)' },
+  { surface: 'POST /api/projects/:projectKey/merge-train',          kind: 'http', disposition: 'WRITE',       door: 'Project config writer sets the per-project merge-train override (setProjectMergeTrainSync, PAN-1696)' },
+
+  // ── merge-train.ts (PAN-1696: aggregate namespace, superset of the /api/flywheel merge-train routes) ──
+  { surface: 'GET /api/merge-train/queues',                         kind: 'http', disposition: 'AGGREGATE',   door: 'Merge-train queues across all tracked projects (review-status ready set, no flywheel run)' },
+  { surface: 'GET /api/merge-train/generations',                    kind: 'http', disposition: 'AGGREGATE',   door: 'UAT generation chains across all tracked projects (getUatGenerationsPayload per project)' },
+  { surface: 'POST /api/merge-train/generations/:name/stack',       kind: 'http', disposition: 'WRITE',       door: 'UAT stack write door (postUatGenerationStackPayload) — supersedes POST /api/flywheel/uat-generations/:name/stack' },
+  { surface: 'POST /api/merge-train/generations/:name/promote',     kind: 'http', disposition: 'WRITE',       door: 'UAT promote write door (postUatGenerationPromotePayload + firePostMergeLifecycle) — supersedes POST /api/flywheel/uat-generations/:name/promote' },
+  { surface: 'POST /api/merge-train/assemble',                      kind: 'http', disposition: 'WRITE',       door: 'Forced UAT reconcile for one project or all — supersedes POST /api/flywheel/assemble-uat' },
+  { surface: 'POST /api/merge-train/merge-next',                    kind: 'http', disposition: 'WRITE',       door: 'Escape-hatch batch merge from a named project ready set — supersedes POST /api/flywheel/merge-next' },
 
   // ── remote.ts ─────────────────────────────────────────────────────────────
   { surface: 'GET /api/remote/status',                                      kind: 'http', disposition: 'RELOCATE',    door: 'Infra/Settings (remote substrate health)' },

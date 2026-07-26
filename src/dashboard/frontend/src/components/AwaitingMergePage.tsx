@@ -16,90 +16,15 @@ import { capture, captureException } from '../lib/telemetry';
 import { useDashboardStore, selectAwaitingMerge, selectBlockedFromMerge, selectOpenMergeRequests, selectIssues } from '../lib/store';
 import { useConfirm } from './DialogProvider';
 import { AutoMergeToggle } from './AutoMergeToggle';
+import { MergeTrainSection } from './merge-train/MergeTrainSection';
 import { UatStackStatus } from './CommandDeck/UatStackStatus';
-import type { WorkspaceContainerStatus, WorkspacePendingOperation, WorkspaceStackHealth } from './CommandDeck/ZoneCOverviewTabs/queries';
+import { fetchUatContext, fetchWorkspace, forgeApprove, forgeMerge, mergeIssue, rebuildStack, type UatContext, type WorkspaceInfo } from './awaitingMergeApi';
+import type { WorkspaceContainerStatus, WorkspacePendingOperation } from './CommandDeck/ZoneCOverviewTabs/queries';
 import type { Issue } from '../types';
-
-interface WorkspaceInfo {
-  exists?: boolean;
-  frontendUrl?: string;
-  apiUrl?: string;
-  mrUrl?: string;
-  stackHealth?: WorkspaceStackHealth;
-  containers?: Record<string, WorkspaceContainerStatus> | null;
-  pendingOperation?: WorkspacePendingOperation | null;
-}
-
-interface UatContext {
-  acceptanceCriteria?: Array<{ id: string; title: string; status: string; itemId: string; itemTitle: string }>;
-  deliverables?: Array<{ id: string; title: string; status: string; action?: string }>;
-  proposal?: string | null;
-  changedFiles?: Array<{ path: string; status: string; additions: number; deletions: number }>;
-  changedFilesTotal?: number;
-  changedFilesOmitted?: number;
-  diffStat?: { stat: string; truncated: boolean } | null;
-  source?: { plan?: 'vbrief' | 'none'; files?: 'git' | 'none' };
-}
-
-async function fetchWorkspace(issueId: string): Promise<WorkspaceInfo> {
-  const res = await fetch(`/api/workspaces/${issueId}`);
-  if (!res.ok) return {};
-  return res.json();
-}
-
-async function fetchUatContext(issueId: string): Promise<UatContext> {
-  const res = await fetch(`/api/workspaces/${issueId}/uat-context`);
-  if (!res.ok) return {};
-  return res.json();
-}
-
-async function rebuildStack(issueId: string): Promise<void> {
-  const res = await fetch(`/api/workspaces/${issueId}/rebuild-stack`, { method: 'POST' });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || `Rebuild failed (${res.status})`);
-  }
-}
-
-async function forgeMerge(issueId: string): Promise<unknown> {
-  const res = await fetch(`/api/issues/${issueId}/forge-merge`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Merge failed (${res.status})`);
-  }
-  return res.json();
-}
-
-async function forgeApprove(issueId: string): Promise<unknown> {
-  const res = await fetch(`/api/issues/${issueId}/forge-approve`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Approve failed (${res.status})`);
-  }
-  return res.json();
-}
 
 function isVerifyingIssue(issue?: Issue): boolean {
   const state = (issue?.state ?? issue?.status ?? '').trim().toLowerCase().replace(/[-\s]+/g, '_');
   return state === 'verifying' || state === 'verifying_on_main';
-}
-
-async function mergeIssue(issueId: string): Promise<unknown> {
-  const res = await fetch(`/api/issues/${issueId}/merge`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Merge failed (${res.status})`);
-  }
-  return res.json();
 }
 
 export function AwaitingMergePage() {
@@ -187,6 +112,8 @@ export function AwaitingMergePage() {
             UAT + merge click. Open the frontend link to verify, then merge.
           </p>
         </header>
+
+        <MergeTrainSection />
 
         {sortedAwaiting.length === 0 ? (
           <EmptyState />

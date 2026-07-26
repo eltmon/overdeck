@@ -11,13 +11,18 @@ import {
   type BootReconciliationDecision,
   FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY,
   FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY,
+  MERGE_TRAIN_ENABLED_KEY,
+  LEGACY_FLYWHEEL_MERGE_TRAIN_ENABLED_KEY,
   getBootReconciliationState,
   getSetting,
   isFlywheelAutoPickupBacklog,
   isFlywheelRequireUatBeforeMerge,
+  isMergeTrainEnabled,
   setBootReconciliationDecision,
   setFlywheelAutoPickupBacklog,
   setFlywheelRequireUatBeforeMerge,
+  setMergeTrainEnabled,
+  setSetting,
   stampBootReconciliation,
 } from '../app-settings.js';
 import { resetDatabase } from '../index.js';
@@ -130,5 +135,43 @@ describe('boot reconciliation app settings', () => {
       graceDeadline: '2026-06-29T15:30:00.000Z',
     });
     expect(Date.parse(state.decidedAt ?? '')).not.toBeNaN();
+  });
+});
+
+describe('merge train app settings', () => {
+  it('defaults to false on an empty database', () => {
+    expect(isMergeTrainEnabled()).toBe(false);
+    expect(getSetting(MERGE_TRAIN_ENABLED_KEY)).toBeNull();
+  });
+
+  it('reads the new key when set', () => {
+    setMergeTrainEnabled(true);
+    expect(isMergeTrainEnabled()).toBe(true);
+    expect(getSetting(MERGE_TRAIN_ENABLED_KEY)).toBe('true');
+    expect(getSetting(LEGACY_FLYWHEEL_MERGE_TRAIN_ENABLED_KEY)).toBeNull();
+  });
+
+  it('falls back to legacy key when new key is absent', () => {
+    setSetting(LEGACY_FLYWHEEL_MERGE_TRAIN_ENABLED_KEY, 'true');
+    expect(isMergeTrainEnabled()).toBe(true);
+    expect(getSetting(MERGE_TRAIN_ENABLED_KEY)).toBeNull();
+  });
+
+  it('prefers new key over legacy key when both are set', () => {
+    setSetting(LEGACY_FLYWHEEL_MERGE_TRAIN_ENABLED_KEY, 'true');
+    setMergeTrainEnabled(false);
+    expect(isMergeTrainEnabled()).toBe(false);
+    expect(getSetting(MERGE_TRAIN_ENABLED_KEY)).toBe('false');
+    expect(getSetting(LEGACY_FLYWHEEL_MERGE_TRAIN_ENABLED_KEY)).toBe('true');
+  });
+
+  it('round-trips the merge train flag', () => {
+    setMergeTrainEnabled(true);
+    expect(isMergeTrainEnabled()).toBe(true);
+    expect(getSetting(MERGE_TRAIN_ENABLED_KEY)).toBe('true');
+
+    setMergeTrainEnabled(false);
+    expect(isMergeTrainEnabled()).toBe(false);
+    expect(getSetting(MERGE_TRAIN_ENABLED_KEY)).toBe('false');
   });
 });

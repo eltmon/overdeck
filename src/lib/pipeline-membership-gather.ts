@@ -1,7 +1,9 @@
 import { execFile } from 'node:child_process';
-import { join } from 'node:path';
+import { realpath } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
+import type { MembershipUnavailableReason } from '@overdeck/contracts';
 import { Effect } from 'effect';
 
 import {
@@ -188,12 +190,20 @@ function resolveProjectTrackerType(project: ProjectConfig): TrackerType {
   if (project.github_repo) return 'github';
   if (getIssuePrefix(project)) return 'linear';
   if (project.gitlab_repo) return 'gitlab';
-  throw new Error(`Cannot resolve tracker for ${project.name}`);
+  throw new PipelineMembershipUnavailableError(
+    'tracker_unconfigured',
+    `Cannot resolve tracker for ${project.name}`,
+  );
 }
 
 async function listProjectTrackerIssues(project: ProjectConfig): Promise<ProjectTrackerIssueRow[]> {
   const issuePrefix = getIssuePrefix(project)?.toUpperCase();
-  if (!issuePrefix) throw new Error(`Missing issue_prefix for project ${project.name}`);
+  if (!issuePrefix) {
+    throw new PipelineMembershipUnavailableError(
+      'missing_issue_prefix',
+      `Missing issue_prefix for project ${project.name}`,
+    );
+  }
 
   const trackerType = resolveProjectTrackerType(project);
   const trackerConfig = loadConfigSync().trackers[trackerType];
@@ -231,6 +241,31 @@ async function listProjectTrackerIssues(project: ProjectConfig): Promise<Project
       labels: issue.labels,
     }];
   });
+}
+
+export class PipelineMembershipUnavailableError extends Error {
+  public readonly reason: MembershipUnavailableReason;
+
+  constructor(reason: MembershipUnavailableReason, message: string) {
+    super(message);
+    this.name = 'PipelineMembershipUnavailableError';
+    this.reason = reason;
+  }
+}
+
+async function withUnavailableReason<T>(
+  reason: MembershipUnavailableReason,
+  operation: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof PipelineMembershipUnavailableError) throw error;
+    throw new PipelineMembershipUnavailableError(
+      reason,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 }
 
 export interface PipelineMembershipGatherDeps {
@@ -307,16 +342,85 @@ export function projectRepositories(project: ProjectConfig): ProjectRepository[]
   }));
 }
 
+async function normalizeRepoPath(path: string): Promise<string> {
+  return realpath(path).catch(() => resolve(path));
+}
+
+async function hasGitRef(
+  repoPath: string,
+  branch: string,
+  run: PipelineMembershipGatherDeps['run'],
+): Promise<boolean> {
+  const ref = branch.startsWith('origin/')
+    ? `refs/remotes/${branch}`
+    : `refs/heads/${branch}`;
+  try {
+    await run('git', ['rev-parse', '--verify', '--quiet', ref], repoPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function resolveRepositoryDefaultBranch(
+  repoPath: string,
+  configured: string | undefined,
+  run: PipelineMembershipGatherDeps['run'] = defaultDeps.run,
+): Promise<string> {
+  if (configured) {
+    if (await hasGitRef(repoPath, configured, run)) return configured;
+    if (await hasGitRef(repoPath, `origin/${configured}`, run)) return `origin/${configured}`;
+  }
+
+  for (const ref of ['refs/remotes/origin/HEAD', 'HEAD']) {
+    try {
+      const branch = (await run('git', ['symbolic-ref', '--quiet', '--short', ref], repoPath)).trim();
+      if (branch && await hasGitRef(repoPath, branch, run)) return branch;
+    } catch {
+      // Continue to the next source of repository truth.
+    }
+  }
+
+  for (const branch of ['main', 'master', 'origin/main', 'origin/master']) {
+    if (await hasGitRef(repoPath, branch, run)) return branch;
+  }
+
+  throw new PipelineMembershipUnavailableError(
+    'default_branch_unresolved',
+    `Could not resolve default branch for repository ${repoPath} (configured: ${configured ?? 'none'})`,
+  );
+}
+
 export async function snapshotBranchRefs(
   repoPath: string,
   defaultBranch: string,
   refPatterns: string[],
   run: PipelineMembershipGatherDeps['run'] = defaultDeps.run,
 ): Promise<BranchRefSnapshot> {
+  const unavailable = () => new PipelineMembershipUnavailableError(
+    'repo_unavailable',
+    `Workspace repo path is not a git repository: ${repoPath}`,
+  );
+
+  let gitTopLevel: string;
+  try {
+    gitTopLevel = (await run('git', ['rev-parse', '--show-toplevel'], repoPath)).trim();
+  } catch (error) {
+    if (error instanceof PipelineMembershipUnavailableError) throw error;
+    throw unavailable();
+  }
+
+  const [normalizedRepoPath, normalizedGitTopLevel] = await Promise.all([
+    normalizeRepoPath(repoPath),
+    normalizeRepoPath(gitTopLevel),
+  ]);
+  if (normalizedRepoPath !== normalizedGitTopLevel) throw unavailable();
+
+  const resolvedDefaultBranch = await resolveRepositoryDefaultBranch(repoPath, defaultBranch, run);
   const [refs, unmergedRefs, firstParentShas] = await Promise.all([
     run('git', ['for-each-ref', '--format=%(objectname) %(refname:short)', ...refPatterns], repoPath),
     run('git', [
-      'for-each-ref', `--no-merged=${defaultBranch}`,
+      'for-each-ref', `--no-merged=${resolvedDefaultBranch}`,
       '--format=%(refname:short)',
       ...refPatterns,
     ], repoPath),
@@ -324,7 +428,7 @@ export async function snapshotBranchRefs(
     // tip is ON this line has zero unique commits (fresh pointer, not landed
     // work); a contained tip OFF this line arrived via a merge — positive
     // non-PR merge evidence.
-    run('git', ['rev-list', '--first-parent', defaultBranch], repoPath),
+    run('git', ['rev-list', '--first-parent', resolvedDefaultBranch], repoPath),
   ]);
   return { refs, unmergedRefs, firstParentShas };
 }
@@ -397,7 +501,12 @@ export async function gatherProjectLensSignals(
   deps: PipelineMembershipGatherDeps = defaultDeps,
 ): Promise<IssueLensSignals[]> {
   const issuePrefix = getIssuePrefix(project)?.toUpperCase();
-  if (!issuePrefix) throw new Error(`Missing issue_prefix for project ${project.name}`);
+  if (!issuePrefix) {
+    throw new PipelineMembershipUnavailableError(
+      'missing_issue_prefix',
+      `Missing issue_prefix for project ${project.name}`,
+    );
+  }
 
   const githubRepository = project.github_repo?.split('/');
   const owner = githubRepository?.[0];
@@ -415,12 +524,20 @@ export async function gatherProjectLensSignals(
     snapshotBranchRefs(repository.path, repository.defaultBranch, branchRefPatterns, deps.run));
 
   const [trackerIssues, openIssues, phaseLabeledIssues, openPrs, branches, specIssueIds] = await Promise.all([
-    project.github_repo ? Promise.resolve([]) : deps.listTrackerIssues(project),
-    owner && repo ? deps.listOpenIssues(owner, repo) : Promise.resolve([]),
-    owner && repo ? deps.listPhaseLabeledIssues(owner, repo) : Promise.resolve([]),
-    owner && repo ? deps.listOpenPullRequests(owner, repo) : Promise.resolve([]),
+    project.github_repo
+      ? Promise.resolve([])
+      : withUnavailableReason('forge_unavailable', () => deps.listTrackerIssues(project)),
+    owner && repo
+      ? withUnavailableReason('forge_unavailable', () => deps.listOpenIssues(owner, repo))
+      : Promise.resolve([]),
+    owner && repo
+      ? withUnavailableReason('forge_unavailable', () => deps.listPhaseLabeledIssues(owner, repo))
+      : Promise.resolve([]),
+    owner && repo
+      ? withUnavailableReason('forge_unavailable', () => deps.listOpenPullRequests(owner, repo))
+      : Promise.resolve([]),
     Promise.all(branchSnapshots),
-    deps.listSpecIssueIds(project.path),
+    withUnavailableReason('gather_failed', () => deps.listSpecIssueIds(project.path)),
   ]);
 
   const candidates = new Set<string>();
@@ -501,7 +618,10 @@ export async function gatherProjectLensSignals(
       if (!issueStateCandidateSet.has(id)) candidates.delete(id);
     }
     const issueStates = issueStateCandidates.length > 0
-      ? await deps.listIssueStates(owner, repo, issueStateCandidates.map(issueNumber))
+      ? await withUnavailableReason(
+          'forge_unavailable',
+          () => deps.listIssueStates(owner, repo, issueStateCandidates.map(issueNumber)),
+        )
       : [];
     const stateByNumber = new Map(issueStates.map((entry) => [entry.number, entry.state]));
     for (const id of issueStateCandidates) {
@@ -520,7 +640,10 @@ export async function gatherProjectLensSignals(
       `feature/${id.toLowerCase()}`,
       `strike/${id.toLowerCase()}`,
     ]))];
-    const mergedHeads = new Set(await deps.listMergedPullRequestHeads(owner, repo, candidateHeads));
+    const mergedHeads = new Set(await withUnavailableReason(
+      'forge_unavailable',
+      () => deps.listMergedPullRequestHeads(owner, repo, candidateHeads),
+    ));
     for (const id of openCandidates) {
       const possibleHeads = [
         ...(headRefsByIssue.get(id) ?? []),

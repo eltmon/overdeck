@@ -17,23 +17,23 @@ import type { RemoteWorkspaceMetadata, ExecResult } from './interface.js';
 import { join } from 'path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { homedir } from 'os';
-import { getManagedTmuxSocketName } from '../tmux.js';
+import {
+  buildRemoteTmuxCommand,
+  ensureRemoteTmuxContext,
+  REMOTE_PAN_DIR,
+  runSsh,
+  shellQuote,
+} from './remote-tmux.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync, getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 import { resolveProjectForIssue } from '../pan-dir/record.js';
 import { isStateMigrated } from '../state-home.js';
 
+export { sendToRemoteAgentKeyed } from './remote-keyed-delivery.js';
+export type { RemoteKeyedDeliveryOutcome, RemoteKeyedExec } from './remote-keyed-delivery.js';
+
 const AGENTS_DIR = join(homedir(), '.overdeck', 'agents');
-const REMOTE_PAN_DIR = '/workspace/.pan';
-const REMOTE_TMUX_DIR = `${REMOTE_PAN_DIR}/tmux`;
-const REMOTE_TMUX_CONFIG_PATH = `${REMOTE_TMUX_DIR}/overdeck.tmux.conf`;
 const REMOTE_HOST_HEARTBEAT_PATH = `${REMOTE_PAN_DIR}/host-heartbeat`;
-const REMOTE_TMUX_CONFIG_CONTENT = [
-  '# Overdeck-managed tmux config',
-  '# Keep this minimal and include only behavior Overdeck intentionally depends on.',
-  'set -g mouse on',
-  '',
-].join('\n');
 
 const PUSH_DAEMON_INTERVAL_SECONDS = 300;
 const EPHEMERAL_WATCHDOG_INTERVAL_SECONDS = 60;
@@ -333,15 +333,6 @@ export function listActiveRemoteAgentStates(): RemoteAgentState[] {
       state?.location === 'remote' && (state.status === 'running' || state.status === 'starting'));
 }
 
-/** Run a FlyProvider Effect at the async/Promise boundary. */
-function runSsh(
-  provider: FlyProvider,
-  vmName: string,
-  command: string,
-): Promise<ExecResult> {
-  return Effect.runPromise(provider.ssh(vmName, command));
-}
-
 export interface RefreshHostHeartbeatDeps {
   listActiveRemoteAgentStates?: typeof listActiveRemoteAgentStates;
   createFlyProvider?: typeof createFlyProvider;
@@ -503,27 +494,6 @@ export function assertFlyRemoteStateSupported(issueId: string, migrated: boolean
       `Fly remote spawn blocked for ${issueId.toUpperCase()}: PAN-2541 D14 forbids remote work on migrated projects until PAN-2549 implements overdeck-state synchronization.`,
     );
   }
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-function getRemoteTmuxBaseArgs(): string[] {
-  return ['-L', getManagedTmuxSocketName(), '-f', REMOTE_TMUX_CONFIG_PATH];
-}
-
-function buildRemoteTmuxCommand(args: string[]): string {
-  return ['tmux', ...getRemoteTmuxBaseArgs(), ...args].map(shellQuote).join(' ');
-}
-
-async function ensureRemoteTmuxContext(provider: FlyProvider, vmName: string): Promise<void> {
-  const configBase64 = Buffer.from(REMOTE_TMUX_CONFIG_CONTENT).toString('base64');
-  await runSsh(
-    provider,
-    vmName,
-    `mkdir -p ${shellQuote(REMOTE_TMUX_DIR)} && echo ${shellQuote(configBase64)} | base64 -d > ${shellQuote(REMOTE_TMUX_CONFIG_PATH)}`,
-  );
 }
 
 /**
@@ -722,6 +692,7 @@ export async function sendToRemoteAgent(
   await runSsh(fly, vmName, buildRemoteTmuxCommand(['send-keys', '-t', agentId, 'C-m']));
   await runSsh(fly, vmName, `rm -f ${shellQuote(promptFile)}`);
 }
+
 
 /**
  * Check if remote agent is still running

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { FlywheelConversationPane, findFlywheelConversation, resolveFlywheelConfig } from '../FlywheelConversationPane';
+import { FlywheelConversationPane, findFlywheelConversation, resolveDisplayedScope, resolveFlywheelConfig } from '../FlywheelConversationPane';
 import { DialogProvider } from '../../DialogProvider';
 import type { Conversation } from '../../CommandDeck/ConversationList';
 
@@ -119,9 +119,6 @@ function mockFetch() {
         },
       });
     }
-    if (url === '/api/flywheel/merge-queue') {
-      return Response.json([]);
-    }
     return Response.json({ error: 'not found' }, { status: 404 });
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -230,7 +227,6 @@ describe('FlywheelConversationPane', () => {
       if (url === '/api/flywheel/runs?limit=10') return Response.json([]);
       if (url === '/api/flywheel/conversation') return Response.json(null);
       if (url === '/api/settings') return Response.json({ roles: {} });
-      if (url === '/api/flywheel/merge-queue') return Response.json([]);
       return Response.json({ error: 'not found' }, { status: 404 });
     }));
 
@@ -276,7 +272,6 @@ describe('FlywheelConversationPane', () => {
       }
       if (url === '/api/flywheel/conversation') return Response.json(flywheelConversation);
       if (url === '/api/settings') return Response.json({ roles: {} });
-      if (url === '/api/flywheel/merge-queue') return Response.json([]);
       return Response.json({ error: 'not found' }, { status: 404 });
     }));
 
@@ -364,8 +359,7 @@ describe('FlywheelConversationPane', () => {
         }
         if (url === '/api/flywheel/conversation') return Response.json(flywheelConversation);
         if (url === '/api/settings') return Response.json({ roles: {} });
-        if (url === '/api/flywheel/merge-queue') return Response.json([]);
-        return Response.json({ error: 'not found' }, { status: 404 });
+          return Response.json({ error: 'not found' }, { status: 404 });
       }));
     }
 
@@ -412,5 +406,117 @@ describe('FlywheelConversationPane', () => {
       // New Run remains enabled — that's the whole point of the none state.
       expect(screen.getByRole('button', { name: /^New Run$/i })).not.toBeDisabled();
     });
+  });
+});
+
+
+/**
+ * PAN-1696 run-scope-persist: scope is baked into the orchestrator prompt at
+ * start/resume, so a live run keeps its own scope until restarted. The pane must
+ * show the RUN's scope while a run exists, the configured one otherwise, and make
+ * a configured-vs-run mismatch visible instead of quietly showing the new value.
+ */
+describe('resolveDisplayedScope (PAN-1696)', () => {
+  it('shows the running run\'s persisted scope, not the live settings value (ac2)', () => {
+    expect(resolveDisplayedScope({ status: 'running', scope: 'pan-only' }, 'all-tracked-projects')).toEqual({
+      displayed: 'pan-only',
+      source: 'run',
+      mismatchedConfigured: 'all-tracked-projects',
+    });
+  });
+
+  it('reports no mismatch when the run and settings agree', () => {
+    expect(resolveDisplayedScope({ status: 'running', scope: 'pan-only' }, 'pan-only')).toEqual({
+      displayed: 'pan-only',
+      source: 'run',
+    });
+  });
+
+  it('treats a paused run as live — it resumes under its own scope', () => {
+    expect(resolveDisplayedScope({ status: 'paused', scope: 'pan-only' }, 'all-tracked-projects').source).toBe('run');
+  });
+
+  it('reads the scope off latest when the detail payload omits it', () => {
+    expect(resolveDisplayedScope({ status: 'running', latest: { scope: 'all-tracked-projects' } }, 'pan-only')).toEqual({
+      displayed: 'all-tracked-projects',
+      source: 'run',
+      mismatchedConfigured: 'pan-only',
+    });
+  });
+
+  it('falls back to the configured scope with no active run (ac3)', () => {
+    expect(resolveDisplayedScope(null, 'all-tracked-projects')).toEqual({
+      displayed: 'all-tracked-projects',
+      source: 'configured',
+    });
+    expect(resolveDisplayedScope({ status: 'complete', scope: 'pan-only' }, 'all-tracked-projects')).toEqual({
+      displayed: 'all-tracked-projects',
+      source: 'configured',
+    });
+  });
+
+  it('falls back to configured for a pre-PAN-1696 run that persisted no scope', () => {
+    expect(resolveDisplayedScope({ status: 'running' }, 'pan-only')).toEqual({
+      displayed: 'pan-only',
+      source: 'configured',
+    });
+  });
+});
+
+describe('FlywheelConversationPane scope display (PAN-1696)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** The run detail reports pan-only while settings say all-tracked-projects. */
+  function mockFetchWithRunScope(runScope?: 'pan-only' | 'all-tracked-projects') {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === 'POST') return Response.json({ ok: true });
+      if (url === '/api/flywheel/runs?limit=10') {
+        return Response.json([{ id: 'RUN-2', startedAt: flywheelStatus.startedAt, status: 'running' }]);
+      }
+      if (url === '/api/flywheel/runs/RUN-2') {
+        return Response.json({
+          id: 'RUN-2',
+          startedAt: flywheelStatus.startedAt,
+          status: 'running',
+          ...(runScope ? { scope: runScope } : {}),
+          latest: runScope ? { ...flywheelStatus, scope: runScope } : flywheelStatus,
+          paths: { latest: '/tmp/latest.json' },
+        });
+      }
+      if (url === '/api/flywheel/conversation') return Response.json(flywheelConversation);
+      if (url === '/api/settings') {
+        return Response.json({ roles: { flywheel: { scope: 'all-tracked-projects' } } });
+      }
+      return Response.json({ error: 'not found' }, { status: 404 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it('renders the run scope, the mismatch warning, and the apply-timing note (ac2)', async () => {
+    mockFetchWithRunScope('pan-only');
+    renderPane();
+
+    // Wait on the mismatch itself: settings resolve asynchronously, and before
+    // they land the configured scope falls back to the pan-only default, which
+    // would make the displayed value right for the wrong reason.
+    await waitFor(() => expect(screen.getByTestId('flywheel-scope-mismatch')).toBeTruthy());
+    expect(screen.getByTestId('flywheel-scope-value').textContent).toBe('PAN only');
+    expect(screen.getByTestId('flywheel-scope-mismatch').textContent)
+      .toContain('Settings are now set to All tracked projects');
+    expect(screen.getByTestId('flywheel-scope-note').textContent)
+      .toBe('Scope changes apply at the next run start or resume.');
+  });
+
+  it('omits the mismatch warning when the run has no persisted scope (ac3)', async () => {
+    mockFetchWithRunScope();
+    renderPane();
+
+    await waitFor(() => expect(screen.getByTestId('flywheel-scope-value').textContent).toBe('All tracked projects'));
+    expect(screen.queryByTestId('flywheel-scope-mismatch')).toBeNull();
+    expect(screen.getByTestId('flywheel-scope-note')).toBeTruthy();
   });
 });
