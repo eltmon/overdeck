@@ -67,10 +67,10 @@
     "recordedAt": "2026-07-26T11:22:12.725Z"
   },
   "created": "2026-07-26T08:56:03.309Z",
-  "updated": "2026-07-26T11:37:56.249Z",
+  "updated": "2026-07-26T11:46:59.516Z",
   "pipeline": {
     "issueId": "PAN-3115",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -78,12 +78,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T11:26:32.738Z",
-    "updatedAt": "2026-07-26T11:37:55.303Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3115-review",
+    "updatedAt": "2026-07-26T11:46:59.462Z",
+    "reviewNotes": "Default-branch resolution accepts dangling/unborn symbolic refs without verifying targets",
     "inspectNotes": "AC1: MEMBERSHIP_UNAVAILABLE_REASONS in packages/contracts/src/types.ts:15-22 holds exactly the six documented reasons and MembershipUnavailableReason derives from it via typeof[number]; reachable through 'export * from ./types' in index.ts. AC2: PipelineMembershipUnavailableError (src/lib/pipeline-membership-gather.ts:237-245) sets name, readonly reason, and passes message to super, so new(...'repo_unavailable','msg') reads back correctly. AC3: contracts change is type-only plus one const array and the gather import is 'import type', so no runtime cycle or emit hazard; build/typecheck left to the verification gate. PipelineMembershipUnavailableBody added as specified. Locking test added at tests/unit/lib/pipeline-membership-gather.test.ts:67-87.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3134",
     "lastVerifiedCommit": "be424246d36d72f200db1941426254ae4529f7a8",
-    "reviewRequestedAt": "2026-07-26T11:26:32.738Z",
     "reviewSpawnedAt": "2026-07-26T11:37:55.302Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -129,6 +128,14 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 903616,
+            "output": 79820,
+            "cacheRead": 16336896,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 1434213,
@@ -140,15 +147,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1434213,
-          "output": 115737,
-          "cacheRead": 86335488,
+          "input": 2337829,
+          "output": 195557,
+          "cacheRead": 102672384,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 53.810919,
-        "pricingAsOf": "2026-07-26T11:37:55.345Z"
+        "usd": 68.892047,
+        "pricingAsOf": "2026-07-26T11:46:59.490Z"
       }
     },
     "merges": [
