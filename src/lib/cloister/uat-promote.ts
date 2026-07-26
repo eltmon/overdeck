@@ -245,6 +245,34 @@ export async function promoteUatGeneration(
  * per-repo merge SHAs rather than an in-memory list, so it survives a restart
  * between the last publish and finalization.
  */
+/**
+ * A merge that is live on its remote but has no durable record of it.
+ *
+ * Not rolled back — main is never rewound — and deliberately NOT finalized:
+ * marking the generation promoted here would fire post-merge lifecycles against
+ * `uat_generation_repos` rows that still read pending, and would end the
+ * generation's promotable life, so the retry that is supposed to recover the
+ * stamp could never run. Staying promotable is what makes recovery possible.
+ */
+function unstampableFailure(
+  gen: UatGeneration,
+  unstampable: ReadonlyArray<{ repoKey: string; mergeSha: string; error: unknown }>,
+  log: (msg: string) => void,
+): PromoteResult {
+  const detail = unstampable
+    .map((u) => `${u.repoKey}@${u.mergeSha.slice(0, 9)} (${u.error instanceof Error ? u.error.message.split('\n')[0] : String(u.error)})`)
+    .join('; ');
+  log(`[uat-promote] ${gen.name}: merges are live but unrecorded — not finalizing: ${detail}`);
+  return {
+    success: false,
+    reason: 'merge-failed',
+    message:
+      `${gen.name}: ${unstampable.length} repo merge(s) are LIVE on their target but could not be recorded: ${detail}. ` +
+      `Nothing is rolled back — a landed merge is never rewound. The batch stays promotable: fix the state store and ` +
+      `retry, and the already-landed repos are detected and skipped rather than republished.`,
+  };
+}
+
 /** The generation with its repo rows replaced by recovered/updated ones. */
 function withRepos(gen: UatGeneration, repos: readonly UatGenerationRepo[]): UatGeneration {
   return { ...gen, repos: [...repos] };
@@ -283,6 +311,8 @@ async function promotePolyrepo(
   }
 
   const now = deps.now ?? (() => new Date());
+  /** Repos whose merge is live on the remote but whose durable stamp failed. */
+  const unstampable: Array<{ repoKey: string; mergeSha: string; error: unknown }> = [];
 
   // Reconcile local state against the remotes BEFORE classifying anything as
   // pending. A repo whose push succeeded but whose stamp never landed is
@@ -299,7 +329,16 @@ async function promotePolyrepo(
     try {
       landedSha = await git.findLandedMerge(repo.branch);
     } catch (err) {
-      log(`[uat-promote] ${gen.name}: could not check whether ${repo.repoKey} already landed: ${err instanceof Error ? err.message : String(err)}`);
+      // Unknown is not "pending". Treating it as pending would trial-merge and
+      // possibly republish a merge that is already live.
+      return {
+        success: false,
+        reason: 'merge-failed',
+        message:
+          `${gen.name}: could not establish whether ${repo.repoKey} has already landed ` +
+          `(${err instanceof Error ? err.message.split('\n')[0] : String(err)}). ` +
+          `Nothing was published; retry once the remote is reachable.`,
+      };
     }
     if (!landedSha) { recovered.push(repo); continue; }
 
@@ -308,9 +347,20 @@ async function promotePolyrepo(
     try {
       deps.markRepoPromoted?.(gen.name, repo.repoKey, promotedAt, landedSha);
     } catch (err) {
+      // Do NOT fabricate promoted state in memory. The canonical row still says
+      // pending, so finalizing here would mark the generation terminal, fire
+      // post-merge, and destroy the very state the "next attempt recovers" story
+      // depends on — there would be no next attempt.
+      unstampable.push({ repoKey: repo.repoKey, mergeSha: landedSha, error: err });
       log(`[uat-promote] ${gen.name}: recovery stamp failed for ${repo.repoKey}: ${err instanceof Error ? err.message : String(err)}`);
+      recovered.push(repo);
+      continue;
     }
     recovered.push({ ...repo, promotedAt, mergeSha: landedSha });
+  }
+
+  if (unstampable.length > 0) {
+    return unstampableFailure(gen, unstampable, log);
   }
 
   const alreadyLanded = recovered.filter((r) => r.promotedAt);
@@ -427,10 +477,18 @@ async function promotePolyrepo(
     try {
       deps.markRepoPromoted?.(gen.name, p.repoKey, now().toISOString(), p.mergeSha);
     } catch (err) {
-      // The push already succeeded — losing the stamp must not lose the merge.
-      // findLandedMerge recovers this repo on the next attempt.
+      // The push succeeded, so the merge is live and must never be rolled back —
+      // but without the durable stamp the canonical row still says pending.
+      // Finalizing anyway would mark the generation terminal on state that does
+      // not exist, so stop short of finalizing and stay promotable.
+      unstampable.push({ repoKey: p.repoKey, mergeSha: p.mergeSha, error: err });
       log(`[uat-promote] ${gen.name}: publish stamp failed for ${p.repoKey} (merge IS live at ${p.mergeSha.slice(0, 9)}): ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  if (unstampable.length > 0) {
+    await discardAll();
+    return unstampableFailure(gen, unstampable, log);
   }
 
   await discardAll();
@@ -617,7 +675,15 @@ export function buildPolyrepoUatPromoteGitDeps(
 
         findLandedMerge: async (branchName) => {
           const safeBranch = safeUatBranchName(branchName);
-          await runGit(['fetch', 'origin', target], repo.repoPath).catch(() => {});
+          // This call establishes REMOTE truth after an ambiguous publish, so a
+          // failed fetch must not be answered from a cached target ref: that
+          // could report "not landed" for a merge that is live, and republish it.
+          await runGit(['fetch', 'origin', target], repo.repoPath).catch((err) => {
+            throw new Error(
+              `cannot determine whether ${repo.repoKey} already landed: fetching origin/${target} failed ` +
+              `(${err instanceof Error ? err.message.split('\n')[0] : String(err)})`,
+            );
+          });
           const ref = await runGit(['rev-parse', '--verify', `origin/${safeBranch}`], repo.repoPath)
             .then(() => `origin/${safeBranch}`)
             .catch(() => safeBranch);

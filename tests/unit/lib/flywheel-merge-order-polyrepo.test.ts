@@ -41,6 +41,8 @@ interface FakeGit {
    * on the remote until fetched. Absent means fetch changes nothing.
    */
   fetchable?: Set<string>;
+  /** Repo paths whose refresh fails (transport/auth) — must fail closed. */
+  failFetchIn?: Set<string>;
   /** Changed files keyed `<repoPath> <ref>`. */
   changed: Map<string, string[]>;
 }
@@ -63,12 +65,12 @@ function fakeGitLayer(git: FakeGit, calls: string[] = []): Layer.Layer<ChildProc
       Effect.sync(() => {
         const { args, cwd } = read(command);
         if (args[0] === 'fetch') {
-          // `git fetch origin <branch>:refs/remotes/origin/<branch>` — makes a
-          // remote-only branch visible locally.
-          const spec = String(args[2] ?? '');
-          const branch = spec.split(':')[0]!;
-          const key = `${cwd} origin/${branch}`;
-          if (git.fetchable?.has(key)) git.refs.add(key);
+          // One forced, pruning refresh per repo:
+          // `git fetch --prune origin +refs/heads/<ns>*:refs/remotes/origin/<ns>*`
+          if (git.failFetchIn?.has(cwd)) return 1 as never;
+          for (const key of git.fetchable ?? []) {
+            if (key.startsWith(`${cwd} `)) git.refs.add(key);
+          }
           return 0 as never;
         }
         if (args[0] !== 'rev-parse' || args[1] !== '--verify') throw new Error(`unexpected exitCode call: ${args.join(' ')}`);
@@ -222,8 +224,10 @@ describe('computePolyrepoMergeQueueFromCandidates — remote-only branches', () 
 
     expect(queue).toHaveLength(1);
     expect(queue[0]!.repoContributions.map((c) => c.repoKey)).toEqual(['api']);
+    // Forced and pruning, so a force-pushed or deleted branch cannot leave a
+    // stale tracking ref behind.
     expect(calls).toContain(
-      `git fetch origin feature/min-901:refs/remotes/origin/feature/min-901 @${PROJECT_ROOT}/api`,
+      `git fetch --prune origin +refs/heads/feature/*:refs/remotes/origin/feature/* @${PROJECT_ROOT}/api`,
     );
   });
 
@@ -437,5 +441,68 @@ describe('computePolyrepoMergeQueueFromCandidates — conflict prediction', () =
 
     expect(queue).toEqual([]);
     expect(calls).toEqual([]);
+  });
+});
+
+describe('computePolyrepoMergeQueueFromCandidates — fetch failures fail closed', () => {
+  it('excludes every candidate touching a repo whose refresh failed', async () => {
+    // A stale tracking ref is indistinguishable from a current one, so a repo
+    // we could not refresh must not contribute — otherwise assembly can test
+    // and promote obsolete code.
+    const reposByIssue = new Map([
+      ['MIN-901', [repo('fe', 'MIN-901', 0), repo('api', 'MIN-901', 1)]],
+    ]);
+    const git: FakeGit = {
+      refs: new Set([
+        `${PROJECT_ROOT}/fe origin/feature/min-901`,
+        `${PROJECT_ROOT}/api origin/feature/min-901`,
+      ]),
+      failFetchIn: new Set([`${PROJECT_ROOT}/api`]),
+      changed: new Map(),
+    };
+    const excluded: Array<[string, string]> = [];
+
+    const queue = await run(
+      [{ issueId: 'MIN-901', title: 'Spans a broken repo' }],
+      reposByIssue,
+      git,
+      { onExcluded: (issueId, reason) => excluded.push([issueId, reason]) },
+    );
+
+    expect(queue).toEqual([]);
+    expect(excluded[0]![1]).toContain('could not refresh feature refs in api');
+  });
+
+  it('refreshes each repo once no matter how many candidates it holds', async () => {
+    const reposByIssue = new Map([
+      ['MIN-901', [repo('api', 'MIN-901', 0)]],
+      ['MIN-902', [repo('api', 'MIN-902', 0)]],
+      ['MIN-903', [repo('api', 'MIN-903', 0)]],
+    ]);
+    const git: FakeGit = {
+      refs: new Set([
+        `${PROJECT_ROOT}/api origin/feature/min-901`,
+        `${PROJECT_ROOT}/api origin/feature/min-902`,
+        `${PROJECT_ROOT}/api origin/feature/min-903`,
+      ]),
+      changed: new Map(),
+    };
+    const calls: string[] = [];
+
+    await run(
+      [
+        { issueId: 'MIN-901', title: 'One' },
+        { issueId: 'MIN-902', title: 'Two' },
+        { issueId: 'MIN-903', title: 'Three' },
+      ],
+      reposByIssue,
+      git,
+      {},
+      calls,
+    );
+
+    // Three candidates in one repo used to mean three remote negotiations per
+    // reconciler minute.
+    expect(calls.filter((c) => c.startsWith('git fetch'))).toHaveLength(1);
   });
 });

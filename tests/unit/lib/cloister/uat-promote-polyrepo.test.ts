@@ -439,7 +439,7 @@ describe('polyrepo promote — recovering an unstamped but landed repo', () => {
     expect((result as { mergeSha: string }).mergeSha).toBe('fe@fe-reco api@api-rec');
   });
 
-  it('does not lose a published merge when the stamp write throws', async () => {
+  it('stays promotable instead of finalizing when the stamp write throws', async () => {
     const gen = generation([repoRow('fe', 0)]);
     const fe = makeRepoGit('fe');
     const deps = makeDeps(gen, new Map([['fe', fe]]), {
@@ -448,10 +448,34 @@ describe('polyrepo promote — recovering an unstamped but landed repo', () => {
 
     const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
 
-    // The push happened, so the promote must still complete rather than
-    // unwinding — the next attempt recovers the stamp via findLandedMerge.
-    expect(result.success).toBe(true);
+    // The push happened and is never rolled back...
     expect(fe.published).toEqual(['fe-merge-sha']);
+    // ...but the canonical row still says pending, so finalizing here would
+    // mark the batch terminal on state that does not exist and fire post-merge
+    // — and end the promotable life the documented retry depends on.
+    expect(result).toMatchObject({ success: false, reason: 'merge-failed' });
+    const message = (result as { message: string }).message;
+    expect(message).toContain('LIVE on their target but could not be recorded');
+    expect(message).toContain('stays promotable');
+    expect(deps.statuses).not.toContain('promoted');
+    expect(deps.firePostMerge).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when it cannot establish whether a repo already landed', async () => {
+    const gen = generation([repoRow('fe', 0), repoRow('api', 1)]);
+    const fe = makeRepoGit('fe');
+    const api = makeRepoGit('api');
+    // An unreachable remote makes "already landed?" unanswerable; treating that
+    // as "pending" could republish a merge that is already live.
+    api.findLandedMerge = async () => { throw new Error('fetch origin main failed'); };
+    const deps = makeDeps(gen, new Map([['fe', fe], ['api', api]]));
+
+    const result = await promoteUatGeneration(GEN_NAME, PROJECT_ROOT, deps);
+
+    expect(result).toMatchObject({ success: false, reason: 'merge-failed' });
+    expect((result as { message: string }).message).toContain('could not establish whether api has already landed');
+    expect(fe.published).toEqual([]);
+    expect(api.published).toEqual([]);
   });
 
   it('withholds per-repo evidence when a published repo has no recorded merge sha', async () => {

@@ -359,16 +359,42 @@ export interface ComputePolyrepoMergeQueueOptions extends ComputeMergeQueueOptio
   onExcluded?: (issueId: string, reason: string) => void;
 }
 
-/** `git fetch origin <branch>` — updates the remote-tracking ref, ignoring absence. */
-const fetchFeatureBranch = (branch: string, cwd: string) =>
+/** The `feature/` (or configured) namespace a source branch lives in. */
+function branchNamespace(sourceBranch: string): string {
+  const slash = sourceBranch.lastIndexOf('/');
+  return slash >= 0 ? sourceBranch.slice(0, slash + 1) : '';
+}
+
+/**
+ * Refresh every feature-branch tracking ref in one repo with ONE remote
+ * negotiation, and report whether it succeeded.
+ *
+ * Three things this must get right, each of which caused a real defect:
+ *
+ *  - **One fetch per repo, not per candidate.** Fetching per candidate/repo pair
+ *    performs F x R remote negotiations every reconciler minute, which on a
+ *    large ready set can outrun the interval and hold the project's
+ *    single-flight slot permanently.
+ *  - **Force (`+`) the refspec.** Without it a force-with-lease rebase on the
+ *    feature branch makes the update non-fast-forward, so the fetch fails and
+ *    the stale tracking ref survives — assembly would then test and promote
+ *    obsolete code.
+ *  - **Prune.** A deleted remote branch must drop its tracking ref, or the
+ *    probe keeps reporting a contribution that no longer exists.
+ *
+ * Returns false on ANY operational failure (transport, auth, bad repo). The
+ * caller must fail closed: a stale ref is indistinguishable from a current one
+ * once the fetch is gone, so silently continuing risks assembling old code.
+ */
+const refreshFeatureRefs = (namespaces: readonly string[], cwd: string) =>
   Effect.gen(function*() {
+    if (namespaces.length === 0) return true;
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const cmd = ChildProcess.make('git', ['fetch', 'origin', `${branch}:refs/remotes/origin/${branch}`], { cwd });
+    const refspecs = namespaces.map((ns) => `+refs/heads/${ns}*:refs/remotes/origin/${ns}*`);
+    const cmd = ChildProcess.make('git', ['fetch', '--prune', 'origin', ...refspecs], { cwd });
     return yield* spawner.exitCode(cmd).pipe(
-      Effect.map(() => undefined),
-      // A branch that does not exist on the remote is the normal "no
-      // contribution" case, not an error.
-      Effect.orElseSucceed(() => undefined),
+      Effect.map((code) => Number(code) === 0),
+      Effect.orElseSucceed(() => false),
     );
   });
 
@@ -378,14 +404,12 @@ const fetchFeatureBranch = (branch: string, cwd: string) =>
  * lag or be missing entirely in a repo the operator never checked out.
  * Returns the ref that exists, or null when neither does.
  *
- * The fetch is REQUIRED, not an optimization: `git rev-parse origin/<branch>`
- * reads a local remote-tracking ref and never contacts the remote, so a branch
- * pushed from another machine or clone reads as absent. Without it a project
- * whose work all happens remotely sees an empty ready set forever.
+ * Purely local — refreshFeatureRefs has already contacted the remote for this
+ * repo, so `git rev-parse origin/<branch>` now reads a ref that is known
+ * current rather than whatever was cached.
  */
 const resolveFeatureRef = (branch: string, repoPath: string) =>
   Effect.gen(function*() {
-    yield* fetchFeatureBranch(branch, repoPath);
     const originRef = `origin/${branch}`;
     if (yield* branchExists(originRef, repoPath)) return originRef;
     if (yield* branchExists(branch, repoPath)) return branch;
@@ -428,11 +452,36 @@ export const computePolyrepoMergeQueueFromCandidates = (
       };
     });
 
+    // ONE remote refresh per repo, before any probing. Doing it per
+    // candidate/repo pair made F x R remote negotiations every minute.
+    const namespacesByRepo = new Map<string, { repoPath: string; namespaces: Set<string> }>();
+    for (const entry of perCandidate) {
+      for (const repo of entry.repos) {
+        const existing = namespacesByRepo.get(repo.repoPath) ?? { repoPath: repo.repoPath, namespaces: new Set<string>() };
+        existing.namespaces.add(branchNamespace(repo.sourceBranch));
+        namespacesByRepo.set(repo.repoPath, existing);
+      }
+    }
+    const refreshResults = yield* Effect.all(
+      [...namespacesByRepo.values()].map(({ repoPath, namespaces }) =>
+        refreshFeatureRefs([...namespaces], repoPath).pipe(
+          Effect.map((ok) => ({ repoPath, ok })),
+        ),
+      ),
+      { concurrency: gitConcurrency },
+    );
+    const staleRepoPaths = new Set(refreshResults.filter((r) => !r.ok).map((r) => r.repoPath));
+
     // One flat, concurrency-governed collection: nesting Effect.all inside
     // Effect.all applies the limit at both levels, making the real ceiling
     // gitConcurrency² git subprocesses per project.
+    // Repos whose refresh failed are skipped entirely — their tracking refs may
+    // be arbitrarily old, and a stale ref is indistinguishable from a current
+    // one, so probing them could assemble obsolete code.
     const probeJobs = perCandidate.flatMap((entry, candidateIndex) =>
-      entry.repos.map((repo) => ({ candidateIndex, repo })),
+      entry.repos
+        .filter((repo) => !staleRepoPaths.has(repo.repoPath))
+        .map((repo) => ({ candidateIndex, repo })),
     );
     const probeResults = yield* Effect.all(
       probeJobs.map(({ candidateIndex, repo }) =>
@@ -474,6 +523,18 @@ export const computePolyrepoMergeQueueFromCandidates = (
       diffRefs: string[];
     }> = [];
     for (const entry of resolved) {
+      // Fail closed. Including this candidate would assemble it from whatever
+      // its unrefreshed repos happen to hold, and excluding only the failed repo
+      // would silently build a partial batch from a feature that spans more.
+      const unrefreshed = entry.repos.filter((repo) => staleRepoPaths.has(repo.repoPath));
+      if (unrefreshed.length > 0) {
+        options.onExcluded?.(
+          entry.item.issueId,
+          `could not refresh feature refs in ${unrefreshed.map((r) => r.repoKey).join(', ')} — ` +
+          `excluding rather than risk assembling stale code`,
+        );
+        continue;
+      }
       if (entry.contributions.length === 0) {
         const readOnlyNote = entry.readOnlySkipped.length > 0
           ? ` (${entry.readOnlySkipped.map((r) => r.repoKey).join(', ')} excluded as read-only)`

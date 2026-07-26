@@ -303,7 +303,11 @@ export interface GenerationCleanupDeps {
    * the generation stopped using (a hold-out can drop a repo after its branch
    * was already created locally — that branch is never pushed, but it lingers).
    */
-  removeGenerationResidue?: (generation: UatGeneration) => Promise<void>;
+  removeGenerationResidue?: (
+    generation: UatGeneration,
+    /** Repos the generation recorded — already cleaned by removeRepoArtifacts. */
+    recordedRepoKeys?: readonly string[],
+  ) => Promise<void>;
   log?: (msg: string) => void;
 }
 
@@ -345,7 +349,7 @@ export async function cleanupUatGenerations(
           log(`[uat-generation] cleanup ${gen.name}: ${repo.repoKey} artifact removal failed: ${err instanceof Error ? err.message : String(err)}`);
         });
       }
-      await deps.removeGenerationResidue?.(gen).catch((err) => {
+      await deps.removeGenerationResidue?.(gen, (gen.repos ?? []).map((r) => r.repoKey)).catch((err) => {
         cleaned = false;
         log(`[uat-generation] cleanup ${gen.name}: generation folder removal failed: ${err instanceof Error ? err.message : String(err)}`);
       });

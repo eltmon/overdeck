@@ -228,7 +228,10 @@ export function buildPolyrepoCleanupGit(
   removeWorktree(worktreePath: string): Promise<void>;
   deleteBranch(branchName: string): Promise<void>;
   removeRepoArtifacts(repo: { repoKey: string; repoPath: string; branch: string; worktreePath: string }): Promise<void>;
-  removeGenerationResidue(generation: { name: string; worktreePath: string }): Promise<void>;
+  removeGenerationResidue(
+    generation: { name: string; worktreePath: string },
+    recordedRepoKeys?: readonly string[],
+  ): Promise<void>;
 } {
   // Cleanup deletes branches locally AND on the remote, so a read-only repo must
   // be excluded here for the same reason it is excluded from assembly.
@@ -261,8 +264,13 @@ export function buildPolyrepoCleanupGit(
       await deleteBranchIn(repoPath, repo.branch);
     },
 
-    removeGenerationResidue: async (generation) => {
+    removeGenerationResidue: async (generation, recordedRepoKeys = []) => {
+      // Only repos the generation did NOT record: removeRepoArtifacts already
+      // deleted the branch for every recorded repo, and repeating it costs a
+      // full remote handshake per repo before its expected failure.
+      const recorded = new Set(recordedRepoKeys);
       for (const repo of writable) {
+        if (recorded.has(repo.repoKey)) continue;
         await deleteBranchIn(repo.repoPath, generation.name);
         await runGit(['worktree', 'prune'], repo.repoPath).catch(() => {});
       }

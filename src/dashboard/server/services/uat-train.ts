@@ -468,6 +468,17 @@ export interface UatGenerationMemberPayload {
   acceptanceCriteria: Array<{ title: string; status: string }>;
 }
 
+/** Per-repo detail safe to return over HTTP — no host filesystem paths. */
+export interface UatGenerationRepoPayload {
+  repoKey: string;
+  branch: string;
+  baseSha: string;
+  targetBranch: string;
+  mergeOrder: number;
+  promotedAt?: string | null;
+  mergeSha?: string | null;
+}
+
 export interface UatGenerationPayload {
   name: string;
   status: UatGeneration['status'];
@@ -482,8 +493,12 @@ export interface UatGenerationPayload {
    * non-empty: a monorepo generation projects the single synthesized entry, so
    * consumers read one shape. Rendering it is deliberately a follow-up; the
    * data ships now so that follow-up has something to render.
+   *
+   * A deliberate public DTO, not the internal model: `repoPath` and
+   * `worktreePath` are absolute server paths, and a response has no reason to
+   * disclose host filesystem topology.
    */
-  repos: UatGenerationRepo[];
+  repos: UatGenerationRepoPayload[];
   stack: { status: 'running' | 'absent'; frontendUrl: string };
 }
 
@@ -582,7 +597,15 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
       members,
       heldOut: gen.heldOut,
       resolutions: gen.resolutions,
-      repos: gen.repos ?? [],
+      repos: (gen.repos ?? []).map((r) => ({
+        repoKey: r.repoKey,
+        branch: r.branch,
+        baseSha: r.baseSha,
+        targetBranch: r.targetBranch,
+        mergeOrder: r.mergeOrder,
+        promotedAt: r.promotedAt ?? null,
+        mergeSha: r.mergeSha ?? null,
+      })),
       stack: { status: probe.status, frontendUrl: probe.frontendUrl },
     });
   }

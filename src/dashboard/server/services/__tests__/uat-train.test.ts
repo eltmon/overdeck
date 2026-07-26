@@ -220,7 +220,17 @@ describe('getUatGenerationsPayload', () => {
 
     const payload = await getUatGenerationsPayload('/repos/myn');
 
-    expect(payload[0]!.repos).toEqual(polyGen.repos);
+    expect(payload[0]!.repos).toEqual([{
+      repoKey: 'fe',
+      branch: 'uat/min-otter-0727',
+      baseSha: 'aaa1111',
+      targetBranch: 'main',
+      mergeOrder: 0,
+      promotedAt: null,
+      mergeSha: null,
+    }]);
+    // Absolute server paths must not leave the process.
+    expect(JSON.stringify(payload[0]!.repos)).not.toContain('/repos/myn');
   });
 
   it('projects the synthesized single repo for a monorepo generation', async () => {
