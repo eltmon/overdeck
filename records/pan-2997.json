@@ -309,22 +309,21 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T11:23:00.468Z",
+  "updated": "2026-07-26T11:29:54.738Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:57:04.635Z",
-    "updatedAt": "2026-07-26T11:22:59.879Z",
+    "updatedAt": "2026-07-26T11:29:54.679Z",
     "reviewNotes": "The initial strict POISON read still throws a generic error, so one transient marker-read failure can be terminally recorded as failed before any wake is delivered.",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - tests/unit/lib/overdeck/no-loss-matrix.ts",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
-    "lastVerifiedCommit": "1700fa490854ce01aef7b32625e0a6c56d11083a",
+    "lastVerifiedCommit": "4cdeddfe137f2baf82a463230ca972820e69ac68",
     "reviewSpawnedAt": "2026-07-26T11:20:24.600Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -430,9 +429,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 32760776,
-            "output": 1304813,
-            "cacheRead": 184260096,
+            "input": 32770490,
+            "output": 1311540,
+            "cacheRead": 185493504,
             "cacheWrite": 0
           }
         },
@@ -461,9 +460,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 34234549,
-          "output": 1493934,
-          "cacheRead": 279588864,
+          "input": 34244263,
+          "output": 1500661,
+          "cacheRead": 280822272,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -474,8 +473,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 356.1359926,
-        "pricingAsOf": "2026-07-26T11:22:59.924Z"
+        "usd": 357.0030766,
+        "pricingAsOf": "2026-07-26T11:29:54.724Z"
       }
     },
     "merges": [
