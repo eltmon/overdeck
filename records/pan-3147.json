@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T17:26:24.283Z",
-  "updated": "2026-07-26T17:50:04.789Z",
+  "updated": "2026-07-26T17:50:09.961Z",
   "pipeline": {
     "issueId": "PAN-3147",
     "reviewStatus": "pending",
@@ -84,5 +84,16 @@
       "summary": "Test gate waived: Prompt-only doctrine change; existing tests/unit/prompts/prompt-invariants.test.ts covers flywheel prompt rails and passed at blob 74ef381f4a586edb2e08cdb72a95bc49f0866915. The issue's 'stall test' wording is prose, not a request for a new automated test.",
       "recordedAt": "2026-07-26T17:50:04.789Z"
     }
-  ]
+  ],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "roles/flywheel.md"
+    ],
+    "actualChangedFiles": [
+      "roles/flywheel.md"
+    ],
+    "recordedAt": "2026-07-26T17:50:09.960Z"
+  }
 }
