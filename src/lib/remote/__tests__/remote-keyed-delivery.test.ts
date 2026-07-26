@@ -20,6 +20,8 @@ function createFakeRemoteTmux(seed: {
   failSubmit?: boolean;
   failMarkerSetOption?: boolean;
   failNextTargetRead?: boolean;
+  failNextPoisonRead?: boolean;
+  failPoisonClear?: boolean;
   paneDead?: boolean;
   dieOnEnter?: boolean;
 } = {}) {
@@ -31,6 +33,8 @@ function createFakeRemoteTmux(seed: {
     failSubmit: seed.failSubmit ?? false,
     failMarkerSetOption: seed.failMarkerSetOption ?? false,
     failNextTargetRead: seed.failNextTargetRead ?? false,
+    failNextPoisonRead: seed.failNextPoisonRead ?? false,
+    failPoisonClear: seed.failPoisonClear ?? false,
     paneDead: seed.paneDead ?? false,
     dieOnEnter: seed.dieOnEnter ?? false,
     pid: '4242',
@@ -58,10 +62,12 @@ function createFakeRemoteTmux(seed: {
       return '';
     }
     if (command.includes('if-shell') && command.includes('send-keys')) {
-      // Phase 2: atomic submit — liveness gate, Enter, then terminal claim.
+      // Phase 2: atomic submit — liveness gate, Enter, then PROVISIONAL
+      // poison + terminal claim in the same server-owned list.
       if (state.failSubmit) throw new Error('exit 1: simulated submit failure');
       if (state.pending !== '' && state.terminal === '' && !state.paneDead) {
         state.enters += 1;
+        state.poison = '1';
         state.terminal = '1';
         state.pending = '';
         // The pane dies in the shell-to-branch handoff window: send-keys
@@ -72,7 +78,13 @@ function createFakeRemoteTmux(seed: {
     }
     if (command.includes('show-option')) {
       const option = command.trim().split(/\s+/).at(-1)?.replace(/'/g, '') ?? '';
-      if (option.includes('-poison-')) return `${state.poison}\n`;
+      if (option.includes('-poison-')) {
+        if (state.failNextPoisonRead) {
+          state.failNextPoisonRead = false;
+          throw new Error('exit 1: simulated transient poison-read failure');
+        }
+        return `${state.poison}\n`;
+      }
       if (option.includes('-pending-')) return `${state.pending}\n`;
       return `${state.terminal}\n`;
     }
@@ -84,9 +96,12 @@ function createFakeRemoteTmux(seed: {
       return `${state.pid} ${state.paneDead ? '1' : '0'}\n`;
     }
     if (command.includes('set-option')) {
-      // Direct marker mutations (rollback, poison, repair): each subcommand
-      // is quoted as `';'`-separated argv.
+      // Direct marker mutations (rollback, poison clear, repair): each
+      // subcommand is quoted as `';'`-separated argv.
       for (const sub of command.split(`';'`)) {
+        if (sub.includes(dedupPoisonOptionName(KEY)) && sub.includes(`'-u'`) && state.failPoisonClear) {
+          throw new Error('exit 1: simulated poison-clear failure');
+        }
         const touchesMarker =
           sub.includes(dedupTerminalOptionName(KEY)) || sub.includes(dedupPendingOptionName(KEY));
         if (state.failMarkerSetOption && touchesMarker) {
@@ -125,6 +140,8 @@ describe('sendToRemoteAgentKeyed', () => {
     expect(state.enters).toBe(1);
     expect(state.terminal).toBe('1');
     expect(state.pending).toBe('');
+    // Verified delivery lifted the provisional breadcrumb.
+    expect(state.poison).toBe('');
     // The message travels base64-encoded in the prompt-file write.
     expect(state.writes[0]).toContain(Buffer.from('wake up remote').toString('base64'));
   });
@@ -213,9 +230,12 @@ describe('sendToRemoteAgentKeyed', () => {
 
     await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
       .rejects.toThrow(KeyedSubmitTargetDeadError);
-    // The terminal marker was rolled back and the pending claim restored.
+    // The terminal marker was rolled back and the pending claim restored —
+    // the key was NOT claimed even though send-keys reported success, and the
+    // verified rollback lifted the breadcrumb.
     expect(state.terminal).toBe('');
     expect(state.pending).toBe('earlier-send-id');
+    expect(state.poison).toBe('');
 
     // Recovery after the pane is alive again: real submission, never a false dedup.
     state.paneDead = false;
@@ -280,6 +300,54 @@ describe('sendToRemoteAgentKeyed', () => {
     const outcome = await sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec);
     expect(outcome).toBe('delivered');
     expect(state.terminal).toBe('1');
+  });
+
+  it('a PROVISIONAL terminal (crash before post-submit verification) is repaired, never honored as a dedup (cycle 12)', async () => {
+    // The server-owned submit set poison+terminal and the dashboard died
+    // before any post-submit read. The breadcrumb forces repair-first
+    // handling: roll back to pending and re-drive — NEVER 'deduplicated'
+    // from the provisional marker.
+    const { exec, state } = createFakeRemoteTmux({ terminal: '1', poison: '1' });
+
+    const outcome = await sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec);
+
+    expect(outcome).toBe('delivered');
+    expect(state.pastes).toBe(0); // repair continues as a completion, not a fresh paste
+    expect(state.terminal).toBe('1');
+    expect(state.poison).toBe('');
+  });
+
+  it('a FAILED poison read aborts without honoring the terminal marker (cycle 12)', async () => {
+    // A false terminal and its breadcrumb both exist; the poison read fails
+    // transiently. Fail-closed: the call must abort, never interpret the
+    // failed read as "no poison", and never return 'deduplicated'.
+    const { exec, state } = createFakeRemoteTmux({ terminal: '1', poison: '1', failNextPoisonRead: true });
+
+    await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
+      .rejects.toThrow(/transient poison-read failure/);
+    expect(state.terminal).toBe('1'); // untouched — nothing honored or repaired
+    expect(state.poison).toBe('1');
+    expect(state.pastes).toBe(0);
+    expect(state.enters).toBe(0);
+  });
+
+  it('a FAILED poison clear after verified delivery is loud — no success with a stale breadcrumb (cycle 12)', async () => {
+    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id', failPoisonClear: true });
+
+    await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
+      .rejects.toThrow(/poison/i);
+    // The submission happened and is terminal, but success was NOT reported
+    // while the breadcrumb survived.
+    expect(state.terminal).toBe('1');
+    expect(state.poison).toBe('1');
+
+    // Recovery: the breadcrumb forces repair-first handling, the clear works
+    // now, and the delivery completes with the breadcrumb verifiably gone.
+    state.failPoisonClear = false;
+    const outcome = await sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec);
+    expect(outcome).toBe('delivered');
+    expect(state.terminal).toBe('1');
+    expect(state.poison).toBe('');
   });
 
   it('rejects keys that are unsafe for tmux option names', async () => {

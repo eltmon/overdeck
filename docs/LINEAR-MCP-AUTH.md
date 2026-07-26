@@ -196,21 +196,25 @@ has not yet been notified:
     PENDING marker are one atomic server-side `if-shell` step, and the
     submission itself is a second single `if-shell` — only when PENDING is
     present, TERMINAL is absent, AND the pane is alive does the server send
-    the Enter and then flip TERMINAL and clear PENDING, in that order, inside
-    one server-executed command list. The pre-branch liveness check is NOT
-    treated as proof of acceptance: the pane can die in the shell-to-branch
-    handoff, and tmux reports `send-keys` into a remain-on-exit corpse as
-    success. So after the command, the target is re-read — and the key may
-    only become terminal when BOTH target reads succeeded, BOTH report a live
-    pane, and the pid identity matches (an unreadable pre-target fails
-    CLOSED: the pane could have been replaced without its pasted content).
-    If the target was lost around the Enter, the terminal marker is ROLLED
-    BACK as a verified transition: a POISON breadcrumb is written first (so a
-    failed rollback can never leave a false terminal honorable), the rollback
-    runs and is verified, and `KeyedSubmitTargetDeadError` is thrown. A later
-    keyed call that finds the breadcrumb repairs the markers before anything
-    else — it never returns `deduplicated` from a poisoned terminal. The
-    outbox entry stays `pending` and a later pass re-drives the wake after
+    the Enter and then set the POISON breadcrumb and the TERMINAL marker and
+    clear PENDING, all inside one server-executed command list. The terminal
+    is therefore PROVISIONAL from the moment it exists: a dashboard crash
+    anywhere leaves poison+terminal together, and the breadcrumb forces any
+    later keyed call to repair (roll back to pending, verify, lift the
+    breadcrumb) instead of honoring the marker as a dedup. The pre-branch
+    liveness check is NOT treated as proof of acceptance: the pane can die in
+    the shell-to-branch handoff, and tmux reports `send-keys` into a
+    remain-on-exit corpse as success. So after the command, the target is
+    re-read — and the key may only lose its provisional status when BOTH
+    target reads succeeded, BOTH report a live pane, and the pid identity
+    matches (an unreadable pre-target fails CLOSED: the pane could have been
+    replaced without its pasted content). If the target was lost around the
+    Enter, the terminal marker is ROLLED BACK as a verified transition and
+    `KeyedSubmitTargetDeadError` is thrown. Poison reads are fail-closed (a
+    failed read aborts rather than being interpreted as "no poison") and
+    poison clears are verified (a stale breadcrumb must never invalidate a
+    legitimate terminal on a later replay). The outbox entry stays `pending`
+    on every recoverable failure and a later pass re-drives the wake after
     the agent resumes — recovery never suppresses a wake that did not
     demonstrably reach a live harness. A failed Enter aborts the command
     list before the terminal transition, and concurrent or post-crash

@@ -119,6 +119,77 @@ async function readMarker(sessionName: string, option: string): Promise<string> 
 }
 
 /**
+ * Fail-CLOSED marker read (cycle 12): `-q` makes an unset user option a clean
+ * empty read, so a rejection is always a REAL failure (missing session,
+ * unreachable server). Safety-critical markers (the poison breadcrumb) must
+ * be read this way — interpreting a failed read as "absent" could honor a
+ * false terminal marker or bypass a rollback-required state.
+ */
+async function readMarkerStrict(sessionName: string, option: string): Promise<string> {
+  const result = await tmuxExecAsync(['show-option', '-qv', '-t', sessionName, option], { encoding: 'utf-8' });
+  return String(result.stdout).trim();
+}
+
+/** Clear the poison breadcrumb and VERIFY it is gone (cycle 12). */
+async function clearPoisonVerified(
+  sessionName: string,
+  poisonOption: string,
+  context: string,
+  read: (sessionName: string, option: string) => Promise<string> = readMarker,
+): Promise<void> {
+  await tmuxExecAsync(['set-option', '-u', '-t', sessionName, poisonOption], { encoding: 'utf-8' });
+  const remaining = await read(sessionName, poisonOption);
+  if (remaining !== '') {
+    throw new Error(`Keyed tmux markers for ${sessionName}: poison breadcrumb could not be cleared (${context})`);
+  }
+}
+
+export interface KeyedTmuxDeps {
+  /** Test seam for marker-read failures; production uses the real tmux reads. */
+  readMarker?: (sessionName: string, option: string) => Promise<string>;
+  readMarkerStrict?: (sessionName: string, option: string) => Promise<string>;
+  /** Test seam for target-read failures; production uses the real tmux read. */
+  readPaneTarget?: (sessionName: string) => Promise<PaneTarget>;
+}
+
+/**
+ * Repair a poisoned marker set (cycle 11/12): clear the terminal marker,
+ * restore a pending claim, verify both, then clear the breadcrumb — verified.
+ * A poisoned terminal is PROVISIONAL: it may be a false claim (rollback was
+ * interrupted) or a delivered-but-unverified one, and the tmux tier cannot
+ * distinguish them — so repair always rolls back to pending and lets the
+ * normal recovery re-drive. An empty Enter on the (already-submitted, live)
+ * composer is the worst case; a suppressed wake is never acceptable.
+ *
+ * Returns normally only when the breadcrumb is verifiably gone; throws
+ * otherwise (the caller must NOT submit while a stale breadcrumb survives —
+ * a later replay would invalidate a legitimate terminal and re-submit).
+ */
+async function repairPoisonedMarkers(
+  sessionName: string,
+  dedupKey: string,
+  sendId: string,
+  read: (sessionName: string, option: string) => Promise<string>,
+): Promise<void> {
+  const terminalOption = dedupTerminalOptionName(dedupKey);
+  const pendingOption = dedupPendingOptionName(dedupKey);
+  const poisonOption = dedupPoisonOptionName(dedupKey);
+  await tmuxExecAsync([
+    'set-option', '-u', '-t', sessionName, terminalOption,
+    ';',
+    'set-option', '-t', sessionName, pendingOption, sendId,
+  ], { encoding: 'utf-8' });
+  const [repairedTerminal, repairedPending] = await Promise.all([
+    read(sessionName, terminalOption),
+    read(sessionName, pendingOption),
+  ]);
+  if (repairedTerminal !== '' || repairedPending === '') {
+    throw new Error(`Keyed tmux markers for ${sessionName} are poisoned and could not be repaired (key "${dedupKey}")`);
+  }
+  await clearPoisonVerified(sessionName, poisonOption, `repair of key "${dedupKey}"`, read);
+}
+
+/**
  * Deduplicated message paste for the tmux fallback path.
  *
  * Returns 'pasted' when this call pasted (caller must complete the submit),
@@ -135,35 +206,26 @@ export async function sendKeysDedup(
   keys: string,
   dedupKey: string,
   caller?: string,
+  deps: KeyedTmuxDeps = {},
 ): Promise<KeyedTmuxPhase> {
   validateSessionName(sessionName);
   assertValidDedupKey(dedupKey);
+  const read = deps.readMarker ?? readMarker;
+  const readStrict = deps.readMarkerStrict ?? readMarkerStrict;
   const terminalOption = dedupTerminalOptionName(dedupKey);
   const pendingOption = dedupPendingOptionName(dedupKey);
   const poisonOption = dedupPoisonOptionName(dedupKey);
 
   const sendId = randomUUID();
 
-  // The poison breadcrumb invalidates any terminal marker (cycle 11): a
-  // previous post-submit check proved the terminal marker FALSE but could
-  // not verify its rollback. Repair the markers FIRST — the terminal marker
-  // must never be honored while the breadcrumb exists — then continue as a
-  // pending completion, never as a dedup and never as a fresh paste.
-  const poisonMarker = await readMarker(sessionName, poisonOption);
+  // The poison breadcrumb invalidates any terminal marker (cycle 11/12): it
+  // marks either a FALSE terminal whose rollback was interrupted or a
+  // PROVISIONAL terminal whose post-submit verification never completed. The
+  // read is fail-CLOSED — a failed poison read must never be interpreted as
+  // "no poison" while a false terminal sits next to it.
+  const poisonMarker = await readStrict(sessionName, poisonOption);
   if (poisonMarker !== '') {
-    await tmuxExecAsync([
-      'set-option', '-u', '-t', sessionName, terminalOption,
-      ';',
-      'set-option', '-t', sessionName, pendingOption, sendId,
-    ], { encoding: 'utf-8' });
-    const [repairedTerminal, repairedPending] = await Promise.all([
-      readMarker(sessionName, terminalOption),
-      readMarker(sessionName, pendingOption),
-    ]);
-    if (repairedTerminal !== '' || repairedPending === '') {
-      throw new Error(`Keyed tmux markers for ${sessionName} are poisoned and could not be repaired (key "${dedupKey}")`);
-    }
-    await tmuxExecAsync(['set-option', '-u', '-t', sessionName, poisonOption], { encoding: 'utf-8' }).catch(() => {});
+    await repairPoisonedMarkers(sessionName, dedupKey, sendId, read);
     return 'submit-pending';
   }
 
@@ -210,8 +272,10 @@ export async function sendKeysDedup(
  * After the settle window, the SUBMISSION is one server-owned command: a
  * single `if-shell` whose condition requires the pending claim present, the
  * terminal marker absent, AND the pane alive, and whose command list sends
- * the Enter FIRST and only then flips the key TERMINAL and clears pending.
- * The tmux server executes the whole sequence (cycle 9 ordering):
+ * the Enter FIRST and then sets the POISON breadcrumb and the TERMINAL
+ * marker and clears pending — the terminal is PROVISIONAL from the moment it
+ * exists, so a dashboard crash can never strand an honorable-but-unverified
+ * terminal (cycle 12). The tmux server executes the whole sequence:
  *
  * - A pane that died during the settle window fails the liveness condition —
  *   NO marker changes and NO Enter is sent, so the wake is never recorded as
@@ -220,9 +284,12 @@ export async function sendKeysDedup(
  * - The pre-branch liveness condition is NOT proof of acceptance (cycle 10):
  *   the pane can die in the shell-to-branch handoff, and tmux reports
  *   send-keys into a remain-on-exit corpse as success. So after the command
- *   the target is re-read — if the pane died or its pid changed around the
- *   Enter, the terminal marker is ROLLED BACK, the pending claim restored,
- *   and KeyedSubmitTargetDeadError is thrown.
+ *   the target is re-read — if the pane died, was replaced, or cannot be
+ *   identified around the Enter, the terminal marker is ROLLED BACK and the
+ *   pending claim restored, and KeyedSubmitTargetDeadError is thrown. The
+ *   breadcrumb is lifted only after verification, and clearing it is itself
+ *   verified (cycle 12): a stale breadcrumb would let a later replay
+ *   invalidate a legitimate terminal and re-submit.
  * - The Enter precedes the terminal transition inside the transaction, so a
  *   failed Enter (which aborts the command list) can never leave the key
  *   terminal.
@@ -235,18 +302,14 @@ export async function sendKeysDedup(
  * the pane is dead (pending claim preserved), and a generic error when both
  * markers vanished without a submission.
  */
-export interface KeyedSubmitDeps {
-  /** Test seam for target-read failures; production uses the real tmux read. */
-  readPaneTarget?: (sessionName: string) => Promise<PaneTarget>;
-}
-
 export async function completeKeyedSubmit(
   sessionName: string,
   dedupKey: string,
-  deps: KeyedSubmitDeps = {},
+  deps: KeyedTmuxDeps = {},
 ): Promise<void> {
   validateSessionName(sessionName);
   assertValidDedupKey(dedupKey);
+  const read = deps.readMarker ?? readMarker;
   const readTarget = deps.readPaneTarget ?? readPaneTarget;
   const terminalOption = dedupTerminalOptionName(dedupKey);
   const pendingOption = dedupPendingOptionName(dedupKey);
@@ -260,19 +323,23 @@ export async function completeKeyedSubmit(
   // remain-on-exit corpse as SUCCESS. What proves acceptance is the
   // post-submit check below (cycle 10).
   const preTarget = await readTarget(sessionName);
-  const pendingBefore = await readMarker(sessionName, pendingOption);
+  const pendingBefore = await read(sessionName, pendingOption);
 
+  // PROVISIONAL from birth (cycle 12): the Enter, the POISON breadcrumb, the
+  // TERMINAL marker, and the pending clear are ONE server-owned command list,
+  // so a dashboard crash anywhere after this command leaves poison+terminal
+  // together — recovery can never find an honorable-but-unverified terminal.
   await tmuxExecAsync([
     'if-shell', '-t', sessionName,
     `test -z "$(tmux show-option -qv -t ${sessionName} ${terminalOption})" && ` +
     `test -n "$(tmux show-option -qv -t ${sessionName} ${pendingOption})" && ` +
     `test "$(tmux display-message -p -t ${sessionName} '#{pane_dead}')" = "0"`,
-    `send-keys -t ${sessionName} C-m \; set-option -t ${sessionName} ${terminalOption} 1 \; set-option -u -t ${sessionName} ${pendingOption}`,
+    `send-keys -t ${sessionName} C-m \; set-option -t ${sessionName} ${poisonOption} 1 \; set-option -t ${sessionName} ${terminalOption} 1 \; set-option -u -t ${sessionName} ${pendingOption}`,
   ], { encoding: 'utf-8' });
 
   const [terminalAfter, pendingAfter, postTarget] = await Promise.all([
-    readMarker(sessionName, terminalOption),
-    readMarker(sessionName, pendingOption),
+    read(sessionName, terminalOption),
+    read(sessionName, pendingOption),
     readTarget(sessionName),
   ]);
 
@@ -287,25 +354,33 @@ export async function completeKeyedSubmit(
     postTarget.pid !== preTarget.pid;
 
   if (terminalAfter !== '') {
-    if (!targetLost) return; // Submitted to a proven-live pane — by this call or a concurrent completer.
+    if (!targetLost) {
+      // Verified delivery — lift the provisional breadcrumb, fail-closed
+      // (cycle 12): a stale breadcrumb would let a later replay invalidate
+      // this legitimate terminal and re-submit.
+      await clearPoisonVerified(sessionName, poisonOption, `verified delivery of key "${dedupKey}"`, read);
+      return;
+    }
     // The pane died, was replaced, or cannot be identified around the Enter:
     // tmux may have reported send-keys as successful while the input landed
     // nowhere, and even an accepted Enter is worthless once the receiving
-    // harness is gone. ROLL THE KEY BACK as a VERIFIED protocol transition
-    // (cycle 11): breadcrumb first so a failed rollback can never leave a
-    // false terminal marker honorable, then rollback, then verify.
-    await tmuxExecAsync(['set-option', '-t', sessionName, poisonOption, '1'], { encoding: 'utf-8' });
+    // harness is gone. ROLL THE KEY BACK and verify; the breadcrumb set by
+    // the submit list already marks the terminal provisional, so a failed
+    // rollback can never leave it honorable.
     const rollbackArgs = pendingBefore === ''
       ? ['set-option', '-u', '-t', sessionName, terminalOption, ';', 'set-option', '-u', '-t', sessionName, pendingOption]
       : ['set-option', '-u', '-t', sessionName, terminalOption, ';', 'set-option', '-t', sessionName, pendingOption, pendingBefore];
     await tmuxExecAsync(rollbackArgs, { encoding: 'utf-8' }).catch(() => {});
     const [rolledTerminal, restoredPending] = await Promise.all([
-      readMarker(sessionName, terminalOption),
-      readMarker(sessionName, pendingOption),
+      read(sessionName, terminalOption),
+      read(sessionName, pendingOption),
     ]);
     if (rolledTerminal === '' && restoredPending !== '') {
-      // Verified — the breadcrumb is no longer needed.
-      await tmuxExecAsync(['set-option', '-u', '-t', sessionName, poisonOption], { encoding: 'utf-8' }).catch(() => {});
+      // Verified rollback — lift the breadcrumb. If the clear fails the
+      // surviving poison is idempotent-safe here (terminal is already clear,
+      // so a later repair restores the same pending state and retries).
+      await clearPoisonVerified(sessionName, poisonOption, `verified rollback of key "${dedupKey}"`, read)
+        .catch(() => {});
     }
     throw new KeyedSubmitTargetDeadError(sessionName, dedupKey);
   }

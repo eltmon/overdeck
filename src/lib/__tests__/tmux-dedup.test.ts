@@ -205,7 +205,7 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
   });
 
-  it('repairs a poisoned false-terminal before honoring anything (cycle 11)', async () => {
+  it('repairs a poisoned false-terminal before honoring anything (cycle 11/12)', async () => {
     // A prior post-submit check proved this terminal marker FALSE but could
     // not verify its rollback: terminal sits there next to the poison
     // breadcrumb.
@@ -215,11 +215,68 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     const phase = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
 
     // NEVER 'deduplicated' from a false terminal: the repair clears terminal,
-    // restores a pending claim, and lifts the breadcrumb.
+    // restores a pending claim, and lifts the breadcrumb — verified.
     expect(phase).toBe('submit-pending');
     expect(showOption('@overdeck-dedup-test-key-1')).toBe('');
     expect(showOption('@overdeck-dedup-pending-test-key-1')).not.toBe('');
     expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('');
+
+    // The repaired completion delivers for real, and the breadcrumb lifecycle
+    // closes: a later replay dedups on the VERIFIED terminal.
+    await completeKeyedSubmit(session, 'test-key-1');
+    expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
+    expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('');
+    expect(await sendKeysDedup(session, 'wake up agent', 'test-key-1')).toBe('deduplicated');
+  });
+
+  it('a FAILED poison read aborts without honoring the terminal marker (cycle 12)', async () => {
+    // A false terminal and its breadcrumb both exist; the poison read fails.
+    execFileSync('tmux', ['-L', socket, 'set-option', '-t', session, '@overdeck-dedup-test-key-1', '1']);
+    execFileSync('tmux', ['-L', socket, 'set-option', '-t', session, '@overdeck-dedup-poison-test-key-1', '1']);
+
+    await expect(
+      sendKeysDedup(session, 'wake up agent', 'test-key-1', 'test', {
+        readMarkerStrict: () => Promise.reject(new Error('transient poison-read failure')),
+      }),
+    ).rejects.toThrow(/transient poison-read failure/);
+
+    // Nothing was honored, repaired, or pasted — and the call did NOT return
+    // 'deduplicated' from the false terminal.
+    expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
+    expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('1');
+    expect(occurrences(capturePane(), 'wake up agent')).toBe(0);
+
+    // Recovery with a healthy read repairs and completes.
+    const phase = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
+    expect(phase).toBe('submit-pending');
+    await completeKeyedSubmit(session, 'test-key-1');
+    expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
+    expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('');
+  });
+
+  it('a FAILED poison clear after verified delivery is loud — no success with a stale breadcrumb (cycle 12)', async () => {
+    const first = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
+    expect(first).toBe('pasted');
+
+    // The delivery verifies live, but the breadcrumb-clear verification reads
+    // a stale poison — the call must NOT report success.
+    await expect(
+      completeKeyedSubmit(session, 'test-key-1', {
+        readMarker: (name: string, option: string) => {
+          if (option === '@overdeck-dedup-poison-test-key-1') {
+            return Promise.resolve('1');
+          }
+          return Promise.resolve(showOption(option));
+        },
+      }),
+    ).rejects.toThrow(/poison breadcrumb could not be cleared/);
+
+    // The terminal is legitimately set and the REAL breadcrumb was cleared —
+    // only the verification read lied — so a healthy recovery dedups on the
+    // verified terminal instead of invalidating it.
+    expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
+    expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('');
+    expect(await sendKeysDedup(session, 'wake up agent', 'test-key-1')).toBe('deduplicated');
   });
 
   it('fails CLOSED when the pre-submit target read fails — the Enter lands but the claim rolls back (cycle 11)', async () => {

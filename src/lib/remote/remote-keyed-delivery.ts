@@ -87,15 +87,36 @@ export async function sendToRemoteAgentKeyed(
     run(buildRemoteTmuxCommand(['show-option', '-qv', '-t', agentId, option]))
       .then(stdout => stdout.trim(), () => '');
 
+  // Fail-CLOSED marker read (cycle 12): `-q` makes an unset user option a
+  // clean empty read, so a rejection is always a REAL failure. The poison
+  // breadcrumb must be read this way — interpreting a failed read as
+  // "absent" could honor a false terminal marker.
+  const readMarkerStrict = async (option: string): Promise<string> =>
+    run(buildRemoteTmuxCommand(['show-option', '-qv', '-t', agentId, option]))
+      .then(stdout => stdout.trim());
+
+  // Clear the poison breadcrumb and VERIFY it is gone (cycle 12).
+  const clearPoisonVerified = async (context: string): Promise<void> => {
+    await run(buildRemoteTmuxCommand(['set-option', '-u', '-t', agentId, poisonOption]));
+    const remaining = await readMarker(poisonOption);
+    if (remaining !== '') {
+      throw new Error(`Keyed remote markers for ${agentId}: poison breadcrumb could not be cleared (${context})`);
+    }
+  };
+
   try {
-    // The poison breadcrumb invalidates any terminal marker (cycle 11): a
-    // previous post-submit check proved the terminal marker FALSE but its
-    // rollback could not be verified. Repair the markers FIRST — a false
-    // terminal must never be honored as a dedup — then continue as a pending
-    // completion, never as a fresh paste.
-    const poisonMarker = await readMarker(poisonOption);
+    // The poison breadcrumb invalidates any terminal marker (cycle 11/12):
+    // it marks either a FALSE terminal whose rollback was interrupted or a
+    // PROVISIONAL terminal whose post-submit verification never completed.
+    // The read is fail-CLOSED — a failed poison read must never be
+    // interpreted as "no poison" while a false terminal sits next to it.
+    const poisonMarker = await readMarkerStrict(poisonOption);
     let skipPaste = false;
     if (poisonMarker !== '') {
+      // Repair (cycle 12): a poisoned terminal may be false or
+      // delivered-but-unverified, and the tmux tier cannot distinguish —
+      // always roll back to pending and let normal recovery re-drive. The
+      // breadcrumb must be verifiably gone before any submission.
       await run(buildRemoteTmuxCommand([
         'set-option', '-u', '-t', agentId, terminalOption,
         ';',
@@ -108,7 +129,7 @@ export async function sendToRemoteAgentKeyed(
       if (repairedTerminal !== '' || repairedPending === '') {
         throw new Error(`Keyed remote markers for ${agentId} are poisoned and could not be repaired (key "${dedupKey}")`);
       }
-      await run(buildRemoteTmuxCommand(['set-option', '-u', '-t', agentId, poisonOption])).catch(() => '');
+      await clearPoisonVerified(`repair of key "${dedupKey}"`);
       skipPaste = true;
     }
 
@@ -158,12 +179,18 @@ export async function sendToRemoteAgentKeyed(
     const preTarget = await readPaneTarget();
     const pendingBefore = pendingMarker;
     await new Promise(resolve => setTimeout(resolve, 300));
+    // PROVISIONAL from birth (cycle 12): the Enter, the POISON breadcrumb,
+    // the TERMINAL marker, and the pending clear are ONE server-owned command
+    // list, so a dashboard crash anywhere after this command leaves
+    // poison+terminal together — recovery can never find an
+    // honorable-but-unverified terminal.
     const submitCondition =
       `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${terminalOption})" && ` +
       `test -n "$(${innerTmux} show-option -qv -t ${agentId} ${pendingOption})" && ` +
       `test "$(${innerTmux} display-message -p -t ${agentId} '#{pane_dead}')" = "0"`;
     const submitOnTrue =
       `send-keys -t ${agentId} C-m \; ` +
+      `set-option -t ${agentId} ${poisonOption} 1 \; ` +
       `set-option -t ${agentId} ${terminalOption} 1 \; ` +
       `set-option -u -t ${agentId} ${pendingOption}`;
     await run(buildRemoteTmuxCommand(['if-shell', '-t', agentId, submitCondition, submitOnTrue]));
@@ -189,11 +216,10 @@ export async function sendToRemoteAgentKeyed(
     if (targetLost) {
       // The pane died, was replaced, or cannot be identified around the
       // Enter: acceptance is unprovable and the receiving harness is gone.
-      // ROLL THE KEY BACK as a VERIFIED protocol transition (cycle 11):
-      // breadcrumb first so a failed rollback can never leave a false
-      // terminal marker honorable, then rollback, then verify.
+      // ROLL THE KEY BACK and verify; the breadcrumb set by the submit list
+      // already marks the terminal provisional, so a failed rollback can
+      // never leave it honorable.
       if (terminalAfter !== '') {
-        await run(buildRemoteTmuxCommand(['set-option', '-t', agentId, poisonOption, '1']));
         const rollbackArgs = pendingBefore === ''
           ? ['set-option', '-u', '-t', agentId, terminalOption, ';', 'set-option', '-u', '-t', agentId, pendingOption]
           : ['set-option', '-u', '-t', agentId, terminalOption, ';', 'set-option', '-t', agentId, pendingOption, pendingBefore];
@@ -203,8 +229,9 @@ export async function sendToRemoteAgentKeyed(
           readMarker(pendingOption),
         ]);
         if (rolledTerminal === '' && restoredPending !== '') {
-          // Verified — the breadcrumb is no longer needed.
-          await run(buildRemoteTmuxCommand(['set-option', '-u', '-t', agentId, poisonOption])).catch(() => '');
+          // Verified rollback — lift the breadcrumb. A failed clear is
+          // idempotent-safe here (terminal is already clear).
+          await clearPoisonVerified(`verified rollback of key "${dedupKey}"`).catch(() => '');
         }
       }
       throw new KeyedSubmitTargetDeadError(agentId, dedupKey);
@@ -212,6 +239,10 @@ export async function sendToRemoteAgentKeyed(
     if (terminalAfter === '') {
       throw new Error(`Keyed remote submit for ${agentId} was rejected with the pending claim intact on a live pane`);
     }
+    // Verified delivery — lift the provisional breadcrumb, fail-closed
+    // (cycle 12): a stale breadcrumb would let a later replay invalidate
+    // this legitimate terminal and re-submit.
+    await clearPoisonVerified(`verified delivery of key "${dedupKey}"`);
     return 'delivered';
   } finally {
     await cleanup();
