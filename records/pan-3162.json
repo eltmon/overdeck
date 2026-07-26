@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T22:02:27.238Z",
+  "updated": "2026-07-26T22:02:33.714Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "pending",
@@ -207,5 +207,52 @@
     "merge-oracle-docs.merge-oracle-docs.ac1": "completed",
     "merge-oracle-docs.merge-oracle-docs.ac2": "completed",
     "merge-oracle-docs.merge-oracle-docs.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts",
+      "src/lib/cloister/deacon-stuck-merging.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/server/routes/__tests__/merge-ops.test.ts",
+      "tests/unit/lib/cloister/uat-reconciler.test.ts"
+    ],
+    "declaredScope": [
+      "docs/MERGE-TRAIN.md",
+      "docs/MERGE-WORKFLOW.md",
+      "docs/RECOVERY-NET.md",
+      "src/dashboard/server/routes/__tests__/merge-ops.test.ts",
+      "src/dashboard/server/routes/workspaces/merge-ops.ts",
+      "src/lib/cloister/deacon-merge.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/merge-completeness.ts",
+      "src/lib/cloister/merge-verification.ts",
+      "tests/unit/lib/cloister/deacon-forge-merge-reconcile.test.ts",
+      "tests/unit/lib/cloister/deacon-stuck-merging.test.ts",
+      "tests/unit/lib/cloister/merge-completeness-forge-error.test.ts",
+      "tests/unit/lib/cloister/merge-completeness.test.ts",
+      "tests/unit/lib/cloister/merge-verification.test.ts",
+      "tests/unit/lib/cloister/uat-reconciler.test.ts",
+      "tests/unit/lib/flywheel-merge-order.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/MERGE-TRAIN.md",
+      "docs/MERGE-WORKFLOW.md",
+      "docs/RECOVERY-NET.md",
+      "src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts",
+      "src/dashboard/server/routes/workspaces/merge-ops.ts",
+      "src/lib/cloister/deacon-merge.ts",
+      "src/lib/cloister/deacon-stuck-merging.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/merge-completeness.ts",
+      "src/lib/cloister/merge-verification.ts",
+      "tests/unit/lib/cloister/deacon-forge-merge-reconcile.test.ts",
+      "tests/unit/lib/cloister/deacon-stuck-merging.test.ts",
+      "tests/unit/lib/cloister/merge-completeness-forge-error.test.ts",
+      "tests/unit/lib/cloister/merge-completeness.test.ts",
+      "tests/unit/lib/cloister/merge-verification.test.ts",
+      "tests/unit/lib/flywheel-merge-order.test.ts"
+    ],
+    "recordedAt": "2026-07-26T22:02:33.712Z"
   }
 }
