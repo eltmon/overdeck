@@ -32,7 +32,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T20:23:38.456Z",
+  "updated": "2026-07-26T20:35:27.785Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
@@ -59,16 +59,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "docs-patrol-and-dedup": {
-        "writerId": "agent-pan-3148",
-        "agentId": "agent-pan-3148",
-        "pid": 277027,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T20:23:38.456Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3148",
@@ -135,6 +127,16 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3148 dead)",
         "releasedAt": "2026-07-26T18:44:07.944Z"
+      },
+      {
+        "writerId": "agent-pan-3148",
+        "agentId": "agent-pan-3148",
+        "pid": 277027,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T20:23:38.456Z",
+        "itemId": "docs-patrol-and-dedup",
+        "outcome": "completed",
+        "releasedAt": "2026-07-26T20:35:27.785Z"
       }
     ],
     "statusReasons": {
@@ -189,6 +191,8 @@
     "work-prompt-run-id-guidance": "completed",
     "work-prompt-run-id-guidance.work-prompt-run-id-guidance.ac1": "completed",
     "work-prompt-run-id-guidance.work-prompt-run-id-guidance.ac2": "completed",
-    "docs-patrol-and-dedup": "running"
+    "docs-patrol-and-dedup": "completed",
+    "docs-patrol-and-dedup.docs-patrol-and-dedup.ac1": "completed",
+    "docs-patrol-and-dedup.docs-patrol-and-dedup.ac2": "completed"
   }
 }
