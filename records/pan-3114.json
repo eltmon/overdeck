@@ -2,7 +2,7 @@
   "issueId": "PAN-3114",
   "schemaVersion": 2,
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T09:32:27.254Z",
+  "updated": "2026-07-26T09:32:28.483Z",
   "pipeline": {
     "issueId": "PAN-3114",
     "reviewStatus": "pending",
@@ -33,5 +33,5 @@
     }
   ],
   "harness": "claude-code",
-  "model": "claude-fable-5"
+  "model": "k3[1m]"
 }
