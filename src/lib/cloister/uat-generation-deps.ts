@@ -10,6 +10,7 @@
  * the tested logic.
  */
 import { execFile } from 'child_process';
+import { rm } from 'fs/promises';
 import { isAbsolute, relative, resolve } from 'path';
 import { promisify } from 'util';
 import {
@@ -177,6 +178,60 @@ export async function listRemoteUatBranches(projectRoot: string): Promise<string
     .map((line) => line.split('\t')[1] ?? '')
     .filter((ref) => ref.startsWith('refs/heads/'))
     .map((ref) => ref.slice('refs/heads/'.length));
+}
+
+/**
+ * Polyrepo cleanup deps (PAN-3093). Each member repo owns its own worktree and
+ * branch, and the wrapper folder holds them all.
+ *
+ * `removeGenerationResidue` also deletes the generation branch from EVERY
+ * configured member repo, not just the ones the generation recorded: a global
+ * hold-out can drop a repo after its branch was already created locally. That
+ * branch is never pushed, but it would linger. Deleting a branch that does not
+ * exist is a no-op, so the sweep is safe.
+ */
+export function buildPolyrepoCleanupGit(
+  repos: readonly ResolvedProjectRepo[],
+  projectPath: string,
+): {
+  removeWorktree(worktreePath: string): Promise<void>;
+  deleteBranch(branchName: string): Promise<void>;
+  removeRepoArtifacts(repo: { repoKey: string; repoPath: string; branch: string; worktreePath: string }): Promise<void>;
+  removeGenerationResidue(generation: { name: string; worktreePath: string }): Promise<void>;
+} {
+  const byKey = new Map(repos.map((r) => [r.repoKey, r]));
+
+  const deleteBranchIn = async (repoPath: string, branchName: string) => {
+    const safeBranch = safeBranchName(branchName, 'uat');
+    await runGit(['branch', '-D', safeBranch], repoPath).catch(() => {});
+    await runGit(['push', 'origin', '--delete', safeBranch], repoPath).catch(() => {});
+  };
+
+  return {
+    // Unused on the polyrepo path (removeRepoArtifacts supersedes them) but the
+    // deps contract still requires them.
+    removeWorktree: async () => {},
+    deleteBranch: async () => {},
+
+    removeRepoArtifacts: async (repo) => {
+      const repoPath = byKey.get(repo.repoKey)?.repoPath ?? repo.repoPath;
+      const safePath = safeGenerationWorktreePath(projectPath, repo.worktreePath);
+      await runGit(['worktree', 'remove', '--force', safePath], repoPath).catch(() => {});
+      await runGit(['worktree', 'prune'], repoPath).catch(() => {});
+      await deleteBranchIn(repoPath, repo.branch);
+    },
+
+    removeGenerationResidue: async (generation) => {
+      for (const repo of repos) {
+        await deleteBranchIn(repo.repoPath, generation.name);
+        await runGit(['worktree', 'prune'], repo.repoPath).catch(() => {});
+      }
+      // Validate before deleting: this is a recursive removal, and the check
+      // refuses anything outside <projectPath>/workspaces.
+      const safeFolder = safeGenerationWorktreePath(projectPath, generation.worktreePath);
+      await rm(safeFolder, { recursive: true, force: true });
+    },
+  };
 }
 
 /** Cleanup deps: remove a generation worktree and delete its branch everywhere. */

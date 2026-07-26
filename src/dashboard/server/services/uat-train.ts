@@ -21,6 +21,7 @@ import {
   type ReadyFeature,
 } from '../../../lib/cloister/uat-generation-engine.js';
 import {
+  buildPolyrepoCleanupGit,
   buildPolyrepoGitDeps,
   buildUatGenerationGitDeps,
   buildUatGenerationStore,
@@ -101,9 +102,16 @@ function codenameLabel(features: readonly ReadyFeature[]): string {
  */
 function makeCleanupForProject(projectPath: string): () => Promise<void> {
   return async () => {
+    // A polyrepo generation's artifacts live in N repos plus a wrapper folder,
+    // none of them reachable from the wrapper path the monorepo cleanup uses.
+    const projectConfig = findProjectByPathSync(projectPath);
+    const cleanupGit = projectConfig?.workspace?.type === 'polyrepo'
+      ? buildPolyrepoCleanupGit(resolveProjectRepos(projectPath), projectPath)
+      : buildUatGenerationCleanupGit(projectPath);
+
     await cleanupUatGenerations(projectPath, {
       store: buildUatGenerationStore(),
-      ...buildUatGenerationCleanupGit(projectPath),
+      ...cleanupGit,
       teardownStack: (gen) => teardownUatStack(gen),
       log: (msg) => console.log(msg),
     });

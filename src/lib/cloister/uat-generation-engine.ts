@@ -21,6 +21,7 @@ import type { PolyrepoRepoContribution } from '../flywheel-merge-order.js';
 import type {
   UatGeneration,
   UatGenerationMember,
+  UatGenerationRepo,
   UatGenerationStatus,
 } from '../overdeck/merge-sync.js';
 
@@ -287,6 +288,22 @@ export interface GenerationCleanupDeps {
   deleteBranch(branchName: string): Promise<void>;
   /** Tear down the generation's live stack if one is running. */
   teardownStack?: (generation: UatGeneration) => Promise<void>;
+  /**
+   * Remove ONE member repo's worktree and branch (local + remote), for a
+   * polyrepo generation (PAN-3093). Its PRESENCE selects per-repo teardown:
+   * every generation reads back with at least one `repos` entry (monorepo rows
+   * synthesize one), so a repo count cannot distinguish the two, and a polyrepo
+   * generation with a single contributing repo still needs per-repo handling.
+   * Omit it and cleanup behaves exactly as it did before.
+   */
+  removeRepoArtifacts?: (repo: UatGenerationRepo) => Promise<void>;
+  /**
+   * Everything left once the recorded repos are clean: the wrapper folder that
+   * held the per-repo worktrees, plus the generation branch in any member repo
+   * the generation stopped using (a hold-out can drop a repo after its branch
+   * was already created locally — that branch is never pushed, but it lingers).
+   */
+  removeGenerationResidue?: (generation: UatGeneration) => Promise<void>;
   log?: (msg: string) => void;
 }
 
@@ -318,14 +335,30 @@ export async function cleanupUatGenerations(
         log(`[uat-generation] cleanup ${gen.name}: stack teardown failed: ${err instanceof Error ? err.message : String(err)}`);
       });
     }
-    await deps.removeWorktree(gen.worktreePath).catch((err) => {
-      cleaned = false;
-      log(`[uat-generation] cleanup ${gen.name}: worktree removal failed: ${err instanceof Error ? err.message : String(err)}`);
-    });
-    await deps.deleteBranch(gen.name).catch((err) => {
-      cleaned = false;
-      log(`[uat-generation] cleanup ${gen.name}: branch deletion failed: ${err instanceof Error ? err.message : String(err)}`);
-    });
+    if (deps.removeRepoArtifacts) {
+      // Polyrepo: one worktree and one branch per member repo, then the wrapper
+      // folder. Every repo is attempted even after one fails, so a single bad
+      // repo cannot strand the others' artifacts; cleanedAt still stays unset.
+      for (const repo of gen.repos ?? []) {
+        await deps.removeRepoArtifacts(repo).catch((err) => {
+          cleaned = false;
+          log(`[uat-generation] cleanup ${gen.name}: ${repo.repoKey} artifact removal failed: ${err instanceof Error ? err.message : String(err)}`);
+        });
+      }
+      await deps.removeGenerationResidue?.(gen).catch((err) => {
+        cleaned = false;
+        log(`[uat-generation] cleanup ${gen.name}: generation folder removal failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    } else {
+      await deps.removeWorktree(gen.worktreePath).catch((err) => {
+        cleaned = false;
+        log(`[uat-generation] cleanup ${gen.name}: worktree removal failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
+      await deps.deleteBranch(gen.name).catch((err) => {
+        cleaned = false;
+        log(`[uat-generation] cleanup ${gen.name}: branch deletion failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }
     if (!cleaned) continue;
     const cleanedAt = new Date().toISOString();
     if (gen.status === 'ready' || gen.status === 'superseded') {
