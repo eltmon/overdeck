@@ -672,13 +672,13 @@ For polyrepo workspaces, repo discovery goes through `src/lib/project-repos.ts`.
 POST /api/issues/:issueId/sync-main
 
 Response (success):
-{ "success": true, "commitCount": 49, "changedFiles": [...], "message": "Synced 49 commit(s) from main" }
+{ "success": true, "commitCount": 49, "changedFiles": [...], "message": "Synced 49 commit(s) from main", "repos": [{ "repoKey": "api", "success": true, "commitCount": 49, "changedFiles": [...] }] }
 
 Response (already up to date):
-{ "success": true, "alreadyUpToDate": true, "message": "Already up to date with main" }
+{ "success": true, "alreadyUpToDate": true, "message": "Already up to date with main", "repos": [{ "repoKey": "api", "success": true, "alreadyUpToDate": true }] }
 
 Response (error):
-{ "success": false, "error": "...", "conflictFiles": [...] }
+{ "success": false, "error": "...", "conflictFiles": [...], "repos": [{ "repoKey": "api", "success": false, "conflictFiles": [...] }, { "repoKey": "fe", "success": false, "skipped": true, "reason": "..." }] }
 ```
 
 ### CLI
