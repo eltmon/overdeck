@@ -23,6 +23,7 @@ interface MergeResult {
   statusCode?: number;
   mergeStatus?: string;
   retryable?: boolean;
+  deferred?: boolean;
 }
 
 export interface AutoMergeExecutorDeps {
@@ -132,6 +133,14 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
       }
 
       const reason = failureReason(result);
+      if (result.deferred) {
+        const retryAt = new Date(nowDate.getTime() + REQUEUE_BACKOFF_MS).toISOString();
+        const requeued = (deps.requeueToPending ?? requeueToPending)(entry.id, retryAt);
+        log(requeued
+          ? `[auto-merge] merge deferred for ${entry.issueId}; requeued without consuming retry budget for ${retryAt}`
+          : `[auto-merge] failed to requeue deferred merge for ${entry.issueId} (#${entry.id})`);
+        continue;
+      }
       if (result.retryable) {
         const retryCount = (deps.getMergeRetryCount ?? ((issueId) => getReviewStatusSync(issueId)?.mergeRetryCount ?? 0))(entry.issueId);
         if (retryCount >= FAILED_MERGE_MAX_RETRIES) {

@@ -39,19 +39,31 @@ type PostRebaseVerificationDeferralDeps = {
 export function handlePostRebaseVerificationDeferral(
   issueId: string,
   outcome: VerificationRunnerOutcome,
-  previous: MergeStateBeforeAttempt,
+  _previous: MergeStateBeforeAttempt,
   deps: PostRebaseVerificationDeferralDeps,
-): { success: false; statusCode: 409; error: string } | null {
+): {
+  success: false;
+  statusCode: 409;
+  error: string;
+  deferred: true;
+  mergeStatus: 'queued';
+} | null {
   if (outcome.outcome !== 'deferred') return null;
   const message = `Post-rebase verification deferred: ${outcome.reason} — merge retries after the deploy.`;
   deps.appendShipLog(issueId, message, 'verifying');
   deps.setReviewStatus(issueId, {
-    mergeStatus: previous?.mergeStatus === 'merging' ? undefined : previous?.mergeStatus,
-    mergeStep: previous?.mergeStep,
-    mergeNotes: previous?.mergeNotes,
+    mergeStatus: 'queued',
+    mergeStep: 'queued',
+    mergeNotes: message,
   });
   deps.completePendingOperation(issueId, message);
-  return { success: false, statusCode: 409, error: message };
+  return {
+    success: false,
+    statusCode: 409,
+    error: message,
+    deferred: true,
+    mergeStatus: 'queued',
+  };
 }
 
 function shellQuote(value: string): string {

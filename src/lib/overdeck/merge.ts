@@ -919,6 +919,16 @@ export function markMergeProcessing(projectKey: string, issueId: string): void {
   ).run(nowIso(), issueId.toUpperCase());
 }
 
+/** Return a processing merge to the queue without changing its position. */
+export function requeueMerge(projectKey: string, issueId: string): boolean {
+  const result = overdeckDb().prepare(
+    `UPDATE merge_queue
+     SET status = 'queued', started_at = NULL
+     WHERE project_key = ? AND issue_id = ? AND status = 'processing'`,
+  ).run(projectKey, issueId.toUpperCase());
+  return result.changes > 0;
+}
+
 /** Get the currently processing merge for a project, or null. */
 export function getCurrentMerge(projectKey: string): string | null {
   const row = overdeckDb().prepare(

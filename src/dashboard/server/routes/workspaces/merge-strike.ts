@@ -100,6 +100,7 @@ export interface TriggerMergeResult {
   statusCode: number;
   error?: string;
   retryable?: boolean;
+  deferred?: boolean;
   message?: string;
   reviewStatus?: string;
   testStatus?: string;

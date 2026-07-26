@@ -161,6 +161,41 @@ describe('auto-merge executor', () => {
     );
   });
 
+  it('requeues deferred merges without consuming retry budget', async () => {
+    const markFailed = vi.fn();
+    const announceFailure = vi.fn();
+    const requeueToPending = vi.fn().mockReturnValue(true);
+    const setMergeRetryCount = vi.fn();
+    const log = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry()],
+      isPaused: () => false,
+      isEligible: async () => ({ eligible: true }),
+      transition: () => true,
+      mergeIssue: async () => ({
+        success: false,
+        statusCode: 409,
+        error: 'Post-rebase verification deferred',
+        deferred: true,
+        mergeStatus: 'queued',
+      }),
+      getMergeRetryCount: () => 2,
+      setMergeRetryCount,
+      markFailed,
+      announceFailure,
+      requeueToPending,
+      log,
+    });
+
+    expect(requeueToPending).toHaveBeenCalledWith(1, new Date(NOW.getTime() + 60_000).toISOString());
+    expect(setMergeRetryCount).not.toHaveBeenCalled();
+    expect(markFailed).not.toHaveBeenCalled();
+    expect(announceFailure).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('requeued without consuming retry budget'));
+  });
+
   it('requeues retryable failures below the circuit-breaker ceiling', async () => {
     const markMergingBlocked = vi.fn();
     const markFailed = vi.fn();

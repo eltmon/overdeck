@@ -25,7 +25,7 @@ import { handlePostRebaseVerificationDeferral } from '../../../../lib/cloister/m
 import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../../lib/git-activity.js';
 import { extractNumberSync, extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
-import { enqueueMerge, getCurrentMerge, markMergeProcessing, dequeueMerge, getAllActiveQueues } from '../../../../lib/overdeck/merge.js';
+import { enqueueMerge, getCurrentMerge, markMergeProcessing, dequeueMerge, getAllActiveQueues, requeueMerge } from '../../../../lib/overdeck/merge.js';
 import { findProjectByTeamSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync as setReviewStatusBase, type ReviewStatus } from '../../../../lib/review-status.js';
 import { isStatePlaneOnlyStatus } from '../../../../lib/state-plane.js';
@@ -428,6 +428,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
   _serverManagedMerges.add(normalizedMergeId);
   setPendingOperation(issueId, 'merge');
   let queueAdvanced = false;
+  let preserveQueue = false;
 
   const advanceQueue = (): void => {
     if (queueAdvanced) return;
@@ -1052,7 +1053,14 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       })();
 
     const verificationDeferral = handlePostRebaseVerificationDeferral(issueId, verifyResult, reviewStatus, { appendShipLog, setReviewStatus, completePendingOperation });
-    if (verificationDeferral) return verificationDeferral;
+    if (verificationDeferral) {
+      if (!requeueMerge(projectKey, normalizedId)) {
+        enqueueMerge(projectKey, normalizedId);
+      }
+      _serverManagedMerges.delete(normalizedMergeId);
+      preserveQueue = true;
+      return verificationDeferral;
+    }
     if (verifyResult.outcome === 'failed') {
       const error = `Post-rebase verification failed at ${verifyResult.failedCheck}`;
       console.log(`[merge] ${error}`);
@@ -1198,7 +1206,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     completePendingOperation(issueId, error.message);
     return { success: false, statusCode: 500, error: error.message };
   } finally {
-    advanceQueue();
+    if (!preserveQueue) advanceQueue();
   }
 }
 

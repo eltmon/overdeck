@@ -67,7 +67,7 @@ function mergeSet(repoCount: number) {
 }
 
 describe('handlePostRebaseVerificationDeferral', () => {
-  it('returns a retriable abort while restoring merge state without touching readiness', () => {
+  it('returns a non-terminal deferral while restoring queued state without touching readiness', () => {
     const deps = {
       appendShipLog: vi.fn(),
       setReviewStatus: vi.fn(),
@@ -83,12 +83,18 @@ describe('handlePostRebaseVerificationDeferral', () => {
     }, deps);
     const message = 'Post-rebase verification deferred: A dashboard deploy is queued — merge retries after the deploy.';
 
-    expect(result).toEqual({ success: false, statusCode: 409, error: message });
+    expect(result).toEqual({
+      success: false,
+      statusCode: 409,
+      error: message,
+      deferred: true,
+      mergeStatus: 'queued',
+    });
     expect(deps.appendShipLog).toHaveBeenCalledWith('PAN-3135', message, 'verifying');
     expect(deps.setReviewStatus).toHaveBeenCalledWith('PAN-3135', {
       mergeStatus: 'queued',
       mergeStep: 'queued',
-      mergeNotes: 'Waiting',
+      mergeNotes: message,
     });
     expect(deps.setReviewStatus.mock.calls[0]?.[1]).not.toHaveProperty('readyForMerge');
     expect(deps.completePendingOperation).toHaveBeenCalledWith('PAN-3135', message);
