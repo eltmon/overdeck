@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:56:03.309Z",
-  "updated": "2026-07-26T10:22:09.527Z",
+  "updated": "2026-07-26T10:26:11.405Z",
   "pipeline": {
     "issueId": "PAN-3115",
     "reviewStatus": "pending",
@@ -67,16 +67,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "gather-forge-error-typing": {
-        "writerId": "agent-pan-3115",
-        "agentId": "agent-pan-3115",
-        "pid": 1227176,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T10:22:09.527Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3115",
@@ -110,6 +102,17 @@
         "outcome": "completed",
         "reason": "Added deterministic default-branch resolution from configured refs, origin HEAD, current HEAD, and main/master probes; snapshot commands now use the resolved branch with typed unresolved errors.",
         "releasedAt": "2026-07-26T10:21:42.522Z"
+      },
+      {
+        "writerId": "agent-pan-3115",
+        "agentId": "agent-pan-3115",
+        "pid": 1227176,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:22:09.527Z",
+        "itemId": "gather-forge-error-typing",
+        "outcome": "completed",
+        "reason": "Added typed boundary wrappers for forge/tracker and spec lenses, converted missing config errors, preserved existing typed errors, and covered 404/spec/preflight cases.",
+        "releasedAt": "2026-07-26T10:26:11.405Z"
       }
     ],
     "statusReasons": {
@@ -124,6 +127,10 @@
       "gather-default-branch-resolution": {
         "reason": "Added deterministic default-branch resolution from configured refs, origin HEAD, current HEAD, and main/master probes; snapshot commands now use the resolved branch with typed unresolved errors.",
         "updatedAt": "2026-07-26T10:21:42.522Z"
+      },
+      "gather-forge-error-typing": {
+        "reason": "Added typed boundary wrappers for forge/tracker and spec lenses, converted missing config errors, preserved existing typed errors, and covered 404/spec/preflight cases.",
+        "updatedAt": "2026-07-26T10:26:11.405Z"
       }
     }
   },
@@ -140,6 +147,10 @@
     "gather-default-branch-resolution.gather-default-branch-resolution.ac1": "completed",
     "gather-default-branch-resolution.gather-default-branch-resolution.ac2": "completed",
     "gather-default-branch-resolution.gather-default-branch-resolution.ac3": "completed",
-    "gather-forge-error-typing": "running"
+    "gather-forge-error-typing": "completed",
+    "gather-forge-error-typing.gather-forge-error-typing.ac1": "completed",
+    "gather-forge-error-typing.gather-forge-error-typing.ac2": "completed",
+    "gather-forge-error-typing.gather-forge-error-typing.ac3": "completed",
+    "gather-forge-error-typing.gather-forge-error-typing.ac4": "completed"
   }
 }
