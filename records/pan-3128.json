@@ -228,24 +228,23 @@
     "recordedAt": "2026-07-26T18:09:43.613Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T18:39:00.189Z",
+  "updated": "2026-07-26T18:55:16.947Z",
   "pipeline": {
     "issueId": "PAN-3128",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-26T18:38:50.655Z",
-    "updatedAt": "2026-07-26T18:38:54.960Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3128-review",
+    "updatedAt": "2026-07-26T18:55:16.874Z",
+    "reviewNotes": "Canonical deployment review passed: timeout recovery preserves slow-boot deployments, other failures roll back safely, storage stays bounded, and provenance requirements are complete.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3141",
     "reviewedAtCommit": "6efc905e3235aa4579b58d036e43b416f9eb3ea8",
     "lastVerifiedCommit": "6efc905e3235aa4579b58d036e43b416f9eb3ea8",
-    "reviewRequestedAt": "2026-07-26T18:38:50.655Z",
     "reviewSpawnedAt": "2026-07-26T18:38:54.959Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -305,9 +304,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 30570261,
-            "output": 529866,
-            "cacheRead": 124110336,
+            "input": 30884897,
+            "output": 531399,
+            "cacheRead": 124996608,
             "cacheWrite": 0
           }
         },
@@ -354,15 +353,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 53314222,
-          "output": 1796238,
-          "cacheRead": 428878336,
+          "input": 53628858,
+          "output": 1797771,
+          "cacheRead": 429764608,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 534.897418,
-        "pricingAsOf": "2026-07-26T18:38:55.990Z"
+        "usd": 536.959724,
+        "pricingAsOf": "2026-07-26T18:55:16.928Z"
       }
     },
     "merges": [
