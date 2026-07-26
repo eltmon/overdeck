@@ -58,12 +58,25 @@ describe('schema migrations', () => {
 
   it('adds affected_criteria to a current-version database that predates the column', () => {
     db.exec('CREATE TABLE flywheel_substrate_bugs (issue_id TEXT PRIMARY KEY)');
+    db.exec('CREATE TABLE agents (id TEXT PRIMARY KEY)');
     db.pragma(`user_version = ${SCHEMA_VERSION}`);
 
     runMigrations(db);
 
     const columns = db.prepare('PRAGMA table_info(flywheel_substrate_bugs)').all() as Array<{ name: string }>;
     expect(columns.map((column) => column.name)).toContain('affected_criteria');
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+  });
+
+  it('adds started_by to a current-version agents table that predates the column', () => {
+    db.exec('CREATE TABLE flywheel_substrate_bugs (issue_id TEXT PRIMARY KEY, affected_criteria TEXT)');
+    db.exec('CREATE TABLE agents (id TEXT PRIMARY KEY)');
+    db.pragma(`user_version = ${SCHEMA_VERSION}`);
+
+    expect(() => runMigrations(db)).not.toThrow();
+
+    const columns = db.prepare('PRAGMA table_info(agents)').all() as Array<{ name: string }>;
+    expect(columns.map((column) => column.name)).toContain('started_by');
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
   });
 
@@ -500,6 +513,7 @@ describe('schema migrations', () => {
     'last_failure_reason',
     'last_failure_next_retry_at',
     'flywheel_run_id',
+    'started_by',
     'role_run_head',
     'review_sub_role',
     'review_run_id',

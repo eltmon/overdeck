@@ -32,6 +32,7 @@ CREATE TABLE `agents` (
 	`phase` text,
 	`role_run_head` text,
 	`flywheel_run_id` text,
+	`started_by` text,
 	`cost_so_far` real,
 	`review_sub_role` text,
 	`review_run_id` text,

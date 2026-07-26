@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentState } from '../../../../src/lib/agents/agent-state.js';
 
 const STOP_AFTER_STATE_SAVE = new Error('stop after state save');
@@ -117,10 +117,19 @@ import { spawnAgent, spawnRun } from '../../../../src/lib/agents/spawn.js';
 import { agentStateToDbAgent } from '../../../../src/lib/database/agent-mappers.js';
 
 describe('spawn flywheel provenance', () => {
+  let savedStartedBy: string | undefined;
+
   beforeEach(() => {
     mocks.activeRunId = null;
     mocks.savedAsync.length = 0;
     mocks.savedSync.length = 0;
+    savedStartedBy = process.env['OVERDECK_AGENT_STARTED_BY'];
+    delete process.env['OVERDECK_AGENT_STARTED_BY'];
+  });
+
+  afterEach(() => {
+    if (savedStartedBy === undefined) delete process.env['OVERDECK_AGENT_STARTED_BY'];
+    else process.env['OVERDECK_AGENT_STARTED_BY'] = savedStartedBy;
   });
 
   it('persists an explicit flywheel run id in spawnAgent state', async () => {
@@ -129,12 +138,14 @@ describe('spawn flywheel provenance', () => {
       workspace: '/tmp/workspace',
       role: 'knowledge',
       flywheelRunId: 'RUN-71',
+      startedBy: 'operator:cli:pan-start',
     })).rejects.toThrow(STOP_AFTER_STATE_SAVE.message);
 
     expect(mocks.savedSync).toHaveLength(1);
     expect(mocks.savedSync[0]).toMatchObject({
       id: 'agent-pan-3111',
       flywheelRunId: 'RUN-71',
+      startedBy: 'operator:cli:pan-start',
     });
     expect(agentStateToDbAgent(mocks.savedSync[0]!).flywheelRunId).toBe('RUN-71');
   });
@@ -149,10 +160,39 @@ describe('spawn flywheel provenance', () => {
     expect(mocks.savedAsync[0]).toMatchObject({
       id: 'agent-pan-3111-test',
       flywheelRunId: 'RUN-71',
+      startedBy: 'flywheel:RUN-71',
     });
   });
 
-  it('leaves flywheelRunId undefined when no override or active run exists', async () => {
+  it('falls back to the active flywheel run when no explicit origin token is set', async () => {
+    mocks.activeRunId = 'RUN-72';
+
+    await expect(spawnAgent({
+      issueId: 'PAN-3111',
+      workspace: '/tmp/workspace',
+      role: 'knowledge',
+    })).rejects.toThrow(STOP_AFTER_STATE_SAVE.message);
+
+    expect(mocks.savedSync[0]).toMatchObject({
+      flywheelRunId: 'RUN-72',
+      startedBy: 'flywheel:RUN-72',
+    });
+  });
+
+  it('prefers the started-by environment token over the flywheel fallback', async () => {
+    process.env['OVERDECK_AGENT_STARTED_BY'] = 'operator:dashboard:start';
+
+    await expect(spawnAgent({
+      issueId: 'PAN-3111',
+      workspace: '/tmp/workspace',
+      role: 'knowledge',
+      flywheelRunId: 'RUN-71',
+    })).rejects.toThrow(STOP_AFTER_STATE_SAVE.message);
+
+    expect(mocks.savedSync[0]?.startedBy).toBe('operator:dashboard:start');
+  });
+
+  it('leaves provenance undefined when no override, environment token, or active run exists', async () => {
     await expect(spawnAgent({
       issueId: 'PAN-3111',
       workspace: '/tmp/workspace',
@@ -161,5 +201,6 @@ describe('spawn flywheel provenance', () => {
 
     expect(mocks.savedSync).toHaveLength(1);
     expect(mocks.savedSync[0]?.flywheelRunId).toBeUndefined();
+    expect(mocks.savedSync[0]?.startedBy).toBeUndefined();
   });
 });

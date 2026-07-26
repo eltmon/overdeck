@@ -711,7 +711,7 @@ const OVERDECK_AGENT_COLUMNS = [
   'paused', 'paused_reason', 'troubled', 'channels_enabled',
   'consecutive_failures', 'first_failure_in_run_at', 'last_failure_next_retry_at',
   'stopped_at', 'paused_at', 'troubled_at', 'last_activity', 'last_failure_reason',
-  'phase', 'role_run_head', 'flywheel_run_id', 'cost_so_far',
+  'phase', 'role_run_head', 'flywheel_run_id', 'started_by', 'cost_so_far',
   'review_sub_role', 'review_run_id', 'review_synthesis_agent_id',
   'review_output_path', 'review_deadline_at', 'review_monitor_signaled',
   'review_retry_attempt',
@@ -768,6 +768,7 @@ function agentStateToOverdeckRow(state: AgentState): unknown[] {
     state.phase ?? null,
     state.roleRunHead ?? null,
     state.flywheelRunId ?? null,
+    state.startedBy ?? null,
     state.costSoFar ?? null,
     state.reviewSubRole ?? null,
     state.reviewRunId ?? null,
@@ -1029,6 +1030,7 @@ export function listAllAgentsSync(): Array<{
   lastFailureReason: string | null;
   lastFailureNextRetryAt: string | null;
   flywheelRunId: string | null;
+  startedBy: string | null;
   roleRunHead: string | null;
   reviewSubRole: string | null;
   reviewRunId: string | null;
@@ -1051,7 +1053,7 @@ export function listAllAgentsSync(): Array<{
            channels_enabled, consecutive_failures, first_failure_in_run_at,
            last_failure_next_retry_at, stopped_at, paused_at, troubled_at,
            last_activity, last_failure_reason, phase, role_run_head,
-           flywheel_run_id, cost_so_far, review_sub_role, review_run_id,
+           flywheel_run_id, started_by, cost_so_far, review_sub_role, review_run_id,
            updated_at
     FROM agents
   `).all() as Array<Record<string, unknown>>;
@@ -1096,6 +1098,7 @@ export function listAllAgentsSync(): Array<{
     lastFailureReason: (row['last_failure_reason'] as string | null) ?? null,
     lastFailureNextRetryAt: fromMs(row['last_failure_next_retry_at']),
     flywheelRunId: (row['flywheel_run_id'] as string | null) ?? null,
+    startedBy: (row['started_by'] as string | null) ?? null,
     roleRunHead: (row['role_run_head'] as string | null) ?? null,
     reviewSubRole: (row['review_sub_role'] as string | null) ?? null,
     reviewRunId: (row['review_run_id'] as string | null) ?? null,

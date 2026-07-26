@@ -58,6 +58,7 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'agents', column: 'review_forked_from_parent' },
     { table: 'agents', column: 'yielded_at' },
     { table: 'agents', column: 'last_yield_resume_at' },
+    { table: 'agents', column: 'started_by' },
   ],
   indexes: [
     'cost_session_id_idx',
@@ -159,6 +160,7 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_forked_from_parent` integer');
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `yielded_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `started_by` text');
 }
 
 /**

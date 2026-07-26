@@ -48,6 +48,7 @@ export interface Agent {
   lastFailureReason: string | null;
   lastFailureNextRetryAt: string | null;
   flywheelRunId: string | null;
+  startedBy: string | null;
   roleRunHead: string | null;
   reviewSubRole: string | null;
   reviewRunId: string | null;
@@ -101,6 +102,7 @@ export function rowToAgent(row: Record<string, unknown>): Agent {
     lastFailureReason: (row['last_failure_reason'] as string | null) ?? null,
     lastFailureNextRetryAt: (row['last_failure_next_retry_at'] as string | null) ?? null,
     flywheelRunId: (row['flywheel_run_id'] as string | null) ?? null,
+    startedBy: (row['started_by'] as string | null) ?? null,
     roleRunHead: (row['role_run_head'] as string | null) ?? null,
     reviewSubRole: (row['review_sub_role'] as string | null) ?? null,
     reviewRunId: (row['review_run_id'] as string | null) ?? null,
@@ -127,7 +129,7 @@ const ALL_COLUMNS = [
   'yielded_by_scheduler', 'yielded_at', 'last_yield_resume_at',
   'troubled', 'troubled_at', 'consecutive_failures',
   'first_failure_in_run_at', 'last_failure_at', 'last_failure_reason', 'last_failure_next_retry_at',
-  'flywheel_run_id', 'role_run_head',
+  'flywheel_run_id', 'started_by', 'role_run_head',
   'review_sub_role', 'review_run_id', 'review_synthesis_agent_id',
   'review_output_path', 'review_deadline_at', 'review_monitor_signaled', 'review_retry_attempt',
   'inspect_sub_role',
@@ -172,6 +174,7 @@ function agentToParams(agent: Agent): unknown[] {
     agent.lastFailureReason,
     agent.lastFailureNextRetryAt,
     agent.flywheelRunId,
+    agent.startedBy,
     agent.roleRunHead,
     agent.reviewSubRole,
     agent.reviewRunId,

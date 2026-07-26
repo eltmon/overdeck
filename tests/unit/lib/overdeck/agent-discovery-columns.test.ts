@@ -57,6 +57,7 @@ describe('agents-table discovery columns (PAN-2585)', () => {
         status: 'running',
         startedAt: '2026-07-12T02:00:00.000Z',
         reviewRunId: 'agent-pan-9999-review-abcd1234',
+        startedBy: 'flywheel:RUN-71',
         reviewDiscoveryPending: true,
         reviewContextManifestPath: '/tmp/ws/.pan/review/run/context.json',
         reviewDiscoveryReadyAt: '2026-07-12T02:05:00.000Z',
@@ -68,6 +69,7 @@ describe('agents-table discovery columns (PAN-2585)', () => {
 
       const readBack = getOverdeckAgentStateSync('agent-pan-9999-review');
       expect(readBack).not.toBeNull();
+      expect(readBack?.startedBy).toBe('flywheel:RUN-71');
       expect(readBack?.reviewDiscoveryPending).toBe(true);
       expect(readBack?.reviewContextManifestPath).toBe('/tmp/ws/.pan/review/run/context.json');
       expect(readBack?.reviewDiscoveryReadyAt).toBe('2026-07-12T02:05:00.000Z');

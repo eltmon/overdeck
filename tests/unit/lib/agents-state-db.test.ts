@@ -89,6 +89,21 @@ describe('agents state SQLite backing', () => {
     expect(loaded?.deliveryMethod).toBe('supervisor');
   });
 
+  it('round-trips startedBy through state.json and the agents table', () => {
+    const id = agentId('started-by-roundtrip');
+    saveAgentStateSync(makeAgentState({ id, startedBy: 'operator:cli:pan-start' }));
+
+    expect(getAgentStateSync(id)?.startedBy).toBe('operator:cli:pan-start');
+    const row = odb.raw().prepare('SELECT started_by FROM agents WHERE id = ?').get(id) as {
+      started_by: string | null;
+    };
+    expect(row.started_by).toBe('operator:cli:pan-start');
+
+    const stateFile = join(tempHome, 'agents', id, 'state.json');
+    const disk = JSON.parse(readFileSync(stateFile, 'utf8')) as AgentState;
+    expect(disk.startedBy).toBe('operator:cli:pan-start');
+  });
+
   it('getAgentStateSync reads from the agents table, not state.json', () => {
     // Seed via the overdeck writer (the new single source of truth).
     const id = agentId('db-only');

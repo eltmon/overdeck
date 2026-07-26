@@ -96,6 +96,7 @@ export interface SpawnOptions {
   slotItemId?: string;
   allowHost?: boolean;
   flywheelRunId?: string;
+  startedBy?: string;
   /** Claude Code `--effort` level for the spawned session (work/strike). */
   effort?: RoleEffort;
 }
@@ -127,6 +128,7 @@ export interface SpawnRunOptions {
   extraEnvExports?: string[];
   resumeSessionId?: string;
   flywheelRunId?: string;
+  startedBy?: string;
   /** 1-based registered slot index for per-item work-agent spawning. */
   slotIndex?: number;
   /** xBRIEF item id assigned to this registered slot. Required with slotIndex. */
