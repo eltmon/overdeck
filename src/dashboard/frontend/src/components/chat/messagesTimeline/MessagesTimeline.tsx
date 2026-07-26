@@ -55,6 +55,10 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   onDiscardFailed,
   onConfirmCommand,
   proposedPlan,
+  paneChoice,
+  answeredPaneChoices,
+  onPaneChoiceAnswered,
+  onOpenTerminal,
   compactBoundaries,
   compacting,
   conversationName,
@@ -141,8 +145,31 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       }];
     }
 
+    // PAN-3113 — the live pane choice menu pins to the end of the timeline
+    // (the agent is blocked on it, so it is always the newest thing), followed
+    // by any choices answered from the dashboard this mount. A choice whose
+    // signature was just answered is filtered out so the answered row replaces
+    // it immediately instead of waiting for the feed's next poll.
+    const answeredSigs = new Set((answeredPaneChoices ?? []).map((a) => a.signature));
+    if (paneChoice && !answeredSigs.has(paneChoice.signature)) {
+      result = [...result, {
+        kind: 'pending-choice' as const,
+        id: `pane-choice-${paneChoice.signature}`,
+        createdAt: new Date().toISOString(),
+        choice: paneChoice,
+      }];
+    }
+    for (const answered of answeredPaneChoices ?? []) {
+      result = [...result, {
+        kind: 'answered-choice' as const,
+        id: `pane-choice-answered-${answered.signature}`,
+        createdAt: answered.at,
+        answered,
+      }];
+    }
+
     return result;
-  }, [baseRows, proposedPlan, compacting]);
+  }, [baseRows, proposedPlan, compacting, paneChoice, answeredPaneChoices]);
 
   // Index round markers by the row they should follow. A single row can have
   // multiple markers (e.g. two consecutive rounds without any new messages
@@ -457,6 +484,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     hideToolCalls={hideToolCalls}
                     workingPhase={workingPhase}
                     onConfirmCommand={onConfirmCommand}
+                    onOpenTerminal={onOpenTerminal}
+                    onPaneChoiceAnswered={onPaneChoiceAnswered}
                   />
                   {markersForRow?.map((marker) => (
                     <RoundDivider
@@ -495,6 +524,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                 hideToolCalls={hideToolCalls}
                 workingPhase={workingPhase}
                 onConfirmCommand={onConfirmCommand}
+                onOpenTerminal={onOpenTerminal}
+                onPaneChoiceAnswered={onPaneChoiceAnswered}
               />
               {markersForRow?.map((marker) => (
                 <RoundDivider

@@ -16,6 +16,7 @@ export type PendingInputKind =
   | 'enterPlanMode'
   | 'sessionResume'
   | 'rateLimit'
+  | 'paneChoice'
   | 'agentTurnEnded';
 
 /** Short label for a single kind (used in tooltips, joined by comma). */
@@ -26,6 +27,7 @@ export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
   enterPlanMode: 'Plan being drafted',
   sessionResume: 'Session resume waiting',
   rateLimit: 'Rate-limit modal — pick a model',
+  paneChoice: 'Choice menu waiting — pick an option',
   agentTurnEnded: 'Answer the agent',
 };
 

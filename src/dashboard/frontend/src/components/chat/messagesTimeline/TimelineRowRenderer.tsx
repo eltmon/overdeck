@@ -6,6 +6,7 @@ import { PlanCard } from '../PlanCard';
 import { AssistantMessageRow, UserMessageRow } from './messageRows';
 import { WorkLogGroup } from './workLogRows';
 import { CommandResultRow } from './CommandResultRow';
+import { PaneChoiceAnsweredRow, PaneChoiceCard } from './PaneChoiceCard';
 import {
   CompactBoundaryDivider,
   CompactingIndicator,
@@ -25,9 +26,13 @@ interface RowProps {
   hideToolCalls?: boolean;
   workingPhase?: WorkingPhase;
   onConfirmCommand?: (messageId: string, typedText?: string) => Promise<void>;
+  /** PAN-3113 — switch the panel to terminal mode ("Open terminal" on the card). */
+  onOpenTerminal?: () => void;
+  /** PAN-3113 — record a dashboard-answered pane choice. */
+  onPaneChoiceAnswered?: (signature: string, label: string) => void;
 }
 
-export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, cwd, issueId, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase, onConfirmCommand }: RowProps) {
+export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, cwd, issueId, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase, onConfirmCommand, onOpenTerminal, onPaneChoiceAnswered }: RowProps) {
   if (row.kind === 'working') {
     return <WorkingIndicator startedAt={row.createdAt} phase={workingPhase} />;
   }
@@ -36,6 +41,20 @@ export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isSt
   }
   if (row.kind === 'proposed-plan') {
     return <PlanCard plan={row.plan} conversationName={conversationName ?? ''} />;
+  }
+  if (row.kind === 'pending-choice') {
+    return (
+      <PaneChoiceCard
+        key={row.choice.signature}
+        choice={row.choice}
+        conversationName={conversationName}
+        onOpenTerminal={onOpenTerminal}
+        onAnswered={onPaneChoiceAnswered}
+      />
+    );
+  }
+  if (row.kind === 'answered-choice') {
+    return <PaneChoiceAnsweredRow answered={row.answered} />;
   }
   if (row.kind === 'compact-boundary') {
     return <CompactBoundaryDivider boundary={row.boundary} />;

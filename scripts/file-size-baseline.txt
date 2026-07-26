@@ -6,7 +6,7 @@
 1582 src/dashboard/frontend/src/components/CommandDeck/index.tsx
 1002 src/dashboard/frontend/src/components/KanbanBoard.tsx
 1106 src/dashboard/frontend/src/components/PlanDialog.tsx
-1541 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx
+1554 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx
 1443 src/dashboard/server/routes/command-deck.ts
 1004 src/dashboard/server/routes/conversations.ts
 1005 src/dashboard/server/routes/flywheel.ts
