@@ -553,9 +553,44 @@ describe('gatherProjectLensSignals', () => {
     expect(mocked.run).toHaveBeenCalledTimes(10);
   });
 
-  it('rejects GitHub projects without an issue prefix', async () => {
+  it('classifies a missing GitHub issue prefix', async () => {
     await expect(gatherProjectLensSignals({ ...project, issue_prefix: undefined }, deps()))
-      .rejects.toThrow('Missing issue_prefix');
+      .rejects.toMatchObject({
+        reason: 'missing_issue_prefix',
+        message: expect.stringContaining(project.name),
+      });
+  });
+
+  it('classifies forge lens failures without parsing their messages', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockRejectedValue(new Error('HTTP 404'));
+
+    await expect(gatherProjectLensSignals(project, mocked)).rejects.toMatchObject({
+      reason: 'forge_unavailable',
+      message: 'HTTP 404',
+    });
+  });
+
+  it('classifies spec lens failures as gather_failed', async () => {
+    const mocked = deps();
+    mocked.listSpecIssueIds = vi.fn().mockRejectedValue(new Error('spec read failed'));
+
+    await expect(gatherProjectLensSignals(project, mocked)).rejects.toMatchObject({
+      reason: 'gather_failed',
+      message: 'spec read failed',
+    });
+  });
+
+  it('preserves typed repository failures from the branch lens', async () => {
+    const mocked = deps();
+    mocked.run = vi.fn().mockRejectedValue(
+      new PipelineMembershipUnavailableError('repo_unavailable', 'repository missing'),
+    );
+
+    await expect(gatherProjectLensSignals(project, mocked)).rejects.toMatchObject({
+      reason: 'repo_unavailable',
+      message: 'repository missing',
+    });
   });
 
   it('ignores foreign refs, specs, and fork pull requests', async () => {
