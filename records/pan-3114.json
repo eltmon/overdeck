@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T10:09:12.812Z",
+  "updated": "2026-07-26T10:13:14.775Z",
   "pipeline": {
     "issueId": "PAN-3114",
     "reviewStatus": "pending",
@@ -67,16 +67,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "docs": {
-        "writerId": "agent-pan-3114",
-        "agentId": "agent-pan-3114",
-        "pid": 335883,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T10:09:12.812Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3114",
@@ -110,6 +102,17 @@
         "outcome": "completed",
         "reason": "Added promoted-generation evidence recovery before the DoD gate with best-effort merge-SHA lookup and failure-tolerant ceremony output",
         "releasedAt": "2026-07-26T10:08:59.496Z"
+      },
+      {
+        "writerId": "agent-pan-3114",
+        "agentId": "agent-pan-3114",
+        "pid": 335883,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:09:12.812Z",
+        "itemId": "docs",
+        "outcome": "completed",
+        "reason": "Documented UAT promotion as a DoD verification source and the close-out healing path",
+        "releasedAt": "2026-07-26T10:13:14.774Z"
       }
     ],
     "statusReasons": {
@@ -124,6 +127,10 @@
       "close-out-heal": {
         "reason": "Added promoted-generation evidence recovery before the DoD gate with best-effort merge-SHA lookup and failure-tolerant ceremony output",
         "updatedAt": "2026-07-26T10:08:59.496Z"
+      },
+      "docs": {
+        "reason": "Documented UAT promotion as a DoD verification source and the close-out healing path",
+        "updatedAt": "2026-07-26T10:13:14.774Z"
       }
     }
   },
@@ -143,6 +150,9 @@
     "close-out-heal.close-out-heal.ac2": "completed",
     "close-out-heal.close-out-heal.ac3": "completed",
     "close-out-heal.close-out-heal.ac4": "completed",
-    "docs": "running"
+    "docs": "completed",
+    "docs.docs.ac1": "completed",
+    "docs.docs.ac2": "completed",
+    "docs.docs.ac3": "completed"
   }
 }
