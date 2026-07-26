@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T18:10:57.426Z",
+  "updated": "2026-07-26T18:11:13.056Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
@@ -49,8 +49,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "blocked-drift-patrol": {
+        "writerId": "agent-pan-3148",
+        "agentId": "agent-pan-3148",
+        "pid": 698150,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T18:11:13.056Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3148",
@@ -76,6 +84,7 @@
     "anchor-blocked-verdicts.anchor-blocked-verdicts.ac1": "completed",
     "anchor-blocked-verdicts.anchor-blocked-verdicts.ac2": "completed",
     "anchor-blocked-verdicts.anchor-blocked-verdicts.ac3": "completed",
-    "anchor-blocked-verdicts.anchor-blocked-verdicts.ac4": "completed"
+    "anchor-blocked-verdicts.anchor-blocked-verdicts.ac4": "completed",
+    "blocked-drift-patrol": "running"
   }
 }
