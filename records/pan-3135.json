@@ -186,7 +186,7 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T15:50:16.559Z",
+  "updated": "2026-07-26T15:50:18.400Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "reviewing",
@@ -197,7 +197,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:54:56.619Z",
-    "updatedAt": "2026-07-26T15:50:12.056Z",
+    "updatedAt": "2026-07-26T15:50:17.190Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "All 4 ACs met. verification-runner.ts:387-395 gates on readPendingDeploy() before the verificationStatus:'running' write at :409, writes 'pending' + a note naming requestedAt, and self-excludes when status is already 'running'. verification-worker-supervisor.ts:140-144 sits AFTER the live-worker waitForResult join at :137, so a queued deploy blocks only new worker spawns. FOLLOW-UP FOR A LATER BEAD (outside these ACs): request-review-pipeline.ts:31-38 only branches on 'failed'/'error', so a 'deferred' outcome currently falls through to pushBranch()+dispatchReview() and advances to review as if it passed — consumers must be taught to halt on 'deferred'.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3142",
@@ -308,6 +308,14 @@
             "cacheWrite": 0
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 2,
+            "output": 156,
+            "cacheRead": 0,
+            "cacheWrite": 126260
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 3830494,
@@ -323,11 +331,17 @@
           "output": 948915,
           "cacheRead": 398548992,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 2,
+          "output": 156,
+          "cacheRead": 0,
+          "cacheWrite": 126260
         }
       },
       "costAtCloseOut": {
-        "usd": 445.599766,
-        "pricingAsOf": "2026-07-26T15:50:16.556Z"
+        "usd": 445.91698,
+        "pricingAsOf": "2026-07-26T15:50:17.238Z"
       }
     },
     "merges": [
