@@ -411,21 +411,22 @@
     "recordedAt": "2026-07-26T19:11:42.045Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T19:17:53.139Z",
+  "updated": "2026-07-26T19:20:18.089Z",
   "pipeline": {
     "issueId": "PAN-3138",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T19:12:23.171Z",
-    "updatedAt": "2026-07-26T19:17:14.898Z",
-    "reviewNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-26T19:11:07.858Z by deploy-patrol). It re-runs automatically after the deploy.",
+    "updatedAt": "2026-07-26T19:20:18.043Z",
+    "reviewNotes": "Approved after cycle-8 convergence gate; current recovery changes have no blockers",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
+    "reviewedAtCommit": "5e0867c1823c974f31d83bbb2a8d4be80fe33f15",
     "lastVerifiedCommit": "45c64d10937592faceea33d0a627c6e336c9c829",
-    "reviewRequestedAt": "2026-07-26T19:12:23.171Z",
     "reviewSpawnedAt": "2026-07-26T19:17:14.897Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -506,6 +507,24 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T19:11:42.045Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "5e0867c1823c974f31d83bbb2a8d4be80fe33f15"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "5e0867c1823c974f31d83bbb2a8d4be80fe33f15"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "5e0867c1823c974f31d83bbb2a8d4be80fe33f15"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "5e0867c1823c974f31d83bbb2a8d4be80fe33f15"
+      }
     }
   },
   "closeOut": {
@@ -513,9 +532,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 19562385,
-            "output": 338179,
-            "cacheRead": 75471360,
+            "input": 22965055,
+            "output": 404204,
+            "cacheRead": 90240000,
             "cacheWrite": 0
           }
         },
@@ -562,15 +581,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 90012971,
-          "output": 1801834,
-          "cacheRead": 660423168,
+          "input": 93415641,
+          "output": 1867859,
+          "cacheRead": 675191808,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 834.331459,
-        "pricingAsOf": "2026-07-26T19:17:14.925Z"
+        "usd": 860.709879,
+        "pricingAsOf": "2026-07-26T19:20:18.078Z"
       }
     },
     "merges": [
