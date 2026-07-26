@@ -33,7 +33,7 @@ import {
 } from '../../lib/overdeck/control-settings.js';
 import { sessionExists } from '../../lib/tmux.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
-import { computeMergeQueue, computeMergeQueueFromCandidates, listEligibleCandidatesByProject, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
+import { computeMergeQueueFromCandidates, listEligibleCandidatesByProject, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
 import { DEFAULT_BRIEF_PATH, requireFlywheelBrief, resolvePrimaryWorktreeRoot } from '../../lib/flywheel-start.js';
 import { formatMergeBackendStatus, loadMergeBackendStatusForCli } from './flywheel-merge-backend.js';
 import { compensateFailedFlywheelStart, resolveFlywheelOrderBriefOverlay, resolveFlywheelOrderStart, setFlywheelOrderStatus, type FlywheelOrderStartDeps } from './flywheel-orders.js';

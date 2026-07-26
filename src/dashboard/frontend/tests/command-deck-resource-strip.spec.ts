@@ -219,7 +219,15 @@ test.describe('Command Deck resource strip', () => {
         body: JSON.stringify({ version: 'test' }),
       });
     });
-    await page.route('**/api/flywheel/uat-generations', async (route) => {
+    // PAN-1696: the merge-train surfaces read the aggregate namespace now.
+    await page.route('**/api/merge-train/generations', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      });
+    });
+    await page.route('**/api/merge-train/queues', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

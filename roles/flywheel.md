@@ -152,9 +152,10 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
      normal prefix resolution (`PAN-*` → overdeck, `MIN-*` → Mind Your Now, and so on).
      Apply the **same** pickup gate, the same `docs/DECISIONS.md` vetting, and the same
      needs-design / needs-discussion exclusions per project — a non-PAN issue earns no
-     relaxed treatment. The author/assignee safety gate is **per tracker** and is a hard
+     relaxed treatment. The **security-critical identity filter** in the pickup gate below
+     (the rule keyed on issue author and assignee) applies **per tracker** and is a hard
      filter, never a preference:
-     - **GitHub projects** — the existing author/assignee gates apply verbatim.
+     - **GitHub projects** — that rule applies verbatim, unchanged.
      - **Linear projects** (MIN, AUR) — pick up **only issues assigned to the operator**.
        An unassigned or someone-else-assigned Linear issue is out of scope even when it
        otherwise looks ready.
@@ -262,7 +263,7 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
    missing/unknown `conclusion` as NOT green (a green HEAD sha is not a green CI). Then
    inventory active issues **for the projects this run's `scope` covers** — PAN alone under
    `pan-only`, every `projects.yaml` project under `all-tracked-projects` with the
-   per-tracker author/assignee gates above — plus ready backlog when
+   per-tracker identity filter described in the run-config section — plus ready backlog when
    `auto_pickup_backlog=true`. Pull
    runtime truth from sandbox-safe CLI surfaces (they read SQLite/`sequence.md` directly — no
    HTTP, so they work even when your harness sandboxes localhost): `pan review pending --ready`,

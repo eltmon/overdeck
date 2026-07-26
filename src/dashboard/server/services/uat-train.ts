@@ -1,13 +1,15 @@
 /**
  * UAT batch train service (PAN-1737) — real wiring for the reconciler,
  * assembly engine, stacks, and promote path, plus the payload builders the
- * flywheel routes expose.
+ * /api/merge-train/* routes expose.
  *
- * The reconciler interval is the heartbeat of "always one batch ready":
- * every 60s (gated per-tick on flywheel.merge_train_enabled, no-op without an
- * active flywheel run) it compares the ready set against the generation chain
- * and assembles/invalidates as needed. Assemblies run minutes — the reconciler
- * is single-flight per project, so ticks never pile up.
+ * The reconciler interval is the heartbeat of "always one batch ready": every
+ * 60s it walks every tracked project whose effective merge-train flag is on,
+ * comparing that project's ready set against its generation chain and
+ * assembling/invalidating as needed. PAN-1696 removed the active-flywheel-run
+ * requirement — the ready set comes from review-status records, so batches
+ * assemble with no run at all. Assemblies run minutes; the reconciler is
+ * single-flight per project, so ticks never pile up.
  */
 import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -214,7 +216,7 @@ async function assembleFromReadySetForProject(
 
 /**
  * PAN-1696 reconciler-decouple: Single-project reconciliation (used by forced-rebuild endpoint).
- * When called from /api/flywheel/assemble-uat with force:true, reconciles only projectRoot().
+ * When called from /api/merge-train/assemble with force:true and no project, reconciles every enabled project; with { project } or an explicit projectRoot, just that one.
  */
 export async function runUatTrainReconcile(
   options: { force?: boolean; projectRoot?: string } = {},

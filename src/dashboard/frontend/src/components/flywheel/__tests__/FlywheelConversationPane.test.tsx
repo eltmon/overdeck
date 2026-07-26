@@ -119,9 +119,6 @@ function mockFetch() {
         },
       });
     }
-    if (url === '/api/flywheel/merge-queue') {
-      return Response.json([]);
-    }
     return Response.json({ error: 'not found' }, { status: 404 });
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -230,7 +227,6 @@ describe('FlywheelConversationPane', () => {
       if (url === '/api/flywheel/runs?limit=10') return Response.json([]);
       if (url === '/api/flywheel/conversation') return Response.json(null);
       if (url === '/api/settings') return Response.json({ roles: {} });
-      if (url === '/api/flywheel/merge-queue') return Response.json([]);
       return Response.json({ error: 'not found' }, { status: 404 });
     }));
 
@@ -276,7 +272,6 @@ describe('FlywheelConversationPane', () => {
       }
       if (url === '/api/flywheel/conversation') return Response.json(flywheelConversation);
       if (url === '/api/settings') return Response.json({ roles: {} });
-      if (url === '/api/flywheel/merge-queue') return Response.json([]);
       return Response.json({ error: 'not found' }, { status: 404 });
     }));
 
@@ -364,8 +359,7 @@ describe('FlywheelConversationPane', () => {
         }
         if (url === '/api/flywheel/conversation') return Response.json(flywheelConversation);
         if (url === '/api/settings') return Response.json({ roles: {} });
-        if (url === '/api/flywheel/merge-queue') return Response.json([]);
-        return Response.json({ error: 'not found' }, { status: 404 });
+          return Response.json({ error: 'not found' }, { status: 404 });
       }));
     }
 

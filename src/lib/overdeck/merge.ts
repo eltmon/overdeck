@@ -797,6 +797,11 @@ export const MergeWriterLive = Layer.effect(
 );
 
 // ── MergeApi — HttpApiGroup ───────────────────────────────────────────────────
+// PAN-1696: the merge-train endpoints below live under /merge-train/*, matching
+// the shipped routes. They used to be declared under /flywheel/* — the merge
+// train is a per-project pipeline concern, not a flywheel feature, and the live
+// /api/flywheel/* merge-train routes were deleted. Auto-merge schedule/cancel
+// and merge-blockers stay under /flywheel/* because they ARE flywheel surfaces.
 // query: (not urlParams:) for GET params per Effect v4.
 // Schema.Union([...]) array form.
 // HttpApiEndpoint['delete'] for reserved word.
@@ -817,7 +822,7 @@ export const MergeApi = HttpApiGroup.make('merge')
   .add(HttpApiEndpoint.get('listBlockers', '/flywheel/merge-blockers', {
     success: Schema.Array(AutoMerge),
   }))
-  .add(HttpApiEndpoint.get('listUatGenerations', '/flywheel/uat-generations', {
+  .add(HttpApiEndpoint.get('listUatGenerations', '/merge-train/generations', {
     query:   UatGenerationFilter,
     success: Schema.Array(UatGeneration),
   }))
@@ -836,7 +841,7 @@ export const MergeApi = HttpApiGroup.make('merge')
     success: MergeSet,
     error:   MergeSetNotFound,
   }))
-  .add(HttpApiEndpoint.post('mergeNext', '/flywheel/merge-next', {
+  .add(HttpApiEndpoint.post('mergeNext', '/merge-train/merge-next', {
     payload: Schema.Struct({ projectKey: ProjectKey }),
     success: Schema.NullOr(MergeSet),
     error:   Schema.Union([MergeSetNotFound, NotReadyForMerge, MergeInProgress, ForgeMergeFailed]),
@@ -858,15 +863,15 @@ export const MergeApi = HttpApiGroup.make('merge')
     success: AutoMerge,
     error:   AutoMergeNotFound,
   }))
-  .add(HttpApiEndpoint.post('assembleUat', '/flywheel/assemble-uat', {
+  .add(HttpApiEndpoint.post('assembleUat', '/merge-train/assemble', {
     success: Schema.Array(UatGeneration),
   }))
-  .add(HttpApiEndpoint.post('startUatStack', '/flywheel/uat-generations/:name/stack', {
+  .add(HttpApiEndpoint.post('startUatStack', '/merge-train/generations/:name/stack', {
     params:  { name: UatName },
     success: UatGeneration,
     error:   Schema.Union([UatGenerationNotFound, UatNotPromotable]),
   }))
-  .add(HttpApiEndpoint.post('promoteUat', '/flywheel/uat-generations/:name/promote', {
+  .add(HttpApiEndpoint.post('promoteUat', '/merge-train/generations/:name/promote', {
     params:  { name: UatName },
     success: UatGeneration,
     error:   Schema.Union([UatGenerationNotFound, UatNotPromotable]),

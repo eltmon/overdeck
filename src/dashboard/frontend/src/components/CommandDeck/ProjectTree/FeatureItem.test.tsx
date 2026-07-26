@@ -1385,7 +1385,7 @@ describe('FeatureItem needs-attention shading', () => {
     fetchControl = installStrictFetchMock(({ method, url }) => {
       if (method !== 'GET') return undefined;
       if (url === '/api/settings/available-models') return Response.json({ models: [] });
-      if (url === '/api/flywheel/uat-generations') return Response.json([]);
+      if (url === '/api/merge-train/generations') return Response.json([]);
       if (url === '/api/orders') return Response.json({ books: [] });
       if (url === '/api/workspaces/PAN-821') return Response.json({});
       if (url.startsWith('/api/review/PAN-821/') || url.startsWith('/api/issues/PAN-821/')) {

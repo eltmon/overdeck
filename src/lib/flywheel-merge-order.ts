@@ -198,15 +198,6 @@ export const changedFilesVsMain = (branch: string, cwd: string, base = 'main') =
     );
   });
 
-/**
- * Verbs that mean "at the merge gate" (PAN-1736). Orchestrators have
- * legitimately emitted both 'shipping' and 'merging' for merge-ready issues;
- * filtering on one alone silently rendered an empty queue with five ready
- * items in RUN-18. Contract documented next to FlywheelPipelineVerb in
- * packages/contracts/src/flywheel.ts — extend BOTH places together.
- */
-export const MERGE_GATE_VERBS: ReadonlySet<FlywheelPipelineItem['verb']> = new Set(['shipping', 'merging']);
-
 export const MERGE_QUEUE_GIT_CONCURRENCY = 4;
 
 export interface ComputeMergeQueueOptions {
@@ -247,76 +238,6 @@ export function resolveMergeQueuePrUrl(item: { issueId: string; pr?: number }): 
   if (!githubIssue.isGitHub) return undefined;
   return `https://github.com/${githubIssue.owner}/${githubIssue.repo}/pull/${prNumber}`;
 }
-
-export const computeMergeQueue = (
-  items: ReadonlyArray<FlywheelPipelineItem>,
-  projectRoot: string,
-  options: ComputeMergeQueueOptions = {},
-) =>
-  Effect.gen(function*() {
-    const eligibility = options.eligibility ?? reviewRecordEligibility;
-    const candidates = items.filter((item) => {
-      if (!MERGE_GATE_VERBS.has(item.verb)) return false;
-      const gate = eligibility(item.issueId);
-      if (!gate.eligible) {
-        options.onIneligible?.(item.issueId, gate.reason ?? 'not eligible');
-        return false;
-      }
-      return true;
-    });
-    if (candidates.length === 0) return [] as MergeQueueItem[];
-    const gitConcurrency = Math.max(1, Math.floor(options.gitConcurrency ?? MERGE_QUEUE_GIT_CONCURRENCY));
-
-    const branches = candidates.map((item) => `feature/${item.issueId.toLowerCase()}`);
-
-    const existsFlags = yield* Effect.all(
-      branches.map((branch) => branchExists(branch, projectRoot)),
-      { concurrency: gitConcurrency },
-    );
-
-    const existing = candidates
-      .map((item, i) => ({ item, branch: branches[i]!, exists: existsFlags[i]! }))
-      .filter(({ exists }) => exists);
-
-    if (existing.length === 0) return [] as MergeQueueItem[];
-
-    const fileSets = yield* Effect.all(
-      existing.map(({ branch }) => changedFilesVsMain(branch, projectRoot)),
-      { concurrency: gitConcurrency },
-    );
-    const hotspots = options.hotspots ?? getProjectSwarmHotspots(findProjectByPathSync(projectRoot));
-    const conflictSignals = computePredictedConflictSignals(
-      existing.map((e, i) => ({ issueId: e.item.issueId, source: 'actual' as const, files: fileSets[i]! })),
-      { hotspots },
-    );
-    const signalByIssue = new Map(conflictSignals.map(signal => [signal.issueId, signal]));
-    const conflictsMap = new Map(conflictSignals.map(signal => [signal.issueId, new Set(signal.conflictsWith)]));
-
-    // PAN-1691: conflict-aware order. Disjoint (no-conflict) items go first so
-    // they can batch through in a single verification pass; then conflicting
-    // items broadest-file-footprint first, so the remaining cluster members
-    // rebase once onto the worst offender instead of repeatedly. Issue number
-    // is the stable tiebreak within each tier.
-    const sorted = orderMergeCandidates(
-      existing.map((e, i) => ({
-        item: e.item,
-        issueId: e.item.issueId,
-        footprint: signalByIssue.get(e.item.issueId)?.footprint ?? fileSets[i]!.size,
-        conflictCount: signalByIssue.get(e.item.issueId)?.conflictCount ?? 0,
-      })),
-    );
-
-    return sorted.map(({ item, conflictCount }, idx) => ({
-      issueId: item.issueId,
-      title: item.title,
-      branchName: `feature/${item.issueId.toLowerCase()}`,
-      pr: item.pr,
-      prUrl: options.getPrUrl?.(item),
-      mergeOrder: idx + 1,
-      conflictsWith: [...(conflictsMap.get(item.issueId) ?? [])],
-      batchGroup: (conflictCount === 0 ? 'batch' : 'serialize') as 'batch' | 'serialize',
-    }));
-  });
 
 /**
  * PAN-1696 ready-set-source: List all merge-eligible candidates from review-status DB for a given project.

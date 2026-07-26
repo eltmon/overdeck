@@ -51,6 +51,26 @@ const mergeBatchMocks = vi.hoisted(() => ({
   ),
 }));
 
+/**
+ * The real batch semantics, used by the ported PAN-1691 case: merge one at a
+ * time and stop at the first failure, because everything after it would need
+ * re-rebasing onto the new main.
+ */
+async function realShipMergeBatch(
+  issueIds: readonly string[],
+  deps: { merge: (id: string) => Promise<{ ok: true } | { ok: false; reason: string }> },
+) {
+  const outcomes: Array<{ issueId: string; result: string; reason?: string }> = [];
+  let stopped = false;
+  for (const issueId of issueIds) {
+    if (stopped) { outcomes.push({ issueId, result: 'skipped' }); continue; }
+    const r = await deps.merge(issueId);
+    if (r.ok) outcomes.push({ issueId, result: 'merged' });
+    else { outcomes.push({ issueId, result: 'failed', reason: r.reason }); stopped = true; }
+  }
+  return outcomes;
+}
+
 vi.mock('../../../../lib/projects.js', () => projectsMocks);
 vi.mock('../../../../lib/flywheel-merge-order.js', () => mergeOrderMocks);
 vi.mock('../../../../lib/overdeck/merge-sync.js', () => mergeSyncMocks);
@@ -74,7 +94,7 @@ const {
   dashboardSessionCookieHeader,
 } = await import('../dashboard-auth.js');
 
-const { _resetInternalTokenCacheForTests } = await import('../../../../lib/internal-token.js');
+const { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } = await import('../../../../lib/internal-token.js');
 
 interface RouteResult {
   status: number;
@@ -129,6 +149,9 @@ beforeEach(() => {
   mergeSyncMocks.isMergeTrainEnabledForProject.mockReturnValue(true);
   mergeOrderMocks.listEligibleCandidatesByProject.mockReturnValue([]);
   mergeOrderMocks.computeMergeQueueFromCandidates.mockReturnValue(Effect.succeed([]));
+  mergeBatchMocks.shipMergeBatch.mockImplementation(
+    (async (issueIds: readonly string[]) => issueIds.map((issueId) => ({ issueId, ok: true as const }))) as never,
+  );
 });
 
 afterEach(() => {
@@ -257,6 +280,19 @@ describe('PAN-1696 merge-train-routes', () => {
       expect(uatTrainMocks.runUatTrainReconcile).not.toHaveBeenCalled();
     });
 
+    it('allows internal-token callers through the unsafe mutation gate', async () => {
+      const result = await requestMergeTrainRoute('/api/merge-train/generations/pan-otter-0610/stack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: 'test-token' },
+        body: '{}',
+      });
+      expect(result).toEqual({
+        status: 200,
+        body: { frontendUrl: 'https://uat-pan-otter-0610.overdeck.localhost', evicted: [] },
+      });
+      expect(uatTrainMocks.postUatGenerationStackPayload).toHaveBeenCalledWith('uat/pan-otter-0610');
+    });
+
     it('rejects trusted-Origin-only mutations on every POST route', async () => {
       // A trusted Origin alone is NOT enough — the same gate the legacy flywheel
       // uat-generation routes enforce (session cookie + CSRF, or internal token).
@@ -316,6 +352,33 @@ describe('PAN-1696 merge-train-routes', () => {
       expect((await postMergeTrainMergeNextPayload({ n: 0, project: 'myn' })).status).toBe(400);
       expect((await postMergeTrainMergeNextPayload({ project: 'myn' })).status).toBe(400);
       expect(mergeBatchMocks.shipMergeBatch).not.toHaveBeenCalled();
+    });
+
+    // Ported from the deleted postFlywheelMergeNextPayload tests (PAN-1691), so
+    // the ordering + stop-at-first-failure contract survives the route removal.
+    it('merges the first N in order and stops at the first failure', async () => {
+      mergeBatchMocks.shipMergeBatch.mockImplementation(realShipMergeBatch as never);
+      const merge = vi.fn(async (id: string) =>
+        id === 'MIN-900' ? { ok: false as const, reason: 'CI red' } : { ok: true as const });
+
+      const result = await postMergeTrainMergeNextPayload({ n: 3, project: 'myn' }, {
+        getOrderedIssueIds: async () => ['MIN-831', 'MIN-900', 'MIN-901', 'MIN-902'],
+        merge,
+      });
+
+      expect(result).toEqual({
+        status: 200,
+        body: {
+          projectKey: 'myn',
+          outcomes: [
+            { issueId: 'MIN-831', result: 'merged' },
+            { issueId: 'MIN-900', result: 'failed', reason: 'CI red' },
+            { issueId: 'MIN-901', result: 'skipped' },
+          ],
+        },
+      });
+      // MIN-902 is outside the slice; MIN-901 is skipped after the failure.
+      expect(merge).toHaveBeenCalledTimes(2);
     });
 
     it('refuses to merge for a project whose merge-train is disabled', async () => {

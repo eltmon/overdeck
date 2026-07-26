@@ -784,9 +784,16 @@ function useUatTrainMembership(): Map<string, UatTrainBadgeInfo> {
   const { data } = useQuery({
     queryKey: ['uat-generations'],
     queryFn: async () => {
-      const res = await fetch('/api/flywheel/uat-generations');
+      // PAN-1696: reads the aggregate namespace, which returns one entry per
+      // tracked project. The badge is keyed by issue id, and generation members
+      // are already project-scoped, so flattening every project's chain is
+      // correct — and it means a non-PAN issue finally gets a train chip too.
+      const res = await fetch('/api/merge-train/generations');
       if (!res.ok) return [];
-      return res.json() as Promise<Array<{ name: string; status: string; members?: Array<{ issueId: string; mergeOrder: number }> }>>;
+      const byProject = await res.json() as Array<{
+        generations?: Array<{ name: string; status: string; members?: Array<{ issueId: string; mergeOrder: number }> }>;
+      }>;
+      return (Array.isArray(byProject) ? byProject : []).flatMap((entry) => entry.generations ?? []);
     },
     staleTime: 30_000,
     refetchInterval: 60_000,
