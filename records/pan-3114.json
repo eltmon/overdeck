@@ -54,7 +54,7 @@
     "recordedAt": "2026-07-26T10:37:54.195Z"
   },
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T11:09:56.122Z",
+  "updated": "2026-07-26T11:09:58.217Z",
   "pipeline": {
     "issueId": "PAN-3114",
     "reviewStatus": "passed",
@@ -63,11 +63,11 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:40:13.370Z",
-    "updatedAt": "2026-07-26T11:09:56.041Z",
+    "updatedAt": "2026-07-26T11:09:56.066Z",
     "reviewNotes": "Approved: all requirements implemented; correctness, security, and performance review clean; focused tests, typecheck, lint, and diff check pass.",
-    "testNotes": "typecheck+lint pass; all focused xBRIEF-scoped tests pass (69/69, 1 skipped); full-suite has 10 pre-existing failures in 7 files disjoint from this diff, root-caused to launcher-git-guard intercepting real git subprocess calls in unrelated tests; backend/docs-only change, no UAT required",
+    "testNotes": "npm run typecheck: pass (dashboard-types guard: 62 known errors, none new). npm run lint: pass (all guards incl. state-write, circular-deps, file-size, ratchet, quarantine). Focused xBRIEF verify_commands all pass: npx vitest run tests/unit/lib/cloister/uat-promote-verification.test.ts tests/unit/lib/cloister/uat-promote.test.ts src/dashboard/server/services/__tests__/uat-train.test.ts tests/unit/lib/lifecycle/workflows.test.ts tests/unit/lib/head-anchor-write-sites.test.ts tests/unit/lib/lifecycle/dod-doc-drift.test.ts src/dashboard/server/routes/conversations-no-loss.test.ts -> 69 passed, 1 skipped, 0 failed. Full npm test (monorepo, incl. frontend issueActions suites): 10851 passed, 10 failed, 50 skipped across 1191 files; the 10 failures are in 7 files entirely disjoint from this PR's diff (auto-commit.test.ts, record-update.test.ts, dangerous-git-ops.test.ts, merge-validation.test.ts, cloister/validation.test.ts, pipeline-state-paths-contribution.test.ts, workspace-manager-pre-rebase.test.ts) and are caused by src/lib/launcher-git-guard.ts intercepting literal `git rebase`/`git reset --hard` subprocess calls those tests issue directly against real git plumbing -- a known pre-existing environmental artifact of running inside an agent-guarded workspace, not a regression from this change. Confirmed identical failure set (same 10 tests, same 7 files) across two independent full-suite runs. Issue is a backend/docs-only change (UAT-promotion verification-verdict recording + close-out heal + docs); all 4 xBRIEF items are kind:backend/docs with no dashboard UI touched, so browser UAT via Playwright was not required and none was run. Self-review (.pan/review/agent-pan-3114-review-cde4b4cf/review.md) independently reached APPROVED with matching verification evidence.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs met: pending->passed stamp with 'uat-promotion' + generation name + 9-char SHA (slice(0,9)); passed/skipped short-circuit to {} so recordUatPromotionVerdicts skips and preserves existing verdict/notes; lastVerifiedCommit = rehydrateHeadAnchor(member.headSha) via conditional spread, omitted on empty headSha; recordUatPromotionVerdicts returns only non-terminal issue IDs and persists via setReviewStatusSync(issueId, stamp, current ?? undefined) — signature verified against src/lib/review-status.ts:147. Head-anchor guard entry expression matches the AST text exactly and the inventory comparison is order-insensitive.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3126",
@@ -151,7 +151,7 @@
       },
       "costAtCloseOut": {
         "usd": 44.104017,
-        "pricingAsOf": "2026-07-26T11:09:56.086Z"
+        "pricingAsOf": "2026-07-26T11:09:58.211Z"
       }
     },
     "merges": [
