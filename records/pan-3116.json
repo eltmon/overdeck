@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T09:04:01.632Z",
-  "updated": "2026-07-26T09:30:11.725Z",
+  "updated": "2026-07-26T09:34:14.612Z",
   "pipeline": {
     "issueId": "PAN-3116",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "remove-baseline-reconcile": {
-        "writerId": "agent-pan-3116",
-        "agentId": "agent-pan-3116",
-        "pid": 2692273,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T09:30:11.725Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3116",
@@ -93,6 +85,17 @@
         "outcome": "completed",
         "reason": "Retargeted numeric ratchet auditing to file-size-allowlist.txt while preserving ESLint and circular ratchet behavior, with updated range and root/merge tests.",
         "releasedAt": "2026-07-26T09:29:58.531Z"
+      },
+      {
+        "writerId": "agent-pan-3116",
+        "agentId": "agent-pan-3116",
+        "pid": 2692273,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T09:30:11.725Z",
+        "itemId": "remove-baseline-reconcile",
+        "outcome": "completed",
+        "reason": "Deleted the obsolete baseline reconcile module and tests, and removed the UAT promotion reconcile/amend step while preserving no-ff merge and push behavior.",
+        "releasedAt": "2026-07-26T09:34:14.612Z"
       }
     ],
     "statusReasons": {
@@ -103,6 +106,10 @@
       "ratchet-audit-allowlist": {
         "reason": "Retargeted numeric ratchet auditing to file-size-allowlist.txt while preserving ESLint and circular ratchet behavior, with updated range and root/merge tests.",
         "updatedAt": "2026-07-26T09:29:58.531Z"
+      },
+      "remove-baseline-reconcile": {
+        "reason": "Deleted the obsolete baseline reconcile module and tests, and removed the UAT promotion reconcile/amend step while preserving no-ff merge and push behavior.",
+        "updatedAt": "2026-07-26T09:34:14.612Z"
       }
     }
   },
@@ -118,6 +125,9 @@
     "ratchet-audit-allowlist.ratchet-audit-allowlist.ac2": "completed",
     "ratchet-audit-allowlist.ratchet-audit-allowlist.ac3": "completed",
     "ratchet-audit-allowlist.ratchet-audit-allowlist.ac4": "completed",
-    "remove-baseline-reconcile": "running"
+    "remove-baseline-reconcile": "completed",
+    "remove-baseline-reconcile.remove-baseline-reconcile.ac1": "completed",
+    "remove-baseline-reconcile.remove-baseline-reconcile.ac2": "completed",
+    "remove-baseline-reconcile.remove-baseline-reconcile.ac3": "completed"
   }
 }
