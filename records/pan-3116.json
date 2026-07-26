@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T09:04:01.632Z",
-  "updated": "2026-07-26T09:26:41.867Z",
+  "updated": "2026-07-26T09:29:58.531Z",
   "pipeline": {
     "issueId": "PAN-3116",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "ratchet-audit-allowlist": {
-        "writerId": "agent-pan-3116",
-        "agentId": "agent-pan-3116",
-        "pid": 2524944,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T09:26:41.867Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3116",
@@ -82,12 +74,27 @@
         "outcome": "completed",
         "reason": "Replaced the shared baseline with an origin/main-derived ratchet, added audited allowlist parsing, and covered base, growth, malformed, missing-ref, and shrink cases.",
         "releasedAt": "2026-07-26T09:24:42.841Z"
+      },
+      {
+        "writerId": "agent-pan-3116",
+        "agentId": "agent-pan-3116",
+        "pid": 2524944,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T09:26:41.867Z",
+        "itemId": "ratchet-audit-allowlist",
+        "outcome": "completed",
+        "reason": "Retargeted numeric ratchet auditing to file-size-allowlist.txt while preserving ESLint and circular ratchet behavior, with updated range and root/merge tests.",
+        "releasedAt": "2026-07-26T09:29:58.531Z"
       }
     ],
     "statusReasons": {
       "rewrite-lint-derive-from-base": {
         "reason": "Replaced the shared baseline with an origin/main-derived ratchet, added audited allowlist parsing, and covered base, growth, malformed, missing-ref, and shrink cases.",
         "updatedAt": "2026-07-26T09:24:42.841Z"
+      },
+      "ratchet-audit-allowlist": {
+        "reason": "Retargeted numeric ratchet auditing to file-size-allowlist.txt while preserving ESLint and circular ratchet behavior, with updated range and root/merge tests.",
+        "updatedAt": "2026-07-26T09:29:58.531Z"
       }
     }
   },
@@ -98,6 +105,10 @@
     "rewrite-lint-derive-from-base.rewrite-lint-derive-from-base.ac3": "completed",
     "rewrite-lint-derive-from-base.rewrite-lint-derive-from-base.ac4": "completed",
     "rewrite-lint-derive-from-base.rewrite-lint-derive-from-base.ac5": "completed",
-    "ratchet-audit-allowlist": "running"
+    "ratchet-audit-allowlist": "completed",
+    "ratchet-audit-allowlist.ratchet-audit-allowlist.ac1": "completed",
+    "ratchet-audit-allowlist.ratchet-audit-allowlist.ac2": "completed",
+    "ratchet-audit-allowlist.ratchet-audit-allowlist.ac3": "completed",
+    "ratchet-audit-allowlist.ratchet-audit-allowlist.ac4": "completed"
   }
 }
