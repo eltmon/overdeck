@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T17:57:54.100Z",
+  "updated": "2026-07-26T18:10:57.426Z",
   "pipeline": {
     "issueId": "PAN-3148",
     "reviewStatus": "pending",
@@ -49,18 +49,33 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "anchor-blocked-verdicts": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3148",
         "agentId": "agent-pan-3148",
         "pid": 228411,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T17:57:54.100Z"
+        "claimedAt": "2026-07-26T17:57:54.100Z",
+        "itemId": "anchor-blocked-verdicts",
+        "outcome": "completed",
+        "reason": "Anchored blocked verdicts after feedback delivery across CLI and HTTP paths, included fallback synthesis anchors, and added regression coverage plus the head-anchor write-site audit.",
+        "releasedAt": "2026-07-26T18:10:57.426Z"
+      }
+    ],
+    "statusReasons": {
+      "anchor-blocked-verdicts": {
+        "reason": "Anchored blocked verdicts after feedback delivery across CLI and HTTP paths, included fallback synthesis anchors, and added regression coverage plus the head-anchor write-site audit.",
+        "updatedAt": "2026-07-26T18:10:57.426Z"
       }
     }
   },
   "statusOverrides": {
-    "anchor-blocked-verdicts": "running"
+    "anchor-blocked-verdicts": "completed",
+    "anchor-blocked-verdicts.anchor-blocked-verdicts.ac1": "completed",
+    "anchor-blocked-verdicts.anchor-blocked-verdicts.ac2": "completed",
+    "anchor-blocked-verdicts.anchor-blocked-verdicts.ac3": "completed",
+    "anchor-blocked-verdicts.anchor-blocked-verdicts.ac4": "completed"
   }
 }
