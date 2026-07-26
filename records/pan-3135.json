@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T13:31:59.607Z",
+  "updated": "2026-07-26T13:35:14.873Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "merge-step0-intent-registration": {
-        "writerId": "agent-pan-3135",
-        "agentId": "agent-pan-3135",
-        "pid": 2723110,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T13:31:59.606Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3135",
@@ -148,6 +140,17 @@
         "outcome": "completed",
         "reason": "Long-queued blocked deploys now emit one error and priority-1 TTS, trip needs-you on the first active verifier, and persist escalation to prevent repeats",
         "releasedAt": "2026-07-26T13:31:50.471Z"
+      },
+      {
+        "writerId": "agent-pan-3135",
+        "agentId": "agent-pan-3135",
+        "pid": 2723110,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:31:59.606Z",
+        "itemId": "merge-step0-intent-registration",
+        "outcome": "completed",
+        "reason": "Post-merge Step 0 now records merge-step0 deploy intent with the active verification blockers whenever the deploy window is unsafe, while preserving clear/fresh behavior",
+        "releasedAt": "2026-07-26T13:35:14.872Z"
       }
     ],
     "statusReasons": {
@@ -178,6 +181,10 @@
       "deploy-queue-escalation": {
         "reason": "Long-queued blocked deploys now emit one error and priority-1 TTS, trip needs-you on the first active verifier, and persist escalation to prevent repeats",
         "updatedAt": "2026-07-26T13:31:50.471Z"
+      },
+      "merge-step0-intent-registration": {
+        "reason": "Post-merge Step 0 now records merge-step0 deploy intent with the active verification blockers whenever the deploy window is unsafe, while preserving clear/fresh behavior",
+        "updatedAt": "2026-07-26T13:35:14.872Z"
       }
     }
   },
@@ -213,6 +220,8 @@
     "deploy-queue-escalation.deploy-queue-escalation.ac1": "completed",
     "deploy-queue-escalation.deploy-queue-escalation.ac2": "completed",
     "deploy-queue-escalation.deploy-queue-escalation.ac3": "completed",
-    "merge-step0-intent-registration": "running"
+    "merge-step0-intent-registration": "completed",
+    "merge-step0-intent-registration.merge-step0-intent-registration.ac1": "completed",
+    "merge-step0-intent-registration.merge-step0-intent-registration.ac2": "completed"
   }
 }
