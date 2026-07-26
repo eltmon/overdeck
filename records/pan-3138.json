@@ -82,18 +82,18 @@
     "recordedAt": "2026-07-26T15:10:38.144Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T15:15:31.298Z",
+  "updated": "2026-07-26T15:16:45.714Z",
   "pipeline": {
     "issueId": "PAN-3138",
-    "reviewStatus": "failed",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T15:10:55.975Z",
-    "updatedAt": "2026-07-26T15:15:30.057Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-3138-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-26T15:16:45.682Z",
+    "reviewNotes": "A failed verifying-on-main tracker transition permanently skips merge-time Docker teardown and excludes reaper recovery",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "ad37787c2c81d40ae7e7365f0704b913ba266986",
     "reviewSpawnedAt": "2026-07-26T15:15:28.630Z",
@@ -132,6 +132,24 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T15:10:38.144Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "2ae7a2971a8c4516de6fe78b878d3c2fb986c98e"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "2ae7a2971a8c4516de6fe78b878d3c2fb986c98e"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "2ae7a2971a8c4516de6fe78b878d3c2fb986c98e"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "2ae7a2971a8c4516de6fe78b878d3c2fb986c98e"
+      }
     }
   },
   "closeOut": {
@@ -179,24 +197,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2356805,
-            "output": 171234,
-            "cacheRead": 86317056,
+            "input": 3132442,
+            "output": 175601,
+            "cacheRead": 90984448,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 9379171,
-          "output": 385144,
-          "cacheRead": 125877248,
+          "input": 10154808,
+          "output": 389511,
+          "cacheRead": 130544640,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 121.388799,
-        "pricingAsOf": "2026-07-26T15:15:31.290Z"
+        "usd": 127.73169,
+        "pricingAsOf": "2026-07-26T15:16:45.701Z"
       }
     },
     "merges": [
