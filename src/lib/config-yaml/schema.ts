@@ -411,6 +411,12 @@ export interface ResourcesConfig {
   governor_footprint_default_review_gb?: number;
   /** PAN-2500: cold-start footprint estimate (GiB) for a test agent */
   governor_footprint_default_test_gb?: number;
+  /** PAN-3123: swap-free percentage below which new admissions stop */
+  governor_swap_soft_free_percent?: number;
+  /** PAN-3123: swap-free percentage required before admissions resume */
+  governor_swap_recovery_free_percent?: number;
+  /** PAN-3123: memory PSI full avg10 threshold that permits shedding */
+  governor_psi_full_shed_avg10?: number;
 }
 
 export interface IssuesConfig {
@@ -886,6 +892,10 @@ export interface NormalizedConfig {
     governorFootprintDefaultWorkGb: number;
     governorFootprintDefaultReviewGb: number;
     governorFootprintDefaultTestGb: number;
+    /** PAN-3123: swap runway and PSI shedding thresholds. */
+    governorSwapSoftFreePercent: number;
+    governorSwapRecoveryFreePercent: number;
+    governorPsiFullShedAvg10: number;
   };
 
   /** Dashboard issue-fetch behavior, normalised (always defined). */

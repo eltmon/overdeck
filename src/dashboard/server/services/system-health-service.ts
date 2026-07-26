@@ -71,6 +71,27 @@ export interface ProcMemorySnapshot {
   swapFree: number;
   committedAs: number;
   commitLimit: number;
+  psiSomeAvg10: number | null;
+  psiFullAvg10: number | null;
+}
+
+export function parseMemoryPsi(content: string): {
+  someAvg10: number | null;
+  fullAvg10: number | null;
+} {
+  let someAvg10: number | null = null;
+  let fullAvg10: number | null = null;
+
+  for (const line of content.split('\n')) {
+    const match = line.match(/^(some|full)\s+.*\bavg10=([^\s]+)/);
+    if (!match) continue;
+    const value = Number(match[2]);
+    if (!Number.isFinite(value) || value < 0) continue;
+    if (match[1] === 'some') someAvg10 = value;
+    if (match[1] === 'full') fullAvg10 = value;
+  }
+
+  return { someAvg10, fullAvg10 };
 }
 
 interface CpuSample {
@@ -333,6 +354,14 @@ async function readProcMemoryLinux(): Promise<ProcMemorySnapshot> {
     if (match) values.set(match[1] ?? '', Number(match[2] ?? '0') * KB);
   }
 
+  let psiSomeAvg10: number | null = null;
+  let psiFullAvg10: number | null = null;
+  try {
+    const psi = parseMemoryPsi(await readFile('/proc/pressure/memory', 'utf-8'));
+    psiSomeAvg10 = psi.someAvg10;
+    psiFullAvg10 = psi.fullAvg10;
+  } catch { /* PSI is unavailable on older or restricted Linux hosts */ }
+
   return {
     memTotal: values.get('MemTotal') ?? 0,
     memAvailable: values.get('MemAvailable') ?? values.get('MemFree') ?? 0,
@@ -341,6 +370,8 @@ async function readProcMemoryLinux(): Promise<ProcMemorySnapshot> {
     swapFree: values.get('SwapFree') ?? 0,
     committedAs: values.get('Committed_AS') ?? 0,
     commitLimit: values.get('CommitLimit') ?? 0,
+    psiSomeAvg10,
+    psiFullAvg10,
   };
 }
 
@@ -385,6 +416,8 @@ async function readProcMemoryDarwin(): Promise<ProcMemorySnapshot> {
     swapFree,
     committedAs: 0,
     commitLimit: 0,
+    psiSomeAvg10: null,
+    psiFullAvg10: null,
   };
 }
 

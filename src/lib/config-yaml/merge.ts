@@ -188,6 +188,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       governorFootprintDefaultWorkGb: DEFAULT_CONFIG.resources.governorFootprintDefaultWorkGb,
       governorFootprintDefaultReviewGb: DEFAULT_CONFIG.resources.governorFootprintDefaultReviewGb,
       governorFootprintDefaultTestGb: DEFAULT_CONFIG.resources.governorFootprintDefaultTestGb,
+      governorSwapSoftFreePercent: DEFAULT_CONFIG.resources.governorSwapSoftFreePercent,
+      governorSwapRecoveryFreePercent: DEFAULT_CONFIG.resources.governorSwapRecoveryFreePercent,
+      governorPsiFullShedAvg10: DEFAULT_CONFIG.resources.governorPsiFullShedAvg10,
     },
     issues: {
       closedWindowDays: DEFAULT_CONFIG.issues.closedWindowDays,
@@ -661,10 +664,25 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       if (typeof config.resources.governor_footprint_default_test_gb === 'number') {
         result.resources.governorFootprintDefaultTestGb = config.resources.governor_footprint_default_test_gb;
       }
+      if (typeof config.resources.governor_swap_soft_free_percent === 'number') {
+        result.resources.governorSwapSoftFreePercent = config.resources.governor_swap_soft_free_percent;
+      }
+      if (typeof config.resources.governor_swap_recovery_free_percent === 'number') {
+        result.resources.governorSwapRecoveryFreePercent = config.resources.governor_swap_recovery_free_percent;
+      }
+      if (typeof config.resources.governor_psi_full_shed_avg10 === 'number') {
+        result.resources.governorPsiFullShedAvg10 = config.resources.governor_psi_full_shed_avg10;
+      }
       // PAN-2500: RECOVERY must exceed SOFT or hysteresis can never re-admit.
       // Normalize rather than throw — a misconfigured reserve shouldn't crash config load.
       if (result.resources.governorRecoveryReserveGb <= result.resources.governorSoftReserveGb) {
         result.resources.governorRecoveryReserveGb = result.resources.governorSoftReserveGb + 1;
+      }
+      if (result.resources.governorSwapRecoveryFreePercent <= result.resources.governorSwapSoftFreePercent) {
+        result.resources.governorSwapRecoveryFreePercent = Math.min(
+          result.resources.governorSwapSoftFreePercent + 10,
+          100,
+        );
       }
     }
 
