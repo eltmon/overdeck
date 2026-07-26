@@ -4,17 +4,17 @@
     "created": "2026-07-26T12:48:35.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3093: Polyrepo UAT assembly: per-repo generation branches, per-repo base SHAs, all-or-nothing promote (unblocks the MYN train)",
-    "updated": "2026-07-26T12:53:48.383Z"
+    "updated": "2026-07-26T12:57:55.382Z"
   },
   "plan": {
     "id": "pan-3093",
     "title": "Polyrepo UAT assembly: per-repo generation branches, per-repo base SHAs, all-or-nothing promote (unblocks the MYN train)",
-    "status": "proposed",
+    "status": "approved",
     "uid": "3ea48430-5aa2-43f3-81b5-b8c03e78a37c",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-26T12:48:35.000Z",
-    "updated": "2026-07-26T12:53:48.383Z",
+    "updated": "2026-07-26T12:57:55.382Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3093",
@@ -650,5 +650,5 @@
       "canonicalFilename": "2026-07-26-PAN-3093-polyrepo-uat-assembly-per-repo-generation-branches-per-repo-base-shas-all-or-nothing-promote-unblocks-the-myn-train.xbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
