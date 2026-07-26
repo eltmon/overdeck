@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:56:03.309Z",
-  "updated": "2026-07-26T10:45:05.454Z",
+  "updated": "2026-07-26T10:49:32.214Z",
   "pipeline": {
     "issueId": "PAN-3115",
     "reviewStatus": "pending",
@@ -67,16 +67,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "docs-prompts-contract": {
-        "writerId": "agent-pan-3115",
-        "agentId": "agent-pan-3115",
-        "pid": 2140390,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T10:45:05.454Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3115",
@@ -165,6 +157,17 @@
         "outcome": "completed",
         "reason": "Both membership probes now parse HTTP 200 bodies and reject typed unavailable results so the existing boundary error/Retry UX remains active; array and 503 behavior is covered.",
         "releasedAt": "2026-07-26T10:44:43.074Z"
+      },
+      {
+        "writerId": "agent-pan-3115",
+        "agentId": "agent-pan-3115",
+        "pid": 2140390,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:45:05.454Z",
+        "itemId": "docs-prompts-contract",
+        "outcome": "completed",
+        "reason": "Documented success, typed unavailable, and cold-loading response shapes across the canonical doc, flywheel mission, UAT promote nudge, and pipeline-status skill; prohibited ad-hoc fallback derivation.",
+        "releasedAt": "2026-07-26T10:49:32.214Z"
       }
     ],
     "statusReasons": {
@@ -199,6 +202,10 @@
       "frontend-unavailable-probe": {
         "reason": "Both membership probes now parse HTTP 200 bodies and reject typed unavailable results so the existing boundary error/Retry UX remains active; array and 503 behavior is covered.",
         "updatedAt": "2026-07-26T10:44:43.074Z"
+      },
+      "docs-prompts-contract": {
+        "reason": "Documented success, typed unavailable, and cold-loading response shapes across the canonical doc, flywheel mission, UAT promote nudge, and pipeline-status skill; prohibited ad-hoc fallback derivation.",
+        "updatedAt": "2026-07-26T10:49:32.214Z"
       }
     }
   },
@@ -237,6 +244,9 @@
     "frontend-unavailable-probe.frontend-unavailable-probe.ac1": "completed",
     "frontend-unavailable-probe.frontend-unavailable-probe.ac2": "completed",
     "frontend-unavailable-probe.frontend-unavailable-probe.ac3": "completed",
-    "docs-prompts-contract": "running"
+    "docs-prompts-contract": "completed",
+    "docs-prompts-contract.docs-prompts-contract.ac1": "completed",
+    "docs-prompts-contract.docs-prompts-contract.ac2": "completed",
+    "docs-prompts-contract.docs-prompts-contract.ac3": "completed"
   }
 }
