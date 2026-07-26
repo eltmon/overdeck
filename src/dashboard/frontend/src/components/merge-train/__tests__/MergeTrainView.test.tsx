@@ -204,9 +204,8 @@ describe('one section per project (ac1)', () => {
   });
 
   it('keeps a disabled row visible when it is MIXED with idle enabled projects', async () => {
-    // The dangerous case: one enabled project with nothing ready plus one disabled
-    // project. Every queue is empty, so the collapse shortcut would fire and hide
-    // the fact that the second project's train is switched off.
+    // The idle enabled project is hidden, but the disabled project remains because
+    // its off state carries information the page-level empty copy cannot replace.
     mockFetch({
       '/api/merge-train/queues': [
         { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: [] },
@@ -218,8 +217,60 @@ describe('one section per project (ac1)', () => {
 
     await waitFor(() => expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy());
     expect(screen.getByTestId('merge-train-project-myn').textContent).toContain('turned off for Mind Your Now');
-    expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy();
+    expect(screen.queryByTestId('merge-train-project-overdeck')).toBeNull();
     expect(screen.queryByText(/No features are ready to merge in any project/)).toBeNull();
+  });
+
+  it('hides an idle enabled project when another project has ready work', async () => {
+    mockFetch({
+      '/api/merge-train/queues': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: PAN_QUEUE },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, queue: [] },
+      ],
+      '/api/merge-train/generations': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [PAN_READY_GEN] },
+      ],
+    });
+    renderView();
+
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    expect(screen.queryByTestId('merge-train-project-myn')).toBeNull();
+    expect(screen.getByTestId('merge-train-idle-hidden-note').textContent).toContain(
+      '1 project with nothing ready is hidden',
+    );
+  });
+
+  it('pluralizes the hidden-project footer when multiple idle projects are omitted', async () => {
+    mockFetch({
+      '/api/merge-train/queues': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: PAN_QUEUE },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, queue: [] },
+        { projectKey: 'krux', projectName: 'Krux', enabled: true, queue: [] },
+      ],
+      '/api/merge-train/generations': [],
+    });
+    renderView();
+
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    expect(screen.getByTestId('merge-train-idle-hidden-note').textContent).toContain(
+      '2 projects with nothing ready are hidden',
+    );
+  });
+
+  it('collapses to the page-level empty state when every project is idle and enabled', async () => {
+    mockFetch({
+      '/api/merge-train/queues': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: [] },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, queue: [] },
+      ],
+      '/api/merge-train/generations': [],
+    });
+    renderView();
+
+    await screen.findByText(/No features are ready to merge in any project/);
+    expect(screen.queryByTestId('merge-train-project-overdeck')).toBeNull();
+    expect(screen.queryByTestId('merge-train-project-myn')).toBeNull();
+    expect(screen.queryByTestId('merge-train-idle-hidden-note')).toBeNull();
   });
 
   it('keeps the off rows visible when EVERY project has the train disabled', async () => {
