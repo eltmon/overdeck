@@ -264,15 +264,7 @@
       "timestamp": "2026-07-26T18:36:04.279Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T18:36:03Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3093\n\n# Review Synthesis — PAN-3093 — 2026-07-26T18:35:00Z\n\n## Verdict: CHANGES REQUESTED — the new missing-merge-SHA recovery still finalizes a stamped repo when Git returns no proof, permanently closing the retry path without usable post-merge evidence\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-9270c054/context.json\n- Branch: feature/pan-3093\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093\n- HEAD reviewed: 9270c054d7f64c96fbcb239c75b787be1a33c67f\n- Cycle number: 6\n- Prior cycle SHA: f75a76c41ccd76fa4f94b6f9a6492d9f0f0e559c\n- PR diff: 6409d5ea9304dcf9a31cae03fad4bfd165e29c53..9270c054d7f64c96fbcb239c75b787be1a33c67f (16 commits)\n- Cycle diff: f75a76c41ccd76fa4f94b6f9a6492d9f0f0e559c..9270c054d7f64c96fbcb239c75b787be1a33c67f\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings after gates |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-9270c054/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-9270c054/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-9270c054/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-9270c054/requirements.md | 1 |\n\n## Blocking Findings\n\n### [requirements] Missing merge evidence can still be terminalized after an unsuccessful recovery probe — `src/lib/cloister/uat-promote.ts:327`\nThe current cycle correctly changes stamped rows without `mergeSha` to run through `findLandedMerge()`, but the no-proof branch still pushes the original row into `recovered` with its existing `promotedAt`. The subsequent classification treats that timestamp as sufficient: the row enters `alreadyLanded`, stays out of `pending`, and an all-stamped generation calls `finishPromote()`. Finalization marks the generation `promoted`, then withholds all per-repo evidence because the SHA remains missing; post-merge verification refuses, while the top-level status gate prevents another promotion retry. Treat `promotedAt && !mergeSha && landedSha === null` as unverified and return a non-terminal failure. Require both durable timestamp and merge SHA for every repo before finalization, and replace the evidence-withholding success test with a retryable-failure regression.\n\nThis survives the cycle-6 convergence gate because the stamped-row recovery branch at `src/lib/cloister/uat-promote.ts:327-369` was changed in the current cycle and introduced the incomplete proof classification.\n\n## Non-blocking Findings\n\n### [security] [demoted: previously reviewed] Promotion authorizes by current repo key but writes through stale persisted path and target — `src/dashboard/server/services/uat-train.ts:699`\nReusing a repository key after changing its configured path or target can authorize an existing generation to write to the old destination. The promotion authorization code was already present at the prior cycle SHA and was not changed in this cycle, so cycle-6 convergence forbids promoting this newly reported issue to a blocker.\n\n### [correctness/performance/requirements] [demoted: previously reviewed] Anchor read failures still become synthetic `unknown` values — `src/dashboard/server/services/uat-train.ts:337`\nTarget and member-head failures can still drive false staleness, teardown, and failed reassembly churn. This issue was already documented in the prior synthesis, and the current cycle changes ready-set availability and prefix propagation without changing the cited `catch(() => 'unknown')` anchor lines.\n\n### [requirements] [demoted: previously reviewed] Failure paths can persist shrunken composite base anchors — `src/lib/cloister/uat-polyrepo-engine.ts:308`\nFatal setup and push-failure rows can bypass the complete contributing-repo signature, defeating failed-input backoff. The cited engine code was not changed in this cycle.\n\n### [requirements] [demoted: previously reviewed] Required documentation remains internally contradictory — `features/merge-batches.mdx:14`\nThe gating, Phase-B publication, teardown, and recovery wording was present at the prior cycle SHA and was not changed in this cycle.\n\n### [correctness] Deterministic promotion worktree paths can race concurrent requests — `src/lib/cloister/uat-promote.ts:625`\nConcurrent promotes can force-remove each other's prepared worktree. The reviewer classified this as advisory.\n\n### [security] Validate configured target branches before Git use — `src/lib/cloister/uat-generation-deps.ts:102`\nArgument-array execution avoids shell interpolation, but malformed trusted configuration can still be parsed as a Git option or invalid ref. This remains defense in depth.\n\n### [security] Sanitize and project-scope temporary promotion paths — `src/lib/cloister/uat-promote.ts:629`\nHand-edited repository keys can affect the temporary path, and generic keys can collide across projects. This remains defense in depth under the current trust model.\n\n### [performance] Residue cleanup contacts remotes for branches known never to have been pushed — `src/lib/cloister/uat-generation-deps.ts:307`\nUnrecorded hold-out repos pay a bounded, avoidable remote delete handshake.\n\n### [performance] First-attempt promotion fetches each target twice, serially — `src/lib/cloister/uat-promote.ts:326`\nRecovery and Phase A perform duplicate target refreshes for normal pending repos, producing bounded 2R remote negotiations.\n\n### [performance] Batched generation hydration can exceed SQLite's bind-variable limit — `src/lib/overdeck/merge-sync-uat.ts:242`\nAn installation with enough retained generations can exceed SQLite's variable limit because child-table reads use one placeholder per generation rather than fixed-size chunks.\n\n## Clean Sub-roles\n- security has no blocking findings after the cycle-6 convergence gate.\n- correctness has no blocking findings after the cycle-6 convergence gate.\n- performance has no blocking findings after the cycle-6 convergence gate; ancestry verification now coalesces concurrent misses and does not cache negatives.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-9270c054/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3093 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/concerns.md",
@@ -355,10 +347,10 @@
     "recordedAt": "2026-07-26T18:25:06.675Z"
   },
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T18:46:50.357Z",
+  "updated": "2026-07-26T18:52:14.181Z",
   "pipeline": {
     "issueId": "PAN-3093",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -366,12 +358,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T18:27:46.686Z",
-    "updatedAt": "2026-07-26T18:46:48.776Z",
+    "updatedAt": "2026-07-26T18:52:14.147Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed the cycle-6 blocker: a stamped repo row with no provable merge no longer finalizes the batch. Promote now fails retryably on promotedAt-without-mergeSha when no merge is findable on the target, and finishPromote enforces complete per-repo evidence at the single point a generation turns terminal.",
     "inspectNotes": "All 4 ACs verified; ran uat-polyrepo-engine.test.ts + uat-generation-engine.test.ts, 33/33 pass. AC1: runAssemblyPass calls each repo's own fetchMain then createWorktree and records that repo's baseSha; finish() writes compositeBaseAnchor -> 'fe@aaa1111 api@bbb2222' on the generation row (asserted on both the returned object and the store row). AC2: a block returns from the pass, the issue is added to heldOutIds once and pushed to heldOut with reason suffixed '(in <repoKey>)', then assembly replays from base; verified in real git too, since createWorktree does 'worktree remove --force' + 'worktree add -B <branch> <path> origin/<target>', which resets the sibling repo's branch, so the fake's merged-reset is faithful. Push happens only after the accepted pass, so a held-out feature is never published in repo A. AC3: contributingRepos filters by repoContributions; infra gets zero worktreeCreations and zero pushes. AC4: the push loop returns finish('failed', ...) on the first throw, with fe.pushes=[name] and api.pushes=[] proving the sibling had landed. Deviation 1 confirmed necessary: safeGenerationWorktreePath (uat-generation-deps.ts:39) resolves <projectRoot>/workspaces, and a member repo runs git in <projectRoot>/<repoKey> while its worktree sits under the wrapper's workspaces, so the old signature would throw; workspacesRoot defaults to projectRoot and targetBranch to 'main', reproducing the prior origin/main behavior exactly. Per-repo deps each close over their own worktreePath, so merge/abort/push cannot cross repos. Deviation 2 confirmed: GenerationStorePort.update's Pick had no 'repos'. Non-blocking notes: (a) a repo dropped between passes keeps its unpushed local uat/ branch and worktree until the generation folder is reaped - harmless since 'worktree add -B' force-resets, but cleanup (WI-7) should reap the branch; (b) listRemoteUatBranchesMulti, buildPolyrepoGitDeps, and assemblePolyrepoUatGeneration have no callers yet, which is expected until the WI-5/WI-6 wiring lands.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3145",
     "lastVerifiedCommit": "cd81b757bcb11b125bf455e605a0d0a443c1f23e",
-    "reviewSpawnedAt": "2026-07-26T18:35:44.326Z",
+    "reviewSpawnedAt": "2026-07-26T18:52:14.145Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/concerns.md",
@@ -522,7 +514,7 @@
       },
       "costAtCloseOut": {
         "usd": 360.3214383,
-        "pricingAsOf": "2026-07-26T18:46:50.353Z"
+        "pricingAsOf": "2026-07-26T18:52:14.160Z"
       }
     },
     "merges": [
