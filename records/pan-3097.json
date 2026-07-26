@@ -12,6 +12,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T03:30:16.611Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T03:33:39.534Z"
     }
   ],
   "feedback": [],
@@ -55,18 +60,19 @@
     "recordedAt": "2026-07-26T03:30:04.529Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T03:31:10.909Z",
+  "updated": "2026-07-26T03:33:39.535Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T03:31:04.453Z",
-    "updatedAt": "2026-07-26T03:31:04.850Z",
+    "updatedAt": "2026-07-26T03:33:39.225Z",
     "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf send-keys -t agent-pan-3097-review C-m\ncan't find pane: agent-pan-3097-review\n",
+    "verificationNotes": "Verification FAILED at lint (90684ms):\n\n\n> @overdeck/core@0.45.24 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.45.24 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.45.24 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.45.24 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.45.24 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.45.24 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.45.24 prelint:skills\n> npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli\n\n\n> @overdeck/core@0.45.24 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.45.24 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\nℹ tsdown v0.21.10 powered by rolldown v1.0.0-rc.17\nℹ config file: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3097/packages/contracts/tsdown.config.ts \nℹ entry: src/index.ts\nℹ tsconfig: tsconfig.json\nℹ \n…(46388 chars elided)…\n <duration>\",\"description\":\"Dashboard /api/health wait budget — ms, or Ns/Nm suffix (default 15s; floor 1000ms)\",\"required\":true,\"valueHint\":\"duration\"},{\"flags\":\"--deacon\",\"description\":\"Force Cloister/Deacon auto-start even if the shell inherited OVERDECK_DISABLE_DEACON\",\"required\":false,\"valueHint\":null},{\"flags\":\"--no-deacon\",\"description\":\"Skip Cloister/Deacon auto-start on restart (escape hatch when deacon's startup scan is starving the event loop)\",\"required\":false,\"valueHint\":null},{\"flags\":\"--resume\",\"description\":\"Enable agent auto-resume on boot — auto-resume is ON by default (flag kept for explicitness)\",\"required\":false,\"valueHint\":null},{\"flags\":\"--no-resume\",\"description\":\"Disable agent auto-resume on restart (opt out of the default-on auto-resume)\",\"required\":false,\"valueHint\":null}],\"aliases\":[],\"category\":\"Core\"},\n   {\"id\":\"pan-project\",\"path\":[\"project\"],\"display\":\"/pan project\",\"description\":\"Project registry for multi-project workspace suppo\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3102",
     "reviewRequestedAt": "2026-07-26T03:31:04.453Z",
     "reviewSpawnedAt": "2026-07-26T03:30:14.747Z",
@@ -123,9 +129,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 575492,
-            "output": 12971,
-            "cacheRead": 1411584,
+            "input": 770227,
+            "output": 38746,
+            "cacheRead": 5469184,
             "cacheWrite": 0
           }
         },
@@ -146,15 +152,15 @@
           "cacheWrite": 183727
         },
         "openai/gpt-5.6-sol": {
-          "input": 1602883,
-          "output": 68761,
-          "cacheRead": 41629184,
+          "input": 1797618,
+          "output": 94536,
+          "cacheRead": 45686784,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 38.697266,
-        "pricingAsOf": "2026-07-26T03:31:10.905Z"
+        "usd": 42.472991,
+        "pricingAsOf": "2026-07-26T03:33:39.297Z"
       }
     },
     "merges": [
