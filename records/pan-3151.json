@@ -2,7 +2,7 @@
   "issueId": "PAN-3151",
   "schemaVersion": 2,
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-26T18:14:55.384Z",
+  "updated": "2026-07-26T18:14:58.141Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3151: Oversized changes do not converge under review→rework and nothing detects it (PAN-3093: 5 cycles, findings 12→7→5→4→12, +5.6k lines)",
       "timestamp": "2026-07-26T18:14:55.384Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
