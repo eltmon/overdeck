@@ -54,18 +54,17 @@
     "recordedAt": "2026-07-26T10:37:54.195Z"
   },
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T13:33:32.775Z",
+  "updated": "2026-07-26T13:54:52.155Z",
   "pipeline": {
     "issueId": "PAN-3114",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:40:13.370Z",
-    "updatedAt": "2026-07-26T13:33:26.620Z",
+    "updatedAt": "2026-07-26T13:54:52.121Z",
     "reviewNotes": "Approved: all requirements implemented; correctness, security, and performance review clean; focused tests, typecheck, lint, and diff check pass.",
     "testNotes": "npm run typecheck: pass (dashboard-types guard: 62 known errors, none new). npm run lint: pass (all guards incl. state-write, circular-deps, file-size, ratchet, quarantine). Focused xBRIEF verify_commands all pass: npx vitest run tests/unit/lib/cloister/uat-promote-verification.test.ts tests/unit/lib/cloister/uat-promote.test.ts src/dashboard/server/services/__tests__/uat-train.test.ts tests/unit/lib/lifecycle/workflows.test.ts tests/unit/lib/head-anchor-write-sites.test.ts tests/unit/lib/lifecycle/dod-doc-drift.test.ts src/dashboard/server/routes/conversations-no-loss.test.ts -> 69 passed, 1 skipped, 0 failed. Full npm test (monorepo, incl. frontend issueActions suites): 10851 passed, 10 failed, 50 skipped across 1191 files; the 10 failures are in 7 files entirely disjoint from this PR's diff (auto-commit.test.ts, record-update.test.ts, dangerous-git-ops.test.ts, merge-validation.test.ts, cloister/validation.test.ts, pipeline-state-paths-contribution.test.ts, workspace-manager-pre-rebase.test.ts) and are caused by src/lib/launcher-git-guard.ts intercepting literal `git rebase`/`git reset --hard` subprocess calls those tests issue directly against real git plumbing -- a known pre-existing environmental artifact of running inside an agent-guarded workspace, not a regression from this change. Confirmed identical failure set (same 10 tests, same 7 files) across two independent full-suite runs. Issue is a backend/docs-only change (UAT-promotion verification-verdict recording + close-out heal + docs); all 4 xBRIEF items are kind:backend/docs with no dashboard UI touched, so browser UAT via Playwright was not required and none was run. Self-review (.pan/review/agent-pan-3114-review-cde4b4cf/review.md) independently reached APPROVED with matching verification evidence.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -105,7 +104,9 @@
         "tests/unit/lib/lifecycle/workflows.test.ts"
       ],
       "recordedAt": "2026-07-26T10:37:54.195Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-26T13:54:52.121Z"
   },
   "closeOut": {
     "usage": {
@@ -157,7 +158,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3126"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-26T13:54:52.151Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed",
+          "observed": "verificationStatus: passed (no lastVerifiedCommit recorded)",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge, or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3126 MERGED at 2026-07-26T11:32:26Z",
+          "status": "pass",
+          "mergedAt": "2026-07-26T11:32:26Z",
+          "mergeCommit": "ac121d640e59b53f4bf042ae0d2d6d2d1219adff"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "1 check-runs concluded successfully on ac121d640e59b53f4bf042ae0d2d6d2d1219adff",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit bb89254d contains merge ac121d64",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 4 orphaned process(es); Removed git worktree; Removed 9 agent state directories; No strike branch strike/pan-3114 found; Pruned 89 checkpoint ref(s) for agent-pan-3114, planning-pan-3114, strike-pan-3114; No specialist registry entries for PAN-3114"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
