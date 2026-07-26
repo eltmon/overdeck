@@ -48,6 +48,11 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   isPaneDead: vi.fn(() => Effect.succeed(false)),
 }));
 
+vi.mock('../../../../src/lib/cloister/autonomous-work-dispatch.js', () => ({
+  gatherAutonomousWorkDispatchInput: vi.fn(async () => ({})),
+  decideAutonomousWorkDispatch: vi.fn(() => ({ allow: true })),
+}));
+
 vi.mock('../../../../src/lib/cloister/conflict-gate.js', () => ({
   getCachedConflictGateMergeability: vi.fn(() => null),
   resolveConflictGate: vi.fn(async () => ({ gated: false })),
@@ -156,6 +161,9 @@ describe('guard-advancing-dispatch', () => {
 
     await Effect.runPromise(onIssueStateChange('PAN-2420', 'in_progress'));
 
-    expect(mockSpawnRun).toHaveBeenCalledWith('PAN-2420', 'work', expect.objectContaining({ prompt: expect.stringContaining('in_progress') }));
+    expect(mockSpawnRun).toHaveBeenCalledWith('PAN-2420', 'work', expect.objectContaining({
+      prompt: expect.stringContaining('in_progress'),
+      startedBy: 'reactive-lifecycle',
+    }));
   });
 });
