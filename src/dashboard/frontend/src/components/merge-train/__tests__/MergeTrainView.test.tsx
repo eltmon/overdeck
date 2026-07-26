@@ -306,6 +306,55 @@ describe('one section per project (ac1)', () => {
     renderView();
     expect(await screen.findByText('Merge backend unavailable')).toBeTruthy();
   });
+
+  // PAN-3165: a spec the server could not resolve must not be reported as a
+  // plan that listed nothing to check — that sentence silently removed the
+  // operator's UAT checklist for every issue planned after the state cutover.
+  it('says the plan is unresolved instead of claiming it has no UAT steps', async () => {
+    mockFetch(twoProjectResponses({
+      '/api/merge-train/generations': [{
+        projectKey: 'overdeck',
+        projectName: 'Overdeck',
+        enabled: true,
+        generations: [{
+          ...PAN_READY_GEN,
+          members: [
+            { issueId: 'PAN-3158', title: 'Cedar', branch: 'feature/pan-3158', mergeOrder: 1, acceptanceCriteria: [], planResolved: false },
+          ],
+          resolutions: [],
+        }],
+      }],
+    }));
+    renderView();
+
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    const pan = screen.getByTestId('merge-train-project-overdeck');
+    expect(pan.textContent).toContain('Plan not found for PAN-3158');
+    expect(pan.textContent).not.toContain('No UAT steps in plan');
+  });
+
+  it('keeps the no-steps message for a resolved plan that authored none', async () => {
+    mockFetch(twoProjectResponses({
+      '/api/merge-train/generations': [{
+        projectKey: 'overdeck',
+        projectName: 'Overdeck',
+        enabled: true,
+        generations: [{
+          ...PAN_READY_GEN,
+          members: [
+            { issueId: 'PAN-3158', title: 'Cedar', branch: 'feature/pan-3158', mergeOrder: 1, acceptanceCriteria: [], planResolved: true },
+          ],
+          resolutions: [],
+        }],
+      }],
+    }));
+    renderView();
+
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    const pan = screen.getByTestId('merge-train-project-overdeck');
+    expect(pan.textContent).toContain('No UAT steps in plan');
+    expect(pan.textContent).not.toContain('Plan not found');
+  });
 });
 
 // ── AC2 ───────────────────────────────────────────────────────────────────────

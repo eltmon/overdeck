@@ -47,6 +47,12 @@ export interface UatGenerationMember {
   prUrl?: string;
   mergeOrder: number;
   acceptanceCriteria: Array<{ title: string; status: string }>;
+  /**
+   * PAN-3165: false when the server could not resolve the issue's xBRIEF at
+   * all. Optional so an older cached payload degrades to the unresolved
+   * message rather than asserting the plan listed nothing.
+   */
+  planResolved?: boolean;
 }
 
 export interface UatGenerationPayload {
@@ -634,7 +640,13 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                                     <span className="truncate text-foreground">{member.title}</span>
                                   </div>
                                   <ul className="mt-0.5 space-y-0.5 pl-1">
-                                    {member.acceptanceCriteria.length === 0 ? (
+                                    {member.planResolved === false ? (
+                                      // PAN-3165: a lookup miss must never render as a claim about
+                                      // the plan's contents — say the plan is unresolved and name it.
+                                      <li className="text-[10.5px] italic text-muted-foreground">
+                                        Plan not found for {member.issueId} — its UAT checklist could not be read; exercise the feature described above.
+                                      </li>
+                                    ) : member.acceptanceCriteria.length === 0 ? (
                                       <li className="text-[10.5px] italic text-muted-foreground">No UAT steps in plan — exercise the feature described above.</li>
                                     ) : (
                                       member.acceptanceCriteria.map((ac, i) => (
