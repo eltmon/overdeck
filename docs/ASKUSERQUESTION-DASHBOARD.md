@@ -274,6 +274,33 @@ own in that dir (codex and omp keep history elsewhere). Freshest-wins alone
 attributes whichever session wrote last to whoever asks: the live flywheel was
 observed reporting an operator conversation's open question as its own.
 
+## Liveness is part of pendingness (PAN-3055)
+
+A question is actionable only while its asking agent has a live tmux pane. Before
+PAN-3055, a missing tmux server during dashboard boot produced
+`tmuxAvailable:false`, but `listRunningAgents` deliberately failed open and marked
+every registered agent `tmuxActive:true`. The enrichment poller then scanned
+long-stopped agents, projected them as running, and announced their weeks-old
+questions with TTS.
+
+The poller now checks the runtime census before each cycle. When the census cannot
+see tmux, `pollOnce` returns before it scans agents, emits domain or activity
+events, speaks TTS, or mutates its enrichment caches. The fail-open remains in
+`listRunningAgents` because one-off CLI processes may not see the dashboard-owned
+tmux socket; those callers must not declare every registered agent dead from
+missing local evidence.
+
+Once the census is available, the poller treats removal from the census-verified
+active set as a falling edge. If the removed agent had pending input, it emits a
+clearing `agent.enrichment_changed` event and one info-level activity entry. It
+emits no TTS because the operator cannot answer the question in place. PAN-2633's
+idle-alive case remains intact: a live pane is never reaped, even when the agent
+registry still carries a stop-shaped status.
+
+Reaping removes the question from the Decisions list, but it does not erase
+history. The original question and its options remain in the agent's JSONL
+transcript, and the agent's terminal status records why the question expired.
+
 ## Gotchas for future debugging
 
 - Dashboard runs under `pan dev`: the **frontend is Vite HMR** (source changes
