@@ -4,17 +4,17 @@
     "created": "2026-07-26T09:44:54.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3115: Pipeline membership read door returns 503 for 6 of 12 registered projects — the authoritative resolver is blind for half the fleet",
-    "updated": "2026-07-26T09:54:26.825Z"
+    "updated": "2026-07-26T13:54:05.773Z"
   },
   "plan": {
     "id": "pan-3115",
     "title": "Pipeline membership read door: typed per-project unavailability instead of 503",
-    "status": "running",
+    "status": "completed",
     "uid": "be8a913d-753e-424f-b0d0-5a9cbd7afe0b",
     "author": "agent:k3[1m]",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-26T09:44:54.000Z",
-    "updated": "2026-07-26T09:54:26.825Z",
+    "updated": "2026-07-26T13:54:05.773Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3115",
@@ -691,5 +691,5 @@
       "canonicalFilename": "2026-07-26-PAN-3115-pipeline-membership-read-door-typed-per-project-unavailability-instead-of-503.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
