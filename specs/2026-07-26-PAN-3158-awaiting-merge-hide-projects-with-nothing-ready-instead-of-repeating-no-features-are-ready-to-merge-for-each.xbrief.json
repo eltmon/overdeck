@@ -4,17 +4,17 @@
     "created": "2026-07-26T20:25:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3158: Awaiting Merge: hide projects with nothing ready instead of repeating 'No features are ready to merge' for each",
-    "updated": "2026-07-26T20:29:23.721Z"
+    "updated": "2026-07-26T20:29:25.608Z"
   },
   "plan": {
     "id": "pan-3158",
     "title": "Awaiting Merge: hide projects with nothing ready instead of repeating 'No features are ready to merge' for each",
-    "status": "approved",
+    "status": "running",
     "uid": "09c71259-c515-470e-b64f-0dc7c455298e",
     "author": "agent:k3[1m]",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-07-26T20:25:00Z",
-    "updated": "2026-07-26T20:29:23.721Z",
+    "updated": "2026-07-26T20:29:25.608Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3158",
