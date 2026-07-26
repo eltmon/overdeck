@@ -15,8 +15,9 @@ function renderWithQuery(ui: ReactElement) {
 const agentDecision = {
   id: 'planning-pan-2760',
   source: 'agent' as const,
-  label: 'PAN-2760',
+  label: 'PAN-2760 — Add issue titles',
   issueId: 'PAN-2760',
+  issueTitle: 'Add issue titles',
   kinds: ['askUserQuestion'],
   pendingAskUserQuestion: {
     toolUseId: 'toolu_1',
@@ -31,6 +32,8 @@ const conversationDecision = {
   id: 'conv-20260716-6155',
   source: 'conversation' as const,
   label: 'Docs domain move',
+  issueId: 'PAN-3097',
+  issueTitle: 'Add question context',
   kinds: ['askUserQuestion'],
   pendingAskUserQuestion: {
     toolUseId: 'toolu_2',
@@ -65,8 +68,9 @@ describe('DecisionsPanel', () => {
     vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([agentDecision, conversationDecision]);
     renderWithQuery(<DecisionsPanel />);
 
-    expect(screen.getByText('PAN-2760')).toBeTruthy();
+    expect(screen.getByText('PAN-2760 — Add issue titles')).toBeTruthy();
     expect(screen.getByText('Docs domain move')).toBeTruthy();
+    expect(screen.getByText('PAN-3097 — Add question context')).toBeTruthy();
     expect(screen.getByText('Conversation')).toBeTruthy();
   });
 

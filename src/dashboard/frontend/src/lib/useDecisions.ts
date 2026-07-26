@@ -16,8 +16,14 @@
  */
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useDashboardStore, selectPendingInputSubjects, type PendingInputSubject } from './store';
+import {
+  useDashboardStore,
+  selectIssues,
+  selectPendingInputSubjects,
+  type PendingInputSubject,
+} from './store';
 import { fetchWithTimeout } from './apiFetch';
+import { formatIssueRef } from './issueLabel';
 
 /** A conversation with an open blocking surface, as served by the REST door. */
 export interface ConversationPendingInputRow {
@@ -38,6 +44,7 @@ export interface Decision {
   /** What the operator recognizes this as — issue id, conversation title, or the raw id. */
   label: string;
   issueId?: string;
+  issueTitle?: string;
   kinds: ReadonlyArray<string>;
   pendingAskUserQuestion?: PendingInputSubject['pendingAskUserQuestion'];
   pendingProposedPlan?: PendingInputSubject['pendingProposedPlan'];
@@ -124,6 +131,14 @@ export function usePendingInputSubjects(): PendingInputSubject[] {
 
 export function useDecisions(): Decision[] {
   const agentSubjects = useDashboardStore(selectPendingInputSubjects);
+  const issues = useDashboardStore(selectIssues);
+  const titleByIssueId = useMemo(() => {
+    const titles = new Map<string, string>();
+    for (const issue of issues as Array<{ id?: string; title?: string }>) {
+      if (issue?.id && issue.title) titles.set(issue.id, issue.title);
+    }
+    return titles;
+  }, [issues]);
 
   // Same query key as usePendingInputDialogs so react-query dedupes the poll
   // rather than doubling it.
@@ -137,11 +152,13 @@ export function useDecisions(): Decision[] {
     const out: Decision[] = [];
 
     for (const s of agentSubjects) {
+      const issueTitle = s.issueId ? titleByIssueId.get(s.issueId) : undefined;
       out.push({
         id: s.agentId,
         source: 'agent',
-        label: s.issueId ?? s.agentId,
+        label: formatIssueRef(s.issueId, issueTitle) ?? s.agentId,
         issueId: s.issueId,
+        issueTitle,
         kinds: s.kinds,
         pendingAskUserQuestion: s.pendingAskUserQuestion,
         pendingProposedPlan: s.pendingProposedPlan,
@@ -160,11 +177,13 @@ export function useDecisions(): Decision[] {
             ...(c.pendingProposedPlan ? ['exitPlanMode'] : []),
           ];
       if (kinds.length === 0) continue;
+      const issueTitle = c.issueId ? titleByIssueId.get(c.issueId) : undefined;
       out.push({
         id: c.name,
         source: 'conversation',
         label: c.title || c.name,
         issueId: c.issueId ?? undefined,
+        issueTitle,
         kinds,
         pendingAskUserQuestion: c.pendingAskUserQuestion,
         pendingProposedPlan: c.pendingProposedPlan,
@@ -181,5 +200,5 @@ export function useDecisions(): Decision[] {
       return a.since.localeCompare(b.since);
     });
     return out;
-  }, [agentSubjects, convRows]);
+  }, [agentSubjects, convRows, titleByIssueId]);
 }
