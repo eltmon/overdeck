@@ -15,7 +15,11 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { emitDashboardLifecycleSync } from '../../lib/activity-logger.js';
-import { claimPendingLifecycleFile } from '../../lib/cloister/pending-lifecycle-claim.js';
+import {
+  claimPendingLifecycleFile,
+  settlePendingLifecycleClaim,
+  type PendingLifecycleClaim,
+} from '../../lib/cloister/pending-lifecycle-claim.js';
 
 export const PENDING_FILE = join(homedir(), '.overdeck', 'pending-post-merge.json');
 export const RESTART_MARKER = join(homedir(), '.overdeck', 'dashboard-restarting.json');
@@ -50,6 +54,43 @@ async function defaultLifecycleRunner(pending: PendingLifecycleData): Promise<vo
   await postMergeLifecycle(pending.issueId, pending.projectPath, pending.sourceBranch, { skipDeploy: true });
   if (pending.sourceBranch) {
     await notifyTldrDaemon(pending.projectPath, pending.sourceBranch);
+  }
+}
+
+async function runClaimedPendingLifecycle(
+  claim: PendingLifecycleClaim,
+  pending: PendingLifecycleData,
+  runner: LifecycleRunner,
+  lifecycleDelayMs: number,
+  startTime: number,
+): Promise<void> {
+  let succeeded = false;
+  try {
+    if (lifecycleDelayMs > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, lifecycleDelayMs));
+    }
+    await runner(pending);
+    succeeded = true;
+    emitDashboardLifecycleSync('completed', {
+      reason: pending.reason ?? 'post-merge',
+      issueId: pending.issueId,
+      durationMs: Date.now() - startTime,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[overdeck] Post-merge lifecycle failed for ${pending.issueId}: ${message}`);
+    emitDashboardLifecycleSync('failed', {
+      reason: pending.reason ?? 'post-merge',
+      issueId: pending.issueId,
+      error: message,
+    });
+  } finally {
+    try {
+      await settlePendingLifecycleClaim(claim, pending.issueId, succeeded);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[overdeck] Failed to settle pending lifecycle claim for ${pending.issueId}: ${message}`);
+    }
   }
 }
 
@@ -125,27 +166,7 @@ export async function processPendingLifecycle(options?: {
     console.log(
       `[overdeck] Found pending post-merge lifecycle for ${pending.issueId} — running in ${lifecycleDelayMs}ms`
     );
-    if (lifecycleDelayMs > 0) {
-      await new Promise<void>((resolve) => setTimeout(resolve, lifecycleDelayMs));
-    }
-
-    try {
-      await runner(pending);
-      emitDashboardLifecycleSync('completed', {
-        reason: pending.reason ?? 'post-merge',
-        issueId: pending.issueId,
-        durationMs: Date.now() - startTime,
-      });
-    } catch (err: any) {
-      console.error(`[overdeck] Post-merge lifecycle failed for ${pending.issueId}: ${err.message}`);
-      emitDashboardLifecycleSync('failed', {
-        reason: pending.reason ?? 'post-merge',
-        issueId: pending.issueId,
-        error: err.message,
-      });
-    } finally {
-      await claim.discard();
-    }
+    void runClaimedPendingLifecycle(claim, pending, runner, lifecycleDelayMs, startTime);
   } catch (err: any) {
     console.warn(`[overdeck] Failed to process pending-post-merge.json: ${err.message}`);
   }

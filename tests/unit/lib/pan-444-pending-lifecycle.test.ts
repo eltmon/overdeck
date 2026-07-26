@@ -8,15 +8,27 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // ── fs/promises mock ──────────────────────────────────────────────────────────
 const mockReadFile = vi.hoisted(() => vi.fn<(path: string, enc: string) => Promise<string>>());
 const mockRename = vi.hoisted(() => vi.fn<(from: string, to: string) => Promise<void>>());
+const mockLink = vi.hoisted(() => vi.fn<(from: string, to: string) => Promise<void>>());
 const mockUnlink = vi.hoisted(() => vi.fn<(path: string) => Promise<void>>());
 const mockExistsSync = vi.hoisted(() => vi.fn<(path: string) => boolean>());
 const mockEmitDashboardLifecycleSync = vi.hoisted(() => vi.fn());
+const mockResolveCanonicalReviewStatus = vi.hoisted(() => vi.fn<(
+  issueId: string,
+) => {
+  available: boolean;
+  status: { mergeStatus?: string; mergeStep?: string } | null;
+}>(() => ({ available: true, status: null })));
 
 vi.mock('../../../src/lib/activity-logger.js', () => ({
   emitDashboardLifecycleSync: mockEmitDashboardLifecycleSync,
 }));
 
+vi.mock('../../../src/lib/cloister/review-status-source.js', () => ({
+  resolveCanonicalReviewStatus: mockResolveCanonicalReviewStatus,
+}));
+
 vi.mock('fs/promises', () => ({
+  link: mockLink,
   readFile: mockReadFile,
   rename: mockRename,
   unlink: mockUnlink,
@@ -67,7 +79,9 @@ describe('processPendingLifecycle', () => {
       if (mockExistsSync(from)) return;
       throw Object.assign(new Error('missing'), { code: 'ENOENT' });
     });
+    mockLink.mockResolvedValue(undefined);
     mockUnlink.mockResolvedValue(undefined);
+    mockResolveCanonicalReviewStatus.mockReturnValue({ available: true, status: null });
   });
 
   afterEach(() => {
@@ -118,6 +132,7 @@ describe('processPendingLifecycle', () => {
       now: data.timestamp + 1000,
       _runner: vi.fn().mockResolvedValue(undefined),
     });
+    await vi.runAllTimersAsync();
 
     expect(mockRename).toHaveBeenCalledWith(
       PENDING_FILE,
@@ -181,6 +196,34 @@ describe('processPendingLifecycle', () => {
     expect(runner).toHaveBeenCalledWith(data);
   });
 
+  it('returns after scheduling while the claimed lifecycle remains in flight', async () => {
+    const data = makePendingData();
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
+    mockReadFile.mockResolvedValue(JSON.stringify(data));
+    let resolveRunner!: () => void;
+    const runner = vi.fn(() => new Promise<void>((resolve) => {
+      resolveRunner = resolve;
+    }));
+
+    await expect(processPendingLifecycle({
+      pendingFile: PENDING_FILE,
+      lifecycleDelayMs: 0,
+      now: data.timestamp + 1000,
+      _runner: runner,
+    })).resolves.toBeUndefined();
+
+    expect(runner).toHaveBeenCalledOnce();
+    expect(mockUnlink).not.toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+    );
+
+    resolveRunner();
+    await vi.runAllTimersAsync();
+    expect(mockUnlink).toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+    );
+  });
+
   it('passes full pending data to the runner', async () => {
     const data = makePendingData({ issueId: 'PAN-42', projectPath: '/my/proj', sourceBranch: 'feature/x' });
     mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
@@ -239,11 +282,13 @@ describe('processPendingLifecycle', () => {
     expect(runner).not.toHaveBeenCalled();
   });
 
-  it('emits one failed terminal event and discards the claim when the runner throws', async () => {
+  it('restores a failed claim without durable retry ownership so a later call can retry', async () => {
     const data = makePendingData();
     mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
-    const runner = vi.fn().mockRejectedValue(new Error('lifecycle failed'));
+    const runner = vi.fn()
+      .mockRejectedValueOnce(new Error('lifecycle failed'))
+      .mockResolvedValueOnce(undefined);
 
     await processPendingLifecycle({
       pendingFile: PENDING_FILE,
@@ -251,12 +296,51 @@ describe('processPendingLifecycle', () => {
       now: data.timestamp + 1000,
       _runner: runner,
     });
+    await vi.runAllTimersAsync();
 
     expect(mockEmitDashboardLifecycleSync).toHaveBeenCalledTimes(1);
     expect(mockEmitDashboardLifecycleSync).toHaveBeenCalledWith('failed', expect.objectContaining({
       issueId: data.issueId,
       error: 'lifecycle failed',
     }));
+    expect(mockLink).toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+      PENDING_FILE,
+    );
+
+    await processPendingLifecycle({
+      pendingFile: PENDING_FILE,
+      lifecycleDelayMs: 0,
+      now: data.timestamp + 1000,
+      _runner: runner,
+    });
+    await vi.runAllTimersAsync();
+
+    expect(runner).toHaveBeenCalledTimes(2);
+    expect(mockEmitDashboardLifecycleSync).toHaveBeenCalledTimes(2);
+    expect(mockEmitDashboardLifecycleSync).toHaveBeenLastCalledWith('completed', expect.objectContaining({
+      issueId: data.issueId,
+    }));
+  });
+
+  it('discards a failed claim when canonical status positively owns the retry', async () => {
+    const data = makePendingData();
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
+    mockReadFile.mockResolvedValue(JSON.stringify(data));
+    mockResolveCanonicalReviewStatus.mockReturnValue({
+      available: true,
+      status: { mergeStatus: 'merged', mergeStep: 'post-merge-cleanup' },
+    });
+
+    await processPendingLifecycle({
+      pendingFile: PENDING_FILE,
+      lifecycleDelayMs: 0,
+      now: data.timestamp + 1000,
+      _runner: vi.fn().mockRejectedValue(new Error('lifecycle failed')),
+    });
+    await vi.runAllTimersAsync();
+
+    expect(mockLink).not.toHaveBeenCalled();
     expect(mockUnlink).toHaveBeenCalledWith(
       expect.stringContaining(`${PENDING_FILE}.claimed-`),
     );

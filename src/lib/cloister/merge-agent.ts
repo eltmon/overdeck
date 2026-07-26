@@ -300,11 +300,7 @@ export async function postMergeLifecycle(
   sourceBranch?: string,
   options?: PostMergeLifecycleOptions,
 ): Promise<void> {
-  // PAN-1517: the per-slot swarm runtime is gone. Slot branches no longer exist
-  // — parallelism is an in-context concern owned by the work agent (see
-  // roles/work.md "Parallel work via subagents"). postMergeLifecycle fires only
-  // for the issue's main feature branch merging to `main`.
-
+  // PAN-1517: postMergeLifecycle fires only when the issue's main feature branch merges to `main`.
   // Guard 1: skip if already completed (defense-in-depth against infinite loops)
   if (_completedPostMerge.has(issueId) || getReviewStatusSync(issueId)?.mergeStep === 'merged') {
     _completedPostMerge.add(issueId);
@@ -319,8 +315,12 @@ export async function postMergeLifecycle(
   }
 
   const run = withPostMergeLifecycleLock(issueId, async () => {
-    // Guard 2: closed-out is TERMINAL. Close-out flips the spec on main to
-    // completed/cancelled, clears review status, and closes the tracker issue.
+    if (_completedPostMerge.has(issueId) || getReviewStatusSync(issueId)?.mergeStep === 'merged') {
+      _completedPostMerge.add(issueId); console.log(`[merge-agent] postMergeLifecycle completed while waiting for ${issueId}, skipping`);
+      return;
+    }
+    // Guard 2: closed-out is TERMINAL. Close-out flips the spec to completed/cancelled,
+    // clears review status, and closes the tracker issue.
     // Re-running the handoff after that resurrects the review row and REOPENS
     // the closed issue — observed live on PAN-1190 (2026-06-11): the deacon's
     // stale-mergeStatus sweep saw the cleared row as "stale" 47 minutes after

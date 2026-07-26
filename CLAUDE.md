@@ -511,9 +511,12 @@ and queues Docker-only teardown for merged-but-not-closed issues on a deduplicat
 worker with retry backoff. The worker revalidates canonical merged status before each
 attempt, while a fresh merge-agent enqueue may use its just-verified merge for the first
 retry if status persistence lags. Durable `mergeStep: post-merge-cleanup` marks an incomplete
-handoff; an atomic pending-file claim and per-issue cross-process lock prevent duplicate
-execution, while a deduplicated serial worker retries the handoff without blocking patrol.
-Completion records `mergeStep: merged`. Patrol reconciliation prunes Docker retries that are
+handoff. Startup atomically claims the pending file and runs it in a supervised background
+promise, so dashboard boot continues while the claim remains owned. Failure restores the claim
+unless canonical status positively owns the retry; exclusive hard-link restoration cannot
+overwrite a newer pending generation. Issue IDs are validated at the route and lock boundaries,
+and the resolved lock path must remain inside the lifecycle lock directory. Completion records
+`mergeStep: merged`. Patrol reconciliation prunes Docker retries that are
 no longer eligible. The worker removes Compose
 volumes, project-owned containers, and the leaked devnet while preserving workspace files,
 branches, agents, sessions, state, and xBRIEF. The single `rebuildWorkspaceStack`

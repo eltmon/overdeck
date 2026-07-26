@@ -1,6 +1,7 @@
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, resolve } from 'node:path';
 
+import { parseIssueIdSync } from '../issue-id.js';
 import { OVERDECK_HOME } from '../paths.js';
 
 function isProcessAlive(pid: number): boolean {
@@ -23,8 +24,17 @@ function isAlreadyExists(error: unknown): boolean {
 export async function acquirePostMergeLifecycleLock(
   issueId: string,
 ): Promise<(() => Promise<void>) | null> {
-  const lockDir = join(OVERDECK_HOME, 'locks', 'post-merge-lifecycle');
-  const lockPath = join(lockDir, `${issueId.trim().toUpperCase()}.lock`);
+  const trimmedIssueId = issueId.trim();
+  const parsedIssueId = parseIssueIdSync(trimmedIssueId);
+  if (!parsedIssueId) {
+    throw new Error(`Invalid issue ID for post-merge lifecycle lock: ${issueId}`);
+  }
+
+  const lockDir = resolve(OVERDECK_HOME, 'locks', 'post-merge-lifecycle');
+  const lockPath = resolve(lockDir, `${parsedIssueId.normalized.toUpperCase()}.lock`);
+  if (dirname(lockPath) !== lockDir) {
+    throw new Error(`Post-merge lifecycle lock escaped its lock directory: ${issueId}`);
+  }
   await mkdir(lockDir, { recursive: true });
 
   for (let attempt = 0; attempt < 2; attempt += 1) {

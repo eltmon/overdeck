@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const testHome = vi.hoisted(() => `/tmp/post-merge-lifecycle-lock-${process.pid}`);
@@ -51,5 +51,24 @@ describe('post-merge lifecycle cross-process lock', () => {
 
     expect(release).not.toBeNull();
     await release!();
+  });
+
+  it.each([
+    '../outside',
+    'PAN-3138/../../outside',
+    'PAN-3138%2F..%2Foutside',
+  ])('rejects traversal-bearing issue ID %s before creating a lock', async (issueId) => {
+    await expect(acquirePostMergeLifecycleLock(issueId)).rejects.toThrow('Invalid issue ID');
+
+    expect(existsSync(join(testHome, 'locks', 'post-merge-lifecycle'))).toBe(false);
+  });
+
+  it('rejects an absolute path without writing outside the lock directory', async () => {
+    const outsidePath = `${testHome}-outside`;
+
+    await expect(acquirePostMergeLifecycleLock(outsidePath)).rejects.toThrow('Invalid issue ID');
+
+    expect(existsSync(`${outsidePath}.lock`)).toBe(false);
+    expect(existsSync(join(testHome, 'locks', 'post-merge-lifecycle'))).toBe(false);
   });
 });
