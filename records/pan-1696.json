@@ -224,31 +224,20 @@
       "timestamp": "2026-07-26T03:34:40.635Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "test-agent",
-      "outcome": "failed",
-      "timestamp": "2026-07-26T03:34:40Z",
-      "markdownBody": "# Test failure\n\nCommands: npm run typecheck (PASS). npm run lint (FAIL) — scripts/lint-file-size.sh: src/dashboard/server/routes/projects.ts grew to 1108 lines (baseline 1064); caused by an UNCOMMITTED working-tree diff (+44 net lines) adding GET/POST /api/projects/:projectKey/merge-train that is NOT part of reviewed HEAD d3093267ff — a live work-agent session (tmux agent-pan-1696) still has uncommitted changes in this workspace. npx vitest run on touched-module tests (merge-train.test.ts, flywheel-merge-order.test.ts, app-settings.test.ts, control-settings.test.ts, uat-train.test.ts): 1 failed / 60 passed — uat-train.test.ts 'returns [] without touching persisted generations when no flywheel run is active' still asserts the legacy no-run early-return that xBRIEF item reconciler-decouple.ac4 requires REMOVED; the test was never updated even though reconciler-decouple is marked completed. Root cause (verified via git diff <merge-base 00450ae1>..HEAD): only 4 of 17 xBRIEF items are implemented in committed HEAD — flag-rename, per-project-flag, ready-set-source, reconciler-decouple (backend-only: uat-train.ts, merge-train.ts, app-settings.ts, flywheel-merge-order.ts, control-settings.ts, merge-sync.ts, projects.ts+tests). The remaining 13 items have zero code: no src/dashboard/server/routes/merge-train.ts (merge-train-routes), no committed /api/projects/:key/merge-train endpoint (project-merge-train-endpoint — only uncommitted), no uat-stack-domain DNS resolution change, no cli-flywheel-status change, zero frontend changes (MergeQueueCard.tsx byte-identical to merge-base — fe-merge-train-view/fe-awaiting-merge/fe-flywheel-viewer/fe-cockpit-toggle/run-scope-persist/settings-scope-ux all untouched), zero docs changes (UAT-BATCH-TRAINS.md, MERGE-TRAIN.md, FLYWHEEL.md untouched), roles/flywheel.md untouched (role-prompt-scope), and legacy /api/flywheel merge-train routes not removed (remove-legacy-routes). This is the literal multi-project dashboard view the issue title promises, entirely missing. Per CLAUDE.md 'Deliver Complete Features — No Partial Implementations' (this is one plan, not phased into separate issues), shipping only the backend plumbing delivers zero user-visible value. UAT not run: no frontend/API surface exists yet for any AC that specifies browser verification (fe-merge-train-view.ac4, fe-awaiting-merge, settings-scope-ux.ac1), so there is nothing to drive with Playwright. Unmet ACs: merge-train-routes.ac1-3, project-merge-train-endpoint.ac1-2, uat-stack-domain.ac1-2, cli-flywheel-status.ac1-2, fe-merge-train-view.ac1-4, fe-awaiting-merge.ac1-3, fe-flywheel-viewer.ac1-2, fe-cockpit-toggle.ac1-3, run-scope-persist.ac1-3, settings-scope-ux.ac1-3, role-prompt-scope.ac1-2, remove-legacy-routes.ac1-2, docs-decouple.ac1-3. Actionable: (1) commit or discard the uncommitted projects.ts diff, bump scripts/file-size-baseline.txt if that growth is accepted; (2) update/remove the stale uat-train.test.ts assertion to match the new no-run-required behavior; (3) resume the work agent through the remaining 13 xBRIEF items before requesting review/test again — this issue is not ready to leave review.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-1696`."
-    }
-  ],
+  "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:51:00.965Z",
+  "updated": "2026-07-26T03:51:07.481Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "passed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:37:09.529Z",
-    "reviewNotes": "Agent re-review request (6/25): Fixed security issue: added dashboard auth guard to POST merge-train endpoint",
-    "testNotes": "Commands: npm run typecheck (PASS). npm run lint (FAIL) — scripts/lint-file-size.sh: src/dashboard/server/routes/projects.ts grew to 1108 lines (baseline 1064); caused by an UNCOMMITTED working-tree diff (+44 net lines) adding GET/POST /api/projects/:projectKey/merge-train that is NOT part of reviewed HEAD d3093267ff — a live work-agent session (tmux agent-pan-1696) still has uncommitted changes in this workspace. npx vitest run on touched-module tests (merge-train.test.ts, flywheel-merge-order.test.ts, app-settings.test.ts, control-settings.test.ts, uat-train.test.ts): 1 failed / 60 passed — uat-train.test.ts 'returns [] without touching persisted generations when no flywheel run is active' still asserts the legacy no-run early-return that xBRIEF item reconciler-decouple.ac4 requires REMOVED; the test was never updated even though reconciler-decouple is marked completed. Root cause (verified via git diff <merge-base 00450ae1>..HEAD): only 4 of 17 xBRIEF items are implemented in committed HEAD — flag-rename, per-project-flag, ready-set-source, reconciler-decouple (backend-only: uat-train.ts, merge-train.ts, app-settings.ts, flywheel-merge-order.ts, control-settings.ts, merge-sync.ts, projects.ts+tests). The remaining 13 items have zero code: no src/dashboard/server/routes/merge-train.ts (merge-train-routes), no committed /api/projects/:key/merge-train endpoint (project-merge-train-endpoint — only uncommitted), no uat-stack-domain DNS resolution change, no cli-flywheel-status change, zero frontend changes (MergeQueueCard.tsx byte-identical to merge-base — fe-merge-train-view/fe-awaiting-merge/fe-flywheel-viewer/fe-cockpit-toggle/run-scope-persist/settings-scope-ux all untouched), zero docs changes (UAT-BATCH-TRAINS.md, MERGE-TRAIN.md, FLYWHEEL.md untouched), roles/flywheel.md untouched (role-prompt-scope), and legacy /api/flywheel merge-train routes not removed (remove-legacy-routes). This is the literal multi-project dashboard view the issue title promises, entirely missing. Per CLAUDE.md 'Deliver Complete Features — No Partial Implementations' (this is one plan, not phased into separate issues), shipping only the backend plumbing delivers zero user-visible value. UAT not run: no frontend/API surface exists yet for any AC that specifies browser verification (fe-merge-train-view.ac4, fe-awaiting-merge, settings-scope-ux.ac1), so there is nothing to drive with Playwright. Unmet ACs: merge-train-routes.ac1-3, project-merge-train-endpoint.ac1-2, uat-stack-domain.ac1-2, cli-flywheel-status.ac1-2, fe-merge-train-view.ac1-4, fe-awaiting-merge.ac1-3, fe-flywheel-viewer.ac1-2, fe-cockpit-toggle.ac1-3, run-scope-persist.ac1-3, settings-scope-ux.ac1-3, role-prompt-scope.ac1-2, remove-legacy-routes.ac1-2, docs-decouple.ac1-3. Actionable: (1) commit or discard the uncommitted projects.ts diff, bump scripts/file-size-baseline.txt if that growth is accepted; (2) update/remove the stale uat-train.test.ts assertion to match the new no-run-required behavior; (3) resume the work agent through the remaining 13 xBRIEF items before requesting review/test again — this issue is not ready to leave review.",
+    "updatedAt": "2026-07-26T03:51:07.128Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
-    "reviewedAtCommit": "97b0e6591dcd106ef8f1f8507929a9dd1a77d2ec",
     "reviewSpawnedAt": "2026-07-26T03:32:17.629Z"
   },
   "closeOut": {
@@ -294,10 +283,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3131,
-            "output": 134236,
-            "cacheRead": 75377745,
-            "cacheWrite": 3406900
+            "input": 3473,
+            "output": 146988,
+            "cacheRead": 84161336,
+            "cacheWrite": 3553464
           }
         }
       },
@@ -333,15 +322,15 @@
           "cacheWrite": 205680
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3131,
-          "output": 134236,
-          "cacheRead": 75377745,
-          "cacheWrite": 3406900
+          "input": 3473,
+          "output": 146988,
+          "cacheRead": 84161336,
+          "cacheWrite": 3553464
         }
       },
       "costAtCloseOut": {
-        "usd": 138.5416022,
-        "pricingAsOf": "2026-07-26T03:37:10.691Z"
+        "usd": 139.6672742,
+        "pricingAsOf": "2026-07-26T03:51:07.152Z"
       }
     },
     "merges": [
