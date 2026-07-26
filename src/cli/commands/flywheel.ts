@@ -33,7 +33,7 @@ import {
 } from '../../lib/overdeck/control-settings.js';
 import { sessionExists } from '../../lib/tmux.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
-import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
+import { computeMergeQueue, computeMergeQueueFromCandidates, listEligibleCandidatesByProject, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
 import { DEFAULT_BRIEF_PATH, requireFlywheelBrief, resolvePrimaryWorktreeRoot } from '../../lib/flywheel-start.js';
 import { formatMergeBackendStatus, loadMergeBackendStatusForCli } from './flywheel-merge-backend.js';
 import { compensateFailedFlywheelStart, resolveFlywheelOrderBriefOverlay, resolveFlywheelOrderStart, setFlywheelOrderStatus, type FlywheelOrderStartDeps } from './flywheel-orders.js';
@@ -811,8 +811,10 @@ export async function flywheelStopCommand(options: Pick<ReportOptions, 'cwd'> = 
 }
 
 async function buildFlywheelStateReport(status: FlywheelStatus, cwd: string): Promise<string> {
+  // PAN-1696: Compute merge queue from pipeline ready set, not flywheel activePipeline (CLI-flywheel-status, FR-11)
+  const candidates = listEligibleCandidatesByProject(cwd);
   const mergeQueue = await Effect.runPromise(
-    computeMergeQueue(status.activePipeline, cwd).pipe(Effect.provide(nodeServicesLayer)),
+    computeMergeQueueFromCandidates(candidates, cwd).pipe(Effect.provide(nodeServicesLayer)),
   );
   return formatFlywheelStateReport(status, mergeQueue);
 }
