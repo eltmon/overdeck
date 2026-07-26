@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ReviewStatus } from '../../../../src/lib/review-status.js';
 import type { PanIssuePipelineRecord } from '../../../../src/lib/pan-dir/record.js';
 import {
@@ -209,6 +209,74 @@ describe('Definition-of-Done merged row', () => {
       status: 'pass',
       observed: expect.stringContaining('forge metadata unavailable: gh timed out'),
     });
+  });
+
+  it('accepts branch work contained in main as a non-PR landing', async () => {
+    const row = await checkMergedRow(ctx, {
+      verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
+      readPullRequest: async () => ({}),
+      readDurableMerges: async () => [],
+      readBranchContainment: async () => ({
+        mergedWorkRefs: ['frontend:feature/min-873'],
+        unmergedRefs: [],
+        pointerRefs: [],
+      }),
+    });
+
+    expect(row).toMatchObject({
+      status: 'pass',
+      evidence: 'branch-containment',
+      observed: expect.stringContaining('frontend:feature/min-873'),
+    });
+    expect(row.mergedAt).toBeUndefined();
+    expect(row.mergeCommit).toBeUndefined();
+  });
+
+  it('does not accept containment while any issue branch remains unmerged', async () => {
+    const row = await checkMergedRow(ctx, {
+      verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
+      readPullRequest: async () => ({}),
+      readDurableMerges: async () => [],
+      readBranchContainment: async () => ({
+        mergedWorkRefs: ['frontend:feature/min-873'],
+        unmergedRefs: ['api:feature/min-873'],
+        pointerRefs: [],
+      }),
+    });
+
+    expect(row.status).toBe('miss');
+    expect(row.evidence).toBeUndefined();
+  });
+
+  it('reports unavailable containment evidence and keeps the merged row missing', async () => {
+    const row = await checkMergedRow(ctx, {
+      verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
+      readPullRequest: async () => ({}),
+      readDurableMerges: async () => [],
+      readBranchContainment: async () => { throw new Error('git unavailable'); },
+    });
+
+    expect(row).toMatchObject({
+      status: 'miss',
+      observed: expect.stringContaining('branch containment evidence unavailable: git unavailable'),
+    });
+  });
+
+  it('does not gather containment when merge evidence already passes', async () => {
+    const readBranchContainment = vi.fn();
+    const row = await checkMergedRow(ctx, {
+      verifyMerged: async () => stepOk('close-out:verify-merged', ['All commits merged to main']),
+      readPullRequest: async () => ({}),
+      readBranchContainment,
+    });
+
+    expect(row.status).toBe('pass');
+    expect(readBranchContainment).not.toHaveBeenCalled();
+  });
+
+  it('describes branch containment as accepted merged-row evidence', () => {
+    expect(DOD_ROWS.find(row => row.id === 'merged')?.expected)
+      .toBe('PR merged on the forge, or branch work contained in main (non-PR landing)');
   });
 });
 

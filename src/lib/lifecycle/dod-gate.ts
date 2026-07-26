@@ -18,6 +18,10 @@ import {
 import { getAutoCloseOutCanonicalState } from '../cloister/deacon-canonical-state.js';
 import { fetchCommitCheckRuns, fetchIssuePullRequest } from '../overdeck/pull-requests.js';
 import {
+  gatherIssueBranchContainment,
+  type IssueBranchContainment,
+} from '../pipeline-membership-gather.js';
+import {
   acceptFlagFor,
   BRANCH_ABSENT_MERGE_ERROR,
   canAcceptDodMisses,
@@ -44,6 +48,7 @@ export interface DodStatusRowDeps {
 export interface MergedDodRowResult extends DodRowResult {
   mergedAt?: string;
   mergeCommit?: string;
+  evidence?: 'branch-containment';
 }
 
 interface MergedRowDeps {
@@ -55,6 +60,7 @@ interface MergedRowDeps {
     mergeCommit?: { oid?: string } | string | null;
   }>;
   readDurableMerges?: (ctx: LifecycleContext) => Promise<string[]>;
+  readBranchContainment?: (ctx: LifecycleContext) => Promise<IssueBranchContainment>;
 }
 
 const defaultMergedRowDeps: MergedRowDeps = {
@@ -74,6 +80,11 @@ const defaultMergedRowDeps: MergedRowDeps = {
   readDurableMerges: async ctx => {
     const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
     return (await readIssueRecord(project, ctx.issueId))?.closeOut.merges ?? [];
+  },
+  readBranchContainment: async ctx => {
+    const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
+    if (!project) return { unmergedRefs: [], mergedWorkRefs: [], pointerRefs: [] };
+    return gatherIssueBranchContainment(project, ctx.issueId);
   },
 };
 
@@ -287,6 +298,20 @@ export async function checkMergedRow(
       }
     } else {
       merged.observed = `${merged.observed}; no merged forge artifact or durable close-out merge record found`;
+    }
+  }
+
+  if (merged.status === 'miss') {
+    try {
+      const containment = await (deps.readBranchContainment ?? defaultMergedRowDeps.readBranchContainment!)(ctx);
+      if (containment.mergedWorkRefs.length > 0 && containment.unmergedRefs.length === 0) {
+        merged.status = 'pass';
+        merged.evidence = 'branch-containment';
+        merged.observed = `${merged.observed}; branch work contained in default branch with no merged PR — non-PR landing (membership L2-work lens): ${containment.mergedWorkRefs.join(', ')}`;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      merged.observed = `${merged.observed}; branch containment evidence unavailable: ${message}`;
     }
   }
 
