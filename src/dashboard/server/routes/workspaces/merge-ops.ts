@@ -25,7 +25,7 @@ import { handlePostRebaseVerificationDeferral } from '../../../../lib/cloister/m
 import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../../lib/git-activity.js';
 import { extractNumberSync, extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
-import { enqueueMerge, getCurrentMerge, markMergeProcessing, dequeueMerge, getAllActiveQueues, requeueMerge } from '../../../../lib/overdeck/merge.js';
+import { enqueueMerge, getCurrentMerge, markMergeProcessing, dequeueMerge, getAllActiveQueues } from '../../../../lib/overdeck/merge.js';
 import { findProjectByTeamSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync as setReviewStatusBase, type ReviewStatus } from '../../../../lib/review-status.js';
 import { isStatePlaneOnlyStatus } from '../../../../lib/state-plane.js';
@@ -421,22 +421,17 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     : workspaceDirName.startsWith('feature-')
       ? `feature/${workspaceDirName.slice('feature-'.length)}`
       : `feature/${issueLower}`;
-
   setReviewStatus(issueId, { mergeStatus: 'merging', mergeStep: 'validating-pr' });
-
   const normalizedMergeId = issueId.toUpperCase();
   _serverManagedMerges.add(normalizedMergeId);
   setPendingOperation(issueId, 'merge');
-  let queueAdvanced = false;
-  let preserveQueue = false;
-
+  let queueAdvanced = false, preserveQueue = false;
   const advanceQueue = (): void => {
     if (queueAdvanced) return;
     queueAdvanced = true;
     _serverManagedMerges.delete(normalizedMergeId);
     dequeueNextMerge(projectKey, normalizedId);
   };
-
   try {
     if (request.kind === 'normal' && workspaceInfo.isRemote && workspaceInfo.vmName) {
       console.log(
@@ -1051,12 +1046,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           { ...mergeVerificationOptions(request), onGateLog: (line) => appendShipLog(issueId, line, 'verifying') },
         ));
       })();
-
     const verificationDeferral = handlePostRebaseVerificationDeferral(issueId, verifyResult, reviewStatus, { appendShipLog, setReviewStatus, completePendingOperation });
     if (verificationDeferral) {
-      if (!requeueMerge(projectKey, normalizedId)) {
-        enqueueMerge(projectKey, normalizedId);
-      }
+      markMergeProcessing(projectKey, normalizedId, false);
       _serverManagedMerges.delete(normalizedMergeId);
       preserveQueue = true;
       return verificationDeferral;

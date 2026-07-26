@@ -10,7 +10,6 @@ import {
   getCurrentMerge,
   getQueueForProject,
   markMergeProcessing,
-  requeueMerge,
 } from '../../../../src/lib/overdeck/merge.js';
 
 let odb: OverdeckTestDb;
@@ -27,7 +26,7 @@ describe('persistent merge queue', () => {
     markMergeProcessing('pan', 'PAN-3135');
     expect(getCurrentMerge('pan')).toBe('PAN-3135');
 
-    expect(requeueMerge('pan', 'PAN-3135')).toBe(true);
+    markMergeProcessing('pan', 'PAN-3135', false);
 
     expect(getCurrentMerge('pan')).toBeNull();
     expect(getQueueForProject('pan')).toEqual([

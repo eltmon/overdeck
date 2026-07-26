@@ -912,21 +912,11 @@ export function enqueueMerge(projectKey: string, issueId: string): number {
   return position;
 }
 
-/** Mark a queued merge as processing (currently being merged). */
-export function markMergeProcessing(projectKey: string, issueId: string): void {
+/** Toggle whether a queued merge is the project's current processing entry. */
+export function markMergeProcessing(projectKey: string, issueId: string, processing = true): void {
   overdeckDb().prepare(
-    `UPDATE merge_queue SET status = 'processing', started_at = ? WHERE issue_id = ? AND status = 'queued'`,
-  ).run(nowIso(), issueId.toUpperCase());
-}
-
-/** Return a processing merge to the queue without changing its position. */
-export function requeueMerge(projectKey: string, issueId: string): boolean {
-  const result = overdeckDb().prepare(
-    `UPDATE merge_queue
-     SET status = 'queued', started_at = NULL
-     WHERE project_key = ? AND issue_id = ? AND status = 'processing'`,
-  ).run(projectKey, issueId.toUpperCase());
-  return result.changes > 0;
+    `UPDATE merge_queue SET status = ?, started_at = ? WHERE project_key = ? AND issue_id = ? AND status = ?`,
+  ).run(processing ? 'processing' : 'queued', processing ? nowIso() : null, projectKey, issueId.toUpperCase(), processing ? 'queued' : 'processing');
 }
 
 /** Get the currently processing merge for a project, or null. */
