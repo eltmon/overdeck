@@ -134,10 +134,10 @@
       "tests/unit/lib/review-status.test.ts",
       "tests/unit/lib/workspace-anchor-drift.test.ts"
     ],
-    "recordedAt": "2026-07-25T23:48:58.041Z"
+    "recordedAt": "2026-07-26T00:18:45.985Z"
   },
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-26T00:18:42.663Z",
+  "updated": "2026-07-26T00:18:45.987Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "failed",
