@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T10:37:54.197Z",
+  "updated": "2026-07-26T10:37:57.027Z",
   "pipeline": {
     "issueId": "PAN-3114",
     "reviewStatus": "pending",
@@ -32,8 +32,42 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T09:56:00.123Z",
-    "inspectNotes": "All 4 ACs met: pending->passed stamp with 'uat-promotion' + generation name + 9-char SHA (slice(0,9)); passed/skipped short-circuit to {} so recordUatPromotionVerdicts skips and preserves existing verdict/notes; lastVerifiedCommit = rehydrateHeadAnchor(member.headSha) via conditional spread, omitted on empty headSha; recordUatPromotionVerdicts returns only non-terminal issue IDs and persists via setReviewStatusSync(issueId, stamp, current ?? undefined) — signature verified against src/lib/review-status.ts:147. Head-anchor guard entry expression matches the AST text exactly and the inventory comparison is order-insensitive."
+    "updatedAt": "2026-07-26T10:37:57.025Z",
+    "inspectNotes": "All 4 ACs met: pending->passed stamp with 'uat-promotion' + generation name + 9-char SHA (slice(0,9)); passed/skipped short-circuit to {} so recordUatPromotionVerdicts skips and preserves existing verdict/notes; lastVerifiedCommit = rehydrateHeadAnchor(member.headSha) via conditional spread, omitted on empty headSha; recordUatPromotionVerdicts returns only non-terminal issue IDs and persists via setReviewStatusSync(issueId, stamp, current ?? undefined) — signature verified against src/lib/review-status.ts:147. Head-anchor guard entry expression matches the AST text exactly and the inventory comparison is order-insensitive.",
+    "reviewRequestedAt": "2026-07-26T10:37:57.025Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "src/dashboard/server/services/__tests__/uat-train.test.ts",
+        "tests/unit/lib/head-anchor-write-sites.test.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/DEFINITION-OF-DONE.md",
+        "docs/UAT-BATCH-TRAINS.md",
+        "src/dashboard/server/services/uat-train.ts",
+        "src/lib/cloister/uat-promote-verification.ts",
+        "src/lib/cloister/uat-promote.ts",
+        "src/lib/lifecycle/workflows.ts",
+        "tests/unit/lib/cloister/uat-promote-verification.test.ts",
+        "tests/unit/lib/cloister/uat-promote.test.ts",
+        "tests/unit/lib/lifecycle/workflows.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/DEFINITION-OF-DONE.md",
+        "docs/UAT-BATCH-TRAINS.md",
+        "src/dashboard/server/services/__tests__/uat-train.test.ts",
+        "src/dashboard/server/services/uat-train.ts",
+        "src/lib/cloister/uat-promote-verification.ts",
+        "src/lib/cloister/uat-promote.ts",
+        "src/lib/lifecycle/workflows.ts",
+        "tests/unit/lib/cloister/uat-promote-verification.test.ts",
+        "tests/unit/lib/cloister/uat-promote.test.ts",
+        "tests/unit/lib/head-anchor-write-sites.test.ts",
+        "tests/unit/lib/lifecycle/workflows.test.ts"
+      ],
+      "recordedAt": "2026-07-26T10:37:54.195Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3126"
   },
   "closeOut": {
     "usage": {
