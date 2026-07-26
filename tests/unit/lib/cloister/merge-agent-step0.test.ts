@@ -34,7 +34,7 @@ describe('postMergeLifecycle Step 0 deploy gating', () => {
     const recordIntent = recordIntentMock();
     await expect(shouldRestartForPostMerge('/repo', {
       computeStaleness: async () => staleness('fresh'),
-      getBlockReason: vi.fn(),
+      getWindowAssessment: vi.fn(),
       recordIntent,
       log,
     })).resolves.toBe(false);
@@ -50,9 +50,8 @@ describe('postMergeLifecycle Step 0 deploy gating', () => {
     const reason = 'Deployment deferred because verification is in flight for PAN-1.';
     await expect(shouldRestartForPostMerge('/repo', {
       computeStaleness: async () => staleness('stale'),
-      getBlockReason: async () => reason,
+      getWindowAssessment: async () => ({ reason, verifyingIssues: ['PAN-1'] }),
       recordIntent,
-      listVerifyingIssues: () => ['PAN-1'],
       log,
     })).resolves.toBe(false);
     expect(recordIntent).toHaveBeenCalledWith({
@@ -69,7 +68,7 @@ describe('postMergeLifecycle Step 0 deploy gating', () => {
     const recordIntent = recordIntentMock();
     await expect(shouldRestartForPostMerge('/repo', {
       computeStaleness: async () => staleness('stale'),
-      getBlockReason: async () => null,
+      getWindowAssessment: async () => ({ reason: null, verifyingIssues: [] }),
       recordIntent,
     })).resolves.toBe(true);
     expect(recordIntent).not.toHaveBeenCalled();
@@ -80,9 +79,8 @@ describe('postMergeLifecycle Step 0 deploy gating', () => {
     const recordIntent = recordIntentMock();
     await expect(shouldRestartForPostMerge('/repo', {
       computeStaleness: async () => staleness('unknown'),
-      getBlockReason: async () => reason,
+      getWindowAssessment: async () => ({ reason, verifyingIssues: [] }),
       recordIntent,
-      listVerifyingIssues: () => [],
     })).resolves.toBe(false);
     expect(recordIntent).toHaveBeenCalledWith({
       requestedBy: 'merge-step0',
@@ -95,7 +93,7 @@ describe('postMergeLifecycle Step 0 deploy gating', () => {
     const recordIntent = recordIntentMock();
     await expect(shouldRestartForPostMerge('/repo', {
       computeStaleness: async () => staleness('unknown'),
-      getBlockReason: async () => null,
+      getWindowAssessment: async () => ({ reason: null, verifyingIssues: [] }),
       recordIntent,
     })).resolves.toBe(true);
     expect(recordIntent).not.toHaveBeenCalled();

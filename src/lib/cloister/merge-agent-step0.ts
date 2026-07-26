@@ -1,10 +1,10 @@
+import type { DeployWindowAssessment } from '../deploy/deploy-window.js';
 import type { BuildStaleness } from '../deploy/staleness.js';
 
 interface Step0Dependencies {
   readonly computeStaleness: () => Promise<BuildStaleness>;
-  readonly getBlockReason: () => Promise<string | null>;
+  readonly getWindowAssessment: () => Promise<DeployWindowAssessment>;
   readonly recordIntent: typeof import('../deploy/deploy-queue.js').recordDeployIntent;
-  readonly listVerifyingIssues: () => string[];
   readonly log: (message: string) => void;
 }
 
@@ -28,21 +28,19 @@ export async function shouldRestartForPostMerge(
     return false;
   }
 
-  const getBlockReason = dependencies.getBlockReason ?? (async () =>
-    (await import('../deploy/deploy-window.js')).getDeployBlockReason());
-  const reason = await getBlockReason();
-  if (reason) {
+  const getWindowAssessment = dependencies.getWindowAssessment ?? (async () =>
+    (await import('../deploy/deploy-window.js')).getDeployWindowAssessment());
+  const assessment = await getWindowAssessment();
+  if (assessment.reason) {
     const recordIntent = dependencies.recordIntent
       ?? (await import('../deploy/deploy-queue.js')).recordDeployIntent;
-    const getVerifyingIssues = dependencies.listVerifyingIssues
-      ?? (await import('../deploy/deploy-window.js')).listVerifyingIssues;
     await recordIntent({
       requestedBy: 'merge-step0',
-      reason,
-      blockedBy: getVerifyingIssues(),
+      reason: assessment.reason,
+      blockedBy: assessment.verifyingIssues,
     });
     (dependencies.log ?? console.log)(
-      `Deploy window unsafe (${reason}) — deferring deploy to the staleness patrol`,
+      `Deploy window unsafe (${assessment.reason}) — deferring deploy to the staleness patrol`,
     );
     return false;
   }

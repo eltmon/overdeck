@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -109,6 +109,22 @@ describe('deploy queue', () => {
       deferralCount: 2,
       escalated: true,
     });
+  });
+
+  it('reclaims a lock immediately when its recorded owner is dead', async () => {
+    const lockPath = join(home, 'pending-deploy.lock');
+    mkdirSync(lockPath);
+    writeFileSync(join(lockPath, 'owner.json'), JSON.stringify({
+      pid: 2_147_483_647,
+      acquiredAt: new Date().toISOString(),
+    }));
+
+    await expect(recordDeployIntent({
+      requestedBy: 'agent-pan-3135',
+      reason: 'Verification is running',
+      blockedBy: ['PAN-10'],
+    }, { overdeckHome: home })).resolves.toMatchObject({ deferralCount: 1 });
+    expect(existsSync(lockPath)).toBe(false);
   });
 
   it('returns null for invalid record shapes', async () => {

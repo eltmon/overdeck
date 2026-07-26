@@ -83,6 +83,7 @@ describe('agentRestartBlockReason', () => {
     expect(result).toContain('2 distinct verifications: PAN-10, PAN-20');
     expect(result).toContain('fire automatically at the next verification boundary');
     expect(result).toContain('do not retry or use --force');
+    expect(deps.loadReviewStatuses).toHaveBeenCalledOnce();
   });
 
   it('refreshes a queued restart without resetting its original request time', async () => {

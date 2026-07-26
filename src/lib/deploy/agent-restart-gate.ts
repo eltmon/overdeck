@@ -1,7 +1,6 @@
 import { recordDeployIntent } from './deploy-queue.js';
 import {
-  getDeployBlockReason,
-  listVerifyingIssues,
+  getDeployWindowAssessment,
   type DeployWindowDependencies,
 } from './deploy-window.js';
 
@@ -30,17 +29,17 @@ export async function agentRestartBlockReason(
   const deployDeps = initiator === 'flywheel-orchestrator'
     ? { ...deps, getFlywheelActiveRunId: () => null }
     : deps;
-  const blockReason = await getDeployBlockReason(deployDeps);
-  if (!blockReason) return null;
+  const assessment = await getDeployWindowAssessment(deployDeps);
+  if (!assessment.reason) return null;
 
   const queued = await recordDeployIntent({
     requestedBy: initiator,
-    reason: blockReason,
-    blockedBy: listVerifyingIssues(deployDeps.loadReviewStatuses),
+    reason: assessment.reason,
+    blockedBy: assessment.verifyingIssues,
   });
   const blockerCount = queued.blockedBy.length;
   const blockerLabel = blockerCount === 1 ? 'verification' : 'verifications';
   const blockerIds = blockerCount > 0 ? queued.blockedBy.join(', ') : 'none';
 
-  return `Restart refused. The active deployment gate says: "${blockReason}" This deploy has been queued since ${queued.requestedAt} (${formatQueueAge(queued.requestedAt)} ago); it has been held by ${blockerCount} distinct ${blockerLabel}: ${blockerIds}. It will fire automatically at the next verification boundary — do not retry or use --force, which would kill a healthy verification mid-run.`;
+  return `Restart refused. The active deployment gate says: "${assessment.reason}" This deploy has been queued since ${queued.requestedAt} (${formatQueueAge(queued.requestedAt)} ago); it has been held by ${blockerCount} distinct ${blockerLabel}: ${blockerIds}. It will fire automatically at the next verification boundary — do not retry or use --force, which would kill a healthy verification mid-run.`;
 }
