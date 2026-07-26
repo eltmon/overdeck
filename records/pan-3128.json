@@ -17,9 +17,22 @@
       "timestamp": "2026-07-26T13:31:00.653Z",
       "reason": "end",
       "note": "Anomaly: the server build code-splits build provenance into dist/dashboard/build-info-*.js, so the plan's literal grep against dist/dashboard/server.js returns 0; the shipped server imports that chunk and recursive bundle verification finds buildDirty there. Deviation: updated pre-existing reload and dashboard identity tests after the full suite exposed stale in-place-build expectations; added the required Prompt-Change trailer in a follow-up commit because history rewriting is forbidden. No remaining failures: full npm test, npm run typecheck, and npm run lint pass. Delivered detached origin/main reload builds, buildDirty/buildBranch health provenance, DoD canonicality enforcement, and canonical deploy documentation."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T13:37Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T13:37:25.690Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T13:37:25Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3128\n\nCanonical reload deletes its installed runtime dependencies before restart; stale worktree registrations also block recovery.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3128 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/__tests__/reload.test.ts",
@@ -59,10 +72,10 @@
     "recordedAt": "2026-07-26T13:30:54.544Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T13:34:54.139Z",
+  "updated": "2026-07-26T13:37:25.691Z",
   "pipeline": {
     "issueId": "PAN-3128",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -70,7 +83,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:31:33.728Z",
-    "updatedAt": "2026-07-26T13:34:52.968Z",
+    "updatedAt": "2026-07-26T13:37:25.070Z",
+    "reviewNotes": "Canonical reload deletes its installed runtime dependencies before restart; stale worktree registrations also block recovery.",
     "inspectNotes": "All 5 ACs verified: installAndBuild only ever receives the detached worktree (asserted across clean/dirty/ahead/behind); dirty + HEAD-divergence emit notes and continue; build failure propagates with 'old dashboard left running' -> exitCode 1 and removes worktree + dist.incoming in finally; grep merge-base on reload.ts returns no matches; typecheck clean and build-from-origin.test.ts 7/7 pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3141",
     "reviewRequestedAt": "2026-07-26T13:31:33.728Z",
@@ -119,9 +133,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 744856,
-            "output": 46084,
-            "cacheRead": 5581312,
+            "input": 796839,
+            "output": 61619,
+            "cacheRead": 8949248,
             "cacheWrite": 0
           }
         },
@@ -136,15 +150,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1428349,
-          "output": 157993,
-          "cacheRead": 47055360,
+          "input": 1480332,
+          "output": 173528,
+          "cacheRead": 50423296,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 35.409215,
-        "pricingAsOf": "2026-07-26T13:34:53.272Z"
+        "usd": 37.819148,
+        "pricingAsOf": "2026-07-26T13:37:25.144Z"
       }
     },
     "merges": [
