@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:56:03.309Z",
-  "updated": "2026-07-26T09:55:30.025Z",
+  "updated": "2026-07-26T10:09:15.191Z",
   "pipeline": {
     "issueId": "PAN-3115",
     "reviewStatus": "pending",
@@ -49,18 +49,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "typed-unavailable-contract": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3115",
         "agentId": "agent-pan-3115",
         "pid": 3879345,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T09:55:30.024Z"
+        "claimedAt": "2026-07-26T09:55:30.024Z",
+        "itemId": "typed-unavailable-contract",
+        "outcome": "completed",
+        "reason": "Added the shared typed unavailable reason/body contract and gather error, with unit coverage; contracts build and root typecheck pass.",
+        "releasedAt": "2026-07-26T10:09:15.191Z"
+      }
+    ],
+    "statusReasons": {
+      "typed-unavailable-contract": {
+        "reason": "Added the shared typed unavailable reason/body contract and gather error, with unit coverage; contracts build and root typecheck pass.",
+        "updatedAt": "2026-07-26T10:09:15.191Z"
       }
     }
   },
   "statusOverrides": {
-    "typed-unavailable-contract": "running"
+    "typed-unavailable-contract": "completed",
+    "typed-unavailable-contract.typed-unavailable-contract.ac1": "completed",
+    "typed-unavailable-contract.typed-unavailable-contract.ac2": "completed",
+    "typed-unavailable-contract.typed-unavailable-contract.ac3": "completed"
   }
 }
