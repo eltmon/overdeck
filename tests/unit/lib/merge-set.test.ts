@@ -14,6 +14,7 @@ import {
 import {
   getMergeSetSync,
   patchMergeSetRepoSync,
+  patchMergeSetReposSync,
   upsertMergeSetSync,
   deleteMergeSetSync,
 } from '../../../src/lib/merge-set.js';
@@ -137,6 +138,28 @@ describe('merge-set sync accessors', () => {
 
     expect(patched).toBe(false);
     expect(getMergeSetSync('PAN-399')?.repos[0]).toEqual(expect.objectContaining({
+      artifactId: '2',
+      mergeStatus: 'pending',
+    }));
+  });
+
+  it('rolls back every repo patch when one batch comparison fails', () => {
+    seedIssue('PAN-399');
+    const observedFe = repo('fe');
+    const observedApi = repo('api');
+    upsertMergeSetSync(makeMergeSet({
+      repos: [observedFe, repo('api', { artifactId: '2' })],
+    }));
+
+    const patched = patchMergeSetReposSync('PAN-399', [
+      { repoKey: 'fe', expected: observedFe, patch: { mergeStatus: 'merged' } },
+      { repoKey: 'api', expected: observedApi, patch: { mergeStatus: 'skipped' } },
+    ]);
+    const loaded = getMergeSetSync('PAN-399')!;
+
+    expect(patched).toBe(false);
+    expect(loaded.repos.find((entry) => entry.repoKey === 'fe')?.mergeStatus).toBe('pending');
+    expect(loaded.repos.find((entry) => entry.repoKey === 'api')).toEqual(expect.objectContaining({
       artifactId: '2',
       mergeStatus: 'pending',
     }));

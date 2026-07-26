@@ -123,6 +123,25 @@ vi.mock('../../../../../lib/merge-set.js', () => ({
     };
     return true;
   }),
+  patchMergeSetReposSync: vi.fn((_issueId: string, patches: any[]) => {
+    const matches = patches.every(({ repoKey, expected }) => {
+      const current = mocks.mergeSet?.repos.find((repo: any) => repo.repoKey === repoKey);
+      return current
+        && current.sourceBranch === expected.sourceBranch
+        && current.targetBranch === expected.targetBranch
+        && current.artifactUrl === expected.artifactUrl
+        && current.artifactId === expected.artifactId;
+    });
+    if (!matches) return false;
+    mocks.mergeSet = {
+      ...mocks.mergeSet,
+      repos: mocks.mergeSet.repos.map((repo: any) => {
+        const planned = patches.find(({ repoKey }) => repoKey === repo.repoKey);
+        return planned ? { ...repo, ...planned.patch } : repo;
+      }),
+    };
+    return true;
+  }),
   upsertMergeSetSync: (mergeSet: any) => {
     mocks.mergeSet = mergeSet;
     mocks.upsertMergeSet(mergeSet);

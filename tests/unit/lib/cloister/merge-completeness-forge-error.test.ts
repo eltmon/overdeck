@@ -7,6 +7,7 @@ const {
   getMergeSetMock,
   isGitHubAppConfiguredMock,
   patchMergeSetRepoMock,
+  patchMergeSetReposMock,
   upsertMergeSetMock,
   withRepoStateMock,
 } = vi.hoisted(() => ({
@@ -15,6 +16,7 @@ const {
   getMergeSetMock: vi.fn(),
   isGitHubAppConfiguredMock: vi.fn(),
   patchMergeSetRepoMock: vi.fn(),
+  patchMergeSetReposMock: vi.fn(),
   upsertMergeSetMock: vi.fn(),
   withRepoStateMock: vi.fn(),
 }));
@@ -45,6 +47,7 @@ vi.mock('../../../../src/lib/merge-set.js', () => ({
   ensureMergeSetForIssueSync: ensureMergeSetForIssueMock,
   getMergeSetSync: getMergeSetMock,
   patchMergeSetRepoSync: patchMergeSetRepoMock,
+  patchMergeSetReposSync: patchMergeSetReposMock,
   upsertMergeSetSync: upsertMergeSetMock,
   withRepoArtifactUrlSync: vi.fn(),
   withRepoStateSync: withRepoStateMock,
@@ -117,6 +120,7 @@ describe('merge completeness forge error propagation', () => {
       }),
     ]);
     expect(patchMergeSetRepoMock).not.toHaveBeenCalled();
+    expect(patchMergeSetReposMock).not.toHaveBeenCalled();
     expect(withRepoStateMock).not.toHaveBeenCalled();
     expect(upsertMergeSetMock).not.toHaveBeenCalled();
   });
@@ -146,6 +150,7 @@ describe('merge completeness forge error propagation', () => {
       }),
     ]);
     expect(patchMergeSetRepoMock).not.toHaveBeenCalled();
+    expect(patchMergeSetReposMock).not.toHaveBeenCalled();
     expect(withRepoStateMock).not.toHaveBeenCalled();
     expect(upsertMergeSetMock).not.toHaveBeenCalled();
   });

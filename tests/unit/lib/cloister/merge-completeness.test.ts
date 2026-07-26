@@ -8,6 +8,7 @@ const {
   getForgeAdapterMock,
   getMergeSetMock,
   patchMergeSetRepoMock,
+  patchMergeSetReposMock,
   resolveProjectReposForIssueMock,
   upsertMergeSetMock,
   withRepoArtifactUrlMock,
@@ -20,6 +21,7 @@ const {
   getForgeAdapterMock: vi.fn(),
   getMergeSetMock: vi.fn(),
   patchMergeSetRepoMock: vi.fn(),
+  patchMergeSetReposMock: vi.fn(),
   resolveProjectReposForIssueMock: vi.fn(),
   upsertMergeSetMock: vi.fn(),
   withRepoArtifactUrlMock: vi.fn(),
@@ -44,6 +46,7 @@ vi.mock('../../../../src/lib/merge-set.js', () => ({
   ensureMergeSetForIssueSync: ensureMergeSetForIssueMock,
   getMergeSetSync: getMergeSetMock,
   patchMergeSetRepoSync: patchMergeSetRepoMock,
+  patchMergeSetReposSync: patchMergeSetReposMock,
   upsertMergeSetSync: upsertMergeSetMock,
   withRepoArtifactUrlSync: withRepoArtifactUrlMock,
   withRepoStateSync: withRepoStateMock,
@@ -158,6 +161,18 @@ describe('assessMergeCompleteness', () => {
     ]);
     expect(getForgeAdapterMock).toHaveBeenNthCalledWith(1, 'github');
     expect(getForgeAdapterMock).toHaveBeenNthCalledWith(2, 'gitlab');
+    expect(findMergedArtifactMock).toHaveBeenNthCalledWith(1, {
+      sourceBranch: 'feature/min-857',
+      cwd: '/projects/myn/fe',
+    });
+    expect(findMergedArtifactMock).toHaveBeenNthCalledWith(2, {
+      sourceBranch: 'feature/min-857',
+      targetBranch: 'main',
+      headSha: currentHead.trim(),
+      artifactUrl: undefined,
+      artifactId: undefined,
+      cwd: '/projects/myn/api',
+    });
   });
 
   it('returns unmerged when a required sibling has commits but no merged artifact', async () => {
@@ -439,18 +454,22 @@ describe('reconcileStrandedRepos', () => {
     discoverArtifactMock.mockResolvedValue(null);
     findMergedArtifactMock.mockResolvedValue(null);
     getMergeSetMock.mockImplementation(() => storedMergeSet);
-    patchMergeSetRepoMock.mockImplementation((_issueId, repoKey, expected, patch) => {
-      const current = storedMergeSet?.repos.find((entry) => entry.repoKey === repoKey);
-      if (!current
-        || current.sourceBranch !== expected.sourceBranch
-        || current.targetBranch !== expected.targetBranch
-        || current.artifactUrl !== expected.artifactUrl
-        || current.artifactId !== expected.artifactId) return false;
+    patchMergeSetReposMock.mockImplementation((_issueId, patches) => {
+      const matches = patches.every(({ repoKey, expected }) => {
+        const current = storedMergeSet?.repos.find((entry) => entry.repoKey === repoKey);
+        return current
+          && current.sourceBranch === expected.sourceBranch
+          && current.targetBranch === expected.targetBranch
+          && current.artifactUrl === expected.artifactUrl
+          && current.artifactId === expected.artifactId;
+      });
+      if (!matches) return false;
       storedMergeSet = {
         ...storedMergeSet,
-        repos: storedMergeSet.repos.map((entry) => (
-          entry.repoKey === repoKey ? { ...entry, ...patch } : entry
-        )),
+        repos: storedMergeSet.repos.map((entry) => {
+          const planned = patches.find(({ repoKey }) => repoKey === entry.repoKey);
+          return planned ? { ...entry, ...planned.patch } : entry;
+        }),
       };
       return true;
     });
@@ -473,7 +492,7 @@ describe('reconcileStrandedRepos', () => {
       artifactUrl: 'https://gitlab.com/org/api/-/merge_requests/56',
       artifactId: '56',
     }));
-    expect(patchMergeSetRepoMock).toHaveBeenCalledTimes(1);
+    expect(patchMergeSetReposMock).toHaveBeenCalledTimes(1);
     expect(upsertMergeSetMock).not.toHaveBeenCalled();
   });
 
@@ -487,7 +506,7 @@ describe('reconcileStrandedRepos', () => {
 
     expect(result.blockers).toEqual([]);
     expect(result.mergeSet.repos[0]).toEqual(expect.objectContaining({ mergeStatus: 'skipped' }));
-    expect(patchMergeSetRepoMock).toHaveBeenCalledTimes(1);
+    expect(patchMergeSetReposMock).toHaveBeenCalledTimes(1);
     expect(upsertMergeSetMock).not.toHaveBeenCalled();
   });
 
@@ -531,8 +550,8 @@ describe('reconcileStrandedRepos', () => {
         artifactUrl: 'https://gitlab.com/org/api/-/merge_requests/56',
         mergeStatus: 'merged',
       }));
-      expect(patchMergeSetRepoMock).toHaveBeenCalledTimes(1);
-    expect(upsertMergeSetMock).not.toHaveBeenCalled();
+      expect(patchMergeSetReposMock).toHaveBeenCalledTimes(1);
+      expect(upsertMergeSetMock).not.toHaveBeenCalled();
     },
   );
 
@@ -588,12 +607,47 @@ describe('reconcileStrandedRepos', () => {
       expect.objectContaining({ repoKey: 'fe', mergeStatus: 'merged' }),
       expect.objectContaining({ repoKey: 'api', mergeStatus: 'merged' }),
     ]);
-    expect(patchMergeSetRepoMock).toHaveBeenCalledTimes(1);
-    expect(patchMergeSetRepoMock).toHaveBeenCalledWith('MIN-857', 'api', repoB, {
-      artifactId: '56',
-      artifactUrl: repoB.artifactUrl,
-      mergeStatus: 'merged',
+    expect(patchMergeSetReposMock).toHaveBeenCalledTimes(1);
+    expect(patchMergeSetReposMock).toHaveBeenCalledWith('MIN-857', [{
+      repoKey: 'api',
+      expected: repoB,
+      patch: {
+        artifactId: '56',
+        artifactUrl: repoB.artifactUrl,
+        mergeStatus: 'merged',
+      },
+    }]);
+    expect(upsertMergeSetMock).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing when one repo succeeds and a sibling is unverifiable', async () => {
+    const repoA = { ...repo('fe', 'gitlab'), mergeStatus: 'pending' };
+    const repoB = { ...repo('api', 'gitlab'), mergeStatus: 'pending' };
+    const initial = seedMergeSet([repoA, repoB]);
+    execMock.mockImplementation(async (command) => repoGitResult(command, '2\n'));
+    discoverArtifactMock.mockImplementation(async ({ cwd }) => {
+      if (cwd.endsWith('/api')) throw new Error('forge unavailable');
+      return {
+        forge: 'gitlab',
+        created: false,
+        url: 'https://gitlab.com/org/fe/-/merge_requests/55',
+        id: '55',
+      };
     });
+    findMergedArtifactMock.mockResolvedValue({
+      forge: 'gitlab',
+      created: false,
+      url: 'https://gitlab.com/org/fe/-/merge_requests/55',
+      id: '55',
+    });
+
+    const result = await reconcileStrandedRepos(initial as any);
+
+    expect(result.blockers).toEqual([
+      expect.objectContaining({ repoKey: 'api', state: 'unverifiable' }),
+    ]);
+    expect(patchMergeSetReposMock).not.toHaveBeenCalled();
+    expect(storedMergeSet).toEqual(initial);
     expect(upsertMergeSetMock).not.toHaveBeenCalled();
   });
 

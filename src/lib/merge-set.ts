@@ -4,6 +4,8 @@ import {
   getAllMergeSetsFromDb,
   getMergeSetFromDb,
   patchMergeSetRepo as dbPatchRepo,
+  patchMergeSetRepos as dbPatchRepos,
+  type MergeSetRepoPatch,
   upsertMergeSet as dbUpsert,
 } from './overdeck/merge-sync.js';
 import type { ForgeType } from './forge.js';
@@ -144,6 +146,10 @@ export function patchMergeSetRepoSync(
   patch: Partial<Pick<MergeSetRepoState, 'artifactUrl' | 'artifactId' | 'mergeStatus'>>,
 ): boolean {
   return dbPatchRepo(resolveIssueIdSync(issueId), repoKey, expected, patch);
+}
+
+export function patchMergeSetReposSync(issueId: string, patches: MergeSetRepoPatch[]): boolean {
+  return dbPatchRepos(resolveIssueIdSync(issueId), patches);
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
