@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:56:03.309Z",
-  "updated": "2026-07-26T10:36:30.058Z",
+  "updated": "2026-07-26T10:40:07.755Z",
   "pipeline": {
     "issueId": "PAN-3115",
     "reviewStatus": "pending",
@@ -67,16 +67,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "registered-projects-queryable-flag": {
-        "writerId": "agent-pan-3115",
-        "agentId": "agent-pan-3115",
-        "pid": 1881822,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T10:36:30.058Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3115",
@@ -143,6 +135,17 @@
         "outcome": "completed",
         "reason": "GET and POST membership routes now return HTTP 200 typed unavailable bodies for determined failures, preserve cold-boot 503 and healthy arrays, with route and no-loss coverage.",
         "releasedAt": "2026-07-26T10:36:10.999Z"
+      },
+      {
+        "writerId": "agent-pan-3115",
+        "agentId": "agent-pan-3115",
+        "pid": 1881822,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:36:30.058Z",
+        "itemId": "registered-projects-queryable-flag",
+        "outcome": "completed",
+        "reason": "Registered project entries now include additive membershipQueryable based on issue-prefix resolution, with route coverage for true/false while preserving all existing fields.",
+        "releasedAt": "2026-07-26T10:40:07.754Z"
       }
     ],
     "statusReasons": {
@@ -169,6 +172,10 @@
       "route-typed-200": {
         "reason": "GET and POST membership routes now return HTTP 200 typed unavailable bodies for determined failures, preserve cold-boot 503 and healthy arrays, with route and no-loss coverage.",
         "updatedAt": "2026-07-26T10:36:10.999Z"
+      },
+      "registered-projects-queryable-flag": {
+        "reason": "Registered project entries now include additive membershipQueryable based on issue-prefix resolution, with route coverage for true/false while preserving all existing fields.",
+        "updatedAt": "2026-07-26T10:40:07.754Z"
       }
     }
   },
@@ -200,6 +207,8 @@
     "route-typed-200.route-typed-200.ac3": "completed",
     "route-typed-200.route-typed-200.ac4": "completed",
     "route-typed-200.route-typed-200.ac5": "completed",
-    "registered-projects-queryable-flag": "running"
+    "registered-projects-queryable-flag": "completed",
+    "registered-projects-queryable-flag.registered-projects-queryable-flag.ac1": "completed",
+    "registered-projects-queryable-flag.registered-projects-queryable-flag.ac2": "completed"
   }
 }
