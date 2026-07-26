@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T20:32:47.007Z",
+  "updated": "2026-07-26T20:34:41.698Z",
   "pipeline": {
     "issueId": "PAN-3158",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "idle-hidden-footer": {
-        "writerId": "agent-pan-3158",
-        "agentId": "agent-pan-3158",
-        "pid": 639238,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T20:32:47.007Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3158",
@@ -64,12 +56,27 @@
         "outcome": "completed",
         "reason": "Filtered idle enabled projects from rendered sections while preserving disabled rows and the page-level empty state",
         "releasedAt": "2026-07-26T20:32:37.882Z"
+      },
+      {
+        "writerId": "agent-pan-3158",
+        "agentId": "agent-pan-3158",
+        "pid": 639238,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T20:32:47.007Z",
+        "itemId": "idle-hidden-footer",
+        "outcome": "completed",
+        "reason": "Added singular/plural footer copy reporting hidden idle enabled projects while omitting it from the all-empty collapse",
+        "releasedAt": "2026-07-26T20:34:41.698Z"
       }
     ],
     "statusReasons": {
       "hide-idle-enabled-sections": {
         "reason": "Filtered idle enabled projects from rendered sections while preserving disabled rows and the page-level empty state",
         "updatedAt": "2026-07-26T20:32:37.882Z"
+      },
+      "idle-hidden-footer": {
+        "reason": "Added singular/plural footer copy reporting hidden idle enabled projects while omitting it from the all-empty collapse",
+        "updatedAt": "2026-07-26T20:34:41.698Z"
       }
     }
   },
@@ -80,6 +87,9 @@
     "hide-idle-enabled-sections.hide-idle-enabled-sections.ac3": "completed",
     "hide-idle-enabled-sections.hide-idle-enabled-sections.ac4": "completed",
     "hide-idle-enabled-sections.hide-idle-enabled-sections.ac5": "completed",
-    "idle-hidden-footer": "running"
+    "idle-hidden-footer": "completed",
+    "idle-hidden-footer.idle-hidden-footer.ac1": "completed",
+    "idle-hidden-footer.idle-hidden-footer.ac2": "completed",
+    "idle-hidden-footer.idle-hidden-footer.ac3": "completed"
   }
 }
