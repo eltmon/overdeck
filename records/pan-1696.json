@@ -166,7 +166,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T01:49:12.613Z",
+  "updated": "2026-07-26T01:54:05.057Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -254,16 +254,8 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "ready-set-source": {
-        "writerId": "agent-pan-1696",
-        "agentId": "agent-pan-1696",
-        "pid": 177121,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T01:49:12.613Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1696",
@@ -297,6 +289,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-1696 dead)",
         "releasedAt": "2026-07-26T01:00:10.144Z"
+      },
+      {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 177121,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T01:49:12.613Z",
+        "itemId": "ready-set-source",
+        "outcome": "completed",
+        "reason": "Refactored getReadySet() to source from review-status DB; removed flywheel-run dependency",
+        "releasedAt": "2026-07-26T01:54:05.057Z"
       }
     ],
     "statusReasons": {
@@ -309,8 +312,8 @@
         "updatedAt": "2026-07-26T00:51:57.593Z"
       },
       "ready-set-source": {
-        "reason": "stale claim released (agent-pan-1696 dead)",
-        "updatedAt": "2026-07-26T01:00:10.144Z"
+        "reason": "Refactored getReadySet() to source from review-status DB; removed flywheel-run dependency",
+        "updatedAt": "2026-07-26T01:54:05.057Z"
       }
     }
   },
@@ -323,6 +326,10 @@
     "per-project-flag.per-project-flag.ac1": "completed",
     "per-project-flag.per-project-flag.ac2": "completed",
     "per-project-flag.per-project-flag.ac3": "completed",
-    "ready-set-source": "running"
+    "ready-set-source": "completed",
+    "ready-set-source.ready-set-source.ac1": "completed",
+    "ready-set-source.ready-set-source.ac2": "completed",
+    "ready-set-source.ready-set-source.ac3": "completed",
+    "ready-set-source.ready-set-source.ac4": "completed"
   }
 }
