@@ -49,15 +49,7 @@
       "timestamp": "2026-07-26T15:16:46.315Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T15:16:46Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3138\n\n# Review Synthesis — PAN-3138 — 2026-07-26T15:15:00Z\n\n## Verdict: CHANGES REQUESTED — a failed verifying-on-main tracker transition permanently skips the required merge-time Docker teardown\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-2ae7a297/context.json\n- Branch: feature/pan-3138\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138\n- HEAD reviewed: 2ae7a2971a8c4516de6fe78b878d3c2fb986c98e\n- Cycle number: 2\n- Prior cycle SHA: ad37787c2c81d40ae7e7365f0704b913ba266986\n- PR commits: 8\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-2ae7a297/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-2ae7a297/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-2ae7a297/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-2ae7a297/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Merge-time teardown is skipped permanently when the verifying-on-main transition fails — `src/lib/cloister/merge-agent.ts:548`\nThe new name-based teardown remains after `transitionIssueToVerifyingOnMain()`. If that external tracker transition fails after `verifyMergedBeforeLifecycle()` has already established that the merge succeeded, the catch at lines 427–441 writes `mergeStatus: 'failed'` and rethrows, so execution never reaches the changed teardown call at lines 548–556. The reaper fallback introduced by this PR only cleans open devnets whose canonical local merge status is `merged`, so the overwritten `failed` status prevents later recovery and leaves the `_devnet` allocated indefinitely. The teardown placement is inside the PR diff and directly defeats the feature's address-pool-leak guarantee on a supported failure path. Run the non-fatal name-based teardown immediately after merge verification and before unrelated fatal lifecycle operations, or put it in a guaranteed verified-merge cleanup path, with a regression test covering tracker-transition failure.\n\n## Non-blocking Findings\n\n### [performance] Merged Docker cleanup serially occupies the main Deacon patrol — `src/lib/cloister/closed-issue-reaper.ts:751`\nThe patrol awaits each multi-command Docker teardown serially, so a degraded Docker daemon or a backlog of leaked devnets can delay later patrol responsibilities for minutes. This is advisory because healthy commands are bounded and the serial execution avoids overloading Docker, but a dedicated deduplicated worker with retry backoff would keep the main patrol responsive.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-2ae7a297/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3138 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -99,21 +91,22 @@
     "recordedAt": "2026-07-26T15:34:06.412Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T15:34:07.226Z",
+  "updated": "2026-07-26T15:34:09.975Z",
   "pipeline": {
     "issueId": "PAN-3138",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T15:34:07.224Z",
+    "updatedAt": "2026-07-26T15:34:09.620Z",
     "reviewNotes": "Verification failed at typecheck",
     "verificationNotes": "Verification FAILED at typecheck (274666ms):\n\n\n> @overdeck/core@0.45.24 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.45.24 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.45.24 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m357.58 kB\u001b[22m \u001b[2m│ gzip: 57.95 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 357.58 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3328ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m327.99 kB\u001b[22m \u001b[2m│ gzip: 55.88 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m541.65 kB\u001b[22m \u001b[2m│ gzip: 87.31 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 45.87 kB\u001b[22m \u001b[2m│ gzip:  5.64 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m752.90 kB\u001b[22m \u001b[2m│ gzip: 74.89 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.67 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3671ms\u001b[39m\n\n> @overdeck/core@0.45.24 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard\n\n\n> @overdeck/core@0.45.24 typecheck:hooks\n> tsc --noEmit -p tsconfig.hooks.json\n\n\n> @overdeck/core@0.45.24 typecheck:evals\n> tsc --noEmit -p tsconfig.evals.json\n\n\n> @overdeck/core@0.45.24 typecheck:dashboard\n> bash scripts/lint-dashboard-types.sh\n\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (62%)\n  - rolldown-plugin-dts:fake-js (32%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n✖ dashboard server typecheck regressed: 64 errors (baseline 62).\n  New type errors in src/dashboard/server. Offending lines:\nsrc/dashboard/server/pending-feedback.ts(118,9): error TS7022: 'getAgentState' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.\nsrc/dashboard/server/pending-feedback.ts(118,53): error TS7024: Function implicitly has return type 'any' because it does not have a return type annotation and is referenced directly or indirectly in one of its return expressions.\nsrc/dashboard/\n…(4026 chars elided)…\ne: boolean; }'.\nsrc/dashboard/server/routes/projects.ts(496,33): error TS2345: Argument of typ\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "ad37787c2c81d40ae7e7365f0704b913ba266986",
-    "reviewSpawnedAt": "2026-07-26T15:15:28.630Z",
+    "reviewRequestedAt": "2026-07-26T15:34:07.224Z",
+    "reviewSpawnedAt": "2026-07-26T15:34:09.618Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -153,8 +146,7 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T15:34:06.412Z"
-    },
-    "reviewRequestedAt": "2026-07-26T15:34:07.224Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -201,24 +193,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3145189,
-            "output": 179650,
-            "cacheRead": 93506048,
+            "input": 3264298,
+            "output": 211847,
+            "cacheRead": 120047104,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 10401603,
-          "output": 401308,
-          "cacheRead": 133788672,
+          "input": 10520712,
+          "output": 433505,
+          "cacheRead": 160329728,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 130.941591,
-        "pricingAsOf": "2026-07-26T15:17:20.647Z"
+        "usd": 145.773574,
+        "pricingAsOf": "2026-07-26T15:34:09.630Z"
       }
     },
     "merges": [
