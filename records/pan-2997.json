@@ -237,21 +237,21 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T08:28:37.044Z",
+  "updated": "2026-07-26T08:35:12.935Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T05:50:39.330Z",
-    "updatedAt": "2026-07-26T08:28:35.798Z",
+    "updatedAt": "2026-07-26T08:35:12.901Z",
     "reviewNotes": "Agent re-review request (4/25): Fixed the cycle-10 blocker: the pre-branch pane_dead snapshot is no longer treated as proof of acceptance. completeKeyedSubmit now snapshots pane_pid/pane_dead + the pending claim before the if-shell and re-reads the target afterwards — if the pane died or was replaced around the Enter, the terminal marker is rolled back, pending restored, and KeyedSubmitTargetDeadError thrown (outbox stays pending, recovery re-drives after resume). Same invariant + rollback remotely. New tests: pane exits upon consuming the submitted line (exact handoff window), terminal rollback + pending restoration proven, real-content recovery after session recreation; remote dieOnEnter coverage. Also fixed the monitor-spool vs gated-queue docs terminology note.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
-    "lastVerifiedCommit": "93b46b172c28bb0634ae73e2831d6680d3642793",
+    "lastVerifiedCommit": "bb28e3e9c44b6cfa4ca4b733cdd423bb5a977dea",
     "reviewSpawnedAt": "2026-07-26T08:04:17.205Z"
   },
   "closeOut": {
@@ -312,7 +312,7 @@
       },
       "costAtCloseOut": {
         "usd": 260.418437,
-        "pricingAsOf": "2026-07-26T08:28:37.041Z"
+        "pricingAsOf": "2026-07-26T08:35:12.930Z"
       }
     },
     "merges": [
