@@ -284,17 +284,9 @@
       "timestamp": "2026-07-26T08:13:00.219Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T08:13:00Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1696\n\nMalformed assemble JSON triggers an all-project forced reconcile; stack/rebuild confirmations, cross-project UAT criteria, cockpit summary, disabled rows, and the prompt trailer also remain blocking.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1696 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T08:32:36.508Z",
+  "updated": "2026-07-26T08:32:37.101Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
