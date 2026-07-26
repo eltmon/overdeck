@@ -6707,3 +6707,12 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - **RUN-70 close-out tally: 8 issues fully closed** (PAN-3021, PAN-3053, PAN-3068, PAN-3052, PAN-3070, PAN-2467, PAN-3055, PAN-3083), each with workspace + Docker-network reclamation.
 - Still open: MIN-902 behind PAN-3092's self-deadlock (no sanctioned recovery); PAN-3029/3051/3056 with `verification_status: null`; MIN-858 reviewing. **Not quiescent — no retrospective yet.**
 - **LESSON: a staged build plus an armed, preflight-checked retry is the right shape for a gated deploy.** I could not know when PAN-3076's verification would finish, and forcing past it would have disconnected a live session. Preparing everything, then letting a mechanical check fire on the condition, turned an unpredictable wait into an unattended success.
+
+## RUN-70 tick 32 (2026-07-26 01:10Z) — post-deploy steady state; MIN-858 review cycled, MIN-902 still deadlocked
+- This tick's scheduled prompt was **stale** (written pre-deploy); re-derived instead of replaying it. Live `77f78eda15` with cedar verified; PAN-2467/3055/3083 closed at tick 31.
+- **MIN-858 moved `reviewing` → `pending`** with `verification_status: passed` — a review cycle completed and the next one has not been dispatched yet. Watching rather than acting: it has been in motion this whole run, and a fresh `pending` right after a cycle is normal dispatch latency, not the orphan signature (which needs a *prior stage terminal verdict* plus **no agent**, sustained — the corrected predicate from tick 25).
+- **PAN-2997 progressed to `review=passed test=passed`** (verification pending) — the tick-24 orphan recovery continues to hold.
+- **MIN-902 still stuck at `reviewing`; PAN-3092 confirmed still OPEN.** No sanctioned recovery, and I did not redispatch. A good verdict remains stranded behind the reviewer's own record lock.
+- `verification_status` still `null` on PAN-3029/3051/3056 → close-outs correctly blocked; **zero `--accept-*` across 32 ticks**.
+- main **green** on `a52a00e600`; 19 agents; networks **19** (no reclaim needed). Not quiescent — no retrospective.
+- **LESSON: distinguish dispatch latency from a stall using the corrected predicate, not elapsed time.** MIN-858 reading `pending` looks identical to PAN-2997's orphan an hour ago. The difference is that PAN-2997 had a terminal prior-stage verdict and no agent for ~90 minutes; MIN-858 just finished a cycle. Same field value, different diagnosis — and the tick-25 predicate is what separates them.
