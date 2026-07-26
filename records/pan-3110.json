@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T06:17:49.254Z",
-  "updated": "2026-07-26T10:53:53.627Z",
+  "updated": "2026-07-26T10:57:42.229Z",
   "pipeline": {
     "issueId": "PAN-3110",
     "reviewStatus": "pending",
@@ -67,16 +67,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "auto-merge-executor-requeue": {
-        "writerId": "agent-pan-3110",
-        "agentId": "agent-pan-3110",
-        "pid": 2380487,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T10:53:53.627Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3110",
@@ -110,6 +102,17 @@
         "outcome": "completed",
         "reason": "Added server-first rebase escalation, conflict-aware agent fallback, retryable queued failures, and regression coverage",
         "releasedAt": "2026-07-26T10:51:14.730Z"
+      },
+      {
+        "writerId": "agent-pan-3110",
+        "agentId": "agent-pan-3110",
+        "pid": 2380487,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:53:53.627Z",
+        "itemId": "auto-merge-executor-requeue",
+        "outcome": "completed",
+        "reason": "Retryable merge failures now requeue with backoff and retry-count persistence, then block with operator guidance at the circuit-breaker ceiling",
+        "releasedAt": "2026-07-26T10:57:42.228Z"
       }
     ],
     "statusReasons": {
@@ -124,6 +127,10 @@
       "server-rebase-fallback-retryable": {
         "reason": "Added server-first rebase escalation, conflict-aware agent fallback, retryable queued failures, and regression coverage",
         "updatedAt": "2026-07-26T10:51:14.730Z"
+      },
+      "auto-merge-executor-requeue": {
+        "reason": "Retryable merge failures now requeue with backoff and retry-count persistence, then block with operator guidance at the circuit-breaker ceiling",
+        "updatedAt": "2026-07-26T10:57:42.228Z"
       }
     }
   },
@@ -145,6 +152,10 @@
     "server-rebase-fallback-retryable.server-rebase-fallback-retryable.ac3": "completed",
     "server-rebase-fallback-retryable.server-rebase-fallback-retryable.ac4": "completed",
     "server-rebase-fallback-retryable.server-rebase-fallback-retryable.ac5": "completed",
-    "auto-merge-executor-requeue": "running"
+    "auto-merge-executor-requeue": "completed",
+    "auto-merge-executor-requeue.auto-merge-executor-requeue.ac1": "completed",
+    "auto-merge-executor-requeue.auto-merge-executor-requeue.ac2": "completed",
+    "auto-merge-executor-requeue.auto-merge-executor-requeue.ac3": "completed",
+    "auto-merge-executor-requeue.auto-merge-executor-requeue.ac4": "completed"
   }
 }
