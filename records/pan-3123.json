@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:25:26.814Z",
-  "updated": "2026-07-26T12:48:08.059Z",
+  "updated": "2026-07-26T12:49:54.554Z",
   "pipeline": {
     "issueId": "PAN-3123",
     "reviewStatus": "pending",
@@ -43,8 +43,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "governor-runway-config": {
+        "writerId": "agent-pan-3123",
+        "agentId": "agent-pan-3123",
+        "pid": 1230233,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T12:49:54.554Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3123",
@@ -69,6 +77,7 @@
     "psi-snapshot-reader": "completed",
     "psi-snapshot-reader.psi-snapshot-reader.ac1": "completed",
     "psi-snapshot-reader.psi-snapshot-reader.ac2": "completed",
-    "psi-snapshot-reader.psi-snapshot-reader.ac3": "completed"
+    "psi-snapshot-reader.psi-snapshot-reader.ac3": "completed",
+    "governor-runway-config": "running"
   }
 }
