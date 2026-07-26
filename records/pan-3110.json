@@ -2,7 +2,7 @@
   "issueId": "PAN-3110",
   "schemaVersion": 2,
   "created": "2026-07-26T06:17:49.254Z",
-  "updated": "2026-07-26T06:17:49.255Z",
+  "updated": "2026-07-26T06:17:50.181Z",
   "pipeline": {
     "issueId": "PAN-3110",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3110: Merge-ready recovery trap: auto-merge of a CLEAN PR fails when the work agent is stopped, and pan start --fresh wipes the earned verdicts",
       "timestamp": "2026-07-26T06:17:49.254Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
