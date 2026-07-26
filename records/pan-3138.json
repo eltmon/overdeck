@@ -386,21 +386,20 @@
     "recordedAt": "2026-07-26T18:42:41.042Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T18:43:48.411Z",
+  "updated": "2026-07-26T18:46:12.867Z",
   "pipeline": {
     "issueId": "PAN-3138",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T18:43:47.747Z",
-    "reviewNotes": "Verification failed at typecheck",
+    "updatedAt": "2026-07-26T18:46:12.839Z",
+    "reviewNotes": "Claim recovery loses an older lifecycle when a newer pending generation exists",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "45c64d10937592faceea33d0a627c6e336c9c829",
-    "reviewRequestedAt": "2026-07-26T18:42:42.167Z",
     "reviewSpawnedAt": "2026-07-26T18:42:48.185Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -483,6 +482,24 @@
         "tests/unit/lib/review-status.test.ts"
       ],
       "recordedAt": "2026-07-26T18:42:41.042Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "12e875a85f8c9386b618dc4b93d82b901b96f325"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "12e875a85f8c9386b618dc4b93d82b901b96f325"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "12e875a85f8c9386b618dc4b93d82b901b96f325"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "12e875a85f8c9386b618dc4b93d82b901b96f325"
+      }
     }
   },
   "closeOut": {
@@ -490,9 +507,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 16432003,
-            "output": 215780,
-            "cacheRead": 55481344,
+            "input": 19548365,
+            "output": 336213,
+            "cacheRead": 74549760,
             "cacheWrite": 0
           }
         },
@@ -539,15 +556,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 85312066,
-          "output": 1581690,
-          "cacheRead": 602409984,
+          "input": 88428428,
+          "output": 1702123,
+          "cacheRead": 621478400,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 775.216022,
-        "pricingAsOf": "2026-07-26T18:43:48.140Z"
+        "usd": 803.94503,
+        "pricingAsOf": "2026-07-26T18:46:12.859Z"
       }
     },
     "merges": [
