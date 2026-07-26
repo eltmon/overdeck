@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T14:11:48.654Z",
+  "updated": "2026-07-26T14:11:57.374Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "passed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T13:33:01.170Z",
-    "inspectNotes": "All 3 ACs verified. AC1: getUatGenerationSync loads both child tables (loadReposForUat/loadMemberReposForUat) and returns 2 repos with distinct baseSha aaa1111/bbb2222 plus MIN-901's fe+api and MIN-902's api contributions. AC2: synthesizeSingleRepo (merge-sync-uat.ts:118) yields exactly one entry from project_root/base_sha/worktree_path for rows with no child rows. AC3: ensureUatGenerationRepoTablesSync uses CREATE TABLE/INDEX IF NOT EXISTS and runs on every getOverdeckDatabaseSync open after runOverdeckMigrationSync early-returns; reopen test asserts 2 repo rows / 3 member-repo rows unchanged. Ran the 11-case suite: all pass. FK pragma is ON and insertUatGenerationSync deletes child rows before INSERT OR REPLACE on the parent, so the replace does not FK-fail; no DELETE FROM uat_generations path exists anywhere in src, so the new no-action FKs block nothing. Table count 32->34 matches 34 CREATE TABLE statements in the migration. Non-blocking notes for later items: (a) loadMemberReposForUat has no ORDER BY and merge_order_in_repo ties within a member, so per-member repo order relies on scan order; (b) calling updateUatGenerationSync with an explicit members list that omits .repos wipes uat_generation_member_repos - WI-6/WI-7 must pass repos alongside members; (c) the API DTO Schema.Struct at merge.ts:217 still lacks repos, so per-repo state is not yet visible over HTTP."
+    "updatedAt": "2026-07-26T14:11:57.337Z",
+    "inspectNotes": "Inspecting item polyrepo-assembly-engine"
   },
   "closeOut": {
     "usage": {
@@ -46,7 +46,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.0161303,
-        "pricingAsOf": "2026-07-26T13:33:01.407Z"
+        "pricingAsOf": "2026-07-26T14:11:57.364Z"
       }
     },
     "merges": [],
