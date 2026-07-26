@@ -40,7 +40,7 @@
     "recordedAt": "2026-07-26T17:50:09.960Z"
   },
   "created": "2026-07-26T17:26:24.283Z",
-  "updated": "2026-07-26T17:53:00.397Z",
+  "updated": "2026-07-26T17:53:11.612Z",
   "pipeline": {
     "issueId": "PAN-3147",
     "reviewStatus": "pending",
@@ -63,7 +63,9 @@
         "roles/flywheel.md"
       ],
       "recordedAt": "2026-07-26T17:50:09.960Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-26T17:53:11.161Z",
+    "panDoneRecoveredAt": "2026-07-26T17:53:11.161Z"
   },
   "closeOut": {
     "usage": {
