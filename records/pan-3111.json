@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-26T13:15:17.285Z",
+  "updated": "2026-07-26T13:18:13.812Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "gate-reactive-work-dispatch": {
-        "writerId": "agent-pan-3111",
-        "agentId": "agent-pan-3111",
-        "pid": 2104537,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T13:15:17.284Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3111",
@@ -93,6 +85,17 @@
         "outcome": "completed",
         "reason": "Applied the autonomous pickup predicate before orphan work-agent checks, recorded durable needs-you trips on refusal without activity-feed spam, and updated the reconciler suite with explicit allow/refusal coverage.",
         "releasedAt": "2026-07-26T13:15:05.360Z"
+      },
+      {
+        "writerId": "agent-pan-3111",
+        "agentId": "agent-pan-3111",
+        "pid": 2104537,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:15:17.284Z",
+        "itemId": "gate-reactive-work-dispatch",
+        "outcome": "completed",
+        "reason": "Gated in_progress lifecycle work dispatch through the shared autonomous pickup predicate and added warning plus durable needs-you handling on refusal while preserving allowed spawns.",
+        "releasedAt": "2026-07-26T13:18:13.812Z"
       }
     ],
     "statusReasons": {
@@ -103,6 +106,10 @@
       "gate-orphan-proposed-reconciler": {
         "reason": "Applied the autonomous pickup predicate before orphan work-agent checks, recorded durable needs-you trips on refusal without activity-feed spam, and updated the reconciler suite with explicit allow/refusal coverage.",
         "updatedAt": "2026-07-26T13:15:05.360Z"
+      },
+      "gate-reactive-work-dispatch": {
+        "reason": "Gated in_progress lifecycle work dispatch through the shared autonomous pickup predicate and added warning plus durable needs-you handling on refusal while preserving allowed spawns.",
+        "updatedAt": "2026-07-26T13:18:13.812Z"
       }
     }
   },
@@ -115,6 +122,8 @@
     "gate-orphan-proposed-reconciler.gate-orphan-proposed-reconciler.ac1": "completed",
     "gate-orphan-proposed-reconciler.gate-orphan-proposed-reconciler.ac2": "completed",
     "gate-orphan-proposed-reconciler.gate-orphan-proposed-reconciler.ac3": "completed",
-    "gate-reactive-work-dispatch": "running"
+    "gate-reactive-work-dispatch": "completed",
+    "gate-reactive-work-dispatch.gate-reactive-work-dispatch.ac1": "completed",
+    "gate-reactive-work-dispatch.gate-reactive-work-dispatch.ac2": "completed"
   }
 }
