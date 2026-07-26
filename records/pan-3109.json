@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T05:55:05.237Z",
-  "updated": "2026-07-26T06:18:01.407Z",
+  "updated": "2026-07-26T06:19:19.777Z",
   "pipeline": {
     "issueId": "PAN-3109",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "docs-dod-containment": {
-        "writerId": "agent-pan-3109",
-        "agentId": "agent-pan-3109",
-        "pid": 1998055,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T06:18:01.407Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3109",
@@ -118,6 +110,17 @@
         "outcome": "completed",
         "reason": "Passed DoD row 4 evidence into row 5, waived only the unobservable lifecycle marker for containment-proven non-PR landings, preserved the agent-quiescence requirement, and added assembled MIN-305-shaped coverage; typecheck and focused tests pass.",
         "releasedAt": "2026-07-26T06:17:45.582Z"
+      },
+      {
+        "writerId": "agent-pan-3109",
+        "agentId": "agent-pan-3109",
+        "pid": 1998055,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T06:18:01.407Z",
+        "itemId": "docs-dod-containment",
+        "outcome": "completed",
+        "reason": "Documented the shared L2-work containment fallback and its zero-unmerged-ref rule in the DoD, documented the row-5 agent-quiescence condition, and identified gatherIssueBranchContainment as the single implementation in membership docs; the drift test passes.",
+        "releasedAt": "2026-07-26T06:19:19.777Z"
       }
     ],
     "statusReasons": {
@@ -132,6 +135,10 @@
       "post-merge-row-containment": {
         "reason": "Passed DoD row 4 evidence into row 5, waived only the unobservable lifecycle marker for containment-proven non-PR landings, preserved the agent-quiescence requirement, and added assembled MIN-305-shaped coverage; typecheck and focused tests pass.",
         "updatedAt": "2026-07-26T06:17:45.582Z"
+      },
+      "docs-dod-containment": {
+        "reason": "Documented the shared L2-work containment fallback and its zero-unmerged-ref rule in the DoD, documented the row-5 agent-quiescence condition, and identified gatherIssueBranchContainment as the single implementation in membership docs; the drift test passes.",
+        "updatedAt": "2026-07-26T06:19:19.777Z"
       }
     }
   },
@@ -153,6 +160,9 @@
     "post-merge-row-containment.post-merge-row-containment.ac2": "completed",
     "post-merge-row-containment.post-merge-row-containment.ac3": "completed",
     "post-merge-row-containment.post-merge-row-containment.ac4": "completed",
-    "docs-dod-containment": "running"
+    "docs-dod-containment": "completed",
+    "docs-dod-containment.docs-dod-containment.ac1": "completed",
+    "docs-dod-containment.docs-dod-containment.ac2": "completed",
+    "docs-dod-containment.docs-dod-containment.ac3": "completed"
   }
 }
