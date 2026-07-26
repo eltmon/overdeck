@@ -76,17 +76,68 @@ export function canStartUatTrainReconciler(): boolean {
   return identity.mode === 'primary' && resolve(identity.repoRoot) === projectRoot();
 }
 
-/** Ready set in merge order, sourced from review-status DB (no flywheel run required). */
-async function getReadySet(): Promise<ReadyFeature[] | null> {
-  const { computeMergeQueueFromCandidates, listEligibleCandidatesByProject, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
-  const root = projectRoot();
+function codenameLabel(features: readonly ReadyFeature[]): string {
+  const prefix = features[0]?.issueId.split('-')[0];
+  return (prefix ?? 'uat').toLowerCase();
+}
 
-  // PAN-1696: source candidates directly from review-status DB per project
-  const candidates = listEligibleCandidatesByProject(root);
+class PolyrepoAssemblyUnsupported extends Error {
+  constructor() {
+    super('polyrepo UAT assembly not yet supported');
+    this.name = 'PolyrepoAssemblyUnsupported';
+  }
+}
+
+/**
+ * PAN-1696 reconciler-decouple: Per-project cleanup function factory.
+ */
+function makeCleanupForProject(projectPath: string): () => Promise<void> {
+  return async () => {
+    await cleanupUatGenerations(projectPath, {
+      store: buildUatGenerationStore(),
+      ...buildUatGenerationCleanupGit(projectPath),
+      teardownStack: (gen) => teardownUatStack(gen),
+      log: (msg) => console.log(msg),
+    });
+  };
+}
+
+/** One reconciler pass. `force` rebuilds even when a live generation matches. */
+/**
+ * PAN-1696 reconciler-decouple: Internal per-project reconciler.
+ * Runs the UAT train reconciliation for a specific project.
+ */
+async function runUatTrainReconcileForProject(
+  projectPath: string,
+  options: { force?: boolean } = {},
+): Promise<ReconcileResult> {
+  const gitDeps = buildUatGenerationGitDeps(projectPath);
+  const { isMergeTrainEnabledForProject } = await import('../../../lib/overdeck/merge-sync.js');
+
+  return reconcileUatGenerations(projectPath, {
+    isEnabled: () => isMergeTrainEnabledForProject(projectPath),
+    getReadySet: () => getReadySetForProject(projectPath),
+    getMainHeadSha: () => gitDeps.fetchMain(),
+    getBranchHeadSha: (branch) => gitDeps.branchHeadSha(branch),
+    store: buildUatGenerationStore(),
+    assemble: (features) => assembleFromReadySetForProject(projectPath, features),
+    teardownStack: (gen) => teardownUatStack(gen),
+    cleanup: makeCleanupForProject(projectPath),
+    log: (msg) => console.log(msg),
+  }, options);
+}
+
+/**
+ * Get ready set for a specific project path.
+ */
+async function getReadySetForProject(projectPath: string): Promise<ReadyFeature[] | null> {
+  const { computeMergeQueueFromCandidates, listEligibleCandidatesByProject, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
+
+  const candidates = listEligibleCandidatesByProject(projectPath);
   if (candidates.length === 0) return [];
 
   const queue = await Effect.runPromise(
-    computeMergeQueueFromCandidates(candidates, root, {
+    computeMergeQueueFromCandidates(candidates, projectPath, {
       getPrUrl: resolveMergeQueuePrUrl,
     }).pipe(
       Effect.provide(nodeServicesLayer),
@@ -103,24 +154,15 @@ async function getReadySet(): Promise<ReadyFeature[] | null> {
   }));
 }
 
-
-function codenameLabel(features: readonly ReadyFeature[]): string {
-  const prefix = features[0]?.issueId.split('-')[0];
-  return (prefix ?? 'uat').toLowerCase();
-}
-
-class PolyrepoAssemblyUnsupported extends Error {
-  constructor() {
-    super('polyrepo UAT assembly not yet supported');
-    this.name = 'PolyrepoAssemblyUnsupported';
-  }
-}
-
-async function assembleFromReadySet(features: readonly ReadyFeature[]): Promise<UatGeneration> {
-  const root = projectRoot();
-
-  // PAN-1696: polyrepo assembly not yet supported. Gate before git operations and store writes.
-  const project = findProjectByPathSync(root);
+/**
+ * Assemble UAT generation for a specific project's ready set.
+ */
+async function assembleFromReadySetForProject(
+  projectPath: string,
+  features: readonly ReadyFeature[],
+): Promise<UatGeneration> {
+  const { findProjectByPathSync } = await import('../../../lib/projects.js');
+  const project = findProjectByPathSync(projectPath);
   if (project?.workspace?.type === 'polyrepo') {
     console.log(`[uat-train] polyrepo project type not supported for UAT assembly — skipping`);
     throw new PolyrepoAssemblyUnsupported();
@@ -129,46 +171,30 @@ async function assembleFromReadySet(features: readonly ReadyFeature[]): Promise<
   const store = buildUatGenerationStore();
   return assembleUatGeneration(
     {
-      projectRoot: root,
+      projectRoot: projectPath,
       label: codenameLabel(features),
       dateIso: new Date().toISOString(),
       features,
-      takenBranchNames: await listRemoteUatBranches(root),
+      takenBranchNames: await listRemoteUatBranches(projectPath),
     },
     {
-      git: buildUatGenerationGitDeps(root),
+      git: buildUatGenerationGitDeps(projectPath),
       store,
-      resolveConflict: buildConflictAgentHook(),
-      log: (msg) => console.log(msg),
+      buildCleanup: () => buildUatGenerationCleanupGit(projectPath),
+      buildConflictHook: () => buildConflictAgentHook(projectPath),
     },
   );
 }
 
-async function runCleanup(): Promise<void> {
-  const root = projectRoot();
-  await cleanupUatGenerations(root, {
-    store: buildUatGenerationStore(),
-    ...buildUatGenerationCleanupGit(root),
-    teardownStack: (gen) => teardownUatStack(gen),
-    log: (msg) => console.log(msg),
-  });
-}
-
-/** One reconciler pass. `force` rebuilds even when a live generation matches. */
+/**
+ * PAN-1696 reconciler-decouple: Legacy entry point for backward compatibility.
+ * Now delegates to per-project reconciliation for all tracked projects.
+ */
 export async function runUatTrainReconcile(options: { force?: boolean } = {}): Promise<ReconcileResult> {
   const root = projectRoot();
-  const gitDeps = buildUatGenerationGitDeps(root);
-  return reconcileUatGenerations(root, {
-    isEnabled: () => isMergeTrainEnabled(),
-    getReadySet,
-    getMainHeadSha: () => gitDeps.fetchMain(),
-    getBranchHeadSha: (branch) => gitDeps.branchHeadSha(branch),
-    store: buildUatGenerationStore(),
-    assemble: assembleFromReadySet,
-    teardownStack: (gen) => teardownUatStack(gen),
-    cleanup: runCleanup,
-    log: (msg) => console.log(msg),
-  }, options);
+  // For backward compatibility, when called without a specific project,
+  // run the reconciler for the primary project (Overdeck repo itself).
+  return runUatTrainReconcileForProject(root, options);
 }
 
 let reconcilerTimer: ReturnType<typeof setInterval> | null = null;
