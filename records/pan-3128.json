@@ -42,9 +42,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T13:46:53.993Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T13:51Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T13:51:56.785Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T13:51:56Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3128\n\nCanonical reload now deletes and replaces the active primary worktree's node_modules, breaking WIP isolation and potentially retargeting workspace links to local sources.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3128 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/__tests__/reload.test.ts",
@@ -84,10 +97,10 @@
     "recordedAt": "2026-07-26T13:30:54.544Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T13:46:53.993Z",
+  "updated": "2026-07-26T13:51:56.785Z",
   "pipeline": {
     "issueId": "PAN-3128",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -95,8 +108,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:31:33.728Z",
-    "updatedAt": "2026-07-26T13:46:52.958Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3128-review",
+    "updatedAt": "2026-07-26T13:51:56.117Z",
+    "reviewNotes": "Canonical reload now deletes and replaces the active primary worktree's node_modules, breaking WIP isolation and potentially retargeting workspace links to local sources.",
     "inspectNotes": "All 5 ACs verified: installAndBuild only ever receives the detached worktree (asserted across clean/dirty/ahead/behind); dirty + HEAD-divergence emit notes and continue; build failure propagates with 'old dashboard left running' -> exitCode 1 and removes worktree + dist.incoming in finally; grep merge-base on reload.ts returns no matches; typecheck clean and build-from-origin.test.ts 7/7 pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3141",
     "reviewSpawnedAt": "2026-07-26T13:46:52.957Z",
@@ -144,9 +157,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1040673,
-            "output": 61835,
-            "cacheRead": 8999424,
+            "input": 1807580,
+            "output": 136521,
+            "cacheRead": 19783680,
             "cacheWrite": 0
           }
         },
@@ -161,15 +174,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2220352,
-          "output": 255134,
-          "cacheRead": 72346624,
+          "input": 2987259,
+          "output": 329820,
+          "cacheRead": 83130880,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 54.929092,
-        "pricingAsOf": "2026-07-26T13:46:52.968Z"
+        "usd": 66.396335,
+        "pricingAsOf": "2026-07-26T13:51:56.158Z"
       }
     },
     "merges": [
