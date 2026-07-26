@@ -104,10 +104,10 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T14:01:12.645Z",
+  "updated": "2026-07-26T14:01:14.406Z",
   "pipeline": {
     "issueId": "PAN-3135",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -115,8 +115,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:54:56.619Z",
-    "updatedAt": "2026-07-26T14:01:12.609Z",
-    "reviewNotes": "Deferred verification can bypass required quality gates, and deferred merges lose retry scheduling.",
+    "updatedAt": "2026-07-26T14:01:13.386Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3135-review",
     "inspectNotes": "All 4 ACs met. verification-runner.ts:387-395 gates on readPendingDeploy() before the verificationStatus:'running' write at :409, writes 'pending' + a note naming requestedAt, and self-excludes when status is already 'running'. verification-worker-supervisor.ts:140-144 sits AFTER the live-worker waitForResult join at :137, so a queued deploy blocks only new worker spawns. FOLLOW-UP FOR A LATER BEAD (outside these ACs): request-review-pipeline.ts:31-38 only branches on 'failed'/'error', so a 'deferred' outcome currently falls through to pushBranch()+dispatchReview() and advances to review as if it passed — consumers must be taught to halt on 'deferred'.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3142",
     "lastVerifiedCommit": "27f89adb9576474823407bf0fba3f7d03d8d46e2",
@@ -244,7 +244,7 @@
       },
       "costAtCloseOut": {
         "usd": 130.782226,
-        "pricingAsOf": "2026-07-26T14:01:12.631Z"
+        "pricingAsOf": "2026-07-26T14:01:13.405Z"
       }
     },
     "merges": [
