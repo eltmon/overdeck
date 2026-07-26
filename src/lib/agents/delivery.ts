@@ -16,6 +16,7 @@ import {
 } from '../agents.js';
 import { getAgentRuntimeState } from './runtime-state.js';
 import { isPaneDead, sendKeys, sessionExists } from '../tmux.js';
+import { completeKeyedSubmit, sendKeysDedup } from '../tmux-dedup.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
 import {
@@ -32,7 +33,30 @@ export type DeliveryResult = {
   ok: boolean;
   path: 'app-server' | 'acp' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
   failure?: string;
+  /** True when the delivery was suppressed by the keyed dedup record — the
+   * side effect already happened on an earlier call with the same key. */
+  deduplicated?: boolean;
 };
+
+export interface DeliverAgentMessageOptions {
+  /**
+   * Idempotency key (PAN-2997). Keyed deliveries are deduplicated by the
+   * crash-independent delivery component, not by dashboard-side state: the
+   * PTY supervisor reserves the key synchronously before injecting and
+   * completes it only after the content-plus-Enter injection succeeds, and
+   * the tmux fallback keeps a two-phase (pending/terminal) per-session marker
+   * owned by the tmux server across the whole paste-settle-submit
+   * transaction. A dashboard crash anywhere in those flows can therefore
+   * neither lose nor duplicate a keyed message.
+   *
+   * Keyed payloads are ONLY routed through those two tiers. The
+   * app-server/ACP/Channels tiers acknowledge receipt without enforcing the
+   * key, so they are skipped in auto mode and rejected when requested
+   * explicitly — a crash after their visible side effect but before the
+   * caller's acknowledgment would otherwise replay the wake.
+   */
+  dedupKey?: string;
+}
 
 /**
  * PAN-1988: resume / feedback / continue delivery must be RESILIENT. When an agent is pinned to
@@ -114,6 +138,40 @@ function readAcpTokenSync(agentId: string): string | null {
 }
 
 /**
+ * A non-2xx RESPONSE from a protocol host. The host answered, so the outcome
+ * is definitive: for a keyed supervisor request a 502 means the injection
+ * failed and was purged and the key was never recorded — unlike a lost
+ * response, this is safe to fall back from.
+ */
+export class SocketPostStatusError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'SocketPostStatusError';
+    this.status = status;
+  }
+}
+
+/**
+ * Thrown when a keyed delivery's outcome is UNKNOWN: the keyed supervisor
+ * request was sent but no response came back (timeout, reset, dropped
+ * connection), so the injection may have completed. Crossing to the tmux
+ * tier with the same key would risk a second visible delivery, because the
+ * supervisor and tmux keep INDEPENDENT dedup stores. The caller's recovery
+ * must retry the same key at the same tier — the supervisor's in-flight
+ * reservation and delivered set deduplicate the retry (PAN-2997 cycle 8).
+ */
+export class AmbiguousKeyedDeliveryError extends Error {
+  constructor(agentId: string, caller: string, reason: string) {
+    super(
+      `MessageDeliveryFailed: ambiguous keyed delivery for ${agentId} (${caller}): ${reason} — ` +
+      'the supervisor may have completed the injection; NOT crossing to the tmux tier with the same key',
+    );
+    this.name = 'AmbiguousKeyedDeliveryError';
+  }
+}
+
+/**
  * POST a JSON body to a Unix-domain socket using node:net + a hand-rolled
  * minimal HTTP/1.1 request. Resolves on a 200-class response, rejects on any
  * error including socket-not-found, connection refused, an optional client
@@ -176,7 +234,7 @@ async function postUnixSocketJson(
             finishOk({ status, body: responseBody });
             return;
           }
-          finishErr(new Error(`socket POST: status ${status}: ${responseBody.slice(0, 100)}`));
+          finishErr(new SocketPostStatusError(status, `socket POST: status ${status}: ${responseBody.slice(0, 100)}`));
         });
       },
     );
@@ -206,8 +264,10 @@ export async function deliverAgentMessage(
   message: string,
   caller: string = 'unknown',
   deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux',
+  opts: DeliverAgentMessageOptions = {},
 ): Promise<DeliveryResult> {
   const normalizedId = normalizeAgentId(agentId);
+  const dedupKey = opts.dedupKey;
 
   let channelsEnabled = false;
   let resolvedMethod = deliveryMethod;
@@ -225,6 +285,13 @@ export async function deliverAgentMessage(
     throw new Error(
       `MessageDeliveryFailed: ACP delivery failed for ${normalizedId} (${caller}): ACP requires authenticated host RPC delivery`,
     );
+  }
+
+  // Keyed deliveries take a dedicated, narrower cascade: only the tiers whose
+  // crash-independent component enforces the key across the complete side
+  // effect. Everything below this branch is the unkeyed cascade.
+  if (dedupKey !== undefined) {
+    return deliverKeyedAgentMessage(normalizedId, message, caller, resolvedMethod ?? 'auto', isAcpTarget, dedupKey);
   }
 
   if (resolvedMethod === 'tmux') {
@@ -317,7 +384,7 @@ export async function deliverAgentMessage(
         // worst-case injection budget. Abandoning the POST mid-injection would
         // fire the tmux fallback while the supervisor is still writing and
         // re-create the duplicate-writer race PAN-1769 fixed.
-        await postUnixSocketJson(
+        const supervisorResponse = await postUnixSocketJson(
           supervisorSocketPath,
           { content: message, meta: { caller } },
           supervisorInjectionBudgetMs(message.length) + SUPERVISOR_CLIENT_MARGIN_MS,
@@ -390,6 +457,120 @@ export async function deliverAgentMessage(
   await assertTmuxTargetCanReceive(normalizedId, caller);
   await Effect.runPromise(sendKeys(normalizedId, message));
   return { ok: true, path: 'tmux' };
+}
+
+/**
+ * Keyed delivery cascade (PAN-2997). Only two tiers may carry a keyed
+ * message, because only their crash-independent components enforce the key
+ * across the COMPLETE visible side effect:
+ *
+ * - the PTY supervisor reserves the key synchronously (closing the concurrent
+ *   same-key race) and completes it only after its single-request
+ *   content-plus-Enter injection succeeds; and
+ * - the tmux fallback keeps two-phase pending/terminal session markers owned
+ *   by the tmux server across paste, settle, and submit.
+ *
+ * App-server, ACP, and Channels acknowledge receipt without enforcing the
+ * key, so they are never used for keyed payloads: a dashboard crash after
+ * their side effect but before the caller's acknowledgment would replay the
+ * wake. Explicitly requesting one of them with a key is a loud error, not a
+ * silent downgrade.
+ */
+async function deliverKeyedAgentMessage(
+  normalizedId: string,
+  message: string,
+  caller: string,
+  resolvedMethod: 'auto' | 'supervisor' | 'channels' | 'tmux',
+  isAcpTarget: boolean,
+  dedupKey: string,
+): Promise<DeliveryResult> {
+  if (isAcpTarget) {
+    throw new Error(
+      `MessageDeliveryFailed: keyed delivery failed for ${normalizedId} (${caller}): the ACP tier cannot enforce a dedup key`,
+    );
+  }
+  if (resolvedMethod === 'channels') {
+    throw new Error(
+      `MessageDeliveryFailed: keyed delivery failed for ${normalizedId} (${caller}): the Channels tier cannot enforce a dedup key`,
+    );
+  }
+  if (resolvedMethod === 'tmux') {
+    return deliverKeyedViaTmux(normalizedId, message, caller, dedupKey);
+  }
+
+  let supervisorFailure: string | undefined;
+  const supervisorSocketPath = join(overdeckHomeForSockets(), 'sockets', `pty-${normalizedId}.sock`);
+  const ptyToken = await readPtyToken(normalizedId);
+  if (!existsSync(supervisorSocketPath)) {
+    supervisorFailure = 'socket-missing';
+  } else if (!ptyToken) {
+    supervisorFailure = 'pty-token-missing';
+  } else {
+    try {
+      // The client deadline must remain above the supervisor's payload-aware
+      // worst-case injection budget. Abandoning the POST mid-injection would
+      // fire the tmux fallback while the supervisor is still writing and
+      // re-create the duplicate-writer race PAN-1769 fixed.
+      const supervisorResponse = await postUnixSocketJson(
+        supervisorSocketPath,
+        { content: message, meta: { caller }, dedupKey },
+        supervisorInjectionBudgetMs(message.length) + SUPERVISOR_CLIENT_MARGIN_MS,
+        ptyToken,
+        PTY_TOKEN_HEADER,
+      );
+      await appendChannelDeliveryLog(normalizedId, { path: 'supervisor', caller });
+      let deduplicated = false;
+      try {
+        deduplicated = (JSON.parse(supervisorResponse.body) as { deduplicated?: boolean }).deduplicated === true;
+      } catch {
+        // Legacy supervisor build without dedup support — treat as delivered.
+      }
+      return { ok: true, path: 'supervisor', deduplicated };
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      if (!(err instanceof SocketPostStatusError)) {
+        // AMBIGUOUS (cycle 8): no response came back, so the supervisor may
+        // have completed the injection. The tmux tier keeps an INDEPENDENT
+        // key store, so crossing to it with the same key could submit a
+        // second visible wake. Stay with the same delivery owner: the
+        // caller's recovery retries the same key at the supervisor, whose
+        // in-flight reservation/delivered set deduplicates the retry.
+        throw new AmbiguousKeyedDeliveryError(normalizedId, caller, reason);
+      }
+      // A received non-2xx (e.g. 502 echo-confirm failure after purge) is a
+      // DEFINITIVE failure: the supervisor answered, recorded no key, and
+      // erased its partial write — safe to fall through to keyed tmux.
+      supervisorFailure = `socket-post-failed: ${reason}`;
+    }
+  }
+
+  if (resolvedMethod === 'supervisor') {
+    throw new Error(`MessageDeliveryFailed: PTY supervisor delivery failed for ${normalizedId} (${caller}): ${supervisorFailure}`);
+  }
+
+  await appendChannelDeliveryLog(normalizedId, { path: 'tmux', reason: supervisorFailure, caller });
+  const result = await deliverKeyedViaTmux(normalizedId, message, caller, dedupKey);
+  return { ...result, failure: supervisorFailure };
+}
+
+/**
+ * Keyed tmux delivery: paste under the two-phase marker protocol, then
+ * complete the submit. A replay that finds the pending marker completes the
+ * prior attempt's submission WITHOUT re-pasting; a terminal marker suppresses
+ * the replay entirely.
+ */
+async function deliverKeyedViaTmux(
+  normalizedId: string,
+  message: string,
+  caller: string,
+  dedupKey: string,
+): Promise<DeliveryResult> {
+  await assertTmuxTargetCanReceive(normalizedId, caller);
+  const phase = await sendKeysDedup(normalizedId, message, dedupKey, caller);
+  if (phase !== 'deduplicated') {
+    await completeKeyedSubmit(normalizedId, dedupKey);
+  }
+  return { ok: true, path: 'tmux', deduplicated: phase === 'deduplicated' };
 }
 
 /**

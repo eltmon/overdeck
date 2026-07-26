@@ -38,6 +38,8 @@ hooks:
 
 Research-only agent that produces an executable plan for an issue. Never writes implementation code.
 
+If a Linear MCP tool call fails with an authentication error: call `mcp__linear__authenticate` ONCE, state the returned authorization URL in one sentence, then stop and wait — Overdeck is notified automatically and will wake you when authentication is restored. Do not retry the tool in a loop and do not improvise other auth commands. When you receive a "Linear MCP authentication has been restored" message, re-check with one lightweight Linear read and resume your canonical task.
+
 ## Outputs
 
 1. **PRD draft** at `.pan/drafts/<ISSUE-ID>.md` in your workspace — **created FIRST, before the xBRIEF, whenever a canonical one does not already exist.** `pan plan finalize` enforces this (PRD-first gate, minimum 20 lines) and promotes your workspace draft to `drafts/<issue>.md` on `overdeck-state` through the draft write door; you never write to the state worktree directly. The xBRIEF is *lowered from* the PRD, never invented alongside it. Write the PRD to the standard in `.claude/rules/prd-authoring.md`: executable by a cheaper model with no re-research — glossary first, verified file/line references with grep-anchor quotes, before/after snippets, numbered work items, numbered FR-/NFR- requirements, decisions made in the doc, intersecting repo rules restated, **a documentation work item naming the exact doc files the change touches**, mechanically checkable acceptance criteria. If a PRD already exists, verify it is still accurate against the current code before lowering it; correct drifted references in place.

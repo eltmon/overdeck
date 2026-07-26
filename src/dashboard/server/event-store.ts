@@ -57,6 +57,13 @@ export interface EventStore {
   queryByType(type: string, limit?: number): StoredEvent[];
   /** Return the latest event per payload.issueId for a given event type. */
   queryLatestPerIssue(type: string): StoredEvent[];
+  /**
+   * Return events whose type is in `types` and whose sequence is greater than
+   * `afterSequence`, oldest first. The type predicate and the sequence bound
+   * are both applied in SQL, so callers reconstructing a typed projection
+   * never materialize unrelated retained history the way `readFrom(0)` does.
+   */
+  queryByTypesSince(types: string[], afterSequence: number): StoredEvent[];
   /** Subscribe to live events. Returns an unsubscribe function. */
   subscribe(fn: EventSubscriber): Unsubscribe;
   /** Run 7-day retention compaction. Called at startup. */
@@ -345,6 +352,19 @@ export function createEventStore(db: DbAdapter): EventStore {
     return queryLatestPerIssueStmt.all([type]).map(rowToStored);
   }
 
+  function queryByTypesSince(types: string[], afterSequence: number): StoredEvent[] {
+    if (types.length === 0) return [];
+    // The IN-list arity varies per call, so this statement is prepared per
+    // call — still an indexed type/sequence lookup, and polls typically
+    // return zero rows.
+    const placeholders = types.map(() => '?').join(', ');
+    const stmt = db.prepare<EventRow>(
+      `SELECT sequence, type, timestamp, payload FROM events WHERE sequence > ? AND type IN (${placeholders}) ORDER BY sequence ASC`,
+    );
+    const rows = stmt.all([afterSequence, ...types]);
+    return rows.map(rowToStored);
+  }
+
   function emitStored(event: StoredEvent): void {
     emitter.emit('event', event);
   }
@@ -356,6 +376,7 @@ export function createEventStore(db: DbAdapter): EventStore {
     readFrom,
     queryByType,
     queryLatestPerIssue,
+    queryByTypesSince,
     subscribe,
     compact,
     purgeType,

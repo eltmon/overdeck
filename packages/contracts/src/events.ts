@@ -594,6 +594,60 @@ export const OperatorInterventionEvent = Schema.Struct({
 })
 export type OperatorInterventionEvent = typeof OperatorInterventionEvent.Type
 
+export const LinearMcpAuthRequiredEvent = Schema.Struct({
+  type: Schema.Literal("linear_mcp_auth.required"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: Schema.String,
+    issueId: Schema.NullOr(Schema.String),
+    authUrl: Schema.NullOr(Schema.String),
+    expiresAt: Schema.NullOr(Schema.String),
+  }),
+})
+export type LinearMcpAuthRequiredEvent = typeof LinearMcpAuthRequiredEvent.Type
+
+export const LinearMcpAuthHealthyEvent = Schema.Struct({
+  type: Schema.Literal("linear_mcp_auth.healthy"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: Schema.String,
+    issueId: Schema.NullOr(Schema.String),
+    source: Schema.Literals(["hook", "operator"]),
+  }),
+})
+export type LinearMcpAuthHealthyEvent = typeof LinearMcpAuthHealthyEvent.Type
+
+export const LinearMcpAuthNotifiedEvent = Schema.Struct({
+  type: Schema.Literal("linear_mcp_auth.notified"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: Schema.String,
+    issueId: Schema.NullOr(Schema.String),
+    // 'delivering' is the durable pre-delivery claim (PAN-2997 review cycle
+    // 3): it makes the wake crash-idempotent — a crash after the claim never
+    // replays the delivery at boot recovery. lifecycleId correlates this
+    // record to the lifecycle whose wake pass produced it; absent only in
+    // events written before PAN-2997 review cycle 2.
+    outcome: Schema.Literals(["delivering", "delivered", "queued", "failed"]),
+    lifecycleId: Schema.optional(Schema.String),
+  }),
+})
+export type LinearMcpAuthNotifiedEvent = typeof LinearMcpAuthNotifiedEvent.Type
+
+export const LinearMcpAuthCallbackRelayedEvent = Schema.Struct({
+  type: Schema.Literal("linear_mcp_auth.callback_relayed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: Schema.String,
+    issueId: Schema.NullOr(Schema.String),
+  }),
+})
+export type LinearMcpAuthCallbackRelayedEvent = typeof LinearMcpAuthCallbackRelayedEvent.Type
+
 export const SubstrateBugFiledEvent = Schema.Struct({
   type: Schema.Literal("substrate.bug_filed"),
   sequence: SequenceNumber,
@@ -1229,6 +1283,10 @@ export const DomainEvent = Schema.Union([
   PipelineVerificationFailedEvent,
   IssueTransitionedEvent,
   OperatorInterventionEvent,
+  LinearMcpAuthRequiredEvent,
+  LinearMcpAuthHealthyEvent,
+  LinearMcpAuthNotifiedEvent,
+  LinearMcpAuthCallbackRelayedEvent,
   SubstrateBugFiledEvent,
   ReviewReviewerStartedEvent,
   ReviewReviewerCompletedEvent,

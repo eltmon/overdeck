@@ -8,9 +8,14 @@
  * accepts a bad enum value).
  */
 
-import { Schema } from 'effect'
+import { Effect, Schema, Stream } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { DomainEvent } from '@overdeck/contracts'
+import { emitAgentRuntimeEvent } from '../../src/dashboard/server/routes/agents/runtime-events'
+import {
+  AgentStateService,
+  type AgentStateServiceShape,
+} from '../../src/dashboard/server/services/agent-state-service'
 import { bodyToEvent } from '../../src/dashboard/server/services/agent-event-utils'
 
 const AGENT = 'agent-800'
@@ -20,6 +25,34 @@ const decode = Schema.decodeUnknownResult(DomainEvent)
 function decodeCandidate(raw: Record<string, unknown> | null) {
   if (!raw) return null
   return decode({ ...raw, sequence: 0 })
+}
+
+function makeAgentStateService(emitted: Array<Omit<DomainEvent, 'sequence'>>): AgentStateServiceShape {
+  const snapshot = {
+    id: AGENT,
+    activity: 'idle' as const,
+    lastActivity: TS,
+    currentIssue: 'PAN-2997',
+    updatedAtSequence: 1,
+  }
+  return {
+    get: () => Effect.succeed(snapshot),
+    getAll: Effect.succeed({ [AGENT]: snapshot }),
+    changes: Stream.empty,
+    emit: event => Effect.sync(() => {
+      emitted.push(event)
+    }),
+  }
+}
+
+async function runHeartbeat(body: Record<string, unknown>) {
+  const emitted: Array<Omit<DomainEvent, 'sequence'>> = []
+  const result = await Effect.runPromise(
+    emitAgentRuntimeEvent(AGENT, body, TS).pipe(
+      Effect.provideService(AgentStateService, makeAgentStateService(emitted)),
+    ),
+  )
+  return { emitted, result }
 }
 
 describe('PAN-800 bodyToEvent + DomainEvent decode', () => {
@@ -60,6 +93,55 @@ describe('PAN-800 bodyToEvent + DomainEvent decode', () => {
       sessionModel: 'claude-opus-4-7',
       sessionHarness: 'claude-code',
     })
+  })
+
+  it('linear_mcp_auth_required → Schema-valid event with resolved issue attribution', async () => {
+    const { emitted, result } = await runHeartbeat({
+      kind: 'linear_mcp_auth_required',
+      authUrl: 'https://linear.app/oauth/authorize?state=test',
+      expiresAt: '2026-04-22T06:30:00.000Z',
+    })
+
+    expect(result).toEqual({ ok: true, emitted: true })
+    expect(emitted).toEqual([{
+      sequence: 0,
+      type: 'linear_mcp_auth.required',
+      timestamp: TS,
+      payload: {
+        agentId: AGENT,
+        issueId: 'PAN-2997',
+        authUrl: 'https://linear.app/oauth/authorize?state=test',
+        expiresAt: '2026-04-22T06:30:00.000Z',
+      },
+    }])
+  })
+
+  it('linear_mcp_auth_healthy → Schema-valid hook event with resolved issue attribution', async () => {
+    const { emitted, result } = await runHeartbeat({ kind: 'linear_mcp_auth_healthy' })
+
+    expect(result).toEqual({ ok: true, emitted: true })
+    expect(emitted).toEqual([{
+      sequence: 0,
+      type: 'linear_mcp_auth.healthy',
+      timestamp: TS,
+      payload: {
+        agentId: AGENT,
+        issueId: 'PAN-2997',
+        source: 'hook',
+      },
+    }])
+  })
+
+  it('rejects a malformed Linear MCP auth heartbeat with 400 and emits nothing', async () => {
+    const { emitted, result } = await runHeartbeat({
+      kind: 'linear_mcp_auth_required',
+      authUrl: 42,
+    })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected malformed heartbeat to be rejected')
+    expect(result.response.status).toBe(400)
+    expect(emitted).toEqual([])
   })
 
   it('unknown kind → null (no emit)', () => {

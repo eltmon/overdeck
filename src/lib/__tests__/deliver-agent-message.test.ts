@@ -34,6 +34,17 @@ vi.mock('../tmux.js', () => ({
   waitForClaudePrompt: vi.fn(async () => true),
 }));
 
+vi.mock('../tmux-dedup.js', () => ({
+  sendKeysDedup: vi.fn(async () => 'pasted'),
+  completeKeyedSubmit: vi.fn(async () => undefined),
+  KeyedSubmitTargetDeadError: class KeyedSubmitTargetDeadError extends Error {
+    constructor(sessionName: string, dedupKey: string) {
+      super(`dead pane for ${sessionName} key ${dedupKey}`);
+      this.name = 'KeyedSubmitTargetDeadError';
+    }
+  },
+}));
+
 vi.mock('../paths.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
@@ -74,6 +85,9 @@ interface FakeBridgeOptions {
   status: number;
   body: string;
   delayMs?: number;
+  /** Accept the request, then destroy the connection WITHOUT responding —
+   * simulates a lost/reset response after possible server-side acceptance. */
+  drop?: boolean;
   capture?: { lastBody?: string; lastHeaders?: Record<string, string> };
 }
 
@@ -120,7 +134,9 @@ function startFakeBridge(socketPath: string, opts: FakeBridgeOptions): Promise<N
             opts.body;
           sock.end(resp);
         };
-        if (opts.delayMs) {
+        if (opts.drop) {
+          sock.destroy();
+        } else if (opts.delayMs) {
           setTimeout(respond, opts.delayMs);
         } else {
           respond();
@@ -525,6 +541,170 @@ describe('channel bridge delivery', () => {
     } finally {
       await new Promise<void>((r) => server.close(() => r()));
     }
+  });
+
+  it('threads dedupKey to the supervisor and surfaces deduplication (PAN-2997)', async () => {
+    const agentId = 'agent-dedup';
+    writeAgentState(agentId, { channelsEnabled: false });
+    await writePtyToken(agentId);
+    const socketPath = join(socketDir, `pty-${agentId}.sock`);
+    const capture: { lastBody?: string } = {};
+    const server = await startFakeBridge(socketPath, {
+      status: 200,
+      body: JSON.stringify({ ok: true, deduplicated: true }),
+      capture,
+    });
+    try {
+      const result = await deliverAgentMessage(agentId, 'wake', 'caller-wake', undefined, { dedupKey: 'wake:seq-1' });
+      expect(result).toEqual({ ok: true, path: 'supervisor', deduplicated: true });
+      expect(JSON.parse(capture.lastBody!)).toMatchObject({
+        content: 'wake',
+        dedupKey: 'wake:seq-1',
+      });
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('uses the two-phase tmux dedup path for keyed tmux deliveries (PAN-2997)', async () => {
+    const agentId = 'agent-dedup-tmux';
+    writeAgentState(agentId, { channelsEnabled: false, deliveryMethod: 'tmux' });
+    const { sendKeysDedup, completeKeyedSubmit } = await import('../tmux-dedup.js');
+    vi.mocked(sendKeysDedup).mockClear();
+    vi.mocked(completeKeyedSubmit).mockClear();
+
+    const result = await deliverAgentMessage(agentId, 'wake', 'caller-wake', 'tmux', { dedupKey: 'wake:seq-1' });
+
+    expect(result).toEqual({ ok: true, path: 'tmux', deduplicated: false });
+    expect(vi.mocked(sendKeysDedup)).toHaveBeenCalledWith(agentId, 'wake', 'wake:seq-1', 'caller-wake');
+    expect(vi.mocked(completeKeyedSubmit)).toHaveBeenCalledWith(agentId, 'wake:seq-1');
+  });
+
+  it('completes a crashed pending tmux submission WITHOUT re-pasting (PAN-2997 cycle 7)', async () => {
+    const agentId = 'agent-dedup-tmux-pending';
+    writeAgentState(agentId, { channelsEnabled: false, deliveryMethod: 'tmux' });
+    const { sendKeysDedup, completeKeyedSubmit } = await import('../tmux-dedup.js');
+    vi.mocked(sendKeysDedup).mockClear();
+    vi.mocked(completeKeyedSubmit).mockClear();
+    vi.mocked(sendKeysDedup).mockResolvedValueOnce('submit-pending');
+
+    const result = await deliverAgentMessage(agentId, 'wake', 'caller-wake', 'tmux', { dedupKey: 'wake:seq-1' });
+
+    expect(result).toEqual({ ok: true, path: 'tmux', deduplicated: false });
+    expect(vi.mocked(completeKeyedSubmit)).toHaveBeenCalledWith(agentId, 'wake:seq-1');
+  });
+
+  it('sends no Enter when the tmux dedup path reports a prior delivery (PAN-2997)', async () => {
+    const agentId = 'agent-dedup-tmux-replay';
+    writeAgentState(agentId, { channelsEnabled: false, deliveryMethod: 'tmux' });
+    const { sendKeysDedup, completeKeyedSubmit } = await import('../tmux-dedup.js');
+    vi.mocked(sendKeysDedup).mockClear();
+    vi.mocked(completeKeyedSubmit).mockClear();
+    vi.mocked(sendKeysDedup).mockResolvedValueOnce('deduplicated');
+
+    const result = await deliverAgentMessage(agentId, 'wake', 'caller-wake', 'tmux', { dedupKey: 'wake:seq-1' });
+
+    expect(result).toEqual({ ok: true, path: 'tmux', deduplicated: true });
+    expect(vi.mocked(completeKeyedSubmit)).not.toHaveBeenCalled();
+  });
+
+  it('keyed deliveries SKIP the Channels tier in auto mode and land on keyed tmux (PAN-2997 cycle 7)', async () => {
+    const agentId = 'agent-dedup-channels-skip';
+    writeAgentState(agentId, { channelsEnabled: true });
+    // No supervisor socket — auto mode would normally fall to Channels, which
+    // acknowledges without enforcing the key. The keyed cascade must bypass it.
+    const channelSocketPath = join(socketDir, `agent-${agentId}.sock`);
+    const channelCapture: { lastBody?: string } = {};
+    const channelServer = await startFakeBridge(channelSocketPath, { status: 200, body: 'ok', capture: channelCapture });
+    const { sendKeysDedup, completeKeyedSubmit } = await import('../tmux-dedup.js');
+    vi.mocked(sendKeysDedup).mockClear();
+    vi.mocked(completeKeyedSubmit).mockClear();
+    try {
+      const result = await deliverAgentMessage(agentId, 'wake', 'caller-wake', undefined, { dedupKey: 'wake:seq-1' });
+
+      expect(result).toMatchObject({ ok: true, path: 'tmux', deduplicated: false });
+      expect(channelCapture.lastBody).toBeUndefined();
+      expect(vi.mocked(sendKeysDedup)).toHaveBeenCalledWith(agentId, 'wake', 'wake:seq-1', 'caller-wake');
+      expect(vi.mocked(completeKeyedSubmit)).toHaveBeenCalledWith(agentId, 'wake:seq-1');
+    } finally {
+      await new Promise<void>((r) => channelServer.close(() => r()));
+    }
+  });
+
+  it('rejects an explicit keyed Channels request instead of delivering unenforced (PAN-2997 cycle 7)', async () => {
+    const agentId = 'agent-dedup-channels-explicit';
+    writeAgentState(agentId, { channelsEnabled: true });
+
+    await expect(
+      deliverAgentMessage(agentId, 'wake', 'caller-wake', 'channels', { dedupKey: 'wake:seq-1' }),
+    ).rejects.toThrow(/Channels tier cannot enforce a dedup key/);
+  });
+
+  it('rejects keyed delivery to an ACP target (PAN-2997 cycle 7)', async () => {
+    const agentId = 'agent-dedup-acp';
+    writeAgentState(agentId, { harness: 'acp' });
+
+    await expect(
+      deliverAgentMessage(agentId, 'wake', 'caller-wake', undefined, { dedupKey: 'wake:seq-1' }),
+    ).rejects.toThrow(/ACP tier cannot enforce a dedup key/);
+  });
+
+  it('does NOT cross to tmux when the keyed supervisor response is lost (ambiguous — cycle 8)', async () => {
+    const agentId = 'agent-dedup-ambiguous';
+    writeAgentState(agentId, { channelsEnabled: false });
+    await writePtyToken(agentId);
+    const socketPath = join(socketDir, `pty-${agentId}.sock`);
+    const capture: { lastBody?: string } = {};
+    // The bridge accepts the keyed request (so the supervisor MAY have
+    // injected) and then drops the connection without a response.
+    const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', drop: true, capture });
+    const { sendKeysDedup } = await import('../tmux-dedup.js');
+    vi.mocked(sendKeysDedup).mockClear();
+    try {
+      await expect(
+        deliverAgentMessage(agentId, 'wake', 'caller-wake', undefined, { dedupKey: 'wake:seq-1' }),
+      ).rejects.toThrow(/ambiguous keyed delivery/);
+      // The request reached the supervisor…
+      expect(capture.lastBody).toBeDefined();
+      // …and the tmux tier — with its independent key store — was never touched.
+      expect(vi.mocked(sendKeysDedup)).not.toHaveBeenCalled();
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('falls back to keyed tmux on a DEFINITIVE supervisor 502 (response received — cycle 8)', async () => {
+    const agentId = 'agent-dedup-definitive';
+    writeAgentState(agentId, { channelsEnabled: false });
+    await writePtyToken(agentId);
+    const socketPath = join(socketDir, `pty-${agentId}.sock`);
+    const server = await startFakeBridge(socketPath, { status: 502, body: 'input echo confirmation failed' });
+    const { sendKeysDedup, completeKeyedSubmit } = await import('../tmux-dedup.js');
+    vi.mocked(sendKeysDedup).mockClear();
+    vi.mocked(completeKeyedSubmit).mockClear();
+    try {
+      const result = await deliverAgentMessage(agentId, 'wake', 'caller-wake', undefined, { dedupKey: 'wake:seq-1' });
+
+      expect(result).toMatchObject({ ok: true, path: 'tmux', deduplicated: false });
+      expect(result.failure).toContain('502');
+      expect(vi.mocked(sendKeysDedup)).toHaveBeenCalledWith(agentId, 'wake', 'wake:seq-1', 'caller-wake');
+      expect(vi.mocked(completeKeyedSubmit)).toHaveBeenCalledWith(agentId, 'wake:seq-1');
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('propagates a dead-pane keyed submit failure instead of acknowledging delivery (cycle 9)', async () => {
+    const agentId = 'agent-dedup-dead-pane';
+    writeAgentState(agentId, { channelsEnabled: false, deliveryMethod: 'tmux' });
+    const { completeKeyedSubmit, KeyedSubmitTargetDeadError } = await import('../tmux-dedup.js');
+    vi.mocked(completeKeyedSubmit).mockRejectedValueOnce(
+      new (KeyedSubmitTargetDeadError as unknown as new (s: string, k: string) => Error)(agentId, 'wake:seq-1'),
+    );
+
+    await expect(
+      deliverAgentMessage(agentId, 'wake', 'caller-wake', 'tmux', { dedupKey: 'wake:seq-1' }),
+    ).rejects.toThrow(/dead pane/);
   });
 
   it('codex work agents use live-session delivery instead of exec resume', async () => {

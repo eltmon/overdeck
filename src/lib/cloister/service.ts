@@ -504,6 +504,14 @@ export class CloisterService {
 
     await this.subscribeToDomainEvents();
 
+    try {
+      const { processLinearMcpAuthWake } = await import('../linear-mcp-auth.js');
+      await processLinearMcpAuthWake();
+      console.log('  ✓ Reconciled pending Linear MCP auth wakes');
+    } catch (error) {
+      console.error('  ✗ Failed to recover pending Linear MCP auth wakes:', error);
+    }
+
     // Start monitoring loop
     this.startMonitoringLoop();
   }

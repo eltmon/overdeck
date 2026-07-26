@@ -137,6 +137,11 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // ── commands.ts ───────────────────────────────────────────────────────────
   { surface: 'GET /api/commands',                                      kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Composer command catalog from generated module state; no canonical state store' },
 
+  // ── linear-mcp-auth.ts (PAN-2997) ─────────────────────────────────────────
+  { surface: 'GET /api/linear-mcp-auth',                  kind: 'http', disposition: 'READ',        door: 'linear-mcp-auth event fold (resolveLinearMcpAuthIntervention)' },
+  { surface: 'POST /api/linear-mcp-auth/callback',        kind: 'http', disposition: 'WRITE',       door: 'linear-mcp-auth events + messageAgent delivery door' },
+  { surface: 'POST /api/linear-mcp-auth/complete',        kind: 'http', disposition: 'WRITE',       door: 'linear-mcp-auth events (appendLinearMcpAuthHealthyEvent)' },
+
   // ── command-deck.ts ───────────────────────────────────────────────────────
   { surface: 'GET /api/command-deck/activity/:issueId',                  kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents + events' },
   { surface: 'GET /api/command-deck/planning/:issueId',                  kind: 'http', disposition: 'AGGREGATE',   door: 'Issues + Agents planning detail' },
@@ -168,7 +173,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/conversations/:name/delete-image',               kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.removeAttachment' },
   { surface: 'POST /api/conversations/:name/message',                    kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.deliver' },
   { surface: 'POST /api/conversations/:id/codex-approval',               kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.approve' },
-  { surface: 'POST /api/conversations/:id/pane-choice',                  kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.answerPaneChoice (pane keystrokes; no durable state)' },
+  { surface: 'POST /api/conversations/:id/pane-choice',                  kind: 'http', disposition: 'RELOCATE',    door: 'handleConversationPaneChoiceAnswer (lib/overdeck/conversation-pane-choice)' },
   { surface: 'POST /api/conversations/:name/delivery-method',            kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.setDeliveryMethod' },
   { surface: 'POST /api/conversations/:name/thinking-level',             kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.setEffort + ConversationRuntime.controlChannel' },
   { surface: 'POST /api/conversations/:name/compact',                    kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.controlChannel.compact' },
