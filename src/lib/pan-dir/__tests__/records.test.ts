@@ -128,6 +128,7 @@ describe('buildIssueRecord', () => {
       verificationStatus: 'passed',
       inspectStatus: 'passed',
       mergeStatus: 'merged',
+      mergeStep: 'post-merge-cleanup',
       releaseStatus: 'partial',
       readyForMerge: true,
       reviewNotes: 'lgtm',
@@ -157,6 +158,7 @@ describe('buildIssueRecord', () => {
     expect(record.pipeline.readyForMerge).toBe(true);
     expect(record.pipeline.prNumber).toBe(1908);
     expect(record.pipeline.mergeStatus).toBe('merged');
+    expect(record.pipeline.mergeStep).toBe('post-merge-cleanup');
     expect(record.pipeline.releaseStatus).toBe('partial');
     expect(record.pipeline.strikeReadyHead).toBe('feedface');
     expect(record.pipeline.strikeRecoveryCount).toBe(2);

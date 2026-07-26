@@ -69,7 +69,9 @@ export function buildConflictResolutionPrompt(ctx: ConflictContext, conflictedFi
     ? ctx.conflictingIssueIds.join(', ')
     : 'an earlier batch member';
   return [
-    `You are resolving a git merge conflict inside a UAT batch assembly worktree.`,
+    ctx.repoKey
+      ? `You are resolving a git merge conflict inside the ${ctx.repoKey} repo of a UAT batch assembly worktree.`
+      : `You are resolving a git merge conflict inside a UAT batch assembly worktree.`,
     ``,
     `The branch ${ctx.branchName} bundles already-reviewed features for human testing.`,
     `Merging ${ctx.feature.branch} (${ctx.feature.issueId}: ${ctx.feature.title}) conflicted with ${counterparts}.`,
@@ -169,7 +171,11 @@ export function buildConflictAgentHook(
   const log = deps.log ?? (() => {});
 
   return async (ctx) => {
-    const tag = `[uat-conflict-agent] ${ctx.branchName} ${ctx.feature.issueId}`;
+    // Polyrepo assembly runs this hook once per repo, so the repo key has to be
+    // in the tag or two repos' log lines are indistinguishable.
+    const tag = ctx.repoKey
+      ? `[uat-conflict-agent] ${ctx.branchName} ${ctx.repoKey} ${ctx.feature.issueId}`
+      : `[uat-conflict-agent] ${ctx.branchName} ${ctx.feature.issueId}`;
     let files: string[];
     let stagedBefore: string[];
     try {

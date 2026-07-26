@@ -424,14 +424,16 @@ describe('Definition-of-Done deploy row', () => {
     commitContains: async () => true,
   };
 
-  it('passes when the live build commit contains the merge commit', async () => {
+  it('preserves old-server health behavior when the canonical live build contains the merge commit', async () => {
+    const commitContains = vi.fn(async () => true);
     const row = await checkDeployRow(ctx, merge, {
       ...baseDeps,
-      commitContains: async (repoRoot, mergeCommit, buildCommit) => {
-        expect([repoRoot, mergeCommit, buildCommit]).toEqual(['/repo/overdeck', 'abcdef123456', 'fedcba654321']);
-        return true;
-      },
+      commitContains,
     });
+    expect(commitContains.mock.calls).toEqual([
+      ['/repo/overdeck', 'fedcba654321', 'origin/main'],
+      ['/repo/overdeck', 'abcdef123456', 'fedcba654321'],
+    ]);
     expect(row).toMatchObject({ status: 'pass', observed: 'build commit fedcba65 contains merge abcdef12' });
   });
 
@@ -443,12 +445,50 @@ describe('Definition-of-Done deploy row', () => {
         buildCommit: 'sibling987654',
         builtAt: '2026-07-15T12:05:00Z',
       }),
-      commitContains: async () => false,
+      commitContains: async (_repoRoot, _ancestor, descendant) => descendant === 'origin/main',
     });
     expect(row).toMatchObject({
       status: 'miss',
       observed: 'build commit sibling9 does not contain merge abcdef12',
     });
+  });
+
+  it('misses a dirty live build before checking commit ancestry', async () => {
+    const commitContains = vi.fn(async () => true);
+    const row = await checkDeployRow(ctx, merge, {
+      ...baseDeps,
+      readJson: async () => ({
+        repoRoot: '/repo/overdeck',
+        buildCommit: 'dirty9876543',
+        buildDirty: true,
+      }),
+      commitContains,
+    });
+
+    expect(row).toMatchObject({ status: 'miss' });
+    expect(row.observed).toContain('dirty working tree');
+    expect(row.observed).toContain('pan reload');
+    expect(commitContains).not.toHaveBeenCalled();
+  });
+
+  it('misses when the live build commit is not an ancestor of origin/main', async () => {
+    const commitContains = vi.fn(async () => false);
+    const row = await checkDeployRow(ctx, merge, {
+      ...baseDeps,
+      readJson: async () => ({
+        repoRoot: '/repo/overdeck',
+        buildCommit: 'local9876543',
+        buildDirty: false,
+      }),
+      commitContains,
+    });
+
+    expect(commitContains).toHaveBeenCalledOnce();
+    expect(commitContains).toHaveBeenCalledWith('/repo/overdeck', 'local9876543', 'origin/main');
+    expect(row).toMatchObject({ status: 'miss' });
+    expect(row.observed).toContain('not an ancestor of origin/main');
+    expect(row.observed).toContain('pan reload');
+    expect(row.observed).not.toContain('does not contain merge');
   });
 
   it('misses when the live server does not expose a build commit', async () => {

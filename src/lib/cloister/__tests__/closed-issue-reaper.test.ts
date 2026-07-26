@@ -6,7 +6,9 @@ import { join } from 'node:path';
 
 const mocks = vi.hoisted(() => ({
   emitActivityEntrySync: vi.fn(),
+  reconcileMergedDockerCleanupQueue: vi.fn(),
   exec: vi.fn(),
+  getReviewStatusesSync: vi.fn(),
   isIssueClosed: vi.fn(),
   listRunningAgents: vi.fn(),
   listProjectsSync: vi.fn(),
@@ -59,6 +61,14 @@ vi.mock('../reap-issue-residue.js', () => ({
   reapIssueResidue: mocks.reapIssueResidue,
 }));
 
+vi.mock('../../review-status.js', () => ({
+  getReviewStatusesSync: mocks.getReviewStatusesSync,
+}));
+
+vi.mock('../merged-docker-cleanup-worker.js', () => ({
+  reconcileMergedDockerCleanupQueue: mocks.reconcileMergedDockerCleanupQueue,
+}));
+
 import { reconcileClosedIssueAgents } from '../closed-issue-reaper.js';
 
 describe('reconcileClosedIssueAgents', () => {
@@ -72,9 +82,13 @@ describe('reconcileClosedIssueAgents', () => {
     mocks.listRunningAgents.mockReturnValue(Effect.succeed([]));
     mocks.listProjectsSync.mockReturnValue([]);
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
+    mocks.getReviewStatusesSync.mockReturnValue({});
     mocks.reapIssueResidue.mockResolvedValue([]);
     mocks.resolveProjectForIssue.mockReturnValue(null);
     mocks.stopAgent.mockReturnValue(Effect.succeed(undefined));
+    mocks.reconcileMergedDockerCleanupQueue.mockImplementation(
+      (issueIds: string[]) => issueIds.map((issueId) => `Queued merged-issue Docker cleanup for ${issueId}`),
+    );
     mocks.isIssueClosed.mockResolvedValue(false);
     mocks.exec.mockImplementation((_command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
       const cb = typeof opts === 'function' ? opts : callback;
@@ -258,6 +272,92 @@ describe('reconcileClosedIssueAgents', () => {
     expect(mocks.reapIssueResidue).toHaveBeenCalledTimes(1);
     expect(mocks.reapIssueResidue).toHaveBeenCalledWith(projectPath, 'PAN-5558');
     rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  it('checks leaked devnet closure state with bounded concurrency', async () => {
+    mocks.exec.mockImplementation((command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
+      const cb = typeof opts === 'function' ? opts : callback;
+      const stdout = String(command).includes('docker network ls')
+        ? Array.from({ length: 6 }, (_, index) => `overdeck-feature-pan-${6000 + index}_devnet`).join('\n')
+        : '';
+      cb?.(null, { stdout, stderr: '' });
+      return { on: vi.fn() };
+    });
+    let active = 0;
+    let maxActive = 0;
+    const resolveChecks: Array<() => void> = [];
+    mocks.isIssueClosed.mockImplementation(() => new Promise<boolean>((resolve) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      resolveChecks.push(() => {
+        active -= 1;
+        resolve(false);
+      });
+    }));
+
+    const reconciliation = reconcileClosedIssueAgents();
+    await vi.waitFor(() => expect(mocks.isIssueClosed).toHaveBeenCalledTimes(4));
+    expect(maxActive).toBe(4);
+    resolveChecks.splice(0, 4).forEach((resolve) => resolve());
+    await vi.waitFor(() => expect(mocks.isIssueClosed).toHaveBeenCalledTimes(6));
+    resolveChecks.splice(0).forEach((resolve) => resolve());
+
+    await expect(reconciliation).resolves.toEqual([]);
+    expect(maxActive).toBe(4);
+  });
+
+  it('queues merged Docker cleanup without blocking patrol or reaping non-Docker state', async () => {
+    mocks.exec.mockImplementation((command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
+      const cb = typeof opts === 'function' ? opts : callback;
+      const stdout = String(command).includes('docker network ls')
+        ? 'overdeck-feature-pan-5559_devnet\nbridge\n'
+        : '';
+      cb?.(null, { stdout, stderr: '' });
+      return { on: vi.fn() };
+    });
+    mocks.getReviewStatusesSync.mockReturnValue({
+      'PAN-5559': { mergeStatus: 'merged' },
+    });
+
+    await expect(reconcileClosedIssueAgents()).resolves.toEqual([
+      'Queued merged-issue Docker cleanup for PAN-5559',
+    ]);
+
+    expect(mocks.getReviewStatusesSync).toHaveBeenCalledTimes(1);
+    expect(mocks.getReviewStatusesSync).toHaveBeenCalledWith(['PAN-5559']);
+    expect(mocks.reconcileMergedDockerCleanupQueue).toHaveBeenCalledWith(['PAN-5559']);
+    expect(mocks.reapIssueResidue).not.toHaveBeenCalled();
+    expect(mocks.stopAgent).not.toHaveBeenCalled();
+  });
+
+  it('ignores leaked devnets without merged review status', async () => {
+    mocks.exec.mockImplementation((command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
+      const cb = typeof opts === 'function' ? opts : callback;
+      const stdout = String(command).includes('docker network ls')
+        ? 'overdeck-feature-pan-5559_devnet\nbridge\n'
+        : '';
+      cb?.(null, { stdout, stderr: '' });
+      return { on: vi.fn() };
+    });
+
+    await expect(reconcileClosedIssueAgents()).resolves.toEqual([]);
+
+    expect(mocks.getReviewStatusesSync).toHaveBeenCalledWith(['PAN-5559']);
+    expect(mocks.reconcileMergedDockerCleanupQueue).toHaveBeenCalledWith([]);
+    expect(mocks.reapIssueResidue).not.toHaveBeenCalled();
+    expect(mocks.stopAgent).not.toHaveBeenCalled();
+  });
+
+  it('preserves queued cleanup when Docker network discovery is unavailable', async () => {
+    mocks.exec.mockImplementation((_command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
+      const cb = typeof opts === 'function' ? opts : callback;
+      cb?.(new Error('docker unavailable'), { stdout: '', stderr: '' });
+      return { on: vi.fn() };
+    });
+
+    await expect(reconcileClosedIssueAgents()).resolves.toEqual([]);
+
+    expect(mocks.reconcileMergedDockerCleanupQueue).not.toHaveBeenCalled();
   });
 
   it('preserves open pure-disk residue', async () => {
