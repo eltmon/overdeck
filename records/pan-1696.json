@@ -207,6 +207,11 @@
       "reason": "feedback",
       "note": "[2026-07-26T03:21Z] review-agent → FAILED — seq 1",
       "timestamp": "2026-07-26T03:21:11.430Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T03:29Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-26T03:29:17.360Z"
     }
   ],
   "feedback": [
@@ -216,10 +221,17 @@
       "outcome": "failed",
       "timestamp": "2026-07-26T03:21:11Z",
       "markdownBody": "# Review FAILED for PAN-1696\n\nReview role spawn failed: Role run agent-pan-1696-review already running. Use 'pan tell' to message it.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1696 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T03:29:17Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1696\n\nPOST /api/projects/:projectKey/merge-train mutates durable project configuration without the dashboard authentication and CSRF guard.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1696 -m \"Fixed review issues\"`"
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:29:16.816Z",
+  "updated": "2026-07-26T03:29:17.360Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "blocked",
