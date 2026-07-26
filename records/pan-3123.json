@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:25:26.814Z",
-  "updated": "2026-07-26T13:01:50.568Z",
+  "updated": "2026-07-26T13:03:16.303Z",
   "pipeline": {
     "issueId": "PAN-3123",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "governor-runway-docs": {
-        "writerId": "agent-pan-3123",
-        "agentId": "agent-pan-3123",
-        "pid": 1611253,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T13:01:50.568Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3123",
@@ -104,6 +96,17 @@
         "outcome": "completed",
         "reason": "Composed swap runway and PSI into the existing governor hysteresis, preserved RAM-only behavior, and exposed evidence in cached verdicts",
         "releasedAt": "2026-07-26T12:59:52.796Z"
+      },
+      {
+        "writerId": "agent-pan-3123",
+        "agentId": "agent-pan-3123",
+        "pid": 1611253,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:01:50.568Z",
+        "itemId": "governor-runway-docs",
+        "outcome": "completed",
+        "reason": "Documented swap admission hysteresis, PSI-gated shedding, swapless and PSI-unavailable behavior, and all three config keys",
+        "releasedAt": "2026-07-26T13:03:16.303Z"
       }
     ],
     "statusReasons": {
@@ -118,6 +121,10 @@
       "governor-swap-psi-hysteresis": {
         "reason": "Composed swap runway and PSI into the existing governor hysteresis, preserved RAM-only behavior, and exposed evidence in cached verdicts",
         "updatedAt": "2026-07-26T12:59:52.796Z"
+      },
+      "governor-runway-docs": {
+        "reason": "Documented swap admission hysteresis, PSI-gated shedding, swapless and PSI-unavailable behavior, and all three config keys",
+        "updatedAt": "2026-07-26T13:03:16.303Z"
       }
     }
   },
@@ -136,6 +143,8 @@
     "governor-swap-psi-hysteresis.governor-swap-psi-hysteresis.ac3": "completed",
     "governor-swap-psi-hysteresis.governor-swap-psi-hysteresis.ac4": "completed",
     "governor-swap-psi-hysteresis.governor-swap-psi-hysteresis.ac5": "completed",
-    "governor-runway-docs": "running"
+    "governor-runway-docs": "completed",
+    "governor-runway-docs.governor-runway-docs.ac1": "completed",
+    "governor-runway-docs.governor-runway-docs.ac2": "completed"
   }
 }
