@@ -382,24 +382,24 @@
     "recordedAt": "2026-07-26T00:40:41.538Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-26T00:40:58.447Z",
+  "updated": "2026-07-26T00:45:46.327Z",
   "pipeline": {
     "issueId": "PAN-3037",
-    "reviewStatus": "failed",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T00:40:53.439Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-3037-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-26T00:45:46.231Z",
+    "reviewNotes": "Documentation advisory is resolved; current-cycle executable behavior is unchanged and all gates pass",
     "testNotes": "Verified at current HEAD d9745b9dfc (test-only commit added mid-verification on top of the previously-approved dddeb04bfb, fixing a stale mock in tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts). npm run typecheck: pass. npm run lint: pass (eslint/effect/permissions/state-writes/overdeck-boundaries/pipeline-membership/skills/circular-deps/file-size guards). Full npm test run with the agent-pan-3037-test git-guard wrapper stripped from PATH (it intercepts test-internal 'git reset --hard' calls in tests' own temp repos and produces false failures, e.g. validation.test.ts autoRevertMerge - confirmed via memory note project_git_guard_blocks_state_write_door.md): 1176 backend test files / 10705 tests passed (3 skipped), 3 frontend test files / 51 tests passed - zero real failures on the first clean run. A second clean full-suite run at the new HEAD showed one hook-timeout flake in src/cli/commands/conversations/__tests__/list.test.ts under heavy machine load (32 concurrent agents); PAN-3037's diff does not touch that file or its DB test helper, and it passes cleanly in isolation (6/6, 5.5s). Focused PAN-3037 coverage: tests/lib/project-repos.test.ts (12/12), sync-main-polyrepo.test.ts, merge-agent-auto-commit.test.ts, specialists-inspect-item.test.ts (3/3) all passed. No UAT: fix is backend/CLI git-resolver logic (pan sync-main, review-restart/dispatch branch probes, agents git status) with no UI-kind xBRIEF items or acceptance criteria referencing the dashboard; the GitHub issue body is entirely about CLI git-probe failures on polyrepo workspaces.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met: per-repo iteration with repoKey-prefixed paths, conflict abort leaves repo quiescent and skips remaining repos, aggregate alreadyUpToDate requires all repos current, monorepo keeps unprefixed single-element shape, abort returns cancellation + skipped entries. Extraction into sync-main-workspace.ts is logic-identical; baseline 1404 matches actual wc -l.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3079",
-    "reviewedAtCommit": "be16726d7f6a0977a5cbe338826575bca3c0641a",
+    "reviewedAtCommit": "83c5b73ebe0664b47e9c13d88fedcf4d167d2996",
     "lastVerifiedCommit": "93ad317654fa305065e3cb80cc73f470c5817ed4",
-    "reviewRequestedAt": "2026-07-26T00:40:42.390Z",
     "reviewSpawnedAt": "2026-07-26T00:40:47.075Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -466,25 +466,25 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 20022046,
-            "output": 300830,
-            "cacheRead": 52833792,
+            "input": 21266430,
+            "output": 312906,
+            "cacheRead": 58465792,
             "cacheWrite": 0
           }
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 194,
-            "output": 41960,
-            "cacheRead": 14672785,
-            "cacheWrite": 365980
+            "input": 212,
+            "output": 50530,
+            "cacheRead": 16235608,
+            "cacheWrite": 381432
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4463496,
-            "output": 223595,
-            "cacheRead": 139988992,
+            "input": 4474214,
+            "output": 224699,
+            "cacheRead": 140772864,
             "cacheWrite": 0
           }
         }
@@ -497,21 +497,21 @@
           "cacheWrite": 311392
         },
         "openai/gpt-5.6-sol": {
-          "input": 24485542,
-          "output": 524425,
-          "cacheRead": 192822784,
+          "input": 25740644,
+          "output": 537605,
+          "cacheRead": 199238656,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 194,
-          "output": 41960,
-          "cacheRead": 14672785,
-          "cacheWrite": 365980
+          "input": 212,
+          "output": 50530,
+          "cacheRead": 16235608,
+          "cacheWrite": 381432
         }
       },
       "costAtCloseOut": {
-        "usd": 251.991705,
-        "pricingAsOf": "2026-07-26T00:40:58.440Z"
+        "usd": 262.307482,
+        "pricingAsOf": "2026-07-26T00:45:46.310Z"
       }
     },
     "merges": [
