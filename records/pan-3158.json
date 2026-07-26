@@ -17,6 +17,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T20:49:01.177Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T20:55:43.646Z"
     }
   ],
   "feedback": [],
@@ -41,22 +46,22 @@
     "recordedAt": "2026-07-26T20:50:56.555Z"
   },
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T20:55:42.068Z",
+  "updated": "2026-07-26T20:55:43.646Z",
   "pipeline": {
     "issueId": "PAN-3158",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T20:51:34.016Z",
-    "updatedAt": "2026-07-26T20:55:41.273Z",
+    "updatedAt": "2026-07-26T20:55:42.271Z",
     "reviewNotes": "Verification failed at test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3161",
     "lastVerifiedCommit": "6487d8b6389e5cb5c8b2bb6b48c9926fe0fdc0e8",
     "reviewRequestedAt": "2026-07-26T20:51:34.016Z",
-    "reviewSpawnedAt": "2026-07-26T20:48:36.960Z",
+    "reviewSpawnedAt": "2026-07-26T20:55:42.270Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/FLYWHEEL-STATE.md",
@@ -108,7 +113,7 @@
       },
       "costAtCloseOut": {
         "usd": 17.671563,
-        "pricingAsOf": "2026-07-26T20:55:41.331Z"
+        "pricingAsOf": "2026-07-26T20:55:42.576Z"
       }
     },
     "merges": [
