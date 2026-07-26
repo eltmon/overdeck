@@ -12,6 +12,11 @@
       "timestamp": "2026-07-26T12:47:00.050Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-26T13:31:00.653Z",
+      "reason": "end",
+      "note": "Anomaly: the server build code-splits build provenance into dist/dashboard/build-info-*.js, so the plan's literal grep against dist/dashboard/server.js returns 0; the shipped server imports that chunk and recursive bundle verification finds buildDirty there. Deviation: updated pre-existing reload and dashboard identity tests after the full suite exposed stale in-place-build expectations; added the required Prompt-Change trailer in a follow-up commit because history rewriting is forbidden. No remaining failures: full npm test, npm run typecheck, and npm run lint pass. Delivered detached origin/main reload builds, buildDirty/buildBranch health provenance, DoD canonicality enforcement, and canonical deploy documentation."
     }
   ],
   "feedback": [],
@@ -54,7 +59,7 @@
     "recordedAt": "2026-07-26T13:30:54.544Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T13:30:59.358Z",
+  "updated": "2026-07-26T13:31:00.653Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "reviewing",
