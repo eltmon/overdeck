@@ -634,3 +634,44 @@ describe('runUatTrainReconcile — terminal generation cleanup', () => {
     expect(result).toEqual({ action: 'idle', invalidated: [] });
   });
 });
+
+// PAN-3093 cycle 4: an outage refreshing member-repo refs must not read as a
+// verified-empty ready set. The reconciler treats [] as authoritative — it
+// marks every live member departed, invalidates the generation, and tears down
+// its stack — so a transient blip would destroy the current testable batch.
+describe('runUatTrainReconcile — ref-refresh outage preserves the live generation', () => {
+  const POLY_ROOT = '/repos/myn';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.isMergeTrainEnabledForProject.mockReturnValue(true);
+    mocks.listEligibleCandidatesByProject.mockReturnValue([{ issueId: 'MIN-901', title: 'MIN-901' }]);
+    mocks.listUatGenerationsSync.mockReturnValue([{ name: 'uat/min-otter-0727', status: 'ready' }]);
+    mocks.buildUatGenerationStore.mockReturnValue({});
+    mocks.buildPolyrepoGitDeps.mockReturnValue(new Map());
+    mocks.reconcileUatGenerations.mockResolvedValue({ action: 'no-queue', invalidated: [] });
+    mocks.findProjectByPathSync.mockReturnValue({
+      name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
+    });
+    mocks.resolveProjectFromIssueSync.mockReturnValue({
+      projectKey: 'mind-your-now', projectName: 'MYN', projectPath: POLY_ROOT,
+    });
+    mocks.resolveProjectReposFromResolvedIssueSync.mockReturnValue([
+      {
+        projectKey: 'mind-your-now', projectPath: POLY_ROOT, repoKey: 'api',
+        repoPath: `${POLY_ROOT}/api`, forge: 'github', sourceBranch: 'feature/min-901',
+        targetBranch: 'main', mergeOrder: 0, required: true,
+      },
+    ]);
+  });
+
+  it('hands the reconciler null, not an empty ready set, when a repo refresh fails', async () => {
+    // computePolyrepoMergeQueueFromCandidates is the real implementation here;
+    // no ChildProcessSpawner is provided, so every git call fails — exactly the
+    // shape of a transport/auth outage.
+    await runUatTrainReconcile({ projectRoot: POLY_ROOT });
+
+    const deps = mocks.reconcileUatGenerations.mock.calls.at(-1)![1] as UatReconcilerDeps;
+    await expect(deps.getReadySet()).resolves.toBeNull();
+  });
+});

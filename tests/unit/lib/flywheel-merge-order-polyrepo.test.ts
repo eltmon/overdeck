@@ -473,6 +473,46 @@ describe('computePolyrepoMergeQueueFromCandidates — fetch failures fail closed
     expect(excluded[0]![1]).toContain('could not refresh feature refs in api');
   });
 
+  it('reports the unavailable repos so the caller can distinguish outage from empty', async () => {
+    // An empty queue from an outage must NOT read as "no features are ready":
+    // the reconciler treats that as authoritative and tears down the live batch.
+    const reposByIssue = new Map([['MIN-901', [repo('api', 'MIN-901', 0)]]]);
+    const git: FakeGit = {
+      refs: new Set([`${PROJECT_ROOT}/api origin/feature/min-901`]),
+      failFetchIn: new Set([`${PROJECT_ROOT}/api`]),
+      changed: new Map(),
+    };
+    const unavailable: string[][] = [];
+
+    await run(
+      [{ issueId: 'MIN-901', title: 'One' }],
+      reposByIssue,
+      git,
+      { onRefreshUnavailable: (paths) => unavailable.push([...paths]) },
+    );
+
+    expect(unavailable).toEqual([[`${PROJECT_ROOT}/api`]]);
+  });
+
+  it('reports nothing unavailable when every refresh succeeds', async () => {
+    const reposByIssue = new Map([['MIN-901', [repo('api', 'MIN-901', 0)]]]);
+    const git: FakeGit = {
+      refs: new Set([`${PROJECT_ROOT}/api origin/feature/min-901`]),
+      changed: new Map(),
+    };
+    const unavailable: string[][] = [];
+
+    const queue = await run(
+      [{ issueId: 'MIN-901', title: 'One' }],
+      reposByIssue,
+      git,
+      { onRefreshUnavailable: (paths) => unavailable.push([...paths]) },
+    );
+
+    expect(queue).toHaveLength(1);
+    expect(unavailable).toEqual([]);
+  });
+
   it('refreshes each repo once no matter how many candidates it holds', async () => {
     const reposByIssue = new Map([
       ['MIN-901', [repo('api', 'MIN-901', 0)]],

@@ -24,6 +24,7 @@ import {
   buildPolyrepoCleanupGit,
   buildPolyrepoGitDeps,
   buildUatGenerationGitDeps,
+  featureNamespaceOf,
   buildUatGenerationStore,
   buildUatGenerationCleanupGit,
   listRemoteUatBranches,
@@ -279,13 +280,27 @@ async function getPolyrepoReadySetForProject(projectPath: string): Promise<Ready
 
   const reposByIssue = new Map(candidates.map((c) => [c.issueId, resolveReposForIssue(c.issueId)]));
 
+  // An outage is "unavailable", never "empty". The reconciler treats an empty
+  // ready set as authoritative and will invalidate the live generation and tear
+  // down its stack; null means "do nothing this tick".
+  let unavailableRepos: readonly string[] = [];
+
   const queue = await Effect.runPromise(
     computePolyrepoMergeQueueFromCandidates(candidates, reposByIssue, projectPath, {
       getPrUrl: resolveMergeQueuePrUrl,
       onExcluded: (issueId, reason) =>
         console.log(`[uat-train] ${issueId} excluded from the polyrepo ready set: ${reason}`),
+      onRefreshUnavailable: (repoPaths) => { unavailableRepos = repoPaths; },
     }).pipe(Effect.provide(nodeServicesLayer)),
   );
+
+  if (unavailableRepos.length > 0) {
+    console.log(
+      `[uat-train] polyrepo ready set unavailable for ${projectPath}: could not refresh refs in ` +
+      `${unavailableRepos.join(', ')} — skipping this tick rather than invalidating the live batch`,
+    );
+    return null;
+  }
 
   return queue.map((item) => ({
     issueId: item.issueId,
@@ -333,7 +348,13 @@ async function getPolyrepoFeatureAnchor(feature: ReadyFeature): Promise<string> 
 
   const entries = await Promise.all(
     contributions.map(async (c) => {
-      const git = buildUatGenerationGitDeps(c.repoPath, { targetBranch: c.targetBranch });
+      const git = buildUatGenerationGitDeps(c.repoPath, {
+        targetBranch: c.targetBranch,
+        // The SAME configured namespace assembly uses. Defaulting to `feature/`
+        // here would reject a valid `feat/…` branch, yield an `unknown` anchor,
+        // and invalidate the generation assembly had just built.
+        featureBranchPrefix: featureNamespaceOf(c.branch),
+      });
       return { repoKey: c.repoKey, headSha: await git.branchHeadSha(c.branch).catch(() => 'unknown') };
     }),
   );

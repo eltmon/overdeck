@@ -106,20 +106,46 @@ const provenAncestry = new Set<string>();
 /** Bound the set so a long-lived server cannot accumulate entries forever. */
 const PROVEN_ANCESTRY_LIMIT = 512;
 
+/**
+ * Checks currently running, so concurrent callers share one process.
+ *
+ * The cache alone is not enough: every member's lifecycle consults it BEFORE
+ * any first check has settled, so all of them miss and each spawns the same
+ * `git merge-base`. A 100-member, 3-repo generation still meant ~300 duplicate
+ * checks and ~100 concurrent processes per repo. Coalescing on the in-flight
+ * promise collapses that to one process per distinct tuple.
+ */
+const inFlightAncestry = new Map<string, Promise<boolean>>();
+
 async function mergeIsAncestorOfTarget(evidence: VerifiedMergedRepo): Promise<boolean> {
   const key = `${evidence.repoPath}|${evidence.mergeSha}|${evidence.targetBranch}`;
   if (provenAncestry.has(key)) return true;
+
+  const running = inFlightAncestry.get(key);
+  if (running) return running;
+
+  const check = (async () => {
+    try {
+      await execAsync(
+        `git merge-base --is-ancestor ${shellQuote(evidence.mergeSha)} ${shellQuote(`origin/${evidence.targetBranch}`)}`,
+        { cwd: evidence.repoPath },
+      );
+    } catch {
+      return false;
+    }
+    // Only successes are retained: an ancestor stays an ancestor, whereas a
+    // negative becomes positive the moment the merge lands.
+    if (provenAncestry.size >= PROVEN_ANCESTRY_LIMIT) provenAncestry.clear();
+    provenAncestry.add(key);
+    return true;
+  })();
+
+  inFlightAncestry.set(key, check);
   try {
-    await execAsync(
-      `git merge-base --is-ancestor ${shellQuote(evidence.mergeSha)} ${shellQuote(`origin/${evidence.targetBranch}`)}`,
-      { cwd: evidence.repoPath },
-    );
-  } catch {
-    return false;
+    return await check;
+  } finally {
+    inFlightAncestry.delete(key);
   }
-  if (provenAncestry.size >= PROVEN_ANCESTRY_LIMIT) provenAncestry.clear();
-  provenAncestry.add(key);
-  return true;
 }
 
 async function requireCompletePolyrepoMerge(

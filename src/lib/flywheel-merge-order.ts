@@ -357,6 +357,17 @@ export interface PolyrepoMergeQueueItem extends MergeQueueItem {
 export interface ComputePolyrepoMergeQueueOptions extends ComputeMergeQueueOptions {
   /** Called for each candidate dropped because no member repo has its branch. */
   onExcluded?: (issueId: string, reason: string) => void;
+  /**
+   * Called once with the repo paths whose ref refresh failed, if any.
+   *
+   * An empty queue caused by an outage is NOT the same fact as a verified empty
+   * ready set, and the caller must not conflate them: the reconciler treats an
+   * empty array as authoritative, marks every live member departed, invalidates
+   * the generation, and tears its stack down. A transport or auth blip would
+   * then destroy the current testable batch even though no feature left the
+   * queue. Callers should report unavailability (null) instead.
+   */
+  onRefreshUnavailable?: (repoPaths: readonly string[]) => void;
 }
 
 /** The `feature/` (or configured) namespace a source branch lives in. */
@@ -471,6 +482,7 @@ export const computePolyrepoMergeQueueFromCandidates = (
       { concurrency: gitConcurrency },
     );
     const staleRepoPaths = new Set(refreshResults.filter((r) => !r.ok).map((r) => r.repoPath));
+    if (staleRepoPaths.size > 0) options.onRefreshUnavailable?.([...staleRepoPaths]);
 
     // One flat, concurrency-governed collection: nesting Effect.all inside
     // Effect.all applies the limit at both levels, making the real ceiling

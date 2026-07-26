@@ -321,7 +321,11 @@ async function promotePolyrepo(
   // this batch's own files.
   const recovered: UatGenerationRepo[] = [];
   for (const repo of allRepos) {
-    if (repo.promotedAt) { recovered.push(repo); continue; }
+    // A stamped row with no merge SHA still needs remote recovery: evidence is
+    // all-or-nothing, so one such row withholds it for the whole generation and
+    // post-merge verification refuses forever. Recovering the SHA is the only
+    // way out, and it is exactly what findLandedMerge answers.
+    if (repo.promotedAt && repo.mergeSha) { recovered.push(repo); continue; }
     const git = repoGit.get(repo.repoKey);
     if (!git) { recovered.push(repo); continue; }
 
@@ -342,8 +346,11 @@ async function promotePolyrepo(
     }
     if (!landedSha) { recovered.push(repo); continue; }
 
-    log(`[uat-promote] ${gen.name}: ${repo.repoKey} is already contained in its target (${landedSha.slice(0, 9)}) but was never stamped — recovering`);
-    const promotedAt = now().toISOString();
+    log(
+      `[uat-promote] ${gen.name}: ${repo.repoKey} is contained in its target (${landedSha.slice(0, 9)}) ` +
+      `${repo.promotedAt ? 'but has no recorded merge sha' : 'but was never stamped'} — recovering`,
+    );
+    const promotedAt = repo.promotedAt ?? now().toISOString();
     try {
       deps.markRepoPromoted?.(gen.name, repo.repoKey, promotedAt, landedSha);
     } catch (err) {
@@ -684,6 +691,15 @@ export function buildPolyrepoUatPromoteGitDeps(
               `(${err instanceof Error ? err.message.split('\n')[0] : String(err)})`,
             );
           });
+          // Fetch the UAT ref as well: a fresh checkout has no tracking ref for
+          // it, and resolving only from local refs would misclassify a landed
+          // unstamped repo as pending. Absence here is normal (the branch may
+          // already be reaped), so this one is best-effort.
+          await runGit(
+            ['fetch', 'origin', `+refs/heads/${safeBranch}:refs/remotes/origin/${safeBranch}`],
+            repo.repoPath,
+          ).catch(() => {});
+
           const ref = await runGit(['rev-parse', '--verify', `origin/${safeBranch}`], repo.repoPath)
             .then(() => `origin/${safeBranch}`)
             .catch(() => safeBranch);

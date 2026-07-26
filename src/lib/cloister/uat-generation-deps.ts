@@ -160,8 +160,14 @@ export function buildUatGenerationGitDeps(
   };
 }
 
-/** The namespace part of a configured source branch: `feat/min-1` -> `feat/`. */
-function featureNamespaceOf(sourceBranch: string): string {
+/**
+ * The namespace part of a configured source branch: `feat/min-1` -> `feat/`.
+ *
+ * Exported because EVERY construction of the feature-branch adapter must use
+ * the same namespace — assembly and the reconciler's anchor path both build one,
+ * and a mismatch makes the reconciler reject a branch assembly just accepted.
+ */
+export function featureNamespaceOf(sourceBranch: string): string {
   const slash = sourceBranch.lastIndexOf('/');
   return slash >= 0 ? sourceBranch.slice(0, slash + 1) : 'feature/';
 }
