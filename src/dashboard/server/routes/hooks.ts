@@ -99,6 +99,7 @@ export type HandleMemorySessionStartBodyResult =
   | { status: 'subagent' }
   | { status: 'disabled' }
   | { status: 'accepted'; sessionId: string }
+  | { status: 'transcript-missing'; sessionId: string }
   | { status: 'error'; statusCode: 400 | 422; error: string };
 
 export function memoryTurnHookResponse(body: unknown): typeof HttpServerResponse.Type | null {
@@ -201,7 +202,19 @@ export async function handleMemorySessionStartBody(
     return { status: 'error', statusCode: 422, error: 'memory identity could not be resolved' };
   }
 
-  const fileStat = await (options.statTranscript ?? getTranscriptStat)(trustedTranscriptPath);
+  // The SessionStart hook can fire before the harness writes the transcript's
+  // first line (and stale hooks can name a deleted transcript). A missing file
+  // is a skip, not a 500 — the memory-reconciliation sweep registers the
+  // transcript once it exists.
+  let fileStat: { size: number; mtimeMs: number };
+  try {
+    fileStat = await (options.statTranscript ?? getTranscriptStat)(trustedTranscriptPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { status: 'transcript-missing', sessionId };
+    }
+    throw error;
+  }
   (options.registerTranscript ?? registerTranscriptForPolling)({
     agentId: stringField(body.agentId) ?? stringField(body.agent_id) ?? identity.runId,
     sessionId,
@@ -375,7 +388,9 @@ const postMemorySessionStartRoute = HttpRouter.add(
     const result = yield* Effect.promise(() => handleMemorySessionStartBody(body, {
       resolveAgentIdBySessionId: async (sessionId) => Effect.runPromise(readModel.getAgentIdBySessionId(sessionId)),
     }));
-    if (result.status === 'subagent' || result.status === 'disabled') return HttpServerResponse.text('', { status: 204 });
+    if (result.status === 'subagent' || result.status === 'disabled' || result.status === 'transcript-missing') {
+      return HttpServerResponse.text('', { status: 204 });
+    }
     if (result.status === 'error') return jsonResponse({ ok: false, error: result.error }, { status: result.statusCode });
 
     return jsonResponse({ ok: true }, { status: 202 });

@@ -63,10 +63,20 @@ function importersOf(pathSpec: RegExp): string[] {
 }
 
 describe('conformance gate: single shell (C-DETAIL §3.9)', () => {
-  it('DrawerAgentSession has only the three sanctioned consumers', () => {
+  it('DrawerAgentSession has only the two sanctioned consumers', () => {
+    // PAN-3090: the simple issue page deliberately left this list — it renders
+    // its own narrative feed (SimpleActivityFeed) instead of the operator
+    // transcript. Only advanced-mode surfaces mount DrawerAgentSession now.
     expect(importersOf(/drawer\/DrawerAgentSession/)).toEqual([
       'components/dock/ConversationDock.tsx',
       'components/issue-detail/IssueDetail.tsx',
+    ]);
+  });
+
+  it('SimpleActivityFeed is only composed by the simple issue page', () => {
+    // PAN-3090: one narrative-feed consumer, same no-fork discipline as the
+    // shell gate above — a second simple surface must share, not copy.
+    expect(importersOf(/SimpleActivityFeed/)).toEqual([
       'components/simple/SimpleIssuePage.tsx',
     ]);
   });

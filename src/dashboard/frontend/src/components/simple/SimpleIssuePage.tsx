@@ -1,10 +1,14 @@
 /**
  * PAN-2908 · C-SIMPLE — one issue, simple mode.
+ * PAN-3090 — narrative feed + rich question card.
  *
- * Status card (one plain sentence + ONE primary action), four-word progress
- * track, the live "what it's saying and doing" feed (memory observations) with
- * a steering composer, and an Advanced disclosure that opens the full operator
- * drawer for the same issue. No destructive actions here.
+ * Composition: status card (one plain sentence + ONE primary action) — or the
+ * rich question card when the agent is blocked on a single-select question —
+ * the four-step progress track (amber "waiting on you" when blocked), the
+ * narrative "What it's doing" feed (kickoff prompt collapsed to a system
+ * line, prose clamped, tool calls as one-line actions) with a steering
+ * composer, and an Advanced disclosure that opens the full operator drawer.
+ * No destructive actions here.
  */
 import { useMemo, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
@@ -16,7 +20,8 @@ import { getHelpUrl } from '../../lib/simple/helpUrl';
 import { SIMPLE_STRINGS } from '../../lib/simple/strings';
 import { useSimpleActions } from '../../lib/simple/useSimpleActions';
 import { useUiMode, syncSimpleIssueUrl } from '../../lib/simple/uiMode';
-import { DrawerAgentSession } from '../drawer/DrawerAgentSession';
+import { SimpleActivityFeed } from './SimpleActivityFeed';
+import { isRichQuestion, SimpleQuestionCard } from './SimpleQuestionCard';
 import { ModeToggle, PrimaryButton, QuietButton, StatusCard, StepsTrack } from './parts';
 
 const S = SIMPLE_STRINGS.issue;
@@ -56,9 +61,12 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
   const d = derivation;
   const agent = d.primaryAgent;
   const questionAgent = d.pendingInputAgent;
-  // The transcript's agent picker owns this selection; the composer below
-  // always talks to the agent you're looking at.
+  // The feed's switcher owns this selection; the composer below always talks
+  // to the agent you're looking at.
   const selectedAgent = d.agents.find((a) => a.id === selectedAgentId) ?? agent;
+  // Rich path (PAN-3090 FR-2): the card quotes the question and hosts
+  // answering. Anything more complex keeps the generic card + composer.
+  const richQuestion = questionAgent != null && isRichQuestion(questionAgent);
   const helpUrl = getHelpUrl(d.issue);
   const busy = actions.tell.isPending || actions.answer.isPending || actions.recover.isPending || actions.unstick.isPending || actions.merge.isPending || actions.startWork.isPending;
 
@@ -129,69 +137,66 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
 
         <StepsTrack state={d.display.state} />
 
-        <StatusCard display={d.display}>
-          {d.expectation && <span className="w-full text-xs text-muted-foreground">{d.expectation}</span>}
-          {primary()}
-          {d.display.secondaryActions.map((label) =>
-            label === 'See what changed' && d.prUrl ? (
-              <QuietButton key={label} onClick={() => window.open(d.prUrl!, '_blank', 'noopener')}>{label}</QuietButton>
-            ) : label === 'Tell the agent something' ? (
-              <QuietButton key={label} onClick={() => composerRef.current?.focus()}>{label}</QuietButton>
-            ) : null,
-          )}
-        </StatusCard>
-
-        {/* The conversation — what it's saying and doing */}
-        <section className="mt-6">
-          <div className="flex items-baseline gap-2.5">
-            <h2 className="text-sm font-medium">{S.conversationTitle}</h2>
-            {agent && (agent.status === 'running' || agent.status === 'starting') && (
-              <span className="flex items-center gap-1.5 text-[11px] text-info-foreground">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-info" /> live
-              </span>
+        {richQuestion ? (
+          <SimpleQuestionCard
+            agent={questionAgent}
+            sending={actions.answer.isPending}
+            onSend={(text, onSuccess) => actions.answer.mutate({ agentId: questionAgent.id, text }, { onSuccess })}
+          />
+        ) : (
+          <StatusCard display={d.display}>
+            {d.expectation && <span className="w-full text-xs text-muted-foreground">{d.expectation}</span>}
+            {primary()}
+            {d.display.secondaryActions.map((label) =>
+              label === 'See what changed' && d.prUrl ? (
+                <QuietButton key={label} onClick={() => window.open(d.prUrl!, '_blank', 'noopener')}>{label}</QuietButton>
+              ) : label === 'Tell the agent something' ? (
+                <QuietButton key={label} onClick={() => composerRef.current?.focus()}>{label}</QuietButton>
+              ) : null,
             )}
-          </div>
+          </StatusCard>
+        )}
+
+        {/* The narrative feed — what it's doing */}
+        <section className="mt-6">
           <div className="mt-2.5">
             {agent ? (
-              <div className="h-[420px] overflow-hidden rounded-xl border border-border">
-                {/* PAN-2908 C-SIMPLE/C-CONVO: the real transcript once work
-                    starts — the same renderer as every other conversation
-                    surface. The panel's own composer is hidden; the simple
-                    composer below stays the single way to talk to it. */}
-                <DrawerAgentSession
-                  view="conversation"
-                  agents={d.agents}
-                  agentId={selectedAgent?.id ?? null}
-                  onSelectAgent={setSelectedAgentId}
-                  issueId={d.issue.identifier}
-                  hideComposer
-                />
-              </div>
+              <SimpleActivityFeed
+                issue={d.issue}
+                agents={d.agents}
+                agent={selectedAgent!}
+                onSelectAgent={setSelectedAgentId}
+                state={d.display.state}
+              />
             ) : (
               <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
                 Nothing to show yet — updates appear here as it works.
               </div>
             )}
           </div>
-          <div className="mt-3 flex items-center gap-2 rounded-2xl border border-input bg-card py-2 pl-3.5 pr-2 focus-within:border-ring">
-            <input
-              ref={composerRef}
-              value={composerText}
-              onChange={(e) => setComposerText(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') sendComposer(); }}
-              placeholder={questionAgent ? S.answerPlaceholder : S.composerPlaceholder}
-              className="flex-1 bg-transparent text-[13.5px] text-foreground outline-none"
-            />
-            <button
-              onClick={sendComposer}
-              disabled={!composerText.trim() || (!selectedAgent && !questionAgent) || busy}
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
-              aria-label="Send"
-            >
-              ➤
-            </button>
-          </div>
-          <div className="mt-1.5 pl-1 text-[11px] text-muted-foreground">{questionAgent ? S.answerHint : S.composerHint}</div>
+          {!richQuestion && (
+            <>
+              <div className="mt-3 flex items-center gap-2 rounded-2xl border border-input bg-card py-2 pl-3.5 pr-2 focus-within:border-ring">
+                <input
+                  ref={composerRef}
+                  value={composerText}
+                  onChange={(e) => setComposerText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') sendComposer(); }}
+                  placeholder={questionAgent ? S.answerPlaceholder : S.composerPlaceholder}
+                  className="flex-1 bg-transparent text-[13.5px] text-foreground outline-none"
+                />
+                <button
+                  onClick={sendComposer}
+                  disabled={!composerText.trim() || (!selectedAgent && !questionAgent) || busy}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
+                  aria-label="Send"
+                >
+                  ➤
+                </button>
+              </div>
+              <div className="mt-1.5 pl-1 text-[11px] text-muted-foreground">{questionAgent ? S.answerHint : S.composerHint}</div>
+            </>
+          )}
         </section>
 
         {/* Advanced disclosure */}

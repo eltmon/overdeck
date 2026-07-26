@@ -32,14 +32,34 @@ export async function checkIncompletePlanItemsPromise(workspacePath: string, _is
   return checkIncompletePlanItemsSync(workspacePath);
 }
 
-function nonStateLines(porcelain: string): string[] {
-  return porcelain.split('\n').map((line) => line.trimEnd()).filter(Boolean).filter((line) => !isStatePlaneOnlyStatus(line));
+/**
+ * Generated devcontainer harness (`pan workspace render-devcontainer`):
+ * reproducible runtime artifacts, never commit targets. Excluded from the
+ * uncommitted-changes check unconditionally — without this, the preflight
+ * fails on `?? .devcontainer/` / `?? dev` and agents infer they must delete
+ * workspace infrastructure to unblock `pan done` (MIN-896/MIN-898).
+ */
+const GENERATED_HARNESS_PATHS = ['.devcontainer/', '.devcontainer', 'dev'];
+
+function isGeneratedHarnessStatus(porcelain: string): boolean {
+  const path = porcelain.slice(3).trim();
+  return GENERATED_HARNESS_PATHS.some((p) => path === p || path.startsWith(p.endsWith('/') ? p : `${p}/`));
+}
+
+/** Pure, exported for tests: drop state-plane and generated-harness lines from `git status --porcelain`. */
+export function filterUncommittedPorcelainLines(porcelain: string): string[] {
+  return porcelain.split('\n').map((line) => line.trimEnd()).filter(Boolean)
+    .filter((line) => !isStatePlaneOnlyStatus(line))
+    .filter((line) => !isGeneratedHarnessStatus(line));
 }
 
 async function checkUncommittedChangesPromise(workspacePath: string): Promise<string[]> {
   if (existsSync(join(workspacePath, '.git'))) {
     try {
-      const lines = nonStateLines((await execAsync('git status --porcelain', { cwd: workspacePath })).stdout);
+      // -uall: list untracked files individually instead of collapsing dirs, so
+      // state-plane paths (.pan/review/ etc.) inside an untracked .pan/ dir are
+      // still matched and filtered — a collapsed `?? .pan/` line is not.
+      const lines = filterUncommittedPorcelainLines((await execAsync('git status --porcelain -uall', { cwd: workspacePath })).stdout);
       return lines.length === 0 ? [] : ['  Uncommitted changes:', ...lines.map((line) => `    ${line}`)];
     } catch { return []; }
   }
@@ -50,7 +70,7 @@ async function checkUncommittedChangesPromise(workspacePath: string): Promise<st
       const path = join(workspacePath, entry.name);
       if (!existsSync(join(path, '.git'))) continue;
       try {
-        const lines = nonStateLines((await execAsync('git status --porcelain', { cwd: path })).stdout);
+        const lines = filterUncommittedPorcelainLines((await execAsync('git status --porcelain -uall', { cwd: path })).stdout);
         if (lines.length > 0) failures.push(`  Uncommitted changes in ${entry.name}/:`, ...lines.map((line) => `    ${line}`));
       } catch { /* ignore unreadable sub-repositories */ }
     }

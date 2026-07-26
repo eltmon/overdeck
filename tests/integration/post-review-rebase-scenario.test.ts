@@ -101,6 +101,12 @@ vi.mock('child_process', async (importOriginal) => {
   };
 });
 
+vi.mock('../../src/lib/workspace-anchor-drift.js', () => ({
+  evaluateWorkspaceAnchorDrift: vi.fn(async () => mockOldTreeSha === mockNewTreeSha
+    ? { kind: 'benign', currentAnchor: mockExecHeadSha }
+    : { kind: 'drifted', currentAnchor: mockExecHeadSha }),
+}));
+
 // ─── Stub modules that deacon and done.ts import ──────────────────────────────
 
 const mockResolveProject = vi.fn();

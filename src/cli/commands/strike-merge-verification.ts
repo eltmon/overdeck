@@ -1,7 +1,46 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
+import { getReviewStatusSync, setReviewStatusSync } from '../../lib/review-status.js';
+
 const execAsync = promisify(exec);
+
+/**
+ * PAN-3067: the review-status patch that records a strike's by-design bypass
+ * of the test and verification stages as 'skipped' verdicts (DoD rows 2 and 3
+ * accept 'skipped'; a silent gap reads as 'missing' and blocks close-out
+ * forever). Verdicts already terminal (passed/skipped) are left untouched.
+ */
+export function buildStrikeBypassStamp(
+  current: { verificationStatus?: string; testStatus?: string } | null,
+): {
+  verificationStatus?: 'skipped';
+  verificationNotes?: string;
+  testStatus?: 'skipped';
+  testNotes?: string;
+} {
+  const stamp: ReturnType<typeof buildStrikeBypassStamp> = {};
+  if (current?.verificationStatus !== 'passed' && current?.verificationStatus !== 'skipped') {
+    stamp.verificationStatus = 'skipped';
+    stamp.verificationNotes = 'Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)';
+  }
+  if (current?.testStatus !== 'passed' && current?.testStatus !== 'skipped') {
+    stamp.testStatus = 'skipped';
+    stamp.testNotes = 'Strike path: no test specialist is dispatched for strikes by design (PAN-3067)';
+  }
+  return stamp;
+}
+
+/** Apply the strike-bypass stamp through the review-status write door; returns the stamped verdict fields. */
+export function recordStrikeBypassVerdicts(issueId: string): string[] {
+  const stamp = buildStrikeBypassStamp(getReviewStatusSync(issueId));
+  const stampedFields = Object.keys(stamp).filter(key => key.endsWith('Status'));
+  if (stampedFields.length > 0) {
+    setReviewStatusSync(issueId, stamp);
+    console.log(`✓ Recorded strike-bypass verdicts (${stampedFields.join(', ')}) for DoD close-out`);
+  }
+  return stampedFields;
+}
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;

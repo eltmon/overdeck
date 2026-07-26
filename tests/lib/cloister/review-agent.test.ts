@@ -697,9 +697,9 @@ describe('stale synthesis session detection (PAN-1131)', () => {
 
     // The guard must consult the existing session's reviewRunId …
     expect(guardBlock).toContain('reviewRunId');
-    // … derived from a HEAD probe, and use it to decide staleness.
+    // … derived from the same composite-aware helper as runId construction.
     expect(guardBlock).toMatch(/staleRunId/);
-    expect(guardBlock).toContain('git rev-parse --short=8 HEAD');
+    expect(guardBlock).toContain('deriveReviewRunHead8(opts.issueId, opts.workspace)');
     // … and the "skip" path must require NOT-stale, not just pane-alive.
     expect(guardBlock).toMatch(/!paneDead && !opts\.force && !staleRunId/);
   });

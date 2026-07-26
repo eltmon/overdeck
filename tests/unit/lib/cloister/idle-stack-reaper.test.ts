@@ -15,11 +15,13 @@ const FRONTEND = (id: string) => `overdeck-feature-${id}-frontend-1`;
 
 function makeDeps(over: Partial<IdleStackReaperDeps> & {
   containers?: string[];
+  composeContainers?: { name: string; composeProject?: string }[];
   sessions?: string[];
 }): { deps: Partial<IdleStackReaperDeps>; stopped: string[][] } {
   const stopped: string[][] = [];
   const deps: Partial<IdleStackReaperDeps> = {
     listContainerNames: async () => over.containers ?? [],
+    listComposeContainers: async () => over.composeContainers ?? [],
     listSessions: async () => over.sessions ?? [],
     stopContainers: async (names) => { stopped.push(names); },
     now: over.now ?? (() => 1_000_000),
@@ -48,6 +50,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
     const stopped: string[][] = [];
     const deps: Partial<IdleStackReaperDeps> = {
       listContainerNames: async () => [SERVER('pan-9002'), FRONTEND('pan-9002')],
+      listComposeContainers: async () => [],
       listSessions: async () => [],
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
@@ -70,6 +73,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
     const stopped: string[][] = [];
     const deps: Partial<IdleStackReaperDeps> = {
       listContainerNames: async () => [SERVER('pan-9003'), FRONTEND('pan-9003')],
+      listComposeContainers: async () => [],
       listSessions: async () => ['agent-pan-9003-review'], // active review convoy
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
@@ -87,6 +91,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
     const stopped: string[][] = [];
     const deps: Partial<IdleStackReaperDeps> = {
       listContainerNames: async () => [SERVER('pan-9004')],
+      listComposeContainers: async () => [],
       listSessions: async () => sessions,
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
@@ -108,6 +113,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
     const stopped: string[][] = [];
     const deps: Partial<IdleStackReaperDeps> = {
       listContainerNames: async () => [SERVER('pan-9005')],
+      listComposeContainers: async () => [],
       listSessions: async () => [],
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
@@ -127,6 +133,7 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
         `overdeck-feature-pan-9006-init-1`,
         `some-unrelated-container`,
       ],
+      listComposeContainers: async () => [],
       listSessions: async () => [],
       stopContainers: async (names) => { stopped.push(names); },
       now: () => nowMs,
@@ -134,6 +141,123 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
     };
     await reconcileIdleWorkspaceStacks(deps);
     nowMs += 10;
+    const actions = await reconcileIdleWorkspaceStacks(deps);
+    expect(actions).toEqual([]);
+    expect(stopped).toEqual([]);
+  });
+});
+
+describe('reconcileIdleWorkspaceStacks — full-stack tier (2026-07-25 container leak)', () => {
+  beforeEach(() => { __resetIdleStackReaperState(); delete process.env.OVERDECK_DISABLE_STACK_REAPER; });
+  afterEach(() => { vi.restoreAllMocks(); delete process.env.OVERDECK_DISABLE_STACK_REAPER; });
+
+  const MYN = (project: string, svc: string) => `${project}-${svc}-1`;
+
+  it('starts the full-tier grace clock on first observation — no stop', async () => {
+    const stopped: string[][] = [];
+    const project = 'myn-feature-min-898';
+    const deps: Partial<IdleStackReaperDeps> = {
+      listContainerNames: async () => [],
+      listComposeContainers: async () => [
+        { name: MYN(project, 'fe'), composeProject: project },
+        { name: MYN(project, 'postgres'), composeProject: project },
+      ],
+      listSessions: async () => [],
+      stopContainers: async (names) => { stopped.push(names); },
+      now: () => 1_000_000,
+      graceMs: 1,
+      fullStackGraceMs: 10_000,
+    };
+    expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]);
+    expect(stopped).toEqual([]);
+  });
+
+  it('stops every service except the dev attach target after the full grace window', async () => {
+    let nowMs = 1_000_000;
+    const stopped: string[][] = [];
+    const project = 'myn-feature-min-898';
+    const deps: Partial<IdleStackReaperDeps> = {
+      listContainerNames: async () => [],
+      listComposeContainers: async () => [
+        { name: MYN(project, 'fe'), composeProject: project },
+        { name: MYN(project, 'api'), composeProject: project },
+        { name: MYN(project, 'postgres'), composeProject: project },
+        { name: MYN(project, 'redis'), composeProject: project },
+        { name: MYN(project, 'dev'), composeProject: project },
+      ],
+      listSessions: async () => [],
+      stopContainers: async (names) => { stopped.push(names); },
+      now: () => nowMs,
+      graceMs: 1,
+      fullStackGraceMs: 10_000,
+    };
+    expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]); // clock starts
+    nowMs += 11_000;
+    const actions = await reconcileIdleWorkspaceStacks(deps);
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('MIN-898');
+    expect(stopped).toHaveLength(1);
+    expect(stopped[0].sort()).toEqual([
+      MYN(project, 'fe'), MYN(project, 'api'), MYN(project, 'postgres'), MYN(project, 'redis'),
+    ].sort());
+  });
+
+  it('NEVER full-reaps a project with a live tmux session for the issue', async () => {
+    let nowMs = 1_000_000;
+    const stopped: string[][] = [];
+    const project = 'myn-feature-min-898';
+    const deps: Partial<IdleStackReaperDeps> = {
+      listContainerNames: async () => [],
+      listComposeContainers: async () => [{ name: MYN(project, 'fe'), composeProject: project }],
+      listSessions: async () => ['agent-min-898-review'],
+      stopContainers: async (names) => { stopped.push(names); },
+      now: () => nowMs,
+      graceMs: 1,
+      fullStackGraceMs: 10_000,
+    };
+    expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]);
+    nowMs += 60_000;
+    expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]);
+    expect(stopped).toEqual([]);
+  });
+
+  it('ignores containers without compose labels and non-feature project names', async () => {
+    let nowMs = 1_000_000;
+    const stopped: string[][] = [];
+    const deps: Partial<IdleStackReaperDeps> = {
+      listContainerNames: async () => [],
+      listComposeContainers: async () => [
+        { name: 'myn-feature-min-899-fe-1' }, // no label — not matched
+        { name: 'traefik', composeProject: 'panopticon-traefik' },
+        { name: 'myn-main-fe-1', composeProject: 'myn-main' }, // not a feature stack
+      ],
+      listSessions: async () => [],
+      stopContainers: async (names) => { stopped.push(names); },
+      now: () => nowMs,
+      graceMs: 1,
+      fullStackGraceMs: 10_000,
+    };
+    await reconcileIdleWorkspaceStacks(deps);
+    nowMs += 60_000;
+    expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]);
+    expect(stopped).toEqual([]);
+  });
+
+  it('does nothing when only the dev container remains', async () => {
+    let nowMs = 1_000_000;
+    const stopped: string[][] = [];
+    const project = 'myn-feature-min-900';
+    const deps: Partial<IdleStackReaperDeps> = {
+      listContainerNames: async () => [],
+      listComposeContainers: async () => [{ name: MYN(project, 'dev'), composeProject: project }],
+      listSessions: async () => [],
+      stopContainers: async (names) => { stopped.push(names); },
+      now: () => nowMs,
+      graceMs: 1,
+      fullStackGraceMs: 10_000,
+    };
+    await reconcileIdleWorkspaceStacks(deps);
+    nowMs += 60_000;
     const actions = await reconcileIdleWorkspaceStacks(deps);
     expect(actions).toEqual([]);
     expect(stopped).toEqual([]);

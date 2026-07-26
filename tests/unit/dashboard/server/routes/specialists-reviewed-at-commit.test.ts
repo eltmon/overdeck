@@ -58,6 +58,11 @@ vi.mock('child_process', async (importActual) => {
       const callback = args[args.length - 1] as (err: Error | null, result: { stdout: string; stderr: string }) => void;
       if (gitArgs[0] === 'rev-parse') {
         const ref = gitArgs[1]!;
+        if (ref.endsWith('^{tree}')) {
+          const commit = ref.slice(0, -7);
+          callback(null, { stdout: `${mockTreeShaByCommit.get(commit) ?? `${commit}-tree`}\n`, stderr: '' });
+          return {} as ReturnType<typeof actual.execFile>;
+        }
         if (ref.endsWith('^')) {
           const commit = ref.slice(0, -1);
           const parent = mockParentShaByCommit.get(commit);

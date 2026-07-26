@@ -267,7 +267,11 @@ function generateJWT(appId: string, privateKey: string): string {
   const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
   const payload = Buffer.from(JSON.stringify({
     iat: now - 60, // 60s clock drift allowance
-    exp: now + 600, // 10 minute expiry
+    // GitHub rejects exp more than 600s ahead of *its* clock. A local clock
+    // running even a few seconds fast made `now + 600` land at 608s and 401 with
+    // "'Expiration time' claim ('exp') is too far in the future", so leave 60s
+    // of headroom instead of sitting exactly on the limit.
+    exp: now + 540,
     iss: appId,
   })).toString('base64url');
 

@@ -78,3 +78,28 @@ describe('open-tasks check follows .tasks/redirect (PAN-2195)', () => {
     }
   });
 });
+
+describe('filterUncommittedPorcelainLines (MIN-896/MIN-898 generated-harness exclusion)', () => {
+  it('excludes generated devcontainer harness artifacts', async () => {
+    const { filterUncommittedPorcelainLines } = await import('../done-preflight.js');
+    expect(filterUncommittedPorcelainLines('?? .devcontainer/\n?? dev\n')).toEqual([]);
+    expect(filterUncommittedPorcelainLines('?? .devcontainer/docker-compose.devcontainer.yml\n?? dev\n')).toEqual([]);
+  });
+
+  it('excludes state-plane paths when -uall expands them inside an untracked .pan/ dir', async () => {
+    const { filterUncommittedPorcelainLines } = await import('../done-preflight.js');
+    expect(filterUncommittedPorcelainLines('?? .pan/review/run-1/context.json\n?? .pan/test/results.json\n')).toEqual([]);
+  });
+
+  it('keeps real source dirt visible', async () => {
+    const { filterUncommittedPorcelainLines } = await import('../done-preflight.js');
+    const out = filterUncommittedPorcelainLines('?? .devcontainer/\n?? dev\n M src/foo.ts\n?? src/new-file.ts\n');
+    expect(out).toEqual([' M src/foo.ts', '?? src/new-file.ts']);
+  });
+
+  it('does not over-match lookalike paths (devdist, devops/, .devcontainer.bak)', async () => {
+    const { filterUncommittedPorcelainLines } = await import('../done-preflight.js');
+    const out = filterUncommittedPorcelainLines('?? devdist\n?? devops/\n?? .devcontainer.bak\n');
+    expect(out).toEqual(['?? devdist', '?? devops/', '?? .devcontainer.bak']);
+  });
+});

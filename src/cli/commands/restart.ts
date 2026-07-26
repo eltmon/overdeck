@@ -46,6 +46,7 @@ import {
   StageError,
   waitForDashboardHealth,
   stopDashboard,
+  parseHealthTimeoutMs,
   type DashboardSpawnHandle,
   type PlatformConfig,
 } from '../../lib/platform-lifecycle.js';
@@ -185,6 +186,12 @@ export function scrubAgentIdentityFromDashboardEnv(env: NodeJS.ProcessEnv): void
   delete env.OVERDECK_AGENT_ID;
   delete env.OVERDECK_ISSUE_ID;
   delete env.OVERDECK_SESSION_TYPE;
+  // An agent-launched restart inherits the launcher's git-guard shim dir on
+  // PATH; a dashboard running behind that shim has every `git stash`/`git
+  // rebase` it issues rejected (the 2026-07-26 workspaces-route GitError storm).
+  if (env.PATH !== undefined) {
+    env.PATH = env.PATH.split(':').filter(segment => !segment.endsWith('/git-guard')).join(':');
+  }
 }
 
 export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOptions): DashboardSpawnHandle {
@@ -338,9 +345,15 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
     return;
   }
   const config = readPlatformConfigSync();
-  const healthTimeoutMs = options.healthTimeout
-    ? parseInt(options.healthTimeout, 10)
-    : undefined;
+  let healthTimeoutMs: number | undefined;
+  try {
+    healthTimeoutMs = options.healthTimeout
+      ? parseHealthTimeoutMs(options.healthTimeout, 15_000)
+      : undefined;
+  } catch (err) {
+    console.error(chalk.red(`Error: ${(err as Error).message}`));
+    return exitCli(2);
+  }
 
   const bootGates = resolveBootGates(options);
   console.log(chalk.dim(`  Boot gates: ${formatBootGateState(bootGates)}`));

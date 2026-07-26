@@ -33,6 +33,7 @@ vi.mock('../../../src/lib/telemetry/pipeline.js', () => ({
 }));
 
 import { getReviewStatusSync, setReviewStatusSync } from '../../../src/lib/review-status.js';
+import { rehydrateHeadAnchor } from '../../../src/lib/git-utils.js';
 
 describe('review status', () => {
   beforeEach(() => {
@@ -45,6 +46,15 @@ describe('review status', () => {
 
   afterEach(() => {
     testDb.close();
+  });
+
+  it('rejects raw strings at the review anchor write door', () => {
+    const invalidWrite = () => {
+      // @ts-expect-error reviewedAtCommit must be producer-issued or explicitly rehydrated.
+      setReviewStatusSync('PAN-3076', { reviewedAtCommit: 'raw-string' });
+    };
+
+    expect(invalidWrite).toBeTypeOf('function');
   });
 
   it('persists scope drift through the review status journal update', () => {
@@ -69,7 +79,8 @@ describe('review status', () => {
   });
 
   it('finalizes verification when no-code-drift skips the post-review test role', () => {
-    const head = 'abc123abc123abc123abc123abc123abc123abcd';
+    // This fixture simulates an anchor read back from unbranded storage.
+    const head = rehydrateHeadAnchor('abc123abc123abc123abc123abc123abc123abcd');
     setReviewStatusSync('PAN-2200', {
       reviewStatus: 'pending',
       testStatus: 'pending',

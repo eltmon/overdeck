@@ -2,7 +2,7 @@ import { exec, type ExecOptions } from 'node:child_process';
 import { promisify } from 'node:util';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { messageAgent, spawnRun } from '../agents.js';
-import { getReviewStatusSync, setReviewStatusSync, type BlockerReason, type ReviewStatus } from '../review-status.js';
+import { getReviewStatusSync, setReviewStatusSync, type BlockerReason, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
 
 const execAsync = promisify(exec);
 const GIT_TIMEOUT_MS = 30_000;
@@ -45,7 +45,7 @@ export interface ResolveConflictGateDeps {
   getReviewStatus: (issueId: string) => ReviewStatus | null | Promise<ReviewStatus | null>;
   setReviewStatus: (
     issueId: string,
-    update: Partial<ReviewStatus>,
+    update: ReviewStatusUpdate,
     existing?: ReviewStatus,
   ) => ReviewStatus | Promise<ReviewStatus>;
   probeMergeability?: (workspacePath: string, targetBranch: string) => BranchMergeability | Promise<BranchMergeability>;

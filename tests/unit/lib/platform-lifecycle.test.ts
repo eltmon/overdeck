@@ -15,6 +15,7 @@ import {
   restartDashboard,
   waitForDashboardHealth,
   StageError,
+  parseHealthTimeoutMs,
 } from '../../../src/lib/platform-lifecycle.js';
 
 // Use ephemeral ports so stopDashboard's lsof scan never hits a real
@@ -69,7 +70,7 @@ describe('restartDashboard — scope contract', () => {
     expect(cliproxySpies.isCliproxyRunning).not.toHaveBeenCalled();
   });
 
-  it('reaps the spawned dashboard if health check never passes', async () => {
+  it('LEAVES the spawned dashboard running if health check never passes (#3099: no zero-listener exit)', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     vi.unstubAllGlobals();
     const fetchMock = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
@@ -84,14 +85,43 @@ describe('restartDashboard — scope contract', () => {
       while (fetchMock.mock.calls.length === 0) {
         await new Promise<void>((resolve) => setImmediate(resolve));
       }
-      const rejection = expect(restart).rejects.toBeInstanceOf(StageError);
+      const rejection = expect(restart).rejects.toThrowError(/LEFT RUNNING/);
       await vi.advanceTimersByTimeAsync(500);
 
       await rejection;
-      expect(stop).toHaveBeenCalledTimes(1);
+      // The 2026-07-26 incident: a 120ms timeout false-failed a healthy boot and
+      // the old policy reaped it, leaving zero listeners. The spawn must survive.
+      expect(stop).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('parseHealthTimeoutMs (#3099)', () => {
+  it('returns the default when the flag is absent', () => {
+    expect(parseHealthTimeoutMs(undefined, 15_000)).toBe(15_000);
+    expect(parseHealthTimeoutMs('', 30_000)).toBe(30_000);
+  });
+
+  it('treats bare numbers as milliseconds, floored at 1000ms', () => {
+    expect(parseHealthTimeoutMs('30000', 15_000)).toBe(30_000);
+    expect(parseHealthTimeoutMs('1000', 15_000)).toBe(1000);
+  });
+
+  it('rejects sub-floor bare values with a did-you-mean-seconds hint', () => {
+    expect(() => parseHealthTimeoutMs('120', 15_000)).toThrow(/below the 1000ms floor.*did you mean 120s\?/s);
+  });
+
+  it('supports s and m suffixes', () => {
+    expect(parseHealthTimeoutMs('120s', 15_000)).toBe(120_000);
+    expect(parseHealthTimeoutMs('2m', 15_000)).toBe(120_000);
+  });
+
+  it('rejects garbage and non-numeric input instead of silently NaN-ing', () => {
+    expect(() => parseHealthTimeoutMs('abc', 15_000)).toThrow(/--health-timeout must be a positive integer/);
+    expect(() => parseHealthTimeoutMs('10x', 15_000)).toThrow(/--health-timeout must be a positive integer/);
+    expect(() => parseHealthTimeoutMs('-5', 15_000)).toThrow(/--health-timeout must be a positive integer/);
   });
 });
 

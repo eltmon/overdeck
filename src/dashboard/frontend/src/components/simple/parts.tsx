@@ -50,6 +50,9 @@ const STEP_INDEX_BY_STATE: Record<UserFacingState, number> = {
 export function StepsTrack({ state }: { state: UserFacingState }) {
   const steps = SIMPLE_STRINGS.issue.steps;
   const current = STEP_INDEX_BY_STATE[state];
+  // PAN-3090: a blocked agent is not working — the current node turns amber
+  // and says so, instead of pulsing blue "Writing code" (FR-4).
+  const waiting = state === 'needs-you';
   return (
     <div className="mt-5 flex" role="list">
       {steps.map((name, i) => {
@@ -70,7 +73,8 @@ export function StepsTrack({ state }: { state: UserFacingState }) {
               className={cn(
                 'absolute left-1/2 top-0 h-3 w-3 -translate-x-1/2 rounded-full border-2',
                 done && 'border-transparent bg-success',
-                now && 'border-transparent bg-info shadow-[0_0_0_3px] shadow-info/25',
+                now && !waiting && 'border-transparent bg-info shadow-[0_0_0_3px] shadow-info/25',
+                now && waiting && 'border-transparent bg-warning shadow-[0_0_0_3px] shadow-warning/25',
                 !done && !now && 'border-border bg-muted',
               )}
             />
@@ -84,6 +88,11 @@ export function StepsTrack({ state }: { state: UserFacingState }) {
             >
               {name}
             </span>
+            {now && waiting && (
+              <span className="mt-0.5 block text-[10.5px] text-warning-foreground">
+                {SIMPLE_STRINGS.issue.waitingOnYou}
+              </span>
+            )}
           </div>
         );
       })}
@@ -92,29 +101,29 @@ export function StepsTrack({ state }: { state: UserFacingState }) {
 }
 
 /* ── Status card ─────────────────────────────────────────────────────── */
-const STATUS_TONE: Record<UserFacingState, { ring: string; iconBg: string; icon: ReactNode }> = {
+const STATUS_TONE: Record<UserFacingState, { accent: string; iconBg: string; icon: ReactNode }> = {
   'not-started': {
-    ring: 'border-border',
+    accent: 'border-transparent',
     iconBg: 'bg-muted text-muted-foreground',
     icon: <PauseCircle size={15} />,
   },
   working: {
-    ring: 'border-info/30',
+    accent: 'border-info',
     iconBg: 'bg-info/10 text-info-foreground',
     icon: <LoaderCircle size={15} />,
   },
   'needs-you': {
-    ring: 'border-warning/40',
+    accent: 'border-warning',
     iconBg: 'bg-warning/10 text-warning-foreground',
     icon: <CircleHelp size={15} />,
   },
   ready: {
-    ring: 'border-success/40',
+    accent: 'border-success',
     iconBg: 'bg-success/10 text-success-foreground',
     icon: <Check size={15} />,
   },
   done: {
-    ring: 'border-border',
+    accent: 'border-transparent',
     iconBg: 'bg-success/10 text-success-foreground',
     icon: <Check size={15} />,
   },
@@ -122,8 +131,16 @@ const STATUS_TONE: Record<UserFacingState, { ring: string; iconBg: string; icon:
 
 export function StatusCard({ display, children }: { display: UserFacingDisplay; children?: ReactNode }) {
   const tone = STATUS_TONE[display.state];
+  // PAN-3090: 3px left accent carries the state color; light mode is
+  // borderless with an ambient shadow, dark mode keeps a hairline border.
   return (
-    <div className={cn('mt-4 rounded-2xl border bg-card p-4 shadow-sm', tone.ring)}>
+    <div
+      className={cn(
+        'mt-4 rounded-2xl border-l-[3px] bg-card p-4',
+        'shadow-[0_1px_2px_rgb(0_0_0/0.05),0_4px_16px_rgb(0_0_0/0.05)] dark:border dark:border-border dark:shadow-none',
+        tone.accent,
+      )}
+    >
       <div className="flex items-center gap-3">
         <span className={cn('flex h-8 w-8 flex-none items-center justify-center rounded-full', tone.iconBg)}>
           {tone.icon}

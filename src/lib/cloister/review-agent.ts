@@ -37,6 +37,7 @@
  */
 
 import { exec } from 'child_process';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'fs';
 import { mkdir, readFile, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
@@ -80,6 +81,33 @@ export const PARENT_REVIEW_TIMEOUT_MS = 45 * 60 * 1000;
 
 const reviewSynthesisPath = (reviewDir: string): string => join(reviewDir, 'synthesis.md');
 const selfReviewReportPath = (reviewDir: string): string => join(reviewDir, 'review.md');
+
+async function deriveReviewRunHead8(issueId: string, workspace: string): Promise<string> {
+  try {
+    const { resolvePrimaryWorkspaceRepoDirSync, resolveWorkspaceRepoRootsSync } = await import('../project-repos.js');
+    const roots = resolveWorkspaceRepoRootsSync(issueId, workspace);
+    if (roots.some(root => root.isPolyrepo)) {
+      const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
+      const anchor = await snapshotWorkspaceHeadsPromise(issueId, workspace);
+      return anchor
+        ? createHash('sha1').update(anchor).digest('hex').substring(0, 8)
+        : 'unknown';
+    }
+
+    // PAN-3037: the primary code repo is resolved through the shared helper —
+    // the polyrepo wrapper's HEAD never moves, so a wrapper-derived runId would
+    // mismatch every live run and kill a healthy convoy on each dispatch.
+    const probeDir = resolvePrimaryWorkspaceRepoDirSync(issueId, workspace);
+    const { stdout } = await execAsync(['git', 'rev-parse', '--short=8', 'HEAD'].join(' '), {
+      cwd: probeDir,
+      encoding: 'utf-8',
+      timeout: 10_000,
+    });
+    return stdout.trim() || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
 
 function buildReviewRolePrompt(opts: {
   issueId: string;
@@ -359,17 +387,9 @@ async function spawnReviewRoleForIssuePromise(
       let currentRunId: string | undefined;
       if (!paneDead && !opts.force) {
         try {
-          // PAN-2948: probe the primary code repo — the polyrepo wrapper's HEAD
-          // never moves, so a wrapper-derived runId would mismatch every live
-          // run and kill a healthy convoy on each dispatch.
-          const { resolvePrimaryWorkspaceRepoDirSync } = await import('../project-repos.js');
-          const probeDir = resolvePrimaryWorkspaceRepoDirSync(opts.issueId, opts.workspace);
-          const { stdout } = await execAsync('git rev-parse --short=8 HEAD', {
-            cwd: probeDir,
-            encoding: 'utf-8',
-            timeout: 10_000,
-          });
-          currentRunId = `agent-${opts.issueId.toLowerCase()}-review-${stdout.trim()}`;
+          const head8 = await deriveReviewRunHead8(opts.issueId, opts.workspace);
+          if (head8 === 'unknown') throw new Error('workspace HEAD unavailable');
+          currentRunId = `agent-${opts.issueId.toLowerCase()}-review-${head8}`;
           const synthReviewRunId = getAgentStateSync(reviewSessionName)?.reviewRunId;
           // A missing identity cannot prove that the live pane covers the
           // current obligation, so legacy/unknown sessions are stale too.
@@ -538,20 +558,12 @@ async function spawnReviewRoleForIssuePromise(
     // read one pre-built diff+AC object instead of each running git diff
     // independently (PAN-1059).
     //
-    // Include HEAD SHA in runId so re-reviews of the same issue get their own
-    // directory and don't overwrite round-1 files (collision prevention).
-    // PAN-2948: resolve the head from the primary code repo — in a polyrepo
-    // workspace the root is an immutable one-commit wrapper, so its SHA would
-    // pin every re-review to the same run directory.
-    let headSha = 'unknown';
-    try {
-      const { resolvePrimaryWorkspaceRepoDirSync } = await import('../project-repos.js');
-      const primaryRepoDir = resolvePrimaryWorkspaceRepoDirSync(opts.issueId, opts.workspace);
-      const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: primaryRepoDir, encoding: 'utf-8', timeout: 10_000 });
-      headSha = stdout.trim();
-    } catch { /* non-fatal — fall back to static runId */ }
-    const runId = headSha !== 'unknown'
-      ? `agent-${opts.issueId.toLowerCase()}-review-${headSha}`
+    // Include the shared workspace-head digest in runId so re-reviews of the
+    // same issue get separate directories. Monorepos retain their short HEAD;
+    // polyrepos hash the full composite anchor so any sub-repo move changes it.
+    const head8 = await deriveReviewRunHead8(opts.issueId, opts.workspace);
+    const runId = head8 !== 'unknown'
+      ? `agent-${opts.issueId.toLowerCase()}-review-${head8}`
       : `agent-${opts.issueId.toLowerCase()}-review`;
     const reviewDir = join(opts.workspace, PAN_DIRNAME, 'review', runId);
     let contextManifestPath: string | undefined;

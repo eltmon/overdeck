@@ -16,12 +16,12 @@ import { useDashboardStore } from '../../lib/store';
 import { useUiMode } from '../../lib/simple/uiMode';
 import type { Issue } from '../../types';
 
-// The real transcript (ConversationPanel chain) is too heavy for jsdom; the
-// contract these tests prove is that the simple page MOUNTS it once an agent
-// exists and hides it before then.
-vi.mock('../drawer/DrawerAgentSession', () => ({
-  DrawerAgentSession: (props: { agentId: string | null; hideComposer?: boolean }) => (
-    <div data-testid="simple-transcript" data-agent-id={props.agentId ?? ''} data-hide-composer={String(!!props.hideComposer)} />
+// The narrative feed (stream/poll chain) is too heavy for jsdom; the contract
+// these tests prove is that the simple page MOUNTS it once an agent exists and
+// hides it before then. The feed itself is covered in SimpleActivityFeed.test.
+vi.mock('./SimpleActivityFeed', () => ({
+  SimpleActivityFeed: (props: { agent: { id: string } | null }) => (
+    <div data-testid="simple-activity-feed" data-agent-id={props.agent?.id ?? ''} />
   ),
 }));
 
@@ -141,28 +141,88 @@ describe('SimpleIssuePage (C-SIMPLE)', () => {
     });
     renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
     expect(screen.getByText('The agent is writing the code.')).toBeInTheDocument();
-    expect(screen.getByText('What it\'s saying and doing')).toBeInTheDocument();
+    expect(screen.getByTestId('simple-activity-feed')).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Say something to the agent/)).toBeInTheDocument();
   });
 
-  it('shows the real transcript once an agent exists, with the panel composer hidden', () => {
+  it('renders the narrative feed once an agent exists, with one composer', () => {
     seed({
       issues: [makeIssue()],
       agents: { 'agent-pan-1': makeAgent() },
     });
     renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
-    const transcript = screen.getByTestId('simple-transcript');
-    expect(transcript).toHaveAttribute('data-agent-id', 'agent-pan-1');
-    expect(transcript).toHaveAttribute('data-hide-composer', 'true');
+    const feed = screen.getByTestId('simple-activity-feed');
+    expect(feed).toHaveAttribute('data-agent-id', 'agent-pan-1');
     // …and there is still exactly ONE way to talk to it (the simple composer).
     expect(screen.getAllByRole('textbox')).toHaveLength(1);
   });
 
-  it('shows the empty state instead of the transcript before work starts', () => {
+  it('shows the empty state instead of the feed before work starts', () => {
     seed({ issues: [makeIssue()] });
     renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
-    expect(screen.queryByTestId('simple-transcript')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('simple-activity-feed')).not.toBeInTheDocument();
     expect(screen.getByText(/Nothing to show yet/)).toBeInTheDocument();
+  });
+
+  it('rich question: quotes the pending question with options and answers inline', async () => {
+    const fetchMock = vi.fn(async () => Response.json({ success: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    seed({
+      issues: [makeIssue()],
+      agents: {
+        'agent-pan-1': makeAgent({
+          pendingInputCount: 1,
+          pendingAskUserQuestion: {
+            toolUseId: 'tu-1',
+            askedAt: new Date().toISOString(),
+            questions: [{
+              question: 'Keep a compatibility view for one release?',
+              options: [
+                { label: 'Keep the view', description: 'Old apps keep working.' },
+                { label: 'Require the update' },
+              ],
+            }],
+          },
+        }),
+      },
+    });
+    renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
+    // The question itself is the hero — not a generic "needs one decision".
+    expect(screen.getByText(/Keep a compatibility view/)).toBeInTheDocument();
+    expect(screen.getByText('Old apps keep working.')).toBeInTheDocument();
+    // The below-feed composer is replaced by the in-card answer path.
+    expect(screen.queryByPlaceholderText(/Type your answer/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Keep the view'));
+    fireEvent.click(screen.getByRole('button', { name: 'Send answer' }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/agents/agent-pan-1/answer-question',
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ answers: ['Keep the view'] }) }),
+      );
+    });
+    await screen.findByText('Answer sent');
+  });
+
+  it('multi-question payloads fall back to the generic card + composer', () => {
+    seed({
+      issues: [makeIssue()],
+      agents: {
+        'agent-pan-1': makeAgent({
+          pendingInputCount: 2,
+          pendingAskUserQuestion: {
+            toolUseId: 'tu-1',
+            askedAt: new Date().toISOString(),
+            questions: [
+              { question: 'First?', options: [] },
+              { question: 'Second?', options: [] },
+            ],
+          },
+        }),
+      },
+    });
+    renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
+    expect(screen.getByText('The agent needs one decision from you before it can continue.')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Type your answer/)).toBeInTheDocument();
   });
 
   it('Get help routes to a new tracker issue pointing back at this task', () => {
@@ -278,7 +338,7 @@ describe('SimpleIssuePage (C-SIMPLE)', () => {
       {
         "done": "See what changed",
         "needs-you / problems": "Tell the agent to fix them",
-        "needs-you / question": "Answer",
+        "needs-you / question": "Send answer",
         "needs-you / stuck": "Get it unstuck",
         "not-started": "Start work",
         "ready": "Merge to main",

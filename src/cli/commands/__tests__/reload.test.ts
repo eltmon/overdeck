@@ -49,6 +49,12 @@ vi.mock('../../../lib/platform-lifecycle.js', () => ({
   readPlatformConfigSync: mocks.readPlatformConfig,
   restartDashboard: mocks.restartDashboard,
   stopDashboard: mocks.stopDashboard,
+  parseHealthTimeoutMs: (value: string | undefined, defaultMs: number) => {
+    if (value === undefined || value === '') return defaultMs;
+    const n = Number.parseInt(value, 10);
+    if (!Number.isFinite(n) || n <= 0) throw new Error(`--health-timeout must be a positive integer, got ${value}`);
+    return n;
+  },
   StageError: class StageError extends Error {
     failure: { stage: string; reason: string };
     constructor(failure: { stage: string; reason: string }) {

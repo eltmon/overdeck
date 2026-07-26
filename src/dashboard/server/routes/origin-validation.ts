@@ -1,3 +1,7 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import yaml from 'js-yaml';
 import type { HttpServerRequest } from 'effect/unstable/http';
 
 export type HeaderMap = Record<string, string | string[] | undefined>;
@@ -8,6 +12,35 @@ function addTrustedOrigin(origins: Set<string>, raw: string | undefined): void {
   if (!raw) return;
   const normalized = normalizeOrigin(raw.trim());
   if (normalized) origins.add(normalized);
+}
+
+interface TraefikYamlConfig {
+  enabled: boolean;
+  domain: string;
+}
+
+/**
+ * Last-resort origin config for launches that carry no origin env at all
+ * (manual `node dist/...`, ad-hoc re-exec). `pan up` builds its launch env from
+ * this same config.yaml, so reading it here keeps every launch path trusting the
+ * same Traefik domain instead of 403ing /ws/* into a "Reconnecting" loop.
+ */
+function readTraefikConfigFromYaml(): TraefikYamlConfig | null {
+  try {
+    const home = process.env['OVERDECK_HOME'] || join(homedir(), '.overdeck');
+    const configPath = join(home, 'config.yaml');
+    if (!existsSync(configPath)) return null;
+    const parsed = yaml.load(readFileSync(configPath, 'utf8')) as
+      | { traefik?: { enabled?: unknown; domain?: unknown } }
+      | null
+      | undefined;
+    const traefik = parsed?.traefik;
+    if (!traefik || typeof traefik !== 'object') return null;
+    if (typeof traefik.domain !== 'string' || traefik.domain.trim() === '') return null;
+    return { enabled: traefik.enabled === true, domain: traefik.domain.trim() };
+  } catch {
+    return null; // unreadable/invalid config → env-only behavior, same as before
+  }
 }
 
 export function getTrustedOrigins(): string[] {
@@ -31,6 +64,20 @@ export function getTrustedOrigins(): string[] {
   const traefikDomain = process.env['OVERDECK_TRAEFIK_DOMAIN'] ?? process.env['TRAEFIK_DOMAIN'];
   if (process.env['OVERDECK_TRAEFIK_ENABLED'] === '1' && traefikDomain) {
     addTrustedOrigin(origins, `https://${traefikDomain}`);
+  }
+
+  // Bare-launch fallback: when the launcher provided NO origin configuration at
+  // all, trust the domain from the operator's config.yaml. Any explicit env
+  // (even an explicit disable) wins over the file.
+  const hasEnvOriginConfig =
+    process.env['OVERDECK_TRAEFIK_ENABLED'] !== undefined ||
+    traefikDomain !== undefined ||
+    process.env['OVERDECK_TRUSTED_ORIGINS'] !== undefined;
+  if (!hasEnvOriginConfig) {
+    const fromYaml = readTraefikConfigFromYaml();
+    if (fromYaml?.enabled) {
+      addTrustedOrigin(origins, `https://${fromYaml.domain}`);
+    }
   }
 
   if (process.env['NODE_ENV'] === 'development') {

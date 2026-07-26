@@ -20,10 +20,14 @@ import { GitFork, TriangleAlert, AlertCircle, Wrench } from 'lucide-react';
 
 import { ConversationPanel } from '../chat/ConversationPanel';
 import { StartAgentCta } from '../issue-view/StartAgentCta';
-import type { Conversation } from '../CommandDeck/ConversationList';
 import { XTerminal } from '../XTerminal';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
+import { agentToConversation, isEndedAgent, type SessionAgent } from '../../lib/agentConversation';
 import styles from '../CommandDeck/styles/command-deck.module.css';
+
+// Re-exported so existing importers (IssueDrawer, dock, tests) keep working —
+// the definitions live in lib/agentConversation.ts (PAN-3090).
+export type { SessionAgent } from '../../lib/agentConversation';
 
 interface AgentGitInfo {
   actualBranch: string | null;
@@ -39,30 +43,6 @@ async function fetchAgentGitInfo(agentId: string): Promise<AgentGitInfo | null> 
   return res.json();
 }
 
-const ENDED_AGENT_STATUSES = new Set<string>(['stopped', 'dead', 'failed']);
-
-/**
- * The minimal agent shape a session pane needs. Both the read-model
- * AgentSnapshot (simple mode, peeks) and the REST Agent (drawer) satisfy it —
- * one conversation renderer over whichever projection the caller has.
- */
-export interface SessionAgent {
-  id: string;
-  issueId?: string | null;
-  status: string;
-  role?: string | null;
-  startedAt?: string | null;
-  lastActivity?: string | null;
-  workspace?: string | null;
-  model?: string | null;
-  harness?: string | null;
-  runtime?: string | null;
-}
-
-function isEndedAgent(agent: SessionAgent): boolean {
-  return ENDED_AGENT_STATUSES.has(agent.status);
-}
-
 /**
  * Pick the agent the drawer should show by default: the active work agent,
  * then any work agent, then any active agent, then whatever exists.
@@ -76,32 +56,6 @@ export function pickDefaultDrawerAgent(agents: readonly SessionAgent[]): Session
     ?? agents[0]
     ?? null
   );
-}
-
-/** Synthesize a Conversation from an agent so ConversationPanel can render it. */
-function agentToConversation(agent: SessionAgent): Conversation {
-  const ended = isEndedAgent(agent);
-  return {
-    id: -1,
-    name: agent.id,
-    tmuxSession: agent.id,
-    status: ended ? 'ended' : 'active',
-    cwd: agent.workspace ?? '',
-    issueId: agent.issueId ?? null,
-    createdAt: agent.startedAt ?? agent.lastActivity ?? '',
-    // ConversationPanel reads `!sessionAlive && !endedAt` as "still spawning"
-    // and shows a "Starting…" placeholder over the transcript — an ended agent
-    // must report a non-null endedAt, so fall back to lastActivity/startedAt.
-    endedAt: ended ? (agent.lastActivity ?? agent.startedAt ?? null) : null,
-    lastAttachedAt: null,
-    sessionAlive: !ended,
-    sessionFile: agent.id,
-    model: agent.model,
-    // The agent snapshot carries the harness in `runtime` (claude-code|pi|codex);
-    // fall back to runtime so the synthetic conversation is correctly tagged —
-    // this drives the RPC terminal notice and pi/codex live streaming (PAN-1908).
-    harness: ((agent.harness ?? agent.runtime) as Conversation['harness']) ?? null,
-  };
 }
 
 function agentOptionLabel(agent: SessionAgent): string {

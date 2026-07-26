@@ -170,6 +170,24 @@ describe('prompt-time memory injection', () => {
     expect(recordBriefingSessionStart).toHaveBeenCalledWith({ sessionId: 'session-1' });
   });
 
+  it('returns transcript-missing instead of throwing when the transcript file does not exist yet', async () => {
+    const transcriptPath = join(tempDir!, 'not-yet-written.jsonl');
+    const registerTranscript = vi.fn();
+
+    const result = await handleMemorySessionStartBody({
+      session_id: 'session-1',
+      transcript_path: transcriptPath,
+      identity,
+    }, {
+      areObservationsEnabled: async () => true,
+      resolveTranscriptPath: async () => transcriptPath,
+      registerTranscript,
+    });
+
+    expect(result).toEqual({ status: 'transcript-missing', sessionId: 'session-1' });
+    expect(registerTranscript).not.toHaveBeenCalled();
+  });
+
   it('prepends a compliance warning before memory context when a current-session miss is pending', async () => {
     const result = await handleMemoryInjectBody({
       prompt: 'Continue from last session',
