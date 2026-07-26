@@ -122,11 +122,24 @@
       "reason": "resume",
       "agentModel": "claude-haiku-4-5",
       "timestamp": "2026-07-26T01:05:09.516Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T01:14Z] review-agent → CHANGES-REQUESTED — seq 3",
+      "timestamp": "2026-07-26T01:14:18.353Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 3,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T01:14:18Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1696\n\nLive config still writes the legacy key, per-project persistence is incomplete, and UAT reconciliation remains flywheel-dependent.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1696 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T01:14:17.691Z",
+  "updated": "2026-07-26T01:14:18.354Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "blocked",
