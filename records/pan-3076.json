@@ -142,26 +142,20 @@
     "recordedAt": "2026-07-26T00:18:45.985Z"
   },
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-26T00:22:33.174Z",
+  "updated": "2026-07-26T00:22:34.625Z",
   "pipeline": {
     "issueId": "PAN-3076",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T00:22:28.487Z",
-    "reviewNotes": "Approved after main merge: feature diff unchanged; typecheck, lint, and 110 focused tests pass",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-07-26T00:00:50.541Z"
-      }
-    ],
+    "updatedAt": "2026-07-26T00:22:28.554Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-3076-review already running. Use 'pan tell' to message it.",
+    "testNotes": "npm run typecheck: PASS (tsc --noEmit, hooks, evals, dashboard-types guard). npm run lint: PASS (eslint + all 13 sub-lints incl. circular-deps, ratchet-audit, file-size). npm run build: PASS (contracts + server + frontend bundle, 9.32s). Focused regression tests for the 5 stamp/compare sites + drift evaluator: OVERDECK_VERIFICATION=1 vitest run tests/unit/lib/workspace-anchor-drift.test.ts tests/unit/lib/head-anchor-write-sites.test.ts tests/unit/lib/git-utils-polyrepo-anchor.test.ts tests/unit/lib/review-status.test.ts tests/lib/cloister/deacon-ci-retry.test.ts tests/lib/cloister/review-agent.test.ts tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts tests/integration/post-review-rebase-scenario.test.ts -> 8 files, 110/110 passed. Browser UAT not required: all 11 xBRIEF items are kind backend/test/docs, narratives.NonGoals explicitly excludes frontend/dashboard type changes, and no acceptance criterion names UI/browser-observable behavior — this is a server-side HeadAnchor type + drift-evaluator + 5 stamp/compare site fix with no dashboard-visible surface.",
+    "verificationNotes": "Verification FAILED at test (605097ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3076\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3076/src/dashboard/frontend\n\nNo test files found, exiting with code 0\n\n ❯ |root| src/lib/cloister/__tests__/reactive-scheduler.test.ts (25 tests | 1 failed) 162ms\n     × routes agent.stopped events to the deacon resume handler 47ms (retry x1)\n ❯ |root| src/lib/cloister/__tests__/pan-1908-reactive-liveness.test.ts (22 tests | 3 failed) 893ms\n       × resumes a stopped work agent with pending review feedback 12ms (retry x1)\n       × resumes normally once a decision is made (no pending window) 3ms (retry x1)\n       × resumes a completed done-handoff agent when review is blocked 4ms (retry x1)\n ❯ |root| tests/lib/cloister/failure-tracking.test.ts (9 tests | 3 failed) 3068ms\n     × increments the counter when resumeAgent fails during auto-resume 1459ms (retry x1)\n     × reconciles a stopped agent with a live tmux session to running 292ms (retry x1)\n     × treats lastFailureNextRetryAt equality as eligible to retry 277ms (retry x1)\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] inspect signaling passed for PAN-2724\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] Set inspect-agent-test to idle\n[specialists/done] Warm lifecycle: verdict recorded, leaving inspect-agent-test running (PAN-2579)\n[specialists/done] Cleared registry lock for inspect-agent:PAN-2724 (overdeck)\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] inspect s\n…(2802 chars elided)…\nproject/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-ZlQl6i/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace: /tmp/pan-auto-resume-gating-ZlQl6i/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent.\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3082",
     "reviewedAtCommit": "f909f3d177827021a7b3463d93fadf30b252ceb4",
     "lastVerifiedCommit": "241e1f76bf1b9dd068e30765ff568e91a561488a",
@@ -252,9 +246,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6451797,
-            "output": 129130,
-            "cacheRead": 27873792,
+            "input": 6460503,
+            "output": 130558,
+            "cacheRead": 28946944,
             "cacheWrite": 0
           }
         },
@@ -283,9 +277,9 @@
           "cacheWrite": 200270
         },
         "openai/gpt-5.6-sol": {
-          "input": 11138981,
-          "output": 413075,
-          "cacheRead": 171985408,
+          "input": 11147687,
+          "output": 414503,
+          "cacheRead": 173058560,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -296,8 +290,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 164.583211,
-        "pricingAsOf": "2026-07-26T00:22:28.539Z"
+        "usd": 165.206157,
+        "pricingAsOf": "2026-07-26T00:22:34.605Z"
       }
     },
     "merges": [
@@ -306,7 +300,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 22,
