@@ -155,6 +155,10 @@ function visibleGenerationsOf(section: MergeTrainProjectSection): UatGenerationP
   );
 }
 
+function isIdleSection(section: MergeTrainProjectSection): boolean {
+  return section.queue.length === 0 && visibleGenerationsOf(section).length === 0;
+}
+
 function readStoredFilter(): string[] | null {
   try {
     const raw = window.localStorage.getItem(MERGE_TRAIN_PROJECT_FILTER_KEY);
@@ -265,6 +269,9 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
 
   const isSelected = (projectKey: string) => selectedProjects === null || selectedProjects.includes(projectKey);
   const visibleSections = sections.filter((s) => isSelected(s.projectKey));
+  // Idle enabled sections repeat boilerplate without adding information. Disabled
+  // sections are never hidden because "merge train off" is meaningful state.
+  const renderedSections = visibleSections.filter((section) => !section.enabled || !isIdleSection(section));
 
   const toggleProject = (projectKey: string) => {
     const current = selectedProjects ?? sections.map((s) => s.projectKey);
@@ -424,19 +431,6 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
     );
   };
 
-  // "Nothing ready anywhere" may only replace the sections when there is nothing
-  // a section would have told the operator. A disabled project's row carries real
-  // information — the train is OFF here, which is a different answer from "nothing
-  // is ready" — so ANY disabled row suppresses the collapse, not just the
-  // all-disabled case. Otherwise a mix of idle-enabled and disabled projects hides
-  // the off rows and sends the operator hunting for work that was never coming.
-  const anyDisabled = sections.some((s) => !s.enabled);
-  const nothingAnywhere =
-    !loading &&
-    !anyDisabled &&
-    sections.length > 0 &&
-    sections.every((s) => s.queue.length === 0 && visibleGenerationsOf(s).length === 0);
-
   return (
     <div data-testid="merge-train-view">
       {mergeBackendUnavailable && (
@@ -482,17 +476,19 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
             ? 'Loading the merge train…'
             : 'No projects are registered, so there is no merge train to show.'}
         </p>
-      ) : nothingAnywhere ? (
-        <p className="px-1 py-1.5 text-xs text-muted-foreground">
-          No features are ready to merge in any project. When work passes review and tests, it lines up here and a test batch assembles automatically.
-        </p>
       ) : visibleSections.length === 0 ? (
         <p className="px-1 py-1.5 text-xs text-muted-foreground">
           Every project is filtered out. Select a project above to see its merge train.
         </p>
+      ) : renderedSections.length === 0 ? (
+        <p className="px-1 py-1.5 text-xs text-muted-foreground">
+          {loading
+            ? 'Loading the merge train…'
+            : 'No features are ready to merge in any project. When work passes review and tests, it lines up here and a test batch assembles automatically.'}
+        </p>
       ) : (
         <div className="space-y-3">
-          {visibleSections.map((section) => {
+          {renderedSections.map((section) => {
             const visibleGenerations = visibleGenerationsOf(section);
             const currentBatch =
               visibleGenerations.find((g) => g.status === 'ready') ??
@@ -519,10 +515,6 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                 {!section.enabled ? (
                   <p className="px-1 py-1.5 text-[11px] text-muted-foreground">
                     The merge train is turned off for {section.projectName}, so no batches assemble here. Turn it on in the project cockpit to start batching this project's ready work.
-                  </p>
-                ) : featureCount === 0 && visibleGenerations.length === 0 ? (
-                  <p className="px-1 py-1.5 text-[11px] text-muted-foreground">
-                    No features are ready to merge. When work passes review and tests, it lines up here and a test batch assembles automatically.
                   </p>
                 ) : (
                   <div className="space-y-1">
