@@ -73,16 +73,16 @@
     "recordedAt": "2026-07-26T03:36:45.308Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T03:39:32.968Z",
+  "updated": "2026-07-26T03:39:40.213Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:39:31.812Z",
+    "updatedAt": "2026-07-26T03:39:40.202Z",
     "reviewNotes": "Approved after rebase: PAN-3097 behavior remains correct and the refreshed generated command manifest matches the CLI registry",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3102",
@@ -144,9 +144,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2189860,
-            "output": 58656,
-            "cacheRead": 8597504,
+            "input": 2192878,
+            "output": 58814,
+            "cacheRead": 8944640,
             "cacheWrite": 0
           }
         },
@@ -175,9 +175,9 @@
           "cacheWrite": 183727
         },
         "openai/gpt-5.6-sol": {
-          "input": 3653204,
-          "output": 120171,
-          "cacheRead": 55916544,
+          "input": 3656222,
+          "output": 120329,
+          "cacheRead": 56263680,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -188,8 +188,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 58.508446,
-        "pricingAsOf": "2026-07-26T03:39:31.900Z"
+        "usd": 58.701844,
+        "pricingAsOf": "2026-07-26T03:39:40.206Z"
       }
     },
     "merges": [
@@ -198,7 +198,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
