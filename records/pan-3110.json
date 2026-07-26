@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T06:17:49.254Z",
-  "updated": "2026-07-26T10:29:32.581Z",
+  "updated": "2026-07-26T10:29:42.374Z",
   "pipeline": {
     "issueId": "PAN-3110",
     "reviewStatus": "pending",
@@ -49,8 +49,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "clean-pr-direct-merge": {
+        "writerId": "agent-pan-3110",
+        "agentId": "agent-pan-3110",
+        "pid": 1609213,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:29:42.374Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3110",
@@ -77,6 +85,7 @@
     "verdict-anchor-guard-on-spawn.verdict-anchor-guard-on-spawn.ac2": "completed",
     "verdict-anchor-guard-on-spawn.verdict-anchor-guard-on-spawn.ac3": "completed",
     "verdict-anchor-guard-on-spawn.verdict-anchor-guard-on-spawn.ac4": "completed",
-    "verdict-anchor-guard-on-spawn.verdict-anchor-guard-on-spawn.ac5": "completed"
+    "verdict-anchor-guard-on-spawn.verdict-anchor-guard-on-spawn.ac5": "completed",
+    "clean-pr-direct-merge": "running"
   }
 }
