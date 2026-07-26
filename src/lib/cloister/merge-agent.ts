@@ -14,6 +14,7 @@ import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.j
 import { loadConfigSync } from '../config-yaml.js';
 import { shouldRestartForPostMerge } from './merge-agent-step0.js'; import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import { enqueueMergedDockerCleanup } from './merged-docker-cleanup-worker.js';
+import { withPostMergeLifecycleLock } from './post-merge-lifecycle-lock.js';
 import {
   ensureSyncGitQuiescent,
   probeGitOperationHeads,
@@ -305,7 +306,8 @@ export async function postMergeLifecycle(
   // for the issue's main feature branch merging to `main`.
 
   // Guard 1: skip if already completed (defense-in-depth against infinite loops)
-  if (_completedPostMerge.has(issueId)) {
+  if (_completedPostMerge.has(issueId) || getReviewStatusSync(issueId)?.mergeStep === 'merged') {
+    _completedPostMerge.add(issueId);
     console.log(`[merge-agent] postMergeLifecycle already completed for ${issueId}, skipping`);
     return;
   }
@@ -316,7 +318,7 @@ export async function postMergeLifecycle(
     return inFlight;
   }
 
-  const run = (async () => {
+  const run = withPostMergeLifecycleLock(issueId, async () => {
     // Guard 2: closed-out is TERMINAL. Close-out flips the spec on main to
     // completed/cancelled, clears review status, and closes the tracker issue.
     // Re-running the handoff after that resurrects the review row and REOPENS
@@ -557,9 +559,7 @@ export async function postMergeLifecycle(
     console.log(`[merge-agent] Post-merge handoff completed for ${issueId}. Awaiting close-out (verify on main).`);
     announceMerge('completed', issueId);
     logActivity('merge_complete', `Merged ${issueId}. Awaiting close-out (verify on main).`);
-  })().finally(() => {
-    _postMergeInFlight.delete(issueId);
-  });
+  }).finally(() => { _postMergeInFlight.delete(issueId); });
   _postMergeInFlight.set(issueId, run);
   return run;
 }

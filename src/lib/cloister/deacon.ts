@@ -2739,24 +2739,21 @@ export async function runPatrol(): Promise<PatrolResult> {
   // In dev mode, the deploy script may fail to restart cleanly, leaving the pending file.
   try {
     const pendingFile = join(OVERDECK_HOME, 'pending-post-merge.json');
-    if (existsSync(pendingFile)) {
-      const content = readFileSync(pendingFile, 'utf-8');
-      const pending = JSON.parse(content);
+    const { claimPendingLifecycleFile } = await import('./pending-lifecycle-claim.js');
+    const claim = await claimPendingLifecycleFile(pendingFile);
+    if (claim) try {
+      const pending = JSON.parse(claim.raw);
       const age = Date.now() - (pending.timestamp ?? 0);
       if (age < 60 * 60 * 1000) { // Less than 1 hour old
         console.log(`[deacon] Processing pending post-merge lifecycle for ${pending.issueId} (age: ${Math.round(age / 1000)}s)`);
-        // Delete only after a successful skipDeploy run so patrol can retry failures.
         const { postMergeLifecycle } = await import('./merge-agent.js');
         await postMergeLifecycle(pending.issueId, pending.projectPath, pending.sourceBranch, { skipDeploy: true });
-        const { unlinkSync } = await import('fs');
-        unlinkSync(pendingFile);
         actions.push(`Processed pending post-merge lifecycle for ${pending.issueId}`);
       } else {
-        // Stale — delete it
-        const { unlinkSync } = await import('fs');
-        unlinkSync(pendingFile);
-        console.log(`[deacon] Deleted stale pending-post-merge.json (age: ${Math.round(age / 60000)}m)`);
+        console.log(`[deacon] Discarded stale pending post-merge claim (age: ${Math.round(age / 60000)}m)`);
       }
+    } finally {
+      await claim.discard();
     }
   } catch (err: any) {
     console.warn(`[deacon] Failed to process pending lifecycle: ${err.message}`);

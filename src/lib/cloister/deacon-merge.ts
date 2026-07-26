@@ -174,16 +174,9 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
 
       const branch = `feature/${issueId.toLowerCase()}`;
       if (postMergeIncomplete) {
-        try {
-          const { postMergeLifecycle } = await import('./merge-agent.js');
-          await postMergeLifecycle(issueId, project.projectPath, branch, { skipDeploy: true });
-          staleMergeReconciled.add(issueId);
-          const msg = `Completed pending post-merge lifecycle for ${issueId}`;
-          actions.push(msg);
-          console.log(`[deacon] ${msg}`);
-        } catch (err) {
-          console.warn(`[deacon] Pending post-merge lifecycle retry failed for ${issueId}: ${err}`);
-        }
+        const { enqueuePostMergeLifecycle } = await import('./post-merge-lifecycle-worker.js');
+        const action = enqueuePostMergeLifecycle(issueId, project.projectPath, branch);
+        if (action) actions.push(action);
         continue;
       }
 
@@ -258,16 +251,10 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
         actions.push(msg);
         console.log(`[deacon] ${msg}`);
 
-        // PAN-1027: also run the post-merge handoff so labels get cleaned and
-        // sessions are released. Await it so a failed handoff remains eligible
-        // for the next patrol instead of being hidden by staleMergeReconciled.
-        try {
-          const { postMergeLifecycle } = await import('./merge-agent.js');
-          await postMergeLifecycle(issueId, project.projectPath, branch, { skipDeploy: true });
-          staleMergeReconciled.add(issueId);
-        } catch (err) {
-          console.warn(`[deacon] postMergeLifecycle (reconcile) failed for ${issueId}: ${err}`);
-        }
+        // PAN-1027: queue the post-merge handoff without blocking unrelated patrol work.
+        const { enqueuePostMergeLifecycle } = await import('./post-merge-lifecycle-worker.js');
+        const action = enqueuePostMergeLifecycle(issueId, project.projectPath, branch);
+        if (action) actions.push(action);
       }
     }
   } catch (err: unknown) {

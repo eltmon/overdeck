@@ -5,7 +5,7 @@ const mockLoadReviewStatuses = vi.fn();
 const mockSetReviewStatusSync = vi.fn();
 const mockResolveProjectFromIssueSync = vi.fn();
 const mockGetAgentStateSync = vi.fn();
-const mockPostMergeLifecycle = vi.fn();
+const mockEnqueuePostMergeLifecycle = vi.fn();
 const mockFindSpecByIssue = vi.fn();
 const { mockExecFile } = vi.hoisted(() => ({
   mockExecFile: vi.fn(),
@@ -53,10 +53,11 @@ vi.mock('../../../../src/lib/pan-dir/specs.js', () => ({
   findSpecByIssue: (...args: Parameters<typeof mockFindSpecByIssue>) => mockFindSpecByIssue(...args),
 }));
 
-vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({
-  postMergeLifecycle: (...args: Parameters<typeof mockPostMergeLifecycle>) => mockPostMergeLifecycle(...args),
-  syncMainIntoWorkspace: vi.fn(),
+vi.mock('../../../../src/lib/cloister/post-merge-lifecycle-worker.js', () => ({
+  enqueuePostMergeLifecycle: (...args: Parameters<typeof mockEnqueuePostMergeLifecycle>) => mockEnqueuePostMergeLifecycle(...args),
 }));
+
+vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({ syncMainIntoWorkspace: vi.fn() }));
 
 vi.mock('../../../../src/lib/concurrency.js', () => ({
   withConcurrencyLimit: vi.fn((fn: () => unknown) => fn()),
@@ -73,7 +74,9 @@ describe('reconcileStaleMergeStatus (PAN-2420)', () => {
     vi.clearAllMocks();
     mockResolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/project' });
     mockFindSpecByIssue.mockReturnValue(Effect.succeed({ status: 'active' }));
-    mockPostMergeLifecycle.mockReturnValue(Promise.resolve(undefined));
+    mockEnqueuePostMergeLifecycle.mockImplementation(
+      (issueId: string) => `Queued pending post-merge lifecycle for ${issueId}`,
+    );
     mockExecFile.mockImplementation((cmd: string, args: string[]) => {
       const joined = `${cmd} ${args.join(' ')}`;
       if (joined.includes('gh pr list')) {
@@ -101,28 +104,21 @@ describe('reconcileStaleMergeStatus (PAN-2420)', () => {
       mergeStep: 'post-merge-cleanup',
       readyForMerge: false,
     });
-    expect(mockPostMergeLifecycle).toHaveBeenCalledWith('PAN-2420', '/tmp/project', 'feature/pan-2420', { skipDeploy: true });
+    expect(mockEnqueuePostMergeLifecycle).toHaveBeenCalledWith(
+      'PAN-2420', '/tmp/project', 'feature/pan-2420',
+    );
   });
 
-  it('retries an incomplete post-merge lifecycle on the next patrol', async () => {
+  it('queues an incomplete post-merge lifecycle without running it in patrol', async () => {
     mockLoadReviewStatuses.mockReturnValue({
       'PAN-2421': makeStatus('merged', 'post-merge-cleanup'),
     });
-    mockPostMergeLifecycle
-      .mockRejectedValueOnce(new Error('tracker transition failed'))
-      .mockResolvedValueOnce(undefined);
 
-    const firstActions = await reconcileStaleMergeStatus();
-    const secondActions = await reconcileStaleMergeStatus();
+    const actions = await reconcileStaleMergeStatus();
 
-    expect(firstActions).toEqual([]);
-    expect(secondActions).toContain('Completed pending post-merge lifecycle for PAN-2421');
-    expect(mockPostMergeLifecycle).toHaveBeenCalledTimes(2);
-    expect(mockPostMergeLifecycle).toHaveBeenCalledWith(
-      'PAN-2421',
-      '/tmp/project',
-      'feature/pan-2421',
-      { skipDeploy: true },
+    expect(actions).toContain('Queued pending post-merge lifecycle for PAN-2421');
+    expect(mockEnqueuePostMergeLifecycle).toHaveBeenCalledWith(
+      'PAN-2421', '/tmp/project', 'feature/pan-2421',
     );
   });
 
@@ -137,7 +133,7 @@ describe('reconcileStaleMergeStatus (PAN-2420)', () => {
 
     expect(actions).toHaveLength(0);
     expect(mockSetReviewStatusSync).not.toHaveBeenCalled();
-    expect(mockPostMergeLifecycle).not.toHaveBeenCalled();
+    expect(mockEnqueuePostMergeLifecycle).not.toHaveBeenCalled();
   });
 
   it('defers terminalization when the spec is back at draft/proposed', async () => {
@@ -149,7 +145,7 @@ describe('reconcileStaleMergeStatus (PAN-2420)', () => {
 
     expect(actions).toHaveLength(0);
     expect(mockSetReviewStatusSync).not.toHaveBeenCalled();
-    expect(mockPostMergeLifecycle).not.toHaveBeenCalled();
+    expect(mockEnqueuePostMergeLifecycle).not.toHaveBeenCalled();
   });
 
   it('skips issues whose PR is not merged', async () => {

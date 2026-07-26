@@ -15,6 +15,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { emitDashboardLifecycleSync } from '../../lib/activity-logger.js';
+import { claimPendingLifecycleFile } from '../../lib/cloister/pending-lifecycle-claim.js';
 
 export const PENDING_FILE = join(homedir(), '.overdeck', 'pending-post-merge.json');
 export const RESTART_MARKER = join(homedir(), '.overdeck', 'dashboard-restarting.json');
@@ -54,8 +55,8 @@ async function defaultLifecycleRunner(pending: PendingLifecycleData): Promise<vo
 
 /**
  * Check for and process a pending post-merge lifecycle file.
- * Reads and validates the file, then deletes it only after lifecycle execution
- * succeeds. A failed handoff remains durable for the next boot or patrol retry.
+ * Atomically claims the file before execution so dashboard and Deacon cannot
+ * run the same handoff. The durable mergeStep marker owns retries after failure.
  *
  * Also checks for a RESTART_MARKER file (written by deploy script before killing
  * the old server) and emits dashboard.lifecycle_started if found.
@@ -98,26 +99,23 @@ export async function processPendingLifecycle(options?: {
     }
   }
 
-  if (!existsSync(pendingFile)) {
-    return;
-  }
-
   const startTime = Date.now();
 
   try {
-    const raw = await readFile(pendingFile, 'utf-8');
+    const claim = await claimPendingLifecycleFile(pendingFile);
+    if (!claim) return;
     let pending: PendingLifecycleData;
     try {
-      pending = JSON.parse(raw) as PendingLifecycleData;
+      pending = JSON.parse(claim.raw) as PendingLifecycleData;
     } catch (error) {
-      await unlink(pendingFile);
+      await claim.discard();
       throw error;
     }
     const now = options?.now ?? Date.now();
     const age = now - (pending.timestamp ?? 0);
 
     if (age > staleThresholdMs) {
-      await unlink(pendingFile);
+      await claim.discard();
       console.warn(
         `[overdeck] Ignoring stale pending-post-merge.json (age: ${Math.round(age / 60000)}min) for ${pending.issueId}`
       );
@@ -125,27 +123,29 @@ export async function processPendingLifecycle(options?: {
     }
 
     console.log(
-      `[overdeck] Found pending post-merge lifecycle for ${pending.issueId} — scheduling in ${lifecycleDelayMs}ms`
+      `[overdeck] Found pending post-merge lifecycle for ${pending.issueId} — running in ${lifecycleDelayMs}ms`
     );
+    if (lifecycleDelayMs > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, lifecycleDelayMs));
+    }
 
-    setTimeout(async () => {
-      try {
-        await runner(pending);
-        await unlink(pendingFile);
-        emitDashboardLifecycleSync('completed', {
-          reason: pending.reason ?? 'post-merge',
-          issueId: pending.issueId,
-          durationMs: Date.now() - startTime,
-        });
-      } catch (err: any) {
-        console.error(`[overdeck] Post-merge lifecycle failed for ${pending.issueId}: ${err.message}`);
-        emitDashboardLifecycleSync('failed', {
-          reason: pending.reason ?? 'post-merge',
-          issueId: pending.issueId,
-          error: err.message,
-        });
-      }
-    }, lifecycleDelayMs);
+    try {
+      await runner(pending);
+      emitDashboardLifecycleSync('completed', {
+        reason: pending.reason ?? 'post-merge',
+        issueId: pending.issueId,
+        durationMs: Date.now() - startTime,
+      });
+    } catch (err: any) {
+      console.error(`[overdeck] Post-merge lifecycle failed for ${pending.issueId}: ${err.message}`);
+      emitDashboardLifecycleSync('failed', {
+        reason: pending.reason ?? 'post-merge',
+        issueId: pending.issueId,
+        error: err.message,
+      });
+    } finally {
+      await claim.discard();
+    }
   } catch (err: any) {
     console.warn(`[overdeck] Failed to process pending-post-merge.json: ${err.message}`);
   }

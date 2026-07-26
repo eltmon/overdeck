@@ -121,6 +121,10 @@ vi.mock('../../../src/lib/cloister/merge-agent-step0.js', () => ({
   shouldRestartForPostMerge: mockShouldRestartForPostMerge,
 }));
 
+vi.mock('../../../src/lib/cloister/post-merge-lifecycle-lock.js', () => ({
+  withPostMergeLifecycleLock: vi.fn((_issueId: string, run: () => Promise<unknown>) => run()),
+}));
+
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn().mockReturnValue(null),
   resolveProjectFromIssueSync: vi.fn().mockReturnValue(null),

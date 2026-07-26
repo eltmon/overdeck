@@ -18,6 +18,7 @@ export interface WarmIdleStatusShape {
   testStatus?: string;
   readyForMerge?: boolean;
   mergeStatus?: string;
+  mergeStep?: string;
 }
 
 export type AdvancingRole = 'review' | 'test' | 'ship';

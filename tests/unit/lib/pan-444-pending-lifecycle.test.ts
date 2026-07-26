@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── fs/promises mock ──────────────────────────────────────────────────────────
 const mockReadFile = vi.hoisted(() => vi.fn<(path: string, enc: string) => Promise<string>>());
+const mockRename = vi.hoisted(() => vi.fn<(from: string, to: string) => Promise<void>>());
 const mockUnlink = vi.hoisted(() => vi.fn<(path: string) => Promise<void>>());
 const mockExistsSync = vi.hoisted(() => vi.fn<(path: string) => boolean>());
 const mockEmitDashboardLifecycleSync = vi.hoisted(() => vi.fn());
@@ -17,6 +18,7 @@ vi.mock('../../../src/lib/activity-logger.js', () => ({
 
 vi.mock('fs/promises', () => ({
   readFile: mockReadFile,
+  rename: mockRename,
   unlink: mockUnlink,
 }));
 
@@ -61,6 +63,11 @@ describe('processPendingLifecycle', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     mockExistsSync.mockReturnValue(false);
+    mockRename.mockImplementation(async (from) => {
+      if (mockExistsSync(from)) return;
+      throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+    });
+    mockUnlink.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -100,11 +107,10 @@ describe('processPendingLifecycle', () => {
     });
   });
 
-  it('deletes the pending file only after the lifecycle succeeds', async () => {
+  it('atomically claims and discards the pending artifact after success', async () => {
     const data = makePendingData();
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
-    mockUnlink.mockResolvedValue(undefined);
 
     await processPendingLifecycle({
       pendingFile: PENDING_FILE,
@@ -113,27 +119,36 @@ describe('processPendingLifecycle', () => {
       _runner: vi.fn().mockResolvedValue(undefined),
     });
 
-    expect(mockReadFile).toHaveBeenCalledWith(PENDING_FILE, 'utf-8');
-    expect(mockUnlink).not.toHaveBeenCalledWith(PENDING_FILE);
-    await vi.runAllTimersAsync();
-    expect(mockUnlink).toHaveBeenCalledWith(PENDING_FILE);
+    expect(mockRename).toHaveBeenCalledWith(
+      PENDING_FILE,
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+    );
+    expect(mockReadFile).toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+      'utf-8',
+    );
+    expect(mockUnlink).toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+    );
   });
 
-  it('deletes the file before checking staleness', async () => {
+  it('discards a claimed stale artifact', async () => {
     const data = makePendingData({ timestamp: Date.now() - (STALE_THRESHOLD_MS + 1000) });
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
     mockUnlink.mockResolvedValue(undefined);
 
     await processPendingLifecycle({ pendingFile: PENDING_FILE, now: Date.now() });
 
-    expect(mockUnlink).toHaveBeenCalledWith(PENDING_FILE);
+    expect(mockUnlink).toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+    );
   });
 
   it('ignores stale files (> 1h old) without running lifecycle', async () => {
     const staleTimestamp = Date.now() - (STALE_THRESHOLD_MS + 60_000);
     const data = makePendingData({ timestamp: staleTimestamp });
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
     mockUnlink.mockResolvedValue(undefined);
     const runner = vi.fn().mockResolvedValue(undefined);
@@ -146,27 +161,29 @@ describe('processPendingLifecycle', () => {
 
   it('schedules lifecycle runner after delay for fresh files', async () => {
     const data = makePendingData();
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
     mockUnlink.mockResolvedValue(undefined);
     const runner = vi.fn().mockResolvedValue(undefined);
 
-    await processPendingLifecycle({
+    const processing = processPendingLifecycle({
       pendingFile: PENDING_FILE,
       lifecycleDelayMs: 100,
       now: data.timestamp + 1000,
       _runner: runner,
     });
 
+    await vi.advanceTimersByTimeAsync(99);
     expect(runner).not.toHaveBeenCalled();
-    await vi.runAllTimersAsync();
+    await vi.advanceTimersByTimeAsync(1);
+    await processing;
     expect(runner).toHaveBeenCalledOnce();
     expect(runner).toHaveBeenCalledWith(data);
   });
 
   it('passes full pending data to the runner', async () => {
     const data = makePendingData({ issueId: 'PAN-42', projectPath: '/my/proj', sourceBranch: 'feature/x' });
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
     mockUnlink.mockResolvedValue(undefined);
     const runner = vi.fn().mockResolvedValue(undefined);
@@ -187,7 +204,7 @@ describe('processPendingLifecycle', () => {
   });
 
   it('handles malformed JSON gracefully without throwing', async () => {
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue('not-valid-json');
     mockUnlink.mockResolvedValue(undefined);
 
@@ -197,7 +214,7 @@ describe('processPendingLifecycle', () => {
   it('accepts files exactly at the stale boundary (1h - 1s is fresh)', async () => {
     const data = makePendingData({ timestamp: 0 });
     const now = STALE_THRESHOLD_MS - 1000; // 59m59s old → not stale
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
     mockUnlink.mockResolvedValue(undefined);
     const runner = vi.fn().mockResolvedValue(undefined);
@@ -211,7 +228,7 @@ describe('processPendingLifecycle', () => {
   it('rejects files exactly at the stale boundary (1h + 1s is stale)', async () => {
     const data = makePendingData({ timestamp: 0 });
     const now = STALE_THRESHOLD_MS + 1000;
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
     mockUnlink.mockResolvedValue(undefined);
     const runner = vi.fn().mockResolvedValue(undefined);
@@ -222,11 +239,10 @@ describe('processPendingLifecycle', () => {
     expect(runner).not.toHaveBeenCalled();
   });
 
-  it('retains the pending file when the runner throws', async () => {
+  it('emits one failed terminal event and discards the claim when the runner throws', async () => {
     const data = makePendingData();
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
-    mockUnlink.mockResolvedValue(undefined);
     const runner = vi.fn().mockRejectedValue(new Error('lifecycle failed'));
 
     await processPendingLifecycle({
@@ -235,37 +251,46 @@ describe('processPendingLifecycle', () => {
       now: data.timestamp + 1000,
       _runner: runner,
     });
-    await expect(vi.runAllTimersAsync()).resolves.not.toThrow();
-    expect(mockUnlink).not.toHaveBeenCalledWith(PENDING_FILE);
+
+    expect(mockEmitDashboardLifecycleSync).toHaveBeenCalledTimes(1);
+    expect(mockEmitDashboardLifecycleSync).toHaveBeenCalledWith('failed', expect.objectContaining({
+      issueId: data.issueId,
+      error: 'lifecycle failed',
+    }));
+    expect(mockUnlink).toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+    );
   });
 
-  it('retries a retained lifecycle on the next boot and deletes it after success', async () => {
+  it('runs one lifecycle and emits one terminal event when two processes see one artifact', async () => {
     const data = makePendingData();
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
-    mockUnlink.mockResolvedValue(undefined);
-    const runner = vi.fn()
-      .mockRejectedValueOnce(new Error('tracker transition failed'))
-      .mockResolvedValueOnce(undefined);
+    mockRename
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    const runner = vi.fn().mockResolvedValue(undefined);
 
+    const owner = processPendingLifecycle({
+      pendingFile: PENDING_FILE,
+      lifecycleDelayMs: 100,
+      now: data.timestamp + 1000,
+      _runner: runner,
+    });
+    await vi.advanceTimersByTimeAsync(0);
     await processPendingLifecycle({
       pendingFile: PENDING_FILE,
       lifecycleDelayMs: 0,
       now: data.timestamp + 1000,
       _runner: runner,
     });
-    await vi.runAllTimersAsync();
-    expect(mockUnlink).not.toHaveBeenCalledWith(PENDING_FILE);
+    await vi.advanceTimersByTimeAsync(100);
+    await owner;
 
-    await processPendingLifecycle({
-      pendingFile: PENDING_FILE,
-      lifecycleDelayMs: 0,
-      now: data.timestamp + 2000,
-      _runner: runner,
-    });
-    await vi.runAllTimersAsync();
-
-    expect(runner).toHaveBeenCalledTimes(2);
-    expect(mockUnlink).toHaveBeenCalledWith(PENDING_FILE);
+    expect(runner).toHaveBeenCalledTimes(1);
+    expect(mockEmitDashboardLifecycleSync).toHaveBeenCalledTimes(1);
+    expect(mockEmitDashboardLifecycleSync).toHaveBeenCalledWith('completed', expect.objectContaining({
+      issueId: data.issueId,
+    }));
   });
 });
