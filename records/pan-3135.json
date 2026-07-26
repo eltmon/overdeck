@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T12:56:51.598Z",
+  "updated": "2026-07-26T12:57:14.677Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T12:56:51.578Z",
-    "inspectNotes": "Inspecting item deploy-queue-module"
+    "updatedAt": "2026-07-26T12:57:14.628Z",
+    "inspectNotes": "All 4 ACs met: recordDeployIntent creates ${OVERDECK_HOME}/pending-deploy.json with deferralCount=1/escalated=false; refresh preserves requestedAt and sorted-deduped unions with deferralCount=2; corrupt JSON reads null and is overwritten with a fresh record; clearPendingDeploy uses rmSync force so repeat clears are safe. Tests cover each criterion."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 343840,
-            "output": 29464,
-            "cacheRead": 7033856,
+            "input": 355354,
+            "output": 31556,
+            "cacheRead": 8074240,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 343840,
-          "output": 29464,
-          "cacheRead": 7033856,
+          "input": 355354,
+          "output": 31556,
+          "cacheRead": 8074240,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 6.120048,
-        "pricingAsOf": "2026-07-26T12:56:51.586Z"
+        "usd": 6.7605699999999995,
+        "pricingAsOf": "2026-07-26T12:57:14.666Z"
       }
     },
     "merges": [],
