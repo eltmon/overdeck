@@ -12,6 +12,23 @@ export type PipelineBucket =
   | "planned_backlog"
   | "clean_terminal"
 
+export const MEMBERSHIP_UNAVAILABLE_REASONS = [
+  "missing_issue_prefix",
+  "repo_unavailable",
+  "default_branch_unresolved",
+  "forge_unavailable",
+  "tracker_unconfigured",
+  "gather_failed",
+] as const
+export type MembershipUnavailableReason = typeof MEMBERSHIP_UNAVAILABLE_REASONS[number]
+
+export interface PipelineMembershipUnavailableBody {
+  status: "unavailable"
+  reason: MembershipUnavailableReason
+  message: string
+  projectKey: string
+}
+
 /** Server-computed pipeline membership attached to dashboard issue DTOs. */
 export interface IssuePipelineMembership {
   available?: boolean

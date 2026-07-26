@@ -1,3 +1,5 @@
+import type { PipelineMembershipUnavailableBody } from '@overdeck/contracts';
+
 import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from './http-handler.js';
 /**
@@ -36,10 +38,16 @@ const getPipelineMembershipRoute = HttpRouter.add(
     // Operator-initiated retries go through POST /api/pipeline/membership/refresh.
     const snapshot = readPipelineMembershipSnapshotsForProjects([project])[0];
     if (snapshot?.memberships) return jsonResponse(snapshot.memberships);
-    const message = snapshot?.error instanceof Error
-      ? snapshot.error.message
-      : 'Pipeline membership snapshot is loading';
-    return jsonResponse({ error: message }, { status: 503 });
+    if (snapshot?.error && snapshot.unavailableReason) {
+      const body: PipelineMembershipUnavailableBody = {
+        status: 'unavailable',
+        reason: snapshot.unavailableReason ?? 'gather_failed',
+        message: snapshot.error instanceof Error ? snapshot.error.message : String(snapshot.error),
+        projectKey,
+      };
+      return jsonResponse(body);
+    }
+    return jsonResponse({ error: 'Pipeline membership snapshot is loading' }, { status: 503 });
   })),
 );
 
@@ -62,10 +70,15 @@ const postPipelineMembershipRefreshRoute = HttpRouter.add(
     yield* Effect.promise(() => refreshMembershipSnapshotsForProjects([project]));
     const snapshot = readPipelineMembershipSnapshotsForProjects([project])[0];
     if (snapshot?.memberships) return jsonResponse(snapshot.memberships);
-    const message = snapshot?.error instanceof Error
-      ? snapshot.error.message
-      : 'Pipeline membership refresh failed';
-    return jsonResponse({ error: message }, { status: 502 });
+    const body: PipelineMembershipUnavailableBody = {
+      status: 'unavailable',
+      reason: snapshot?.unavailableReason ?? 'gather_failed',
+      message: snapshot?.error instanceof Error
+        ? snapshot.error.message
+        : 'Pipeline membership refresh failed',
+      projectKey,
+    };
+    return jsonResponse(body);
   })),
 );
 

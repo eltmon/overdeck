@@ -71,9 +71,24 @@ export function groupProjects(issues: ProjectFeature[]): ProjectData[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+async function readMembershipSuccess(response: Response): Promise<true> {
+  const body = await response.json() as unknown;
+  if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
+    const result = body as Record<string, unknown>;
+    if (result.status === 'unavailable') {
+      const message = typeof result.message === 'string'
+        ? result.message
+        : 'Pipeline membership could not be loaded';
+      const reason = typeof result.reason === 'string' ? result.reason : 'gather_failed';
+      throw new Error(`${message} (${reason})`);
+    }
+  }
+  return true;
+}
+
 export async function fetchProjectPipelineMembership(projectKey: string): Promise<true> {
   const response = await fetch(`/api/pipeline/membership?project=${encodeURIComponent(projectKey)}`);
-  if (response.ok) return true;
+  if (response.ok) return readMembershipSuccess(response);
   throw new Error(await readMembershipError(response));
 }
 
@@ -87,7 +102,7 @@ export async function refreshProjectPipelineMembership(projectKey: string): Prom
     `/api/pipeline/membership/refresh?project=${encodeURIComponent(projectKey)}`,
     { method: 'POST', headers: await dashboardMutationJsonHeaders() },
   );
-  if (response.ok) return true;
+  if (response.ok) return readMembershipSuccess(response);
   throw new Error(await readMembershipError(response));
 }
 

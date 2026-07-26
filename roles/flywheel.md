@@ -76,11 +76,15 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    `auto_merge_default: hold` — never emit merge verbs for held projects (e.g. MIN issues).
    Fetch `GET /api/registered-projects`, then call the authoritative read door once for
    every returned project key as `GET /api/pipeline/membership?project=<URL-encoded-project-key>`.
-   Combine the responses and derive the `activePipeline` issue universe only from rows where
-   `inPipeline === true`; `clean_terminal` rows are audit-only and excluded. Preserve each
-   included row's bucket — `in_flight`, `zombie_pr`, `post_merge_limbo`, or `planned_backlog` —
-   and treat agent, tmux, workspace, and review-status state only as annotations on those
-   resolver verdicts.
+   `membershipQueryable: false` is an upfront hint that the project may return
+   `missing_issue_prefix`; it is not permission to skip the read door. A bare array is a
+   successful answer: combine the arrays and derive `activePipeline` only from rows where
+   `inPipeline === true`; `clean_terminal` rows are audit-only and excluded. An object with
+   `status: 'unavailable'` is a typed blind spot, not an empty pipeline: emit an `investigate`
+   suggestion naming its `projectKey`, `reason`, and `message`, and NEVER reconstruct membership
+   from tracker, agent, tmux, workspace, or review-status state. Preserve each included row's
+   bucket — `in_flight`, `zombie_pr`, `post_merge_limbo`, or `planned_backlog` — and use those
+   other state sources only as annotations on resolver verdicts.
 4. **Fix at the root, every revolution.** When a Overdeck command, route, gate, or role is
    broken, file the substrate bug as a record (the provenance trailer attaches automatically),
    then **drive a root-cause fix to `main`** — `pan strike` for a precision fix, `pan plan
