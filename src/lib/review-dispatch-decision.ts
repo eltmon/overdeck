@@ -13,17 +13,23 @@
  *  - a request exists (`reviewRequestedAt` set), AND
  *  - it is newer than the last spawn (or there was never a spawn) — i.e. a genuinely un-serviced
  *    request, not the request that produced the current review, AND
- *  - a review is not already in progress (`reviewing`), AND
- *  - the issue is not already merged.
+ *  - review is pending rather than already reviewing or terminal, AND
+ *  - the issue is not already ready to merge or merged.
+ *
+ * Genuine re-review paths reset `reviewStatus` to `pending` before recording a fresh request: `pan
+ * done` does this for a new commit, and the operator force-review route does it explicitly.
  */
 export function needsReviewDispatch(params: {
   reviewRequestedAt?: string;
   reviewSpawnedAt?: string | number;
   reviewStatus?: string;
   mergeStatus?: string;
+  readyForMerge?: boolean;
 }): boolean {
   if (!params.reviewRequestedAt) return false;
   if (params.reviewStatus === 'reviewing') return false;
+  if (params.reviewStatus === 'passed' || params.reviewStatus === 'skipped') return false;
+  if (params.readyForMerge) return false;
   if (params.mergeStatus === 'merged') return false;
   return !params.reviewSpawnedAt || Date.parse(params.reviewRequestedAt) > new Date(params.reviewSpawnedAt).getTime();
 }
