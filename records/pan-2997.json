@@ -152,9 +152,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T08:35:17.422Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T08:38Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T08:38:08.904Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T08:38:08Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nRemote rollback failures are swallowed and unreadable pre-submit targets are ignored, so false terminal markers can still suppress an undelivered wake.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/event-store.ts",
@@ -234,7 +247,7 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T08:38:08.371Z",
+  "updated": "2026-07-26T08:38:08.905Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
