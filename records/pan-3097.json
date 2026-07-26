@@ -85,7 +85,7 @@
     "recordedAt": "2026-07-26T06:45:11.935Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T06:46:32.663Z",
+  "updated": "2026-07-26T06:46:37.971Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "pending",
@@ -96,7 +96,7 @@
     "readyForMerge": false,
     "updatedAt": "2026-07-26T06:46:31.414Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3102",
-    "reviewRequestedAt": "2026-07-26T06:45:12.712Z",
+    "reviewRequestedAt": "2026-07-26T06:46:37.589Z",
     "reviewSpawnedAt": "2026-07-26T06:45:14.281Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -136,7 +136,8 @@
         "sync-sources/rules/ask-user-question-self-contained.md"
       ],
       "recordedAt": "2026-07-26T06:45:11.935Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-26T06:46:37.589Z"
   },
   "closeOut": {
     "usage": {
