@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T13:30:51.400Z",
+  "updated": "2026-07-26T13:30:54.545Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "pending",
@@ -150,5 +150,43 @@
     "deploy-docs-and-flywheel-mission.deploy-docs-and-flywheel-mission.ac2": "completed",
     "deploy-docs-and-flywheel-mission.deploy-docs-and-flywheel-mission.ac3": "completed",
     "deploy-docs-and-flywheel-mission.deploy-docs-and-flywheel-mission.ac4": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/__tests__/reload.test.ts",
+      "tests/unit/dashboard/identity.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/OVERDECK_DEV_SOP.md",
+      "roles/flywheel.md",
+      "src/cli/commands/reload.ts",
+      "src/dashboard/server/tsdown.config.ts",
+      "src/lib/deploy/build-from-origin.ts",
+      "src/lib/deploy/build-info.ts",
+      "src/lib/lifecycle/dod-gate.ts",
+      "sync-sources/skills/pan-reload/SKILL.md",
+      "tests/unit/lib/deploy/build-from-origin.test.ts",
+      "tests/unit/lib/deploy/build-info.test.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/OVERDECK_DEV_SOP.md",
+      "roles/flywheel.md",
+      "src/cli/commands/__tests__/reload.test.ts",
+      "src/cli/commands/reload.ts",
+      "src/dashboard/server/tsdown.config.ts",
+      "src/lib/deploy/build-from-origin.ts",
+      "src/lib/deploy/build-info.ts",
+      "src/lib/lifecycle/dod-gate.ts",
+      "sync-sources/skills/pan-reload/SKILL.md",
+      "tests/unit/dashboard/identity.test.ts",
+      "tests/unit/lib/deploy/build-from-origin.test.ts",
+      "tests/unit/lib/deploy/build-info.test.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts"
+    ],
+    "recordedAt": "2026-07-26T13:30:54.544Z"
   }
 }
