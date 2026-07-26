@@ -78,18 +78,19 @@
     "recordedAt": "2026-07-26T03:36:45.308Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T03:45:17.111Z",
+  "updated": "2026-07-26T03:45:30.003Z",
   "pipeline": {
     "issueId": "PAN-3097",
-    "reviewStatus": "failed",
+    "reviewStatus": "passed",
     "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T03:45:06.177Z",
-    "updatedAt": "2026-07-26T03:45:14.656Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-3097-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-26T03:45:29.940Z",
+    "reviewNotes": "Approved: exact HEAD 887ba284 was fully reviewed; no correctness, security, requirements, or performance blockers",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3102",
     "reviewedAtCommit": "887ba28422e0d80895d7af96be3ce759012ce75a",
     "lastVerifiedCommit": "887ba28422e0d80895d7af96be3ce759012ce75a",
@@ -195,7 +196,7 @@
       },
       "costAtCloseOut": {
         "usd": 59.459994,
-        "pricingAsOf": "2026-07-26T03:45:17.075Z"
+        "pricingAsOf": "2026-07-26T03:45:29.990Z"
       }
     },
     "merges": [
