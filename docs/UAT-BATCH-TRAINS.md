@@ -115,8 +115,14 @@ primary checkout), pushes, then runs each member issue's post-merge lifecycle
 **exactly once** through the [PAN-328](https://github.com/eltmon/overdeck/issues/328)
 in-flight guard (see CLAUDE.md "postMergeLifecycle Idempotency"). GitHub marks
 the per-feature PRs merged automatically because their head commits become
-reachable from main. The promoted generation is reaped; all other live
-generations invalidate (main moved) and the reconciler rebuilds.
+reachable from main. Promotion also records `verificationStatus: passed` for
+each member through the review-status write door with source `uat-promotion`,
+the generation name, and the promote commit. Existing terminal `passed` or
+`skipped` verdicts are preserved. During close-out, members of generations
+promoted before this write path existed are healed from the stored generation
+record, so the verification row uses recorded evidence instead of an operator
+override. The promoted generation is reaped; all other live generations
+invalidate (main moved) and the reconciler rebuilds.
 
 ### Live stacks — the hard cap
 
