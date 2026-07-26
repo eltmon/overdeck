@@ -1,11 +1,12 @@
 /** PAN-1696: Per-project merge-train override endpoints (GET/POST) */
 
 import { Effect, Layer } from 'effect';
-import { HttpRouter } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { httpHandler } from './http-handler.js';
 import { jsonResponse } from '../http-helpers.js';
 import { getProjectSync, setProjectMergeTrainSync } from '../../../lib/projects.js';
 import { readProjectJsonBody } from './projects.js';
+import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 
 // ─── Route: GET /api/projects/:projectKey/merge-train ────────────────
 // PAN-1696: get per-project merge-train override (enabled/disabled/null) and effective state.
@@ -31,6 +32,10 @@ const postProjectMergeTrainRoute = HttpRouter.add(
   'POST',
   '/api/projects/:projectKey/merge-train',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+
     const params = yield* HttpRouter.params;
     const key = params['projectKey'] ?? '';
     if (!getProjectSync(key)) return jsonResponse({ error: 'Project not found' }, { status: 404 });
