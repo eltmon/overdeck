@@ -34,7 +34,7 @@ pan restart --traefik
 pan restart --full       # nuclear — stops & restarts everything
 
 # Explicit force cases
-pan restart --force              # bypass the agent deploy-window gate
+pan restart --force              # explicit operator bypass of the deploy-window gate
 pan restart --cliproxy --force   # redownload the pinned CLIProxy binary
 ```
 
@@ -61,9 +61,10 @@ server is a failure, not a successful restart.
 - `pan restart --dashboard` NEVER touches CLIProxy, Traefik, or TLDR — that
   scope contract is enforced by tests.
 - Agent-issued dashboard and full restarts consult the deploy-window gate before
-  acquiring the restart lock. Active verification, merge, post-merge, flywheel,
-  restart, or `pan dev` ownership refuses the restart because it would disconnect
-  live conversations and terminals; `--force` explicitly bypasses this gate.
+  acquiring the restart lock. A refusal queues the deploy, reports its age and
+  distinct verification blockers, and self-fires at the next safe verification
+  boundary. Do not retry in a loop or use `--force` to interrupt healthy verification;
+  `--force` remains the explicit operator bypass for exceptional recovery.
 - For `--cliproxy`, `--force` has a separate meaning: it redownloads the binary at
   the pinned version before restarting it.
 - If the dashboard restart fails, shared sidecars are left running so recovery

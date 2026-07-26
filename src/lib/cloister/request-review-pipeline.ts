@@ -9,6 +9,7 @@ export interface RequestReviewPipelineDeps {
   dispatchReview: () => Promise<void>;
   onVerificationFailed: (outcome: Extract<VerificationRunnerOutcome, { outcome: 'failed' }>) => MaybePromise;
   onVerificationError: (outcome: Extract<VerificationRunnerOutcome, { outcome: 'error' }>) => MaybePromise;
+  onVerificationDeferred?: (outcome: Extract<VerificationRunnerOutcome, { outcome: 'deferred' }>) => MaybePromise;
   onError?: (error: unknown) => void;
 }
 
@@ -36,6 +37,10 @@ export function createRequestReviewPipeline(): RequestReviewPipeline {
           await deps.onVerificationError(outcome);
           return;
         }
+        if (outcome.outcome === 'deferred') {
+          await deps.onVerificationDeferred?.(outcome);
+          return;
+        }
 
         await deps.pushBranch();
         await deps.dispatchReview();
@@ -46,3 +51,6 @@ export function createRequestReviewPipeline(): RequestReviewPipeline {
     },
   };
 }
+
+/** Shared host-side pipeline so HTTP requests and durable intent recovery coalesce. */
+export const requestReviewPipeline = createRequestReviewPipeline();

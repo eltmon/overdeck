@@ -90,12 +90,27 @@ Configure the behavior in Cloister config:
 
 ```yaml
 deploy:
-  auto_deploy: true       # default: rebuild and restart when the safety window clears
-  debounce_minutes: 5     # default: wait for origin/main to settle
+  auto_deploy: true          # default: rebuild and restart when the safety window clears
+  debounce_minutes: 5        # default: wait for origin/main to settle
+  queue_deadline_minutes: 30 # default: escalate a deploy that remains blocked
 ```
 
-Set `deploy.auto_deploy: false` for signal-only mode. Staleness remains visible in system health
-and the header, but Deacon does not start a deployment. On Linux, Deacon runs the reload in a
+### Deploy queue
+
+When the deploy gate refuses an agent-issued restart, Overdeck records the request in
+`~/.overdeck/pending-deploy.json`. New verification admissions pause while this record exists,
+but a verification already running continues until it finishes. The deploy patrol then fires the
+queued reload when the merge debounce has passed, CI is green for the exact `origin/main` tip,
+and the deploy gate is clear. A queued request fires even when `deploy.auto_deploy` is false,
+because that setting controls patrol-created deployments rather than a deployment already requested.
+
+If the queue remains blocked past `deploy.queue_deadline_minutes`, the patrol emits an error,
+announces the delay, and surfaces a needs-you decision against the active verifier. The queue file is
+runtime-plane state: it remains present while the reload runs and clears only after the running build
+reports fresh, which proves that the queued deployment landed.
+
+Set `deploy.auto_deploy: false` for signal-only mode when no deploy is already queued. Staleness remains visible in system health
+and the header, but Deacon does not create a deployment request. On Linux, Deacon runs the reload in a
 transient systemd user unit with rate-limited failure recovery, so stopping the old dashboard cannot
 kill the reload through the dashboard's cgroup. Patrol reloads stamp `deploy-patrol` as the restart
 initiator instead of inheriting the identity that launched the current dashboard. Deployment output

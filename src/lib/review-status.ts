@@ -530,36 +530,18 @@ function maybeAutoDispatchReviewHostSide(issueId: string, status: ReviewStatus):
 }
 async function dispatchReviewHostSide(issueId: string, prUrl?: string): Promise<void> {
   try {
-    const { resolveProjectFromIssueSync } = await import('./projects.js');
-    const resolved = resolveProjectFromIssueSync(issueId);
-    if (!resolved) return;
-    const { existsSync } = await import('fs');
-    const workspace = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-    if (!existsSync(workspace)) return;
-    const { resolvePrimaryWorkspaceRepoDirSync, resolveWorkspaceRepoRootsSync } = await import('./project-repos.js');
-    let branch = resolveWorkspaceRepoRootsSync(issueId, workspace)[0].sourceBranch;
-    try {
-      const { promisify } = await import('util');
-      const { exec } = await import('child_process');
-      const execAsync = promisify(exec);
-      const { stdout } = await execAsync('git branch --show-current', {
-        cwd: resolvePrimaryWorkspaceRepoDirSync(issueId, workspace),
-        encoding: 'utf-8',
-      });
-      branch = stdout.trim() || branch;
-    } catch { /* non-fatal — fall back to the configured source branch */ }
-    const { spawnReviewRoleForIssue } = await import('./cloister/review-agent.js');
-    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+    const [{ startDurableReviewPipelineHostSide }, { spawnReviewRoleForIssue }] = await Promise.all([
+      import('./cloister/durable-review-pipeline.js'),
+      import('./cloister/review-agent.js'),
+    ]);
+    const started = await startDurableReviewPipelineHostSide({
       issueId,
-      workspace,
-      branch,
       ...(prUrl ? { prUrl } : {}),
-    }));
-    if (result.success) {
-      const message = result.message?.startsWith('Review already in progress')
-        ? 'already in progress — no-op'
-        : 'auto-dispatched from durable journal intent';
-      console.log(`[review-status] review dispatch for ${issueId}: ${message} (host-side)`);
+      setReviewPending: (update) => setReviewStatusSync(issueId, update),
+      dispatchReview: (context) => Effect.runPromise(spawnReviewRoleForIssue(context)),
+    });
+    if (!started) {
+      console.log(`[review-status] durable review pipeline unavailable or already in flight for ${issueId} (host-side)`);
     }
   } catch (err) {
     console.warn(`[review-status] host-side review auto-dispatch for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);

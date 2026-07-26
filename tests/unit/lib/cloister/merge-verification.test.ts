@@ -55,6 +55,7 @@ vi.mock('../../../../src/lib/cloister/merge-completeness.js', () => ({
 }));
 
 import {
+  handlePostRebaseVerificationDeferral,
   shouldSkipDispatchAsMerged,
   verifyMergedBeforeLifecycle,
 } from '../../../../src/lib/cloister/merge-verification.js';
@@ -64,6 +65,54 @@ function mergeSet(repoCount: number) {
     repos: Array.from({ length: repoCount }, (_, index) => ({ repoKey: `repo-${index}` })),
   };
 }
+
+describe('handlePostRebaseVerificationDeferral', () => {
+  it('returns a non-terminal deferral while restoring queued state without touching readiness', () => {
+    const deps = {
+      appendShipLog: vi.fn(),
+      setReviewStatus: vi.fn(),
+      completePendingOperation: vi.fn(),
+    };
+    const result = handlePostRebaseVerificationDeferral('PAN-3135', {
+      outcome: 'deferred',
+      reason: 'A dashboard deploy is queued',
+    }, {
+      mergeStatus: 'queued',
+      mergeStep: 'queued',
+      mergeNotes: 'Waiting',
+    }, deps);
+    const message = 'Post-rebase verification deferred: A dashboard deploy is queued — merge retries after the deploy.';
+
+    expect(result).toEqual({
+      success: false,
+      statusCode: 409,
+      error: message,
+      deferred: true,
+      mergeStatus: 'queued',
+    });
+    expect(deps.appendShipLog).toHaveBeenCalledWith('PAN-3135', message, 'verifying');
+    expect(deps.setReviewStatus).toHaveBeenCalledWith('PAN-3135', {
+      mergeStatus: 'queued',
+      mergeStep: 'queued',
+      mergeNotes: message,
+    });
+    expect(deps.setReviewStatus.mock.calls[0]?.[1]).not.toHaveProperty('readyForMerge');
+    expect(deps.completePendingOperation).toHaveBeenCalledWith('PAN-3135', message);
+  });
+
+  it('returns null without side effects for terminal verification outcomes', () => {
+    const deps = {
+      appendShipLog: vi.fn(),
+      setReviewStatus: vi.fn(),
+      completePendingOperation: vi.fn(),
+    };
+
+    expect(handlePostRebaseVerificationDeferral('PAN-3135', { outcome: 'passed' }, null, deps)).toBeNull();
+    expect(deps.appendShipLog).not.toHaveBeenCalled();
+    expect(deps.setReviewStatus).not.toHaveBeenCalled();
+    expect(deps.completePendingOperation).not.toHaveBeenCalled();
+  });
+});
 
 describe('verifyMergedBeforeLifecycle', () => {
   beforeEach(() => {
