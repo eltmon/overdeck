@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T13:18:27.247Z",
+  "updated": "2026-07-26T13:22:53.739Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "restart-gate-queue-registration": {
-        "writerId": "agent-pan-3135",
-        "agentId": "agent-pan-3135",
-        "pid": 2188334,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T13:18:27.247Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3135",
@@ -115,6 +107,17 @@
         "outcome": "completed",
         "reason": "Added retriable post-rebase deferral with ship-log evidence and merge-state restoration; a second fix commit moved side effects into a tested helper after the file-size pre-push ratchet rejected route growth",
         "releasedAt": "2026-07-26T13:18:17.787Z"
+      },
+      {
+        "writerId": "agent-pan-3135",
+        "agentId": "agent-pan-3135",
+        "pid": 2188334,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:18:27.247Z",
+        "itemId": "restart-gate-queue-registration",
+        "outcome": "completed",
+        "reason": "Agent restart refusals now register cumulative deploy intent, report queue age and distinct verification blockers, and tell agents to wait for automatic firing instead of retrying or forcing",
+        "releasedAt": "2026-07-26T13:22:53.738Z"
       }
     ],
     "statusReasons": {
@@ -133,6 +136,10 @@
       "merge-ops-deferred-handling": {
         "reason": "Added retriable post-rebase deferral with ship-log evidence and merge-state restoration; a second fix commit moved side effects into a tested helper after the file-size pre-push ratchet rejected route growth",
         "updatedAt": "2026-07-26T13:18:17.787Z"
+      },
+      "restart-gate-queue-registration": {
+        "reason": "Agent restart refusals now register cumulative deploy intent, report queue age and distinct verification blockers, and tell agents to wait for automatic firing instead of retrying or forcing",
+        "updatedAt": "2026-07-26T13:22:53.738Z"
       }
     }
   },
@@ -154,6 +161,9 @@
     "merge-ops-deferred-handling": "completed",
     "merge-ops-deferred-handling.merge-ops-deferred-handling.ac1": "completed",
     "merge-ops-deferred-handling.merge-ops-deferred-handling.ac2": "completed",
-    "restart-gate-queue-registration": "running"
+    "restart-gate-queue-registration": "completed",
+    "restart-gate-queue-registration.restart-gate-queue-registration.ac1": "completed",
+    "restart-gate-queue-registration.restart-gate-queue-registration.ac2": "completed",
+    "restart-gate-queue-registration.restart-gate-queue-registration.ac3": "completed"
   }
 }
