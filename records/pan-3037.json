@@ -316,7 +316,6 @@
       "src/lib/cloister/sync-main-workspace.ts",
       "tests/lib/project-repos.test.ts",
       "tests/unit/cli/sync-main.test.ts",
-      "tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts",
       "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
     ],
     "declaredScopeUntouched": [
@@ -358,13 +357,12 @@
       "sync-sources/skills/pan-sync-main/SKILL.md",
       "tests/lib/project-repos.test.ts",
       "tests/unit/cli/sync-main.test.ts",
-      "tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts",
       "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
     ],
-    "recordedAt": "2026-07-25T23:26:03.281Z"
+    "recordedAt": "2026-07-26T00:21:47.769Z"
   },
   "created": "2026-07-25T20:44:21.373Z",
-  "updated": "2026-07-26T00:21:38.494Z",
+  "updated": "2026-07-26T00:21:47.771Z",
   "pipeline": {
     "issueId": "PAN-3037",
     "reviewStatus": "failed",
