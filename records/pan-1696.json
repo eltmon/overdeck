@@ -231,7 +231,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T03:57:28.129Z",
+  "updated": "2026-07-26T03:58:45.885Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "passed",
@@ -348,7 +348,7 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 17,
+    "sequence": 18,
     "claims": {
       "merge-train-routes": {
         "writerId": "agent-pan-1696",
@@ -356,6 +356,13 @@
         "pid": 368474,
         "host": "eltmon-z790",
         "claimedAt": "2026-07-26T01:56:42.620Z"
+      },
+      "fe-cockpit-toggle": {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 3980127,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T03:58:45.885Z"
       }
     },
     "claimHistory": [
@@ -492,6 +499,7 @@
     "uat-stack-domain.uat-stack-domain.ac2": "completed",
     "cli-flywheel-status": "completed",
     "cli-flywheel-status.cli-flywheel-status.ac1": "completed",
-    "cli-flywheel-status.cli-flywheel-status.ac2": "completed"
+    "cli-flywheel-status.cli-flywheel-status.ac2": "completed",
+    "fe-cockpit-toggle": "running"
   }
 }
