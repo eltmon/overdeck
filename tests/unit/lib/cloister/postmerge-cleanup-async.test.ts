@@ -160,6 +160,10 @@ vi.mock('../../../../src/lib/github-app.js', () => ({
   listPullRequestsForHead: vi.fn().mockReturnValue(Effect.succeed([])),
 }));
 
+vi.mock('../../../../src/lib/merge-set.js', () => ({
+  getMergeSetSync: vi.fn().mockReturnValue({ repos: [{ repoKey: 'overdeck' }] }),
+}));
+
 vi.mock('../../../../src/lib/activity-log.js', () => ({
   logActivity: vi.fn(),
 }));
