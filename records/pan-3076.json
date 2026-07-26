@@ -172,23 +172,23 @@
     "recordedAt": "2026-07-26T00:59:07.168Z"
   },
   "created": "2026-07-25T21:12:36.630Z",
-  "updated": "2026-07-26T01:04:46.345Z",
+  "updated": "2026-07-26T01:04:56.019Z",
   "pipeline": {
     "issueId": "PAN-3076",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T01:00:25.237Z",
-    "updatedAt": "2026-07-26T01:04:45.072Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-26T01:04:55.951Z",
+    "reviewNotes": "All changed regions reviewed; correctness, security, requirements, performance, lint, typecheck, and 114 focused tests are clean",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3082",
-    "reviewedAtCommit": "f909f3d177827021a7b3463d93fadf30b252ceb4",
+    "reviewedAtCommit": "39d5480caead737c18ee0f37a62de1d3fcb5085b",
     "lastVerifiedCommit": "241e1f76bf1b9dd068e30765ff568e91a561488a",
-    "reviewRequestedAt": "2026-07-26T01:00:25.237Z",
     "reviewSpawnedAt": "2026-07-26T01:04:45.072Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -320,7 +320,7 @@
       },
       "costAtCloseOut": {
         "usd": 204.335286,
-        "pricingAsOf": "2026-07-26T01:04:45.244Z"
+        "pricingAsOf": "2026-07-26T01:04:56.009Z"
       }
     },
     "merges": [
