@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T02:42:23.947Z",
+  "updated": "2026-07-26T02:44:35.423Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "pending",
@@ -54,16 +54,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "dialog-issue-title": {
-        "writerId": "agent-pan-3097",
-        "agentId": "agent-pan-3097",
-        "pid": 1490752,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T02:42:23.947Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3097",
@@ -75,12 +67,27 @@
         "outcome": "completed",
         "reason": "Added formatIssueRef with trimming, null fallback, em dash formatting, and unit coverage",
         "releasedAt": "2026-07-26T02:42:13.424Z"
+      },
+      {
+        "writerId": "agent-pan-3097",
+        "agentId": "agent-pan-3097",
+        "pid": 1490752,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T02:42:23.947Z",
+        "itemId": "dialog-issue-title",
+        "outcome": "completed",
+        "reason": "Added issueTitle support, formatted header and Issue cell, removed Unknown fallback, and covered bound/unbound cases",
+        "releasedAt": "2026-07-26T02:44:35.423Z"
       }
     ],
     "statusReasons": {
       "issue-ref-helper": {
         "reason": "Added formatIssueRef with trimming, null fallback, em dash formatting, and unit coverage",
         "updatedAt": "2026-07-26T02:42:13.424Z"
+      },
+      "dialog-issue-title": {
+        "reason": "Added issueTitle support, formatted header and Issue cell, removed Unknown fallback, and covered bound/unbound cases",
+        "updatedAt": "2026-07-26T02:44:35.423Z"
       }
     }
   },
@@ -89,6 +96,9 @@
     "issue-ref-helper.issue-ref-helper.ac1": "completed",
     "issue-ref-helper.issue-ref-helper.ac2": "completed",
     "issue-ref-helper.issue-ref-helper.ac3": "completed",
-    "dialog-issue-title": "running"
+    "dialog-issue-title": "completed",
+    "dialog-issue-title.dialog-issue-title.ac1": "completed",
+    "dialog-issue-title.dialog-issue-title.ac2": "completed",
+    "dialog-issue-title.dialog-issue-title.ac3": "completed"
   }
 }
