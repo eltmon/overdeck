@@ -131,7 +131,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T00:36:11.324Z",
+  "updated": "2026-07-26T00:47:28.142Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -185,18 +185,32 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "flag-rename": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-1696",
         "agentId": "agent-pan-1696",
         "pid": 1587606,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T00:36:08.500Z"
+        "claimedAt": "2026-07-26T00:36:08.500Z",
+        "itemId": "flag-rename",
+        "outcome": "completed",
+        "reason": "Flag key renamed to merge_train.enabled with legacy fallback support, unit tests pass",
+        "releasedAt": "2026-07-26T00:47:28.142Z"
+      }
+    ],
+    "statusReasons": {
+      "flag-rename": {
+        "reason": "Flag key renamed to merge_train.enabled with legacy fallback support, unit tests pass",
+        "updatedAt": "2026-07-26T00:47:28.142Z"
       }
     }
   },
   "statusOverrides": {
-    "flag-rename": "running"
+    "flag-rename": "completed",
+    "flag-rename.flag-rename.ac1": "completed",
+    "flag-rename.flag-rename.ac2": "completed",
+    "flag-rename.flag-rename.ac3": "completed"
   }
 }
