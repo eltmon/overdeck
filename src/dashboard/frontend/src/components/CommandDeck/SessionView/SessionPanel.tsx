@@ -171,7 +171,7 @@ function SessionPanelBranchChip({ sessionId }: { sessionId: string }) {
   );
 }
 
-function DeliveryMethodToggle({ sessionId, deliveryMethod }: { sessionId: string; deliveryMethod?: 'auto' | 'channels' | 'tmux' }) {
+function DeliveryMethodToggle({ sessionId, deliveryMethod }: { sessionId: string; deliveryMethod?: 'auto' | 'channels' | 'tmux' | 'supervisor' }) {
   const [current, setCurrent] = useState(deliveryMethod ?? 'auto');
   const [saving, setSaving] = useState(false);
 
@@ -207,6 +207,8 @@ function DeliveryMethodToggle({ sessionId, deliveryMethod }: { sessionId: string
       <option value="auto">Auto</option>
       <option value="channels">Channels</option>
       <option value="tmux">Tmux</option>
+      {/* System-set state (PTY supervisor transport) — displayable, not operator-settable. */}
+      <option value="supervisor" disabled>Supervisor</option>
     </select>
   );
 }
