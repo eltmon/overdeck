@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T10:08:59.497Z",
+  "updated": "2026-07-26T10:09:12.812Z",
   "pipeline": {
     "issueId": "PAN-3114",
     "reviewStatus": "pending",
@@ -67,8 +67,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "docs": {
+        "writerId": "agent-pan-3114",
+        "agentId": "agent-pan-3114",
+        "pid": 335883,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:09:12.812Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3114",
@@ -134,6 +142,7 @@
     "close-out-heal.close-out-heal.ac1": "completed",
     "close-out-heal.close-out-heal.ac2": "completed",
     "close-out-heal.close-out-heal.ac3": "completed",
-    "close-out-heal.close-out-heal.ac4": "completed"
+    "close-out-heal.close-out-heal.ac4": "completed",
+    "docs": "running"
   }
 }
