@@ -231,20 +231,18 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T04:00:39.782Z",
+  "updated": "2026-07-26T04:01:17.285Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T03:57:28.115Z",
-    "reviewNotes": "Per-project UAT frontend URLs correctly use the generation project's configured DNS domain with pan.localhost fallback; no new blockers found.",
+    "updatedAt": "2026-07-26T04:01:16.915Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
-    "reviewedAtCommit": "284698c068f8a1abe69bdc5985b4f7e4218a3b25",
     "reviewSpawnedAt": "2026-07-26T03:51:07.492Z"
   },
   "closeOut": {
@@ -282,18 +280,18 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 70,
-            "output": 30852,
-            "cacheRead": 5908419,
-            "cacheWrite": 205680
+            "input": 96,
+            "output": 40345,
+            "cacheRead": 7703356,
+            "cacheWrite": 388052
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3545,
-            "output": 149325,
-            "cacheRead": 86289940,
-            "cacheWrite": 3558468
+            "input": 3646,
+            "output": 153633,
+            "cacheRead": 89070741,
+            "cacheWrite": 3709374
           }
         }
       },
@@ -323,21 +321,21 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 70,
-          "output": 30852,
-          "cacheRead": 5908419,
-          "cacheWrite": 205680
+          "input": 96,
+          "output": 40345,
+          "cacheRead": 7703356,
+          "cacheWrite": 388052
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3545,
-          "output": 149325,
-          "cacheRead": 86289940,
-          "cacheWrite": 3558468
+          "input": 3646,
+          "output": 153633,
+          "cacheRead": 89070741,
+          "cacheWrite": 3709374
         }
       },
       "costAtCloseOut": {
-        "usd": 150.5952972,
-        "pricingAsOf": "2026-07-26T03:57:28.120Z"
+        "usd": 151.9935512,
+        "pricingAsOf": "2026-07-26T04:01:16.947Z"
       }
     },
     "merges": [
