@@ -269,7 +269,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T06:19:08.106Z",
+  "updated": "2026-07-26T06:41:13.019Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "pending",
@@ -384,16 +384,8 @@
   "harness": "claude-code",
   "model": "claude-opus-5",
   "tasks": {
-    "sequence": 25,
-    "claims": {
-      "fe-awaiting-merge": {
-        "writerId": "agent-pan-1696",
-        "agentId": "agent-pan-1696",
-        "pid": 2051539,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T06:19:08.105Z"
-      }
-    },
+    "sequence": 26,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1696",
@@ -522,6 +514,17 @@
         "outcome": "completed",
         "reason": "Added components/merge-train/MergeTrainView.tsx: shared multi-project merge-train body reading only /api/merge-train/queues and /api/merge-train/generations, one section per project preserving every old-card behavior (batches, stack, promote, rebuild, held-out, What-to-UAT, ready-feature rows, escape hatch), project-scoped actions behind the same confirms, and filter chips persisted under localStorage merge-train.projectFilter. 21 tests. Deviation: kept the /api/flywheel/merge-backend capability probe so the 'merge backend unavailable' warning is not lost; a test asserts no flywheel run/state or legacy endpoint is fetched. ac4 browser verification deferred to fe-awaiting-merge, which mounts the view.",
         "releasedAt": "2026-07-26T06:18:56.744Z"
+      },
+      {
+        "writerId": "agent-pan-1696",
+        "agentId": "agent-pan-1696",
+        "pid": 2051539,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T06:19:08.105Z",
+        "itemId": "fe-awaiting-merge",
+        "outcome": "completed",
+        "reason": "AwaitingMergePage now hosts MergeTrainSection (shared MergeTrainView + global merge_train_enabled toggle via /api/flywheel/config) above the per-issue rows; all per-row actions untouched. Browser-verified in an isolated Playwright chromium against a throwaway stub API: 3 project sections incl. an explicit 'merge train off' row, batches/held-out/checklist/escape hatch, toggle state, and filter persistence surviving a reload; zero console errors. ALSO fixed 8 tests left red by this branch's earlier fe-cockpit-toggle commit (missing merge-train endpoint in 3 strict fetch mocks, stale call-count, and two buttons sharing the accessible name 'Global default' — now scoped aria-labels). Extracted the page's API helpers to awaitingMergeApi.ts to satisfy the file-size guard, dropping the page under the god-file ceiling. Left alone: the page's pre-existing EmptyState still says 'The flywheel is idling — run /all-up' (per-issue empty state, outside this item).",
+        "releasedAt": "2026-07-26T06:41:13.019Z"
       }
     ],
     "statusReasons": {
@@ -548,6 +551,10 @@
       "fe-merge-train-view": {
         "reason": "Added components/merge-train/MergeTrainView.tsx: shared multi-project merge-train body reading only /api/merge-train/queues and /api/merge-train/generations, one section per project preserving every old-card behavior (batches, stack, promote, rebuild, held-out, What-to-UAT, ready-feature rows, escape hatch), project-scoped actions behind the same confirms, and filter chips persisted under localStorage merge-train.projectFilter. 21 tests. Deviation: kept the /api/flywheel/merge-backend capability probe so the 'merge backend unavailable' warning is not lost; a test asserts no flywheel run/state or legacy endpoint is fetched. ac4 browser verification deferred to fe-awaiting-merge, which mounts the view.",
         "updatedAt": "2026-07-26T06:18:56.744Z"
+      },
+      "fe-awaiting-merge": {
+        "reason": "AwaitingMergePage now hosts MergeTrainSection (shared MergeTrainView + global merge_train_enabled toggle via /api/flywheel/config) above the per-issue rows; all per-row actions untouched. Browser-verified in an isolated Playwright chromium against a throwaway stub API: 3 project sections incl. an explicit 'merge train off' row, batches/held-out/checklist/escape hatch, toggle state, and filter persistence surviving a reload; zero console errors. ALSO fixed 8 tests left red by this branch's earlier fe-cockpit-toggle commit (missing merge-train endpoint in 3 strict fetch mocks, stale call-count, and two buttons sharing the accessible name 'Global default' — now scoped aria-labels). Extracted the page's API helpers to awaitingMergeApi.ts to satisfy the file-size guard, dropping the page under the god-file ceiling. Left alone: the page's pre-existing EmptyState still says 'The flywheel is idling — run /all-up' (per-issue empty state, outside this item).",
+        "updatedAt": "2026-07-26T06:41:13.019Z"
       }
     }
   },
@@ -592,6 +599,9 @@
     "fe-merge-train-view.fe-merge-train-view.ac2": "completed",
     "fe-merge-train-view.fe-merge-train-view.ac3": "completed",
     "fe-merge-train-view.fe-merge-train-view.ac4": "completed",
-    "fe-awaiting-merge": "running"
+    "fe-awaiting-merge": "completed",
+    "fe-awaiting-merge.fe-awaiting-merge.ac1": "completed",
+    "fe-awaiting-merge.fe-awaiting-merge.ac2": "completed",
+    "fe-awaiting-merge.fe-awaiting-merge.ac3": "completed"
   }
 }
