@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T05:55:05.237Z",
-  "updated": "2026-07-26T06:14:42.768Z",
+  "updated": "2026-07-26T06:17:45.582Z",
   "pipeline": {
     "issueId": "PAN-3109",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "post-merge-row-containment": {
-        "writerId": "agent-pan-3109",
-        "agentId": "agent-pan-3109",
-        "pid": 1829927,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T06:14:42.768Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3109",
@@ -107,6 +99,17 @@
         "outcome": "completed",
         "reason": "Added the branch-containment fallback to DoD row 4, propagated explicit evidence without fabricated merge metadata, updated the row expectation, and added focused lifecycle tests; typecheck and lifecycle tests pass.",
         "releasedAt": "2026-07-26T06:14:29.858Z"
+      },
+      {
+        "writerId": "agent-pan-3109",
+        "agentId": "agent-pan-3109",
+        "pid": 1829927,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T06:14:42.768Z",
+        "itemId": "post-merge-row-containment",
+        "outcome": "completed",
+        "reason": "Passed DoD row 4 evidence into row 5, waived only the unobservable lifecycle marker for containment-proven non-PR landings, preserved the agent-quiescence requirement, and added assembled MIN-305-shaped coverage; typecheck and focused tests pass.",
+        "releasedAt": "2026-07-26T06:17:45.582Z"
       }
     ],
     "statusReasons": {
@@ -117,6 +120,10 @@
       "merged-row-containment-fallback": {
         "reason": "Added the branch-containment fallback to DoD row 4, propagated explicit evidence without fabricated merge metadata, updated the row expectation, and added focused lifecycle tests; typecheck and lifecycle tests pass.",
         "updatedAt": "2026-07-26T06:14:29.858Z"
+      },
+      "post-merge-row-containment": {
+        "reason": "Passed DoD row 4 evidence into row 5, waived only the unobservable lifecycle marker for containment-proven non-PR landings, preserved the agent-quiescence requirement, and added assembled MIN-305-shaped coverage; typecheck and focused tests pass.",
+        "updatedAt": "2026-07-26T06:17:45.582Z"
       }
     }
   },
@@ -133,6 +140,10 @@
     "merged-row-containment-fallback.merged-row-containment-fallback.ac3": "completed",
     "merged-row-containment-fallback.merged-row-containment-fallback.ac4": "completed",
     "merged-row-containment-fallback.merged-row-containment-fallback.ac5": "completed",
-    "post-merge-row-containment": "running"
+    "post-merge-row-containment": "completed",
+    "post-merge-row-containment.post-merge-row-containment.ac1": "completed",
+    "post-merge-row-containment.post-merge-row-containment.ac2": "completed",
+    "post-merge-row-containment.post-merge-row-containment.ac3": "completed",
+    "post-merge-row-containment.post-merge-row-containment.ac4": "completed"
   }
 }
