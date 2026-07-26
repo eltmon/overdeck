@@ -15,8 +15,34 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [
+      "tests/unit/lib/lifecycle/dod-doc-drift.test.ts"
+    ],
+    "declaredScope": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/lib/lifecycle/dod-gate.ts",
+      "src/lib/lifecycle/dod.ts",
+      "src/lib/pipeline-membership-gather.ts",
+      "tests/unit/lib/lifecycle/dod-doc-drift.test.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/lib/lifecycle/dod-gate.ts",
+      "src/lib/lifecycle/dod.ts",
+      "src/lib/pipeline-membership-gather.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "recordedAt": "2026-07-26T06:27:49.436Z"
+  },
   "created": "2026-07-26T05:55:05.237Z",
-  "updated": "2026-07-26T06:27:52.565Z",
+  "updated": "2026-07-26T06:27:56.035Z",
   "pipeline": {
     "issueId": "PAN-3109",
     "reviewStatus": "pending",
@@ -26,8 +52,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T06:27:52.564Z",
+    "updatedAt": "2026-07-26T06:27:55.669Z",
     "inspectNotes": "AC1-4 verified in diff: per-line classify handles merged-work/pointer/unmerged, exact ref patterns include strike + origin remotes, polyrepo aggregates both repo paths with per-repo default branch (main vs develop). AC5: vitest run exits 0, 29 passed, zero deleted lines in the test file so no pre-existing case modified; gatherProjectLensSignals routes through the same classifier with identical sets. Nit only: no isolated case asserting mergedWorkRefs empty for a pure-pointer scenario; helper has no production consumer yet (expected for a later bead).",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3112",
     "reviewRequestedAt": "2026-07-26T06:27:52.564Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -54,8 +81,7 @@
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ],
       "recordedAt": "2026-07-26T06:27:49.436Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3112"
+    }
   },
   "closeOut": {
     "usage": {
@@ -70,9 +96,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 338807,
-            "output": 24133,
-            "cacheRead": 7620608,
+            "input": 608899,
+            "output": 52603,
+            "cacheRead": 24207360,
             "cacheWrite": 0
           }
         }
@@ -85,18 +111,20 @@
           "cacheWrite": 194126
         },
         "openai/gpt-5.6-sol": {
-          "input": 338807,
-          "output": 24133,
-          "cacheRead": 7620608,
+          "input": 608899,
+          "output": 52603,
+          "cacheRead": 24207360,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 14.396173,
-        "pricingAsOf": "2026-07-26T06:11:08.924Z"
+        "usd": 24.894109,
+        "pricingAsOf": "2026-07-26T06:27:55.719Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3112"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -192,31 +220,5 @@
     "docs-dod-containment.docs-dod-containment.ac1": "completed",
     "docs-dod-containment.docs-dod-containment.ac2": "completed",
     "docs-dod-containment.docs-dod-containment.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [
-      "tests/unit/lib/lifecycle/dod-doc-drift.test.ts"
-    ],
-    "declaredScope": [
-      "docs/DEFINITION-OF-DONE.md",
-      "docs/PIPELINE-MEMBERSHIP.md",
-      "src/lib/lifecycle/dod-gate.ts",
-      "src/lib/lifecycle/dod.ts",
-      "src/lib/pipeline-membership-gather.ts",
-      "tests/unit/lib/lifecycle/dod-doc-drift.test.ts",
-      "tests/unit/lib/lifecycle/dod-gate.test.ts",
-      "tests/unit/lib/pipeline-membership-gather.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/DEFINITION-OF-DONE.md",
-      "docs/PIPELINE-MEMBERSHIP.md",
-      "src/lib/lifecycle/dod-gate.ts",
-      "src/lib/lifecycle/dod.ts",
-      "src/lib/pipeline-membership-gather.ts",
-      "tests/unit/lib/lifecycle/dod-gate.test.ts",
-      "tests/unit/lib/pipeline-membership-gather.test.ts"
-    ],
-    "recordedAt": "2026-07-26T06:27:49.436Z"
   }
 }
