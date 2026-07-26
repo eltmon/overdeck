@@ -8,9 +8,12 @@ import { promisify } from 'node:util';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  activateDashboardDeployment,
   buildDashboardFromOriginMain,
-  installDashboardDeployment,
+  dashboardDeploymentRoots,
   removeDashboardDeployment,
+  selectDashboardDeploymentRoot,
+  sweepDashboardDeployments,
   type BuildFromOriginDeps,
 } from '../../../../src/lib/deploy/build-from-origin.js';
 
@@ -61,9 +64,12 @@ function createDependencies(options: {
   return { deps, gitCalls, removedPaths, notes, installAndBuild };
 }
 
+const originalOverdeckHome = process.env.OVERDECK_HOME;
 const temporaryRoots: string[] = [];
 
 afterEach(async () => {
+  if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = originalOverdeckHome;
   await Promise.all(temporaryRoots.splice(0).map((path) => fs.rm(path, { recursive: true, force: true })));
 });
 
@@ -209,7 +215,7 @@ describe('buildDashboardFromOriginMain', () => {
       processId,
     });
 
-    await installDashboardDeployment(repoRoot, deployment);
+    const activation = await activateDashboardDeployment(repoRoot, deployment);
     const deployedBundle = await import(`${pathToFileURL(join(deployment.deployRoot, 'dist', 'dashboard', 'server.mjs')).href}?test=${processId}`);
     expect(deployedBundle.default).toBe('canonical runtime dependency:canonical workspace dependency');
     await expect(fs.readFile(join(repoRoot, 'node_modules', 'wip-only', 'sentinel.txt'), 'utf8'))
@@ -220,8 +226,40 @@ describe('buildDashboardFromOriginMain', () => {
     expect((await fs.lstat(join(repoRoot, 'dist', 'node_modules'))).isSymbolicLink()).toBe(true);
     await expect(fs.readlink(join(repoRoot, 'dist', 'node_modules')))
       .resolves.toBe(join(deployRoot, 'node_modules'));
+    await activation.commit();
     await removeDashboardDeployment(repoRoot, deployRoot, {
       runGit: async () => ({ stdout: '', stderr: '' }),
     });
+  });
+
+  it('alternates between two fixed deployment generations', async () => {
+    const home = await fs.mkdtemp(join(tmpdir(), 'overdeck-deployment-slots-'));
+    temporaryRoots.push(home);
+    process.env.OVERDECK_HOME = home;
+    const [first, second] = dashboardDeploymentRoots();
+
+    expect(selectDashboardDeploymentRoot(null)).toBe(first);
+    expect(selectDashboardDeploymentRoot(first)).toBe(second);
+    expect(selectDashboardDeploymentRoot(second)).toBe(first);
+  });
+
+  it('sweeps legacy deployment roots while retaining the two bounded generations', async () => {
+    const home = await fs.mkdtemp(join(tmpdir(), 'overdeck-deployment-sweep-'));
+    temporaryRoots.push(home);
+    process.env.OVERDECK_HOME = home;
+    const [first, second] = dashboardDeploymentRoots();
+    const baseDir = dirname(first);
+    const legacyOne = join(baseDir, '.pan-reload-build-101');
+    const legacyTwo = join(baseDir, '.pan-reload-build-202');
+    await Promise.all([first, second, legacyOne, legacyTwo].map((path) => fs.mkdir(path, { recursive: true })));
+
+    await sweepDashboardDeployments('/repo', [first, second], {
+      runGit: async () => ({ stdout: '', stderr: '' }),
+    });
+
+    await expect(fs.access(first)).resolves.toBeUndefined();
+    await expect(fs.access(second)).resolves.toBeUndefined();
+    await expect(fs.access(legacyOne)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(fs.access(legacyTwo)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 });

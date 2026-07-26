@@ -3,11 +3,15 @@ import chalk from 'chalk';
 import { statSync } from 'fs';
 import { resolve } from 'path';
 import {
+  activateDashboardDeployment,
   buildDashboardFromOriginMain,
-  installDashboardDeployment,
+  dashboardDeploymentRoots,
   removeDashboardDeployment,
   runGitAsync,
+  selectDashboardDeploymentRoot,
+  sweepDashboardDeployments,
   type DashboardDeployment,
+  type DashboardDeploymentActivation,
 } from '../../lib/deploy/build-from-origin.js';
 import {
   readActiveDashboardBundleSync,
@@ -149,18 +153,27 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     const config = readPlatformConfigSync();
     let repoRoot = process.cwd();
     let deployment: DashboardDeployment | null = null;
+    let activation: DashboardDeploymentActivation | null = null;
     const previousBundle = readActiveDashboardBundleSync();
     if (!options.skipBuild) {
       try {
         repoRoot = await resolvePrimaryRepoRoot(process.cwd());
-        deployment = await buildDashboardFromOriginMain(repoRoot);
+        const generationRoots = dashboardDeploymentRoots();
+        await sweepDashboardDeployments(repoRoot, [
+          ...generationRoots,
+          ...(previousBundle ? [previousBundle.deployRoot] : []),
+        ]);
+        const nextDeployRoot = selectDashboardDeploymentRoot(previousBundle?.deployRoot);
+        deployment = await buildDashboardFromOriginMain(repoRoot, {
+          deploymentRoot: () => nextDeployRoot,
+        });
         const deployedMtime = dashboardBundleMtimeMs(deployment.serverPath);
         if (deployedMtime <= 0) {
           throw new Error(`Build did not create ${deployment.serverPath}`);
         }
         await writeActiveDashboardBundle({ repoRoot, ...deployment });
         try {
-          await installDashboardDeployment(repoRoot, deployment);
+          activation = await activateDashboardDeployment(repoRoot, deployment);
         } catch (error) {
           await writeActiveDashboardBundle(previousBundle).catch(() => undefined);
           throw error;
@@ -180,17 +193,31 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
       }
     }
 
-    await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, {
-      deacon: options.deacon,
-      serverPath: deployment?.serverPath,
-      repoRoot,
-    }), {
-      healthTimeoutMs,
-      expectedIdentity: { repoRoot, mode: 'primary' },
-    }));
+    try {
+      await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, {
+        deacon: options.deacon,
+        serverPath: deployment?.serverPath,
+        repoRoot,
+      }), {
+        healthTimeoutMs,
+        expectedIdentity: { repoRoot, mode: 'primary' },
+      }));
+    } catch (error) {
+      if (deployment) {
+        await writeActiveDashboardBundle(previousBundle).catch(() => undefined);
+        await activation?.rollback();
+        await removeDashboardDeployment(repoRoot, deployment.deployRoot);
+        await sweepDashboardDeployments(repoRoot, [
+          ...dashboardDeploymentRoots(),
+          ...(previousBundle ? [previousBundle.deployRoot] : []),
+        ]).catch(() => undefined);
+      }
+      throw error;
+    }
 
-    if (deployment && previousBundle && previousBundle.deployRoot !== deployment.deployRoot) {
-      await removeDashboardDeployment(previousBundle.repoRoot, previousBundle.deployRoot);
+    await activation?.commit();
+    if (deployment) {
+      await sweepDashboardDeployments(repoRoot, dashboardDeploymentRoots()).catch(() => undefined);
     }
     await recordReloadStatus(startedAt, true);
     console.log(chalk.green('✓ Dashboard reloaded and healthy'));

@@ -143,7 +143,8 @@ function mockExecByCommand(handlers: Record<string, Array<{ stdout?: string; cod
 
 const DEFAULT_REPO_ROOT = '/repo';
 const TEST_OVERDECK_HOME = '/overdeck-home';
-const DEFAULT_BUILD_WORKTREE = `${TEST_OVERDECK_HOME}/deployments/dashboard/.pan-reload-build-${process.pid}`;
+const DEFAULT_BUILD_WORKTREE = `${TEST_OVERDECK_HOME}/deployments/dashboard/.pan-reload-generation-a`;
+const ALTERNATE_BUILD_WORKTREE = `${TEST_OVERDECK_HOME}/deployments/dashboard/.pan-reload-generation-b`;
 const DEFAULT_ORIGIN_MAIN_SHA = '1111111111111111111111111111111111111111';
 
 const originalAgentId = process.env.OVERDECK_AGENT_ID;
@@ -359,13 +360,14 @@ describe('reloadCommand', () => {
   });
 
   it('keeps a successful restart green when previous deployment cleanup fails', async () => {
-    const previousRoot = `${TEST_OVERDECK_HOME}/deployments/dashboard/previous`;
+    const previousRoot = `${TEST_OVERDECK_HOME}/deployments/dashboard/.pan-reload-build-previous`;
     mocks.readActiveDashboardBundle.mockReturnValue({
       repoRoot: DEFAULT_REPO_ROOT,
       deployRoot: previousRoot,
       serverPath: `${previousRoot}/dist/dashboard/server.js`,
     });
     mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+    mocks.fsReaddir.mockResolvedValue(['.pan-reload-build-previous']);
     mocks.fsRm.mockImplementation(async (path: string) => {
       if (path === previousRoot) throw Object.assign(new Error('busy'), { code: 'EBUSY' });
     });
@@ -388,11 +390,54 @@ describe('reloadCommand', () => {
     expect(process.exitCode).toBeUndefined();
   });
 
+  it('reuses the inactive generation and restores the active generation across repeated restart failures', async () => {
+    const activeBundle = {
+      repoRoot: DEFAULT_REPO_ROOT,
+      deployRoot: DEFAULT_BUILD_WORKTREE,
+      serverPath: `${DEFAULT_BUILD_WORKTREE}/dist/dashboard/server.js`,
+    };
+    let marker = activeBundle;
+    mocks.readActiveDashboardBundle.mockImplementation(() => marker);
+    mocks.writeActiveDashboardBundle.mockImplementation(async (next: typeof activeBundle | null) => {
+      marker = next ?? activeBundle;
+    });
+    mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+    mocks.exec.mockImplementation(async (command: string) => {
+      if (command === "git 'rev-parse' '--show-toplevel'") return { stdout: `${DEFAULT_REPO_ROOT}\n`, stderr: '' };
+      if (command === "git 'rev-parse' 'HEAD'" || command === "git 'rev-parse' 'origin/main'") {
+        return { stdout: `${DEFAULT_ORIGIN_MAIN_SHA}\n`, stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
+    mocks.restartDashboard.mockReturnValue(Effect.fail(new Error('health failed')));
+    mockSpawnExits();
+
+    await reloadCommand({});
+    expect(process.exitCode).toBe(1);
+    process.exitCode = undefined;
+    await reloadCommand({});
+
+    const addedRoots = mocks.exec.mock.calls
+      .map(([command]) => command as string)
+      .filter((command) => command.includes("git 'worktree' 'add'"));
+    expect(addedRoots).toEqual([
+      `git 'worktree' 'add' '--detach' '${ALTERNATE_BUILD_WORKTREE}' 'origin/main'`,
+      `git 'worktree' 'add' '--detach' '${ALTERNATE_BUILD_WORKTREE}' 'origin/main'`,
+    ]);
+    expect(marker).toEqual(activeBundle);
+    expect(mocks.fsRm).toHaveBeenCalledWith(ALTERNATE_BUILD_WORKTREE, { recursive: true, force: true });
+    expect(mocks.fsRename).toHaveBeenCalledWith(
+      `/repo/dist.rollback.${process.pid}`,
+      '/repo/dist',
+    );
+    expect(process.exitCode).toBe(1);
+  });
+
   it('restarts when obsolete primary dist cleanup fails after the new dist is installed', async () => {
     mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
     let oldDistRemovals = 0;
     mocks.fsRm.mockImplementation(async (path: string) => {
-      if (path === `/repo/dist.old.${process.pid}` && ++oldDistRemovals === 2) {
+      if (path === `/repo/dist.rollback.${process.pid}` && ++oldDistRemovals === 2) {
         throw Object.assign(new Error('busy'), { code: 'EBUSY' });
       }
     });
