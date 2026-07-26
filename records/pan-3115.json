@@ -62,17 +62,17 @@
     "recordedAt": "2026-07-26T11:22:12.725Z"
   },
   "created": "2026-07-26T08:56:03.309Z",
-  "updated": "2026-07-26T11:22:26.066Z",
+  "updated": "2026-07-26T11:26:18.088Z",
   "pipeline": {
     "issueId": "PAN-3115",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T11:22:24.366Z",
+    "updatedAt": "2026-07-26T11:26:17.937Z",
     "inspectNotes": "AC1: MEMBERSHIP_UNAVAILABLE_REASONS in packages/contracts/src/types.ts:15-22 holds exactly the six documented reasons and MembershipUnavailableReason derives from it via typeof[number]; reachable through 'export * from ./types' in index.ts. AC2: PipelineMembershipUnavailableError (src/lib/pipeline-membership-gather.ts:237-245) sets name, readonly reason, and passes message to super, so new(...'repo_unavailable','msg') reads back correctly. AC3: contracts change is type-only plus one const array and the gather import is 'import type', so no runtime cycle or emit hazard; build/typecheck left to the verification gate. PipelineMembershipUnavailableBody added as specified. Locking test added at tests/unit/lib/pipeline-membership-gather.test.ts:67-87.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3134",
     "reviewRequestedAt": "2026-07-26T11:22:15.614Z",
@@ -123,24 +123,24 @@
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1429766,
-            "output": 114069,
-            "cacheRead": 84952576,
+            "input": 1434213,
+            "output": 115737,
+            "cacheRead": 86335488,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1429766,
-          "output": 114069,
-          "cacheRead": 84952576,
+          "input": 1434213,
+          "output": 115737,
+          "cacheRead": 86335488,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 53.047188,
-        "pricingAsOf": "2026-07-26T11:22:25.956Z"
+        "usd": 53.810919,
+        "pricingAsOf": "2026-07-26T11:26:18.036Z"
       }
     },
     "merges": [
