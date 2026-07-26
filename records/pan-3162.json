@@ -63,10 +63,10 @@
     "recordedAt": "2026-07-26T22:02:33.712Z"
   },
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T22:11:24.228Z",
+  "updated": "2026-07-26T22:15:00.897Z",
   "pipeline": {
     "issueId": "PAN-3162",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -74,10 +74,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T22:02:50.304Z",
-    "updatedAt": "2026-07-26T22:03:49.794Z",
+    "updatedAt": "2026-07-26T22:15:00.838Z",
+    "reviewNotes": "Forge observation can accept a historical MR for the same source branch and can overwrite concurrent merge-set progress from a stale full snapshot",
     "inspectNotes": "All 4 ACs met. observeForgeMergeState (merge-completeness.ts:189-232) persists mergeStatus='merged'+artifactUrl via withRepoStateSync/upsertMergeSetSync only for state==='merged' rows lacking that evidence, and is gated on no repo being unverifiable, so unmerged/no-changes/unverifiable verdicts write nothing and hasPositiveMergedEvidence is false for all-no-changes. reconcileStrandedRepos (lines 280-308) flips required, non-skipped, artifact-backed pending/failed/merging rows to merged (with artifactId) only when findMergedArtifact returns an artifact, and continues untouched on null. Forge errors in both paths become unverifiable blockers; reconcile now batches writes and returns initialMergeSet with zero upserts when any unverifiable blocker exists (lines 310-313), covered by both new cases in merge-completeness-forge-error.test.ts. Notes, non-blocking: (a) observeForgeMergeState has no production caller yet — presumably a later bead wires it; (b) mixed sets where one repo is verifiably merged and another is unverifiable discard the confirmed evidence, which is the AC4-mandated fail-open reading; (c) merge-ops.ts:533-535 activeRepos still includes rows this flips to merged, so a reconciled-merged repo will still be walked by the rebase/merge loop — worth a follow-on look outside this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3170",
-    "reviewRequestedAt": "2026-07-26T22:02:50.304Z",
     "reviewSpawnedAt": "2026-07-26T22:03:49.792Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -130,6 +130,14 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 1995426,
+            "output": 192329,
+            "cacheRead": 31395328,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 1281505,
@@ -141,15 +149,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1281505,
-          "output": 237116,
-          "cacheRead": 67637248,
+          "input": 3276931,
+          "output": 429445,
+          "cacheRead": 99032576,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 47.339629,
-        "pricingAsOf": "2026-07-26T22:03:51.886Z"
+        "usd": 78.784293,
+        "pricingAsOf": "2026-07-26T22:15:00.875Z"
       }
     },
     "merges": [
@@ -158,7 +166,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 14,
