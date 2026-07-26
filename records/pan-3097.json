@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T02:39:07.545Z",
+  "updated": "2026-07-26T02:42:13.424Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "pending",
@@ -54,18 +54,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "issue-ref-helper": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3097",
         "agentId": "agent-pan-3097",
         "pid": 1424127,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T02:39:07.545Z"
+        "claimedAt": "2026-07-26T02:39:07.545Z",
+        "itemId": "issue-ref-helper",
+        "outcome": "completed",
+        "reason": "Added formatIssueRef with trimming, null fallback, em dash formatting, and unit coverage",
+        "releasedAt": "2026-07-26T02:42:13.424Z"
+      }
+    ],
+    "statusReasons": {
+      "issue-ref-helper": {
+        "reason": "Added formatIssueRef with trimming, null fallback, em dash formatting, and unit coverage",
+        "updatedAt": "2026-07-26T02:42:13.424Z"
       }
     }
   },
   "statusOverrides": {
-    "issue-ref-helper": "running"
+    "issue-ref-helper": "completed",
+    "issue-ref-helper.issue-ref-helper.ac1": "completed",
+    "issue-ref-helper.issue-ref-helper.ac2": "completed",
+    "issue-ref-helper.issue-ref-helper.ac3": "completed"
   }
 }
