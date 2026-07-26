@@ -113,6 +113,7 @@ describe('POST /api/specialists/done inspect item attribution', () => {
       'issue-view-model',
       'passed',
       join(projectPath, 'workspaces', 'feature-pan-2724'),
+      'This predates this bead and is correct',
     );
   });
 });
