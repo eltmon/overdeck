@@ -181,7 +181,7 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T15:50:06.175Z",
+  "updated": "2026-07-26T15:50:07.119Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "passed",
@@ -192,13 +192,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:54:56.619Z",
-    "updatedAt": "2026-07-26T15:50:05.049Z",
+    "updatedAt": "2026-07-26T15:50:06.419Z",
     "reviewNotes": "Approved: all prior blockers are resolved; only two non-blocking correctness edge cases remain.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs met. verification-runner.ts:387-395 gates on readPendingDeploy() before the verificationStatus:'running' write at :409, writes 'pending' + a note naming requestedAt, and self-excludes when status is already 'running'. verification-worker-supervisor.ts:140-144 sits AFTER the live-worker waitForResult join at :137, so a queued deploy blocks only new worker spawns. FOLLOW-UP FOR A LATER BEAD (outside these ACs): request-review-pipeline.ts:31-38 only branches on 'failed'/'error', so a 'deferred' outcome currently falls through to pushBranch()+dispatchReview() and advances to review as if it passed — consumers must be taught to halt on 'deferred'.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3142",
     "reviewedAtCommit": "c8973a5b95c27de791f8ed4a2c2f70bbb865932d",
-    "lastVerifiedCommit": "dafef43b8d0a334724280cc3145f6a93bee9512f",
+    "lastVerifiedCommit": "c8973a5b95c27de791f8ed4a2c2f70bbb865932d",
     "reviewSpawnedAt": "2026-07-26T15:44:01.359Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -259,24 +258,6 @@
         "tests/unit/lib/deploy/deploy-queue.test.ts"
       ],
       "recordedAt": "2026-07-26T13:53:58.173Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "c8973a5b95c27de791f8ed4a2c2f70bbb865932d"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "c8973a5b95c27de791f8ed4a2c2f70bbb865932d"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "c8973a5b95c27de791f8ed4a2c2f70bbb865932d"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "c8973a5b95c27de791f8ed4a2c2f70bbb865932d"
-      }
     }
   },
   "closeOut": {
@@ -341,7 +322,7 @@
       },
       "costAtCloseOut": {
         "usd": 445.46116,
-        "pricingAsOf": "2026-07-26T15:50:05.113Z"
+        "pricingAsOf": "2026-07-26T15:50:06.462Z"
       }
     },
     "merges": [
@@ -350,7 +331,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 18,
