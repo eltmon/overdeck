@@ -331,7 +331,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T12:31:42.367Z",
+  "updated": "2026-07-26T12:31:56.885Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "passed",
@@ -339,10 +339,10 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T11:50:51.889Z",
-    "updatedAt": "2026-07-26T12:31:42.165Z",
+    "updatedAt": "2026-07-26T12:31:55.861Z",
     "reviewNotes": "Approved at ca167961: main-line UAT promotion and Awaiting Merge integrations preserve all PAN-1696 behavior; focused server/frontend tests, typecheck, lint, and file-size checks pass. Report: .pan/review/agent-pan-1696-review-ca167961/review.md",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3095",
     "reviewedAtCommit": "ca167961dcf75dd71f2e4b2cd00afbbc9726e2e6",
@@ -439,7 +439,7 @@
       },
       "costAtCloseOut": {
         "usd": 292.1565652,
-        "pricingAsOf": "2026-07-26T12:31:42.352Z"
+        "pricingAsOf": "2026-07-26T12:31:56.327Z"
       }
     },
     "merges": [
