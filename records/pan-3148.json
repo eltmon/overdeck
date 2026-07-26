@@ -40,15 +40,7 @@
       "timestamp": "2026-07-26T21:19:44.351Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T21:19:44Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3148\n\nFeedback dedup keys omit the review run ID on primary verdict paths, causing same-run duplicates and later-run suppression\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3148 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/source-introspection-baseline.txt",
@@ -104,20 +96,20 @@
     "recordedAt": "2026-07-26T21:02:31.919Z"
   },
   "created": "2026-07-26T17:27:17.644Z",
-  "updated": "2026-07-26T21:20:46.763Z",
+  "updated": "2026-07-26T21:50:50.398Z",
   "pipeline": {
     "issueId": "PAN-3148",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T21:02:53.986Z",
-    "updatedAt": "2026-07-26T21:20:46.721Z",
+    "updatedAt": "2026-07-26T21:50:50.344Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3163",
     "lastVerifiedCommit": "850679a81982462e5d74e18693cb35873e951829",
-    "reviewSpawnedAt": "2026-07-26T21:04:42.253Z",
+    "reviewSpawnedAt": "2026-07-26T21:50:50.342Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/source-introspection-baseline.txt",
@@ -186,24 +178,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3081478,
-            "output": 246450,
-            "cacheRead": 111609856,
+            "input": 3458541,
+            "output": 309249,
+            "cacheRead": 171638272,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 3758974,
-          "output": 293091,
-          "cacheRead": 122109440,
+          "input": 4136037,
+          "output": 355890,
+          "cacheRead": 182137856,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 88.64232,
-        "pricingAsOf": "2026-07-26T21:20:46.757Z"
+        "usd": 122.425813,
+        "pricingAsOf": "2026-07-26T21:50:50.371Z"
       }
     },
     "merges": [
