@@ -9,8 +9,14 @@ import {
   haveSameCodeContribution,
   haveSameEffectiveCodeCommit,
 } from './pipeline-state-paths.js';
+import type { ReviewStatus } from './review-status-reconcile.js';
 
 const execFileAsync = promisify(execFile);
+
+export type ReviewStatusUpdate = Omit<Partial<ReviewStatus>, 'reviewedAtCommit' | 'lastVerifiedCommit'> & {
+  reviewedAtCommit?: HeadAnchor;
+  lastVerifiedCommit?: HeadAnchor;
+};
 
 export type WorkspaceAnchorDriftVerdict =
   | { kind: 'current'; currentAnchor: HeadAnchor }

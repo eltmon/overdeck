@@ -19,21 +19,15 @@ import {
   reconcileJournalIntoCacheSync,
   reviewGatesPassedSync,
   verificationSatisfied,
-  type BlockerReason,
-  type ReviewStatus,
-  type StatusHistoryEntry,
+  type BlockerReason, type ReviewStatus, type StatusHistoryEntry,
 } from './review-status-reconcile.js';
 import { needsReviewDispatch } from './review-dispatch-decision.js';
 import { capturePipelineStageForIssue } from './telemetry/pipeline.js';
-import type { HeadAnchor } from './git-utils.js';
+import type { ReviewStatusUpdate } from './workspace-anchor-drift.js';
 
 export { reviewGatesPassedSync, verificationSatisfied } from './review-status-reconcile.js';
 export type { BlockerReason, ReviewStatus, StatusHistoryEntry } from './review-status-reconcile.js';
-
-export type ReviewStatusUpdate = Omit<Partial<ReviewStatus>, 'reviewedAtCommit' | 'lastVerifiedCommit'> & {
-  reviewedAtCommit?: HeadAnchor;
-  lastVerifiedCommit?: HeadAnchor;
-};
+export type { ReviewStatusUpdate } from './workspace-anchor-drift.js';
 
 export interface MergeGateEligibility {
   eligible: boolean;
