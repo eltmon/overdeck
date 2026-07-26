@@ -11,24 +11,42 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T13:30:47.569Z",
+  "updated": "2026-07-26T13:31:08.197Z",
   "pipeline": {
     "issueId": "PAN-3093",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T12:57:41.521Z"
+    "updatedAt": "2026-07-26T13:31:08.177Z",
+    "inspectNotes": "Inspecting item schema-per-repo-generation-tables"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 15130,
+            "output": 200,
+            "cacheRead": 3,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 15130,
+          "output": 200,
+          "cacheRead": 3,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-26T12:57:41.546Z"
+        "usd": 0.0161303,
+        "pricingAsOf": "2026-07-26T13:31:08.185Z"
       }
     },
     "merges": [],
