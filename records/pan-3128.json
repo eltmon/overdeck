@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T12:54:52.554Z",
+  "updated": "2026-07-26T12:58:09.970Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "stamp-build-provenance": {
-        "writerId": "agent-pan-3128",
-        "agentId": "agent-pan-3128",
-        "pid": 1386934,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T12:54:52.554Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3128",
@@ -82,12 +74,27 @@
         "outcome": "completed",
         "reason": "Moved reload builds into an always-detached origin/main worktree, added exclusion notes and cleanup guarantees, and covered primary-tree regression plus dist swapping.",
         "releasedAt": "2026-07-26T12:53:12.664Z"
+      },
+      {
+        "writerId": "agent-pan-3128",
+        "agentId": "agent-pan-3128",
+        "pid": 1386934,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T12:54:52.554Z",
+        "itemId": "stamp-build-provenance",
+        "outcome": "completed",
+        "reason": "Stamped buildDirty/buildBranch alongside commit/time, exposed them through existing BuildInfo identity spreading, and added absent/present/detached provenance tests. Server code splitting emits build-info in its shared build-info chunk.",
+        "releasedAt": "2026-07-26T12:58:09.970Z"
       }
     ],
     "statusReasons": {
       "build-from-clean-worktree": {
         "reason": "Moved reload builds into an always-detached origin/main worktree, added exclusion notes and cleanup guarantees, and covered primary-tree regression plus dist swapping.",
         "updatedAt": "2026-07-26T12:53:12.664Z"
+      },
+      "stamp-build-provenance": {
+        "reason": "Stamped buildDirty/buildBranch alongside commit/time, exposed them through existing BuildInfo identity spreading, and added absent/present/detached provenance tests. Server code splitting emits build-info in its shared build-info chunk.",
+        "updatedAt": "2026-07-26T12:58:09.970Z"
       }
     }
   },
@@ -98,6 +105,10 @@
     "build-from-clean-worktree.build-from-clean-worktree.ac3": "completed",
     "build-from-clean-worktree.build-from-clean-worktree.ac4": "completed",
     "build-from-clean-worktree.build-from-clean-worktree.ac5": "completed",
-    "stamp-build-provenance": "running"
+    "stamp-build-provenance": "completed",
+    "stamp-build-provenance.stamp-build-provenance.ac1": "completed",
+    "stamp-build-provenance.stamp-build-provenance.ac2": "completed",
+    "stamp-build-provenance.stamp-build-provenance.ac3": "completed",
+    "stamp-build-provenance.stamp-build-provenance.ac4": "completed"
   }
 }
