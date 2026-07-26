@@ -8,7 +8,7 @@ import {
 import { getAgentDir } from './agents/agent-state.js';
 import { AmbiguousKeyedDeliveryError } from './agents/delivery.js';
 import { messageAgentWithOutcome } from './agents/messaging.js';
-import { KeyedSubmitTargetDeadError } from './tmux-dedup.js';
+import { KeyedMarkerVerificationError, KeyedSubmitTargetDeadError } from './tmux-dedup.js';
 import { createPromiseCoalescer } from './cloister/in-flight-guard.js';
 
 export const LINEAR_MCP_AUTH_URL_TTL_MS = 30 * 60 * 1000;
@@ -411,7 +411,11 @@ async function deliverWakeWithOutbox(agentId: string, lifecycleId: string): Prom
     // non-terminal. Same handling: the entry stays pending so a later pass
     // re-drives the wake — by then messageAgent's zombie/stopped detection
     // resumes the agent and the keyed door of the new session delivers.
-    if (error instanceof AmbiguousKeyedDeliveryError || error instanceof KeyedSubmitTargetDeadError) {
+    //
+    // UNVERIFIED MARKERS (cycle 13): a safety-critical marker read failed
+    // mid-repair/rollback, so the marker state is unproven and the poison
+    // breadcrumb stays authoritative. Same handling: pending, retried later.
+    if (error instanceof AmbiguousKeyedDeliveryError || error instanceof KeyedSubmitTargetDeadError || error instanceof KeyedMarkerVerificationError) {
       throw error;
     }
     outcome = 'failed';

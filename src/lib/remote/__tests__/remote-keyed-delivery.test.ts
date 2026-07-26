@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 
 import { sendToRemoteAgentKeyed } from '../remote-agents.js';
-import { dedupPendingOptionName, dedupPoisonOptionName, dedupTerminalOptionName, KeyedSubmitTargetDeadError } from '../../tmux-dedup.js';
+import { dedupPendingOptionName, dedupPoisonOptionName, dedupTerminalOptionName, KeyedMarkerVerificationError, KeyedSubmitTargetDeadError } from '../../tmux-dedup.js';
 
 /**
  * Fake remote tmux server for the keyed remote-delivery protocol (PAN-2997
@@ -16,11 +16,13 @@ function createFakeRemoteTmux(seed: {
   pending?: string;
   terminal?: string;
   poison?: string;
+  targetPid?: string;
   failPaste?: boolean;
   failSubmit?: boolean;
   failMarkerSetOption?: boolean;
-  failNextTargetRead?: boolean;
+  failTargetReadOnCall?: number;
   failNextPoisonRead?: boolean;
+  failTerminalReadOnCall?: number;
   failPoisonClear?: boolean;
   paneDead?: boolean;
   dieOnEnter?: boolean;
@@ -29,11 +31,13 @@ function createFakeRemoteTmux(seed: {
     pending: seed.pending ?? '',
     terminal: seed.terminal ?? '',
     poison: seed.poison ?? '',
+    targetPid: seed.targetPid ?? '',
     failPaste: seed.failPaste ?? false,
     failSubmit: seed.failSubmit ?? false,
     failMarkerSetOption: seed.failMarkerSetOption ?? false,
-    failNextTargetRead: seed.failNextTargetRead ?? false,
+    failTargetReadOnCall: seed.failTargetReadOnCall ?? 0,
     failNextPoisonRead: seed.failNextPoisonRead ?? false,
+    failTerminalReadOnCall: seed.failTerminalReadOnCall ?? 0,
     failPoisonClear: seed.failPoisonClear ?? false,
     paneDead: seed.paneDead ?? false,
     dieOnEnter: seed.dieOnEnter ?? false,
@@ -44,6 +48,17 @@ function createFakeRemoteTmux(seed: {
     commands: [] as string[],
   };
 
+  // The sendId follows the LAST occurrence of the pending option name in an
+  // if-shell onTrue (a UUID: hex + dashes).
+  const sendIdRe = new RegExp(
+    dedupPendingOptionName(KEY).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s+([A-Za-z0-9-]+)(?!.*' +
+    dedupPendingOptionName(KEY).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')',
+  );
+  const extractSendId = (command: string): string => sendIdRe.exec(command)?.[1] ?? '';
+
+  let targetReadCalls = 0;
+  let terminalReadCalls = 0;
+
   const exec = async (command: string): Promise<string> => {
     state.commands.push(command);
     if (command.includes('base64 -d >')) {
@@ -51,21 +66,29 @@ function createFakeRemoteTmux(seed: {
       return '';
     }
     if (command.includes('if-shell') && command.includes('paste-buffer')) {
-      // Phase 1: atomic check + paste + pending claim.
+      // Paste steps (fresh or re-paste after a target mismatch).
       if (state.failPaste) throw new Error('exit 1: simulated paste failure');
+      const isRepaste = command.includes('! test');
+      if (isRepaste) {
+        if (state.pending !== '' && state.terminal === '' && state.targetPid !== state.pid) {
+          state.pastes += 1;
+          state.pending = extractSendId(command);
+          state.targetPid = state.pid;
+        }
+        return '';
+      }
       if (state.pending === '' && state.terminal === '') {
         state.pastes += 1;
-        // The onTrue command string ends with `set-option -t <agent> <pendingOption> <sendId>`.
-        const sendId = command.trim().replace(/'/g, '').split(/\s+/).at(-1) ?? '';
-        state.pending = sendId;
+        state.pending = extractSendId(command);
+        state.targetPid = state.pid;
       }
       return '';
     }
     if (command.includes('if-shell') && command.includes('send-keys')) {
-      // Phase 2: atomic submit — liveness gate, Enter, then PROVISIONAL
-      // poison + terminal claim in the same server-owned list.
+      // Phase 2: atomic submit — liveness gate, target-identity match,
+      // Enter, then PROVISIONAL poison + terminal claim in one list.
       if (state.failSubmit) throw new Error('exit 1: simulated submit failure');
-      if (state.pending !== '' && state.terminal === '' && !state.paneDead) {
+      if (state.pending !== '' && state.terminal === '' && !state.paneDead && state.targetPid === state.pid) {
         state.enters += 1;
         state.poison = '1';
         state.terminal = '1';
@@ -86,11 +109,16 @@ function createFakeRemoteTmux(seed: {
         return `${state.poison}\n`;
       }
       if (option.includes('-pending-')) return `${state.pending}\n`;
+      if (option.includes('-target-')) return `${state.targetPid}\n`;
+      terminalReadCalls += 1;
+      if (state.failTerminalReadOnCall === terminalReadCalls) {
+        throw new Error('exit 1: simulated transient verify-read failure');
+      }
       return `${state.terminal}\n`;
     }
     if (command.includes('display-message')) {
-      if (state.failNextTargetRead) {
-        state.failNextTargetRead = false;
+      targetReadCalls += 1;
+      if (state.failTargetReadOnCall === targetReadCalls) {
         throw new Error('exit 1: simulated transient target-read failure');
       }
       return `${state.pid} ${state.paneDead ? '1' : '0'}\n`;
@@ -149,7 +177,7 @@ describe('sendToRemoteAgentKeyed', () => {
   it('completes a crashed attempt from the pending marker WITHOUT a second paste', async () => {
     // A prior attempt pasted and set its pending claim, then the dashboard died
     // before the submit.
-    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id' });
+    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id', targetPid: '4242' });
 
     const outcome = await sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec);
 
@@ -163,7 +191,7 @@ describe('sendToRemoteAgentKeyed', () => {
   it('admits exactly one completer when the submit races (cycle 8)', async () => {
     // Both a prior paste claim and a racing completer hit the atomic submit:
     // the first claims terminal; the second loses the server-side condition.
-    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id' });
+    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id', targetPid: '4242' });
 
     const [first, second] = await Promise.all([
       sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec),
@@ -204,7 +232,7 @@ describe('sendToRemoteAgentKeyed', () => {
 
   it('a pane that dies after the paste keeps the key NON-terminal and recoverable (cycle 9)', async () => {
     // The harness exited during the settle window: pending claim exists, pane dead.
-    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id', paneDead: true });
+    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id', targetPid: '4242', paneDead: true });
 
     await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
       .rejects.toThrow(KeyedSubmitTargetDeadError);
@@ -226,7 +254,7 @@ describe('sendToRemoteAgentKeyed', () => {
     // The if-shell condition sees a live pane, the Enter lands, the markers
     // flip — and the pane dies in the same breath, inside the shell-to-branch
     // handoff window. tmux reported success throughout.
-    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id', dieOnEnter: true });
+    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id', targetPid: '4242', dieOnEnter: true });
 
     await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
       .rejects.toThrow(KeyedSubmitTargetDeadError);
@@ -252,6 +280,7 @@ describe('sendToRemoteAgentKeyed', () => {
     // breadcrumb lands — and the rollback itself fails.
     const { exec, state } = createFakeRemoteTmux({
       pending: 'earlier-send-id',
+      targetPid: '4242',
       dieOnEnter: true,
       failMarkerSetOption: true,
     });
@@ -286,7 +315,7 @@ describe('sendToRemoteAgentKeyed', () => {
     // The pre-submit target read fails transiently; the submit then "succeeds"
     // against a pane whose identity cannot be proven — the Enter may have
     // landed on a replacement with no pasted content.
-    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id', failNextTargetRead: true });
+    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id', targetPid: '4242', failTargetReadOnCall: 2 });
 
     await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
       .rejects.toThrow(KeyedSubmitTargetDeadError);
@@ -312,9 +341,65 @@ describe('sendToRemoteAgentKeyed', () => {
     const outcome = await sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec);
 
     expect(outcome).toBe('delivered');
-    expect(state.pastes).toBe(0); // repair continues as a completion, not a fresh paste
+    // With no recorded paste target the content is unverifiable (cycle 13):
+    // the repair RE-PASTES the real content rather than completing blind.
+    expect(state.pastes).toBe(1);
     expect(state.terminal).toBe('1');
     expect(state.poison).toBe('');
+  });
+
+  it('crash recovery re-delivers real content to a REPLACED pane exactly once (cycle 13)', async () => {
+    // The provisional crash state (poison+terminal) survives, but the pane
+    // that held the pasted message was replaced: the recorded target pid no
+    // longer matches the current pane.
+    const { exec, state } = createFakeRemoteTmux({ terminal: '1', poison: '1', targetPid: '4242' });
+    state.pid = '9999'; // replacement pane, session options survive
+
+    const outcome = await sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec);
+
+    expect(outcome).toBe('delivered');
+    // The repair rolled back, the target mismatch forced a REAL re-paste into
+    // the replacement, and the submit completed against the new target.
+    expect(state.pastes).toBe(1);
+    expect(state.enters).toBe(1);
+    expect(state.targetPid).toBe('9999');
+    expect(state.terminal).toBe('1');
+    expect(state.poison).toBe('');
+  });
+
+  it('a provisional claim with the SAME pane completes without a re-paste (cycle 13)', async () => {
+    const { exec, state } = createFakeRemoteTmux({ terminal: '1', poison: '1', targetPid: '4242' });
+
+    const outcome = await sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec);
+
+    expect(outcome).toBe('delivered');
+    expect(state.pastes).toBe(0);
+    expect(state.enters).toBe(1);
+    expect(state.terminal).toBe('1');
+    expect(state.poison).toBe('');
+  });
+
+  it('a rejected REPAIR verification read aborts with the breadcrumb authoritative (cycle 13)', async () => {
+    const { exec, state } = createFakeRemoteTmux({ terminal: '1', poison: '1', failTerminalReadOnCall: 1 });
+
+    await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
+      .rejects.toThrow(KeyedMarkerVerificationError);
+    // The failed read was NOT converted to empty state: the breadcrumb stays
+    // authoritative for the next recovery attempt.
+    expect(state.poison).toBe('1');
+  });
+
+  it('a rejected ROLLBACK verification read aborts with the breadcrumb authoritative (cycle 13)', async () => {
+    const { exec, state } = createFakeRemoteTmux({
+      pending: 'earlier-send-id',
+      targetPid: '4242',
+      dieOnEnter: true,
+      failTerminalReadOnCall: 3,
+    });
+
+    await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
+      .rejects.toThrow(KeyedMarkerVerificationError);
+    expect(state.poison).toBe('1');
   });
 
   it('a FAILED poison read aborts without honoring the terminal marker (cycle 12)', async () => {
@@ -332,7 +417,7 @@ describe('sendToRemoteAgentKeyed', () => {
   });
 
   it('a FAILED poison clear after verified delivery is loud — no success with a stale breadcrumb (cycle 12)', async () => {
-    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id', failPoisonClear: true });
+    const { exec, state } = createFakeRemoteTmux({ pending: 'earlier-send-id', targetPid: '4242', failPoisonClear: true });
 
     await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
       .rejects.toThrow(/poison/i);

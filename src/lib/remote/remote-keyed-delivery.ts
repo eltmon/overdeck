@@ -17,7 +17,9 @@ import {
   assertValidDedupKey,
   dedupPendingOptionName,
   dedupPoisonOptionName,
+  dedupTargetOptionName,
   dedupTerminalOptionName,
+  KeyedMarkerVerificationError,
   KeyedSubmitTargetDeadError,
 } from '../tmux-dedup.js';
 import { createFlyProvider } from './fly-provider.js';
@@ -87,22 +89,31 @@ export async function sendToRemoteAgentKeyed(
     run(buildRemoteTmuxCommand(['show-option', '-qv', '-t', agentId, option]))
       .then(stdout => stdout.trim(), () => '');
 
-  // Fail-CLOSED marker read (cycle 12): `-q` makes an unset user option a
-  // clean empty read, so a rejection is always a REAL failure. The poison
-  // breadcrumb must be read this way — interpreting a failed read as
-  // "absent" could honor a false terminal marker.
+  // Fail-CLOSED marker read (cycle 12/13): `-q` makes an unset user option a
+  // clean empty read, so a rejection is always a REAL failure. Safety-critical
+  // markers (the poison breadcrumb, every verification read) must be read
+  // this way — interpreting a failed read as "absent" could honor a false
+  // terminal marker or bypass a rollback-required state.
   const readMarkerStrict = async (option: string): Promise<string> =>
     run(buildRemoteTmuxCommand(['show-option', '-qv', '-t', agentId, option]))
       .then(stdout => stdout.trim());
 
-  // Clear the poison breadcrumb and VERIFY it is gone (cycle 12).
+  // Clear the poison breadcrumb and VERIFY it is gone with a strict read (cycle 13).
   const clearPoisonVerified = async (context: string): Promise<void> => {
     await run(buildRemoteTmuxCommand(['set-option', '-u', '-t', agentId, poisonOption]));
-    const remaining = await readMarker(poisonOption);
+    const remaining = await readMarkerStrict(poisonOption);
     if (remaining !== '') {
       throw new Error(`Keyed remote markers for ${agentId}: poison breadcrumb could not be cleared (${context})`);
     }
   };
+
+  const readPaneTarget = async (): Promise<{ pid: string; dead: boolean }> =>
+    run(buildRemoteTmuxCommand(['display-message', '-p', '-t', agentId, '#{pane_pid} #{pane_dead}']))
+      .then(stdout => {
+        const [pid = '', dead = ''] = stdout.trim().split(/\s+/);
+        return { pid, dead: dead === '1' };
+      })
+      .catch(() => ({ pid: '', dead: true }));
 
   try {
     // The poison breadcrumb invalidates any terminal marker (cycle 11/12):
@@ -111,44 +122,59 @@ export async function sendToRemoteAgentKeyed(
     // The read is fail-CLOSED — a failed poison read must never be
     // interpreted as "no poison" while a false terminal sits next to it.
     const poisonMarker = await readMarkerStrict(poisonOption);
-    let skipPaste = false;
-    if (poisonMarker !== '') {
+    // A repaired pending claim still has to prove its pane identity below —
+    // the original paste's target may be stale or missing (cycle 13).
+    const repaired = poisonMarker !== '';
+    if (repaired) {
       // Repair (cycle 12): a poisoned terminal may be false or
       // delivered-but-unverified, and the tmux tier cannot distinguish —
-      // always roll back to pending and let normal recovery re-drive. The
-      // breadcrumb must be verifiably gone before any submission.
+      // always roll back to pending and let normal recovery re-drive. STRICT
+      // verification reads (cycle 13): a failed read aborts with the
+      // breadcrumb authoritative, never converted to empty state.
       await run(buildRemoteTmuxCommand([
         'set-option', '-u', '-t', agentId, terminalOption,
         ';',
         'set-option', '-t', agentId, pendingOption, sendId,
       ]));
-      const [repairedTerminal, repairedPending] = await Promise.all([
-        readMarker(terminalOption),
-        readMarker(pendingOption),
-      ]);
+      let repairedTerminal: string;
+      let repairedPending: string;
+      try {
+        [repairedTerminal, repairedPending] = await Promise.all([
+          readMarkerStrict(terminalOption),
+          readMarkerStrict(pendingOption),
+        ]);
+      } catch {
+        throw new KeyedMarkerVerificationError(agentId, `repair verification of key "${dedupKey}"`);
+      }
       if (repairedTerminal !== '' || repairedPending === '') {
         throw new Error(`Keyed remote markers for ${agentId} are poisoned and could not be repaired (key "${dedupKey}")`);
       }
       await clearPoisonVerified(`repair of key "${dedupKey}"`);
-      skipPaste = true;
     }
 
+    const targetOption = dedupTargetOptionName(dedupKey);
+    // The buffer is needed for a fresh paste AND for a re-paste after a
+    // repair or a target mismatch.
+    const messageBase64 = Buffer.from(message).toString('base64');
+    await run(
+      `mkdir -p ${shellQuote(`${REMOTE_PAN_DIR}/prompts`)} && echo ${shellQuote(messageBase64)} | base64 -d > ${shellQuote(promptFile)}`,
+    );
+    await run(buildRemoteTmuxCommand(['load-buffer', '-b', bufferName, promptFile]));
+
     let pendingMarker: string;
-    if (skipPaste) {
+    if (repaired) {
       pendingMarker = sendId;
     } else {
-      const messageBase64 = Buffer.from(message).toString('base64');
-      await run(
-        `mkdir -p ${shellQuote(`${REMOTE_PAN_DIR}/prompts`)} && echo ${shellQuote(messageBase64)} | base64 -d > ${shellQuote(promptFile)}`,
-      );
-      await run(buildRemoteTmuxCommand(['load-buffer', '-b', bufferName, promptFile]));
-
       // One server-side command: paste only when NEITHER marker is set, and
-      // record OUR sendId in the pending option in the same breath.
+      // record OUR sendId in the pending option AND the receiving pane's pid
+      // in the target option in the same breath (cycle 13).
       const condition =
         `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${pendingOption})" && ` +
         `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${terminalOption})"`;
-      const onTrue = `paste-buffer -b ${bufferName} -p -t ${agentId} \; set-option -t ${agentId} ${pendingOption} ${sendId}`;
+      const onTrue =
+        `paste-buffer -b ${bufferName} -p -t ${agentId} \; ` +
+        `set-option -t ${agentId} ${pendingOption} ${sendId} \; ` +
+        `set-option -F -t ${agentId} ${targetOption} '#{pane_pid}'`;
       await run(buildRemoteTmuxCommand(['if-shell', '-t', agentId, condition, onTrue]));
 
       const terminalMarker = await readMarker(terminalOption);
@@ -159,23 +185,43 @@ export async function sendToRemoteAgentKeyed(
       }
     }
 
-    // 'pasted' (our sendId) and 'submit-pending' (a prior crashed attempt's
-    // sendId) both complete the same transaction WITHOUT re-pasting. The
-    // SUBMISSION is one server-owned command: a single if-shell whose
-    // condition requires the pending claim, no terminal marker, AND a LIVE
-    // pane, and whose command list sends the Enter FIRST and only then flips
-    // terminal and clears pending. The pre-branch liveness check is only an
-    // optimization (cycle 10): the pane can die in the shell-to-branch
-    // handoff and remote tmux reports send-keys into a corpse as success, so
-    // acceptance is proven by the post-submit target re-read below.
-    const readPaneTarget = async (): Promise<{ pid: string; dead: boolean }> =>
-      run(buildRemoteTmuxCommand(['display-message', '-p', '-t', agentId, '#{pane_pid} #{pane_dead}']))
-        .then(stdout => {
-          const [pid = '', dead = ''] = stdout.trim().split(/\s+/);
-          return { pid, dead: dead === '1' };
-        })
-        .catch(() => ({ pid: '', dead: true }));
+    // A pending claim (fresh, prior, or repaired) is only completable with
+    // Enter alone when the current pane IS the pane that received the paste
+    // (cycle 13): a replaced pane has an empty composer, so Enter alone
+    // would be a blank submission. Re-paste the real content instead.
+    const recordedTarget = await readMarker(targetOption);
+    const currentPid = (await readPaneTarget()).pid;
+    if (!(recordedTarget !== '' && currentPid !== '' && recordedTarget === currentPid)) {
+      // One server-side command: re-paste only when the pending claim still
+      // stands, no terminal exists, and the recorded target does NOT match
+      // the current pane — and record the NEW target in the same breath.
+      const repasteCondition =
+        `test -n "$(${innerTmux} show-option -qv -t ${agentId} ${pendingOption})" && ` +
+        `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${terminalOption})" && ` +
+        `! test "$(${innerTmux} display-message -p -t ${agentId} '#{pane_pid}')" = "$(${innerTmux} show-option -qv -t ${agentId} ${targetOption})"`;
+      const repasteOnTrue =
+        `paste-buffer -b ${bufferName} -p -t ${agentId} \; ` +
+        `set-option -t ${agentId} ${pendingOption} ${sendId} \; ` +
+        `set-option -F -t ${agentId} ${targetOption} '#{pane_pid}'`;
+      await run(buildRemoteTmuxCommand(['if-shell', '-t', agentId, repasteCondition, repasteOnTrue]));
+      const [repastedPending, repastedTerminal] = await Promise.all([
+        readMarker(pendingOption),
+        readMarker(terminalOption),
+      ]);
+      if (repastedTerminal !== '') return 'deduplicated';
+      if (repastedPending === '') {
+        throw new Error(`Keyed remote paste for ${agentId} did not land and no dedup marker was recorded`);
+      }
+      pendingMarker = repastedPending;
+    }
 
+    // The SUBMISSION is one server-owned command: a single if-shell whose
+    // condition requires the pending claim, no terminal marker, a LIVE pane,
+    // AND the current pane matching the recorded paste target (cycle 13).
+    // The pre-branch liveness check is only an optimization (cycle 10): the
+    // pane can die in the shell-to-branch handoff and remote tmux reports
+    // send-keys into a corpse as success, so acceptance is proven by the
+    // post-submit target re-read below.
     const preTarget = await readPaneTarget();
     const pendingBefore = pendingMarker;
     await new Promise(resolve => setTimeout(resolve, 300));
@@ -187,7 +233,8 @@ export async function sendToRemoteAgentKeyed(
     const submitCondition =
       `test -z "$(${innerTmux} show-option -qv -t ${agentId} ${terminalOption})" && ` +
       `test -n "$(${innerTmux} show-option -qv -t ${agentId} ${pendingOption})" && ` +
-      `test "$(${innerTmux} display-message -p -t ${agentId} '#{pane_dead}')" = "0"`;
+      `test "$(${innerTmux} display-message -p -t ${agentId} '#{pane_dead}')" = "0" && ` +
+      `test "$(${innerTmux} display-message -p -t ${agentId} '#{pane_pid}')" = "$(${innerTmux} show-option -qv -t ${agentId} ${targetOption})"`;
     const submitOnTrue =
       `send-keys -t ${agentId} C-m \; ` +
       `set-option -t ${agentId} ${poisonOption} 1 \; ` +
@@ -195,10 +242,11 @@ export async function sendToRemoteAgentKeyed(
       `set-option -u -t ${agentId} ${pendingOption}`;
     await run(buildRemoteTmuxCommand(['if-shell', '-t', agentId, submitCondition, submitOnTrue]));
 
-    const [terminalAfter, pendingAfter, postTarget] = await Promise.all([
+    const [terminalAfter, pendingAfter, postTarget, recordedTargetAfter] = await Promise.all([
       readMarker(terminalOption),
       readMarker(pendingOption),
       readPaneTarget(),
+      readMarker(targetOption),
     ]);
     // FAIL CLOSED (cycle 11): the key may only become terminal when BOTH
     // target reads succeeded, BOTH report a live pane, and the pid identity
@@ -213,21 +261,33 @@ export async function sendToRemoteAgentKeyed(
     if (terminalAfter === '' && pendingAfter === '') {
       throw new Error(`Keyed remote submit for ${agentId} found neither a pending claim nor a terminal marker — the paste vanished without submission`);
     }
+    if (terminalAfter === '' && (targetLost || recordedTargetAfter === '' || recordedTargetAfter !== postTarget.pid)) {
+      // The condition rejected the submit: a dead/replaced/unprovable pane
+      // is the recoverable case — recovery re-pastes the real content via
+      // the target-mismatch path above.
+      throw new KeyedSubmitTargetDeadError(agentId, dedupKey);
+    }
     if (targetLost) {
       // The pane died, was replaced, or cannot be identified around the
       // Enter: acceptance is unprovable and the receiving harness is gone.
-      // ROLL THE KEY BACK and verify; the breadcrumb set by the submit list
-      // already marks the terminal provisional, so a failed rollback can
-      // never leave it honorable.
+      // ROLL THE KEY BACK and verify with STRICT reads (cycle 13): the
+      // breadcrumb set by the submit list already marks the terminal
+      // provisional, so a failed rollback can never leave it honorable.
       if (terminalAfter !== '') {
         const rollbackArgs = pendingBefore === ''
           ? ['set-option', '-u', '-t', agentId, terminalOption, ';', 'set-option', '-u', '-t', agentId, pendingOption]
           : ['set-option', '-u', '-t', agentId, terminalOption, ';', 'set-option', '-t', agentId, pendingOption, pendingBefore];
         await run(buildRemoteTmuxCommand(rollbackArgs)).catch(() => '');
-        const [rolledTerminal, restoredPending] = await Promise.all([
-          readMarker(terminalOption),
-          readMarker(pendingOption),
-        ]);
+        let rolledTerminal: string;
+        let restoredPending: string;
+        try {
+          [rolledTerminal, restoredPending] = await Promise.all([
+            readMarkerStrict(terminalOption),
+            readMarkerStrict(pendingOption),
+          ]);
+        } catch {
+          throw new KeyedMarkerVerificationError(agentId, `rollback verification of key "${dedupKey}"`);
+        }
         if (rolledTerminal === '' && restoredPending !== '') {
           // Verified rollback — lift the breadcrumb. A failed clear is
           // idempotent-safe here (terminal is already clear).

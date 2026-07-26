@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { completeKeyedSubmit, KeyedSubmitTargetDeadError, sendKeysDedup } from '../tmux-dedup.js';
+import { completeKeyedSubmit, KeyedMarkerVerificationError, KeyedSubmitTargetDeadError, sendKeysDedup } from '../tmux-dedup.js';
 
 const socket = `dedup-test-${process.pid}`;
 const session = 'agent-dedup';
@@ -166,15 +166,19 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(showOption('@overdeck-dedup-test-key-1')).toBe('');
     expect(showOption('@overdeck-dedup-pending-test-key-1')).toBe(pendingBefore);
 
-    // Recovery after the agent "resumes" (pane respawned): the preserved
-    // pending claim routes to completion, never to a false dedup. The wake
-    // CONTENT re-delivery belongs to the resume path; the marker protocol's
-    // job here is to prove the key was never falsely claimed.
+    // Recovery after the agent "resumes" (pane respawned = a REPLACEMENT
+    // pane): the recorded paste target no longer matches, so the protocol
+    // re-pastes the REAL content instead of completing with a blank Enter
+    // (cycle 13). The marker protocol's job here is to prove the key was
+    // never falsely claimed and the content reaches the replacement.
     execFileSync('tmux', ['-L', socket, 'respawn-pane', '-k', '-t', session, 'cat']);
     const replay = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
-    expect(replay).toBe('submit-pending');
+    expect(replay).toBe('pasted');
+    expect(capturePane()).toContain('wake up agent');
     await completeKeyedSubmit(session, 'test-key-1');
     expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
+    // Exactly one content submission reached the replacement pane.
+    expect(occurrences(capturePane(), 'wake up agent')).toBe(2);
   });
 
   it('rolls the key back when the pane dies AROUND the Enter — no false terminal, recovery pastes real content (cycle 10)', async () => {
@@ -214,14 +218,18 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
 
     const phase = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
 
-    // NEVER 'deduplicated' from a false terminal: the repair clears terminal,
-    // restores a pending claim, and lifts the breadcrumb — verified.
-    expect(phase).toBe('submit-pending');
+    // NEVER 'deduplicated' from a false terminal: the repair clears terminal
+    // and restores a pending claim. With no recorded paste target (the seeded
+    // markers predate it), the content is unverifiable — so the protocol
+    // RE-PASTES the real content and records the current pane as target.
+    expect(phase).toBe('pasted');
     expect(showOption('@overdeck-dedup-test-key-1')).toBe('');
     expect(showOption('@overdeck-dedup-pending-test-key-1')).not.toBe('');
     expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('');
+    expect(showOption('@overdeck-dedup-target-test-key-1')).not.toBe('');
+    expect(capturePane()).toContain('wake up agent');
 
-    // The repaired completion delivers for real, and the breadcrumb lifecycle
+    // The completion delivers for real, and the breadcrumb lifecycle
     // closes: a later replay dedups on the VERIFIED terminal.
     await completeKeyedSubmit(session, 'test-key-1');
     expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
@@ -246,9 +254,11 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('1');
     expect(occurrences(capturePane(), 'wake up agent')).toBe(0);
 
-    // Recovery with a healthy read repairs and completes.
+    // Recovery with a healthy read repairs and RE-PASTES the real content
+    // (the seeded markers carry no recorded target).
     const phase = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
-    expect(phase).toBe('submit-pending');
+    expect(phase).toBe('pasted');
+    expect(capturePane()).toContain('wake up agent');
     await completeKeyedSubmit(session, 'test-key-1');
     expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
     expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('');
@@ -262,7 +272,7 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     // a stale poison — the call must NOT report success.
     await expect(
       completeKeyedSubmit(session, 'test-key-1', {
-        readMarker: (name: string, option: string) => {
+        readMarkerStrict: (name: string, option: string) => {
           if (option === '@overdeck-dedup-poison-test-key-1') {
             return Promise.resolve('1');
           }
@@ -308,6 +318,69 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(replay).toBe('submit-pending');
     await completeKeyedSubmit(session, 'test-key-1');
     expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
+  });
+
+  it('crash recovery re-delivers real content to a REPLACED pane exactly once (cycle 13)', async () => {
+    // Paste into pane A; its pid is recorded as the target atomically.
+    const first = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
+    expect(first).toBe('pasted');
+    // Simulate the provisional crash state: the server-owned submit wrote
+    // poison+terminal and the dashboard died before any post-submit read.
+    execFileSync('tmux', ['-L', socket, 'set-option', '-t', session, '@overdeck-dedup-poison-test-key-1', '1']);
+    execFileSync('tmux', ['-L', socket, 'set-option', '-t', session, '@overdeck-dedup-test-key-1', '1']);
+    execFileSync('tmux', ['-L', socket, 'set-option', '-u', '-t', session, '@overdeck-dedup-pending-test-key-1']);
+    // Pane A is replaced (respawned harness) while the session options survive.
+    execFileSync('tmux', ['-L', socket, 'respawn-pane', '-k', '-t', session, 'cat']);
+
+    // Recovery: the breadcrumb forces repair, the recorded target no longer
+    // matches, so the REAL content is re-pasted into the replacement —
+    // never 'deduplicated', never a blank-Enter completion.
+    const replay = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
+    expect(replay).toBe('pasted');
+    expect(capturePane()).toContain('wake up agent');
+
+    await completeKeyedSubmit(session, 'test-key-1');
+    expect(showOption('@overdeck-dedup-test-key-1')).toBe('1');
+    expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('');
+    // Exactly one content submission reached the replacement pane.
+    expect(occurrences(capturePane(), 'wake up agent')).toBe(2);
+  });
+
+  it('a rejected REPAIR verification read aborts with the breadcrumb authoritative (cycle 13)', async () => {
+    execFileSync('tmux', ['-L', socket, 'set-option', '-t', session, '@overdeck-dedup-test-key-1', '1']);
+    execFileSync('tmux', ['-L', socket, 'set-option', '-t', session, '@overdeck-dedup-poison-test-key-1', '1']);
+
+    await expect(
+      sendKeysDedup(session, 'wake up agent', 'test-key-1', 'test', {
+        readMarkerStrict: (name: string, option: string) => (
+          option === '@overdeck-dedup-test-key-1'
+            ? Promise.reject(new Error('transient verify-read failure'))
+            : Promise.resolve(showOption(option))
+        ),
+      }),
+    ).rejects.toThrow(KeyedMarkerVerificationError);
+    // The failed read was NOT converted to empty state: the breadcrumb stays
+    // authoritative for the next recovery attempt.
+    expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('1');
+  });
+
+  it('a rejected ROLLBACK verification read aborts with the breadcrumb authoritative (cycle 13)', async () => {
+    // Pane exits upon consuming the submitted line — targetLost rollback path.
+    execFileSync('tmux', ['-L', socket, 'respawn-pane', '-k', '-t', session, 'sh']);
+    execFileSync('tmux', ['-L', socket, 'set-option', '-t', session, 'remain-on-exit', 'on']);
+    const first = await sendKeysDedup(session, 'exit', 'test-key-1');
+    expect(first).toBe('pasted');
+
+    await expect(
+      completeKeyedSubmit(session, 'test-key-1', {
+        readMarkerStrict: (name: string, option: string) => (
+          option === '@overdeck-dedup-test-key-1'
+            ? Promise.reject(new Error('transient verify-read failure'))
+            : Promise.resolve(showOption(option))
+        ),
+      }),
+    ).rejects.toThrow(KeyedMarkerVerificationError);
+    expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('1');
   });
 
   it('delivers identical content under a different key', async () => {

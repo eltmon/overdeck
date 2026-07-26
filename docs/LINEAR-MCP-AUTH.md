@@ -191,32 +191,36 @@ has not yet been notified:
     `pending`, and a later wake pass retries the SAME key at the SAME tier,
     where the supervisor's reservation/delivered set deduplicates it. Only a
     received non-2xx (a definitive, purged failure) may fall back to tmux.
-  - **tmux fallback** uses two-phase per-session markers owned by the tmux
-    server (`sendKeysDedup` + `completeKeyedSubmit`): the paste and the
-    PENDING marker are one atomic server-side `if-shell` step, and the
-    submission itself is a second single `if-shell` — only when PENDING is
-    present, TERMINAL is absent, AND the pane is alive does the server send
-    the Enter and then set the POISON breadcrumb and the TERMINAL marker and
-    clear PENDING, all inside one server-executed command list. The terminal
-    is therefore PROVISIONAL from the moment it exists: a dashboard crash
-    anywhere leaves poison+terminal together, and the breadcrumb forces any
-    later keyed call to repair (roll back to pending, verify, lift the
-    breadcrumb) instead of honoring the marker as a dedup. The pre-branch
-    liveness check is NOT treated as proof of acceptance: the pane can die in
-    the shell-to-branch handoff, and tmux reports `send-keys` into a
-    remain-on-exit corpse as success. So after the command, the target is
-    re-read — and the key may only lose its provisional status when BOTH
-    target reads succeeded, BOTH report a live pane, and the pid identity
-    matches (an unreadable pre-target fails CLOSED: the pane could have been
-    replaced without its pasted content). If the target was lost around the
-    Enter, the terminal marker is ROLLED BACK as a verified transition and
-    `KeyedSubmitTargetDeadError` is thrown. Poison reads are fail-closed (a
-    failed read aborts rather than being interpreted as "no poison") and
-    poison clears are verified (a stale breadcrumb must never invalidate a
-    legitimate terminal on a later replay). The outbox entry stays `pending`
-    on every recoverable failure and a later pass re-drives the wake after
-    the agent resumes — recovery never suppresses a wake that did not
-    demonstrably reach a live harness. A failed Enter aborts the command
+  - **tmux fallback** uses per-session markers owned by the tmux server
+    (`sendKeysDedup` + `completeKeyedSubmit`): the paste, the PENDING claim,
+    AND the receiving pane's pid (TARGET, via `set-option -F '#{pane_pid}'`)
+    are one atomic server-side `if-shell` step, and the submission itself is
+    a second single `if-shell` — only when PENDING is present, TERMINAL is
+    absent, the pane is alive, AND the current pane IS the recorded paste
+    target does the server send the Enter and then set the POISON breadcrumb
+    and the TERMINAL marker and clear PENDING, all inside one server-executed
+    command list. The terminal is therefore PROVISIONAL from the moment it
+    exists: a dashboard crash anywhere leaves poison+terminal together, and
+    the breadcrumb forces any later keyed call to repair (roll back to
+    pending, verify, lift the breadcrumb) instead of honoring the marker as
+    a dedup. The pre-branch liveness check is NOT treated as proof of
+    acceptance: the pane can die in the shell-to-branch handoff, and tmux
+    reports `send-keys` into a remain-on-exit corpse as success. So after the
+    command, the target is re-read — and the key may only lose its
+    provisional status when BOTH target reads succeeded, BOTH report a live
+    pane, and the pid identity matches (an unreadable pre-target fails
+    CLOSED). A pane that was REPLACED around or after the paste no longer
+    matches the recorded target: the submit refuses, and recovery RE-PASTES
+    the real content into the replacement pane rather than completing with a
+    blank Enter. If the target was lost around the Enter, the terminal
+    marker is ROLLED BACK as a verified transition and
+    `KeyedSubmitTargetDeadError` is thrown. Poison reads and every
+    verification read (repair, rollback, post-clear) are strict: a failed
+    read aborts as `KeyedMarkerVerificationError` with the breadcrumb
+    authoritative, never converted to empty state. The outbox entry stays
+    `pending` on every recoverable failure and a later pass re-drives the
+    wake after the agent resumes — recovery never suppresses a wake that did
+    not demonstrably reach a live harness holding the real content. A failed Enter aborts the command
     list before the terminal transition, and concurrent or post-crash
     callers lose the server-side condition, so no stray Enter can land in a
     composer holding unrelated operator text.

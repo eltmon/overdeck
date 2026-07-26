@@ -26,7 +26,7 @@ vi.mock('../agents/messaging.js', () => ({
 
 import { handleCloisterDomainEvent } from '../cloister/service-reactive.js';
 import { AmbiguousKeyedDeliveryError } from '../agents/delivery.js';
-import { KeyedSubmitTargetDeadError } from '../tmux-dedup.js';
+import { KeyedMarkerVerificationError, KeyedSubmitTargetDeadError } from '../tmux-dedup.js';
 import {
   LINEAR_MCP_AUTH_WAKE_COPY,
   _resetLinearMcpAuthProjectionCacheForTests,
@@ -441,6 +441,32 @@ describe('Linear MCP auth wake processor', () => {
 
     // A later pass in the same run re-drove the same keyed wake (by then the
     // agent has resumed) and exactly one completion was recorded.
+    expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
+    expect(mocks.messageAgent.mock.calls[1]).toEqual([
+      'agent-min-852',
+      LINEAR_MCP_AUTH_WAKE_COPY,
+      'linear-mcp-auth-wake',
+      { dedupKey: 'linear-mcp-auth-wake:seq-1' },
+    ]);
+    expect(notifiedEvents()).toHaveLength(1);
+    expect(notifiedEvents()[0]?.payload['outcome']).toBe('delivered');
+    expect(readOutbox('agent-min-852', 'seq-1')).toMatchObject({
+      state: 'acknowledged',
+      outcome: 'delivered',
+    });
+  });
+
+  it('leaves the wake pending and retries when marker verification fails mid-recovery (cycle 13)', async () => {
+    events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
+    // A safety-critical marker read failed during repair/rollback: the marker
+    // state is unproven, the breadcrumb stays authoritative, and the outbox
+    // must stay pending — never terminal 'failed', never 'delivered'.
+    mocks.messageAgent.mockRejectedValueOnce(
+      new KeyedMarkerVerificationError('agent-min-852', 'rollback verification of key "linear-mcp-auth-wake:seq-1"'),
+    );
+
+    await processLinearMcpAuthWake();
+
     expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
     expect(mocks.messageAgent.mock.calls[1]).toEqual([
       'agent-min-852',
