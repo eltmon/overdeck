@@ -240,6 +240,7 @@ interface RowProps {
 const MERGE_STEPS = [
   { key: 'queued', label: 'Queued in merge queue' },
   { key: 'validating-pr', label: 'Validating PR state' },
+  { key: 'preparing-work-agent', label: 'Preparing work agent' },
   { key: 'rebasing', label: 'Rebasing onto main' },
   { key: 'stripping-planning', label: 'Stripping .planning/ artifacts' },
   { key: 'verifying', label: 'Post-rebase verification' },
@@ -285,6 +286,9 @@ function MergeStepTracker({ mergeStep, mergeStatus, mergeNotes }: { mergeStep?: 
       </div>
       {isFailed && mergeNotes && (
         <p className="text-[11px] text-destructive mt-2 pl-3">{mergeNotes}</p>
+      )}
+      {!isFailed && mergeNotes && currentIdx >= 0 && (
+        <p className="text-[11px] text-muted-foreground mt-2 pl-3">{mergeNotes}</p>
       )}
     </div>
   );
