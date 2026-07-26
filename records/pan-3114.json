@@ -21,8 +21,40 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/dashboard/server/services/__tests__/uat-train.test.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/UAT-BATCH-TRAINS.md",
+      "src/dashboard/server/services/uat-train.ts",
+      "src/lib/cloister/uat-promote-verification.ts",
+      "src/lib/cloister/uat-promote.ts",
+      "src/lib/lifecycle/workflows.ts",
+      "tests/unit/lib/cloister/uat-promote-verification.test.ts",
+      "tests/unit/lib/cloister/uat-promote.test.ts",
+      "tests/unit/lib/lifecycle/workflows.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/UAT-BATCH-TRAINS.md",
+      "src/dashboard/server/services/__tests__/uat-train.test.ts",
+      "src/dashboard/server/services/uat-train.ts",
+      "src/lib/cloister/uat-promote-verification.ts",
+      "src/lib/cloister/uat-promote.ts",
+      "src/lib/lifecycle/workflows.ts",
+      "tests/unit/lib/cloister/uat-promote-verification.test.ts",
+      "tests/unit/lib/cloister/uat-promote.test.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts",
+      "tests/unit/lib/lifecycle/workflows.test.ts"
+    ],
+    "recordedAt": "2026-07-26T10:37:54.195Z"
+  },
   "created": "2026-07-26T08:55:24.679Z",
-  "updated": "2026-07-26T10:37:57.027Z",
+  "updated": "2026-07-26T10:38:01.173Z",
   "pipeline": {
     "issueId": "PAN-3114",
     "reviewStatus": "pending",
@@ -32,8 +64,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T10:37:57.025Z",
+    "updatedAt": "2026-07-26T10:38:00.732Z",
     "inspectNotes": "All 4 ACs met: pending->passed stamp with 'uat-promotion' + generation name + 9-char SHA (slice(0,9)); passed/skipped short-circuit to {} so recordUatPromotionVerdicts skips and preserves existing verdict/notes; lastVerifiedCommit = rehydrateHeadAnchor(member.headSha) via conditional spread, omitted on empty headSha; recordUatPromotionVerdicts returns only non-terminal issue IDs and persists via setReviewStatusSync(issueId, stamp, current ?? undefined) — signature verified against src/lib/review-status.ts:147. Head-anchor guard entry expression matches the AST text exactly and the inventory comparison is order-insensitive.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3126",
     "reviewRequestedAt": "2026-07-26T10:37:57.025Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -66,35 +99,36 @@
         "tests/unit/lib/lifecycle/workflows.test.ts"
       ],
       "recordedAt": "2026-07-26T10:37:54.195Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3126"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 497858,
-            "output": 20373,
-            "cacheRead": 7181312,
+            "input": 784413,
+            "output": 62031,
+            "cacheRead": 33622016,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 497858,
-          "output": 20373,
-          "cacheRead": 7181312,
+          "input": 784413,
+          "output": 62031,
+          "cacheRead": 33622016,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 6.691136,
-        "pricingAsOf": "2026-07-26T09:56:00.803Z"
+        "usd": 22.594003,
+        "pricingAsOf": "2026-07-26T10:38:00.780Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3126"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -188,37 +222,5 @@
     "docs.docs.ac1": "completed",
     "docs.docs.ac2": "completed",
     "docs.docs.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "src/dashboard/server/services/__tests__/uat-train.test.ts",
-      "tests/unit/lib/head-anchor-write-sites.test.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/DEFINITION-OF-DONE.md",
-      "docs/UAT-BATCH-TRAINS.md",
-      "src/dashboard/server/services/uat-train.ts",
-      "src/lib/cloister/uat-promote-verification.ts",
-      "src/lib/cloister/uat-promote.ts",
-      "src/lib/lifecycle/workflows.ts",
-      "tests/unit/lib/cloister/uat-promote-verification.test.ts",
-      "tests/unit/lib/cloister/uat-promote.test.ts",
-      "tests/unit/lib/lifecycle/workflows.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/DEFINITION-OF-DONE.md",
-      "docs/UAT-BATCH-TRAINS.md",
-      "src/dashboard/server/services/__tests__/uat-train.test.ts",
-      "src/dashboard/server/services/uat-train.ts",
-      "src/lib/cloister/uat-promote-verification.ts",
-      "src/lib/cloister/uat-promote.ts",
-      "src/lib/lifecycle/workflows.ts",
-      "tests/unit/lib/cloister/uat-promote-verification.test.ts",
-      "tests/unit/lib/cloister/uat-promote.test.ts",
-      "tests/unit/lib/head-anchor-write-sites.test.ts",
-      "tests/unit/lib/lifecycle/workflows.test.ts"
-    ],
-    "recordedAt": "2026-07-26T10:37:54.195Z"
   }
 }
