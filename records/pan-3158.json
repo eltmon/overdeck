@@ -61,17 +61,18 @@
     "recordedAt": "2026-07-26T21:01:22.337Z"
   },
   "created": "2026-07-26T20:19:41.143Z",
-  "updated": "2026-07-26T21:10:12.573Z",
+  "updated": "2026-07-26T21:20:10.095Z",
   "pipeline": {
     "issueId": "PAN-3158",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T21:02:53.986Z",
-    "updatedAt": "2026-07-26T21:10:09.793Z",
+    "updatedAt": "2026-07-26T21:20:10.005Z",
     "reviewNotes": "Idle merge-train filtering is correct across global, selected, disabled, and populated states; focused frontend tests pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3161",
@@ -104,9 +105,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2246291,
-            "output": 63304,
-            "cacheRead": 8521728,
+            "input": 2250255,
+            "output": 65733,
+            "cacheRead": 9302528,
             "cacheWrite": 0
           }
         },
@@ -121,15 +122,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 3198942,
-          "output": 112129,
-          "cacheRead": 32271360,
+          "input": 3202906,
+          "output": 114558,
+          "cacheRead": 33052160,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 35.49426,
-        "pricingAsOf": "2026-07-26T21:10:09.864Z"
+        "usd": 35.97735,
+        "pricingAsOf": "2026-07-26T21:20:10.065Z"
       }
     },
     "merges": [
