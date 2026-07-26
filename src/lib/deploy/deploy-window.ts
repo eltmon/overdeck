@@ -38,14 +38,20 @@ const defaultDependencies: DeployWindowDependencies = {
   readDevSupervisorMarker,
 };
 
+export function listVerifyingIssues(
+  loadStatuses: () => Record<string, ReviewStatus> = loadReviewStatuses,
+): string[] {
+  return Object.entries(loadStatuses())
+    .filter(([, status]) => status.verificationStatus === 'running' && status.mergeStatus !== 'merged')
+    .map(([issueId]) => issueId)
+    .sort();
+}
+
 export async function getDeployBlockReason(
   dependencies: Partial<DeployWindowDependencies> = {},
 ): Promise<string | null> {
   const deps = { ...defaultDependencies, ...dependencies };
-  const verifyingIssues = Object.entries(deps.loadReviewStatuses())
-    .filter(([, status]) => status.verificationStatus === 'running' && status.mergeStatus !== 'merged')
-    .map(([issueId]) => issueId)
-    .sort();
+  const verifyingIssues = listVerifyingIssues(deps.loadReviewStatuses);
 
   if (verifyingIssues.length > 0) {
     return `Deployment deferred because verification is in flight for ${verifyingIssues.join(', ')}.`;

@@ -1,11 +1,23 @@
+import { recordDeployIntent } from './deploy-queue.js';
 import {
   getDeployBlockReason,
+  listVerifyingIssues,
   type DeployWindowDependencies,
 } from './deploy-window.js';
 
 export interface AgentRestartGateInput {
   initiator: string | undefined;
   force: boolean;
+}
+
+function formatQueueAge(requestedAt: string): string {
+  const ageMs = Math.max(0, Date.now() - Date.parse(requestedAt));
+  const minutes = Math.floor(ageMs / 60_000);
+  if (minutes < 1) return `${Math.floor(ageMs / 1_000)}s`;
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
 
 export async function agentRestartBlockReason(
@@ -15,12 +27,20 @@ export async function agentRestartBlockReason(
   const initiator = input.initiator?.trim();
   if (!initiator || input.force) return null;
 
-  const blockReason = await getDeployBlockReason(
-    initiator === 'flywheel-orchestrator'
-      ? { ...deps, getFlywheelActiveRunId: () => null }
-      : deps,
-  );
+  const deployDeps = initiator === 'flywheel-orchestrator'
+    ? { ...deps, getFlywheelActiveRunId: () => null }
+    : deps;
+  const blockReason = await getDeployBlockReason(deployDeps);
   if (!blockReason) return null;
 
-  return `Restart refused. The active deployment gate says: "${blockReason}" This agent-issued restart would disconnect live sessions while that gate is active. Rerun with --force to bypass the gate.`;
+  const queued = recordDeployIntent({
+    requestedBy: initiator,
+    reason: blockReason,
+    blockedBy: listVerifyingIssues(deployDeps.loadReviewStatuses),
+  });
+  const blockerCount = queued.blockedBy.length;
+  const blockerLabel = blockerCount === 1 ? 'verification' : 'verifications';
+  const blockerIds = blockerCount > 0 ? queued.blockedBy.join(', ') : 'none';
+
+  return `Restart refused. The active deployment gate says: "${blockReason}" This deploy has been queued since ${queued.requestedAt} (${formatQueueAge(queued.requestedAt)} ago); it has been held by ${blockerCount} distinct ${blockerLabel}: ${blockerIds}. It will fire automatically at the next verification boundary — do not retry or use --force, which would kill a healthy verification mid-run.`;
 }

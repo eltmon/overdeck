@@ -1,6 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { agentRestartBlockReason } from '../../../../src/lib/deploy/agent-restart-gate.js';
+import { readPendingDeploy } from '../../../../src/lib/deploy/deploy-queue.js';
 import type { DeployWindowDependencies } from '../../../../src/lib/deploy/deploy-window.js';
 
 function clearDependencies() {
@@ -20,6 +24,21 @@ function expectNoDependencyCalls(deps: ReturnType<typeof clearDependencies>): vo
   }
 }
 
+const originalHome = process.env.OVERDECK_HOME;
+let home: string;
+
+beforeEach(() => {
+  home = mkdtempSync(join(tmpdir(), 'overdeck-agent-restart-gate-'));
+  process.env.OVERDECK_HOME = home;
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = originalHome;
+  rmSync(home, { recursive: true, force: true });
+});
+
 describe('agentRestartBlockReason', () => {
   it.each([undefined, '', '   '])(
     'allows a restart without an initiator (%s) without consulting deploy gates',
@@ -28,6 +47,7 @@ describe('agentRestartBlockReason', () => {
 
       await expect(agentRestartBlockReason({ initiator, force: false }, deps)).resolves.toBeNull();
       expectNoDependencyCalls(deps);
+      expect(readPendingDeploy()).toBeNull();
     },
   );
 
@@ -36,17 +56,58 @@ describe('agentRestartBlockReason', () => {
 
     await expect(agentRestartBlockReason({ initiator: 'agent-pan-2772', force: true }, deps)).resolves.toBeNull();
     expectNoDependencyCalls(deps);
+    expect(readPendingDeploy()).toBeNull();
   });
 
-  it('refuses an agent restart with the active reason and force bypass explained', async () => {
+  it('queues a refused restart and explains its age and distinct verification blockers', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-26T12:00:00.000Z'));
     const deps = clearDependencies();
-    deps.getFlywheelActiveRunId.mockReturnValue('RUN-42');
+    deps.loadReviewStatuses.mockReturnValue({
+      'PAN-20': { issueId: 'PAN-20', verificationStatus: 'running' },
+      'PAN-10': { issueId: 'PAN-10', verificationStatus: 'running' },
+    });
 
     const result = await agentRestartBlockReason({ initiator: 'agent-pan-2772', force: false }, deps);
+    const queued = readPendingDeploy();
 
-    expect(result).toContain('"Deployment deferred because flywheel run RUN-42 owns deployment."');
-    expect(result).toContain('This agent-issued restart would disconnect live sessions while that gate is active.');
-    expect(result).toContain('Rerun with --force to bypass the gate.');
+    expect(queued).toEqual({
+      requestedAt: '2026-07-26T12:00:00.000Z',
+      requestedBy: ['agent-pan-2772'],
+      lastReason: 'Deployment deferred because verification is in flight for PAN-10, PAN-20.',
+      blockedBy: ['PAN-10', 'PAN-20'],
+      deferralCount: 1,
+      escalated: false,
+    });
+    expect(result).toContain('queued since 2026-07-26T12:00:00.000Z (0s ago)');
+    expect(result).toContain('2 distinct verifications: PAN-10, PAN-20');
+    expect(result).toContain('fire automatically at the next verification boundary');
+    expect(result).toContain('do not retry or use --force');
+  });
+
+  it('refreshes a queued restart without resetting its original request time', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-26T12:00:00.000Z'));
+    const deps = clearDependencies();
+    deps.loadReviewStatuses.mockReturnValue({
+      'PAN-10': { issueId: 'PAN-10', verificationStatus: 'running' },
+    });
+    await agentRestartBlockReason({ initiator: 'agent-a', force: false }, deps);
+
+    vi.setSystemTime(new Date('2026-07-26T12:05:00.000Z'));
+    deps.loadReviewStatuses.mockReturnValue({
+      'PAN-20': { issueId: 'PAN-20', verificationStatus: 'running' },
+    });
+    const result = await agentRestartBlockReason({ initiator: 'agent-z', force: false }, deps);
+
+    expect(readPendingDeploy()).toMatchObject({
+      requestedAt: '2026-07-26T12:00:00.000Z',
+      requestedBy: ['agent-a', 'agent-z'],
+      blockedBy: ['PAN-10', 'PAN-20'],
+      deferralCount: 2,
+    });
+    expect(result).toContain('(5m ago)');
+    expect(result).toContain('2 distinct verifications: PAN-10, PAN-20');
   });
 
   it('does not block the flywheel on its own active run', async () => {
@@ -58,6 +119,7 @@ describe('agentRestartBlockReason', () => {
       force: false,
     }, deps)).resolves.toBeNull();
     expect(deps.getFlywheelActiveRunId).not.toHaveBeenCalled();
+    expect(readPendingDeploy()).toBeNull();
   });
 
   it('still blocks the flywheel while verification is in flight', async () => {
@@ -73,7 +135,9 @@ describe('agentRestartBlockReason', () => {
     }, deps);
 
     expect(result).toContain('"Deployment deferred because verification is in flight for PAN-100."');
-    expect(result).toContain('Rerun with --force to bypass the gate.');
+    expect(result).toContain('1 distinct verification: PAN-100');
+    expect(result).toContain('do not retry or use --force');
+    expect(readPendingDeploy()?.requestedBy).toEqual(['flywheel-orchestrator']);
     expect(deps.getFlywheelActiveRunId).not.toHaveBeenCalled();
   });
 });
