@@ -284,20 +284,20 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T10:15:02.527Z",
+  "updated": "2026-07-26T10:55:02.845Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T10:15:01.324Z",
+    "updatedAt": "2026-07-26T10:55:02.771Z",
     "reviewNotes": "Provisional recovery loses the original pane identity, and poison repair/clear verification still treats failed marker reads as empty state.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
-    "lastVerifiedCommit": "dae8d6dfbd4da721132281460260596645c92fdb",
+    "lastVerifiedCommit": "1700fa490854ce01aef7b32625e0a6c56d11083a",
     "reviewSpawnedAt": "2026-07-26T10:07:38.654Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -395,17 +395,17 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 3320,
-            "output": 2942,
-            "cacheRead": 3,
+            "input": 6206,
+            "output": 5986,
+            "cacheRead": 6,
             "cacheWrite": 0
           }
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 29588925,
-            "output": 1066698,
-            "cacheRead": 163229696,
+            "input": 29597634,
+            "output": 1067328,
+            "cacheRead": 163621376,
             "cacheWrite": 0
           }
         },
@@ -428,15 +428,15 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 3320,
-          "output": 2942,
-          "cacheRead": 3,
+          "input": 6206,
+          "output": 5986,
+          "cacheRead": 6,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 31062698,
-          "output": 1255819,
-          "cacheRead": 258558464,
+          "input": 31071407,
+          "output": 1256449,
+          "cacheRead": 258950144,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -447,8 +447,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 322.5999813,
-        "pricingAsOf": "2026-07-26T10:15:01.406Z"
+        "usd": 322.8763726,
+        "pricingAsOf": "2026-07-26T10:55:02.832Z"
       }
     },
     "merges": [
