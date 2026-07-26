@@ -75,6 +75,27 @@ export function isMergeTrainEnabled(): boolean {
   return readFlag('flywheel.merge_train_enabled');
 }
 
+/**
+ * PAN-1696: Check if merge train is enabled for a project, respecting the
+ * per-project override in projects.yaml if set, otherwise falling back to
+ * the global merge_train.enabled flag.
+ *
+ * @param project - ProjectConfig from projects.yaml with merge_train field. If not set, uses global.
+ * @returns true if merge train is enabled for this project, false otherwise.
+ */
+export function isMergeTrainEnabledForProject(project?: { merge_train?: 'enabled' | 'disabled' }): boolean {
+  // Check per-project override first
+  if (project?.merge_train === 'enabled') {
+    return true;
+  }
+  if (project?.merge_train === 'disabled') {
+    return false;
+  }
+
+  // Fall back to global flag if no project override
+  return isMergeTrainEnabled();
+}
+
 // ── PendingAutoMerge ──────────────────────────────────────────────────────────
 
 export type { PendingAutoMergeStatus } from './merge-types.js';
