@@ -4,7 +4,7 @@
     "created": "2026-07-26T12:40:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3135: Deploy gate can starve the deployer: 'any verification in flight' has no queue or deadline, and blockers hand off to each other",
-    "updated": "2026-07-26T12:51:20.671Z"
+    "updated": "2026-07-26T12:51:22.700Z"
   },
   "plan": {
     "id": "pan-3135",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "af74f2e3-98ce-449d-b894-cf6cc4841452",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-07-26T12:40:00.000Z",
-    "updated": "2026-07-26T12:51:20.671Z",
+    "updated": "2026-07-26T12:51:22.700Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3135",
