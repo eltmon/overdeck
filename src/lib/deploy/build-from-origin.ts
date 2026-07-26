@@ -1,9 +1,9 @@
 import chalk from 'chalk';
-import { exec, spawn } from 'node:child_process';
-import { constants, promises as fs } from 'node:fs';
-import { homedir } from 'node:os';
-import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
-import { promisify } from 'node:util';
+import { exec, spawn } from 'child_process';
+import { constants, promises as fs } from 'fs';
+import { homedir } from 'os';
+import { delimiter, dirname, isAbsolute, join, resolve } from 'path';
+import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
