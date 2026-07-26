@@ -194,15 +194,7 @@
       "timestamp": "2026-07-26T17:40:35.749Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T17:40:35Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3093\n\n# Review Synthesis — PAN-3093 — 2026-07-26T17:39:00Z\n\n## Verdict: CHANGES REQUESTED — a transient member-repo ref refresh failure is converted into an authoritative empty ready set, invalidating and tearing down the live UAT generation\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-a0bd3511/context.json\n- Branch: feature/pan-3093\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093\n- HEAD reviewed: a0bd35113418eed8c372b6caa82b73c8f89c416e\n- Cycle number: 4\n- Prior cycle SHA: cd81b757bcb11b125bf455e605a0d0a443c1f23e\n- PR diff: ce4ace8275179642723ae5dc7b459f125623e4d0..a0bd35113418eed8c372b6caa82b73c8f89c416e (14 commits)\n- Cycle diff: cd81b757bcb11b125bf455e605a0d0a443c1f23e..a0bd35113418eed8c372b6caa82b73c8f89c416e\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings after gates |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-a0bd3511/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-a0bd3511/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-a0bd3511/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-a0bd3511/requirements.md | 1 |\n\n## Blocking Findings\n\n### [requirements] A ref-refresh outage invalidates the live generation instead of preserving unavailable state — `src/lib/flywheel-merge-order.ts:473`\nThe current cycle correctly stops trusting stale tracking refs, but it represents an operational refresh failure by excluding every affected candidate and returning the same empty array used for a verified empty ready set. `getPolyrepoReadySetForProject` forwards that result unchanged, while the reconciler reserves `null` for unavailable input. It therefore computes `desiredIds = ∅`, marks every live member departed, invalidates the generation, and tears down its stack. A temporary transport, authentication, or repository outage can destroy the current testable batch even though no feature left the queue. Preserve an explicit unavailable result and abort the reconciliation tick without lifecycle mutation; add a live-generation integration test proving failed repo refresh causes no status update or teardown.\n\nThis finding survives the cycle-4 convergence gate because the fail-closed exclusion and ordinary-empty-array behavior were introduced in the current cycle at `src/lib/flywheel-merge-order.ts:455-537`.\n\n## Non-blocking Findings\n\n### [correctness] [demoted: previously reviewed] Missing merge evidence is terminalized instead of recovered — `src/lib/cloister/uat-promote.ts:327`\nA row with `promotedAt` but no `mergeSha` bypasses remote recovery, and an all-stamped generation can finalize while withholding all polyrepo verification evidence. That can make post-merge refusal permanent. The relevant `promotedAt` fast path, all-pending completion branch, and evidence-withholding behavior were already present at the prior cycle SHA and were not changed by this cycle, so cycle-4 convergence forbids promoting the finding to a blocker.\n\n### [performance] [demoted: outside reviewed HEAD and previously reviewed] Concurrent ancestry checks are not coalesced — `src/lib/cloister/merge-verification.ts:60`\nThe performance report analyzed an uncommitted positive-cache implementation in the dirty workspace; that cache is not present in reviewed HEAD `a0bd35113418eed8c372b6caa82b73c8f89c416e`. The underlying F × R duplicate ancestry-check issue was already raised in cycle 3, and the current committed cycle does not change `src/lib/cloister/merge-verification.ts`, so it is not promotable in cycle 4.\n\n### [requirements] Cross-machine recovery does not fetch the UAT branch ref — `src/lib/cloister/uat-promote.ts:681`\n`findLandedMerge` refreshes the target branch but resolves the UAT branch only from existing local refs. A fresh checkout without that tracking ref can misclassify a landed unstamped repo as pending. This remains advisory because the reviewer classified it as non-blocking.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3093/.pan/review/agent-pan-3093-review-a0bd3511/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3093 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/concerns.md",
@@ -277,10 +269,10 @@
     "recordedAt": "2026-07-26T16:24:11.129Z"
   },
   "created": "2026-07-26T12:33:18.311Z",
-  "updated": "2026-07-26T17:41:53.289Z",
+  "updated": "2026-07-26T17:50:54.873Z",
   "pipeline": {
     "issueId": "PAN-3093",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -288,12 +280,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T16:25:24.266Z",
-    "updatedAt": "2026-07-26T17:40:35.033Z",
+    "updatedAt": "2026-07-26T17:50:54.621Z",
     "reviewNotes": "A transient member-repo ref refresh failure invalidates and tears down the live UAT generation",
     "inspectNotes": "All 4 ACs verified; ran uat-polyrepo-engine.test.ts + uat-generation-engine.test.ts, 33/33 pass. AC1: runAssemblyPass calls each repo's own fetchMain then createWorktree and records that repo's baseSha; finish() writes compositeBaseAnchor -> 'fe@aaa1111 api@bbb2222' on the generation row (asserted on both the returned object and the store row). AC2: a block returns from the pass, the issue is added to heldOutIds once and pushed to heldOut with reason suffixed '(in <repoKey>)', then assembly replays from base; verified in real git too, since createWorktree does 'worktree remove --force' + 'worktree add -B <branch> <path> origin/<target>', which resets the sibling repo's branch, so the fake's merged-reset is faithful. Push happens only after the accepted pass, so a held-out feature is never published in repo A. AC3: contributingRepos filters by repoContributions; infra gets zero worktreeCreations and zero pushes. AC4: the push loop returns finish('failed', ...) on the first throw, with fe.pushes=[name] and api.pushes=[] proving the sibling had landed. Deviation 1 confirmed necessary: safeGenerationWorktreePath (uat-generation-deps.ts:39) resolves <projectRoot>/workspaces, and a member repo runs git in <projectRoot>/<repoKey> while its worktree sits under the wrapper's workspaces, so the old signature would throw; workspacesRoot defaults to projectRoot and targetBranch to 'main', reproducing the prior origin/main behavior exactly. Per-repo deps each close over their own worktreePath, so merge/abort/push cannot cross repos. Deviation 2 confirmed: GenerationStorePort.update's Pick had no 'repos'. Non-blocking notes: (a) a repo dropped between passes keeps its unpushed local uat/ branch and worktree until the generation folder is reaped - harmless since 'worktree add -B' force-resets, but cleanup (WI-7) should reap the branch; (b) listRemoteUatBranchesMulti, buildPolyrepoGitDeps, and assemblePolyrepoUatGeneration have no callers yet, which is expected until the WI-5/WI-6 wiring lands.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3145",
     "lastVerifiedCommit": "cd81b757bcb11b125bf455e605a0d0a443c1f23e",
-    "reviewSpawnedAt": "2026-07-26T17:32:25.327Z",
+    "reviewSpawnedAt": "2026-07-26T17:50:54.620Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/concerns.md",
@@ -366,24 +358,6 @@
         "tests/unit/lib/overdeck/uat-generation-repos.test.ts"
       ],
       "recordedAt": "2026-07-26T16:24:11.129Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "f75a76c41ccd76fa4f94b6f9a6492d9f0f0e559c"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "f75a76c41ccd76fa4f94b6f9a6492d9f0f0e559c"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "f75a76c41ccd76fa4f94b6f9a6492d9f0f0e559c"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "f75a76c41ccd76fa4f94b6f9a6492d9f0f0e559c"
-      }
     }
   },
   "closeOut": {
@@ -399,9 +373,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 17918016,
-            "output": 606376,
-            "cacheRead": 171730432,
+            "input": 17924818,
+            "output": 610935,
+            "cacheRead": 172456960,
             "cacheWrite": 0
           }
         },
@@ -446,15 +420,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 20292469,
-          "output": 820332,
-          "cacheRead": 215412224,
+          "input": 20299271,
+          "output": 824891,
+          "cacheRead": 216138752,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 233.7945473,
-        "pricingAsOf": "2026-07-26T17:40:35.052Z"
+        "usd": 234.3285913,
+        "pricingAsOf": "2026-07-26T17:50:54.813Z"
       }
     },
     "merges": [
@@ -463,7 +437,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "tasks": {
     "sequence": 16,
     "claims": {},
