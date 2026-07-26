@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-26T13:44:51.834Z",
+  "updated": "2026-07-26T13:45:06.538Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "passed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T13:07:52.474Z",
-    "inspectNotes": "AC1-3 met: decide() allows only ready + one release source with blocker precedence (parked/vetoed/objection/epic) ahead of readiness; all label constants verified lowercase in src/lib/backlog/pickup.ts so the lowercased-Set lookup is case-correct incl. LEGACY_PARKED_LABELS; gather() fails closed to null labels on missing issue or throwing issue service, and to false on settings/order-book/flag failures (activeOrderBookIssues returns uppercase IDs, matching the normalized has() lookup; readAutoSpawnOnFinalizeFlag lowercases its path internally so the uppercase arg is safe). Tests cover every clause and code. Non-blocking observation: no call sites yet -- the predicate is not wired into any dispatch path, so the commit subject 'enforce autonomous work pickup policy' is satisfied only once a later item consumes it."
+    "updatedAt": "2026-07-26T13:45:06.508Z",
+    "inspectNotes": "Inspecting item started-by-field-plumbing"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 459847,
-            "output": 39029,
-            "cacheRead": 10871808,
+            "input": 1323027,
+            "output": 198072,
+            "cacheRead": 109727744,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 459847,
-          "output": 39029,
-          "cacheRead": 10871808,
+          "input": 1323027,
+          "output": 198072,
+          "cacheRead": 109727744,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 8.906009000000001,
-        "pricingAsOf": "2026-07-26T13:07:52.646Z"
+        "usd": 67.421167,
+        "pricingAsOf": "2026-07-26T13:45:06.521Z"
       }
     },
     "merges": [],
