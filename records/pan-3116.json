@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T09:04:01.632Z",
-  "updated": "2026-07-26T09:29:58.531Z",
+  "updated": "2026-07-26T09:30:11.725Z",
   "pipeline": {
     "issueId": "PAN-3116",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "remove-baseline-reconcile": {
+        "writerId": "agent-pan-3116",
+        "agentId": "agent-pan-3116",
+        "pid": 2692273,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T09:30:11.725Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3116",
@@ -109,6 +117,7 @@
     "ratchet-audit-allowlist.ratchet-audit-allowlist.ac1": "completed",
     "ratchet-audit-allowlist.ratchet-audit-allowlist.ac2": "completed",
     "ratchet-audit-allowlist.ratchet-audit-allowlist.ac3": "completed",
-    "ratchet-audit-allowlist.ratchet-audit-allowlist.ac4": "completed"
+    "ratchet-audit-allowlist.ratchet-audit-allowlist.ac4": "completed",
+    "remove-baseline-reconcile": "running"
   }
 }
