@@ -46,7 +46,7 @@
     "recordedAt": "2026-07-26T20:34:03.489Z"
   },
   "created": "2026-07-26T19:16:39.648Z",
-  "updated": "2026-07-26T20:34:34.019Z",
+  "updated": "2026-07-26T20:34:40.053Z",
   "pipeline": {
     "issueId": "PAN-3155",
     "reviewStatus": "pending",
@@ -55,7 +55,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T20:34:13.971Z",
+    "panDoneRecoveredAt": "2026-07-26T20:34:33.677Z",
+    "updatedAt": "2026-07-26T20:34:34.012Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3160",
     "reviewRequestedAt": "2026-07-26T20:34:33.677Z",
     "scopeDrift": {
@@ -87,8 +88,7 @@
         "tests/unit/lib/lifecycle/workflows.test.ts"
       ],
       "recordedAt": "2026-07-26T20:34:03.489Z"
-    },
-    "panDoneRecoveredAt": "2026-07-26T20:34:33.677Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -112,7 +112,7 @@
       },
       "costAtCloseOut": {
         "usd": 31.555984,
-        "pricingAsOf": "2026-07-26T20:34:14.079Z"
+        "pricingAsOf": "2026-07-26T20:34:40.046Z"
       }
     },
     "merges": [
