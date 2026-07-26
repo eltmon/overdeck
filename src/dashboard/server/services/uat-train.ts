@@ -152,6 +152,60 @@ function codenameLabel(features: readonly ReadyFeature[]): string {
 
 async function assembleFromReadySet(features: readonly ReadyFeature[]): Promise<UatGeneration> {
   const root = projectRoot();
+
+  // PAN-1696: polyrepo assembly not yet supported. Polypro projects require
+  // per-repo branch management and assembly across multiple repos. For now,
+  // return a failed generation with a clear reason.
+  const project = findProjectByPathSync(root);
+  if (project?.workspace?.type === 'polyrepo') {
+    const store = buildUatGenerationStore();
+    const label = codenameLabel(features);
+    const name = (await import('../../../lib/cloister/uat-candidate-name.js')).makeUatCandidateName({
+      label,
+      dateIso: new Date().toISOString(),
+    });
+    const worktreePath = `${root}/workspaces/${name.replace(/[^a-zA-Z0-9._-]+/g, '-')}`;
+
+    console.log(`[uat-train] ${name}: polyrepo UAT assembly not yet supported — generation marked failed`);
+    store.insert({
+      name,
+      worktreePath,
+      projectRoot: root,
+      baseSha: 'unknown',
+      status: 'failed',
+      members: [],
+      heldOut: features.map((f) => ({
+        issueId: f.issueId,
+        branch: f.branch,
+        headSha: 'unknown',
+        reason: 'polyrepo UAT assembly not yet supported',
+      })),
+      resolutions: [],
+      stackStartedAt: null,
+      cleanedAt: null,
+    });
+
+    return {
+      name,
+      worktreePath,
+      projectRoot: root,
+      baseSha: 'unknown',
+      status: 'failed',
+      members: [],
+      heldOut: features.map((f) => ({
+        issueId: f.issueId,
+        branch: f.branch,
+        headSha: 'unknown',
+        reason: 'polyrepo UAT assembly not yet supported',
+      })),
+      resolutions: [],
+      stackStartedAt: null,
+      cleanedAt: null,
+      createdAt: '',
+      updatedAt: '',
+    };
+  }
+
   const store = buildUatGenerationStore();
   return assembleUatGeneration(
     {
