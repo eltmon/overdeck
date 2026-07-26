@@ -17,7 +17,13 @@ import { isXBriefFilename } from '../xbrief/lifecycle.js';
 import type { XBriefDocument } from '../xbrief/types.js';
 import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import {
+  decideAutonomousWorkDispatch,
+  gatherAutonomousWorkDispatchInput,
+  type AutonomousWorkDispatchDecision,
+} from './autonomous-work-dispatch.js';
 import { loadCloisterConfig } from './config.js';
+import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { clearIssueClosedCache, isIssueClosed } from './issue-closed.js';
 
 const DEFAULT_ATTEMPT_INTERVAL_MS = 5 * 60 * 1000;
@@ -86,12 +92,14 @@ export interface ReconcileOrphanProposedOptions extends FindOrphanProposedOption
   config?: OrphanProposedReconcilerConfig;
   spawnWorkAgent?: (issueId: string) => Promise<SpawnWorkAgentResult>;
   hasOpenPrForBranch?: (projectPath: string, issueId: string) => Promise<boolean>;
+  evaluatePickupGate?: (issueId: string) => Promise<AutonomousWorkDispatchDecision>;
   dashboardOrigin?: string;
 }
 
 export interface HandleOrphanProposedSpecOptions {
   spawnWorkAgent?: (issueId: string) => Promise<SpawnWorkAgentResult>;
   hasOpenPrForBranch?: (projectPath: string, issueId: string) => Promise<boolean>;
+  evaluatePickupGate?: (issueId: string) => Promise<AutonomousWorkDispatchDecision>;
   dashboardOrigin?: string;
   config?: OrphanProposedReconcilerConfig;
   /** Project override for tests / callers that already resolved the issue. */
@@ -362,10 +370,14 @@ function logReconcilerDiagnostic(kind: string, info: Record<string, unknown> = {
   console.debug(`[orphan-proposed-reconciler] ${kind}`, info);
 }
 
+async function defaultEvaluatePickupGate(issueId: string): Promise<AutonomousWorkDispatchDecision> {
+  return decideAutonomousWorkDispatch(await gatherAutonomousWorkDispatchInput(issueId));
+}
+
 /**
- * PAN-1908: reactive orphan-proposed handler. When a spec reaches `proposed`
- * and no work agent is running/starting, spawn a work agent for that issue
- * without scanning all project specs.
+ * PAN-1908: reactive orphan-proposed handler. When a spec reaches `proposed`,
+ * the autonomous-work pickup gate allows it, and no work agent is
+ * running/starting, spawn a work agent without scanning all project specs.
  */
 export async function handleOrphanProposedSpec(
   issueId: string,
@@ -424,6 +436,19 @@ export async function handleOrphanProposedSpec(
   if (planDoc.plan?.status !== 'proposed') {
     logReconcilerDiagnostic('spawn-skipped', { issueId: upperIssueId, reason: 'not-proposed', status: planDoc.plan?.status });
     return [];
+  }
+
+  const pickupGate = await (options.evaluatePickupGate ?? defaultEvaluatePickupGate)(upperIssueId);
+  if (!pickupGate.allow) {
+    const reason = `pickup-gate:${pickupGate.code}`;
+    logReconcilerDiagnostic('spawn-skipped', { issueId: upperIssueId, reason });
+    await recordDeadEndNeedsYou(
+      upperIssueId,
+      'orphan-proposed-pickup-gate',
+      'proposed',
+      pickupGate.reason,
+    );
+    return [`Skipped orphan proposed spec ${upperIssueId}: ${reason}`];
   }
 
   const agentId = `agent-${issueLower}`;
@@ -555,6 +580,7 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
       const result = await handleOrphanProposedSpec(candidate.issueId, {
         spawnWorkAgent: options.spawnWorkAgent,
         hasOpenPrForBranch: options.hasOpenPrForBranch,
+        evaluatePickupGate: options.evaluatePickupGate,
         dashboardOrigin: options.dashboardOrigin,
         config: { enabled: true, minAttemptIntervalMs: loadedConfig.minAttemptIntervalMs },
         project: { projectKey: candidate.projectKey, projectPath: candidate.projectPath },
