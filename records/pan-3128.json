@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T12:58:21.377Z",
+  "updated": "2026-07-26T13:00:53.416Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "dod-row7-provenance-gate": {
-        "writerId": "agent-pan-3128",
-        "agentId": "agent-pan-3128",
-        "pid": 1473426,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T12:58:21.377Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3128",
@@ -93,6 +85,17 @@
         "outcome": "completed",
         "reason": "Stamped buildDirty/buildBranch alongside commit/time, exposed them through existing BuildInfo identity spreading, and added absent/present/detached provenance tests. Server code splitting emits build-info in its shared build-info chunk.",
         "releasedAt": "2026-07-26T12:58:09.970Z"
+      },
+      {
+        "writerId": "agent-pan-3128",
+        "agentId": "agent-pan-3128",
+        "pid": 1473426,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T12:58:21.377Z",
+        "itemId": "dod-row7-provenance-gate",
+        "outcome": "completed",
+        "reason": "DoD deploy evidence now rejects dirty builds and build commits outside origin/main before checking merge containment, with explicit pan reload remediation and regression coverage for old health payloads.",
+        "releasedAt": "2026-07-26T13:00:53.416Z"
       }
     ],
     "statusReasons": {
@@ -103,6 +106,10 @@
       "stamp-build-provenance": {
         "reason": "Stamped buildDirty/buildBranch alongside commit/time, exposed them through existing BuildInfo identity spreading, and added absent/present/detached provenance tests. Server code splitting emits build-info in its shared build-info chunk.",
         "updatedAt": "2026-07-26T12:58:09.970Z"
+      },
+      "dod-row7-provenance-gate": {
+        "reason": "DoD deploy evidence now rejects dirty builds and build commits outside origin/main before checking merge containment, with explicit pan reload remediation and regression coverage for old health payloads.",
+        "updatedAt": "2026-07-26T13:00:53.416Z"
       }
     }
   },
@@ -118,6 +125,10 @@
     "stamp-build-provenance.stamp-build-provenance.ac2": "completed",
     "stamp-build-provenance.stamp-build-provenance.ac3": "completed",
     "stamp-build-provenance.stamp-build-provenance.ac4": "completed",
-    "dod-row7-provenance-gate": "running"
+    "dod-row7-provenance-gate": "completed",
+    "dod-row7-provenance-gate.dod-row7-provenance-gate.ac1": "completed",
+    "dod-row7-provenance-gate.dod-row7-provenance-gate.ac2": "completed",
+    "dod-row7-provenance-gate.dod-row7-provenance-gate.ac3": "completed",
+    "dod-row7-provenance-gate.dod-row7-provenance-gate.ac4": "completed"
   }
 }
