@@ -202,9 +202,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T11:20:26.056Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T11:23Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T11:23:00.467Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T11:23:00Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nThe initial strict POISON read still throws a generic error, so one transient marker-read failure can be terminally recorded as failed before any wake is delivered.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/event-store.ts",
@@ -296,7 +309,7 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T11:22:59.947Z",
+  "updated": "2026-07-26T11:23:00.468Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "blocked",
