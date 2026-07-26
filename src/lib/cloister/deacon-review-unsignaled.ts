@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
-import { join } from 'path';
+import { basename, join } from 'path';
 import { Effect } from 'effect';
 import { getAgentRuntimeStateSync, getAgentStateSync, listRunningAgents } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
@@ -233,7 +233,7 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
         }
 
         // Agent is alive but idle — nudge it to signal completion
-        const cmd = `pan admin specialists done review ${issueId} --status ${verdict}${verdict === 'blocked' || verdict === 'failed' ? ` --notes "${topBlocker || 'See synthesis.md'}"` : ''}`;
+        const cmd = `pan admin specialists done review ${issueId} --status ${verdict}${verdict === 'blocked' || verdict === 'failed' ? ` --notes "${topBlocker || 'See synthesis.md'}"` : ''} --run-id "${basename(latestDir)}"`;
         const nudge = `Your review synthesis is already written and saved. Your ONLY remaining task is to execute this Bash command immediately — do not analyze, do not summarize, do not ask questions, just run it:\n\n${cmd}\n\nRun this command NOW. Do not write any other response before executing it.`;
         try {
           const { messageAgent } = await import('../agents.js');

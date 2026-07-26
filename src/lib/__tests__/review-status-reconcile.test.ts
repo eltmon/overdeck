@@ -3,7 +3,9 @@ import { Effect } from 'effect';
 import type { ReviewStatus } from '../review-status.js';
 
 const feedback = vi.hoisted(() => ({ deliver: vi.fn(() => Effect.succeed({ agentMessageSent: true, prCommentPosted: false })) }));
+const agents = vi.hoisted(() => ({ getAgentStateSync: vi.fn() }));
 vi.mock('../cloister/review-verdict-feedback.js', () => ({ deliverReviewVerdictFeedback: feedback.deliver }));
+vi.mock('../agents.js', () => ({ getAgentStateSync: agents.getAgentStateSync }));
 
 // Mock the DB cache layer and the journal layer so we can drive getReviewStatusSync /
 // setReviewStatusSync deterministically without touching SQLite or the filesystem.
@@ -55,6 +57,7 @@ describe('getReviewStatusSync — journal→DB reconcile (PAN-1988)', () => {
     vi.clearAllMocks();
     db.getManyFromDb.mockReturnValue({});
     journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
+    agents.getAgentStateSync.mockReturnValue(null);
   });
 
   it('reconciles the DB cache from the journal when the journal is newer (host-owned write)', () => {
@@ -123,12 +126,20 @@ describe('getReviewStatusSync — journal→DB reconcile (PAN-1988)', () => {
       updatedAt: '2026-06-20T07:22:21.788Z',
       durable: { reviewStatus: 'blocked', testStatus: 'pending', reviewNotes: 'empty-backlog spawn' },
     });
+    agents.getAgentStateSync.mockReturnValue({
+      reviewRunId: 'agent-pan-1866-review-abcdef12',
+    });
 
     getReviewStatusSync('PAN-1866');
     await new Promise((r) => setTimeout(r, 0)); // let the fire-and-forget delivery run
 
     expect(feedback.deliver).toHaveBeenCalledTimes(1);
-    expect(feedback.deliver.mock.calls[0][0]).toMatchObject({ issueId: 'PAN-1866', verdict: 'blocked', notes: 'empty-backlog spawn' });
+    expect(feedback.deliver.mock.calls[0][0]).toMatchObject({
+      issueId: 'PAN-1866',
+      verdict: 'blocked',
+      notes: 'empty-backlog spawn',
+      runId: 'agent-pan-1866-review-abcdef12',
+    });
   });
 
   it('emits review.approved when reconciling a NEW passed verdict — host-owned review→test handoff (PAN-1988)', () => {
