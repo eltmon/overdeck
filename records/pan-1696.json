@@ -269,7 +269,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T04:44:27.434Z",
+  "updated": "2026-07-26T04:44:30.469Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "passed",
@@ -278,7 +278,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T04:44:27.403Z",
+    "updatedAt": "2026-07-26T04:44:30.443Z",
     "reviewNotes": "Agent re-review request (8/25): All test failures fixed: NO-LOSS-MATRIX entry for merge-train routes, flywheelStatusCommand honors --json flag when no active run, stale CLI test updated, file-size ceiling respected (999 lines)",
     "testNotes": "test",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -376,7 +376,7 @@
       },
       "costAtCloseOut": {
         "usd": 192.6896782,
-        "pricingAsOf": "2026-07-26T04:44:27.426Z"
+        "pricingAsOf": "2026-07-26T04:44:30.464Z"
       }
     },
     "merges": [
