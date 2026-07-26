@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T19:16:39.648Z",
-  "updated": "2026-07-26T19:42:00.010Z",
+  "updated": "2026-07-26T19:47:43.666Z",
   "pipeline": {
     "issueId": "PAN-3155",
     "reviewStatus": "pending",
@@ -43,18 +43,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "strike-cascade-verify-merged": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3155",
         "agentId": "agent-pan-3155",
         "pid": 3368583,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T19:42:00.010Z"
+        "claimedAt": "2026-07-26T19:42:00.010Z",
+        "itemId": "strike-cascade-verify-merged",
+        "outcome": "completed",
+        "reason": "Extracted branch verification into a reusable convention-branch cascade, added strike fallback with superseded feature residual evidence, and covered strike success/absence/short-circuit behavior with regression tests.",
+        "releasedAt": "2026-07-26T19:47:43.666Z"
+      }
+    ],
+    "statusReasons": {
+      "strike-cascade-verify-merged": {
+        "reason": "Extracted branch verification into a reusable convention-branch cascade, added strike fallback with superseded feature residual evidence, and covered strike success/absence/short-circuit behavior with regression tests.",
+        "updatedAt": "2026-07-26T19:47:43.666Z"
       }
     }
   },
   "statusOverrides": {
-    "strike-cascade-verify-merged": "running"
+    "strike-cascade-verify-merged": "completed",
+    "strike-cascade-verify-merged.strike-cascade-verify-merged.ac1": "completed",
+    "strike-cascade-verify-merged.strike-cascade-verify-merged.ac2": "completed",
+    "strike-cascade-verify-merged.strike-cascade-verify-merged.ac3": "completed"
   }
 }
