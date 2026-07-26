@@ -545,13 +545,8 @@ export async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<Ste
   }
 }
 
-async function verifyConventionBranchMerged(
-  ctx: LifecycleContext,
-  branchName: string,
-): Promise<StepResult | null> {
+async function verifyConventionBranchMerged(ctx: LifecycleContext, branchName: string): Promise<StepResult | null> {
   const step = 'close-out:verify-merged';
-
-  // Check if branch exists locally
   const { stdout: branchExists } = await execAsync(
     `git branch --list "${branchName}" 2>/dev/null || true`,
     { cwd: ctx.projectPath, encoding: 'utf-8' },
@@ -566,10 +561,7 @@ async function verifyConventionBranchMerged(
       );
       const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
       if (remoteCheck && !remoteCheck.success) return remoteCheck;
-      return stepOk(step, [
-        'All commits merged to main',
-        ...(remoteCheck?.details ?? []),
-      ]);
+      return stepOk(step, ['All commits merged to main', ...(remoteCheck?.details ?? [])]);
     } catch {
       // --is-ancestor fails for squash merges where the branch still exists.
       try {
