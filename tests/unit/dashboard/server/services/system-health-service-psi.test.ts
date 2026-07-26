@@ -21,7 +21,10 @@ vi.mock('node:os', async (importOriginal) => ({
   totalmem: () => 16 * 1024 ** 3,
 }));
 
-import { parseMemoryPsi, readProcMemory } from '../system-health-service.js';
+import {
+  parseMemoryPsi,
+  readProcMemory,
+} from '../../../../../src/dashboard/server/services/system-health-service.js';
 
 const MEMINFO = [
   'MemTotal:       16384000 kB',
