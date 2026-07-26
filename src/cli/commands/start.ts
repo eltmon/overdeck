@@ -6,7 +6,7 @@ import { join, dirname, resolve } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline/promises';
 import { promisify } from 'util';
-import { exec, execFile } from 'child_process';
+import { exec, execFile, execSync } from 'child_process';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { clearAgentPausedSync, getAgentStateSync, spawnAgent } from '../../lib/agents.js';
@@ -14,6 +14,7 @@ import { describeConflictingWorkAgents } from '../../lib/work-agent-conflicts.js
 import { ROLE_EFFORTS, resolveModel as resolveRoleModel, loadConfigSync as loadYamlConfig, type RoleEffort } from '../../lib/config-yaml.js';
 import { getModelEffortLevelsSync } from '../../lib/model-capabilities.js';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
+import { resolveWorkspaceRepoRootsSync } from '../../lib/project-repos.js';
 import { resolveProjectFromIssueSync, hasProjectsSync } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPathSync } from '../../lib/prd-draft.js';
 import { isGitHubIssueSync, resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
@@ -1007,24 +1008,30 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
 
+    const workspaceRepoRoots = resolveWorkspaceRepoRootsSync(normalizedId, workspace);
     if (workspaceExisted) {
-      try {
-        const { execSync } = await import('child_process');
-        const branch = execSync('git branch --show-current', {
-          cwd: workspace,
-          encoding: 'utf8'
-        }).trim();
+      for (const root of workspaceRepoRoots) {
+        let branch = '';
+        try {
+          branch = execSync('git branch --show-current', {
+            cwd: root.dir,
+            encoding: 'utf8'
+          }).trim();
+        } catch { /* post-sync verification emits the canonical failure */ }
         if (branch === 'main' || branch === 'master') {
-          const repairedBranch = await repairMainBranchWorkspace(workspace, normalizedId);
+          const repairedBranch = !root.isPolyrepo
+            ? await repairMainBranchWorkspace(root.dir, normalizedId)
+            : null;
           if (repairedBranch) {
             prep.update(`Moved clean workspace to branch: ${repairedBranch}`);
-          } else {
-            skipSyncMainForUnsafeWorkspace = true;
-            prep.update(`Workspace is on ${branch} branch; skipping sync-main until validation runs`);
+            continue;
           }
         }
-      } catch {
-        // Let the post-sync verification below surface the canonical warning.
+        if (!branch || branch === 'main' || branch === 'master') {
+          skipSyncMainForUnsafeWorkspace = true;
+          prep.update(`Workspace repo ${root.repoKey} is on ${branch || 'an unknown'} branch; skipping sync-main until validation runs`);
+          break;
+        }
       }
     }
 
@@ -1055,66 +1062,47 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
 
-    // CRITICAL: Verify workspace is NOT on main/master branch
-    try {
-      const { execSync } = await import('child_process');
-      const branch = execSync('git branch --show-current', {
-        cwd: workspace,
-        encoding: 'utf8'
-      }).trim();
+    // CRITICAL: Verify every workspace repo is NOT on main/master or an empty branch.
+    for (const root of workspaceRepoRoots) {
+      let branch = '';
+      try {
+        branch = execSync('git branch --show-current', {
+          cwd: root.dir,
+          encoding: 'utf8'
+        }).trim();
+      } catch { /* empty branch below produces the canonical failure */ }
 
-      if (branch === 'main' || branch === 'master') {
-        // For polyrepo workspaces, the workspace root may be on main/master
-        // but sub-repos are on feature branches. Check sub-directories.
-        const { readdirSync, statSync } = await import('fs');
-        let hasFeatureBranch = false;
-        try {
-          const entries = readdirSync(workspace);
-          for (const entry of entries) {
-            const subPath = join(workspace, entry);
-            if (statSync(subPath).isDirectory() && existsSync(join(subPath, '.git'))) {
-              const subBranch = execSync('git branch --show-current', {
-                cwd: subPath,
-                encoding: 'utf8'
-              }).trim();
-              if (subBranch !== 'main' && subBranch !== 'master' && subBranch.length > 0) {
-                hasFeatureBranch = true;
-                prep.update(`Found polyrepo workspace — sub-repo ${entry} on branch: ${subBranch}`);
-                break;
-              }
-            }
-          }
-        } catch { /* ignore sub-repo check errors */ }
-
-        if (!hasFeatureBranch) {
-          const repairedBranch = await repairMainBranchWorkspace(workspace, normalizedId);
-          if (repairedBranch) {
-            prep.update(`Moved clean workspace to branch: ${repairedBranch}`);
-          } else {
-            await failPostCreateValidation({
-              spinner,
-              issueId: id,
-              projectRoot,
-              workspaceCreatedThisRun,
-              message: `Workspace is on ${branch} branch`,
-              printDetails: () => {
-                console.log('');
-                console.log(chalk.red('CRITICAL: Work agents must NOT run on main/master branch.'));
-                console.log(chalk.red('This bypasses the entire review/test/merge workflow.'));
-                console.log('');
-                console.log(chalk.bold('To fix:'));
-                console.log(`  1. Create a proper workspace: ${chalk.cyan(`pan workspace ${id}`)}`);
-                console.log(`  2. Or checkout a feature branch: ${chalk.cyan(`git checkout -b feature/${normalizedId}`)}`);
-              },
-            });
-          }
+      if ((branch === 'main' || branch === 'master') && !root.isPolyrepo) {
+        const repairedBranch = await repairMainBranchWorkspace(root.dir, normalizedId);
+        if (repairedBranch) {
+          prep.update(`Moved clean workspace to branch: ${repairedBranch}`);
+          continue;
         }
-      } else {
-        prep.update(`Found workspace on branch: ${branch}`);
       }
-    } catch (e) {
-      // If git check fails, continue but warn
-      spinner.warn('Could not verify branch - ensure you are NOT on main');
+
+      if (!branch || branch === 'main' || branch === 'master') {
+        const repoLabel = root.isPolyrepo ? ` repo ${root.repoKey}` : '';
+        await failPostCreateValidation({
+          spinner,
+          issueId: id,
+          projectRoot,
+          workspaceCreatedThisRun,
+          message: `Workspace${repoLabel} is on ${branch || 'an unknown'} branch`,
+          printDetails: () => {
+            console.log('');
+            console.log(chalk.red('CRITICAL: Work agents must NOT run on main/master or an unknown branch.'));
+            console.log(chalk.red('This bypasses the entire review/test/merge workflow.'));
+            console.log('');
+            console.log(chalk.bold('To fix:'));
+            console.log(`  1. Create a proper workspace: ${chalk.cyan(`pan workspace ${id}`)}`);
+            console.log(`  2. Or checkout a feature branch: ${chalk.cyan(`git checkout -b feature/${normalizedId}`)}`);
+          },
+        });
+      }
+
+      prep.update(root.isPolyrepo
+        ? `Found workspace repo ${root.repoKey} on branch: ${branch}`
+        : `Found workspace on branch: ${branch}`);
     }
 
     prep.update(`Found workspace: ${workspace}`);

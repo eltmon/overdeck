@@ -277,14 +277,14 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
         return jsonResponse({
           success: true,
           alreadyUpToDate: true,
-          message: 'Already up to date with main',
+          message: 'Already up to date with main', repos: result.repos,
         });
       }
       return jsonResponse({
         success: true,
         commitCount: result.commitCount || 0,
         changedFiles: result.changedFiles || [],
-        message: `Synced ${result.commitCount || 0} commit(s) from main`,
+        message: `Synced ${result.commitCount || 0} commit(s) from main`, repos: result.repos,
       });
     } else {
       const status = result.reason?.includes('uncommitted') ? 400 : 500;
@@ -292,7 +292,7 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
         {
           success: false,
           error: result.reason || 'Sync failed',
-          conflictFiles: result.conflictFiles,
+          conflictFiles: result.conflictFiles, repos: result.repos,
         },
         { status }
       );

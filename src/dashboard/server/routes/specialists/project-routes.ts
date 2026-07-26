@@ -11,6 +11,7 @@ import { normalizeModelName } from '../../../../lib/cost-parsers/jsonl-parser.js
 import { calculateCostSync, getPricingSync, type TokenUsage } from '../../../../lib/cost.js';
 import { loadConfigSync, resolveModel } from '../../../../lib/config-yaml.js';
 import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
+import { resolvePrimaryWorkspaceRepoDirSync, resolveWorkspaceRepoRootsSync } from '../../../../lib/project-repos.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync } from '../../../../lib/review-status.js';
 import { getAgentCommandSync } from '../../../../lib/settings.js';
@@ -596,14 +597,15 @@ const postProjectReviewRestartRoute = HttpRouter.add(
       return jsonResponse({ error: `Workspace not found: ${workspacePath}` }, { status: 404 });
     }
 
-    // Detect branch
-    let branch = 'unknown';
+    // Detect branch from the primary code repo; fall back to configured source branch.
+    const primaryRepo = resolveWorkspaceRepoRootsSync(issueId, workspacePath)[0];
+    let branch = primaryRepo.sourceBranch;
     try {
       const { stdout } = yield* Effect.promise(() => execAsync(
-        `cd "${workspacePath}" && git branch --show-current`,
-        { encoding: 'utf-8', timeout: 5000 },
+        'git branch --show-current',
+        { cwd: resolvePrimaryWorkspaceRepoDirSync(issueId, workspacePath), encoding: 'utf-8', timeout: 5000 },
       ));
-      branch = stdout.trim() || 'unknown';
+      branch = stdout.trim() || primaryRepo.sourceBranch;
     } catch { /* non-fatal */ }
 
     // PAN-1048 R3: review now spawns through the role primitive.

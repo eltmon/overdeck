@@ -26,6 +26,7 @@ import {
   inferProjectForgeSync,
   normalizeForgeSync,
   resolveConfiguredReposSync,
+  resolvePrimaryWorkspaceRepoDirSync,
   resolveProjectReposForIssueSync,
   type ResolvedProjectRepo,
 } from '../../src/lib/project-repos.js';
@@ -199,5 +200,60 @@ describe('computeWorkspaceRepoRootsSync', () => {
     expect(roots).toEqual([
       expect.objectContaining({ repoKey: 'min-999', dir: workspace, sourceBranch: 'feature/min-999', targetBranch: 'main', isPolyrepo: false }),
     ]);
+  });
+});
+
+describe('resolvePrimaryWorkspaceRepoDirSync', () => {
+  let workspace: string;
+
+  beforeEach(() => {
+    workspace = mkdtempSync(join(tmpdir(), 'pan-primary-repo-'));
+    projectsMocks.resolveProjectFromIssueSync.mockReset();
+    projectsMocks.getProject.mockReset();
+  });
+
+  afterEach(() => {
+    rmSync(workspace, { recursive: true, force: true });
+  });
+
+  it('returns the workspace path for a monorepo project', () => {
+    projectsMocks.resolveProjectFromIssueSync.mockReturnValue({
+      projectKey: 'overdeck',
+      projectName: 'Overdeck',
+      projectPath: '/tmp/overdeck',
+    });
+    projectsMocks.getProject.mockReturnValue({
+      name: 'Overdeck',
+      path: '/tmp/overdeck',
+      github_repo: 'eltmon/overdeck',
+      workspace: { type: 'monorepo' },
+    });
+
+    expect(resolvePrimaryWorkspaceRepoDirSync('PAN-3037', workspace)).toBe(workspace);
+  });
+
+  it('returns the first required repo directory for a polyrepo workspace', () => {
+    mkdirSync(join(workspace, 'api', '.git'), { recursive: true });
+    mkdirSync(join(workspace, 'fe', '.git'), { recursive: true });
+    projectsMocks.resolveProjectFromIssueSync.mockReturnValue({
+      projectKey: 'mind-your-now',
+      projectName: 'Mind Your Now',
+      projectPath: '/tmp/myn',
+      linearTeam: 'MIN',
+    });
+    projectsMocks.getProject.mockReturnValue({
+      name: 'Mind Your Now',
+      path: '/tmp/myn',
+      gitlab_repo: 'eltmon/myn',
+      workspace: {
+        type: 'polyrepo',
+        repos: [
+          { name: 'api', path: 'api', remote: 'gitlab' },
+          { name: 'fe', path: 'fe', remote: 'gitlab' },
+        ],
+      },
+    });
+
+    expect(resolvePrimaryWorkspaceRepoDirSync('MIN-850', workspace)).toBe(join(workspace, 'api'));
   });
 });

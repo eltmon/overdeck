@@ -84,7 +84,7 @@ const selfReviewReportPath = (reviewDir: string): string => join(reviewDir, 'rev
 
 async function deriveReviewRunHead8(issueId: string, workspace: string): Promise<string> {
   try {
-    const { resolveWorkspaceRepoRootsSync } = await import('../project-repos.js');
+    const { resolvePrimaryWorkspaceRepoDirSync, resolveWorkspaceRepoRootsSync } = await import('../project-repos.js');
     const roots = resolveWorkspaceRepoRootsSync(issueId, workspace);
     if (roots.some(root => root.isPolyrepo)) {
       const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
@@ -94,7 +94,10 @@ async function deriveReviewRunHead8(issueId: string, workspace: string): Promise
         : 'unknown';
     }
 
-    const probeDir = roots[0]?.dir ?? workspace;
+    // PAN-3037: the primary code repo is resolved through the shared helper —
+    // the polyrepo wrapper's HEAD never moves, so a wrapper-derived runId would
+    // mismatch every live run and kill a healthy convoy on each dispatch.
+    const probeDir = resolvePrimaryWorkspaceRepoDirSync(issueId, workspace);
     const { stdout } = await execAsync(['git', 'rev-parse', '--short=8', 'HEAD'].join(' '), {
       cwd: probeDir,
       encoding: 'utf-8',
