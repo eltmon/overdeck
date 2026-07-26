@@ -269,7 +269,7 @@
     }
   ],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T04:44:05.497Z",
+  "updated": "2026-07-26T04:44:24.404Z",
   "pipeline": {
     "issueId": "PAN-1696",
     "reviewStatus": "passed",
@@ -278,7 +278,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T04:44:05.456Z",
+    "updatedAt": "2026-07-26T04:44:24.360Z",
     "reviewNotes": "Agent re-review request (8/25): All test failures fixed: NO-LOSS-MATRIX entry for merge-train routes, flywheelStatusCommand honors --json flag when no active run, stale CLI test updated, file-size ceiling respected (999 lines)",
     "testNotes": "test",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -321,18 +321,18 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 284,
-            "output": 92339,
-            "cacheRead": 26941787,
-            "cacheWrite": 680445
+            "input": 288,
+            "output": 92838,
+            "cacheRead": 27455491,
+            "cacheWrite": 680946
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 10574,
-            "output": 171830,
-            "cacheRead": 100775568,
-            "cacheWrite": 4373345
+            "input": 10579,
+            "output": 171946,
+            "cacheRead": 100918986,
+            "cacheWrite": 4373626
           }
         }
       },
@@ -362,21 +362,21 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 284,
-          "output": 92339,
-          "cacheRead": 26941787,
-          "cacheWrite": 680445
+          "input": 288,
+          "output": 92838,
+          "cacheRead": 27455491,
+          "cacheWrite": 680946
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 10574,
-          "output": 171830,
-          "cacheRead": 100775568,
-          "cacheWrite": 4373345
+          "input": 10579,
+          "output": 171946,
+          "cacheRead": 100918986,
+          "cacheWrite": 4373626
         }
       },
       "costAtCloseOut": {
-        "usd": 192.5654082,
-        "pricingAsOf": "2026-07-26T04:44:05.482Z"
+        "usd": 192.6896782,
+        "pricingAsOf": "2026-07-26T04:44:24.388Z"
       }
     },
     "merges": [
