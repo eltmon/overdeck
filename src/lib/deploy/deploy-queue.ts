@@ -24,6 +24,7 @@ type DeployIntent = {
 
 const LOCK_RETRY_DELAYS_MS = [5, 10, 20, 40, 80, 160, 320, 360] as const;
 const STALE_LOCK_MS = 30_000;
+let lockPublicationId = 0;
 
 function pendingDeployPath(options: DeployQueueOptions = {}): string {
   return join(options.overdeckHome ?? getOverdeckHome(), 'pending-deploy.json');
@@ -87,27 +88,35 @@ async function removeStaleLock(lockPath: string): Promise<boolean> {
   return true;
 }
 
+async function publishQueueLock(lockPath: string): Promise<boolean> {
+  lockPublicationId += 1;
+  const tempPath = `${lockPath}.${process.pid}.${Date.now()}.${lockPublicationId}.tmp`;
+  await mkdir(tempPath);
+  try {
+    await writeFile(join(tempPath, 'owner.json'), JSON.stringify({
+      pid: process.pid,
+      acquiredAt: new Date().toISOString(),
+    }));
+    try {
+      await rename(tempPath, lockPath);
+      return true;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'EEXIST' || code === 'ENOTEMPTY') return false;
+      throw error;
+    }
+  } finally {
+    await rm(tempPath, { recursive: true, force: true });
+  }
+}
+
 async function acquireQueueLock(options: DeployQueueOptions): Promise<string> {
   const path = pendingDeployPath(options);
   const lockPath = pendingDeployLockPath(options);
   await mkdir(dirname(path), { recursive: true });
   for (let attempt = 0; attempt <= LOCK_RETRY_DELAYS_MS.length; attempt += 1) {
-    try {
-      await mkdir(lockPath);
-      try {
-        await writeFile(join(lockPath, 'owner.json'), JSON.stringify({
-          pid: process.pid,
-          acquiredAt: new Date().toISOString(),
-        }));
-      } catch (error) {
-        await rm(lockPath, { recursive: true, force: true });
-        throw error;
-      }
-      return lockPath;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      if (await removeStaleLock(lockPath)) continue;
-    }
+    if (await publishQueueLock(lockPath)) return lockPath;
+    if (await removeStaleLock(lockPath)) continue;
     const delay = LOCK_RETRY_DELAYS_MS[attempt];
     if (delay === undefined) break;
     await new Promise<void>((resolve) => setTimeout(resolve, delay));

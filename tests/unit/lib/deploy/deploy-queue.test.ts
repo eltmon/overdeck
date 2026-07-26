@@ -127,6 +127,18 @@ describe('deploy queue', () => {
     expect(existsSync(lockPath)).toBe(false);
   });
 
+  it('reclaims an ownerless lock left by a crash without waiting for the stale timeout', async () => {
+    const lockPath = join(home, 'pending-deploy.lock');
+    mkdirSync(lockPath);
+
+    await expect(recordDeployIntent({
+      requestedBy: 'agent-pan-3135',
+      reason: 'Verification is running',
+      blockedBy: ['PAN-10'],
+    }, { overdeckHome: home })).resolves.toMatchObject({ deferralCount: 1 });
+    expect(existsSync(lockPath)).toBe(false);
+  });
+
   it('returns null for invalid record shapes', async () => {
     writeFileSync(join(home, 'pending-deploy.json'), JSON.stringify({ requestedAt: 42 }));
 
