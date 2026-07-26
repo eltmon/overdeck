@@ -495,8 +495,8 @@ idempotent and the test stays green.
 
 `postMergeLifecycle()` in `merge-agent.ts` is a non-destructive merge handoff. After
 merge it marks the issue `verifying_on_main`, applies the `verifying-on-main` label,
-pauses the work/planning agents, preserves workspace/state/xBRIEF/branches, and stops
-Docker containers and networks.
+pauses the work/planning agents, preserves workspace/state/xBRIEF/branches, and removes
+the workspace Docker containers and `overdeck-feature-<issue>_devnet` network.
 
 Docker cleanup still happens at merge time because orphaned networks from merged
 workspaces accumulate and eventually block new workspace creation with "all predefined
@@ -506,9 +506,10 @@ networks. NEVER remove this cleanup step.
 The durable, verified teardown owner is **close-out**: `pan close <id>` / dashboard
 Close Out stops and removes the workspace Docker stack (including the
 `overdeck-feature-<issue>_devnet` network) and verifies the network is gone. The deacon's
-closed-issue reaper (`reapIssueResidue`) is the backstop that tears down any terminal
-issue's leaked stack by name. The single `rebuildWorkspaceStack` chokepoint no-ops for
-closed/merged issues, so patrols never recreate a terminal stack.
+reaper is the backstop: it runs full `reapIssueResidue` cleanup for tracker-closed issues
+and removes only leaked devnets for merged-but-not-closed issues. The single
+`rebuildWorkspaceStack` chokepoint no-ops for closed and merged issues, so patrols never
+recreate a terminal stack.
 
 The destructive/non-reversible completion steps are owned by close-out, not merge:
 `pan close <id>` / dashboard Close Out completes the xBRIEF, archives planning artifacts,
