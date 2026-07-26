@@ -75,7 +75,7 @@
     "recordedAt": "2026-07-26T06:45:11.935Z"
   },
   "created": "2026-07-26T02:29:08.179Z",
-  "updated": "2026-07-26T06:45:11.937Z",
+  "updated": "2026-07-26T06:45:12.714Z",
   "pipeline": {
     "issueId": "PAN-3097",
     "reviewStatus": "pending",
@@ -84,12 +84,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T06:15:08.316Z",
+    "updatedAt": "2026-07-26T06:45:12.712Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3102",
     "scopeDrift": {
-      "outsideDeclaredScope": [
-        "packages/contracts/src/composer-commands.generated.ts"
-      ],
+      "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
       "declaredScope": [
         "docs/ASKUSERQUESTION-DASHBOARD.md",
@@ -110,7 +108,6 @@
       ],
       "actualChangedFiles": [
         "docs/ASKUSERQUESTION-DASHBOARD.md",
-        "packages/contracts/src/composer-commands.generated.ts",
         "roles/plan.md",
         "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
         "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
@@ -126,8 +123,9 @@
         "src/lib/cloister/prompts/planning.md",
         "sync-sources/rules/ask-user-question-self-contained.md"
       ],
-      "recordedAt": "2026-07-26T03:36:45.308Z"
-    }
+      "recordedAt": "2026-07-26T06:45:11.935Z"
+    },
+    "reviewRequestedAt": "2026-07-26T06:45:12.712Z"
   },
   "closeOut": {
     "usage": {
