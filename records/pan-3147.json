@@ -45,17 +45,17 @@
     "recordedAt": "2026-07-26T17:50:09.960Z"
   },
   "created": "2026-07-26T17:26:24.283Z",
-  "updated": "2026-07-26T17:56:56.479Z",
+  "updated": "2026-07-26T17:57:04.151Z",
   "pipeline": {
     "issueId": "PAN-3147",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T17:53:11.161Z",
-    "updatedAt": "2026-07-26T17:56:02.769Z",
+    "updatedAt": "2026-07-26T17:57:04.130Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3149",
     "reviewSpawnedAt": "2026-07-26T17:53:44.034Z",
@@ -69,28 +69,6 @@
         "roles/flywheel.md"
       ],
       "recordedAt": "2026-07-26T17:50:09.960Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3147/.pan/review/agent-pan-3147-review-f43c24ef/security.md",
-        "atCommit": "f43c24ef38f9044256a187b58c3712d12d1694c2"
-      },
-      "correctness": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3147/.pan/review/agent-pan-3147-review-f43c24ef/correctness.md",
-        "atCommit": "f43c24ef38f9044256a187b58c3712d12d1694c2"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3147/.pan/review/agent-pan-3147-review-f43c24ef/performance.md",
-        "atCommit": "f43c24ef38f9044256a187b58c3712d12d1694c2"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3147/.pan/review/agent-pan-3147-review-f43c24ef/requirements.md",
-        "atCommit": "f43c24ef38f9044256a187b58c3712d12d1694c2"
-      }
     }
   },
   "closeOut": {
@@ -155,7 +133,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.788009,
-        "pricingAsOf": "2026-07-26T17:56:02.978Z"
+        "pricingAsOf": "2026-07-26T17:57:04.139Z"
       }
     },
     "merges": [
@@ -164,7 +142,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 2,
