@@ -296,10 +296,10 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T11:20:26.072Z",
+  "updated": "2026-07-26T11:22:59.947Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -307,8 +307,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:57:04.635Z",
-    "updatedAt": "2026-07-26T11:20:24.601Z",
-    "reviewNotes": "Poison-clear and post-clear verification failures escape as generic errors, so pre-delivery repair can be terminally acknowledged as failed without waking the agent.",
+    "updatedAt": "2026-07-26T11:22:59.879Z",
+    "reviewNotes": "The initial strict POISON read still throws a generic error, so one transient marker-read failure can be terminally recorded as failed before any wake is delivered.",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - tests/unit/lib/overdeck/no-loss-matrix.ts",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "1700fa490854ce01aef7b32625e0a6c56d11083a",
@@ -417,9 +417,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 31387474,
-            "output": 1266704,
-            "cacheRead": 176606208,
+            "input": 32760776,
+            "output": 1304813,
+            "cacheRead": 184260096,
             "cacheWrite": 0
           }
         },
@@ -448,9 +448,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 32861247,
-          "output": 1455825,
-          "cacheRead": 271934976,
+          "input": 34234549,
+          "output": 1493934,
+          "cacheRead": 279588864,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -461,8 +461,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 344.2992686,
-        "pricingAsOf": "2026-07-26T11:20:24.615Z"
+        "usd": 356.1359926,
+        "pricingAsOf": "2026-07-26T11:22:59.924Z"
       }
     },
     "merges": [
@@ -472,7 +472,7 @@
   },
   "workModel": "k3[1m]",
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "k3[1m]",
   "tasks": {
     "sequence": 20,
     "claims": {},
