@@ -285,16 +285,16 @@
     "recordedAt": "2026-07-26T16:47:46.685Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T16:47:56.277Z",
+  "updated": "2026-07-26T16:47:58.572Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T16:47:55.933Z",
+    "updatedAt": "2026-07-26T16:47:56.489Z",
     "reviewNotes": "[correctness] A failed verifying-on-main transition now strands the rest of post-merge lifecycle — `src/lib/cloister/merge-agent.ts:451`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "6054ba2e200db2755313b2cf82980134a04a0096",
@@ -427,7 +427,7 @@
       },
       "costAtCloseOut": {
         "usd": 344.616339,
-        "pricingAsOf": "2026-07-26T16:47:56.012Z"
+        "pricingAsOf": "2026-07-26T16:47:57.570Z"
       }
     },
     "merges": [
