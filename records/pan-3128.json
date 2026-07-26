@@ -228,18 +228,18 @@
     "recordedAt": "2026-07-26T18:09:43.613Z"
   },
   "created": "2026-07-26T12:24:12.648Z",
-  "updated": "2026-07-26T18:55:16.947Z",
+  "updated": "2026-07-26T20:04:22.274Z",
   "pipeline": {
     "issueId": "PAN-3128",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T18:38:50.655Z",
-    "updatedAt": "2026-07-26T18:55:16.874Z",
+    "updatedAt": "2026-07-26T20:04:21.639Z",
     "reviewNotes": "Canonical deployment review passed: timeout recovery preserves slow-boot deployments, other failures roll back safely, storage stays bounded, and provenance requirements are complete.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3141",
@@ -361,7 +361,7 @@
       },
       "costAtCloseOut": {
         "usd": 536.959724,
-        "pricingAsOf": "2026-07-26T18:55:16.928Z"
+        "pricingAsOf": "2026-07-26T20:04:22.107Z"
       }
     },
     "merges": [
