@@ -32,6 +32,7 @@ function issueIdFromAgentDir(entryName: string): string | null {
 }
 
 const execAsync = promisify(exec);
+const DEVNET_CLOSURE_CHECK_CONCURRENCY = 4;
 
 // Leaked `_devnet` networks are a residue source of their own: a closed issue
 // whose sessions, workspace, and agent dirs are already gone can still hold a
@@ -224,11 +225,15 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
   const devnetIssueIds = await listFeatureDevnetIssueIds();
   const openDevnetIssueIds: string[] = [];
   if (devnetIssueIds) {
-    for (const issueId of devnetIssueIds) {
-      if (await isClosedIssue(issueId, closedChecks)) {
-        await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
-      } else {
-        openDevnetIssueIds.push(issueId);
+    for (let offset = 0; offset < devnetIssueIds.length; offset += DEVNET_CLOSURE_CHECK_CONCURRENCY) {
+      const batch = devnetIssueIds.slice(offset, offset + DEVNET_CLOSURE_CHECK_CONCURRENCY);
+      const closureResults = await Promise.all(batch.map(async (issueId) => ({
+        issueId,
+        closed: await isClosedIssue(issueId, closedChecks),
+      })));
+      for (const { issueId, closed } of closureResults) {
+        if (closed) await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
+        else openDevnetIssueIds.push(issueId);
       }
     }
   }

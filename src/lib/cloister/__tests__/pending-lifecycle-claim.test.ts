@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -38,31 +45,56 @@ describe('pending lifecycle file claim', () => {
     expect(existsSync(claims[0]!.path)).toBe(false);
   });
 
-  it('restores a failed claim to the canonical pending path', async () => {
+  it('queues a failed claim for a later caller', async () => {
     const claim = await claimPendingLifecycleFile(pendingFile);
 
     await claim!.restore();
 
-    expect(readFileSync(pendingFile, 'utf-8')).toBe('{"issueId":"PAN-3138"}');
     expect(existsSync(claim!.path)).toBe(false);
+    expect(readdirSync(dir).filter((name) => name.includes('.queued-'))).toHaveLength(1);
+    const retried = await claimPendingLifecycleFile(pendingFile);
+    expect(retried?.raw).toBe('{"issueId":"PAN-3138"}');
+    await retried!.discard();
   });
 
-  it('does not overwrite a newer pending generation during restoration', async () => {
-    const claim = await claimPendingLifecycleFile(pendingFile);
+  it('preserves and claims both generations when a newer pending file exists', async () => {
+    const older = await claimPendingLifecycleFile(pendingFile);
     writeFileSync(pendingFile, '{"issueId":"PAN-3139"}');
 
-    await claim!.restore();
+    await older!.restore();
+    const newer = await claimPendingLifecycleFile(pendingFile);
+    const recoveredOlder = await claimPendingLifecycleFile(pendingFile);
 
-    expect(readFileSync(pendingFile, 'utf-8')).toBe('{"issueId":"PAN-3139"}');
-    expect(existsSync(claim!.path)).toBe(false);
+    expect(newer?.raw).toBe('{"issueId":"PAN-3139"}');
+    expect(recoveredOlder?.raw).toBe('{"issueId":"PAN-3138"}');
+    await expect(claimPendingLifecycleFile(pendingFile)).resolves.toBeNull();
+    await newer!.discard();
+    await recoveredOlder!.discard();
   });
 
-  it('restores after failure when canonical retry ownership is missing', async () => {
+  it('gives a dead-owner claim to exactly one recovery caller', async () => {
+    const abandonedPath = `${pendingFile}.claimed-2147483647-abandoned`;
+    renameSync(pendingFile, abandonedPath);
+
+    const [first, second] = await Promise.all([
+      claimPendingLifecycleFile(pendingFile),
+      claimPendingLifecycleFile(pendingFile),
+    ]);
+    const recovered = [first, second].filter((claim) => claim !== null);
+
+    expect(recovered).toHaveLength(1);
+    expect(recovered[0]?.raw).toBe('{"issueId":"PAN-3138"}');
+    expect(existsSync(abandonedPath)).toBe(false);
+    await recovered[0]!.discard();
+  });
+
+  it('queues after failure when canonical retry ownership is missing', async () => {
     const claim = await claimPendingLifecycleFile(pendingFile);
 
-    await expect(settlePendingLifecycleClaim(claim!, 'PAN-3138', false)).resolves.toBe('restored');
+    await expect(settlePendingLifecycleClaim(claim!, 'PAN-3138', false)).resolves.toBe('queued');
 
-    expect(existsSync(pendingFile)).toBe(true);
+    expect(existsSync(pendingFile)).toBe(false);
+    expect(readdirSync(dir).filter((name) => name.includes('.queued-'))).toHaveLength(1);
   });
 
   it('discards after failure when canonical status owns the retry', async () => {

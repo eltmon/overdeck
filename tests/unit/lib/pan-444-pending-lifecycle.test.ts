@@ -7,8 +7,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── fs/promises mock ──────────────────────────────────────────────────────────
 const mockReadFile = vi.hoisted(() => vi.fn<(path: string, enc: string) => Promise<string>>());
+const mockReaddir = vi.hoisted(() => vi.fn<(path: string) => Promise<string[]>>());
 const mockRename = vi.hoisted(() => vi.fn<(from: string, to: string) => Promise<void>>());
-const mockLink = vi.hoisted(() => vi.fn<(from: string, to: string) => Promise<void>>());
 const mockUnlink = vi.hoisted(() => vi.fn<(path: string) => Promise<void>>());
 const mockExistsSync = vi.hoisted(() => vi.fn<(path: string) => boolean>());
 const mockEmitDashboardLifecycleSync = vi.hoisted(() => vi.fn());
@@ -28,7 +28,7 @@ vi.mock('../../../src/lib/cloister/review-status-source.js', () => ({
 }));
 
 vi.mock('fs/promises', () => ({
-  link: mockLink,
+  readdir: mockReaddir,
   readFile: mockReadFile,
   rename: mockRename,
   unlink: mockUnlink,
@@ -75,11 +75,11 @@ describe('processPendingLifecycle', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     mockExistsSync.mockReturnValue(false);
+    mockReaddir.mockResolvedValue([]);
     mockRename.mockImplementation(async (from) => {
-      if (mockExistsSync(from)) return;
+      if (mockExistsSync(from) || from.includes('.claimed-')) return;
       throw Object.assign(new Error('missing'), { code: 'ENOENT' });
     });
-    mockLink.mockResolvedValue(undefined);
     mockUnlink.mockResolvedValue(undefined);
     mockResolveCanonicalReviewStatus.mockReturnValue({ available: true, status: null });
   });
@@ -303,9 +303,9 @@ describe('processPendingLifecycle', () => {
       issueId: data.issueId,
       error: 'lifecycle failed',
     }));
-    expect(mockLink).toHaveBeenCalledWith(
+    expect(mockRename).toHaveBeenCalledWith(
       expect.stringContaining(`${PENDING_FILE}.claimed-`),
-      PENDING_FILE,
+      expect.stringContaining(`${PENDING_FILE}.queued-`),
     );
 
     await processPendingLifecycle({
@@ -340,7 +340,10 @@ describe('processPendingLifecycle', () => {
     });
     await vi.runAllTimersAsync();
 
-    expect(mockLink).not.toHaveBeenCalled();
+    expect(mockRename).not.toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+      expect.stringContaining(`${PENDING_FILE}.queued-`),
+    );
     expect(mockUnlink).toHaveBeenCalledWith(
       expect.stringContaining(`${PENDING_FILE}.claimed-`),
     );

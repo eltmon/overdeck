@@ -274,6 +274,38 @@ describe('reconcileClosedIssueAgents', () => {
     rmSync(projectPath, { recursive: true, force: true });
   });
 
+  it('checks leaked devnet closure state with bounded concurrency', async () => {
+    mocks.exec.mockImplementation((command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
+      const cb = typeof opts === 'function' ? opts : callback;
+      const stdout = String(command).includes('docker network ls')
+        ? Array.from({ length: 6 }, (_, index) => `overdeck-feature-pan-${6000 + index}_devnet`).join('\n')
+        : '';
+      cb?.(null, { stdout, stderr: '' });
+      return { on: vi.fn() };
+    });
+    let active = 0;
+    let maxActive = 0;
+    const resolveChecks: Array<() => void> = [];
+    mocks.isIssueClosed.mockImplementation(() => new Promise<boolean>((resolve) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      resolveChecks.push(() => {
+        active -= 1;
+        resolve(false);
+      });
+    }));
+
+    const reconciliation = reconcileClosedIssueAgents();
+    await vi.waitFor(() => expect(mocks.isIssueClosed).toHaveBeenCalledTimes(4));
+    expect(maxActive).toBe(4);
+    resolveChecks.splice(0, 4).forEach((resolve) => resolve());
+    await vi.waitFor(() => expect(mocks.isIssueClosed).toHaveBeenCalledTimes(6));
+    resolveChecks.splice(0).forEach((resolve) => resolve());
+
+    await expect(reconciliation).resolves.toEqual([]);
+    expect(maxActive).toBe(4);
+  });
+
   it('queues merged Docker cleanup without blocking patrol or reaping non-Docker state', async () => {
     mocks.exec.mockImplementation((command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
       const cb = typeof opts === 'function' ? opts : callback;

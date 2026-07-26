@@ -508,13 +508,14 @@ Close Out stops and removes the workspace Docker stack (including the
 `overdeck-feature-<issue>_devnet` network) and verifies the network is gone. The deacon's
 reaper is the backstop: it runs full `reapIssueResidue` cleanup for tracker-closed issues
 and queues Docker-only teardown for merged-but-not-closed issues on a deduplicated serial
-worker with retry backoff. The worker revalidates canonical merged status before each
+worker with retry backoff. Tracker-backed devnet closure checks run in batches of four. The worker revalidates canonical merged status before each
 attempt, while a fresh merge-agent enqueue may use its just-verified merge for the first
 retry if status persistence lags. Durable `mergeStep: post-merge-cleanup` marks an incomplete
 handoff. Startup atomically claims the pending file and runs it in a supervised background
-promise, so dashboard boot continues while the claim remains owned. Failure restores the claim
-unless canonical status positively owns the retry; exclusive hard-link restoration cannot
-overwrite a newer pending generation. Issue IDs are validated at the route and lock boundaries,
+promise, so dashboard boot continues while the claim remains owned. Failure moves the claim to
+a discoverable queued generation unless canonical status positively owns the retry; a newer
+pending generation is never overwritten or discarded. Startup and patrol reclaim queued files
+and claims whose owner PID is dead. Issue IDs are validated at the route and lock boundaries,
 and the resolved lock path must remain inside the lifecycle lock directory. Completion records
 `mergeStep: merged`. Patrol reconciliation prunes Docker retries that are
 no longer eligible. The worker removes Compose
