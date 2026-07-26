@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T06:17:49.254Z",
-  "updated": "2026-07-26T10:57:42.229Z",
+  "updated": "2026-07-26T10:57:55.355Z",
   "pipeline": {
     "issueId": "PAN-3110",
     "reviewStatus": "pending",
@@ -67,8 +67,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "merge-recovery-docs": {
+        "writerId": "agent-pan-3110",
+        "agentId": "agent-pan-3110",
+        "pid": 2512751,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T10:57:55.355Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3110",
@@ -156,6 +164,7 @@
     "auto-merge-executor-requeue.auto-merge-executor-requeue.ac1": "completed",
     "auto-merge-executor-requeue.auto-merge-executor-requeue.ac2": "completed",
     "auto-merge-executor-requeue.auto-merge-executor-requeue.ac3": "completed",
-    "auto-merge-executor-requeue.auto-merge-executor-requeue.ac4": "completed"
+    "auto-merge-executor-requeue.auto-merge-executor-requeue.ac4": "completed",
+    "merge-recovery-docs": "running"
   }
 }
