@@ -133,6 +133,13 @@ describe('reloadCommand health-timeout recovery', () => {
     await fs.mkdir(join(deployRoot, 'dist', 'dashboard'), { recursive: true });
     await fs.mkdir(join(deployRoot, 'node_modules'), { recursive: true });
     await fs.writeFile(serverPath, 'canonical bundle');
+    // PAN-3172: reload now refuses a generation whose PTY supervisor cannot
+    // start there. This stand-in imports nothing the deployment lacks, so the
+    // gate passes and the health-timeout path under test still runs.
+    await fs.writeFile(
+      join(deployRoot, 'dist', 'pty-supervisor.js'),
+      'import { join } from "node:path";\nexport { join };\n',
+    );
 
     mocks.readPlatformConfigSync.mockReturnValue({
       dashboardPort,

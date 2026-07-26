@@ -17,6 +17,7 @@ import {
   readActiveDashboardBundleSync,
   writeActiveDashboardBundle,
 } from '../../lib/deploy/active-dashboard-bundle.js';
+import { supervisorDeploymentFailure } from '../../lib/channels/pty-supervisor-locate.js';
 import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-lock.js';
 import {
   leavesDashboardRunning,
@@ -177,6 +178,12 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
         if (deployedMtime <= 0) {
           throw new Error(`Build did not create ${deployment.serverPath}`);
         }
+        // A deployment that cannot run the PTY supervisor cannot spawn a
+        // conversation or a Claude Code agent, yet it serves HTTP happily — so
+        // the ordinary health check stays green while a core operator surface
+        // is dead (PAN-3172). Fail before any traffic moves onto it.
+        const supervisorFailure = supervisorDeploymentFailure(deployment.deployRoot);
+        if (supervisorFailure) throw new Error(supervisorFailure);
         await writeActiveDashboardBundle({ repoRoot, ...deployment });
         try {
           activation = await activateDashboardDeployment(repoRoot, deployment);
