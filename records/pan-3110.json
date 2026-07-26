@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T06:17:49.254Z",
-  "updated": "2026-07-26T10:12:44.852Z",
+  "updated": "2026-07-26T10:29:32.581Z",
   "pipeline": {
     "issueId": "PAN-3110",
     "reviewStatus": "pending",
@@ -49,18 +49,34 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "verdict-anchor-guard-on-spawn": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3110",
         "agentId": "agent-pan-3110",
         "pid": 526831,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T10:12:44.851Z"
+        "claimedAt": "2026-07-26T10:12:44.851Z",
+        "itemId": "verdict-anchor-guard-on-spawn",
+        "outcome": "completed",
+        "reason": "Preserved anchored review/test/verification verdicts across work-agent restarts, refreshed benign anchors, and added regression coverage",
+        "releasedAt": "2026-07-26T10:29:32.580Z"
+      }
+    ],
+    "statusReasons": {
+      "verdict-anchor-guard-on-spawn": {
+        "reason": "Preserved anchored review/test/verification verdicts across work-agent restarts, refreshed benign anchors, and added regression coverage",
+        "updatedAt": "2026-07-26T10:29:32.580Z"
       }
     }
   },
   "statusOverrides": {
-    "verdict-anchor-guard-on-spawn": "running"
+    "verdict-anchor-guard-on-spawn": "completed",
+    "verdict-anchor-guard-on-spawn.verdict-anchor-guard-on-spawn.ac1": "completed",
+    "verdict-anchor-guard-on-spawn.verdict-anchor-guard-on-spawn.ac2": "completed",
+    "verdict-anchor-guard-on-spawn.verdict-anchor-guard-on-spawn.ac3": "completed",
+    "verdict-anchor-guard-on-spawn.verdict-anchor-guard-on-spawn.ac4": "completed",
+    "verdict-anchor-guard-on-spawn.verdict-anchor-guard-on-spawn.ac5": "completed"
   }
 }
