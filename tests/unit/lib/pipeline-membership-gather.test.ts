@@ -16,6 +16,7 @@ import {
   listIssueStatesBatched,
   listMergedPullRequestHeadsBatched,
   PipelineMembershipUnavailableError,
+  resolveRepositoryDefaultBranch,
   snapshotBranchRefs,
   type PipelineMembershipGatherDeps,
 } from '../../../src/lib/pipeline-membership-gather.js';
@@ -88,6 +89,28 @@ describe('pipeline membership unavailability contract', () => {
   });
 });
 
+describe('resolveRepositoryDefaultBranch', () => {
+  it('returns a verifiable configured branch without probing fallbacks', async () => {
+    const run = vi.fn().mockImplementation(async (_command: string, args: string[]) => {
+      if (args.at(-1) === 'refs/heads/main') return 'aaa\n';
+      throw new Error(`Unexpected command: ${args.join(' ')}`);
+    });
+
+    await expect(resolveRepositoryDefaultBranch('/repo', 'main', run)).resolves.toBe('main');
+    expect(run).toHaveBeenCalledOnce();
+    expect(run).not.toHaveBeenCalledWith('git', expect.arrayContaining(['symbolic-ref']), '/repo');
+  });
+
+  it('throws typed default_branch_unresolved when no repository refs verify', async () => {
+    const run = vi.fn().mockRejectedValue(new Error('unknown revision'));
+
+    await expect(resolveRepositoryDefaultBranch('/repo', 'develop', run)).rejects.toMatchObject({
+      reason: 'default_branch_unresolved',
+      message: expect.stringMatching(/\/repo.*develop/),
+    });
+  });
+});
+
 describe('snapshotBranchRefs', () => {
   const refPatterns = ['refs/heads/feature/*'];
 
@@ -109,6 +132,24 @@ describe('snapshotBranchRefs', () => {
       message: expect.stringContaining('/expected/repo'),
     });
     expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the current HEAD when the configured branch is unverifiable', async () => {
+    const run = vi.fn().mockImplementation(async (_command: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') return '/master-only\n';
+      if (args[0] === 'rev-parse') throw new Error('unknown revision');
+      if (args[0] === 'symbolic-ref' && args.at(-1) === 'refs/remotes/origin/HEAD') {
+        throw new Error('missing origin HEAD');
+      }
+      if (args[0] === 'symbolic-ref' && args.at(-1) === 'HEAD') return 'master\n';
+      if (args[0] === 'rev-list') return 'aaa\n';
+      return '';
+    });
+
+    await snapshotBranchRefs('/master-only', 'main', refPatterns, run);
+
+    expect(run).toHaveBeenCalledWith('git', ['rev-list', '--first-parent', 'master'], '/master-only');
+    expect(run).toHaveBeenCalledWith('git', expect.arrayContaining(['--no-merged=master']), '/master-only');
   });
 
   it('gathers branch refs after the configured path matches the git toplevel', async () => {
@@ -509,7 +550,7 @@ describe('gatherProjectLensSignals', () => {
     expect(mocked.listOpenPullRequests).not.toHaveBeenCalled();
     expect(mocked.listMergedPullRequestHeads).not.toHaveBeenCalled();
     expect(mocked.listIssueStates).not.toHaveBeenCalled();
-    expect(mocked.run).toHaveBeenCalledTimes(8);
+    expect(mocked.run).toHaveBeenCalledTimes(10);
   });
 
   it('rejects GitHub projects without an issue prefix', async () => {

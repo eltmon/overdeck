@@ -323,6 +323,51 @@ async function normalizeRepoPath(path: string): Promise<string> {
   return realpath(path).catch(() => resolve(path));
 }
 
+async function hasGitRef(
+  repoPath: string,
+  branch: string,
+  run: PipelineMembershipGatherDeps['run'],
+): Promise<boolean> {
+  const ref = branch.startsWith('origin/')
+    ? `refs/remotes/${branch}`
+    : `refs/heads/${branch}`;
+  try {
+    await run('git', ['rev-parse', '--verify', '--quiet', ref], repoPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function resolveRepositoryDefaultBranch(
+  repoPath: string,
+  configured: string | undefined,
+  run: PipelineMembershipGatherDeps['run'] = defaultDeps.run,
+): Promise<string> {
+  if (configured) {
+    if (await hasGitRef(repoPath, configured, run)) return configured;
+    if (await hasGitRef(repoPath, `origin/${configured}`, run)) return `origin/${configured}`;
+  }
+
+  for (const ref of ['refs/remotes/origin/HEAD', 'HEAD']) {
+    try {
+      const branch = (await run('git', ['symbolic-ref', '--quiet', '--short', ref], repoPath)).trim();
+      if (branch) return branch;
+    } catch {
+      // Continue to the next source of repository truth.
+    }
+  }
+
+  for (const branch of ['main', 'master', 'origin/main', 'origin/master']) {
+    if (await hasGitRef(repoPath, branch, run)) return branch;
+  }
+
+  throw new PipelineMembershipUnavailableError(
+    'default_branch_unresolved',
+    `Could not resolve default branch for repository ${repoPath} (configured: ${configured ?? 'none'})`,
+  );
+}
+
 export async function snapshotBranchRefs(
   repoPath: string,
   defaultBranch: string,
@@ -347,10 +392,11 @@ export async function snapshotBranchRefs(
   ]);
   if (normalizedRepoPath !== normalizedGitTopLevel) throw unavailable();
 
+  const resolvedDefaultBranch = await resolveRepositoryDefaultBranch(repoPath, defaultBranch, run);
   const [refs, unmergedRefs, firstParentShas] = await Promise.all([
     run('git', ['for-each-ref', '--format=%(objectname) %(refname:short)', ...refPatterns], repoPath),
     run('git', [
-      'for-each-ref', `--no-merged=${defaultBranch}`,
+      'for-each-ref', `--no-merged=${resolvedDefaultBranch}`,
       '--format=%(refname:short)',
       ...refPatterns,
     ], repoPath),
@@ -358,7 +404,7 @@ export async function snapshotBranchRefs(
     // tip is ON this line has zero unique commits (fresh pointer, not landed
     // work); a contained tip OFF this line arrived via a merge — positive
     // non-PR merge evidence.
-    run('git', ['rev-list', '--first-parent', defaultBranch], repoPath),
+    run('git', ['rev-list', '--first-parent', resolvedDefaultBranch], repoPath),
   ]);
   return { refs, unmergedRefs, firstParentShas };
 }
