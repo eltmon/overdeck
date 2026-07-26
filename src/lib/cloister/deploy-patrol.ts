@@ -7,6 +7,7 @@ import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.j
 import { getBuildInfo } from '../deploy/build-info.js';
 import {
   clearPendingDeploy,
+  markPendingDeployEscalated,
   readPendingDeploy,
   recordDeployIntent,
   type PendingDeploy,
@@ -15,6 +16,7 @@ import { getDeployBlockReason, listVerifyingIssues } from '../deploy/deploy-wind
 import { computeBuildStaleness, type BuildStaleness } from '../deploy/staleness.js';
 import { OVERDECK_HOME } from '../paths.js';
 import { loadCloisterConfigSync, type DeployConfig } from './config.js';
+import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 
 const OBSERVATION_INTERVAL_MS = 30 * 60 * 1000;
 const DEPLOY_SPAWN_COOLDOWN_MS = 10 * 60 * 1000;
@@ -67,7 +69,9 @@ export interface DeployPatrolContext {
   readonly readQueue?: () => PendingDeploy | null;
   readonly clearQueue?: () => void;
   readonly recordIntent?: typeof recordDeployIntent;
+  readonly markQueueEscalated?: () => void;
   readonly listVerifyingIssues?: () => string[];
+  readonly recordNeedsYou?: typeof recordDeadEndNeedsYou;
   readonly spawnReload?: (request: ReloadRequest) => Promise<void>;
   readonly emitEntry?: EmitEntry;
   readonly emitTts?: EmitTts;
@@ -341,12 +345,41 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
   const blockReason = await (context.getBlockReason ?? getDeployBlockReason)();
   if (blockReason) {
     emitDeferral(blockReason, now, emitEntry);
+    const verifyingIssues = (context.listVerifyingIssues ?? listVerifyingIssues)();
     if (context.config.auto_deploy) {
       (context.recordIntent ?? recordDeployIntent)({
         requestedBy: DEPLOY_PATROL_INITIATOR,
         reason: blockReason,
-        blockedBy: (context.listVerifyingIssues ?? listVerifyingIssues)(),
+        blockedBy: verifyingIssues,
       });
+    }
+    if (
+      queuedDeploy
+      && !queuedDeploy.escalated
+      && now - Date.parse(queuedDeploy.requestedAt) > context.config.queue_deadline_minutes * 60_000
+    ) {
+      const ageMinutes = Math.floor((now - Date.parse(queuedDeploy.requestedAt)) / 60_000);
+      const blockers = queuedDeploy.blockedBy.length > 0 ? queuedDeploy.blockedBy.join(', ') : 'none';
+      const message = `Queued dashboard deploy has waited ${ageMinutes} minutes; current block: ${blockReason} Distinct verification blockers: ${blockers}.`;
+      emitEntry({ source: 'deploy-script', level: 'error', message });
+      emitTts({
+        utterance: `Dashboard deploy has been queued for ${ageMinutes} minutes and needs attention.`,
+        priority: 1,
+        source: 'deploy-script',
+        eventType: 'deploy_queue_stuck',
+      });
+      try {
+        if (verifyingIssues[0]) {
+          await (context.recordNeedsYou ?? recordDeadEndNeedsYou)(
+            verifyingIssues[0],
+            'deploy-queue',
+            queuedDeploy.requestedAt,
+            message,
+          );
+        }
+      } finally {
+        (context.markQueueEscalated ?? markPendingDeployEscalated)();
+      }
     }
     return;
   }

@@ -50,7 +50,9 @@ function context(staleness: BuildStaleness = stale()) {
     readQueue: vi.fn(() => null as PendingDeploy | null),
     clearQueue: vi.fn(),
     recordIntent: vi.fn(() => queuedDeploy()),
+    markQueueEscalated: vi.fn(),
     listVerifyingIssues: vi.fn((): string[] => []),
+    recordNeedsYou: vi.fn(async () => undefined as string | undefined),
     spawnReload: vi.fn(async () => undefined),
     emitEntry: vi.fn(),
     emitTts: vi.fn(),
@@ -170,6 +172,73 @@ describe('runDeployPatrol', () => {
 
     expect(ctx.spawnReload).not.toHaveBeenCalled();
     expect(ctx.clearQueue).not.toHaveBeenCalled();
+  });
+
+  it('escalates one long-queued deploy and persists the escalated flag', async () => {
+    const ctx = context();
+    let queue = queuedDeploy({ requestedAt: '2026-07-15T11:29:00.000Z' });
+    ctx.readQueue.mockImplementation(() => queue);
+    ctx.getBlockReason.mockResolvedValue('Deployment deferred because verification is in flight for PAN-10.');
+    ctx.listVerifyingIssues.mockReturnValue(['PAN-10']);
+    ctx.markQueueEscalated.mockImplementation(() => {
+      queue = { ...queue, escalated: true };
+    });
+
+    await runDeployPatrol(ctx);
+    await runDeployPatrol(ctx);
+
+    expect(ctx.emitEntry.mock.calls.filter(([entry]) => entry.level === 'error')).toEqual([[
+      expect.objectContaining({
+        source: 'deploy-script',
+        message: expect.stringContaining('waited 31 minutes'),
+      }),
+    ]]);
+    expect(ctx.emitEntry).toHaveBeenCalledWith(expect.objectContaining({
+      level: 'error',
+      message: expect.stringContaining('Distinct verification blockers: PAN-10'),
+    }));
+    expect(ctx.emitTts).toHaveBeenCalledTimes(1);
+    expect(ctx.emitTts).toHaveBeenCalledWith(expect.objectContaining({
+      priority: 1,
+      eventType: 'deploy_queue_stuck',
+    }));
+    expect(ctx.recordNeedsYou).toHaveBeenCalledOnce();
+    expect(ctx.recordNeedsYou).toHaveBeenCalledWith(
+      'PAN-10',
+      'deploy-queue',
+      '2026-07-15T11:29:00.000Z',
+      expect.stringContaining('current block'),
+    );
+    expect(ctx.markQueueEscalated).toHaveBeenCalledOnce();
+    expect(queue.escalated).toBe(true);
+  });
+
+  it('does not escalate a queued deploy before its deadline', async () => {
+    const ctx = context();
+    ctx.readQueue.mockReturnValue(queuedDeploy({ requestedAt: '2026-07-15T11:31:00.000Z' }));
+    ctx.getBlockReason.mockResolvedValue('Deployment deferred because verification is in flight for PAN-10.');
+    ctx.listVerifyingIssues.mockReturnValue(['PAN-10']);
+
+    await runDeployPatrol(ctx);
+
+    expect(ctx.emitEntry.mock.calls.some(([entry]) => entry.level === 'error')).toBe(false);
+    expect(ctx.emitTts).not.toHaveBeenCalled();
+    expect(ctx.recordNeedsYou).not.toHaveBeenCalled();
+    expect(ctx.markQueueEscalated).not.toHaveBeenCalled();
+  });
+
+  it('does not escalate a long-queued deploy when the gate is clear', async () => {
+    const ctx = context();
+    ctx.readQueue.mockReturnValue(queuedDeploy({ requestedAt: '2026-07-15T11:00:00.000Z' }));
+
+    await runDeployPatrol(ctx);
+
+    expect(ctx.spawnReload).toHaveBeenCalledOnce();
+    expect(ctx.emitEntry.mock.calls.some(([entry]) => entry.level === 'error')).toBe(false);
+    expect(ctx.emitTts).toHaveBeenCalledTimes(1);
+    expect(ctx.emitTts).not.toHaveBeenCalledWith(expect.objectContaining({ priority: 1 }));
+    expect(ctx.recordNeedsYou).not.toHaveBeenCalled();
+    expect(ctx.markQueueEscalated).not.toHaveBeenCalled();
   });
 
   it('keeps a queued deploy pending until CI is green', async () => {
