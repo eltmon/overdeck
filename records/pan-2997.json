@@ -209,15 +209,7 @@
       "timestamp": "2026-07-26T11:23:00.467Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-26T11:23:00Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nThe initial strict POISON read still throws a generic error, so one transient marker-read failure can be terminally recorded as failed before any wake is delivered.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/event-store.ts",
@@ -309,10 +301,10 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T11:29:58.704Z",
+  "updated": "2026-07-26T11:30:00.657Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -320,11 +312,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T10:57:04.635Z",
-    "updatedAt": "2026-07-26T11:29:58.684Z",
+    "updatedAt": "2026-07-26T11:29:59.297Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed the cycle-14 blocker and the sync conflict: every clearPoisonVerified failure (clear command, post-clear verification read, surviving breadcrumb) is now KeyedMarkerVerificationError with the cause preserved — a repair that stops before any delivery keeps the outbox pending instead of recording terminal 'failed' (local + remote repair-time tests, recovery-on-retry proven). Also resolved the no-loss-matrix merge conflict (kept the accurate pane-choice door) and deflaked the real-tmux test setup against stale socket files.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "4cdeddfe137f2baf82a463230ca972820e69ac68",
-    "reviewSpawnedAt": "2026-07-26T11:20:24.600Z",
+    "reviewSpawnedAt": "2026-07-26T11:29:59.296Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/server/event-store.ts",
@@ -474,7 +466,7 @@
       },
       "costAtCloseOut": {
         "usd": 357.0030766,
-        "pricingAsOf": "2026-07-26T11:29:58.700Z"
+        "pricingAsOf": "2026-07-26T11:29:59.735Z"
       }
     },
     "merges": [
