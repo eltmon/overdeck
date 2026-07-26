@@ -32,9 +32,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T23:11:03.722Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T23:20Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T23:20:54.643Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T23:20:54Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3162\n\nReviewed fix commit is absent from PR #3170; mixed forge errors can still persist partial merge-set writes\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3162 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts",
@@ -83,7 +96,7 @@
     "recordedAt": "2026-07-26T22:02:33.712Z"
   },
   "created": "2026-07-26T20:52:58.018Z",
-  "updated": "2026-07-26T23:20:54.045Z",
+  "updated": "2026-07-26T23:20:54.643Z",
   "pipeline": {
     "issueId": "PAN-3162",
     "reviewStatus": "blocked",
