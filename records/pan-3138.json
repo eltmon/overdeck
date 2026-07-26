@@ -288,16 +288,16 @@
     "recordedAt": "2026-07-26T16:47:46.685Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T16:47:46.687Z",
+  "updated": "2026-07-26T16:47:47.444Z",
   "pipeline": {
     "issueId": "PAN-3138",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T16:45:19.394Z",
+    "updatedAt": "2026-07-26T16:47:47.444Z",
     "reviewNotes": "[correctness] A failed verifying-on-main transition now strands the rest of post-merge lifecycle — `src/lib/cloister/merge-agent.ts:451`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "6054ba2e200db2755313b2cf82980134a04a0096",
@@ -305,11 +305,23 @@
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
+        "src/dashboard/server/pending-lifecycle.ts",
         "src/lib/cloister/__tests__/merged-docker-cleanup-worker.test.ts",
+        "src/lib/cloister/deacon-merge.ts",
+        "src/lib/cloister/deacon.ts",
         "src/lib/cloister/merged-docker-cleanup-worker.ts",
         "src/lib/cloister/review-status-source.ts",
+        "src/lib/overdeck/__tests__/review-status-record-sync.test.ts",
+        "src/lib/overdeck/review-status-record-sync.ts",
+        "src/lib/pan-dir/__tests__/records.test.ts",
+        "src/lib/pan-dir/record.ts",
+        "src/lib/pan-dir/records.ts",
+        "src/lib/pan-dir/verdict-restore.ts",
         "src/lib/review-status-read.ts",
         "src/lib/review-status.ts",
+        "tests/unit/lib/cloister/deacon-merge.test.ts",
+        "tests/unit/lib/pan-444-pending-lifecycle.test.ts",
+        "tests/unit/lib/pan-444-post-merge-step0.test.ts",
         "tests/unit/lib/review-status.test.ts"
       ],
       "declaredScopeUntouched": [],
@@ -327,20 +339,32 @@
         "CLAUDE.md",
         "docs/WORKSPACE-CONTAINERS.md",
         "scripts/file-size-baseline.txt",
+        "src/dashboard/server/pending-lifecycle.ts",
         "src/lib/cloister/__tests__/closed-issue-reaper.test.ts",
         "src/lib/cloister/__tests__/merged-docker-cleanup-worker.test.ts",
         "src/lib/cloister/closed-issue-reaper.ts",
+        "src/lib/cloister/deacon-merge.ts",
+        "src/lib/cloister/deacon.ts",
         "src/lib/cloister/merge-agent.ts",
         "src/lib/cloister/merged-docker-cleanup-worker.ts",
         "src/lib/cloister/review-status-source.ts",
+        "src/lib/overdeck/__tests__/review-status-record-sync.test.ts",
+        "src/lib/overdeck/review-status-record-sync.ts",
+        "src/lib/pan-dir/__tests__/records.test.ts",
+        "src/lib/pan-dir/record.ts",
+        "src/lib/pan-dir/records.ts",
+        "src/lib/pan-dir/verdict-restore.ts",
         "src/lib/review-status-read.ts",
         "src/lib/review-status.ts",
         "src/lib/workspace/__tests__/rebuild-stack.test.ts",
         "src/lib/workspace/rebuild-stack.ts",
+        "tests/unit/lib/cloister/deacon-merge.test.ts",
         "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
+        "tests/unit/lib/pan-444-pending-lifecycle.test.ts",
+        "tests/unit/lib/pan-444-post-merge-step0.test.ts",
         "tests/unit/lib/review-status.test.ts"
       ],
-      "recordedAt": "2026-07-26T16:03:54.970Z"
+      "recordedAt": "2026-07-26T16:47:46.685Z"
     },
     "reviewerVerdicts": {
       "security": {
@@ -363,7 +387,8 @@
         "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3138/.pan/review/agent-pan-3138-review-6054ba2e/requirements.md",
         "atCommit": "6054ba2e200db2755313b2cf82980134a04a0096"
       }
-    }
+    },
+    "reviewRequestedAt": "2026-07-26T16:47:47.444Z"
   },
   "closeOut": {
     "usage": {
