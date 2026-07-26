@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-26T17:59:50.911Z",
-  "updated": "2026-07-26T19:15:37.409Z",
+  "updated": "2026-07-26T19:15:39.441Z",
   "pipeline": {
     "issueId": "PAN-3150",
     "reviewStatus": "pending",
@@ -12,20 +12,13 @@
     "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T19:15:36.434Z",
+    "updatedAt": "2026-07-26T19:15:36.442Z",
     "mergeNotes": "GitHub PR #3153 is CONFLICTING with main. Resolve conflicts before merging — see https://github.com/eltmon/overdeck/pull/3153.",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main",
-        "detectedAt": "2026-07-26T19:15:36.433Z"
-      }
-    ],
     "lastVerifiedCommit": "1d3e1f8ecfa15cf674c294c2af999d1aee1c5897",
     "strikeReadyHead": "1d3e1f8ecfa15cf674c294c2af999d1aee1c5897",
     "strikeReadyAt": "2026-07-26T18:43:10.656Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
     "strikeTransportRetryCount": 1,
     "strikeNextAttemptAt": "2026-07-26T18:53:20.543Z",
     "strikeLandingAttempts": [
@@ -35,6 +28,13 @@
         "mainHead": "6409d5ea9304dcf9a31cae03fad4bfd165e29c53",
         "outcome": "transport-failed",
         "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-07-26T19:15:36.439Z",
+        "strikeHead": "1d3e1f8ecfa15cf674c294c2af999d1aee1c5897",
+        "mainHead": "6ac4a3dc11d35931934da26f74dbd9105882ca2e",
+        "outcome": "failed",
+        "detail": "GitHub PR #3153 is CONFLICTING with main. Resolve conflicts before merging — see https://github.com/eltmon/overdeck/pull/3153."
       }
     ]
   },
@@ -44,7 +44,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-26T19:15:36.448Z"
+        "pricingAsOf": "2026-07-26T19:15:39.401Z"
       }
     },
     "merges": [],
