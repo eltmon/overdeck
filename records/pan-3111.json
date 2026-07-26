@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-26T12:58:59.140Z",
+  "updated": "2026-07-26T13:06:13.552Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "pending",
@@ -43,18 +43,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "pickup-gate-predicate": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3111",
         "agentId": "agent-pan-3111",
         "pid": 1485496,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-26T12:58:59.140Z"
+        "claimedAt": "2026-07-26T12:58:59.140Z",
+        "itemId": "pickup-gate-predicate",
+        "outcome": "completed",
+        "reason": "Added the fail-closed autonomous work dispatch predicate, gathered release inputs through canonical sources, and covered the full decision matrix plus unavailable-source fallbacks.",
+        "releasedAt": "2026-07-26T13:06:13.551Z"
+      }
+    ],
+    "statusReasons": {
+      "pickup-gate-predicate": {
+        "reason": "Added the fail-closed autonomous work dispatch predicate, gathered release inputs through canonical sources, and covered the full decision matrix plus unavailable-source fallbacks.",
+        "updatedAt": "2026-07-26T13:06:13.551Z"
       }
     }
   },
   "statusOverrides": {
-    "pickup-gate-predicate": "running"
+    "pickup-gate-predicate": "completed",
+    "pickup-gate-predicate.pickup-gate-predicate.ac1": "completed",
+    "pickup-gate-predicate.pickup-gate-predicate.ac2": "completed",
+    "pickup-gate-predicate.pickup-gate-predicate.ac3": "completed"
   }
 }
