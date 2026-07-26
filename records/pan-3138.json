@@ -101,16 +101,16 @@
     "recordedAt": "2026-07-26T15:34:06.412Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T15:34:15.928Z",
+  "updated": "2026-07-26T15:34:18.327Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T15:34:15.847Z",
+    "updatedAt": "2026-07-26T15:34:16.413Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-3138-review already running. Use 'pan tell' to message it.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3143",
     "lastVerifiedCommit": "ad37787c2c81d40ae7e7365f0704b913ba266986",
@@ -218,7 +218,7 @@
       },
       "costAtCloseOut": {
         "usd": 146.633219,
-        "pricingAsOf": "2026-07-26T15:34:15.910Z"
+        "pricingAsOf": "2026-07-26T15:34:18.066Z"
       }
     },
     "merges": [
