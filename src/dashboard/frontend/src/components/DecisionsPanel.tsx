@@ -16,6 +16,7 @@ import { useDecisions, type Decision } from '../lib/useDecisions';
 import { describePendingInput } from '../lib/pendingInput';
 import { AwaitingInputIndicator } from './AwaitingInputIndicator';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
+import { formatIssueRef } from '../lib/issueLabel';
 import { useNow } from '../hooks/useNow';
 import styles from './styles/decisions.module.css';
 
@@ -25,6 +26,7 @@ function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSu
   const prompt =
     decision.pendingAskUserQuestion?.questions?.[0]?.question ??
     (decision.pendingProposedPlan ? 'A plan is ready for your review.' : describePendingInput(decision.kinds));
+  const issueRef = formatIssueRef(decision.issueId, decision.issueTitle);
 
   return (
     <div
@@ -38,6 +40,9 @@ function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSu
             {describePendingInput(decision.kinds)}
           </span>
           <span className={styles.subject}>{decision.label}</span>
+          {decision.source === 'conversation' && issueRef && (
+            <span className={styles.subject}>{issueRef}</span>
+          )}
           {decision.source === 'conversation' && <span className={styles.chip}>Conversation</span>}
         </div>
         <p className={styles.prompt}>{prompt}</p>

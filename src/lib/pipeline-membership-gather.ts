@@ -276,12 +276,24 @@ function issueIdFromRef(ref: string, issuePrefix: string): string | null {
   return issueId?.startsWith(`${issuePrefix}-`) ? issueId : null;
 }
 
-interface ProjectRepository {
+export interface ProjectRepository {
   path: string;
   defaultBranch: string;
 }
 
-function projectRepositories(project: ProjectConfig): ProjectRepository[] {
+export interface IssueBranchContainment {
+  unmergedRefs: string[];
+  mergedWorkRefs: string[];
+  pointerRefs: string[];
+}
+
+export interface BranchRefSnapshot {
+  refs: string;
+  unmergedRefs: string;
+  firstParentShas: string;
+}
+
+export function projectRepositories(project: ProjectConfig): ProjectRepository[] {
   if (!project.workspace?.repos?.length) {
     return [{
       path: project.path,
@@ -293,6 +305,90 @@ function projectRepositories(project: ProjectConfig): ProjectRepository[] {
     path: join(project.path, repo.path),
     defaultBranch: repo.default_branch ?? project.workspace?.default_branch ?? 'main',
   }));
+}
+
+export async function snapshotBranchRefs(
+  repoPath: string,
+  defaultBranch: string,
+  refPatterns: string[],
+  run: PipelineMembershipGatherDeps['run'] = defaultDeps.run,
+): Promise<BranchRefSnapshot> {
+  const [refs, unmergedRefs, firstParentShas] = await Promise.all([
+    run('git', ['for-each-ref', '--format=%(objectname) %(refname:short)', ...refPatterns], repoPath),
+    run('git', [
+      'for-each-ref', `--no-merged=${defaultBranch}`,
+      '--format=%(refname:short)',
+      ...refPatterns,
+    ], repoPath),
+    // L2-work (PAN-2887): main's first-parent line. A contained branch whose
+    // tip is ON this line has zero unique commits (fresh pointer, not landed
+    // work); a contained tip OFF this line arrived via a merge — positive
+    // non-PR merge evidence.
+    run('git', ['rev-list', '--first-parent', defaultBranch], repoPath),
+  ]);
+  return { refs, unmergedRefs, firstParentShas };
+}
+
+function parseBranchRefLine(line: string): { tipSha: string | null; ref: string } {
+  // "<objectname> <refname:short>"; tolerate refname-only lines (legacy fixtures).
+  const spaceIdx = line.indexOf(' ');
+  return {
+    tipSha: spaceIdx === -1 ? null : line.slice(0, spaceIdx),
+    ref: spaceIdx === -1 ? line : line.slice(spaceIdx + 1),
+  };
+}
+
+export function classifyBranchRefLine(
+  line: string,
+  unmergedSet: Set<string>,
+  firstParentShas: Set<string>,
+): 'unmerged' | 'merged-work' | 'pointer' {
+  const { tipSha, ref } = parseBranchRefLine(line);
+  if (unmergedSet.has(ref)) return 'unmerged';
+  if (tipSha && !firstParentShas.has(tipSha)) return 'merged-work';
+  return 'pointer';
+}
+
+export async function gatherIssueBranchContainment(
+  project: ProjectConfig,
+  issueId: string,
+  run: PipelineMembershipGatherDeps['run'] = defaultDeps.run,
+): Promise<IssueBranchContainment> {
+  const normalizedIssueId = issueId.toLowerCase();
+  const refPatterns = [
+    `refs/heads/feature/${normalizedIssueId}`,
+    `refs/remotes/origin/feature/${normalizedIssueId}`,
+    `refs/heads/strike/${normalizedIssueId}`,
+    `refs/remotes/origin/strike/${normalizedIssueId}`,
+  ];
+  const snapshots = await Promise.all(projectRepositories(project).map(async (repository) => ({
+    repository,
+    snapshot: await snapshotBranchRefs(repository.path, repository.defaultBranch, refPatterns, run),
+  })));
+  const result: IssueBranchContainment = { unmergedRefs: [], mergedWorkRefs: [], pointerRefs: [] };
+
+  for (const { repository, snapshot } of snapshots) {
+    const unmergedSet = new Set(snapshot.unmergedRefs.split('\n').map((ref) => ref.trim()).filter(Boolean));
+    const firstParentShas = new Set(snapshot.firstParentShas.split('\n').map((sha) => sha.trim()).filter(Boolean));
+    const refLines = snapshot.refs.split('\n').map((line) => line.trim()).filter(Boolean);
+    for (const line of refLines) {
+      const { ref } = parseBranchRefLine(line);
+      const qualifiedRef = `${repository.path}:${ref}`;
+      switch (classifyBranchRefLine(line, unmergedSet, firstParentShas)) {
+        case 'unmerged':
+          result.unmergedRefs.push(qualifiedRef);
+          break;
+        case 'merged-work':
+          result.mergedWorkRefs.push(qualifiedRef);
+          break;
+        case 'pointer':
+          result.pointerRefs.push(qualifiedRef);
+          break;
+      }
+    }
+  }
+
+  return result;
 }
 
 /** Gather all durable pipeline lenses for one project in batches. */
@@ -311,27 +407,12 @@ export async function gatherProjectLensSignals(
   }
 
   const repositories = projectRepositories(project);
-  const branchSnapshots = repositories.map(async (repository) => {
-    const [refs, unmergedRefs, firstParentShas] = await Promise.all([
-      deps.run('git', [
-        'for-each-ref', '--format=%(objectname) %(refname:short)',
-        'refs/heads/feature/*', 'refs/remotes/origin/feature/*',
-        'refs/heads/strike/*', 'refs/remotes/origin/strike/*',
-      ], repository.path),
-      deps.run('git', [
-        'for-each-ref', `--no-merged=${repository.defaultBranch}`,
-        '--format=%(refname:short)',
-        'refs/heads/feature/*', 'refs/remotes/origin/feature/*',
-        'refs/heads/strike/*', 'refs/remotes/origin/strike/*',
-      ], repository.path),
-      // L2-work (PAN-2887): main's first-parent line. A contained branch whose
-      // tip is ON this line has zero unique commits (fresh pointer, not landed
-      // work); a contained tip OFF this line arrived via a merge — positive
-      // non-PR merge evidence.
-      deps.run('git', ['rev-list', '--first-parent', repository.defaultBranch], repository.path),
-    ]);
-    return { refs, unmergedRefs, firstParentShas };
-  });
+  const branchRefPatterns = [
+    'refs/heads/feature/*', 'refs/remotes/origin/feature/*',
+    'refs/heads/strike/*', 'refs/remotes/origin/strike/*',
+  ];
+  const branchSnapshots = repositories.map((repository) =>
+    snapshotBranchRefs(repository.path, repository.defaultBranch, branchRefPatterns, deps.run));
 
   const [trackerIssues, openIssues, phaseLabeledIssues, openPrs, branches, specIssueIds] = await Promise.all([
     project.github_repo ? Promise.resolve([]) : deps.listTrackerIssues(project),
@@ -390,21 +471,17 @@ export async function gatherProjectLensSignals(
     const unmerged = new Set(snapshot.unmergedRefs.split('\n').map((ref) => ref.trim()).filter(Boolean));
     const firstParentShas = new Set(snapshot.firstParentShas.split('\n').map((sha) => sha.trim()).filter(Boolean));
     for (const line of refLines) {
-      // "<objectname> <refname:short>"; tolerate refname-only lines (legacy fixtures).
-      const spaceIdx = line.indexOf(' ');
-      const tipSha = spaceIdx === -1 ? null : line.slice(0, spaceIdx);
-      const ref = spaceIdx === -1 ? line : line.slice(spaceIdx + 1);
+      const { ref } = parseBranchRefLine(line);
       const id = issueIdFromRef(ref, issuePrefix);
       if (id) {
         candidates.add(id);
         branchIssues.add(id);
         const headRef = ref.replace(/^origin\//, '');
         headRefsByIssue.set(id, new Set([...(headRefsByIssue.get(id) ?? []), headRef]));
-        if (unmerged.has(ref)) {
+        const classification = classifyBranchRefLine(line, unmerged, firstParentShas);
+        if (classification === 'unmerged') {
           unmergedBranchIssues.add(id);
-        } else if (tipSha && !firstParentShas.has(tipSha)) {
-          // Contained in the default branch AND off its first-parent line ⇒ the
-          // branch's unique commits were merged in — positive non-PR evidence.
+        } else if (classification === 'merged-work') {
           mergedBranchWorkIssues.add(id);
         }
       }

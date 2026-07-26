@@ -144,7 +144,9 @@ Use AskUserQuestion tool to ask contextual questions:
 
 **Question discipline:** one focused question per AskUserQuestion call; mark the
 recommended option first with "(Recommended)" and state the principle behind the
-recommendation in one sentence in its description.
+recommendation in one sentence in its description. Every question must be self-contained:
+1-2 sentences of situation, the decision in plain language, and per-option consequences —
+the operator answers from a dialog without your transcript.
 
 **Discovery is complete only when ALL of these hold:**
 - Every major decision (approach, affected subsystems, library/pattern choices) has an answer

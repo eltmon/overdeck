@@ -657,12 +657,14 @@ The merge-agent also handles syncing active workspaces with the latest `main` br
 4. **Clean merge**: If no conflicts, returns immediately with commit count and changed files
 5. **Conflicts**: If conflicts arise, the merge-agent specialist is woken with the `sync-main.md` prompt template containing the conflict file list. The sync endpoint polls until conflicts are resolved (up to 15 minutes)
 
+For polyrepo workspaces, repo discovery goes through `src/lib/project-repos.ts`. Required member repos sync sequentially in configured order; the first conflict or failure stops iteration, earlier successful merges remain, later repos are marked skipped, and the API and CLI report each repo's result.
+
 ### Design Decisions
 
 - **Merge, not rebase**: Merge preserves history and requires no force-push. Feature branches squash-merge to main anyway, so merge commits don't pollute the final history.
 - **Auto-commit before sync**: Instead of blocking on uncommitted changes, the system auto-commits a WIP snapshot. This prevents data loss if the merge introduces complex conflicts.
 - **Never revert a successful merge**: If post-merge operations (container restart, etc.) fail, the git merge stands. The merge and downstream operations are decoupled.
-- **Polyrepo**: For polyrepo workspaces (MYN), sync runs against each sub-repo independently (all-or-nothing).
+- **Polyrepo**: Required member repos sync sequentially in config order. A failure stops later repos without reverting earlier successful merges.
 
 ### API
 
@@ -670,13 +672,13 @@ The merge-agent also handles syncing active workspaces with the latest `main` br
 POST /api/issues/:issueId/sync-main
 
 Response (success):
-{ "success": true, "commitCount": 49, "changedFiles": [...], "message": "Synced 49 commit(s) from main" }
+{ "success": true, "commitCount": 49, "changedFiles": [...], "message": "Synced 49 commit(s) from main", "repos": [{ "repoKey": "api", "success": true, "commitCount": 49, "changedFiles": [...] }] }
 
 Response (already up to date):
-{ "success": true, "alreadyUpToDate": true, "message": "Already up to date with main" }
+{ "success": true, "alreadyUpToDate": true, "message": "Already up to date with main", "repos": [{ "repoKey": "api", "success": true, "alreadyUpToDate": true }] }
 
 Response (error):
-{ "success": false, "error": "...", "conflictFiles": [...] }
+{ "success": false, "error": "...", "conflictFiles": [...], "repos": [{ "repoKey": "api", "success": false, "conflictFiles": [...] }, { "repoKey": "fe", "success": false, "skipped": true, "reason": "..." }] }
 ```
 
 ### CLI

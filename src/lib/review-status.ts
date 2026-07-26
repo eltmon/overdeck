@@ -528,7 +528,6 @@ function maybeAutoDispatchReviewHostSide(issueId: string, status: ReviewStatus):
   reviewDispatchAttemptAt.set(issueId, Date.now());
   void dispatchReviewHostSide(issueId, status.prUrl);
 }
-
 async function dispatchReviewHostSide(issueId: string, prUrl?: string): Promise<void> {
   try {
     const { resolveProjectFromIssueSync } = await import('./projects.js');
@@ -537,17 +536,18 @@ async function dispatchReviewHostSide(issueId: string, prUrl?: string): Promise<
     const { existsSync } = await import('fs');
     const workspace = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
     if (!existsSync(workspace)) return;
-    let branch = `feature/${issueId.toLowerCase()}`;
+    const { resolvePrimaryWorkspaceRepoDirSync, resolveWorkspaceRepoRootsSync } = await import('./project-repos.js');
+    let branch = resolveWorkspaceRepoRootsSync(issueId, workspace)[0].sourceBranch;
     try {
       const { promisify } = await import('util');
       const { exec } = await import('child_process');
       const execAsync = promisify(exec);
       const { stdout } = await execAsync('git branch --show-current', {
-        cwd: workspace,
+        cwd: resolvePrimaryWorkspaceRepoDirSync(issueId, workspace),
         encoding: 'utf-8',
       });
       branch = stdout.trim() || branch;
-    } catch { /* non-fatal — fall back to the conventional branch name */ }
+    } catch { /* non-fatal — fall back to the configured source branch */ }
     const { spawnReviewRoleForIssue } = await import('./cloister/review-agent.js');
     const result = await Effect.runPromise(spawnReviewRoleForIssue({
       issueId,
