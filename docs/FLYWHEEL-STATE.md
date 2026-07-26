@@ -6814,3 +6814,11 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - `agent-min-858-test`: `$6.8805 / out 1.1k` — **NINTH identical reading (~7.5h)**. PAN-3092 still OPEN. Unchanged and unrecoverable without an external collector.
 - main CI green on `092c180cb1`; live `66860ff9b5`; 23 agents; networks 20.
 - **LESSON: a closed issue is not a fixed system.** Issue state tracks the conversation; the gate tracks reality. When a tracker says resolved, re-run the failing operation before believing it — especially when the "resolution" would let you skip a rail you have been holding for 43 ticks.
+
+## RUN-70 tick 44 (2026-07-26 04:33Z) — quiet tick; state fully static, nothing actionable
+- Main CI **green** on `092c180cb1` (unchanged), live `66860ff9b5`, networks 20, 23 agents.
+- **Per-tick cheap probe (one blocked close-out) — PAN-3029 still fails.** It misses **four** rows (review, tests, verification, post-merge), the worst of the four; it never went through the pipeline at all. Still **no `--accept-*` — 44 ticks unbroken.**
+- **`agent-min-858-test`: `$6.8805 / out 1.1k` — TENTH identical reading (~8h).** MIN-858 still `review=pending / test=pending` with `verification_status: passed`. PAN-3092 OPEN.
+- PAN-2997 unchanged at `review=passed test=passed`, verification pending.
+- **Nothing was actionable this tick and I did not manufacture activity.** The whole cohort is waiting on decisions and fixes outside the flywheel's authority: PAN-3092 (stranded verdict), the strike-verification decision (PAN-3067's four-for-four), the MYN merge hold, and PAN-3055-style operator promotion. **Ticking without acting is the correct output when every remaining lever belongs to someone else** — the alternative is inventing work to look busy, which is how nudges and overrides get rationalised.
+- **LESSON: a cheap standing probe beats a full re-derivation on a static system.** One `pan close` retry and one `grep` of a pane answered "has anything changed?" for the two open questions that could plausibly move. Full membership re-derivation each tick would cost far more and tell me the same thing.
