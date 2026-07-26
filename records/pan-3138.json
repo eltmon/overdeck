@@ -47,6 +47,16 @@
       "reason": "feedback",
       "note": "[2026-07-26T15:16Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-26T15:16:46.315Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-26T15:34:10.824Z"
+    },
+    {
+      "timestamp": "2026-07-26T15:34:11.006Z",
+      "reason": "end",
+      "note": "No findings skipped. Moved name-based Docker teardown to the first verified-merge cleanup point, before deploy restart and tracker transition failures can abort the lifecycle. Moved merged-issue patrol cleanup into a deduplicated serial single-flight worker with exponential retry backoff, keeping the main Deacon patrol responsive while preserving Docker command serialization. Added tracker-transition, deduplication, serialization, and fake-timer backoff regressions; updated lifecycle docs and lowered the file-size baseline after the merge-agent shrink. The failed typecheck now passes, along with full lint, circular-dependency checks, focused tests, and the full test suite."
     }
   ],
   "feedback": [],
@@ -91,7 +101,7 @@
     "recordedAt": "2026-07-26T15:34:06.412Z"
   },
   "created": "2026-07-26T13:39:19.365Z",
-  "updated": "2026-07-26T15:34:09.975Z",
+  "updated": "2026-07-26T15:34:11.006Z",
   "pipeline": {
     "issueId": "PAN-3138",
     "reviewStatus": "reviewing",
