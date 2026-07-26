@@ -51,3 +51,6 @@ export function createRequestReviewPipeline(): RequestReviewPipeline {
     },
   };
 }
+
+/** Shared host-side pipeline so HTTP requests and durable intent recovery coalesce. */
+export const requestReviewPipeline = createRequestReviewPipeline();

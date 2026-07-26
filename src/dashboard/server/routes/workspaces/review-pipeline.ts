@@ -30,7 +30,7 @@ import { getReleaseSetSync } from '../../../../lib/release-set.js';
 import { getCachedConflictGateMergeability } from '../../../../lib/cloister/conflict-gate.js';
 import { transitionIssueToInReview, spawnRun } from '../../../../lib/agents.js';
 import { runVerificationForIssue } from '../../../../lib/cloister/verification-runner.js';
-import { createRequestReviewPipeline } from '../../../../lib/cloister/request-review-pipeline.js';
+import { requestReviewPipeline } from '../../../../lib/cloister/request-review-pipeline.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import {
@@ -47,7 +47,6 @@ import {
 
 const execAsync = promisify(exec);
 const MAX_AUTO_REQUEUE = 25;
-const requestReviewPipeline = createRequestReviewPipeline();
 
 /** Safe `.message` read for caught values of unknown shape. */
 const errorMessage = (e: unknown): string | undefined => e instanceof Error ? e.message : undefined;

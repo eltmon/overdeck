@@ -126,6 +126,38 @@ describe('request review pipeline', () => {
     expect(dispatchReview).not.toHaveBeenCalled();
   });
 
+  it('re-enters verification before review after a queued deploy clears', async () => {
+    const pipeline = createRequestReviewPipeline();
+    const order: string[] = [];
+    let deployQueued = true;
+    const verify = vi.fn(async () => {
+      order.push('verify');
+      return deployQueued
+        ? { outcome: 'deferred' as const, reason: 'A dashboard deploy is queued' }
+        : { outcome: 'passed' as const };
+    });
+    const deps = {
+      verify,
+      pushBranch: vi.fn(async () => { order.push('push'); }),
+      dispatchReview: vi.fn(async () => { order.push('review'); }),
+      onVerificationFailed: vi.fn(),
+      onVerificationError: vi.fn(),
+      onVerificationDeferred: vi.fn(),
+    };
+
+    expect(pipeline.start('PAN-3135', deps)).toBe(true);
+    await vi.waitFor(() => expect(pipeline.isInFlight('PAN-3135')).toBe(false));
+    expect(order).toEqual(['verify']);
+    expect(deps.dispatchReview).not.toHaveBeenCalled();
+
+    deployQueued = false;
+    expect(pipeline.start('PAN-3135', deps)).toBe(true);
+    await vi.waitFor(() => expect(pipeline.isInFlight('PAN-3135')).toBe(false));
+
+    expect(order).toEqual(['verify', 'verify', 'push', 'review']);
+    expect(verify).toHaveBeenCalledTimes(2);
+  });
+
   it('stops on deferred verification when no callback is configured', async () => {
     const pipeline = createRequestReviewPipeline();
     const pushBranch = vi.fn(async () => {});
