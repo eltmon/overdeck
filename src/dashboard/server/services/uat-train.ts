@@ -39,6 +39,7 @@ import {
   listUatGenerationsSync,
   type UatGeneration,
 } from '../../../lib/overdeck/merge-sync.js';
+import { listEligibleCandidatesByProject } from '../../../lib/flywheel-merge-order.js';
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
 import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
 import { findProjectByPathSync } from '../../../lib/projects.js';
@@ -131,9 +132,10 @@ async function runUatTrainReconcileForProject(
     return { action: 'disabled', invalidated: [] };
   }
 
-  // Early exit if no candidates — skip git operations
+  // Early exit if no candidates and no live generations — skip git operations
   const candidates = listEligibleCandidatesByProject(projectPath);
-  const liveGenerations = listUatGenerationsSync({ projectRoot: projectPath, limit: 1 });
+  const allGenerations = listUatGenerationsSync({ projectRoot: projectPath, limit: 100 });
+  const liveGenerations = allGenerations.filter((g) => g.status === 'ready' || g.status === 'superseded');
   if (candidates.length === 0 && liveGenerations.length === 0) {
     return { action: 'idle', invalidated: [] };
   }
@@ -208,11 +210,20 @@ async function assembleFromReadySetForProject(
 // Removed PolyrepoAssemblyUnsupported class — polyrepo guard moved to runUatTrainReconcileForProject
 
 /**
- * PAN-1696 reconciler-decouple: Run UAT reconciliation for all tracked projects.
- * Reconciles only enabled projects; isolates errors per project so one project's failure
- * doesn't prevent others from reconciling. Returns aggregated success/idle/failure state.
+ * PAN-1696 reconciler-decouple: Single-project reconciliation (used by forced-rebuild endpoint).
+ * When called from /api/flywheel/assemble-uat with force:true, reconciles only projectRoot().
  */
 export async function runUatTrainReconcile(options: { force?: boolean } = {}): Promise<ReconcileResult> {
+  const projectPath = projectRoot();
+  return runUatTrainReconcileForProject(projectPath, options);
+}
+
+/**
+ * Internal: Periodic all-project reconciliation for the 60-second tick.
+ * Reconciles each enabled project independently with error isolation.
+ * Not exported — only used by startUatTrainReconciler.
+ */
+async function _reconcileAllProjectsForTick(): Promise<void> {
   const { listProjectsSync } = await import('../../../lib/projects.js');
   const { isMergeTrainEnabledForProject } = await import('../../../lib/overdeck/merge-sync.js');
 
@@ -221,26 +232,18 @@ export async function runUatTrainReconcile(options: { force?: boolean } = {}): P
     projects.map(async ({ config }) => {
       // PAN-1696: skip projects with merge-train disabled
       if (!isMergeTrainEnabledForProject(config)) {
-        return { action: 'disabled', invalidated: [] } as ReconcileResult;
+        return;
       }
 
       const projectPath = resolve(config.path);
       try {
-        return await runUatTrainReconcileForProject(projectPath, options);
+        await runUatTrainReconcileForProject(projectPath, {});
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[uat-train] project ${projectPath} failed:`, msg);
-        return { action: 'idle', invalidated: [] } as ReconcileResult; // Fail closed; continue other projects
+        console.error(`[uat-train] project ${projectPath} failed during periodic tick:`, msg);
       }
     }),
   );
-
-  // Extract fulfilled results and return the final state
-  const fulfilled = results
-    .filter((r) => r.status === 'fulfilled')
-    .map((r) => (r as PromiseFulfilledResult<ReconcileResult>).value);
-
-  return fulfilled[fulfilled.length - 1] ?? { action: 'no-queue', invalidated: [] };
 }
 
 let reconcilerTimer: ReturnType<typeof setInterval> | null = null;
@@ -249,12 +252,12 @@ export function startUatTrainReconciler(): boolean {
   if (!canStartUatTrainReconciler()) return false;
   if (reconcilerTimer) return true;
   reconcilerTimer = setInterval(() => {
-    void runUatTrainReconcile().catch((err) => {
+    void _reconcileAllProjectsForTick().catch((err) => {
       console.warn('[uat-train] reconcile tick failed:', err instanceof Error ? err.message : err);
     });
   }, RECONCILE_INTERVAL_MS);
   reconcilerTimer.unref?.();
-  void runUatTrainReconcile().catch((err) => {
+  void _reconcileAllProjectsForTick().catch((err) => {
     console.warn('[uat-train] initial reconcile failed:', err instanceof Error ? err.message : err);
   });
   return true;
