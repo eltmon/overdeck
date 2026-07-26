@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:25:26.814Z",
-  "updated": "2026-07-26T13:00:09.125Z",
+  "updated": "2026-07-26T13:01:41.417Z",
   "pipeline": {
     "issueId": "PAN-3123",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T13:00:09.104Z",
-    "inspectNotes": "Inspecting item governor-swap-psi-hysteresis"
+    "updatedAt": "2026-07-26T13:01:41.291Z",
+    "inspectNotes": "All 5 ACs met. nextGovernorModeWithRunway composes swap runway over nextGovernorMode with asymmetric swap hysteresis (soft% while admitting, recovery% once held), so SwapFree 0/8GiB with RAM above RECOVERY yields holding (AC1) and re-admission needs SwapFree >= recovery% AND RAM >= RECOVERY (AC2). PSI shed is gated on swapLow && psiFullAvg10 != null && >= threshold, so null PSI degrades to holding (AC3). swapTotalBytes <= 0 early-returns the RAM-only mode, and canAdmit/nextGovernorMode logic is untouched (AC4). Verdict carries swapTotalBytes/swapFreeBytes/psiFullAvg10 as optional MemoryVerdict fields (AC5). Verified beyond the mocks: readProcMemoryLinux/Darwin really populate swapTotal/swapFree/psiFullAvg10, config keys governorSwapSoftFreePercent/RecoveryFreePercent/PsiFullShedAvg10 exist in defaults+schema+merge with a recovery>soft clamp, and every autonomous admission path (boot-reconciliation-apply, deacon-auto-resume, preemption) goes through assessMemoryPressure, so no path bypasses the swap gate. Non-blocking note: the single previousMode variable is shared by both hysteresis axes, so a hold entered for low RAM raises the swap bar to recovery% - swap sitting between soft% and recovery% can prolong a hold it never caused. Conservative (errs toward holding) and consistent with AC2's wording, but worth a follow-up if operators see slow re-admission on hosts with mid-range swap."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 481674,
-            "output": 56511,
-            "cacheRead": 22945792,
+            "input": 486666,
+            "output": 56699,
+            "cacheRead": 23282688,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 481674,
-          "output": 56511,
-          "cacheRead": 22945792,
+          "input": 486666,
+          "output": 56699,
+          "cacheRead": 23282688,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 15.576596,
-        "pricingAsOf": "2026-07-26T13:00:09.113Z"
+        "usd": 15.775644,
+        "pricingAsOf": "2026-07-26T13:01:41.374Z"
       }
     },
     "merges": [],
