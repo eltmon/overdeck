@@ -81,6 +81,47 @@ describe('buildSimpleFeedEntries (PAN-3090 WI-1)', () => {
     expect(entries[0]).toMatchObject({ failed: false });
   });
 
+  it('verb + server detail reads as an action; bare tool names never stand alone', () => {
+    const entries = buildSimpleFeedEntries({
+      messages: [],
+      workLog: [
+        work({ id: 'w1', label: 'Bash', detail: 'npm test', createdAt: '2026-07-25T10:01:00Z' }),
+        work({ id: 'w2', label: 'Read', detail: 'parser.ts', createdAt: '2026-07-25T10:02:00Z' }),
+        work({ id: 'w3', label: 'Bash', createdAt: '2026-07-25T10:03:00Z' }),
+        work({ id: 'w4', label: 'Grep', createdAt: '2026-07-25T10:04:00Z' }),
+      ],
+      issueTitle: TITLE,
+    });
+    const texts = entries.map((e) => (e.kind === 'action' ? e.text : ''));
+    expect(texts).toEqual(['Ran npm test', 'Read parser.ts', 'Ran a command', 'Searched the code']);
+  });
+
+  it('thinking phase markers never become feed rows', () => {
+    const entries = buildSimpleFeedEntries({
+      messages: [],
+      workLog: [
+        work({ id: 't1', label: 'thinking', tone: 'thinking', detail: 'reasoning about the code', createdAt: '2026-07-25T10:01:00Z' }),
+        work({ id: 'w1', label: 'Bash', detail: 'npm test', createdAt: '2026-07-25T10:02:00Z' }),
+      ],
+      issueTitle: TITLE,
+    });
+    expect(entries).toHaveLength(1);
+    expect(JSON.stringify(entries)).not.toMatch(/thinking/);
+  });
+
+  it('failed tool results narrate themselves and go red — no verb prefix', () => {
+    const entries = buildSimpleFeedEntries({
+      messages: [],
+      workLog: [
+        work({ id: 'w1', label: 'Bash', detail: 'Error: Exit code 1 — Work completion checks failed', createdAt: '2026-07-25T10:01:00Z' }),
+        work({ id: 'w2', label: 'Bash', detail: 'npm test', createdAt: '2026-07-25T10:02:00Z' }),
+      ],
+      issueTitle: TITLE,
+    });
+    expect(entries[0]).toMatchObject({ kind: 'action', failed: true, text: 'Error: Exit code 1 — Work completion checks failed' });
+    expect(entries[1]).toMatchObject({ kind: 'action', failed: false });
+  });
+
   it('interleaves messages and work log chronologically', () => {
     const entries = buildSimpleFeedEntries({
       messages: [

@@ -23,6 +23,38 @@ const PREVIEW_CHARS = 280;
 const COMMAND_CHARS = 80;
 const SHOWN_FILES = 2;
 
+/** Tool name → past-tense verb for one-line actions (detail follows). */
+const TOOL_VERB: Record<string, string> = {
+  Bash: 'Ran',
+  Read: 'Read',
+  Edit: 'Edited',
+  MultiEdit: 'Edited',
+  Write: 'Wrote',
+  NotebookEdit: 'Edited',
+  Glob: 'Searched',
+  Grep: 'Searched',
+  LS: 'Listed files in',
+  WebFetch: 'Fetched',
+  WebSearch: 'Searched the web for',
+  TodoWrite: 'Updated the task list',
+};
+
+/** Tool name → standalone phrase when the server sent no input summary. */
+const TOOL_PHRASE: Record<string, string> = {
+  Bash: 'Ran a command',
+  Read: 'Read a file',
+  Edit: 'Edited a file',
+  MultiEdit: 'Edited a file',
+  Write: 'Wrote a file',
+  NotebookEdit: 'Edited a file',
+  Glob: 'Searched the code',
+  Grep: 'Searched the code',
+  LS: 'Listed files',
+  WebFetch: 'Fetched a page',
+  WebSearch: 'Searched the web',
+  TodoWrite: 'Updated the task list',
+};
+
 /** Markdown → plain text for clamped previews. Deliberately shallow. */
 export function toPlainText(markdown: string): string {
   return markdown
@@ -37,6 +69,11 @@ export function toPlainText(markdown: string): string {
     .trim();
 }
 
+/** Tool results that failed arrive with tone 'tool' but an "Error: …" detail. */
+function isFailedTool(entry: WorkLogEntry): boolean {
+  return entry.tone === 'error' || /^error[:\s]/i.test(entry.detail ?? '');
+}
+
 function shapeAction(entry: WorkLogEntry): string {
   const files = entry.changedFiles ?? [];
   if (files.length > 0) {
@@ -48,7 +85,16 @@ function shapeAction(entry: WorkLogEntry): string {
     const cmd = entry.command.length > COMMAND_CHARS ? `${entry.command.slice(0, COMMAND_CHARS)}…` : entry.command;
     return `Ran ${cmd}`;
   }
-  return entry.label;
+  // A failed tool result already narrates itself ("Error: Exit code 1 …") —
+  // prepend no verb ("Ran Error: …" is nonsense) and let the row go red.
+  if (isFailedTool(entry) && entry.detail) return entry.detail;
+  // The server's collapsed-row summary (format-tool-input) is a one-liner
+  // already — a command first line, a basename, a pattern. Verb + detail
+  // reads as an action ("Ran npm test"); bare tool names never stand alone.
+  const verb = TOOL_VERB[entry.label];
+  if (verb && entry.detail) return `${verb} ${entry.detail}`;
+  if (entry.detail) return entry.detail;
+  return TOOL_PHRASE[entry.label] ?? entry.label;
 }
 
 export function buildSimpleFeedEntries(input: {
@@ -89,13 +135,16 @@ export function buildSimpleFeedEntries(input: {
   }
 
   for (const w of input.workLog) {
+    // Phase markers, not content: the operator transcript uses these to drive
+    // its working spinner; as feed rows they are noise ("thinking", "thinking").
+    if (w.tone === 'thinking') continue;
     entries.push({
       kind: 'action',
       id: `act-${w.id}`,
       createdAt: w.createdAt,
       text: shapeAction(w),
       files: w.changedFiles,
-      failed: w.tone === 'error',
+      failed: isFailedTool(w),
     });
   }
 
