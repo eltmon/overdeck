@@ -214,17 +214,20 @@ has not yet been notified:
     the real content into the replacement pane rather than completing with a
     blank Enter. If the target was lost around the Enter, the terminal
     marker is ROLLED BACK as a verified transition and
-    `KeyedSubmitTargetDeadError` is thrown. Poison reads and every
-    verification read (repair, rollback, post-clear) are strict: a failed
-    read aborts as `KeyedMarkerVerificationError` with the breadcrumb
+    `KeyedSubmitTargetDeadError` is thrown. Every safety-critical read —
+    the initial poison read, repair and rollback verification, and the
+    post-clear verification — is strict: a rejected read aborts as
+    `KeyedMarkerVerificationError` (cause preserved) with the breadcrumb
     authoritative, never converted to empty state. Every poison-clear failure
     — the clear command, the post-clear verification read, or a surviving
-    breadcrumb — is the same recoverable class, so a repair that stops
-    before any delivery is never recorded as terminal `failed`. The outbox
-    entry stays `pending` on every recoverable failure and a later pass
-    re-drives the wake after the agent resumes — recovery never suppresses a
-    wake that did not demonstrably reach a live harness holding the real
-    content. A failed Enter aborts the command
+    breadcrumb — is the same recoverable class, so a transient failure
+    before any side effect or a repair that stops mid-way is never recorded
+    as terminal `failed`. (A genuinely missing target is classified upstream
+    at the messageAgent stopped/zombie layer, which resumes and re-delivers.)
+    The outbox entry stays `pending` on every recoverable failure and a later
+    pass re-drives the wake after the agent resumes — recovery never
+    suppresses a wake that did not demonstrably reach a live harness holding
+    the real content. A failed Enter aborts the command
     list before the terminal transition, and concurrent or post-crash
     callers lose the server-side condition, so no stray Enter can land in a
     composer holding unrelated operator text.

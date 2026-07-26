@@ -132,9 +132,16 @@ export async function sendToRemoteAgentKeyed(
     // The poison breadcrumb invalidates any terminal marker (cycle 11/12):
     // it marks either a FALSE terminal whose rollback was interrupted or a
     // PROVISIONAL terminal whose post-submit verification never completed.
-    // The read is fail-CLOSED — a failed poison read must never be
-    // interpreted as "no poison" while a false terminal sits next to it.
-    const poisonMarker = await readMarkerStrict(poisonOption);
+    // The read is fail-CLOSED — and a REJECTED read is unproven protocol
+    // state, so it becomes the recoverable marker-error class (cycle 15): a
+    // transient failure before any side effect must never close the wake as
+    // terminal 'failed'.
+    let poisonMarker: string;
+    try {
+      poisonMarker = await readMarkerStrict(poisonOption);
+    } catch (error) {
+      throw new KeyedMarkerVerificationError(agentId, `initial poison read (key "${dedupKey}")`, { cause: error });
+    }
     // A repaired pending claim still has to prove its pane identity below —
     // the original paste's target may be stale or missing (cycle 13).
     const repaired = poisonMarker !== '';

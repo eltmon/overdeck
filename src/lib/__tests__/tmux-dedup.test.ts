@@ -253,7 +253,7 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(await sendKeysDedup(session, 'wake up agent', 'test-key-1')).toBe('deduplicated');
   });
 
-  it('a FAILED poison read aborts without honoring the terminal marker (cycle 12)', async () => {
+  it('a FAILED poison read aborts as a RECOVERABLE marker error without honoring the terminal marker (cycle 12/15)', async () => {
     // A false terminal and its breadcrumb both exist; the poison read fails.
     execFileSync('tmux', ['-L', socket, 'set-option', '-t', session, '@overdeck-dedup-test-key-1', '1']);
     execFileSync('tmux', ['-L', socket, 'set-option', '-t', session, '@overdeck-dedup-poison-test-key-1', '1']);
@@ -262,7 +262,7 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
       sendKeysDedup(session, 'wake up agent', 'test-key-1', 'test', {
         readMarkerStrict: () => Promise.reject(new Error('transient poison-read failure')),
       }),
-    ).rejects.toThrow(/transient poison-read failure/);
+    ).rejects.toThrow(KeyedMarkerVerificationError);
 
     // Nothing was honored, repaired, or pasted — and the call did NOT return
     // 'deduplicated' from the false terminal.

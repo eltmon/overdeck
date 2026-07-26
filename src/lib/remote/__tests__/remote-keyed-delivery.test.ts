@@ -402,14 +402,15 @@ describe('sendToRemoteAgentKeyed', () => {
     expect(state.poison).toBe('1');
   });
 
-  it('a FAILED poison read aborts without honoring the terminal marker (cycle 12)', async () => {
+  it('a FAILED poison read aborts as a RECOVERABLE marker error without honoring the terminal marker (cycle 12/15)', async () => {
     // A false terminal and its breadcrumb both exist; the poison read fails
-    // transiently. Fail-closed: the call must abort, never interpret the
-    // failed read as "no poison", and never return 'deduplicated'.
+    // transiently. Fail-closed AND recoverable: the call aborts as
+    // KeyedMarkerVerificationError (outbox stays pending), never interprets
+    // the failed read as "no poison", and never returns 'deduplicated'.
     const { exec, state } = createFakeRemoteTmux({ terminal: '1', poison: '1', failNextPoisonRead: true });
 
     await expect(sendToRemoteAgentKeyed(AGENT, VM, 'wake up remote', KEY, exec))
-      .rejects.toThrow(/transient poison-read failure/);
+      .rejects.toThrow(KeyedMarkerVerificationError);
     expect(state.terminal).toBe('1'); // untouched — nothing honored or repaired
     expect(state.poison).toBe('1');
     expect(state.pastes).toBe(0);
