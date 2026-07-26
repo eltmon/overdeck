@@ -162,9 +162,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T09:15:50.980Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-26T09:18Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-26T09:18:41.088Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-26T09:18:41Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2997\n\nThe poison marker is created after TERMINAL becomes crash-visible and is read/cleared fail-open, so recovery can still suppress or duplicate the wake.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2997 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/event-store.ts",
@@ -244,10 +257,10 @@
     "recordedAt": "2026-07-25T23:45:57.195Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T09:16:02.860Z",
+  "updated": "2026-07-26T09:18:41.088Z",
   "pipeline": {
     "issueId": "PAN-2997",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -255,8 +268,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T05:50:39.330Z",
-    "updatedAt": "2026-07-26T09:15:55.049Z",
-    "reviewNotes": "Agent re-review request (5/25): Fixed both cycle-11 blockers: (1) rollback is now a verified protocol transition — a POISON breadcrumb is written before the rollback attempt, so a failed rollback can never leave a false TERMINAL honorable; any later keyed call repairs poisoned markers FIRST and never returns 'deduplicated' from them (remote test covers Enter→terminal→pane death→failed rollback→repair→real delivery). (2) the pre-submit target check now fails CLOSED — the key only becomes terminal when both target reads succeed, both live, pid matches; unreadable pre-target rolls the claim back (local + remote tests). Also split remote-agents.ts under the file-size ratchet into remote-tmux.ts + remote-keyed-delivery.ts with unchanged re-exports.",
+    "updatedAt": "2026-07-26T09:18:40.399Z",
+    "reviewNotes": "The poison marker is created after TERMINAL becomes crash-visible and is read/cleared fail-open, so recovery can still suppress or duplicate the wake.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3004",
     "lastVerifiedCommit": "dae8d6dfbd4da721132281460260596645c92fdb",
     "reviewSpawnedAt": "2026-07-26T09:15:49.535Z"
@@ -274,9 +287,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 23697566,
-            "output": 820846,
-            "cacheRead": 142273024,
+            "input": 25782000,
+            "output": 863767,
+            "cacheRead": 152518656,
             "cacheWrite": 0
           }
         },
@@ -305,9 +318,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 25171339,
-          "output": 1009967,
-          "cacheRead": 237601792,
+          "input": 27255773,
+          "output": 1052888,
+          "cacheRead": 247847424,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -318,8 +331,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 275.274257,
-        "pricingAsOf": "2026-07-26T09:16:02.101Z"
+        "usd": 292.106873,
+        "pricingAsOf": "2026-07-26T09:18:40.503Z"
       }
     },
     "merges": [
