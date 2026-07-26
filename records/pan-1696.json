@@ -117,20 +117,26 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-26T00:59:58.867Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-07-26T01:05:09.516Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-26T00:35:36.057Z",
-  "updated": "2026-07-26T01:00:10.409Z",
+  "updated": "2026-07-26T01:05:09.516Z",
   "pipeline": {
     "issueId": "PAN-1696",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T00:59:58.168Z",
+    "updatedAt": "2026-07-26T01:05:09.248Z",
+    "verificationNotes": "Verification FAILED at lint (62467ms):\n\n\n> @overdeck/core@0.45.24 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.45.24 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.45.24 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.45.24 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.45.24 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n\n--- stderr ---\n✗ overdeck boundary gate: 1 site(s) across 1 file(s) still on the OLD panopticon.db\n\nsrc/lib/cloister/merge-train.ts:13:import { isMergeTrainEnabledForProject } from '../database/app-settings.js';\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1822",
     "reviewRequestedAt": "2026-07-26T00:59:47.845Z",
     "reviewSpawnedAt": "2026-07-26T00:59:51.889Z"
@@ -152,12 +158,20 @@
             "cacheWrite": 0
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 545393,
+            "output": 26429,
+            "cacheRead": 6701056,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 644,
-            "output": 29488,
-            "cacheRead": 15319752,
-            "cacheWrite": 302672
+            "input": 649,
+            "output": 29941,
+            "cacheRead": 15490050,
+            "cacheWrite": 302857
           }
         }
       },
@@ -174,16 +188,22 @@
           "cacheRead": 80896,
           "cacheWrite": 0
         },
+        "openai/gpt-5.6-sol": {
+          "input": 545393,
+          "output": 26429,
+          "cacheRead": 6701056,
+          "cacheWrite": 0
+        },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 644,
-          "output": 29488,
-          "cacheRead": 15319752,
-          "cacheWrite": 302672
+          "input": 649,
+          "output": 29941,
+          "cacheRead": 15490050,
+          "cacheWrite": 302857
         }
       },
       "costAtCloseOut": {
-        "usd": 32.072451,
-        "pricingAsOf": "2026-07-26T01:00:01.153Z"
+        "usd": 38.962345,
+        "pricingAsOf": "2026-07-26T01:05:09.311Z"
       }
     },
     "merges": [
@@ -192,7 +212,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "tasks": {
     "sequence": 6,
     "claims": {},
