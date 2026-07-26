@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T13:05:37.645Z",
+  "updated": "2026-07-26T13:05:48.496Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "merge-ops-deferred-handling": {
+        "writerId": "agent-pan-3135",
+        "agentId": "agent-pan-3135",
+        "pid": 1760559,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-26T13:05:48.496Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3135",
@@ -127,6 +135,7 @@
     "request-review-deferred-handling": "completed",
     "request-review-deferred-handling.request-review-deferred-handling.ac1": "completed",
     "request-review-deferred-handling.request-review-deferred-handling.ac2": "completed",
-    "request-review-deferred-handling.request-review-deferred-handling.ac3": "completed"
+    "request-review-deferred-handling.request-review-deferred-handling.ac3": "completed",
+    "merge-ops-deferred-handling": "running"
   }
 }
