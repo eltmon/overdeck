@@ -186,7 +186,7 @@
     "recordedAt": "2026-07-26T13:53:58.173Z"
   },
   "created": "2026-07-26T12:24:46.201Z",
-  "updated": "2026-07-26T17:39:53.166Z",
+  "updated": "2026-07-26T18:39:20.495Z",
   "pipeline": {
     "issueId": "PAN-3135",
     "reviewStatus": "passed",
@@ -197,7 +197,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-26T13:54:56.619Z",
-    "updatedAt": "2026-07-26T17:38:28.163Z",
+    "updatedAt": "2026-07-26T18:39:20.445Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "testNotes": "npm run typecheck: PASS (tsc + hooks + evals + dashboard-types guard). npm run lint: PASS (eslint + all lint:* checks incl. file-size, circular, ratchet-audit, quarantine-audit). npm test (full vitest suite, 1210 files/11158 tests): 10 tests failed across 7 files, all pre-existing environment artifacts unrelated to this diff — the launcher-git-guard PATH wrapper installed for this agent session unconditionally intercepts `git reset --hard`/`git rebase`/`git stash` even inside disposable temp repos that tests spin up for autoRevertMerge, dangerous-git-ops, auto-commit, record-update, and pre-rebase-hook coverage. Confirmed by: (1) none of the 7 failing test files or their subject source files (validation.ts, workspace-manager.ts, launcher-git-guard.ts) appear in this PR's declared or actual changed-files list; (2) re-running the same 7 files with OVERDECK_PAN_GIT_OP=1 (documented guard bypass) turned 8 of 10 failures green; (3) the remaining 2 (workspace-manager-pre-rebase.test.ts, human-shell-without-agent-id cases) fail because the deployed git-guard script blocks `git rebase` unconditionally with no OVERDECK_AGENT_ID-based exemption, a static property of this session's guard build that predates and is untouched by this branch. No UAT required: xBRIEF NonGoals explicitly excludes a dashboard UI surface for the deploy queue, all 9 items are backend/CLI/docs kind with verify_commands limited to vitest+typecheck+lint, and neither the PR description nor the latest review notes (agent-pan-3135-review-c8973a5b) mention browser/Playwright verification. Reviewed and approved at HEAD c8973a5b95 (reviewedAtCommit match).",
     "verificationNotes": "merge-verify: CI green on the merged tip (PAN-2487 local-gate skip)",
@@ -343,7 +343,7 @@
       },
       "costAtCloseOut": {
         "usd": 447.674002,
-        "pricingAsOf": "2026-07-26T17:38:28.501Z"
+        "pricingAsOf": "2026-07-26T18:39:20.489Z"
       }
     },
     "merges": [
@@ -352,7 +352,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 18,
