@@ -93,6 +93,26 @@ describe('decideResumeGate', () => {
     },
   );
 
+  it('resumes a scheduler-yielded agent for merge preparation but blocks an operator pause (PAN-3120)', () => {
+    const yielded: ResumeGateBlock = {
+      gate: 'paused',
+      reason: 'agent is paused (yield: making room for review of MIN-902)',
+      pausedReason: 'yield: making room for review of MIN-902',
+      yieldedByScheduler: true,
+    };
+    expect(decideResumeGate(yielded, 'merge-preparation')).toEqual({ decision: 'proceed', clearYield: true });
+
+    // An operator's own pause is a decision, not a resource choice — surface it.
+    const operatorPause: ResumeGateBlock = { gate: 'paused', reason: 'agent is paused (investigating)', pausedReason: 'investigating' };
+    expect(decideResumeGate(operatorPause, 'merge-preparation')).toMatchObject({ decision: 'block', needsYou: true });
+    expect(decideResumeGate(blocks[1], 'merge-preparation')).toMatchObject({ decision: 'block', needsYou: true });
+
+    // The merge click is itself the operator action, so it clears an operator stop.
+    expect(decideResumeGate(blocks[2], 'merge-preparation')).toEqual({ decision: 'proceed', clearStoppedByUser: true });
+    expect(decideResumeGate(blocks[3], 'merge-preparation')).toMatchObject({ decision: 'proceed', overrideFailureBackoff: true });
+    expect(decideResumeGate(undefined, 'merge-preparation')).toEqual({ decision: 'proceed' });
+  });
+
   it('makes operator start authoritative only for stopped-by-user and failure backoff', () => {
     expect(decideResumeGate(blocks[0], 'operator-start')).toEqual({
       decision: 'block',

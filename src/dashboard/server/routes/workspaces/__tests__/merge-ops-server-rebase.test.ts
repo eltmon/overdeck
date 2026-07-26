@@ -37,11 +37,18 @@ vi.mock('node:child_process', () => {
   return { exec, execFile };
 });
 
-vi.mock('node:fs', () => ({ existsSync: vi.fn(() => true) }));
+vi.mock('node:fs', async importOriginal => ({
+  ...await importOriginal<typeof import('node:fs')>(),
+  existsSync: vi.fn(() => true),
+}));
 vi.mock('../../../../../lib/agents.js', () => ({
   getAgentState: vi.fn(() => Effect.succeed(null)),
   messageAgent: mocks.messageAgent,
   spawnAgent: vi.fn(),
+}));
+vi.mock('../../../../../lib/agents/agent-state.js', async importOriginal => ({
+  ...await importOriginal<typeof import('../../../../../lib/agents/agent-state.js')>(),
+  getAgentStateSync: vi.fn(() => null),
 }));
 vi.mock('../../../../../lib/work-agent-lifecycle.js', () => ({
   getWorkAgentLifecycleStateSync: vi.fn(() => ({
@@ -130,7 +137,7 @@ describe('triggerMerge server rebase escalation', () => {
     mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState()));
     mocks.rebaseFeatureBranch.mockReturnValue(Effect.succeed({ success: true, newHead: HEAD_SHA }));
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
-    mocks.messageAgent.mockResolvedValue(undefined);
+    mocks.messageAgent.mockResolvedValue({ delivered: true });
     mocks.exec.mockImplementation(async (command) => ({
       stdout: command.includes('git rev-parse HEAD') ? `${HEAD_SHA}\n` : command.includes('git rev-parse origin/') ? 'old-head\n' : '',
       stderr: '',
