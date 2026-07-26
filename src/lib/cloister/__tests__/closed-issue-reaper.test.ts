@@ -7,7 +7,7 @@ import { join } from 'node:path';
 const mocks = vi.hoisted(() => ({
   emitActivityEntrySync: vi.fn(),
   exec: vi.fn(),
-  getReviewStatusSync: vi.fn(),
+  getReviewStatusesSync: vi.fn(),
   isIssueClosed: vi.fn(),
   listRunningAgents: vi.fn(),
   listProjectsSync: vi.fn(),
@@ -62,7 +62,7 @@ vi.mock('../reap-issue-residue.js', () => ({
 }));
 
 vi.mock('../../review-status.js', () => ({
-  getReviewStatusSync: mocks.getReviewStatusSync,
+  getReviewStatusesSync: mocks.getReviewStatusesSync,
 }));
 
 vi.mock('../../workspace-manager/docker.js', () => ({
@@ -82,7 +82,7 @@ describe('reconcileClosedIssueAgents', () => {
     mocks.listRunningAgents.mockReturnValue(Effect.succeed([]));
     mocks.listProjectsSync.mockReturnValue([]);
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
-    mocks.getReviewStatusSync.mockReturnValue(null);
+    mocks.getReviewStatusesSync.mockReturnValue({});
     mocks.reapIssueResidue.mockResolvedValue([]);
     mocks.resolveProjectForIssue.mockReturnValue(null);
     mocks.stopAgent.mockReturnValue(Effect.succeed(undefined));
@@ -275,7 +275,7 @@ describe('reconcileClosedIssueAgents', () => {
     rmSync(projectPath, { recursive: true, force: true });
   });
 
-  it('removes leaked devnets for merged issues without reaping other residue', async () => {
+  it('removes Docker stack/network residue for merged issues without reaping non-Docker state', async () => {
     mocks.exec.mockImplementation((command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
       const cb = typeof opts === 'function' ? opts : callback;
       const stdout = String(command).includes('docker network ls')
@@ -284,12 +284,16 @@ describe('reconcileClosedIssueAgents', () => {
       cb?.(null, { stdout, stderr: '' });
       return { on: vi.fn() };
     });
-    mocks.getReviewStatusSync.mockReturnValue({ mergeStatus: 'merged' });
+    mocks.getReviewStatusesSync.mockReturnValue({
+      'PAN-5559': { mergeStatus: 'merged' },
+    });
 
     await expect(reconcileClosedIssueAgents()).resolves.toEqual([
-      'Removed merged-issue Docker network for PAN-5559: Removed network',
+      'Removed merged-issue Docker stack/network for PAN-5559: Removed network',
     ]);
 
+    expect(mocks.getReviewStatusesSync).toHaveBeenCalledTimes(1);
+    expect(mocks.getReviewStatusesSync).toHaveBeenCalledWith(['PAN-5559']);
     expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith('pan-5559');
     expect(mocks.reapIssueResidue).not.toHaveBeenCalled();
     expect(mocks.stopAgent).not.toHaveBeenCalled();
@@ -307,7 +311,7 @@ describe('reconcileClosedIssueAgents', () => {
 
     await expect(reconcileClosedIssueAgents()).resolves.toEqual([]);
 
-    expect(mocks.getReviewStatusSync).toHaveBeenCalledWith('PAN-5559');
+    expect(mocks.getReviewStatusesSync).toHaveBeenCalledWith(['PAN-5559']);
     expect(mocks.teardownWorkspaceDockerByNamePromise).not.toHaveBeenCalled();
     expect(mocks.reapIssueResidue).not.toHaveBeenCalled();
     expect(mocks.stopAgent).not.toHaveBeenCalled();

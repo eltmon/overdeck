@@ -33,6 +33,10 @@ vi.mock('../../../src/lib/telemetry/pipeline.js', () => ({
 }));
 
 import { getReviewStatusSync, setReviewStatusSync } from '../../../src/lib/review-status.js';
+import {
+  registerReviewStatusMapReader,
+  resolveCanonicalReviewStatus,
+} from '../../../src/lib/cloister/review-status-source.js';
 import { rehydrateHeadAnchor } from '../../../src/lib/git-utils.js';
 
 describe('review status', () => {
@@ -55,6 +59,18 @@ describe('review status', () => {
     };
 
     expect(invalidWrite).toBeTypeOf('function');
+  });
+
+  it('resolves canonical merged status even when the raw status map is stale', () => {
+    setReviewStatusSync('PAN-3138', { mergeStatus: 'merged' });
+    registerReviewStatusMapReader(() => ({
+      'PAN-3138': { mergeStatus: 'failed' },
+    }));
+
+    expect(resolveCanonicalReviewStatus('PAN-3138')).toMatchObject({
+      available: true,
+      status: { mergeStatus: 'merged' },
+    });
   });
 
   it('persists scope drift through the review status journal update', () => {

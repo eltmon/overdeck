@@ -529,14 +529,11 @@ export async function postMergeLifecycle(
     } catch (err) {
       console.warn(`[merge-agent] Memory reset marker creation failed (non-fatal): ${err}`);
     }
-
     // 4. Stop Docker containers + networks to prevent network pool exhaustion (non-fatal)
-    // Orphaned Docker networks accumulate when workspaces are merged but containers are never
-    // torn down, eventually exhausting Docker's address pool and blocking new workspace creation.
+    const issueLower = issueId.toLowerCase();
     try {
       const { findWorkspacePath } = await import('../lifecycle/archive-planning.js');
       const { stopWorkspaceDocker } = await import('../workspace-manager.js');
-      const issueLower = issueId.toLowerCase();
       const workspacePath = findWorkspacePath(projectPath, issueLower);
       if (workspacePath) {
         const dockerResult = await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
@@ -545,7 +542,10 @@ export async function postMergeLifecycle(
           logActivity('docker_cleanup', `Stopped Docker for ${issueId}: ${dockerResult.steps.join('; ')}`);
         }
       }
-
+    } catch (err) {
+      console.warn(`[merge-agent] Docker container stop failed (non-fatal): ${err}`);
+    }
+    try {
       const { teardownWorkspaceDockerByNamePromise } = await import('../workspace-manager/docker.js');
       const teardown = await teardownWorkspaceDockerByNamePromise(issueLower);
       if (teardown.networkRemoved) {
@@ -553,7 +553,7 @@ export async function postMergeLifecycle(
         logActivity('docker_cleanup', `Removed Docker network for ${issueId}: ${teardown.steps.join('; ')}`);
       }
     } catch (err) {
-      console.warn(`[merge-agent] Docker cleanup failed (non-fatal): ${err}`);
+      console.warn(`[merge-agent] Docker network teardown failed (non-fatal): ${err}`);
     }
 
     await notifyTldrDaemon(projectPath, sourceBranch ?? '');

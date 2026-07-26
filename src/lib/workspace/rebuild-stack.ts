@@ -165,14 +165,22 @@ export const rebuildWorkspaceStack = (
 
   return Effect.gen(function* () {
     const closed = yield* Effect.promise(() => isIssueClosed(issueId));
-    const merged = yield* Effect.promise(async () => {
-      const { readReviewStatusMap } = await import('../cloister/review-status-source.js');
-      return readReviewStatusMap()?.[issueId.toUpperCase()]?.mergeStatus === 'merged';
-    });
-    if (closed || merged) {
+    const reviewStatus = closed
+      ? null
+      : yield* Effect.promise(async () => {
+          const { resolveCanonicalReviewStatus } = await import('../cloister/review-status-source.js');
+          return resolveCanonicalReviewStatus(issueId);
+        });
+    if (closed || reviewStatus?.status?.mergeStatus === 'merged') {
       return {
         success: false,
         error: 'Issue is terminal (closed/merged) — skipping stack rebuild',
+      } satisfies RebuildWorkspaceStackResult;
+    }
+    if (!reviewStatus?.available) {
+      return {
+        success: false,
+        error: 'Issue terminal status is unavailable — skipping stack rebuild',
       } satisfies RebuildWorkspaceStackResult;
     }
 

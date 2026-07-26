@@ -221,25 +221,39 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
     await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
   }
 
+  const openDevnetIssueIds: string[] = [];
   for (const issueId of await listFeatureDevnetIssueIds()) {
     if (await isClosedIssue(issueId, closedChecks)) {
       await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
-      continue;
+    } else {
+      openDevnetIssueIds.push(issueId);
     }
+  }
 
+  if (openDevnetIssueIds.length > 0) {
     try {
-      const { getReviewStatusSync } = await import('../review-status.js');
-      if (getReviewStatusSync(issueId)?.mergeStatus !== 'merged') continue;
-
-      const { teardownWorkspaceDockerByNamePromise } = await import('../workspace-manager/docker.js');
-      const result = await teardownWorkspaceDockerByNamePromise(issueId.toLowerCase());
-      actions.push(
-        result.networkRemoved
-          ? `Removed merged-issue Docker network for ${issueId}: ${result.steps.join('; ')}`
-          : `Merged-issue Docker network still present for ${issueId}: ${result.steps.join('; ')}`,
+      const { getReviewStatusesSync } = await import('../review-status.js');
+      const statuses = getReviewStatusesSync(openDevnetIssueIds);
+      const mergedIssueIds = openDevnetIssueIds.filter(
+        (issueId) => statuses[issueId]?.mergeStatus === 'merged',
       );
+      if (mergedIssueIds.length > 0) {
+        const { teardownWorkspaceDockerByNamePromise } = await import('../workspace-manager/docker.js');
+        for (const issueId of mergedIssueIds) {
+          try {
+            const result = await teardownWorkspaceDockerByNamePromise(issueId.toLowerCase());
+            actions.push(
+              result.networkRemoved
+                ? `Removed merged-issue Docker stack/network for ${issueId}: ${result.steps.join('; ')}`
+                : `Merged-issue Docker stack/network still present for ${issueId}: ${result.steps.join('; ')}`,
+            );
+          } catch (error) {
+            actions.push(`Failed to remove merged-issue Docker stack/network for ${issueId}: ${error}`);
+          }
+        }
+      }
     } catch (error) {
-      actions.push(`Failed to remove merged-issue Docker network for ${issueId}: ${error}`);
+      actions.push(`Failed to resolve merged-issue Docker cleanup status: ${error}`);
     }
   }
 
