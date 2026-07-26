@@ -234,6 +234,7 @@ beforeEach(() => {
   createOverdeckDatabase({ dbPath: join(tmpHome, 'overdeck.db') });
   closeOverdeckDatabaseSync();
   process.env.OVERDECK_HOME = tmpHome;
+  process.env.OVERDECK_AGENT_STARTED_BY = 'test:agents-spawn-supervisor';
   capturePaneText = 'Claude Code';
   channelsMcpEnabled = false;
   activeFlywheelRunId = null;
@@ -272,6 +273,7 @@ afterEach(() => {
   vi.doUnmock('../projects.js');
   closeOverdeckDatabaseSync();
   delete process.env.OVERDECK_HOME;
+  delete process.env.OVERDECK_AGENT_STARTED_BY;
   delete process.env.PAN_DOCKER;
   delete process.env.OVERDECK_DOCKER_WORKSPACE;
   rmSync(tmpHome, { recursive: true, force: true });

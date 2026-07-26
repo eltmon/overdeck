@@ -17,6 +17,7 @@ import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.j
 import { listProjects, resolveProjectFromIssueSync, type ProjectConfig } from '../projects.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { listSessionNames } from '../tmux.js';
+import { writeAutoSpawnOnFinalizeFlag } from '../planning/spawn-planning-session.js';
 import { findPlanSync, readPlanSync } from '../xbrief/io.js';
 import { isXBriefFilename } from '../xbrief/lifecycle.js';
 import type { XBriefDocument } from '../xbrief/types.js';
@@ -34,6 +35,7 @@ import { clearIssueClosedCache, isIssueClosed } from './issue-closed.js';
 const DEFAULT_ATTEMPT_INTERVAL_MS = 5 * 60 * 1000;
 const execAsync = promisify(exec);
 const attemptCooldowns = new Map<string, number>();
+const pickupRefusalReasons = new Map<string, string>();
 const terminalClosedIssueIds = new Set<string>();
 let scanInFlight = false;
 
@@ -377,7 +379,7 @@ function logReconcilerDiagnostic(kind: string, info: Record<string, unknown> = {
 }
 
 async function defaultEvaluatePickupGate(issueId: string): Promise<AutonomousWorkDispatchDecision> {
-  return decideAutonomousWorkDispatch(await gatherAutonomousWorkDispatchInput(issueId));
+  return decideAutonomousWorkDispatch(await gatherAutonomousWorkDispatchInput(issueId, { knownPlanned: true }));
 }
 
 /**
@@ -448,14 +450,19 @@ export async function handleOrphanProposedSpec(
   if (!pickupGate.allow) {
     const reason = `pickup-gate:${pickupGate.code}`;
     logReconcilerDiagnostic('spawn-skipped', { issueId: upperIssueId, reason });
-    await recordDeadEndNeedsYou(
-      upperIssueId,
-      'orphan-proposed-pickup-gate',
-      'proposed',
-      pickupGate.reason,
-    );
+    attemptCooldowns.set(upperIssueId, now);
+    if (pickupRefusalReasons.get(upperIssueId) !== pickupGate.reason) {
+      pickupRefusalReasons.set(upperIssueId, pickupGate.reason);
+      await recordDeadEndNeedsYou(
+        upperIssueId,
+        'orphan-proposed-pickup-gate',
+        'proposed',
+        pickupGate.reason,
+      );
+    }
     return [`Skipped orphan proposed spec ${upperIssueId}: ${reason}`];
   }
+  pickupRefusalReasons.delete(upperIssueId);
 
   const agentId = `agent-${issueLower}`;
 
@@ -516,6 +523,7 @@ export async function handleOrphanProposedSpec(
   try {
     const spawn = await (options.spawnWorkAgent ?? ((id) => spawnWorkAgentThroughAgentsEndpoint(id, options.dashboardOrigin)))(upperIssueId);
     if (spawn.spawned) {
+      await writeAutoSpawnOnFinalizeFlag(upperIssueId, false);
       emitReconcilerActivity(
         'success',
         `Started work agent for ${upperIssueId} — proposed spec had tasks but no running agent`,
@@ -603,6 +611,7 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
 
 export function clearOrphanProposedAttemptCooldowns(): void {
   attemptCooldowns.clear();
+  pickupRefusalReasons.clear();
   terminalClosedIssueIds.clear();
   clearIssueClosedCache();
   scanInFlight = false;

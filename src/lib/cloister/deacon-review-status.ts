@@ -679,6 +679,7 @@ async function reconcileReviewStatusOrphan(
             const run = await spawnRun(issueId, 'test', {
               workspace,
               prompt: buildTestRolePrompt({ issueId, workspace, branch }),
+              startedBy: 'deacon:orphan-test-recovery',
             });
             testStackRebuildState.delete(issueId.toUpperCase());
             setReviewStatusSync(issueId, { testStatus: 'testing' });

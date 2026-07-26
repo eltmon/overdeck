@@ -36,6 +36,7 @@ describe('AgentState role persistence', () => {
     vi.resetModules();
     tempHome = mkdtempSync(join(tmpdir(), 'pan-agent-role-'));
     process.env.OVERDECK_HOME = tempHome;
+    process.env.OVERDECK_AGENT_STARTED_BY = 'test:agent-state-role';
   });
 
   afterEach(() => {
@@ -59,6 +60,7 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../runtimes/ohmypi-fifo.js');
     vi.doUnmock('../harness-resolve.js');
     delete process.env.OVERDECK_HOME;
+    delete process.env.OVERDECK_AGENT_STARTED_BY;
     rmSync(tempHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   });
 

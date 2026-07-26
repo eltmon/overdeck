@@ -14,7 +14,8 @@ const mocks = vi.hoisted(() => ({
   isFlywheelAutoPickupBacklog: vi.fn(),
   activeOrderBookIssues: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
-  readAutoSpawnOnFinalizeFlag: vi.fn(),
+  readAutoSpawnOnFinalizeFlagAsync: vi.fn(),
+  findPlannedState: vi.fn(),
 }));
 
 vi.mock('../../overdeck/control-settings.js', () => ({
@@ -30,18 +31,25 @@ vi.mock('../../projects.js', () => ({
 }));
 
 vi.mock('../../planning/spawn-planning-session.js', () => ({
-  readAutoSpawnOnFinalizeFlag: mocks.readAutoSpawnOnFinalizeFlag,
+  readAutoSpawnOnFinalizeFlagAsync: mocks.readAutoSpawnOnFinalizeFlagAsync,
 }));
 
 import {
+  clearAutonomousWorkDispatchCaches,
   decideAutonomousWorkDispatch,
   gatherAutonomousWorkDispatchInput,
   type AutonomousWorkDispatchInput,
 } from '../autonomous-work-dispatch.js';
 
+const gatherDeps = () => ({
+  getIssues: mocks.getIssues,
+  findPlannedState: mocks.findPlannedState,
+});
+
 function input(overrides: Partial<AutonomousWorkDispatchInput> = {}): AutonomousWorkDispatchInput {
   return {
     labels: [READY_LABEL, RELEASED_LABEL],
+    planned: true,
     autoPickupBacklog: false,
     activeBookMember: false,
     autoSpawnOnFinalizeConsent: false,
@@ -87,6 +95,12 @@ describe('decideAutonomousWorkDispatch', () => {
     expect(decision.reason).toContain('Add the ready label');
   });
 
+  it('rejects a ready issue without an active implementation plan', () => {
+    const decision = decideAutonomousWorkDispatch(input({ planned: false }));
+
+    expect(decision).toMatchObject({ allow: false, code: 'not-planned' });
+  });
+
   it('rejects a ready issue without a release source', () => {
     const decision = decideAutonomousWorkDispatch(input({ labels: [READY_LABEL] }));
 
@@ -117,10 +131,11 @@ describe('decideAutonomousWorkDispatch', () => {
 describe('gatherAutonomousWorkDispatchInput', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearAutonomousWorkDispatchCaches();
     mocks.getIssues.mockReturnValue([
       {
         identifier: 'PAN-3111',
-        labels: [READY_LABEL, { name: RELEASED_LABEL }, null],
+        labels: [{ name: READY_LABEL }, null],
       },
     ]);
     mocks.isFlywheelAutoPickupBacklog.mockReturnValue(true);
@@ -130,18 +145,20 @@ describe('gatherAutonomousWorkDispatchInput', () => {
       projectPath: '/repo',
     });
     mocks.activeOrderBookIssues.mockResolvedValue(new Set(['PAN-3111']));
-    mocks.readAutoSpawnOnFinalizeFlag.mockReturnValue(true);
+    mocks.readAutoSpawnOnFinalizeFlagAsync.mockResolvedValue(true);
+    mocks.findPlannedState.mockResolvedValue({ status: 'proposed', itemCount: 1 });
   });
 
   it('gathers labels and every release source for the normalized issue ID', async () => {
-    await expect(gatherAutonomousWorkDispatchInput(' pan-3111 ', { getIssues: mocks.getIssues })).resolves.toEqual({
-      labels: [READY_LABEL, RELEASED_LABEL],
+    await expect(gatherAutonomousWorkDispatchInput(' pan-3111 ', gatherDeps())).resolves.toEqual({
+      labels: [READY_LABEL],
+      planned: true,
       autoPickupBacklog: true,
       activeBookMember: true,
       autoSpawnOnFinalizeConsent: true,
     });
     expect(mocks.activeOrderBookIssues).toHaveBeenCalledWith('/repo');
-    expect(mocks.readAutoSpawnOnFinalizeFlag).toHaveBeenCalledWith('PAN-3111');
+    expect(mocks.readAutoSpawnOnFinalizeFlagAsync).toHaveBeenCalledWith('PAN-3111');
   });
 
   it('uses safe defaults when issue, settings, order-book, and consent reads fail', async () => {
@@ -152,23 +169,64 @@ describe('gatherAutonomousWorkDispatchInput', () => {
       throw new Error('settings unavailable');
     });
     mocks.activeOrderBookIssues.mockRejectedValue(new Error('order book unavailable'));
-    mocks.readAutoSpawnOnFinalizeFlag.mockImplementation(() => {
-      throw new Error('flag unavailable');
-    });
+    mocks.readAutoSpawnOnFinalizeFlagAsync.mockRejectedValue(new Error('flag unavailable'));
 
-    await expect(gatherAutonomousWorkDispatchInput('PAN-3111', { getIssues: mocks.getIssues })).resolves.toEqual({
+    await expect(gatherAutonomousWorkDispatchInput('PAN-3111', gatherDeps())).resolves.toEqual({
       labels: null,
+      planned: false,
       autoPickupBacklog: false,
       activeBookMember: false,
       autoSpawnOnFinalizeConsent: false,
     });
   });
 
+  it('short-circuits storage reads for blocked, unready, and unplanned issues', async () => {
+    mocks.getIssues.mockReturnValue([{ identifier: 'PAN-3111', labels: [READY_LABEL, PARKED_LABEL] }]);
+    await gatherAutonomousWorkDispatchInput('PAN-3111', gatherDeps());
+    expect(mocks.findPlannedState).not.toHaveBeenCalled();
+
+    mocks.getIssues.mockReturnValue([{ identifier: 'PAN-3111', labels: [] }]);
+    await gatherAutonomousWorkDispatchInput('PAN-3111', gatherDeps());
+    expect(mocks.findPlannedState).not.toHaveBeenCalled();
+
+    mocks.getIssues.mockReturnValue([{ identifier: 'PAN-3111', labels: [READY_LABEL] }]);
+    mocks.findPlannedState.mockResolvedValue(null);
+    await gatherAutonomousWorkDispatchInput('PAN-3111', gatherDeps());
+    expect(mocks.isFlywheelAutoPickupBacklog).not.toHaveBeenCalled();
+    expect(mocks.activeOrderBookIssues).not.toHaveBeenCalled();
+    expect(mocks.readAutoSpawnOnFinalizeFlagAsync).not.toHaveBeenCalled();
+  });
+
+  it('short-circuits release-source reads for a planned issue with the released label', async () => {
+    mocks.getIssues.mockReturnValue([{ identifier: 'PAN-3111', labels: [READY_LABEL, RELEASED_LABEL] }]);
+
+    await expect(gatherAutonomousWorkDispatchInput('PAN-3111', gatherDeps())).resolves.toEqual({
+      labels: [READY_LABEL, RELEASED_LABEL],
+      planned: true,
+      autoPickupBacklog: false,
+      activeBookMember: false,
+      autoSpawnOnFinalizeConsent: false,
+    });
+    expect(mocks.isFlywheelAutoPickupBacklog).not.toHaveBeenCalled();
+    expect(mocks.activeOrderBookIssues).not.toHaveBeenCalled();
+    expect(mocks.readAutoSpawnOnFinalizeFlagAsync).not.toHaveBeenCalled();
+  });
+
+  it('caches shared release inputs across candidates in one patrol window', async () => {
+    await gatherAutonomousWorkDispatchInput('PAN-3111', gatherDeps());
+    mocks.getIssues.mockReturnValue([{ identifier: 'PAN-3112', labels: [READY_LABEL] }]);
+    mocks.findPlannedState.mockResolvedValue({ status: 'proposed', itemCount: 1 });
+    await gatherAutonomousWorkDispatchInput('PAN-3112', gatherDeps());
+
+    expect(mocks.isFlywheelAutoPickupBacklog).toHaveBeenCalledTimes(1);
+    expect(mocks.activeOrderBookIssues).toHaveBeenCalledTimes(1);
+  });
+
   it('treats unresolved projects and missing issues as unavailable release inputs', async () => {
     mocks.getIssues.mockReturnValue([]);
     mocks.resolveProjectFromIssueSync.mockReturnValue(null);
 
-    const gathered = await gatherAutonomousWorkDispatchInput('PAN-3111', { getIssues: mocks.getIssues });
+    const gathered = await gatherAutonomousWorkDispatchInput('PAN-3111', gatherDeps());
 
     expect(gathered.labels).toBeNull();
     expect(gathered.activeBookMember).toBe(false);

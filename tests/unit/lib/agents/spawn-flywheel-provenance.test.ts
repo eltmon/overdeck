@@ -192,15 +192,13 @@ describe('spawn flywheel provenance', () => {
     expect(mocks.savedSync[0]?.startedBy).toBe('operator:dashboard:start');
   });
 
-  it('leaves provenance undefined when no override, environment token, or active run exists', async () => {
+  it('fails before persistence when no provenance source is available', async () => {
     await expect(spawnAgent({
       issueId: 'PAN-3111',
       workspace: '/tmp/workspace',
       role: 'knowledge',
-    })).rejects.toThrow(STOP_AFTER_STATE_SAVE.message);
+    } as any)).rejects.toThrow('Agent spawn provenance is required');
 
-    expect(mocks.savedSync).toHaveLength(1);
-    expect(mocks.savedSync[0]?.flywheelRunId).toBeUndefined();
-    expect(mocks.savedSync[0]?.startedBy).toBeUndefined();
+    expect(mocks.savedSync).toHaveLength(0);
   });
 });

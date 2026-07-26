@@ -63,6 +63,7 @@ export function buildRealReconcileDeps(): ReconcileDeps {
         prompt:
           'Your branch was automatically rebased onto the latest main after another feature merged. ' +
           'Re-review on the new HEAD and confirm the issue is still correct and ready to merge.',
+        startedBy: 'merge-train:verification',
       });
     },
 
@@ -78,6 +79,7 @@ export function buildRealReconcileDeps(): ReconcileDeps {
           '',
           `Do not blindly accept one side of a conflict — understand both changesets first.`,
         ].join('\n'),
+        startedBy: 'merge-train:conflict-resolver',
       });
     },
   };

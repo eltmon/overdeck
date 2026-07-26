@@ -62,8 +62,10 @@ export function resolveAgentStartedBy(
   explicit: string | undefined,
   flywheelRunId: string | undefined,
   environmentToken = process.env['OVERDECK_AGENT_STARTED_BY'],
-): string | undefined {
-  return explicit ?? environmentToken ?? (flywheelRunId ? `flywheel:${flywheelRunId}` : undefined);
+): string {
+  const resolved = explicit?.trim() || environmentToken?.trim() || (flywheelRunId ? `flywheel:${flywheelRunId}` : '');
+  if (!resolved) throw new Error('Agent spawn provenance is required: pass startedBy at the launch entry point.');
+  return resolved;
 }
 
 export function flywheelEnvExports(env: FlywheelSpawnEnv): string[] {
@@ -104,7 +106,7 @@ export interface SpawnOptions {
   slotItemId?: string;
   allowHost?: boolean;
   flywheelRunId?: string;
-  startedBy?: string;
+  startedBy: string;
   /** Claude Code `--effort` level for the spawned session (work/strike). */
   effort?: RoleEffort;
 }
@@ -136,7 +138,7 @@ export interface SpawnRunOptions {
   extraEnvExports?: string[];
   resumeSessionId?: string;
   flywheelRunId?: string;
-  startedBy?: string;
+  startedBy: string;
   /** 1-based registered slot index for per-item work-agent spawning. */
   slotIndex?: number;
   /** xBRIEF item id assigned to this registered slot. Required with slotIndex. */

@@ -131,9 +131,10 @@ export function startPlanningForIssue(options: {
   github: any;
   rally: any;
   lifecycle: any;
+  startedBy: string;
 }) {
   return Effect.gen(function* () {
-    const { id, body, eventStore, linear, github, rally, lifecycle } = options;
+    const { id, body, eventStore, linear, github, rally, lifecycle, startedBy } = options;
     const {
       skipWorkspace = false,
       startDocker = false,
@@ -146,7 +147,6 @@ export function startPlanningForIssue(options: {
       probe = false,
       harness = 'claude-code',
     } = body as any;
-    const startedBy = typeof body.startedBy === 'string' && body.startedBy.trim() ? body.startedBy.trim() : 'operator:dashboard';
     void skipWorkspace;
     void startDocker;
     const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' || harness === 'acp' ? harness : 'claude-code';

@@ -29,7 +29,7 @@ vi.mock('../autonomous-plan-dispatch.js', async (importOriginal) => {
 const autonomousWorkMock = vi.hoisted(() => ({
   decision: { allow: true } as
     | { allow: true }
-    | { allow: false; code: 'not-ready' | 'not-released' | 'labels-unavailable'; reason: string },
+    | { allow: false; code: 'not-ready' | 'not-planned' | 'not-released' | 'labels-unavailable'; reason: string },
 }));
 
 vi.mock('../autonomous-work-dispatch.js', () => ({
@@ -381,6 +381,24 @@ describe('reactive Cloister scheduler', () => {
     );
 
     logSpy.mockRestore();
+  });
+
+  it('refuses reactive work dispatch without a finalized implementation plan', async () => {
+    autonomousWorkMock.decision = {
+      allow: false,
+      code: 'not-planned',
+      reason: 'Autonomous work dispatch was refused because no active implementation plan with work items is available.',
+    };
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
+
+    expect(spawnRun).not.toHaveBeenCalled();
+    expect(recordDeadEndNeedsYou).toHaveBeenCalledWith(
+      'PAN-503',
+      'reactive-work-dispatch-pickup-gate',
+      'in_progress',
+      expect.stringContaining('no active implementation plan'),
+    );
   });
 
   it('preserves reactive work spawning when the pickup gate allows dispatch', async () => {

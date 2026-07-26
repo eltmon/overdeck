@@ -714,6 +714,7 @@ async function spawnReviewRoleForIssuePromise(
       ...(opts.model ? { model: opts.model } : {}),
       ...(opts.harness ? { harness: opts.harness } : {}),
       ...(allowHost ? { allowHost: true } : {}),
+      startedBy: 'review-agent',
     });
     // Persist the runId on the synthesis agent's own state so the idempotency
     // guard above can tell a genuinely-running review (runId matches current

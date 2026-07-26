@@ -74,6 +74,7 @@ import {
   unavailablePipelineMembership,
 } from '../services/pipeline-membership.js';
 import { invalidateAgentsCache } from './agents.js';
+import { isInternalAgentRequest, resolveRequestedStartedBy } from './agents/shared.js';
 import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js';
 import { LinearClient } from '../services/linear-client.js';
 import { GitHubClient, type GitHubClientError, type GitHubClientShape, type GitHubIssue } from '../services/github-client.js';
@@ -360,6 +361,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
   'POST',
   '/api/issues/:id/start-planning',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     if (!parseIssueIdSync(id)) {
@@ -371,8 +373,11 @@ const postIssueStartPlanningRoute = HttpRouter.add(
     const github = yield* GitHubClient;
     const rally = yield* RallyClient;
     const lifecycle = yield* IssueLifecycle;
+    let startedBy: string;
+    try { startedBy = resolveRequestedStartedBy(body.startedBy, yield* Effect.promise(() => isInternalAgentRequest(request))); }
+    catch (error) { return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 }); }
 
-    return yield* startPlanningForIssue({ id, body, eventStore, linear, github, rally, lifecycle });
+    return yield* startPlanningForIssue({ id, body, eventStore, linear, github, rally, lifecycle, startedBy });
   })),
 );
 

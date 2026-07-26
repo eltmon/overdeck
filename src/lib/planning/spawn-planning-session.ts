@@ -12,7 +12,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { access, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -73,6 +73,21 @@ export function readAutoSpawnOnFinalizeFlag(issueId: string): boolean {
   }
 }
 
+export async function readAutoSpawnOnFinalizeFlagAsync(issueId: string): Promise<boolean> {
+  try {
+    const flag = JSON.parse(await readFile(autoSpawnOnFinalizeFlagPath(issueId), 'utf-8')) as { autoSpawnOnFinalize?: unknown };
+    return flag.autoSpawnOnFinalize === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function writeAutoSpawnOnFinalizeFlag(issueId: string, enabled: boolean): Promise<void> {
+  const flagFile = autoSpawnOnFinalizeFlagPath(issueId);
+  await mkdir(dirname(flagFile), { recursive: true });
+  await writeFile(flagFile, JSON.stringify({ autoSpawnOnFinalize: enabled }));
+}
+
 /**
  * Decide whether finalizing planning should auto-spawn the work agent. An
  * explicit request value always wins (`true`/`false`); otherwise fall back to
@@ -80,10 +95,12 @@ export function readAutoSpawnOnFinalizeFlag(issueId: string): boolean {
  * the CLI `pan plan finalize`, the dashboard Done button, and host
  * auto-finalize — consistent with how the session was launched.
  */
-export function resolveAutoSpawnOnFinalize(requestedAutoSpawn: unknown, issueId: string): boolean {
-  if (requestedAutoSpawn === true) return true;
-  if (requestedAutoSpawn === false) return false;
-  return readAutoSpawnOnFinalizeFlag(issueId);
+export async function resolveAutoSpawnOnFinalize(requestedAutoSpawn: unknown, issueId: string): Promise<boolean> {
+  if (requestedAutoSpawn === true || requestedAutoSpawn === false) {
+    await writeAutoSpawnOnFinalizeFlag(issueId, requestedAutoSpawn);
+    return requestedAutoSpawn;
+  }
+  return readAutoSpawnOnFinalizeFlagAsync(issueId);
 }
 
 async function getPackageVersion(): Promise<string> {
@@ -174,7 +191,7 @@ export interface SpawnPlanningOptions {
   /** Automatically start the work agent after finalize; stamped by trusted callers only. */
   autoSpawnOnFinalize?: boolean;
   /** Origin token for the planning agent state. */
-  startedBy?: string;
+  startedBy: string;
   /** Optional callback for streaming progress events to the client. */
   onProgress?: (event: PlanningProgress) => void;
 }
@@ -193,7 +210,7 @@ export interface PlanningAgentStateInput {
   workspaceLocation: 'local' | 'remote';
   auto?: boolean;
   autoSpawnOnFinalize?: boolean;
-  startedBy?: string;
+  startedBy: string;
   startedAt?: string;
 }
 
@@ -493,6 +510,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
   };
 
   try {
+    await writeAutoSpawnOnFinalizeFlag(issue.identifier, autoSpawnOnFinalize === true);
     console.log(`[start-planning] Background setup starting for ${issue.identifier}`);
 
     // ── Step 1: Create workspace if needed ─────────────────────────────────
@@ -751,12 +769,6 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         auto: auto === true,
         startedBy,
       });
-      if (autoSpawnOnFinalize) {
-        await writeFile(
-          join(agentStateDir, 'auto-spawn-on-finalize.json'),
-          JSON.stringify({ autoSpawnOnFinalize: true }),
-        );
-      }
     }
 
     if (behavior.usesCodexHome || behavior.launchCommandKind === 'acp-host') {

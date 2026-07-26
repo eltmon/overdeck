@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readAutoSpawnOnFinalizeFlag, resolveAutoSpawnOnFinalize } from '../spawn-planning-session.js';
+import {
+  readAutoSpawnOnFinalizeFlag,
+  resolveAutoSpawnOnFinalize,
+  writeAutoSpawnOnFinalizeFlag,
+} from '../spawn-planning-session.js';
 
 // Locks the fix for the stranded-planning bug: finalizing a planning session
 // launched with --auto-start must auto-spawn the work agent regardless of HOW
@@ -41,18 +45,28 @@ describe('resolveAutoSpawnOnFinalize', () => {
     expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(false);
   });
 
-  it('an explicit request value always wins over the flag', () => {
+  it('an explicit request value replaces prior-cycle consent', async () => {
     stampFlag(true);
-    expect(resolveAutoSpawnOnFinalize(false, ISSUE)).toBe(false); // explicit false beats flag=true
-    expect(resolveAutoSpawnOnFinalize(true, ISSUE)).toBe(true);
+    await expect(resolveAutoSpawnOnFinalize(false, ISSUE)).resolves.toBe(false);
+    await expect(resolveAutoSpawnOnFinalize(undefined, ISSUE)).resolves.toBe(false);
+
+    await expect(resolveAutoSpawnOnFinalize(true, ISSUE)).resolves.toBe(true);
+    await expect(resolveAutoSpawnOnFinalize(undefined, ISSUE)).resolves.toBe(true);
   });
 
-  it('falls back to the flag when the request omits autoSpawn (the dashboard Done path)', () => {
+  it('a new planning launch without auto-start clears stale consent', async () => {
     stampFlag(true);
-    expect(resolveAutoSpawnOnFinalize(undefined, ISSUE)).toBe(true);
+    await writeAutoSpawnOnFinalizeFlag(ISSUE, false);
+
+    await expect(resolveAutoSpawnOnFinalize(undefined, ISSUE)).resolves.toBe(false);
   });
 
-  it('omitted autoSpawn + no flag = no spawn (interactive planning, manual start)', () => {
-    expect(resolveAutoSpawnOnFinalize(undefined, ISSUE)).toBe(false);
+  it('falls back to the current-cycle flag when the request omits autoSpawn', async () => {
+    stampFlag(true);
+    await expect(resolveAutoSpawnOnFinalize(undefined, ISSUE)).resolves.toBe(true);
+  });
+
+  it('omitted autoSpawn + no flag = no spawn (interactive planning, manual start)', async () => {
+    await expect(resolveAutoSpawnOnFinalize(undefined, ISSUE)).resolves.toBe(false);
   });
 });

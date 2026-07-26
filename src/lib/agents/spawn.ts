@@ -84,7 +84,7 @@ import { stopAgent } from './termination.js';
 import { createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
 import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
 const execAsync = promisify(exec);
-export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
+export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
   const modelSpawnKey = `${role}:${issueId}`;
   const selectedModel = determineModel({ model: options.model, role, spawnKey: modelSpawnKey });

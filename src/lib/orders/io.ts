@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { OrderBookIndexEntry as OrderBookIndexEntrySchema } from '@overdeck/contracts';
 import type { OrderBook, OrderBookIndexEntry, OrderBookItem } from '@overdeck/contracts';
@@ -26,6 +27,21 @@ export function orderBookIndexPath(stateRoot: string): string {
 
 export function backlogSequencePath(stateRoot: string): string {
   return join(stateRoot, 'backlog', 'sequence.md');
+}
+
+export async function readOrderBookAsync(stateRoot: string, bookId: string): Promise<OrderBook | null> {
+  const path = orderBookPath(stateRoot, bookId);
+  let value: unknown;
+  try {
+    value = JSON.parse(await readFile(path, 'utf8'));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw new Error(`Could not parse order book ${bookId}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const parsed = parseOrderBookJson(value);
+  if (!parsed.ok) throw new Error(`Could not parse order book ${bookId}: ${parsed.error}`);
+  if (parsed.book.id !== bookId) throw new Error(`Order book ${bookId} contains mismatched id ${parsed.book.id}`);
+  return parsed.book;
 }
 
 export function readOrderBook(stateRoot: string, bookId: string): OrderBook | null {

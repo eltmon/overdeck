@@ -58,6 +58,7 @@ import {
   getIssueDataService,
   getProjectPath,
   invalidateAgentsCache,
+  isInternalAgentRequest,
   readJsonBody,
   resolveRequestedStartedBy,
   spawnPanCommandDetached,
@@ -216,7 +217,6 @@ export async function spawnAfterClearingStartGates<T>(input: {
     throw error;
   }
 }
-
 // ─── Route: POST /api/agents (start agent) ───────────────────────────────────
 
 export const postAgentsRoute = HttpRouter.add(
@@ -226,19 +226,19 @@ export const postAgentsRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return authError;
-
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const lifecycle = yield* IssueLifecycle;
     const readModel = yield* ReadModelService;
-
     const { issueId, projectId } = body as any;
-    const startedBy = resolveRequestedStartedBy((body as any).startedBy);
+    const internalRequest = yield* Effect.promise(() => isInternalAgentRequest(request));
+    let startedBy: string;
+    try { startedBy = resolveRequestedStartedBy((body as any).startedBy, internalRequest); }
+    catch (error) { return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 }); }
     const autoStart = (body as any).auto === true;
     const guardrailAcknowledged = (body as any).guardrailAcknowledged === true;
     const offBook = (body as any).offBook === true;
     const requestedHostOverride = (body as any).host === true || (body as any).allowHost === true;
-
     if (!issueId) {
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
     }

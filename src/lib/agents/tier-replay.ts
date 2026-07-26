@@ -225,6 +225,7 @@ async function spawnReplayTarget(target: ReplayTarget, deps: Required<TierReplay
       harness: target.supervisor.harness,
       workspace: target.workspace,
       prompt: target.prompt,
+      startedBy: 'tier-replay',
     });
   }
 
@@ -233,6 +234,7 @@ async function spawnReplayTarget(target: ReplayTarget, deps: Required<TierReplay
     slotIndex: slot.slotIndex,
     slotItemId: slot.slotItemId,
     prompt: target.prompt,
+    startedBy: 'tier-replay',
     ...currentTierSpawnOverride(target),
   };
   return deps.spawn(target.issueId, 'work', spawnOptions);

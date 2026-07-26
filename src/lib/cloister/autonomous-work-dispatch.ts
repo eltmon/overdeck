@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import {
   EPIC_LABEL,
   LEGACY_PARKED_LABELS,
@@ -8,23 +9,30 @@ import {
   VETOED_LABEL,
 } from '../backlog/pickup.js';
 import { isFlywheelAutoPickupBacklog } from '../overdeck/control-settings.js';
-import { readAutoSpawnOnFinalizeFlag } from '../planning/spawn-planning-session.js';
+import { findSpecByIssue } from '../pan-dir/specs.js';
+import { readAutoSpawnOnFinalizeFlagAsync } from '../planning/spawn-planning-session.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { activeOrderBookIssues } from './flywheel.js';
 
 export interface AutonomousWorkDispatchInput {
   labels: readonly string[] | null;
+  planned: boolean;
   autoPickupBacklog: boolean;
   activeBookMember: boolean;
   autoSpawnOnFinalizeConsent: boolean;
 }
 
+type PlannedState = { status: string; itemCount: number } | null;
+
 export interface AutonomousWorkDispatchDeps {
   getIssues?: () => Array<Record<string, unknown>>;
-  isAutoPickupBacklog?: typeof isFlywheelAutoPickupBacklog;
+  isAutoPickupBacklog?: () => boolean | Promise<boolean>;
   resolveProject?: typeof resolveProjectFromIssueSync;
   activeBookIssues?: typeof activeOrderBookIssues;
-  readAutoSpawnConsent?: typeof readAutoSpawnOnFinalizeFlag;
+  readAutoSpawnConsent?: (issueId: string) => boolean | Promise<boolean>;
+  findPlannedState?: (projectRoot: string, issueId: string) => Promise<PlannedState>;
+  knownPlanned?: boolean;
+  now?: () => number;
 }
 
 export type AutonomousWorkDispatchDecision =
@@ -33,6 +41,7 @@ export type AutonomousWorkDispatchDecision =
       allow: false;
       code:
         | 'not-ready'
+        | 'not-planned'
         | 'not-released'
         | 'parked'
         | 'vetoed'
@@ -42,12 +51,69 @@ export type AutonomousWorkDispatchDecision =
       reason: string;
     };
 
+const RELEASE_CONTEXT_CACHE_MS = 5_000;
+let autoPickupCache: { expiresAt: number; value: boolean } | null = null;
+const activeBookCache = new Map<string, { expiresAt: number; value: ReadonlySet<string> }>();
+
+export function clearAutonomousWorkDispatchCaches(): void {
+  autoPickupCache = null;
+  activeBookCache.clear();
+}
+
 function getSharedIssues(): Array<Record<string, unknown>> {
   // Keep this lazy require aligned with autonomous-plan-dispatch: a static
   // import creates a lib → dashboard layering edge.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { getSharedIssueService } = require('../../dashboard/server/services/issue-service-singleton.js') as typeof import('../../dashboard/server/services/issue-service-singleton.js');
   return getSharedIssueService().getIssues() as Array<Record<string, unknown>>;
+}
+
+async function defaultFindPlannedState(projectRoot: string, issueId: string): Promise<PlannedState> {
+  const entry = await Effect.runPromise(
+    findSpecByIssue(projectRoot, issueId).pipe(Effect.catch(() => Effect.succeed(null))),
+  );
+  if (!entry) return null;
+  return {
+    status: entry.status,
+    itemCount: Array.isArray(entry.document.plan?.items) ? entry.document.plan.items.length : 0,
+  };
+}
+
+function isPlannedState(state: PlannedState): boolean {
+  return state !== null
+    && (state.status === 'proposed' || state.status === 'active')
+    && state.itemCount > 0;
+}
+
+async function cachedAutoPickup(deps: AutonomousWorkDispatchDeps, now: number): Promise<boolean> {
+  if (deps.isAutoPickupBacklog) return deps.isAutoPickupBacklog();
+  if (autoPickupCache && autoPickupCache.expiresAt > now) return autoPickupCache.value;
+  const value = isFlywheelAutoPickupBacklog();
+  autoPickupCache = { value, expiresAt: now + RELEASE_CONTEXT_CACHE_MS };
+  return value;
+}
+
+async function cachedActiveBookIssues(
+  projectRoot: string,
+  deps: AutonomousWorkDispatchDeps,
+  now: number,
+): Promise<ReadonlySet<string>> {
+  if (deps.activeBookIssues) return deps.activeBookIssues(projectRoot);
+  const cached = activeBookCache.get(projectRoot);
+  if (cached && cached.expiresAt > now) return cached.value;
+  const value = await activeOrderBookIssues(projectRoot);
+  activeBookCache.set(projectRoot, { value, expiresAt: now + RELEASE_CONTEXT_CACHE_MS });
+  return value;
+}
+
+function emptyInput(labels: readonly string[] | null, planned = false): AutonomousWorkDispatchInput {
+  return {
+    labels,
+    planned,
+    autoPickupBacklog: false,
+    activeBookMember: false,
+    autoSpawnOnFinalizeConsent: false,
+  };
 }
 
 export async function gatherAutonomousWorkDispatchInput(
@@ -75,35 +141,45 @@ export async function gatherAutonomousWorkDispatchInput(
     // Autonomous dispatch fails closed when tracker labels cannot be read.
   }
 
-  let autoPickupBacklog = false;
-  try {
-    autoPickupBacklog = (deps.isAutoPickupBacklog ?? isFlywheelAutoPickupBacklog)();
-  } catch {
-    // The release override is absent when control settings cannot be read.
-  }
+  const labelDecision = decideAutonomousWorkDispatch({ ...emptyInput(labels, true) });
+  if (!labelDecision.allow && labelDecision.code !== 'not-released') return emptyInput(labels);
 
-  let activeBookMember = false;
-  try {
-    const project = (deps.resolveProject ?? resolveProjectFromIssueSync)(normalizedIssueId);
-    if (project) {
-      const activeIssues = await (deps.activeBookIssues ?? activeOrderBookIssues)(project.projectPath);
-      activeBookMember = activeIssues.has(normalizedIssueId);
+  let project: ReturnType<typeof resolveProjectFromIssueSync> = null;
+  let planned = deps.knownPlanned === true;
+  if (!planned) {
+    try {
+      project = (deps.resolveProject ?? resolveProjectFromIssueSync)(normalizedIssueId);
+      planned = Boolean(project && isPlannedState(
+        await (deps.findPlannedState ?? defaultFindPlannedState)(project.projectPath, normalizedIssueId),
+      ));
+    } catch {
+      planned = false;
     }
-  } catch {
-    // The release override is absent when order-book state cannot be read.
   }
+  if (!planned) return emptyInput(labels);
 
-  let autoSpawnOnFinalizeConsent = false;
-  try {
-    autoSpawnOnFinalizeConsent = (deps.readAutoSpawnConsent ?? readAutoSpawnOnFinalizeFlag)(normalizedIssueId);
-  } catch {
-    // The explicit launch consent is absent when its flag cannot be read.
+  const normalizedLabels = new Set(labels?.map((label) => label.toLowerCase()));
+  if (normalizedLabels.has(RELEASED_LABEL)) return emptyInput(labels, true);
+
+  if (!project) {
+    try {
+      project = (deps.resolveProject ?? resolveProjectFromIssueSync)(normalizedIssueId);
+    } catch {
+      project = null;
+    }
   }
+  const now = (deps.now ?? Date.now)();
+  const [autoPickupBacklog, activeIssues, autoSpawnOnFinalizeConsent] = await Promise.all([
+    cachedAutoPickup(deps, now).catch(() => false),
+    project ? cachedActiveBookIssues(project.projectPath, deps, now).catch(() => new Set<string>()) : new Set<string>(),
+    Promise.resolve((deps.readAutoSpawnConsent ?? readAutoSpawnOnFinalizeFlagAsync)(normalizedIssueId)).catch(() => false),
+  ]);
 
   return {
     labels,
+    planned: true,
     autoPickupBacklog,
-    activeBookMember,
+    activeBookMember: activeIssues.has(normalizedIssueId),
     autoSpawnOnFinalizeConsent,
   };
 }
@@ -165,6 +241,15 @@ export function decideAutonomousWorkDispatch(
       code: 'not-ready',
       reason:
         'Autonomous work dispatch was refused because the issue is not ready. Add the ready label before allowing autonomous work, or run pan start manually.',
+    };
+  }
+
+  if (!input.planned) {
+    return {
+      allow: false,
+      code: 'not-planned',
+      reason:
+        'Autonomous work dispatch was refused because no active implementation plan with work items is available. Complete planning or run pan start manually.',
     };
   }
 

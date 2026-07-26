@@ -18,7 +18,7 @@ import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.j
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
 import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
 import { checkPrdGateSync, promoteWorkspacePrdDraft, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue } from '../pan-dir/index.js';
-import { resolveAutoSpawnOnFinalize } from '../planning/spawn-planning-session.js';
+import { resolveAutoSpawnOnFinalize, writeAutoSpawnOnFinalizeFlag } from '../planning/spawn-planning-session.js';
 import { extractTeamPrefix, findProjectByPathSync, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
 import { markWorkspaceStuck } from '../review-status.js';
 import { isStateMigrated } from '../state-home.js';
@@ -327,6 +327,7 @@ export async function completePlanningAutoSpawn(options: {
   autoSpawn?: boolean;
   fetchImpl?: typeof fetch;
   dashboardOrigin?: string;
+  consumeAutoSpawnConsent?: (issueId: string) => Promise<void>;
 }): Promise<CompletePlanningAutoSpawnResult | null> {
   if (options.autoSpawn !== true) {
     emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'skipped', 'autoSpawn not requested');
@@ -356,6 +357,7 @@ export async function completePlanningAutoSpawn(options: {
       : `agent-${options.issueId.toLowerCase()}`;
 
     if (response.ok && body['success'] !== false) {
+      await (options.consumeAutoSpawnConsent ?? ((issueId) => writeAutoSpawnOnFinalizeFlag(issueId, false)))(options.issueId);
       emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'success', 'work agent spawn requested', { agentId });
       return { workAgentSpawned: true, workAgentSession: agentId };
     }
@@ -377,6 +379,7 @@ export async function completePlanningAutoSpawn(options: {
       );
       const recoveryBody = await recovery.json().catch(() => ({})) as Record<string, unknown>;
       if (recovery.ok && recoveryBody['success'] !== false) {
+        await (options.consumeAutoSpawnConsent ?? ((issueId) => writeAutoSpawnOnFinalizeFlag(issueId, false)))(options.issueId);
         emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'success', 'stack rebuild and work-agent spawn requested', {
           agentId,
           activityId: recoveryBody['activityId'],
@@ -463,7 +466,7 @@ export async function completePlanningForIssue(options: {
   // spawn the work agent for sessions launched with --auto-start, matching
   // `pan plan finalize`. An explicit body value always wins.
   const bodyAutoSpawn = (body as any)?.autoSpawn;
-  const autoSpawn = resolveAutoSpawnOnFinalize(bodyAutoSpawn, id);
+  const autoSpawn = await resolveAutoSpawnOnFinalize(bodyAutoSpawn, id);
   // PRD-first gate bypass (PAN-2234): `--no-prd` from `pan plan finalize` /
   // `pan plan done` propagates here as body.noPrd. The dashboard Done button
   // never sets it, so a manual Done still requires a qualifying PRD draft.

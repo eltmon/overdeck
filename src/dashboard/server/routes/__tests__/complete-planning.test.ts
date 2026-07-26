@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -26,11 +26,14 @@ import {
   recordPlanningAutoHandoffFailure,
   resolveCompletePlanningTerminalStatus,
 } from '../../../../lib/overdeck/planning-promotion.js';
+import { readAutoSpawnOnFinalizeFlag, writeAutoSpawnOnFinalizeFlag } from '../../../../lib/planning/spawn-planning-session.js';
 import { applyStatusOverrides } from '../../../../lib/xbrief/io.js';
 import { lintPlanQuality, PlanQualityLintError } from '../../../../lib/xbrief/quality-lint.js';
 import type { XBriefDocument } from '../../../../lib/xbrief/types.js';
 
 let projectRoot: string | null = null;
+let overdeckHome: string;
+let previousOverdeckHome: string | undefined;
 
 const flush = async () => {
   await Promise.resolve();
@@ -187,11 +190,21 @@ function makeFileSizeRatchetDoc(issueId: string, intermediateCommand: string): X
   return doc;
 }
 
+beforeEach(() => {
+  previousOverdeckHome = process.env['OVERDECK_HOME'];
+  overdeckHome = mkdtempSync(join(tmpdir(), 'complete-planning-home-'));
+  process.env['OVERDECK_HOME'] = overdeckHome;
+});
+
+
 afterEach(() => {
   if (projectRoot) {
     rmSync(projectRoot, { recursive: true, force: true });
     projectRoot = null;
   }
+  rmSync(overdeckHome, { recursive: true, force: true });
+  if (previousOverdeckHome === undefined) delete process.env['OVERDECK_HOME'];
+  else process.env['OVERDECK_HOME'] = previousOverdeckHome;
 });
 
 describe('completePlanningArtifacts', () => {
@@ -395,7 +408,8 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toBeNull();
   });
 
-  it('auto-spawns a work agent through the existing agents endpoint', async () => {
+  it('auto-spawns a work agent and consumes current-cycle consent', async () => {
+    const consumeAutoSpawnConsent = vi.fn(async () => undefined);
     const fetchImpl: typeof fetch = async (input, init) => {
       expect(String(input)).toBe('http://127.0.0.1:3011/api/agents');
       expect(init?.method).toBe('POST');
@@ -416,13 +430,16 @@ describe('completePlanningArtifacts', () => {
       autoSpawn: true,
       dashboardOrigin: 'http://127.0.0.1:3011',
       fetchImpl,
+      consumeAutoSpawnConsent,
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1146',
     });
+    expect(consumeAutoSpawnConsent).toHaveBeenCalledWith('PAN-1146');
   });
 
-  it('classifies unauthorized auto-spawn responses and fails the terminal phase', async () => {
+  it('retains current-cycle consent when auto-spawn fails', async () => {
+    await writeAutoSpawnOnFinalizeFlag('PAN-1146', true);
     const result = await completePlanningAutoSpawn({
       issueId: 'PAN-1146',
       autoSpawn: true,
@@ -439,6 +456,7 @@ describe('completePlanningArtifacts', () => {
       workAgentSkipReason: 'unauthorized',
     });
     expect(resolveCompletePlanningTerminalStatus(true, result)).toBe('failure');
+    expect(readAutoSpawnOnFinalizeFlag('PAN-1146')).toBe(true);
   });
 
   it('records a refused auto-handoff as planning failure and pipeline stuck state', async () => {
@@ -482,7 +500,8 @@ describe('completePlanningArtifacts', () => {
     }));
   });
 
-  it('rebuilds the stack and starts work when the initial auto-spawn finds no healthy stack', async () => {
+  it('rebuilds the stack, starts work, and consumes current-cycle consent', async () => {
+    const consumeAutoSpawnConsent = vi.fn(async () => undefined);
     const requests: string[] = [];
     const fetchImpl: typeof fetch = async (input, init) => {
       requests.push(String(input));
@@ -505,6 +524,7 @@ describe('completePlanningArtifacts', () => {
       autoSpawn: true,
       dashboardOrigin: 'http://127.0.0.1:3011',
       fetchImpl,
+      consumeAutoSpawnConsent,
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1147',
@@ -513,6 +533,7 @@ describe('completePlanningArtifacts', () => {
       'http://127.0.0.1:3011/api/agents',
       'http://127.0.0.1:3011/api/workspaces/PAN-1147/rebuild-and-start',
     ]);
+    expect(consumeAutoSpawnConsent).toHaveBeenCalledWith('PAN-1147');
   });
 
   it('kills the planning session immediately after autoSpawn succeeds', async () => {

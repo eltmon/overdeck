@@ -168,6 +168,7 @@ export const AgentSpawnerLive = Layer.effect(
             role: 'work',
             prompt: opts.prompt,
             allowHost: opts.allowHost,
+            startedBy: 'dashboard:agent-spawner',
           });
 
           return {
@@ -218,6 +219,7 @@ export const AgentSpawnerLive = Layer.effect(
             workspaceLocation: 'local',
             shadowMode: opts.shadowMode ?? false,
             autoSpawnOnFinalize: false,
+            startedBy: 'dashboard:agent-spawner',
           });
 
           if (!result.success) {

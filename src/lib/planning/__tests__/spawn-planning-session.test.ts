@@ -109,6 +109,7 @@ describe('buildPlanningAgentState', () => {
     model: 'claude-opus-4-7',
     harness: 'claude-code' as const,
     workspaceLocation: 'local' as const,
+    startedBy: 'test:planning-session',
     startedAt: '2026-06-12T00:00:00.000Z',
   };
 

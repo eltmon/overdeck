@@ -65,6 +65,7 @@ import {
 import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { EventStoreService } from '../services/domain-services.js';
+import { isInternalAgentRequest, resolveRequestedStartedBy } from './agents/shared.js';
 import {
   enqueuePendingFeedbackDelivery,
   markPendingFeedbackDelivered,
@@ -972,16 +973,16 @@ const postWorkspaceRebuildRoute = HttpRouter.add(
     });
   }))
 );
-
-// Recovery route: rebuild an unhealthy stack, then chain `pan start` into the same activity.
+// Rebuild an unhealthy stack, then chain `pan start` into the same activity.
 const postWorkspaceRebuildAndStartRoute = HttpRouter.add(
   'POST',
   '/api/workspaces/:issueId/rebuild-and-start',
   httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const body = yield* readJsonBody;
-    const issueId = params['issueId'] ?? '';
-    const startedBy = typeof body.startedBy === 'string' && body.startedBy.trim() ? body.startedBy.trim() : 'operator:dashboard';
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const issueId = (yield* HttpRouter.params)['issueId'] ?? '';
+    let startedBy: string;
+    try { startedBy = resolveRequestedStartedBy((yield* readJsonBody).startedBy, yield* Effect.promise(() => isInternalAgentRequest(request))); }
+    catch (error) { return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 }); }
     if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
     }
@@ -1008,7 +1009,6 @@ const postWorkspaceRebuildAndStartRoute = HttpRouter.add(
     });
   }))
 );
-
 // ─── Route: GET /api/workspaces/:issueId/plan ─────────────────────────────────
 
 const getWorkspaceStateMdRoute = HttpRouter.add(

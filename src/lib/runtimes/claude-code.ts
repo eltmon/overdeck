@@ -356,6 +356,7 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
       model: determineModel({ model: config.model, role: 'work', spawnKey: `work:${config.agentId.replace(/^agent-/, '')}` }),
       role: 'work',
       prompt: config.prompt,
+      startedBy: config.env?.['OVERDECK_AGENT_STARTED_BY'] ?? 'runtime:claude-code',
     });
 
     // Get the session ID (we'll need to look it up from the workspace)

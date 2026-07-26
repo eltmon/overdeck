@@ -28,9 +28,10 @@ async function emitSpawnWhenReady(
 }
 
 describe('detached composer command execution', () => {
-  it('defaults dashboard spawn provenance and preserves explicit callers', () => {
+  it('derives browser provenance and preserves allowlisted internal callers', () => {
     expect(resolveRequestedStartedBy(undefined)).toBe('operator:dashboard');
-    expect(resolveRequestedStartedBy(' orphan-proposed-reconciler ')).toBe('orphan-proposed-reconciler');
+    expect(resolveRequestedStartedBy(' orphan-proposed-reconciler ')).toBe('operator:dashboard');
+    expect(resolveRequestedStartedBy(' orphan-proposed-reconciler ', true)).toBe('orphan-proposed-reconciler');
   });
 
   let overdeckHome: string;

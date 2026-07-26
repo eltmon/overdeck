@@ -251,6 +251,7 @@ export class StandingTierManager {
       slotIndex,
       slotItemId: firstItemId,
       prompt: this.options.prompt,
+      startedBy: 'standing-tier',
     });
     const agent: StandingTierAgent = {
       tierName,

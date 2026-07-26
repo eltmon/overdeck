@@ -75,8 +75,25 @@ export function buildPanStartArgs(input: {
  * owns process/log lifecycle; this route-compatible wrapper preserves the
  * original behavior by waiting for a successful child exit.
  */
-export function resolveRequestedStartedBy(value: unknown, fallback = 'operator:dashboard'): string {
-  return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+const INTERNAL_STARTED_BY_TOKENS = new Set([
+  'operator:cli:pan-start',
+  'planning-auto-handoff',
+  'orphan-proposed-reconciler',
+  'workspace-rebuild-recovery',
+]);
+
+export function resolveRequestedStartedBy(value: unknown, internalRequest = false): string {
+  if (!internalRequest) return 'operator:dashboard';
+  const token = typeof value === 'string' ? value.trim() : '';
+  if (!INTERNAL_STARTED_BY_TOKENS.has(token)) throw new Error('Invalid internal startedBy provenance token.');
+  return token;
+}
+
+export async function isInternalAgentRequest(request: HttpServerRequest.HttpServerRequest): Promise<boolean> {
+  const expected = await readInternalTokenForRequest();
+  if (!expected) return false;
+  const provided = getHeaderFromMap(request.headers as Record<string, string | string[] | undefined>, INTERNAL_TOKEN_HEADER);
+  return constantTimeTokenEqual(provided, expected);
 }
 
 export async function spawnPanCommandDetached(input: {

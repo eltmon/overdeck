@@ -10,6 +10,7 @@ import { exec, execFile, execSync } from 'child_process';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { clearAgentPausedSync, getAgentStateSync, spawnAgent } from '../../lib/agents.js';
+import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { describeConflictingWorkAgents } from '../../lib/work-agent-conflicts.js';
 import { ROLE_EFFORTS, resolveModel as resolveRoleModel, loadConfigSync as loadYamlConfig, type RoleEffort } from '../../lib/config-yaml.js';
 import { getModelEffortLevelsSync } from '../../lib/model-capabilities.js';
@@ -33,7 +34,6 @@ import {
   streamPlanningSession,
 } from './planning-stream.js';
 import { createPlanningProgress, createPrepProgress, runStartPrepStep, runStateReconcile, warnSyncMainFailure } from './start-prep-progress.js';
-
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
  */
@@ -886,7 +886,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
             `${getDashboardApiUrlSync()}/api/issues/${encodeURIComponent(id)}/start-planning`,
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: ensureInternalTokenSync() },
               body: buildStartPlanningBody({
                 auto: resolvedPlanningMode === 'auto',
                 autoStart: true,
@@ -1201,7 +1201,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     if (shouldClearPauseBeforeSpawn) {
       clearAgentPausedSync(agentId);
     }
-
     const admitted = await withActiveOrderDispatchReservation(
       projectRoot,
       id,
@@ -1214,6 +1213,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         role: 'work',
         prompt,
         allowHost: options.host,
+        startedBy: process.env['OVERDECK_AGENT_STARTED_BY']!,
         effort: resolvedEffort,
       })),
     );

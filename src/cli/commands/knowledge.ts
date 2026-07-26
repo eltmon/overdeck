@@ -120,6 +120,7 @@ export async function knowledgeCommand(issueId: string, options: KnowledgeOption
       effort: options.effort,
       extraEnvExports: ['export PATH="$HOME/.overdeck/bin:$PATH"'],
       prompt: buildKnowledgePrompt(normalized, options),
+      startedBy: 'operator:cli:pan-knowledge',
     });
 
     spinner.succeed(`Knowledge agent spawned: ${agent.id}`);
