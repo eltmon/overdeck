@@ -39,6 +39,7 @@ import {
   listFlywheelRuns,
   nextFlywheelRunId,
   resolveLiveFlywheelRunId,
+  readFlywheelLaunchMetadata,
   writeFlywheelLaunchMetadata,
   writeLatestFlywheelStatus,
 } from '../flywheel-run-state.js';
@@ -169,6 +170,72 @@ describe('flywheel run state', () => {
 
     expect(setOrderStatus).toHaveBeenCalledWith('/state', value.id, 'drained', { runId: 'RUN-1' });
     expect((await getFlywheelRunDetail('RUN-1', { overdeckHome }))?.latest?.orders?.drained).toBe(true);
+  });
+
+  // PAN-1696 run-scope-persist: scope is server-owned, restamped from launch
+  // metadata on every status write so the orchestrator's own POSTs cannot forge
+  // or erase it.
+  describe('run scope (PAN-1696)', () => {
+    async function launchWith(scope?: 'pan-only' | 'all-tracked-projects') {
+      await writeFlywheelLaunchMetadata({
+        version: 1,
+        runId: 'RUN-1',
+        workspace: '/project',
+        briefPath: '/project/docs/flywheel-brief.md',
+        briefDisplayPath: 'docs/flywheel-brief.md',
+        ...(scope ? { scope } : {}),
+      }, { overdeckHome });
+    }
+
+    it('exposes the launch scope on the status and the run detail (ac1)', async () => {
+      await launchWith('all-tracked-projects');
+      await writeLatestFlywheelStatus(makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), { overdeckHome });
+
+      const detail = await getFlywheelRunDetail('RUN-1', { overdeckHome });
+      expect(detail?.latest?.scope).toBe('all-tracked-projects');
+      expect(detail?.scope).toBe('all-tracked-projects');
+    });
+
+    it('round-trips the scope through launch metadata', async () => {
+      await launchWith('all-tracked-projects');
+      expect((await readFlywheelLaunchMetadata('RUN-1', { overdeckHome }))?.scope).toBe('all-tracked-projects');
+    });
+
+    it('restamps a status that claims a different scope than the run was launched with', async () => {
+      await launchWith('pan-only');
+      const forged = { ...makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), scope: 'all-tracked-projects' as const };
+      await writeLatestFlywheelStatus(forged, { overdeckHome });
+
+      expect((await getFlywheelRunDetail('RUN-1', { overdeckHome }))?.latest?.scope).toBe('pan-only');
+    });
+
+    it('drops a self-reported scope when the run has none on its launch metadata', async () => {
+      await launchWith();
+      const forged = { ...makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), scope: 'all-tracked-projects' as const };
+      await writeLatestFlywheelStatus(forged, { overdeckHome });
+
+      const detail = await getFlywheelRunDetail('RUN-1', { overdeckHome });
+      expect(detail?.latest?.scope).toBeUndefined();
+      expect(detail?.scope).toBeUndefined();
+    });
+
+    it('leaves pre-PAN-1696 runs with no launch metadata scope-free', async () => {
+      await writeLatestFlywheelStatus(makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), { overdeckHome });
+      expect((await getFlywheelRunDetail('RUN-1', { overdeckHome }))?.latest?.scope).toBeUndefined();
+    });
+
+    it('rejects launch metadata carrying an unknown scope', async () => {
+      await writeFlywheelLaunchMetadata({
+        version: 1,
+        runId: 'RUN-1',
+        workspace: '/project',
+        briefPath: '/project/docs/flywheel-brief.md',
+        briefDisplayPath: 'docs/flywheel-brief.md',
+        scope: 'every-repo-on-disk' as never,
+      }, { overdeckHome });
+
+      await expect(readFlywheelLaunchMetadata('RUN-1', { overdeckHome })).rejects.toThrow(/scope/);
+    });
   });
 
   it('removes a self-reported orders block from a bookless run', async () => {

@@ -724,7 +724,7 @@ const getAllSessionTreesRoute = HttpRouter.add(
 
 // ─── Compose route into a single Layer ────────────────────────────────────────
 
-const readProjectJsonBody = Effect.gen(function* () {
+export const readProjectJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const text = yield* request.text;
   try { return text ? JSON.parse(text) : {}; } catch { return {}; }

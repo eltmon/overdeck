@@ -182,22 +182,41 @@ escalate to a work agent.
 
 ## Merge: UAT batch trains
 
-While a run is active and `flywheel.merge_train_enabled` is on, merge-ready
-features don't wait in a queue for one-at-a-time human merges. A 60-second
+When a project's merge train is on, merge-ready features don't wait in a queue for
+one-at-a-time human merges. A 60-second
 reconciler assembles them into rolling **UAT batch trains** — throwaway `uat/*`
 branches off main that bundle as many ready features as possible, resolving
 cross-feature conflicts inside the batch, so a human can UAT the combined result
 and **promote the batch** (merge exactly what they tested) in one action. Each
 generation can serve a live stack at `uat-<codename>.overdeck.localhost`.
 
-This is the primary merge path for a flywheel run; the per-issue merge (see
+This is the primary merge path; the per-issue merge (see
 [`MERGE-WORKFLOW.md`](./MERGE-WORKFLOW.md)) remains the escape hatch. The full
 model — generations, the assembly agent, held-out features, promotion, the live
-stacks (max 2), and the "UAT batches" card — is documented in
-[`UAT-BATCH-TRAINS.md`](./UAT-BATCH-TRAINS.md). Batch trains are inert until the
-merge-train flag is on and a run is active; the ready set is computed from the
-merge queue (`computeMergeQueue`, gated on `MERGE_GATE_VERBS = {shipping,
-merging}` per [PAN-1736](https://github.com/eltmon/overdeck/issues/1736)).
+stacks (max 2), and the multi-project view — is documented in
+[`UAT-BATCH-TRAINS.md`](./UAT-BATCH-TRAINS.md). Batch trains are inert until a
+project's effective merge-train flag is on; the ready set comes from that
+project's review-status records, so **no flywheel run is required**
+([PAN-1696](https://github.com/eltmon/overdeck/issues/1696)).
+
+### Orchestrator scope vs merge-train independence
+
+Two things are easy to conflate, so state them separately:
+
+- **Flywheel `scope`** decides **which projects the orchestrator inventories and
+  dispatches into** — `pan-only`, or `all-tracked-projects`. Nothing else. It is
+  baked into the run prompt at start or resume, so changing it mid-run does not
+  reach the running orchestrator until the next start or resume; the run record
+  and the Flywheel pane show the value the run is actually operating under.
+- **Merge and UAT trains are per project and independent of that scope.** A
+  project's train assembles from its own review-status ready set whenever its
+  effective `merge_train` flag is on — whether or not the current run's scope
+  includes that project, and whether or not a run exists at all. The orchestrator
+  observes trains and reports them; it never gates or adopts one.
+
+**Cross-project batches remain out of scope.** A generation always contains exactly
+one project's work; only the view and control surface spans projects (one section
+per project on Awaiting Merge, with the Flywheel rail as a second viewer).
 
 ## Settings → Roles → Flywheel
 
@@ -209,7 +228,7 @@ The Flywheel row in Settings → Roles controls the singleton orchestrator, not 
 | Model | Selects the model or workhorse slot for the orchestrator's reasoning loop. This should usually be stronger than a worker default because it makes prioritization and recovery decisions. |
 | Effort | Sets the reasoning budget for each loop tick. Use higher effort for unattended fix-all runs and lower effort for short, supervised runs. |
 | Max agents | Sets the orchestrator's active-agent budget. The value is reflected in `FlywheelStatus.system.agentsCap`. |
-| Scope | Chooses whether the run stays on PAN issues or includes every tracked project. `pan-only` is the default. |
+| Scope | Chooses whether the run stays on PAN issues or includes every tracked project. `pan-only` is the default. This is the **orchestrator's** scope only — it does not enable or gate any project's merge train (see above). Unlike the other fields, a scope change applies at the next run **start or resume**, not on the next tick. |
 
 Changing the Flywheel row affects future starts. It must not mutate already-saved run artifacts.
 

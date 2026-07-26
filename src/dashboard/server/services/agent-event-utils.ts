@@ -150,6 +150,27 @@ export const bodyToEvent = (
           contextSaturatedAt: source['contextSaturatedAt'] as string | undefined,
         },
       };
+    case 'linear_mcp_auth_required':
+      return {
+        type: 'linear_mcp_auth.required',
+        timestamp,
+        payload: {
+          agentId,
+          issueId: source['issueId'] ?? null,
+          authUrl: source['authUrl'] ?? null,
+          expiresAt: source['expiresAt'] ?? null,
+        },
+      };
+    case 'linear_mcp_auth_healthy':
+      return {
+        type: 'linear_mcp_auth.healthy',
+        timestamp,
+        payload: {
+          agentId,
+          issueId: source['issueId'] ?? null,
+          source: 'hook',
+        },
+      };
     default:
       return null;
   }

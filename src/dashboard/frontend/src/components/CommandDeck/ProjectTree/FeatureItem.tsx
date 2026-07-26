@@ -784,9 +784,9 @@ function useUatTrainMembership(): Map<string, UatTrainBadgeInfo> {
   const { data } = useQuery({
     queryKey: ['uat-generations'],
     queryFn: async () => {
-      const res = await fetch('/api/flywheel/uat-generations');
+      const res = await fetch('/api/merge-train/generations'); // PAN-1696: one entry per project; members are project-scoped and the badge keys by issue id, so flattening every chain is correct
       if (!res.ok) return [];
-      return res.json() as Promise<Array<{ name: string; status: string; members?: Array<{ issueId: string; mergeOrder: number }> }>>;
+      return ((await res.json()) as Array<{ generations?: Array<{ name: string; status: string; members?: Array<{ issueId: string; mergeOrder: number }> }> }>).flatMap((entry) => entry.generations ?? []);
     },
     staleTime: 30_000,
     refetchInterval: 60_000,

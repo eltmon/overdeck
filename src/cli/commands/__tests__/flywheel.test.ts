@@ -444,11 +444,21 @@ describe('flywheel CLI commands', () => {
     expect(output).toContain('\x1b[31m●\x1b[0m red');
   });
 
-  it('exits 1 when no active run exists', async () => {
+  it('displays the merge queue when no active run exists', async () => {
     await flywheelStatusCommand({});
 
-    expect(process.exitCode).toBe(1);
-    expect(errorSpy).toHaveBeenCalledWith('no active flywheel run');
+    expect(process.exitCode).toBeUndefined();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Merge queue:'));
+  });
+
+  it('emits merge queue JSON with --json when no active run exists', async () => {
+    await flywheelStatusCommand({ json: true });
+
+    expect(process.exitCode).toBeUndefined();
+    const output = logSpy.mock.calls[0][0] as string;
+    expect(() => JSON.parse(output)).not.toThrow();
+    const parsed = JSON.parse(output);
+    expect(parsed).toHaveProperty('mergeQueue');
   });
 
   it('prints all flywheel config values', async () => {

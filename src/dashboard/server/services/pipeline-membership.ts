@@ -1,7 +1,12 @@
-import type { ProjectConfig } from '../../../lib/projects.js';
-import type { IssuePipelineMembership } from '@overdeck/contracts';
+import type { IssuePipelineMembership, MembershipUnavailableReason } from '@overdeck/contracts';
 import { createPromiseConcurrencyLimiter, createSettledTtlPromiseCache } from '../../../lib/concurrency.js';
-import { gatherProjectLensSignals, mapPipelineProjects, PIPELINE_PROJECT_CONCURRENCY } from '../../../lib/pipeline-membership-gather.js';
+import {
+  gatherProjectLensSignals,
+  mapPipelineProjects,
+  PipelineMembershipUnavailableError,
+  PIPELINE_PROJECT_CONCURRENCY,
+} from '../../../lib/pipeline-membership-gather.js';
+import type { ProjectConfig } from '../../../lib/projects.js';
 import { resolvePipelineMembership, type IssueLensSignals, type PipelineMembership } from '../../../lib/pipeline-membership.js';
 
 export const PIPELINE_MEMBERSHIP_TTL_MS = 30_000;
@@ -45,6 +50,7 @@ export interface ProjectPipelineMembershipResult {
   project: ProjectConfig;
   memberships?: PipelineMembership[];
   error?: unknown;
+  unavailableReason?: MembershipUnavailableReason;
 }
 
 export async function getPipelineMembershipResultsForProjects(
@@ -65,6 +71,7 @@ interface MembershipSnapshot {
   refreshedAt: number;
   refresh?: Promise<void>;
   lastError?: string;
+  lastErrorReason?: MembershipUnavailableReason;
   lastErrorAt?: number;
 }
 
@@ -82,12 +89,16 @@ function refreshMembershipSnapshot(
     snapshot.value = value;
     snapshot.refreshedAt = now();
     snapshot.lastError = undefined;
+    snapshot.lastErrorReason = undefined;
     snapshot.lastErrorAt = undefined;
   }).catch((error: unknown) => {
     // Keep the last successful snapshot; a cold caller remains unavailable.
     // Record and log the failure — a swallowed boot-warm failure previously
     // left a cold project with zero diagnostic trace (PAN-2972).
     snapshot.lastError = error instanceof Error ? error.message : String(error);
+    snapshot.lastErrorReason = error instanceof PipelineMembershipUnavailableError
+      ? error.reason
+      : 'gather_failed';
     snapshot.lastErrorAt = now();
     console.warn(
       `[pipeline-membership] refresh failed for ${project.name ?? project.path}; keeping last-good snapshot:`,
@@ -113,6 +124,7 @@ export function readPipelineMembershipSnapshotsForProjects(
       error: new Error(snapshot?.lastError
         ? `Pipeline membership refresh failed: ${snapshot.lastError}`
         : 'Pipeline membership snapshot is loading'),
+      unavailableReason: snapshot?.lastErrorReason,
     };
   });
 }
@@ -154,7 +166,11 @@ export async function getPipelineMembershipSnapshotsForResourceDiscovery(
     await refreshMembershipSnapshot(project, snapshot, getMembership, now);
     return snapshot.refreshedAt
       ? { project, memberships: snapshot.value }
-      : { project, error: new Error('Pipeline membership snapshot failed to load') };
+      : {
+          project,
+          error: new Error('Pipeline membership snapshot failed to load'),
+          unavailableReason: snapshot.lastErrorReason,
+        };
   }));
 }
 

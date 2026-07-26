@@ -19,6 +19,8 @@ interface FlywheelRunSummary {
 
 interface FlywheelRunDetail extends FlywheelRunSummary {
   latest: FlywheelStatus | null;
+  /** PAN-1696: the scope this run was actually started or resumed with. */
+  scope?: 'pan-only' | 'all-tracked-projects';
   paths: {
     latest: string;
     report?: string;
@@ -86,6 +88,26 @@ function formatScope(value: string): string {
   return value;
 }
 
+/**
+ * PAN-1696: which scope to SHOW. Scope is baked into the orchestrator prompt when
+ * a run starts or resumes, so a settings change does not reach a live run. While
+ * a run exists we show the run's own persisted scope; with no run there is
+ * nothing running under an old value, so the configured one is the honest answer.
+ */
+export function resolveDisplayedScope(
+  run: { status: FlywheelRunSummary['status']; scope?: string; latest?: { scope?: string } | null } | null,
+  configuredScope: string,
+): { displayed: string; source: 'run' | 'configured'; mismatchedConfigured?: string } {
+  const live = run?.status === 'running' || run?.status === 'paused';
+  const runScope = run?.scope ?? run?.latest?.scope;
+  if (!live || !runScope) return { displayed: configuredScope, source: 'configured' };
+  return {
+    displayed: runScope,
+    source: 'run',
+    ...(runScope !== configuredScope ? { mismatchedConfigured: configuredScope } : {}),
+  };
+}
+
 export function resolveFlywheelConfig(settings: SettingsResponse | undefined): Required<FlywheelRoleConfig> {
   return {
     ...DEFAULT_FLYWHEEL_CONFIG,
@@ -133,6 +155,7 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
   const status = (run?.status === 'running' || run?.status === 'paused') ? run.latest : null;
   const conversation = conversationQuery.data ?? null;
   const config = resolveFlywheelConfig(settingsQuery.data);
+  const scopeDisplay = resolveDisplayedScope(run, config.scope);
   const runState: 'none' | 'running' | 'paused' = run?.status === 'running'
     ? 'running'
     : run?.status === 'paused'
@@ -447,6 +470,11 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
       <footer className="border-t border-border bg-card/60 p-4 space-y-3">
         <button
           type="button"
+          // Without an explicit label this button's accessible name is the whole
+          // config dump, so every word inside it (e.g. "resume" in the scope
+          // apply-timing note) collides with toolbar button queries and with
+          // what a screen reader announces for the card.
+          aria-label="Open Flywheel run config in Settings"
           className="w-full rounded-lg border border-border bg-background p-3 text-left hover:bg-accent/60"
           onClick={onOpenSettings}
         >
@@ -472,8 +500,21 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
               <dd className="font-medium text-foreground">{config.maxAgents}</dd>
             </div>
             <div className="col-span-2">
-              <dt className="text-muted-foreground">Scope</dt>
-              <dd className="font-medium text-foreground">{formatScope(config.scope)}</dd>
+              <dt className="text-muted-foreground">
+                Scope{scopeDisplay.source === 'run' ? ' (this run)' : ''}
+              </dt>
+              <dd className="font-medium text-foreground" data-testid="flywheel-scope-value">
+                {formatScope(scopeDisplay.displayed)}
+              </dd>
+              {scopeDisplay.mismatchedConfigured && (
+                <dd className="mt-0.5 text-[11px] leading-snug text-amber-400" data-testid="flywheel-scope-mismatch">
+                  Settings are now set to {formatScope(scopeDisplay.mismatchedConfigured)}. This run keeps
+                  running under {formatScope(scopeDisplay.displayed)} until it is restarted or resumed.
+                </dd>
+              )}
+              <dd className="mt-0.5 text-[11px] leading-snug text-muted-foreground" data-testid="flywheel-scope-note">
+                Scope changes apply at the next run start or resume.
+              </dd>
             </div>
           </dl>
         </button>

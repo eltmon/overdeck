@@ -162,16 +162,39 @@ describe('getUatGenerationsPayload', () => {
     tmp = undefined;
   });
 
-  it('returns [] without touching persisted generations when no flywheel run is active', async () => {
-    mocks.readCurrentFlywheelStatusForDashboard.mockResolvedValue(null);
-    mocks.listUatGenerationsSync.mockReturnValue([gen([
+  // PAN-1696 review finding: once this payload started serving every tracked
+  // project, resolving each member's xBRIEF against the DASHBOARD's repo left
+  // every non-PAN batch with an empty "What to UAT" checklist.
+  it("resolves acceptance criteria in the generation's own project, not the dashboard's", async () => {
+    mocks.listUatGenerationsSync.mockReturnValue([
+      gen([{ issueId: 'MIN-831', title: 'Compass', branch: 'feature/min-831', headSha: 'h1', mergeOrder: 1 }]),
+    ]);
+    mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
+
+    await getUatGenerationsPayload('/repos/myn');
+
+    // The lookup root must be the MYN repo the caller asked for.
+    expect(mocks.findXBriefByIssue).toHaveBeenCalledWith('/repos/myn', 'MIN-831');
+    expect(mocks.listUatGenerationsSync).toHaveBeenCalledWith(
+      expect.objectContaining({ projectRoot: '/repos/myn' }),
+    );
+  });
+
+  it('returns generations without flywheel run active (PAN-1696: reconciler-decouple.ac4)', async () => {
+    // With reconciler-decouple, generations are visible regardless of flywheel run state
+    const generation = gen([
       { issueId: 'PAN-1', title: 'One', branch: 'feature/pan-1', headSha: 'h1', mergeOrder: 1 },
-    ])]);
+    ]);
+    mocks.listUatGenerationsSync.mockReturnValue([generation]);
+    // For a ready generation, probeUatStack succeeds; AC items get cached empty list
+    mocks.probeUatStack.mockResolvedValue({ status: 'running', frontendUrl: 'http://test' });
 
-    await expect(getUatGenerationsPayload()).resolves.toEqual([]);
+    const result = await getUatGenerationsPayload();
 
-    expect(mocks.listUatGenerationsSync).not.toHaveBeenCalled();
-    expect(mocks.findXBriefByIssue).not.toHaveBeenCalled();
+    // Should return the generation even without a flywheel run
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe(generation.name);
+    expect(mocks.listUatGenerationsSync).toHaveBeenCalled();
   });
 
   it('bounds member xBRIEF reads and reuses unchanged checklist summaries', async () => {

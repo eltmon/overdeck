@@ -11,6 +11,7 @@ import {
   ConfigResolver,
   ConfigResolverLive,
   FLYWHEEL_MERGE_TRAIN_ENABLED_KEY,
+  MERGE_TRAIN_ENABLED_KEY,
   type FlywheelConfig,
   type IssuePolicy,
 } from '../../../../src/lib/overdeck/control-settings.js';
@@ -255,7 +256,7 @@ describe('SettingsWriter', () => {
     );
 
     expect(upsertedKeys).toContain('flywheel.auto_pickup_backlog');
-    expect(upsertedKeys).toContain(FLYWHEEL_MERGE_TRAIN_ENABLED_KEY);
+    expect(upsertedKeys).toContain(MERGE_TRAIN_ENABLED_KEY);
     expect(upsertedKeys).not.toContain('flywheel.require_uat_before_merge');
     expect(result.autoPickupBacklog).toBe(true);
     expect(result.mergeTrainEnabled).toBe(true);

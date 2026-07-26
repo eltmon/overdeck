@@ -1,13 +1,15 @@
 /**
  * UAT batch train service (PAN-1737) — real wiring for the reconciler,
  * assembly engine, stacks, and promote path, plus the payload builders the
- * flywheel routes expose.
+ * /api/merge-train/* routes expose.
  *
- * The reconciler interval is the heartbeat of "always one batch ready":
- * every 60s (gated per-tick on flywheel.merge_train_enabled, no-op without an
- * active flywheel run) it compares the ready set against the generation chain
- * and assembles/invalidates as needed. Assemblies run minutes — the reconciler
- * is single-flight per project, so ticks never pile up.
+ * The reconciler interval is the heartbeat of "always one batch ready": every
+ * 60s it walks every tracked project whose effective merge-train flag is on,
+ * comparing that project's ready set against its generation chain and
+ * assembling/invalidating as needed. PAN-1696 removed the active-flywheel-run
+ * requirement — the ready set comes from review-status records, so batches
+ * assemble with no run at all. Assemblies run minutes; the reconciler is
+ * single-flight per project, so ticks never pile up.
  */
 import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -39,11 +41,11 @@ import {
   listUatGenerationsSync,
   type UatGeneration,
 } from '../../../lib/overdeck/merge-sync.js';
+import { listEligibleCandidatesByProject } from '../../../lib/flywheel-merge-order.js';
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
 import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
 import { findProjectByPathSync } from '../../../lib/projects.js';
 import { getDashboardIdentity } from '../identity.js';
-import { readCurrentFlywheelStatusForDashboard } from './flywheel-actions.js';
 
 const RECONCILE_INTERVAL_MS = 60_000;
 const CHAIN_PAYLOAD_LIMIT = 10;
@@ -77,21 +79,105 @@ export function canStartUatTrainReconciler(): boolean {
   return identity.mode === 'primary' && resolve(identity.repoRoot) === projectRoot();
 }
 
-/** Ready set in merge order, or null when no flywheel run is active. */
-async function getReadySet(): Promise<ReadyFeature[] | null> {
-  const status = await readCurrentFlywheelStatusForDashboard();
-  if (!status) return null;
-  const { computeMergeQueue, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
+function codenameLabel(features: readonly ReadyFeature[]): string {
+  const prefix = features[0]?.issueId.split('-')[0];
+  return (prefix ?? 'uat').toLowerCase();
+}
+
+class PolyrepoAssemblyUnsupported extends Error {
+  constructor() {
+    super('polyrepo UAT assembly not yet supported');
+    this.name = 'PolyrepoAssemblyUnsupported';
+  }
+}
+
+/**
+ * PAN-1696 reconciler-decouple: Per-project cleanup function factory.
+ */
+function makeCleanupForProject(projectPath: string): () => Promise<void> {
+  return async () => {
+    await cleanupUatGenerations(projectPath, {
+      store: buildUatGenerationStore(),
+      ...buildUatGenerationCleanupGit(projectPath),
+      teardownStack: (gen) => teardownUatStack(gen),
+      log: (msg) => console.log(msg),
+    });
+  };
+}
+
+/** One reconciler pass. `force` rebuilds even when a live generation matches. */
+/**
+ * PAN-1696 reconciler-decouple: Internal per-project reconciler.
+ * Runs the UAT train reconciliation for a specific project.
+ */
+async function runUatTrainReconcileForProject(
+  projectPath: string,
+  options: { force?: boolean } = {},
+): Promise<ReconcileResult> {
+  const { isMergeTrainEnabledForProject } = await import('../../../lib/overdeck/merge-sync.js');
+  const projectConfig = findProjectByPathSync(projectPath);
+
+  // Fail closed: if project cannot be resolved, don't proceed
+  if (!projectConfig) {
+    console.log(`[uat-train] project at ${projectPath} not found in config — skipping`);
+    return { action: 'no-queue', invalidated: [] };
+  }
+
+  // PAN-1696: polyrepo assembly not yet supported — skip before git operations
+  if (projectConfig.workspace?.type === 'polyrepo') {
+    console.log(`[uat-train] polyrepo project type not supported for UAT assembly — skipping`);
+    return { action: 'no-queue', invalidated: [] };
+  }
+
+  // Check if enabled before building git deps (fail closed on null config)
+  if (!isMergeTrainEnabledForProject(projectConfig)) {
+    return { action: 'disabled', invalidated: [] };
+  }
+
+  // Early exit if no candidates and no live generations — skip git operations
+  const candidates = listEligibleCandidatesByProject(projectPath);
+  const liveGenerations = listUatGenerationsSync({
+    projectRoot: projectPath,
+    statuses: ['assembling', 'ready', 'superseded'],
+    limit: 1,
+  });
+  if (candidates.length === 0 && liveGenerations.length === 0) {
+    return { action: 'idle', invalidated: [] };
+  }
+
+  const gitDeps = buildUatGenerationGitDeps(projectPath);
+
+  return reconcileUatGenerations(projectPath, {
+    isEnabled: () => true,  // Already checked above
+    getReadySet: () => getReadySetForProject(projectPath),
+    getMainHeadSha: () => gitDeps.fetchMain(),
+    getBranchHeadSha: (branch) => gitDeps.branchHeadSha(branch),
+    store: buildUatGenerationStore(),
+    assemble: (features) => assembleFromReadySetForProject(projectPath, features),
+    teardownStack: (gen) => teardownUatStack(gen),
+    cleanup: makeCleanupForProject(projectPath),
+    log: (msg) => console.log(msg),
+  }, options);
+}
+
+/**
+ * Get ready set for a specific project path.
+ */
+async function getReadySetForProject(projectPath: string): Promise<ReadyFeature[] | null> {
+  const { computeMergeQueueFromCandidates, listEligibleCandidatesByProject, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
+
+  const candidates = listEligibleCandidatesByProject(projectPath);
+  if (candidates.length === 0) return [];
+
   const queue = await Effect.runPromise(
-    computeMergeQueue(status.activePipeline, projectRoot(), {
+    computeMergeQueueFromCandidates(candidates, projectPath, {
       getPrUrl: resolveMergeQueuePrUrl,
-      onIneligible: (issueId, reason) =>
-        console.log(`[uat-train] ${issueId} has a merge verb but is not merge-eligible (${reason}) — excluded from the ready set`),
     }).pipe(
       Effect.provide(nodeServicesLayer),
     ),
   );
-  const fromVerbs: ReadyFeature[] = queue.map((item) => ({
+
+  return queue.map((item) => ({
     issueId: item.issueId,
     title: item.title,
     branch: item.branchName,
@@ -99,70 +185,26 @@ async function getReadySet(): Promise<ReadyFeature[] | null> {
     ...(item.prUrl !== undefined ? { prUrl: item.prUrl } : {}),
     conflictsWith: item.conflictsWith,
   }));
-  const swept = await sweepEligibleFeatures(new Set(fromVerbs.map((f) => f.issueId)));
-  return [...fromVerbs, ...swept];
 }
 
 /**
- * PAN-2484: the verb-based ready set misses merge-eligible issues that entered
- * the pipeline outside the active flywheel run (operator revivals, strikes,
- * externally-requested reviews) — those sat at readyForMerge with no train ever
- * assembling around them. Sweep review status for THIS project's merge-eligible
- * issues whose feature branch exists and append any the verb set missed. The
- * flywheel's ordering still leads; swept extras ride at the tail (the assembly
- * engine's conflict hook owns any cross-feature conflicts).
+ * Assemble UAT generation for a specific project's ready set.
  */
-async function sweepEligibleFeatures(alreadyIncluded: ReadySet): Promise<ReadyFeature[]> {
-  try {
-    const { loadReviewStatuses, mergeGateEligibility } = await import('../../../lib/review-status.js');
-    const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
-    const { execFile } = await import('node:child_process');
-    const { promisify } = await import('node:util');
-    const execFileAsync = promisify(execFile);
-    const root = projectRoot();
-    const extras: ReadyFeature[] = [];
-    for (const [issueId, rs] of Object.entries(loadReviewStatuses())) {
-      if (alreadyIncluded.has(issueId)) continue;
-      if (rs.readyForMerge !== true) continue;
-      if (!mergeGateEligibility(rs).eligible) continue;
-      const project = resolveProjectFromIssueSync(issueId);
-      if (!project || resolve(project.projectPath) !== root) continue;
-      const branch = `feature/${issueId.toLowerCase()}`;
-      try {
-        await execFileAsync('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`], { cwd: root, timeout: 10_000 });
-      } catch {
-        continue; // no local branch — nothing to assemble
-      }
-      console.log(`[uat-train] ${issueId} is merge-eligible without a flywheel merge verb — swept into the ready set (PAN-2484)`);
-      extras.push({ issueId, title: issueId, branch, conflictsWith: [] });
-    }
-    return extras;
-  } catch (err) {
-    console.warn(`[uat-train] eligibility sweep failed: ${err instanceof Error ? err.message : String(err)}`);
-    return [];
-  }
-}
-
-type ReadySet = Set<string>;
-
-function codenameLabel(features: readonly ReadyFeature[]): string {
-  const prefix = features[0]?.issueId.split('-')[0];
-  return (prefix ?? 'uat').toLowerCase();
-}
-
-async function assembleFromReadySet(features: readonly ReadyFeature[]): Promise<UatGeneration> {
-  const root = projectRoot();
+async function assembleFromReadySetForProject(
+  projectPath: string,
+  features: readonly ReadyFeature[],
+): Promise<UatGeneration> {
   const store = buildUatGenerationStore();
   return assembleUatGeneration(
     {
-      projectRoot: root,
+      projectRoot: projectPath,
       label: codenameLabel(features),
       dateIso: new Date().toISOString(),
       features,
-      takenBranchNames: await listRemoteUatBranches(root),
+      takenBranchNames: await listRemoteUatBranches(projectPath),
     },
     {
-      git: buildUatGenerationGitDeps(root),
+      git: buildUatGenerationGitDeps(projectPath),
       store,
       resolveConflict: buildConflictAgentHook(),
       log: (msg) => console.log(msg),
@@ -170,31 +212,45 @@ async function assembleFromReadySet(features: readonly ReadyFeature[]): Promise<
   );
 }
 
-async function runCleanup(): Promise<void> {
-  const root = projectRoot();
-  await cleanupUatGenerations(root, {
-    store: buildUatGenerationStore(),
-    ...buildUatGenerationCleanupGit(root),
-    teardownStack: (gen) => teardownUatStack(gen),
-    log: (msg) => console.log(msg),
-  });
+// Removed PolyrepoAssemblyUnsupported class — polyrepo guard moved to runUatTrainReconcileForProject
+
+/**
+ * PAN-1696 reconciler-decouple: Single-project reconciliation (used by forced-rebuild endpoint).
+ * When called from /api/merge-train/assemble with force:true and no project, reconciles every enabled project; with { project } or an explicit projectRoot, just that one.
+ */
+export async function runUatTrainReconcile(
+  options: { force?: boolean; projectRoot?: string } = {},
+): Promise<ReconcileResult> {
+  const projectPath = options.projectRoot ? resolve(options.projectRoot) : projectRoot();
+  return runUatTrainReconcileForProject(projectPath, { ...(options.force !== undefined ? { force: options.force } : {}) });
 }
 
-/** One reconciler pass. `force` rebuilds even when a live generation matches. */
-export async function runUatTrainReconcile(options: { force?: boolean } = {}): Promise<ReconcileResult> {
-  const root = projectRoot();
-  const gitDeps = buildUatGenerationGitDeps(root);
-  return reconcileUatGenerations(root, {
-    isEnabled: () => isMergeTrainEnabled(),
-    getReadySet,
-    getMainHeadSha: () => gitDeps.fetchMain(),
-    getBranchHeadSha: (branch) => gitDeps.branchHeadSha(branch),
-    store: buildUatGenerationStore(),
-    assemble: assembleFromReadySet,
-    teardownStack: (gen) => teardownUatStack(gen),
-    cleanup: runCleanup,
-    log: (msg) => console.log(msg),
-  }, options);
+/**
+ * PAN-1696 merge-train-routes: reconcile every tracked project whose effective
+ * merge-train flag is on, isolating failures so one project's git error cannot
+ * abort the others. Returns one result per attempted project so the caller can
+ * report which projects moved and which errored.
+ */
+export async function runUatTrainReconcileAllProjects(
+  options: { force?: boolean } = {},
+): Promise<Array<{ projectKey: string; result?: ReconcileResult; error?: string }>> {
+  const { listProjectsSync } = await import('../../../lib/projects.js');
+  const { isMergeTrainEnabledForProject } = await import('../../../lib/overdeck/merge-sync.js');
+
+  const enabled = listProjectsSync().filter(({ config }) => isMergeTrainEnabledForProject(config));
+  return Promise.all(
+    enabled.map(async ({ key, config }) => {
+      const projectPath = resolve(config.path);
+      try {
+        const result = await runUatTrainReconcileForProject(projectPath, options);
+        return { projectKey: key, result };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[uat-train] project ${projectPath} failed to reconcile:`, msg);
+        return { projectKey: key, error: msg };
+      }
+    }),
+  );
 }
 
 let reconcilerTimer: ReturnType<typeof setInterval> | null = null;
@@ -203,12 +259,12 @@ export function startUatTrainReconciler(): boolean {
   if (!canStartUatTrainReconciler()) return false;
   if (reconcilerTimer) return true;
   reconcilerTimer = setInterval(() => {
-    void runUatTrainReconcile().catch((err) => {
+    void runUatTrainReconcileAllProjects().catch((err) => {
       console.warn('[uat-train] reconcile tick failed:', err instanceof Error ? err.message : err);
     });
   }, RECONCILE_INTERVAL_MS);
   reconcilerTimer.unref?.();
-  void runUatTrainReconcile().catch((err) => {
+  void runUatTrainReconcileAllProjects().catch((err) => {
     console.warn('[uat-train] initial reconcile failed:', err instanceof Error ? err.message : err);
   });
   return true;
@@ -257,11 +313,21 @@ async function mapBounded<T>(items: readonly T[], concurrency: number, worker: (
   await Promise.all(workers);
 }
 
-async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promise<Map<string, AcceptanceCriteriaSummary>> {
+/**
+ * PAN-1696: `root` is the project the issues belong to, NOT the dashboard's own
+ * repo. Once the generations payload started serving every tracked project, a
+ * dashboard-rooted xBRIEF lookup silently returned no acceptance criteria for
+ * every non-PAN generation, so those batches showed an empty "What to UAT" list.
+ * Issue ids are prefix-distinct across projects, so the module-level mtime cache
+ * stays safe to key by issue id alone.
+ */
+async function loadAcceptanceCriteriaCache(
+  issueIds: ReadonlySet<string>,
+  root: string,
+): Promise<Map<string, AcceptanceCriteriaSummary>> {
   const cache = new Map<string, AcceptanceCriteriaSummary>();
   if (issueIds.size === 0) return cache;
 
-  const root = projectRoot();
   await mapBounded([...issueIds], ACCEPTANCE_CRITERIA_READ_CONCURRENCY, async (issueId) => {
     const upperIssueId = issueId.toUpperCase();
     const existing = acceptanceCriteriaByIssue.get(upperIssueId);
@@ -297,14 +363,16 @@ async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promi
 }
 
 /** The generation chain, newest first, enriched for the UAT batches card. */
-export async function getUatGenerationsPayload(): Promise<UatGenerationPayload[]> {
-  const status = await readCurrentFlywheelStatusForDashboard();
-  if (!status) return [];
-
-  const chain = listUatGenerationsSync({ projectRoot: projectRoot(), limit: CHAIN_PAYLOAD_LIMIT });
+export async function getUatGenerationsPayload(projectRootOverride?: string): Promise<UatGenerationPayload[]> {
+  // PAN-1696: no flywheel-run requirement — list generations directly from store.
+  // projectRootOverride lets the aggregate /api/merge-train/generations route read
+  // each tracked project's chain instead of only the dashboard's own repo.
+  const root = projectRootOverride ? resolve(projectRootOverride) : projectRoot();
+  const chain = listUatGenerationsSync({ projectRoot: root, limit: CHAIN_PAYLOAD_LIMIT });
   if (chain.length === 0) return [];
   const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
-  const acCache = await loadAcceptanceCriteriaCache(memberIssueIds);
+  // Resolve each member's xBRIEF in ITS OWN project, not the dashboard's repo.
+  const acCache = await loadAcceptanceCriteriaCache(memberIssueIds, root);
   const payload: UatGenerationPayload[] = [];
   for (const gen of chain) {
     const probe = await probeUatStack(gen);
@@ -373,7 +441,10 @@ export async function postUatGenerationPromotePayload(
   name: string,
   firePostMerge: (issueId: string) => boolean,
 ): Promise<PromoteResult> {
-  const root = projectRoot();
+  // PAN-1696: promote into the generation's OWN project repo. Generation rows carry
+  // project_root, so a MIN generation must not be merged against the Overdeck repo.
+  // For a generation belonging to this repo this resolves to the same path as before.
+  const root = resolve(getUatGenerationSync(name)?.projectRoot ?? projectRoot());
   const [
     { reviewRecordEligibility },
     { recordUatPromotionVerdicts },

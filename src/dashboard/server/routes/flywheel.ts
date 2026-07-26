@@ -590,42 +590,6 @@ const getMergeBlockersRoute = HttpRouter.add(
   })),
 );
 
-interface MergeNextDeps {
-  getOrderedIssueIds?: () => Promise<string[]>;
-  merge?: (issueId: string) => Promise<{ ok: true } | { ok: false; reason: string }>;
-}
-
-async function defaultGetOrderedIssueIds(): Promise<string[]> {
-  const status = await readCurrentFlywheelStatusForDashboard();
-  if (!status) return [];
-  const { computeMergeQueue } = await import('../../../lib/flywheel-merge-order.js');
-  const queue = await Effect.runPromise(
-    computeMergeQueue(status.activePipeline, process.cwd()).pipe(Effect.provide(nodeServicesLayer)),
-  );
-  return queue.map((i) => i.issueId);
-}
-
-async function defaultMergeOne(issueId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const { triggerMerge } = await import('./workspaces/merge-ops.js');
-  const r = await triggerMerge(issueId);
-  return r.success ? { ok: true } : { ok: false, reason: r.error ?? r.message ?? 'merge failed' };
-}
-
-/**
- * PAN-1691 "merge next N" / "ship the UAT candidate": merge the first N issues
- * of the conflict-aware merge order, one at a time, stopping at the first
- * failure (the rest would need re-rebasing). Pure-ish + DI for testing.
- */
-export async function postFlywheelMergeNextPayload(payload: unknown, deps: MergeNextDeps = {}) {
-  const body = (payload ?? {}) as { n?: unknown };
-  const n = typeof body.n === 'number' && Number.isFinite(body.n) ? Math.floor(body.n) : 0;
-  if (n <= 0) return { status: 400, body: { error: 'n must be a positive integer' } };
-
-  const issueIds = (await (deps.getOrderedIssueIds ?? defaultGetOrderedIssueIds)()).slice(0, n);
-  const { shipMergeBatch } = await import('../../../lib/cloister/merge-batch.js');
-  const outcomes = await shipMergeBatch(issueIds, { merge: deps.merge ?? defaultMergeOne });
-  return { status: 200, body: { outcomes } };
-}
 const postAutoMergeScheduleRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/auto-merge/schedule',
@@ -638,20 +602,6 @@ const postAutoMergeScheduleRoute = HttpRouter.add(
     if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
 
     const result = yield* Effect.promise(() => postAutoMergeSchedulePayload(parsed.body));
-    return jsonResponse(result.body, { status: result.status });
-  })),
-);
-
-const postFlywheelMergeNextRoute = HttpRouter.add(
-  'POST',
-  '/api/flywheel/merge-next',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedOrigin(request);
-    if (originError) return originError;
-    const parsed = yield* readUnknownJsonBody;
-    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
-    const result = yield* Effect.promise(() => postFlywheelMergeNextPayload(parsed.body));
     return jsonResponse(result.body, { status: result.status });
   })),
 );
@@ -859,44 +809,6 @@ const postFlywheelBriefRoute = HttpRouter.add(
   })),
 );
 
-const getFlywheelMergeQueueRoute = HttpRouter.add(
-  'GET',
-  '/api/flywheel/merge-queue',
-  httpHandler(Effect.gen(function* () {
-    return yield* Effect.promise(async () => {
-      const status = await readCurrentFlywheelStatusForDashboard();
-      if (!status) return jsonResponse([]);
-      const { computeMergeQueue, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
-      const queue = await Effect.runPromise(
-        computeMergeQueue(status.activePipeline, process.cwd(), { getPrUrl: resolveMergeQueuePrUrl }).pipe(
-          Effect.provide(nodeServicesLayer),
-        ),
-      );
-      return jsonResponse(queue);
-    });
-  })),
-);
-
-/**
- * PAN-1737 UAT batch trains. Generation names contain a slash
- * (`uat/pan-otter-0610`); URL params carry the name WITHOUT the `uat/`
- * prefix and handlers reconstitute it.
- */
-function uatGenerationNameFromParam(param: string): string {
-  const decoded = decodeURIComponent(param);
-  return decoded.startsWith('uat/') ? decoded : `uat/${decoded}`;
-}
-
-const getUatGenerationsRoute = HttpRouter.add(
-  'GET',
-  '/api/flywheel/uat-generations',
-  httpHandler(Effect.gen(function* () {
-    const { getUatGenerationsPayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
-    const payload = yield* Effect.promise(() => getUatGenerationsPayload());
-    return jsonResponse(payload);
-  })),
-);
-
 const getUatCandidateRoute = HttpRouter.add(
   'GET',
   '/api/flywheel/uat-candidate',
@@ -904,60 +816,6 @@ const getUatCandidateRoute = HttpRouter.add(
     const { getUatCandidatePayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
     const payload = yield* Effect.promise(() => getUatCandidatePayload());
     return jsonResponse(payload);
-  })),
-);
-
-const postUatGenerationStackRoute = HttpRouter.add(
-  'POST',
-  '/api/flywheel/uat-generations/:name/stack',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const authError = rejectUnsafeDashboardMutationRequest(request);
-    if (authError) return authError;
-    const params = yield* HttpRouter.params;
-    const name = uatGenerationNameFromParam(params['name'] ?? '');
-    const { postUatGenerationStackPayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
-    const result = yield* Effect.promise(() => postUatGenerationStackPayload(name));
-    if (!result.ok) return jsonResponse({ error: result.error }, { status: result.status });
-    return jsonResponse({ frontendUrl: result.frontendUrl, evicted: result.evicted });
-  })),
-);
-
-const postUatGenerationPromoteRoute = HttpRouter.add(
-  'POST',
-  '/api/flywheel/uat-generations/:name/promote',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const authError = rejectUnsafeDashboardMutationRequest(request);
-    if (authError) return authError;
-    const params = yield* HttpRouter.params;
-    const name = uatGenerationNameFromParam(params['name'] ?? '');
-    const { postUatGenerationPromotePayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
-    const { firePostMergeLifecycle } = yield* Effect.promise(() => import('./specialists.js'));
-    const result = yield* Effect.promise(() => postUatGenerationPromotePayload(name, firePostMergeLifecycle));
-    if (!result.success) {
-      const status = result.reason === 'not-found' ? 404 : result.reason === 'merge-failed' ? 500 : 409;
-      return jsonResponse(result, { status });
-    }
-    return jsonResponse(result);
-  })),
-);
-
-/**
- * PAN-1737: repurposed from the PAN-1691 one-shot candidate assembly. Now a
- * FORCED reconcile — rebuild the current generation even when the chain
- * already answers the ready set (operator suspects staleness).
- */
-const postFlywheelAssembleUatRoute = HttpRouter.add(
-  'POST',
-  '/api/flywheel/assemble-uat',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const authError = rejectUnsafeDashboardMutationRequest(request);
-    if (authError) return authError;
-    const { runUatTrainReconcile } = yield* Effect.promise(() => import('../services/uat-train.js'));
-    const result = yield* Effect.promise(() => runUatTrainReconcile({ force: true }));
-    return jsonResponse(result);
   })),
 );
 
@@ -983,14 +841,8 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getMergeBlockersRoute,
   getMergeBackendRoute,
   postAutoMergeScheduleRoute,
-  postFlywheelMergeNextRoute,
   deleteAutoMergeRoute,
-  getFlywheelMergeQueueRoute,
-  getUatGenerationsRoute,
   getUatCandidateRoute,
-  postUatGenerationStackRoute,
-  postUatGenerationPromoteRoute,
-  postFlywheelAssembleUatRoute,
   getFlywheelStateRoute,
   postFlywheelStatusRoute,
   postFlywheelStartRoute,

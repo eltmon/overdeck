@@ -129,6 +129,17 @@ Turn `merge_train_enabled` ON, observe ONE real cascade (a merge → siblings re
 
 ## 7. Future: decouple merge-train from the Flywheel?
 
+> **Resolved by [PAN-1696](https://github.com/eltmon/overdeck/issues/1696)
+> (2026-06).** All three couplings below are gone: the flag is `merge_train.enabled`
+> with a per-project `merge_train` override (reading through the legacy
+> `flywheel.merge_train_enabled` key when unset, so an existing ON value survived),
+> the ready set is computed from the review-status records per project with no
+> flywheel run, and the controls live on Awaiting Merge and in the project cockpit
+> with the Flywheel rail as one viewer of the shared view. The legacy
+> `/api/flywheel/*` merge-train routes were deleted in favour of
+> `/api/merge-train/*`. The section is kept verbatim below as the decision record.
+> **Current model: [`UAT-BATCH-TRAINS.md`](./UAT-BATCH-TRAINS.md).**
+
 The Flywheel began as a Overdeck-dev tool (keep agents working, surface holes the
 deacon alone can't). The merge-train is broadly useful — and it's **already mostly
 structurally decoupled**: the engine lives in `src/lib/` + `src/lib/cloister/`, the

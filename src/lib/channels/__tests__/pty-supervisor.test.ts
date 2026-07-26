@@ -492,4 +492,80 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
 
     expect(statSync(socketPath).mode & 0o777).toBe(0o600);
   });
+
+  it('deduplicates a repeated dedupKey without a second PTY write (PAN-2997)', async () => {
+    const agentId = 'agent-dedup-key';
+    const content = 'dedup-wake-content';
+    const { token, socketPath } = await readySupervisor(agentId, 'cat');
+
+    const first = await postToUnixSocket(socketPath, token, { content, echo: false, dedupKey: 'wake-seq-1' });
+    expect(first.status).toBe(200);
+    await waitForProcessOutput(() => stdout.includes(content), 'supervisor did not echo posted content');
+    // Plain cat echoes both the tty input and its output, so let the first
+    // delivery's output fully settle, then require the replay adds nothing.
+    await new Promise(r => setTimeout(r, 500));
+    const occurrencesAfterFirst = stdout.match(new RegExp(content, 'g'))?.length ?? 0;
+    expect(occurrencesAfterFirst).toBeGreaterThan(0);
+
+    // The dashboard-crash replay: same key, same content. The supervisor
+    // survived the "crash", so it answers with a dedup, not a second write.
+    const second = await postToUnixSocket(socketPath, token, { content, echo: false, dedupKey: 'wake-seq-1' });
+    expect(second.status).toBe(200);
+    expect(second.body).toContain('deduplicated');
+    await new Promise(r => setTimeout(r, 300));
+    expect(stdout.match(new RegExp(content, 'g'))).toHaveLength(occurrencesAfterFirst);
+  });
+
+  it('coalesces two CONCURRENT same-key injections into a single PTY write (PAN-2997 cycle 7)', async () => {
+    const agentId = 'agent-dedup-race';
+    const content = 'dedup-race-content';
+    // The child echoes its input only after a delay, so the first injection is
+    // still awaiting echo confirmation when the second request arrives — the
+    // exact interleaving that used to let both pass the dedup check.
+    const { token, socketPath } = await readySupervisor(agentId, 'bash', [
+      '-lc',
+      'stty raw -echo; printf READY; sleep 1; cat',
+    ]);
+    await waitForProcessOutput(() => stdout.includes('READY'), 'child did not start');
+    stdout = '';
+
+    const [first, second] = await Promise.all([
+      postToUnixSocket(socketPath, token, { content, echo: false, dedupKey: 'wake-race-1' }),
+      postToUnixSocket(socketPath, token, { content, echo: false, dedupKey: 'wake-race-1' }),
+    ]);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    // Exactly one request injected; the other coalesced onto it and answered dedup.
+    const dedupAnswers = [first.body, second.body].filter(body => body.includes('deduplicated'));
+    expect(dedupAnswers).toHaveLength(1);
+
+    // With tty echo disabled and supervisor stdout echo off, ONE injection
+    // produces exactly one occurrence of the content (cat's output); a racing
+    // second injection would add another.
+    await waitForProcessOutput(() => stdout.includes(content), 'injected content did not echo through cat');
+    await new Promise(r => setTimeout(r, 300));
+    expect(stdout.match(new RegExp(content, 'g'))).toHaveLength(1);
+  }, 15_000);
+
+  it('releases the key reservation when the injection fails so a retry can succeed (PAN-2997 cycle 7)', async () => {
+    const agentId = 'agent-dedup-release';
+    const content = `release-${'y'.repeat(32)}`;
+    // The child never echoes — echo confirmation fails after the retry budget
+    // and the supervisor answers 502. The reservation must be released: a
+    // later same-key request is a fresh attempt, not a false dedup.
+    const byteCount = Buffer.byteLength(content, 'utf8') * 4 + 16;
+    const { token, socketPath } = await readySupervisor(agentId, 'bash', [
+      '-lc',
+      `stty raw -echo; printf READY; dd bs=1 count=${byteCount} of=/dev/null 2>/dev/null; sleep 30`,
+    ]);
+    await waitForProcessOutput(() => stdout.includes('READY'), 'child did not enter raw no-echo mode');
+
+    const first = await postToUnixSocket(socketPath, token, { content, echo: true, dedupKey: 'wake-release-1' });
+    expect(first.status).toBe(502);
+
+    const retry = await postToUnixSocket(socketPath, token, { content, echo: true, dedupKey: 'wake-release-1' });
+    expect(retry.status).toBe(502);
+    expect(retry.body).not.toContain('deduplicated');
+  }, 30_000);
 });

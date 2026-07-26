@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   computePredictedConflictSignals,
   declaredIssueFootprint,
@@ -235,21 +235,6 @@ describe('planUatCandidate (PAN-1691 on-demand UAT branch)', () => {
   });
 });
 
-describe('MERGE_GATE_VERBS (PAN-1736 verb contract)', () => {
-  it("treats both 'shipping' and 'merging' as at-the-merge-gate", async () => {
-    const { MERGE_GATE_VERBS } = await import('../../../src/lib/flywheel-merge-order.js');
-    expect(MERGE_GATE_VERBS.has('shipping')).toBe(true);
-    expect(MERGE_GATE_VERBS.has('merging')).toBe(true);
-  });
-
-  it('excludes verbs that do not mean merge-ready', async () => {
-    const { MERGE_GATE_VERBS } = await import('../../../src/lib/flywheel-merge-order.js');
-    for (const verb of ['planning', 'working', 'reviewing', 'testing', 'blocked', 'parked'] as const) {
-      expect(MERGE_GATE_VERBS.has(verb)).toBe(false);
-    }
-  });
-});
-
 describe('mergeGateEligibility (PAN-1759 verb vs authoritative state)', () => {
   it('passes only when review passed and test passed/skipped', async () => {
     const { mergeGateEligibility } = await import('../../../src/lib/review-status.js');
@@ -271,31 +256,43 @@ describe('mergeGateEligibility (PAN-1759 verb vs authoritative state)', () => {
   });
 });
 
-describe('computeMergeQueue eligibility gate (PAN-1759)', () => {
-  it('excludes verb-tagged items the review pipeline has not cleared, reporting each rejection', async () => {
-    const { Effect } = await import('effect');
-    const { layer: nodeServicesLayer } = await import('@effect/platform-node/NodeServices');
-    const { computeMergeQueue } = await import('../../../src/lib/flywheel-merge-order.js');
-    const items = [
-      { issueId: 'PAN-1', title: 'Mid-review rider', verb: 'merging' },
-      { issueId: 'PAN-2', title: 'Still testing', verb: 'shipping' },
-      { issueId: 'PAN-3', title: 'Not at the gate', verb: 'working' },
-    ] as never[];
-    const rejected: Array<[string, string]> = [];
-    const queue = await Effect.runPromise(
-      computeMergeQueue(items, '/nonexistent', {
-        eligibility: (issueId) =>
-          issueId === 'PAN-1'
-            ? { eligible: false, reason: 'review is reviewing' }
-            : { eligible: false, reason: 'test is testing' },
-        onIneligible: (issueId, reason) => rejected.push([issueId, reason]),
-      }).pipe(Effect.provide(nodeServicesLayer)),
-    );
-    expect(queue).toEqual([]);
-    // PAN-3 never reaches the eligibility gate — wrong verb.
-    expect(rejected).toEqual([
-      ['PAN-1', 'review is reviewing'],
-      ['PAN-2', 'test is testing'],
-    ]);
+describe('listEligibleCandidatesByProject eligibility gate (PAN-1759, moved by PAN-1696)', () => {
+  // PAN-1696 retired the verb-based computeMergeQueue wrapper, so the gate this
+  // test protects moved here: the ready set is built from review-status records
+  // and must still exclude anything the review pipeline has not cleared. Without
+  // this, a mid-review or still-testing issue reaches the merge queue again.
+  it('includes only review-cleared, non-deacon-ignored issues for the project', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/projects.js', () => ({
+      findProjectByPathSync: () => ({ path: '/repo/overdeck', name: 'Overdeck' }),
+      resolveProjectFromIssueSync: (issueId: string) =>
+        issueId.startsWith('MIN-') ? { projectPath: '/repo/myn' } : { projectPath: '/repo/overdeck' },
+      getProjectSwarmHotspots: () => [],
+    }));
+    vi.doMock('../../../src/lib/review-status.js', () => ({
+      loadReviewStatuses: () => ({
+        'PAN-1': { readyForMerge: true, reviewStatus: 'reviewing', testStatus: 'pending', prNumber: 1 },
+        'PAN-2': { readyForMerge: true, reviewStatus: 'passed', testStatus: 'testing', prNumber: 2 },
+        'PAN-3': { readyForMerge: true, reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', prNumber: 3 },
+        'PAN-4': { readyForMerge: true, reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', deaconIgnored: true, prNumber: 4 },
+        'PAN-5': { readyForMerge: false, reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', prNumber: 5 },
+        'MIN-9': { readyForMerge: true, reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', prNumber: 9 },
+      }),
+      mergeGateEligibility: (rs: { reviewStatus?: string; testStatus?: string; verificationStatus?: string }) => {
+        if (rs.reviewStatus !== 'passed') return { eligible: false, reason: `review is ${rs.reviewStatus}` };
+        if (rs.testStatus !== 'passed' && rs.testStatus !== 'skipped') return { eligible: false, reason: `test is ${rs.testStatus}` };
+        if (rs.verificationStatus === 'failed') return { eligible: false, reason: 'verification failed' };
+        return { eligible: true };
+      },
+    }));
+
+    const { listEligibleCandidatesByProject } = await import('../../../src/lib/flywheel-merge-order.js');
+    const candidates = listEligibleCandidatesByProject('/repo/overdeck');
+
+    // PAN-3 alone survives: PAN-1 is mid-review, PAN-2 still testing, PAN-4 is
+    // deacon-ignored, PAN-5 is not ready, and MIN-9 belongs to another project.
+    expect(candidates.map((candidate) => candidate.issueId)).toEqual(['PAN-3']);
+    expect(candidates[0]).toMatchObject({ issueId: 'PAN-3', pr: 3 });
+    vi.resetModules();
   });
 });
