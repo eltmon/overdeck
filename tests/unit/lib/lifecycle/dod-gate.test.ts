@@ -1,4 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
+
+const issueClosureMocks = vi.hoisted(() => ({
+  isIssueClosed: vi.fn(),
+  isTrackerIssueClosed: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({
+  isIssueClosed: issueClosureMocks.isIssueClosed,
+  isTrackerIssueClosed: issueClosureMocks.isTrackerIssueClosed,
+}));
+
 import type { ReviewStatus } from '../../../../src/lib/review-status.js';
 import type { PanIssuePipelineRecord } from '../../../../src/lib/pan-dir/record.js';
 import {
@@ -832,6 +843,38 @@ describe('assembled Definition-of-Done gate', () => {
     expect(calls.slice(0, 3)).toEqual(['merged', 'main-verify', 'tracker-closed']);
     expect(review).toHaveBeenCalledTimes(1);
     expect(gate.rows.slice(0, 3).map(row => row.status)).toEqual(['skip', 'skip', 'skip']);
+  });
+
+  it('does not settle verdict rows from terminal shadow state while the tracker is open', async () => {
+    vi.clearAllMocks();
+    issueClosureMocks.isIssueClosed.mockResolvedValue(true);
+    issueClosureMocks.isTrackerIssueClosed.mockResolvedValue(false);
+    const settlements: unknown[] = [];
+    const verdictRow = (id: 'review' | 'tests' | 'verification') =>
+      async (_issueId: string, settlement?: unknown) => {
+        settlements.push(settlement);
+        return makeRow(id, 'miss');
+      };
+
+    const gate = await evaluateDodGate(ctx, {}, {
+      review: verdictRow('review'),
+      tests: verdictRow('tests'),
+      verification: verdictRow('verification'),
+      merged: async () => ({ ...makeRow('merged'), mergeCommit: 'abc123' }),
+      postMerge: async () => makeRow('post-merge'),
+      mainVerify: async () => makeRow('main-verify'),
+      deploy: async () => makeRow('deploy'),
+      now: () => '2026-07-15T13:00:00Z',
+    });
+
+    expect(issueClosureMocks.isTrackerIssueClosed).toHaveBeenCalledWith(issueId);
+    expect(issueClosureMocks.isIssueClosed).not.toHaveBeenCalled();
+    expect(settlements).toEqual(Array(3).fill({
+      trackerClosed: false,
+      landedWork: true,
+      mainVerifyStatus: 'pass',
+    }));
+    expect(gate.misses).toEqual(['review', 'tests', 'verification']);
   });
 
   // PAN-3188: a landing with no resolvable merge commit must skip row 7 when

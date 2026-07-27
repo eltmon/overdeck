@@ -17,7 +17,7 @@ import {
   type PanIssuePipelineRecord,
 } from '../pan-dir/record.js';
 import { getAutoCloseOutCanonicalState } from '../cloister/deacon-canonical-state.js';
-import { isIssueClosed } from '../cloister/issue-closed.js';
+import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
 import { fetchCommitCheckRuns, fetchIssuePullRequest } from '../overdeck/pull-requests.js';
 import {
   gatherIssueBranchContainment,
@@ -158,7 +158,7 @@ const defaultEvaluateDodGateDeps: EvaluateDodGateDeps = {
   postMerge: checkPostMergeRow,
   mainVerify: checkMainVerifyRow,
   deploy: checkDeployRow,
-  trackerClosed: isIssueClosed,
+  trackerClosed: isTrackerIssueClosed,
   now: () => new Date().toISOString(),
 };
 

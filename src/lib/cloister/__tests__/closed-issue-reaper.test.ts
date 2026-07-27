@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   loadReviewStatuses: vi.fn(),
   getReviewStatusesSync: vi.fn(),
   isIssueClosed: vi.fn(),
+  isTrackerIssueClosed: vi.fn(),
   readJournalStatusSync: vi.fn(),
   listRunningAgents: vi.fn(),
   listProjectsSync: vi.fn(),
@@ -58,6 +59,7 @@ vi.mock('../../tmux.js', () => ({
 
 vi.mock('../issue-closed.js', () => ({
   isIssueClosed: mocks.isIssueClosed,
+  isTrackerIssueClosed: mocks.isTrackerIssueClosed,
 }));
 
 vi.mock('../reap-issue-residue.js', () => ({
@@ -104,6 +106,7 @@ describe('reconcileClosedIssueAgents', () => {
       (issueIds: string[]) => issueIds.map((issueId) => `Queued merged-issue Docker cleanup for ${issueId}`),
     );
     mocks.isIssueClosed.mockResolvedValue(false);
+    mocks.isTrackerIssueClosed.mockResolvedValue(false);
     mocks.exec.mockImplementation((_command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
       const cb = typeof opts === 'function' ? opts : callback;
       cb?.(null, { stdout: '', stderr: '' });
@@ -401,7 +404,7 @@ describe('reconcileClosedIssueAgents', () => {
       updatedAt: '2026-07-02T00:00:00.000Z',
       durable: { reviewRequestedAt: '2026-07-02T00:00:00.000Z' },
     });
-    mocks.isIssueClosed.mockResolvedValue(true);
+    mocks.isTrackerIssueClosed.mockResolvedValue(true);
 
     await expect(reapClosedIssueReviewRequests(new Map())).resolves.toEqual([
       'Cleared unserviced review request for PAN-7001 — parent issue is closed',
@@ -430,10 +433,15 @@ describe('reconcileClosedIssueAgents', () => {
         readyForMerge: false,
       },
     });
-    mocks.isIssueClosed.mockResolvedValue(false);
+    // The broad lifecycle predicate can be true from terminal shadow state while
+    // the tracker remains open. Review intent must follow the tracker itself.
+    mocks.isIssueClosed.mockResolvedValue(true);
+    mocks.isTrackerIssueClosed.mockResolvedValue(false);
 
     await expect(reapClosedIssueReviewRequests(new Map())).resolves.toEqual([]);
 
+    expect(mocks.isTrackerIssueClosed).toHaveBeenCalledWith('PAN-7002');
+    expect(mocks.isIssueClosed).not.toHaveBeenCalled();
     expect(mocks.setReviewStatusSync).not.toHaveBeenCalled();
   });
 

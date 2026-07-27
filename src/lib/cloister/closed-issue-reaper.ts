@@ -13,7 +13,7 @@ import { resolveProjectForIssue } from '../pan-dir/record.js';
 import { loadReviewStatuses, setReviewStatusSync } from '../review-status.js';
 import type { ReviewStatus } from '../review-status-reconcile.js';
 import { listSessionNames } from '../tmux.js';
-import { isIssueClosed } from './issue-closed.js';
+import { isIssueClosed, isTrackerIssueClosed } from './issue-closed.js';
 import { reapIssueResidue } from './reap-issue-residue.js';
 
 // Sessions reaped by NAME as a backstop: inspect sessions never have agent
@@ -69,8 +69,20 @@ async function isClosedIssue(
   return promise;
 }
 
+async function isTrackerClosedIssue(
+  issueId: string,
+  trackerClosedChecks: Map<string, Promise<boolean>>,
+): Promise<boolean> {
+  let promise = trackerClosedChecks.get(issueId);
+  if (!promise) {
+    promise = isTrackerIssueClosed(issueId);
+    trackerClosedChecks.set(issueId, promise);
+  }
+  return promise;
+}
+
 export async function reapClosedIssueReviewRequests(
-  closedChecks: Map<string, Promise<boolean>>,
+  trackerClosedChecks: Map<string, Promise<boolean>>,
 ): Promise<string[]> {
   const actions: string[] = [];
   const statuses = loadReviewStatuses();
@@ -91,7 +103,7 @@ export async function reapClosedIssueReviewRequests(
     if (existing.reviewStatus !== 'pending' || !existing.reviewRequestedAt) continue;
     if (existing.reviewSpawnedAt &&
         Date.parse(existing.reviewRequestedAt) <= new Date(existing.reviewSpawnedAt).getTime()) continue;
-    if (!await isClosedIssue(issueId, closedChecks)) continue;
+    if (!await isTrackerClosedIssue(issueId, trackerClosedChecks)) continue;
 
     setReviewStatusSync(issueId, {
       reviewRequestedAt: undefined,
@@ -214,6 +226,7 @@ export async function handleIssueStatusChangedClosed(issueId: string): Promise<s
 export async function reconcileClosedIssueAgents(): Promise<string[]> {
   const actions: string[] = [];
   const closedChecks = new Map<string, Promise<boolean>>();
+  const trackerClosedChecks = new Map<string, Promise<boolean>>();
   const reapedAgentIds = new Set<string>();
   const closedIssueIds = new Set<string>();
   const reapedIssueKeys = new Set<string>();
@@ -305,6 +318,6 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
     }
   }
 
-  actions.push(...await reapClosedIssueReviewRequests(closedChecks));
+  actions.push(...await reapClosedIssueReviewRequests(trackerClosedChecks));
   return actions;
 }
