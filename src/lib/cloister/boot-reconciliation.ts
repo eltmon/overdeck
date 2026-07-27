@@ -210,6 +210,15 @@ export function armBootReconciliationGraceTimer(
   graceTimer = setTimeout(() => {
     graceTimer = null;
     if (getBootReconciliationState().decision !== 'pending') return;
+    if (listBootReconciliationCandidateIds().length === 0) {
+      setBootReconciliationDecision('resume_all');
+      logDeaconEventSync('boot reconciliation grace expired — vacuous hold auto-released (0 candidates)');
+      void Promise.resolve(onGraceExpired()).catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        logDeaconEventSync(`boot reconciliation grace expiry apply hook failed: ${message}`);
+      });
+      return;
+    }
     setBootReconciliationDecision('hold_all');
     logDeaconEventSync('boot reconciliation grace expired — decision set to hold_all');
     void Promise.resolve(onGraceExpired()).catch((err) => {

@@ -322,7 +322,7 @@ describe('boot reconciliation', () => {
     expect(listBootReconciliationCandidateIds()).toEqual(['agent-live']);
   });
 
-  it('PAN-2510: opens the grace window in pending on an empty candidate list, then safely holds at expiry', async () => {
+  it('PAN-2510: opens the grace window in pending on an empty candidate list, then auto-releases a vacuous hold at expiry', async () => {
     // An empty candidate list at stamp time is ambiguous: it can mean "genuinely
     // nothing to resume" (only phantoms) OR "the deacon child has not marked the
     // crashed agents `stopped` yet" (the cross-process boot race). We can't tell
@@ -363,9 +363,12 @@ describe('boot reconciliation', () => {
       graceDeadline: '2026-06-29T15:00:30.000Z',
     });
 
-    // Still nothing genuine to resume by the deadline → safe hold default.
+    // Still nothing genuine to resume by the deadline → the hold is vacuous.
     await vi.advanceTimersByTimeAsync(30_000);
-    expect(getBootReconciliationState().decision).toBe('hold_all');
+    expect(getBootReconciliationState().decision).toBe('resume_all');
+    expect(mocks.logDeaconEventSync).toHaveBeenCalledWith(
+      'boot reconciliation grace expired — vacuous hold auto-released (0 candidates)',
+    );
     expect(onGraceExpired).toHaveBeenCalledTimes(1);
   });
 
