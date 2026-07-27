@@ -29,6 +29,8 @@ function makeDeps(overrides: Partial<ReconcileBranchInvalidationDeps> = {}): Rec
   setSetting: ReturnType<typeof vi.fn>;
   probeConflictPaths: ReturnType<typeof vi.fn>;
   lsRemoteMainSha: ReturnType<typeof vi.fn>;
+  resolveFeedbackTarget: ReturnType<typeof vi.fn>;
+  messageAgent: ReturnType<typeof vi.fn>;
 } {
   const settings = new Map<string, string>();
   return {
@@ -46,6 +48,8 @@ function makeDeps(overrides: Partial<ReconcileBranchInvalidationDeps> = {}): Rec
     emitActivityEntry: vi.fn(),
     lsRemoteMainSha: vi.fn(async () => 'shaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
     probeConflictPaths: vi.fn(async () => ({ mergeability: 'clean' as const, paths: [] })),
+    resolveFeedbackTarget: vi.fn(async () => ({ agentId: 'agent-pan-1111' })),
+    messageAgent: vi.fn(async () => undefined),
     now: () => Date.parse('2026-07-26T19:10:00.000Z'),
     ...overrides,
   };
@@ -155,6 +159,79 @@ describe('reconcileBranchInvalidation', () => {
       message: expect.stringContaining('invalidated 1 branch(es): PAN-1111'),
     }));
     expect(actions.some((a) => a.includes('PAN-1111'))).toBe(true);
+    expect(deps.messageAgent).toHaveBeenCalledWith(
+      'agent-pan-1111',
+      expect.stringContaining('shaaaaa'),
+      'internal',
+    );
+    expect(deps.messageAgent).toHaveBeenCalledWith(
+      'agent-pan-1111',
+      expect.stringContaining('a.txt, b.txt'),
+      'internal',
+    );
+  });
+
+  it('delivers exactly one notification per main-head SHA to a live agent, naming the sha and every path (AC-1)', async () => {
+    const status = makeStatus({ issueId: 'PAN-1111' });
+    const deps = makeDeps({
+      loadReviewStatuses: () => ({ 'PAN-1111': status }),
+      listAgentWorkspaces: () => [{ issueId: 'PAN-1111', workspace: '/projects/pan/workspaces/feature-pan-1111' }],
+      existsSync: () => true,
+      probeConflictPaths: vi.fn(async () => ({ mergeability: 'conflicts' as const, paths: ['a.txt', 'b.txt', 'c.txt'] })),
+      resolveFeedbackTarget: vi.fn(async () => ({ agentId: 'agent-pan-1111' })),
+    });
+
+    await reconcileBranchInvalidation(deps);
+
+    expect(deps.messageAgent).toHaveBeenCalledTimes(1);
+    const [agentId, message] = deps.messageAgent.mock.calls[0];
+    expect(agentId).toBe('agent-pan-1111');
+    expect(message).toContain('shaaaaa');
+    expect(message).toContain('a.txt');
+    expect(message).toContain('b.txt');
+    expect(message).toContain('c.txt');
+  });
+
+  it('sends no message and throws no error for a needsYou (no live agent) target, but still marks the issue (AC-2)', async () => {
+    const status = makeStatus({ issueId: 'PAN-1111' });
+    const deps = makeDeps({
+      loadReviewStatuses: () => ({ 'PAN-1111': status }),
+      listAgentWorkspaces: () => [{ issueId: 'PAN-1111', workspace: '/projects/pan/workspaces/feature-pan-1111' }],
+      existsSync: () => true,
+      probeConflictPaths: vi.fn(async () => ({ mergeability: 'conflicts' as const, paths: ['a.txt'] })),
+      resolveFeedbackTarget: vi.fn(async () => ({ needsYou: true, reason: 'no live agent' })),
+    });
+
+    await expect(reconcileBranchInvalidation(deps)).resolves.toEqual(expect.any(Array));
+
+    expect(deps.messageAgent).not.toHaveBeenCalled();
+    expect(deps.setReviewStatus).toHaveBeenCalledWith(
+      'PAN-1111',
+      expect.objectContaining({ conflictsSince: expect.objectContaining({ sha: 'shaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }) }),
+      status,
+    );
+  });
+
+  it('sends no additional message on a second sweep with an unchanged main head (AC-3)', async () => {
+    let currentStatus = makeStatus({ issueId: 'PAN-1111' });
+    const deps = makeDeps({
+      loadReviewStatuses: () => ({ 'PAN-1111': currentStatus }),
+      listAgentWorkspaces: () => [{ issueId: 'PAN-1111', workspace: '/projects/pan/workspaces/feature-pan-1111' }],
+      existsSync: () => true,
+      probeConflictPaths: vi.fn(async () => ({ mergeability: 'conflicts' as const, paths: ['a.txt'] })),
+    });
+    deps.setReviewStatus.mockImplementation((_issueId, update, existing) => {
+      currentStatus = { ...(existing ?? currentStatus), ...update } as ReviewStatus;
+      return currentStatus;
+    });
+
+    await reconcileBranchInvalidation(deps);
+    expect(deps.messageAgent).toHaveBeenCalledTimes(1);
+
+    __resetBranchInvalidationCooldownsForTests();
+    await reconcileBranchInvalidation(deps);
+
+    expect(deps.messageAgent).toHaveBeenCalledTimes(1);
   });
 
   it('does not re-mark an issue already conflicting at the same main head (dedup)', async () => {

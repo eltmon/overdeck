@@ -14,6 +14,7 @@ import { promisify } from 'node:util';
 import { emitActivityEntrySync, type EmitActivityOptions } from '../activity-logger.js';
 import { getSetting, setSetting } from '../overdeck/control-settings.js';
 import { listAllAgentsSync } from '../overdeck/agents.js';
+import { messageAgent } from '../agents/messaging.js';
 import {
   loadReviewStatuses,
   setReviewStatusSync,
@@ -23,6 +24,7 @@ import {
 } from '../review-status.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { probeBranchConflictPaths, type BranchConflictProbeResult } from './conflict-gate.js';
+import { resolveIssueFeedbackTarget, type IssueFeedbackTarget } from './feedback-target.js';
 
 const execAsync = promisify(exec);
 const GIT_TIMEOUT_MS = 30_000;
@@ -48,6 +50,8 @@ export interface ReconcileBranchInvalidationDeps {
   emitActivityEntry: (options: EmitActivityOptions) => void;
   lsRemoteMainSha: (projectPath: string) => Promise<string | null>;
   probeConflictPaths: (workspacePath: string, targetBranch: string) => Promise<BranchConflictProbeResult>;
+  resolveFeedbackTarget: (issueId: string) => Promise<IssueFeedbackTarget>;
+  messageAgent: (agentId: string, message: string, caller?: string) => Promise<unknown>;
   now: () => number;
 }
 
@@ -80,6 +84,8 @@ export function buildRealBranchInvalidationDeps(): ReconcileBranchInvalidationDe
     emitActivityEntry: emitActivityEntrySync,
     lsRemoteMainSha: lsRemoteMainShaReal,
     probeConflictPaths: (workspacePath, targetBranch) => probeBranchConflictPaths(workspacePath, targetBranch),
+    resolveFeedbackTarget: resolveIssueFeedbackTarget,
+    messageAgent: (agentId, message, caller) => messageAgent(agentId, message, caller),
     now: () => Date.now(),
   };
 }
@@ -113,6 +119,31 @@ function resolveWorkspacePath(
 function formatPathSummary(paths: string[]): string {
   const shown = paths.slice(0, 3).join(', ');
   return paths.length > 3 ? `${shown}, …` : shown;
+}
+
+/**
+ * Notify the live owning agent that main moved and now conflicts with its
+ * branch. Skips silently when no agent is live (needsYou) — the blocker plus
+ * the existing conflict-resolver dispatch already cover stopped agents; this
+ * is not a second nudge channel.
+ */
+async function notifyBranchInvalidated(
+  deps: Pick<ReconcileBranchInvalidationDeps, 'resolveFeedbackTarget' | 'messageAgent'>,
+  issueId: string,
+  info: { sha: string; paths: string[] },
+): Promise<void> {
+  const target = await deps.resolveFeedbackTarget(issueId);
+  if ('needsYou' in target) return;
+
+  const shortSha = info.sha.slice(0, 7);
+  const message = [
+    `main moved: merge ${shortSha} now conflicts with your branch in: ${info.paths.join(', ')}.`,
+    'Rebase onto the new main NOW while the conflict is small — run',
+    `\`pan sync-main ${issueId}\` (or \`git fetch origin main && git rebase origin/main\`),`,
+    'resolve preserving BOTH intents, then continue your current task.',
+  ].join(' ');
+
+  await deps.messageAgent(target.agentId, message, 'internal');
 }
 
 async function sweepProject(
@@ -166,6 +197,12 @@ async function sweepProject(
       issueId,
       message: `main moved: ${issueId} now conflicts with main (${shortSha}) in ${formatPathSummary(probe.paths)}`,
     });
+
+    try {
+      await notifyBranchInvalidated(deps, issueId, { sha: newSha, paths: probe.paths });
+    } catch (notifyErr: unknown) {
+      console.warn(`[deacon] reconcileBranchInvalidation: ${issueId} notify failed: ${notifyErr instanceof Error ? notifyErr.message : String(notifyErr)}`);
+    }
 
     newlyMarkedIssueIds.push(issueId);
     actions.push(`Marked ${issueId} conflicting with main since ${shortSha}`);
