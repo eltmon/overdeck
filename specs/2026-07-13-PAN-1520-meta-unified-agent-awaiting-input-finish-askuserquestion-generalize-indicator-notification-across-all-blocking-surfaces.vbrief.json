@@ -4,17 +4,17 @@
     "created": "2026-07-13T06:22:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1520: [META] Unified \"agent awaiting input\" — finish AskUserQuestion, generalize indicator + notification across all blocking surfaces",
-    "updated": "2026-07-13T06:25:37.412Z"
+    "updated": "2026-07-27T16:56:41.757Z"
   },
   "plan": {
     "id": "pan-1520",
     "title": "[META] Unified \"agent awaiting input\" — finish AskUserQuestion, generalize indicator + notification across all blocking surfaces",
-    "status": "proposed",
+    "status": "completed",
     "uid": "ed66519e-45bd-475f-91f8-e70b3afd9609",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-13T06:22:00.000Z",
-    "updated": "2026-07-13T06:25:37.412Z",
+    "updated": "2026-07-27T16:56:41.757Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1520",
@@ -652,5 +652,5 @@
       "canonicalFilename": "2026-07-13-PAN-1520-meta-unified-agent-awaiting-input-finish-askuserquestion-generalize-indicator-notification-across-all-blocking-surfaces.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
