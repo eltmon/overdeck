@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T10:38:53.942Z",
+  "updated": "2026-07-27T10:38:59.953Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "pending",
@@ -35,7 +35,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-opus-5",
   "tasks": {
     "sequence": 4,
     "claims": {},
