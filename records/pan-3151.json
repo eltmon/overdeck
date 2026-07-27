@@ -341,7 +341,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T15:07:58.038Z",
+  "updated": "2026-07-27T15:08:03.590Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
@@ -351,10 +351,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T15:07:57.303Z",
+    "updatedAt": "2026-07-27T15:08:03.581Z",
     "reviewNotes": "The real v62→v63 migration is now correct, but the focused migration suite is red: two existing assertions still require version 62 after SCHEMA_VERSION was bumped to 63. Update those expectations/comments and return all 35 targeted tests green.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
-    "reviewedAtCommit": "fc19e669a59088966a8149057824ab6a8db87946",
+    "reviewedAtCommit": "41af9787162a731722d44d99b4a480ec0fd2fb2c",
     "reviewSpawnedAt": "2026-07-27T15:05:51.110Z"
   },
   "closeOut": {
@@ -421,7 +421,7 @@
       },
       "costAtCloseOut": {
         "usd": 274.9738873,
-        "pricingAsOf": "2026-07-27T15:07:57.325Z"
+        "pricingAsOf": "2026-07-27T15:08:03.587Z"
       }
     },
     "merges": [
