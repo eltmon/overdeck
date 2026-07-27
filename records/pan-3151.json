@@ -17,9 +17,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-27T11:23:39.020Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-27T11:30Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-27T11:30:34.120Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-27T11:30:34Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nunstick now binds undefined and fails to clear every existing stuck issue\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-allowlist.txt",
@@ -96,7 +109,7 @@
     "recordedAt": "2026-07-27T11:05:50.125Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T11:30:33.446Z",
+  "updated": "2026-07-27T11:30:34.120Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
