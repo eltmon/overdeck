@@ -56,7 +56,7 @@
     "recordedAt": "2026-07-27T05:50:18.081Z"
   },
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T05:50:24.246Z",
+  "updated": "2026-07-27T05:50:26.860Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "pending",
@@ -66,7 +66,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T05:50:24.184Z",
+    "updatedAt": "2026-07-27T05:50:24.318Z",
     "inspectNotes": "All 4 ACs met: isAutoResumableRole(work|strike) admits strikes (boot-reconciliation.ts:94-99); the hasCompletionMarker/stoppedByUser gate is gone so in-window stoppedByUser agents qualify while isRecentBootCandidate still rejects out-of-window ones; handleAgentStoppedEvent now gates on isAutoResumableRole and logs 'not auto-resumable' (deacon-auto-resume.ts:640-643). Verified end-to-end: applyBootReconciliationDecision resumes via handleAgentStoppedEvent, so admitted strikes are not dead-ended, and the removed workspace-path completion check is still covered by bootReconciliationSkipReason's agent-dir marker check. vitest boot-reconciliation.test.ts 22/22 pass, npm run typecheck clean. Non-blocking note for follow-up beads: deacon-auto-resume.ts:868 and :935 still filter role==='work', so strikes stay invisible to the batch patrol and reconcile safety net outside the boot window.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3199",
     "reviewRequestedAt": "2026-07-27T05:50:20.746Z",
@@ -133,7 +133,7 @@
       },
       "costAtCloseOut": {
         "usd": 49.867316,
-        "pricingAsOf": "2026-07-27T05:50:24.236Z"
+        "pricingAsOf": "2026-07-27T05:50:26.856Z"
       }
     },
     "merges": [
