@@ -7730,3 +7730,7 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - **The whole PAN-3191 episode ended without a single override**: the on-disk verdict justified the merge, the merge and deploy satisfied rows 5–7, and row 1 healed itself. **The only thing that would have made this worse was acting early** — writing a speculative verdict at tick 29, or `--accept-review`-ing at tick 31.
 - Post-close sweep: ready queue empty, merge-blockers `[]`, both trains idle, MIN-879 cache still present.
 - **RUN TOTALS: 44 close-outs, 12 merges, merge queue 15 → 0, 9 substrate bugs filed of which 7 fixed, merged and closed out.**
+
+## RUN-72 tick 33 (2026-07-27 14:40Z) — watch tick, unchanged
+- Ready queue empty, merge-blockers `[]`, both trains enabled and idle, zero code on main past the live build (`5ae5d217844e`), MIN-879 cache still present. Nothing actionable.
+- Totals unchanged: 44 close-outs, 12 merges, 9 substrate bugs filed / 7 fixed, merged and closed out. MIN-879 still the sole queue-lane item with a path forward, waiting on the operator's `sudo rm`.
