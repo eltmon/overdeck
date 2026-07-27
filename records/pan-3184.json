@@ -15,8 +15,48 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/lib/cloister/__tests__/pan-1908-reactive-liveness.test.ts",
+      "src/lib/cloister/deacon.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/FAILSAFE-CONTROL-ARCHITECTURE.md",
+      "src/dashboard/frontend/src/components/BootReconciliationModal.tsx",
+      "src/dashboard/frontend/src/components/__tests__/BootReconciliationModal.test.tsx",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/routes/__tests__/boot-reconciliation.test.ts",
+      "src/dashboard/server/routes/boot-reconciliation.ts",
+      "src/lib/cloister/__tests__/boot-reconciliation-apply.test.ts",
+      "src/lib/cloister/__tests__/boot-reconciliation.test.ts",
+      "src/lib/cloister/boot-reconciliation-apply.ts",
+      "src/lib/cloister/boot-reconciliation.ts",
+      "src/lib/cloister/config.ts",
+      "src/lib/cloister/deacon-auto-resume.ts",
+      "src/lib/overdeck/control-settings.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/FAILSAFE-CONTROL-ARCHITECTURE.md",
+      "src/dashboard/frontend/src/components/BootReconciliationModal.tsx",
+      "src/dashboard/frontend/src/components/__tests__/BootReconciliationModal.test.tsx",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/routes/__tests__/boot-reconciliation.test.ts",
+      "src/dashboard/server/routes/boot-reconciliation.ts",
+      "src/lib/cloister/__tests__/boot-reconciliation-apply.test.ts",
+      "src/lib/cloister/__tests__/boot-reconciliation.test.ts",
+      "src/lib/cloister/__tests__/pan-1908-reactive-liveness.test.ts",
+      "src/lib/cloister/boot-reconciliation-apply.ts",
+      "src/lib/cloister/boot-reconciliation.ts",
+      "src/lib/cloister/config.ts",
+      "src/lib/cloister/deacon-auto-resume.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/overdeck/control-settings.ts"
+    ],
+    "recordedAt": "2026-07-27T05:50:18.081Z"
+  },
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T05:50:20.749Z",
+  "updated": "2026-07-27T05:50:24.246Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "pending",
@@ -26,8 +66,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T05:50:20.746Z",
+    "updatedAt": "2026-07-27T05:50:24.184Z",
     "inspectNotes": "All 4 ACs met: isAutoResumableRole(work|strike) admits strikes (boot-reconciliation.ts:94-99); the hasCompletionMarker/stoppedByUser gate is gone so in-window stoppedByUser agents qualify while isRecentBootCandidate still rejects out-of-window ones; handleAgentStoppedEvent now gates on isAutoResumableRole and logs 'not auto-resumable' (deacon-auto-resume.ts:640-643). Verified end-to-end: applyBootReconciliationDecision resumes via handleAgentStoppedEvent, so admitted strikes are not dead-ended, and the removed workspace-path completion check is still covered by bootReconciliationSkipReason's agent-dir marker check. vitest boot-reconciliation.test.ts 22/22 pass, npm run typecheck clean. Non-blocking note for follow-up beads: deacon-auto-resume.ts:868 and :935 still filter role==='work', so strikes stay invisible to the batch patrol and reconcile safety net outside the boot window.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3199",
     "reviewRequestedAt": "2026-07-27T05:50:20.746Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -68,35 +109,36 @@
         "src/lib/overdeck/control-settings.ts"
       ],
       "recordedAt": "2026-07-27T05:50:18.081Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3199"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 312204,
-            "output": 17069,
-            "cacheRead": 8028160,
+            "input": 844958,
+            "output": 128513,
+            "cacheRead": 83574272,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 312204,
-          "output": 17069,
-          "cacheRead": 8028160,
+          "input": 844958,
+          "output": 128513,
+          "cacheRead": 83574272,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 6.08717,
-        "pricingAsOf": "2026-07-27T05:06:20.806Z"
+        "usd": 49.867316,
+        "pricingAsOf": "2026-07-27T05:50:24.236Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3199"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -263,45 +305,5 @@
     "docs-failsafe-amendment": "completed",
     "docs-failsafe-amendment.docs-failsafe-amendment.ac1": "completed",
     "docs-failsafe-amendment.docs-failsafe-amendment.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "src/lib/cloister/__tests__/pan-1908-reactive-liveness.test.ts",
-      "src/lib/cloister/deacon.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/FAILSAFE-CONTROL-ARCHITECTURE.md",
-      "src/dashboard/frontend/src/components/BootReconciliationModal.tsx",
-      "src/dashboard/frontend/src/components/__tests__/BootReconciliationModal.test.tsx",
-      "src/dashboard/server/main.ts",
-      "src/dashboard/server/routes/__tests__/boot-reconciliation.test.ts",
-      "src/dashboard/server/routes/boot-reconciliation.ts",
-      "src/lib/cloister/__tests__/boot-reconciliation-apply.test.ts",
-      "src/lib/cloister/__tests__/boot-reconciliation.test.ts",
-      "src/lib/cloister/boot-reconciliation-apply.ts",
-      "src/lib/cloister/boot-reconciliation.ts",
-      "src/lib/cloister/config.ts",
-      "src/lib/cloister/deacon-auto-resume.ts",
-      "src/lib/overdeck/control-settings.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/FAILSAFE-CONTROL-ARCHITECTURE.md",
-      "src/dashboard/frontend/src/components/BootReconciliationModal.tsx",
-      "src/dashboard/frontend/src/components/__tests__/BootReconciliationModal.test.tsx",
-      "src/dashboard/server/main.ts",
-      "src/dashboard/server/routes/__tests__/boot-reconciliation.test.ts",
-      "src/dashboard/server/routes/boot-reconciliation.ts",
-      "src/lib/cloister/__tests__/boot-reconciliation-apply.test.ts",
-      "src/lib/cloister/__tests__/boot-reconciliation.test.ts",
-      "src/lib/cloister/__tests__/pan-1908-reactive-liveness.test.ts",
-      "src/lib/cloister/boot-reconciliation-apply.ts",
-      "src/lib/cloister/boot-reconciliation.ts",
-      "src/lib/cloister/config.ts",
-      "src/lib/cloister/deacon-auto-resume.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/overdeck/control-settings.ts"
-    ],
-    "recordedAt": "2026-07-27T05:50:18.081Z"
   }
 }
