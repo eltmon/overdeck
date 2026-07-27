@@ -8,13 +8,16 @@ const mocks = vi.hoisted(() => ({
   emitActivityEntrySync: vi.fn(),
   reconcileMergedDockerCleanupQueue: vi.fn(),
   exec: vi.fn(),
+  loadReviewStatuses: vi.fn(),
   getReviewStatusesSync: vi.fn(),
   isIssueClosed: vi.fn(),
+  readJournalStatusSync: vi.fn(),
   listRunningAgents: vi.fn(),
   listProjectsSync: vi.fn(),
   listSessionNames: vi.fn(),
   reapIssueResidue: vi.fn(),
   resolveProjectForIssue: vi.fn(),
+  setReviewStatusSync: vi.fn(),
   stopAgent: vi.fn(),
 }));
 
@@ -63,13 +66,22 @@ vi.mock('../reap-issue-residue.js', () => ({
 
 vi.mock('../../review-status.js', () => ({
   getReviewStatusesSync: mocks.getReviewStatusesSync,
+  loadReviewStatuses: mocks.loadReviewStatuses,
+  setReviewStatusSync: mocks.setReviewStatusSync,
+}));
+
+vi.mock('../../overdeck/review-status-record-sync.js', () => ({
+  readJournalStatusSync: mocks.readJournalStatusSync,
 }));
 
 vi.mock('../merged-docker-cleanup-worker.js', () => ({
   reconcileMergedDockerCleanupQueue: mocks.reconcileMergedDockerCleanupQueue,
 }));
 
-import { reconcileClosedIssueAgents } from '../closed-issue-reaper.js';
+import {
+  reapClosedIssueReviewRequests,
+  reconcileClosedIssueAgents,
+} from '../closed-issue-reaper.js';
 
 describe('reconcileClosedIssueAgents', () => {
   let overdeckHome: string;
@@ -82,7 +94,9 @@ describe('reconcileClosedIssueAgents', () => {
     mocks.listRunningAgents.mockReturnValue(Effect.succeed([]));
     mocks.listProjectsSync.mockReturnValue([]);
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
+    mocks.loadReviewStatuses.mockReturnValue({});
     mocks.getReviewStatusesSync.mockReturnValue({});
+    mocks.readJournalStatusSync.mockReturnValue(null);
     mocks.reapIssueResidue.mockResolvedValue([]);
     mocks.resolveProjectForIssue.mockReturnValue(null);
     mocks.stopAgent.mockReturnValue(Effect.succeed(undefined));
@@ -371,5 +385,91 @@ describe('reconcileClosedIssueAgents', () => {
     expect(mocks.isIssueClosed).toHaveBeenCalledWith('PAN-5557');
     expect(mocks.reapIssueResidue).not.toHaveBeenCalled();
     rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  it('clears unserviced review intent for a tracker-closed issue', async () => {
+    const dbStatus = {
+      issueId: 'PAN-7001',
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      reviewRequestedAt: '2026-07-01T00:00:00.000Z',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+      readyForMerge: false,
+    };
+    mocks.loadReviewStatuses.mockReturnValue({ 'PAN-7001': dbStatus });
+    mocks.readJournalStatusSync.mockReturnValue({
+      updatedAt: '2026-07-02T00:00:00.000Z',
+      durable: { reviewRequestedAt: '2026-07-02T00:00:00.000Z' },
+    });
+    mocks.isIssueClosed.mockResolvedValue(true);
+
+    await expect(reapClosedIssueReviewRequests(new Map())).resolves.toEqual([
+      'Cleared unserviced review request for PAN-7001 — parent issue is closed',
+    ]);
+
+    expect(mocks.setReviewStatusSync).toHaveBeenCalledWith(
+      'PAN-7001',
+      { reviewRequestedAt: undefined, reviewSpawnedAt: undefined },
+      expect.objectContaining({ reviewRequestedAt: '2026-07-02T00:00:00.000Z' }),
+    );
+    expect(mocks.emitActivityEntrySync).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'cloister',
+      level: 'info',
+      issueId: 'PAN-7001',
+    }));
+  });
+
+  it('preserves unserviced review intent for a tracker-open issue', async () => {
+    mocks.loadReviewStatuses.mockReturnValue({
+      'PAN-7002': {
+        issueId: 'PAN-7002',
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        reviewRequestedAt: '2026-07-01T00:00:00.000Z',
+        updatedAt: '2026-07-01T00:00:00.000Z',
+        readyForMerge: false,
+      },
+    });
+    mocks.isIssueClosed.mockResolvedValue(false);
+
+    await expect(reapClosedIssueReviewRequests(new Map())).resolves.toEqual([]);
+
+    expect(mocks.setReviewStatusSync).not.toHaveBeenCalled();
+  });
+
+  it('preserves serviced requests and terminal review verdicts', async () => {
+    mocks.loadReviewStatuses.mockReturnValue({
+      'PAN-7003': {
+        issueId: 'PAN-7003',
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        reviewRequestedAt: '2026-07-01T00:00:00.000Z',
+        reviewSpawnedAt: '2026-07-01T00:00:01.000Z',
+        updatedAt: '2026-07-01T00:00:01.000Z',
+        readyForMerge: false,
+      },
+      'PAN-7004': {
+        issueId: 'PAN-7004',
+        reviewStatus: 'passed',
+        testStatus: 'pending',
+        reviewRequestedAt: '2026-07-01T00:00:00.000Z',
+        updatedAt: '2026-07-01T00:00:00.000Z',
+        readyForMerge: false,
+      },
+    });
+    mocks.isIssueClosed.mockResolvedValue(true);
+
+    await expect(reapClosedIssueReviewRequests(new Map())).resolves.toEqual([]);
+
+    expect(mocks.isIssueClosed).not.toHaveBeenCalled();
+    expect(mocks.setReviewStatusSync).not.toHaveBeenCalled();
+  });
+
+  it('runs the review-intent sweep once per reconciliation patrol', async () => {
+    mocks.loadReviewStatuses.mockReturnValue({});
+
+    await expect(reconcileClosedIssueAgents()).resolves.toEqual([]);
+
+    expect(mocks.loadReviewStatuses).toHaveBeenCalledTimes(1);
   });
 });

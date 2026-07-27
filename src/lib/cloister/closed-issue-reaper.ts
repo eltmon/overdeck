@@ -8,7 +8,10 @@ import { listRunningAgents, stopAgent } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { AGENTS_DIR } from '../paths.js';
 import { listProjectsSync } from '../projects.js';
+import { readJournalStatusSync } from '../overdeck/review-status-record-sync.js';
 import { resolveProjectForIssue } from '../pan-dir/record.js';
+import { loadReviewStatuses, setReviewStatusSync } from '../review-status.js';
+import type { ReviewStatus } from '../review-status-reconcile.js';
 import { listSessionNames } from '../tmux.js';
 import { isIssueClosed } from './issue-closed.js';
 import { reapIssueResidue } from './reap-issue-residue.js';
@@ -64,6 +67,48 @@ async function isClosedIssue(
     closedChecks.set(issueId, promise);
   }
   return promise;
+}
+
+export async function reapClosedIssueReviewRequests(
+  closedChecks: Map<string, Promise<boolean>>,
+): Promise<string[]> {
+  const actions: string[] = [];
+  const statuses = loadReviewStatuses();
+
+  for (const [issueId, dbStatus] of Object.entries(statuses)) {
+    if (dbStatus.reviewStatus !== 'pending') continue;
+
+    const journal = readJournalStatusSync(issueId);
+    const existing = {
+      ...dbStatus,
+      ...(journal?.durable ?? {}),
+      issueId,
+    } as ReviewStatus;
+    for (const field of journal?.clearedFields ?? []) {
+      delete (existing as unknown as Record<string, unknown>)[field];
+    }
+
+    if (existing.reviewStatus !== 'pending' || !existing.reviewRequestedAt) continue;
+    if (existing.reviewSpawnedAt &&
+        Date.parse(existing.reviewRequestedAt) <= new Date(existing.reviewSpawnedAt).getTime()) continue;
+    if (!await isClosedIssue(issueId, closedChecks)) continue;
+
+    setReviewStatusSync(issueId, {
+      reviewRequestedAt: undefined,
+      reviewSpawnedAt: undefined,
+    }, existing);
+    const action = `Cleared unserviced review request for ${issueId} — parent issue is closed`;
+    actions.push(action);
+    console.log(`[deacon] ${action}`);
+    emitActivityEntrySync({
+      source: 'cloister',
+      level: 'info',
+      issueId,
+      message: `[deacon] cleared unserviced review request for ${issueId} — parent issue is closed`,
+    });
+  }
+
+  return actions;
 }
 
 async function reapClosedIssueResidue(
@@ -260,5 +305,6 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
     }
   }
 
+  actions.push(...await reapClosedIssueReviewRequests(closedChecks));
   return actions;
 }
