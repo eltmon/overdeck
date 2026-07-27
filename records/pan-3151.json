@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T10:46:34.292Z",
+  "updated": "2026-07-27T10:49:07.417Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -37,16 +37,8 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "feedback-suppression": {
-        "writerId": "agent-pan-3151",
-        "agentId": "agent-pan-3151",
-        "pid": 2107554,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T10:46:34.291Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3151",
@@ -111,6 +103,16 @@
         "itemId": "reconcile-gate-wiring",
         "outcome": "completed",
         "releasedAt": "2026-07-27T10:46:29.263Z"
+      },
+      {
+        "writerId": "agent-pan-3151",
+        "agentId": "agent-pan-3151",
+        "pid": 2107554,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T10:46:34.291Z",
+        "itemId": "feedback-suppression",
+        "outcome": "completed",
+        "releasedAt": "2026-07-27T10:49:07.417Z"
       }
     ],
     "statusReasons": {
@@ -159,6 +161,8 @@
     "reconcile-gate-wiring.reconcile-gate-wiring.ac3": "completed",
     "reconcile-gate-wiring.reconcile-gate-wiring.ac4": "completed",
     "reconcile-gate-wiring.reconcile-gate-wiring.ac5": "completed",
-    "feedback-suppression": "running"
+    "feedback-suppression": "completed",
+    "feedback-suppression.feedback-suppression.ac1": "completed",
+    "feedback-suppression.feedback-suppression.ac2": "completed"
   }
 }
