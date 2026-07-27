@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T05:32:40.540Z",
+  "updated": "2026-07-27T05:43:29.793Z",
   "pipeline": {
     "issueId": "PAN-3187",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "dod-terminal-settling-rows-1-2-3": {
-        "writerId": "agent-pan-3187",
-        "agentId": "agent-pan-3187",
-        "pid": 1699873,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:32:40.540Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3187",
@@ -115,6 +107,17 @@
         "outcome": "completed",
         "reason": "Added a patrol sweep that overlays durable journal intent, filters to tracker-closed unserviced pending requests, and clears only request timestamps through the review-status write surface.",
         "releasedAt": "2026-07-27T05:32:22.212Z"
+      },
+      {
+        "writerId": "agent-pan-3187",
+        "agentId": "agent-pan-3187",
+        "pid": 1699873,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:32:40.540Z",
+        "itemId": "dod-terminal-settling-rows-1-2-3",
+        "outcome": "completed",
+        "reason": "Added tracker-closure and landed-work evidence to the DoD gate, settled absent non-negative verdicts, superseded negative test/verification verdicts only after green main verification, and preserved negative review verdicts.",
+        "releasedAt": "2026-07-27T05:43:29.793Z"
       }
     ],
     "statusReasons": {
@@ -133,6 +136,10 @@
       "reap-closed-issue-review-requests": {
         "reason": "Added a patrol sweep that overlays durable journal intent, filters to tracker-closed unserviced pending requests, and clears only request timestamps through the review-status write surface.",
         "updatedAt": "2026-07-27T05:32:22.212Z"
+      },
+      "dod-terminal-settling-rows-1-2-3": {
+        "reason": "Added tracker-closure and landed-work evidence to the DoD gate, settled absent non-negative verdicts, superseded negative test/verification verdicts only after green main verification, and preserved negative review verdicts.",
+        "updatedAt": "2026-07-27T05:43:29.793Z"
       }
     }
   },
@@ -154,6 +161,11 @@
     "reap-closed-issue-review-requests.reap-closed-issue-review-requests.ac2": "completed",
     "reap-closed-issue-review-requests.reap-closed-issue-review-requests.ac3": "completed",
     "reap-closed-issue-review-requests.reap-closed-issue-review-requests.ac4": "completed",
-    "dod-terminal-settling-rows-1-2-3": "running"
+    "dod-terminal-settling-rows-1-2-3": "completed",
+    "dod-terminal-settling-rows-1-2-3.dod-terminal-settling-rows-1-2-3.ac1": "completed",
+    "dod-terminal-settling-rows-1-2-3.dod-terminal-settling-rows-1-2-3.ac2": "completed",
+    "dod-terminal-settling-rows-1-2-3.dod-terminal-settling-rows-1-2-3.ac3": "completed",
+    "dod-terminal-settling-rows-1-2-3.dod-terminal-settling-rows-1-2-3.ac4": "completed",
+    "dod-terminal-settling-rows-1-2-3.dod-terminal-settling-rows-1-2-3.ac5": "completed"
   }
 }
