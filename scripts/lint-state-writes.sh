@@ -170,4 +170,42 @@ if [[ -n "$orders_violations" ]]; then
   exit 1
 fi
 
+# ── Rule 6: agents-table mutations stay inside audited write doors (PAN-3183) ──
+AGENTS_TABLE_APPROVED=(
+  # AgentWriter verbs, boot backfill, and canonical removal live here.
+  ':!src/lib/overdeck/agents.ts'
+  # Legacy sync agent-state writes used by lifecycle callers live here.
+  ':!src/lib/overdeck/agent-state-sync.ts'
+  # Durable harness/model identity mirroring is part of the agent write surface.
+  ':!src/lib/overdeck/agent-record-sync.ts'
+  # The dormant sources-only reconstruction service owns its audited rebuild upsert.
+  ':!src/lib/overdeck/reconstruction.ts'
+  # Legacy generic agents-table writers remain for migration and tests.
+  ':!src/lib/database/agents-db.ts'
+  # The one-time state.json migration backfill owns its full-row upsert.
+  ':!src/lib/database/agent-backfill.ts'
+  # Schema migrations own agents DDL and invoke the one-time backfill.
+  ':!src/lib/database/schema.ts'
+  # Dashboard lifecycle projection atomically persists the row and domain event.
+  ':!src/dashboard/server/services/agent-projection.ts'
+)
+
+agents_table_candidates=$(
+  { git grep -nEi \
+      -e 'INSERT( OR REPLACE)? INTO agents' \
+      -e 'UPDATE agents' \
+      -e 'DELETE FROM agents' \
+      -e '\.(insert|update|delete)\((overdeckAgents|agentsTable)\)' \
+      -- 'src/**' 'packages/**' "${AGENTS_TABLE_APPROVED[@]}" \
+      ':!src/**/__tests__/**' ':!src/**/*.test.ts' \
+      ':!packages/**/__tests__/**' ':!packages/**/*.test.ts'; } || true
+)
+agents_table_violations=$(printf '%s\n' "$agents_table_candidates" | comment_filter)
+if [[ -n "$agents_table_violations" ]]; then
+  echo "✗ direct agents-table mutation outside the audited agent write doors:" >&2
+  echo "$agents_table_violations" >&2
+  echo "Route status writes through AgentWriter or agent-projection; audit rebuild exceptions here." >&2
+  exit 1
+fi
+
 echo "✓ state-write lint passed (single write surface intact)"
