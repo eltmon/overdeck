@@ -223,18 +223,25 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:18:17.214Z",
+  "updated": "2026-07-27T14:19:32.937Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:16:23.590Z",
-    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
+    "updatedAt": "2026-07-27T14:19:32.892Z",
+    "reviewNotes": "Agent re-review request (7/25): Merged with origin/main: resolved conflicts preserving both PAN-3151 (review_cycle_history, unconditional v61 repairs) and PAN-3154 (conflicts_since) features",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-27T14:13:03.586Z"
+      }
+    ],
     "conflictsSince": {
       "sha": "050c54fb3ec155db17aaa23ddcba7a05d3f345a4",
       "detectedAt": "2026-07-27T14:08:42.556Z",
@@ -279,10 +286,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3775,
-            "output": 146638,
-            "cacheRead": 89044557,
-            "cacheWrite": 3721074
+            "input": 3824,
+            "output": 148421,
+            "cacheRead": 90458319,
+            "cacheWrite": 3723679
           }
         }
       },
@@ -306,15 +313,15 @@
           "cacheWrite": 473562
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3775,
-          "output": 146638,
-          "cacheRead": 89044557,
-          "cacheWrite": 3721074
+          "input": 3824,
+          "output": 148421,
+          "cacheRead": 90458319,
+          "cacheWrite": 3723679
         }
       },
       "costAtCloseOut": {
-        "usd": 184.7154863,
-        "pricingAsOf": "2026-07-27T14:16:25.018Z"
+        "usd": 184.8690813,
+        "pricingAsOf": "2026-07-27T14:19:32.932Z"
       }
     },
     "merges": [
@@ -323,7 +330,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "tasks": {
     "sequence": 20,
     "claims": {},
