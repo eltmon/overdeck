@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:32:47.311Z",
-  "updated": "2026-07-27T05:13:14.100Z",
+  "updated": "2026-07-27T05:13:25.671Z",
   "pipeline": {
     "issueId": "PAN-3192",
     "reviewStatus": "pending",
@@ -43,8 +43,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "docs-quality-gates-frontend": {
+        "writerId": "agent-pan-3192",
+        "agentId": "agent-pan-3192",
+        "pid": 266075,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:13:25.671Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3192",
@@ -109,6 +117,7 @@
     "frontend-types-ratchet-test.frontend-types-ratchet-test.ac1": "completed",
     "frontend-types-ratchet-test.frontend-types-ratchet-test.ac2": "completed",
     "frontend-types-ratchet-test.frontend-types-ratchet-test.ac3": "completed",
-    "frontend-types-ratchet-test.frontend-types-ratchet-test.ac4": "completed"
+    "frontend-types-ratchet-test.frontend-types-ratchet-test.ac4": "completed",
+    "docs-quality-gates-frontend": "running"
   }
 }
