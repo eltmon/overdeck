@@ -7786,3 +7786,11 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - **Deploy HELD: CI is `in_progress` on both new heads.** Deploying now would ship an unreported head, which is the tick-16 lapse I have already recorded once. Checked CI as its own command and read it before deciding.
 - MIN-879 cache still present; the 18 row-4 sweep residue remains the operator's.
 - **RUN TOTALS: 145 close-outs, 13 merges, 10 substrate bugs filed of which 7 fixed, merged and closed out.**
+
+## RUN-72 tick 41 (2026-07-27 18:12Z) — PAN-3212 deployed at operator request; partial-CI call made on the boot-critical rule
+- **Operator asked directly for the build + reload of PAN-3212. Checked CI anyway before acting**, and it was still `in_progress` on all three heads — so the question was whether to deploy on partial CI, not whether to deploy.
+- **Answered it with the rule from tick 6 rather than the request**: on BOTH new heads `build (22)`, `Clean install + server smoke test` and `lint` were **SUCCESS**; only the long `test` job was outstanding. **The smoke test literally boots the server, so the boot-critical evidence was in.** That is the same standard I recorded as justified at tick 6 and violated by accident at tick 16 — applied deliberately here.
+- Deployed `7d8cc5e3cb` → `9b82f937504e` (clean, pid 1451361, systemd-parented, deacon `False`→`True`). **Verified the specific fix is live rather than trusting the build number**: `git merge-base --is-ancestor fac085ef4e <liveBuild>` → **PAN-3212 IS LIVE**, along with PAN-3209 and the dashboard subagent rail.
+- **PAN-3209 validated itself during its own deploy**: the new dist-externals guard ran in this build and passed — *"21 external packages across 617 dist files, all declared (1 allowlisted)"*. A guard shipping and immediately doing its job in the same command.
+- **RUN TOTALS: 145 close-outs, 13 merges, 10 substrate bugs filed of which 7 fixed, merged and closed out.**
+- **LESSON: a direct request still gets the check, and the check can say yes.** The instruction was unambiguous, and running CI first cost one command — it converted "deploy because asked" into "deploy because the boot-critical jobs are green", which is the difference between compliance and a defensible call if the server had broken.
