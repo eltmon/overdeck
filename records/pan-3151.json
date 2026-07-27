@@ -162,17 +162,14 @@
       "reason": "feedback",
       "note": "[2026-07-27T14:31Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-27T14:31:50.983Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T14:31:50Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nthe v62 top-up makes two migration tests fail and is skipped again after the next schema-version bump\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-27T14:32:50.127Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -261,21 +258,21 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:32:46.944Z",
+  "updated": "2026-07-27T14:32:50.148Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:32:45.493Z",
+    "updatedAt": "2026-07-27T14:32:48.643Z",
     "reviewNotes": "Agent re-review request (10/25): Fixed: removed redundant v62 repairs causing test failures",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "1a4b8b91f4d83cb2dda724be2292b1ccb85334b1",
-    "reviewSpawnedAt": "2026-07-27T14:29:31.282Z"
+    "reviewSpawnedAt": "2026-07-27T14:32:48.643Z"
   },
   "closeOut": {
     "usage": {
@@ -341,7 +338,7 @@
       },
       "costAtCloseOut": {
         "usd": 219.0545943,
-        "pricingAsOf": "2026-07-27T14:32:46.942Z"
+        "pricingAsOf": "2026-07-27T14:32:48.725Z"
       }
     },
     "merges": [
@@ -350,7 +347,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 20,
     "claims": {},
