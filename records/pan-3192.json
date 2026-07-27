@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:32:47.311Z",
-  "updated": "2026-07-27T05:11:14.148Z",
+  "updated": "2026-07-27T05:13:14.100Z",
   "pipeline": {
     "issueId": "PAN-3192",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "frontend-types-ratchet-test": {
-        "writerId": "agent-pan-3192",
-        "agentId": "agent-pan-3192",
-        "pid": 73155,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:11:14.148Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3192",
@@ -75,6 +67,17 @@
         "outcome": "completed",
         "reason": "Added the frontend package typecheck script and wired the ratcheted guard into the root npm run typecheck chain; both root and package-level typechecks pass.",
         "releasedAt": "2026-07-27T05:11:02.875Z"
+      },
+      {
+        "writerId": "agent-pan-3192",
+        "agentId": "agent-pan-3192",
+        "pid": 73155,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:11:14.148Z",
+        "itemId": "frontend-types-ratchet-test",
+        "outcome": "completed",
+        "reason": "Added six hermetic Vitest cases covering parity, growth labeling, shrink/update, update refusal, missing baseline, and line-shift normalization; all six pass with a PATH-stubbed npx.",
+        "releasedAt": "2026-07-27T05:13:14.100Z"
       }
     ],
     "statusReasons": {
@@ -85,6 +88,10 @@
       "wire-typecheck-gates": {
         "reason": "Added the frontend package typecheck script and wired the ratcheted guard into the root npm run typecheck chain; both root and package-level typechecks pass.",
         "updatedAt": "2026-07-27T05:11:02.875Z"
+      },
+      "frontend-types-ratchet-test": {
+        "reason": "Added six hermetic Vitest cases covering parity, growth labeling, shrink/update, update refusal, missing baseline, and line-shift normalization; all six pass with a PATH-stubbed npx.",
+        "updatedAt": "2026-07-27T05:13:14.100Z"
       }
     }
   },
@@ -98,6 +105,10 @@
     "wire-typecheck-gates.wire-typecheck-gates.ac1": "completed",
     "wire-typecheck-gates.wire-typecheck-gates.ac2": "completed",
     "wire-typecheck-gates.wire-typecheck-gates.ac3": "completed",
-    "frontend-types-ratchet-test": "running"
+    "frontend-types-ratchet-test": "completed",
+    "frontend-types-ratchet-test.frontend-types-ratchet-test.ac1": "completed",
+    "frontend-types-ratchet-test.frontend-types-ratchet-test.ac2": "completed",
+    "frontend-types-ratchet-test.frontend-types-ratchet-test.ac3": "completed",
+    "frontend-types-ratchet-test.frontend-types-ratchet-test.ac4": "completed"
   }
 }
