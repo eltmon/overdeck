@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T10:49:07.417Z",
+  "updated": "2026-07-27T10:55:38.757Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -37,8 +37,16 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 14,
-    "claims": {},
+    "sequence": 15,
+    "claims": {
+      "dashboard-trend-display": {
+        "writerId": "agent-pan-3151",
+        "agentId": "agent-pan-3151",
+        "pid": 2705105,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T10:55:38.757Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3151",
@@ -163,6 +171,7 @@
     "reconcile-gate-wiring.reconcile-gate-wiring.ac5": "completed",
     "feedback-suppression": "completed",
     "feedback-suppression.feedback-suppression.ac1": "completed",
-    "feedback-suppression.feedback-suppression.ac2": "completed"
+    "feedback-suppression.feedback-suppression.ac2": "completed",
+    "dashboard-trend-display": "running"
   }
 }
