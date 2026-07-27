@@ -294,7 +294,7 @@
     "recordedAt": "2026-07-27T06:51:31.024Z"
   },
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T07:07:12.964Z",
+  "updated": "2026-07-27T07:07:15.318Z",
   "pipeline": {
     "issueId": "PAN-2876",
     "reviewStatus": "blocked",
@@ -304,10 +304,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T07:07:11.778Z",
+    "updatedAt": "2026-07-27T07:07:15.308Z",
     "reviewNotes": "AC-4 is unmet: subagent transcript cache entries remain populated after deselection",
     "inspectNotes": "All 4 ACs verified: contracts builds clean (tsdown), rpc.test.ts 3/3 pass covering subagents event decode, subscribeConversationMessages payload with+without agentId, and ConversationResponse with+without subagents (legacy shape still decodes); root npm run typecheck passes with chat-types.ts ConversationEvent extended. Note (non-blocking): ConversationResponse moved from interface to Schema.Struct so arrays are now ReadonlyArray — no consumer broke today, watch it if a caller ever mutates the result in place.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3204",
+    "reviewedAtCommit": "d5591af2e73a6515ac5a24b646d6b5f83d3ae3c6",
     "reviewSpawnedAt": "2026-07-27T06:53:20.832Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -433,7 +434,7 @@
       },
       "costAtCloseOut": {
         "usd": 115.642551,
-        "pricingAsOf": "2026-07-27T07:07:11.810Z"
+        "pricingAsOf": "2026-07-27T07:07:15.313Z"
       }
     },
     "merges": [
