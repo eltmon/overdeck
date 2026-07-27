@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-07T02:41:17.313Z",
-  "updated": "2026-07-27T05:59:23.840Z",
+  "updated": "2026-07-27T05:59:40.945Z",
   "pipeline": {
     "issueId": "PAN-2375",
     "reviewStatus": "pending",
@@ -35,14 +35,14 @@
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T05:59:23.813Z",
+    "updatedAt": "2026-07-27T05:59:40.912Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "Bead state-plane-predicate ack: commit 2fe848f6 is a pure test-colocation move (tests/unit/lib/state-plane.test.ts -> src/lib/__tests__/state-plane.test.ts, import path fixed), no logic changes; verified all 4 acceptance criteria still pass against current src/lib/state-plane.ts (state-only=true, mixed src+state=false, drafts-only=false, empty-diff=true).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2457",
     "lastVerifiedCommit": "a1e27c714a5596831cc98a8c815180a97a5a87aa",
     "reviewRequestedAt": "2026-07-07T06:33:45.658Z",
     "closedOut": true,
-    "closedOutAt": "2026-07-27T05:59:23.813Z"
+    "closedOutAt": "2026-07-27T05:59:40.912Z"
   },
   "closeOut": {
     "usage": {
@@ -150,14 +150,14 @@
     ],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-27T05:59:23.839Z",
+      "evaluatedAt": "2026-07-27T05:59:40.936Z",
       "rows": [
         {
           "id": "review",
           "num": 1,
           "title": "Review passed",
           "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
-          "observed": "reviewStatus: pending; settled because the tracker issue is closed and merged work is landed",
+          "observed": "reviewStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
           "status": "skip"
         },
         {
@@ -165,7 +165,7 @@
           "num": 2,
           "title": "Tests passed",
           "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "testStatus: pending; settled because the tracker issue is closed and merged work is landed",
+          "observed": "testStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
           "status": "skip"
         },
         {
@@ -173,8 +173,8 @@
           "num": 3,
           "title": "Verification green on the branch",
           "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "verificationStatus: passed at a1e27c714a5596831cc98a8c815180a97a5a87aa",
-          "status": "pass"
+          "observed": "verificationStatus: missing at a1e27c714a5596831cc98a8c815180a97a5a87aa (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
         },
         {
           "id": "merged",
@@ -217,7 +217,7 @@
           "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
           "overridable": false,
           "status": "pass",
-          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; Removed 3 agent state directories; No strike branch strike/pan-2375 found; Pruned 0 checkpoint ref(s) for agent-pan-2375, planning-pan-2375, strike-pan-2375; No specialist registry entries for PAN-2375"
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; No strike branch strike/pan-2375 found; Pruned 0 checkpoint ref(s) for agent-pan-2375, planning-pan-2375, strike-pan-2375; No specialist registry entries for PAN-2375"
         }
       ],
       "accepted": []
