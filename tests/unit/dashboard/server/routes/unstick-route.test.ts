@@ -226,12 +226,14 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     // unstick must clear the cycle history so a fresh attempt doesn't immediately re-trigger the gate.
     // Regression: without clearing, the history series would re-engage convergence detection immediately.
 
-    // Seed cycle history: [12 blocks → 8 blocks → 7 blocks] = not converging due to first-cycle reversal
-    const cycleHistory = JSON.stringify([
+    // Seed cycle history as a JSON string (database storage format): [12 blocks → 8 blocks → 7 blocks]
+    // This sequence triggers the convergence gate (reversal in cycle 1→2 shows not-converging).
+    const cycles = [
       { cycle: 1, runId: 'agent-run-1', atCommit: 'abc123', blockingCount: 12, recordedAt: '2026-07-27T10:00:00Z' },
       { cycle: 2, runId: 'agent-run-2', atCommit: 'abc123', blockingCount: 8, recordedAt: '2026-07-27T10:30:00Z' },
       { cycle: 3, runId: 'agent-run-3', atCommit: 'abc123', blockingCount: 7, recordedAt: '2026-07-27T11:00:00Z' },
-    ]);
+    ];
+    const cycleHistory = JSON.stringify(cycles);
 
     setReviewStatusSync('PAN-CONV-CLEAR', {
       reviewStatus: 'blocked',
@@ -246,12 +248,14 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     const stuckStatusBefore = getReviewStatusSync('PAN-CONV-CLEAR');
     expect(stuckStatusBefore?.stuck).toBe(true);
     expect(stuckStatusBefore?.stuckReason).toBe('review-not-converging');
-    expect(stuckStatusBefore?.reviewCycleHistory).toBeDefined(); // Precondition: history exists before unstick
+    // Precondition: history JSON string exists before unstick (will be parsed for convergence gate on next cycle)
+    expect(stuckStatusBefore?.reviewCycleHistory).toBe(cycleHistory);
+    expect(() => JSON.parse(stuckStatusBefore?.reviewCycleHistory ?? 'null')).not.toThrow();
 
     processUnstickRequest('PAN-CONV-CLEAR', true, stuckStatusBefore, { safe: true });
 
     const after = getReviewStatusSync('PAN-CONV-CLEAR');
-    // Convergence history must be cleared so a fresh rework attempt doesn't re-engage the gate
+    // Convergence history must be cleared so a fresh rework attempt doesn't immediately re-engage the gate
     expect(after?.reviewCycleHistory).toBeUndefined();
     // Stuck flag cleared — deacon will process the issue again from a clean slate
     expect(after?.stuck).toBeFalsy();
