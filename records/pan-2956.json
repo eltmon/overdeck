@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-20T08:41:51.037Z",
-  "updated": "2026-07-20T10:00:12.789Z",
+  "updated": "2026-07-27T17:41:22.348Z",
   "pipeline": {
     "issueId": "PAN-2956",
     "reviewStatus": "pending",
@@ -11,7 +11,7 @@
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-20T10:00:12.770Z",
+    "updatedAt": "2026-07-27T17:41:22.318Z",
     "lastVerifiedCommit": "353f5fef725a0e5eb3e93cec4ea85c2dd6ef8322",
     "strikeReadyHead": "0e77b2cdd3a10e4ba9a0196784b268e3f06d159f",
     "strikeReadyAt": "2026-07-20T09:47:38.952Z",
@@ -34,7 +34,7 @@
       }
     ],
     "closedOut": true,
-    "closedOutAt": "2026-07-20T10:00:12.770Z"
+    "closedOutAt": "2026-07-27T17:41:22.318Z"
   },
   "closeOut": {
     "usage": {
@@ -64,38 +64,38 @@
     "merges": [],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-20T10:00:12.789Z",
+      "evaluatedAt": "2026-07-27T17:41:22.342Z",
       "rows": [
         {
           "id": "review",
           "num": 1,
           "title": "Review passed",
-          "expected": "reviewStatus: passed",
-          "observed": "reviewStatus: passed",
-          "status": "pass"
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
         },
         {
           "id": "tests",
           "num": 2,
           "title": "Tests passed",
-          "expected": "testStatus: passed",
-          "observed": "testStatus: passed",
-          "status": "pass"
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
         },
         {
           "id": "verification",
           "num": 3,
           "title": "Verification green on the branch",
-          "expected": "verificationStatus: passed at lastVerifiedCommit",
-          "observed": "verificationStatus: passed at 353f5fef725a0e5eb3e93cec4ea85c2dd6ef8322",
-          "status": "pass"
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: missing at 353f5fef725a0e5eb3e93cec4ea85c2dd6ef8322 (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
         },
         {
           "id": "merged",
           "num": 4,
           "title": "Merged to main",
-          "expected": "PR merged on the forge",
-          "observed": "Merge specialist confirmed merge completed; PR #2958 MERGED at 2026-07-20T09:46:25Z",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Feature branch is absent; positive merge evidence is required; PR #2958 MERGED at 2026-07-20T09:46:25Z",
           "status": "pass",
           "mergedAt": "2026-07-20T09:46:25Z",
           "mergeCommit": "c5d4a4e8f9b1b08495443754af8969c29f2b4d49"
@@ -105,7 +105,7 @@
           "num": 5,
           "title": "Post-merge lifecycle ran",
           "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
-          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
           "status": "pass"
         },
         {
@@ -121,7 +121,7 @@
           "num": 7,
           "title": "Deployed",
           "expected": "live server build includes the merged commit",
-          "observed": "build commit c5d4a4e8 contains merge c5d4a4e8",
+          "observed": "build commit 7d8cc5e3 contains merge c5d4a4e8",
           "status": "pass"
         },
         {
@@ -131,7 +131,7 @@
           "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
           "overridable": false,
           "status": "pass",
-          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 1 agent state directory; Preserved local branch strike/pan-2956 — not merged to main; Preserved remote branch strike/pan-2956 — not merged to main; Pruned 59 checkpoint ref(s) for agent-pan-2956, planning-pan-2956, strike-pan-2956; No specialist registry entries for PAN-2956"
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; Preserved local branch strike/pan-2956 — not merged to main; Preserved remote branch strike/pan-2956 — not merged to main; Pruned 0 checkpoint ref(s) for agent-pan-2956, planning-pan-2956, strike-pan-2956; No specialist registry entries for PAN-2956"
         }
       ],
       "accepted": []
