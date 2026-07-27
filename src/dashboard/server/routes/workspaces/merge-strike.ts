@@ -230,7 +230,7 @@ export async function ensureAgentReadyForMerge(issueId: string, workspacePath: s
     if (!lifecycle.canStartFresh) throw error;
   }
   if (options?.allowFreshStart === false || !lifecycle.canStartFresh) throw new Error(lifecycle.reason || `Work agent ${agentId} cannot be resumed or started for merge preparation.`);
-  const state = await spawnAgent({ issueId, workspace: workspacePath, role: 'work', prompt: rebaseMsg });
+  const state = await spawnAgent({ issueId, workspace: workspacePath, role: 'work', prompt: rebaseMsg, startedBy: 'merge-strike' });
   return { recovered: true, agentId, detail: `Started fresh work agent ${state.id} and sent merge preparation request.` };
 }
 

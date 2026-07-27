@@ -12,7 +12,7 @@ import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { computePredictedConflictSignals, declaredIssueFootprint, pickFromSequence, type IssueFileFootprint } from '../flywheel-merge-order.js';
 import { requireFlywheelBrief } from '../flywheel-start.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
-import { getBook as getOrderBook } from '../orders/resolver.js';
+import { getBookAsync as getOrderBook } from '../orders/resolver.js';
 import { resolveStateReadHomeSync } from '../state-read-home.js';
 import type { XBriefDocument } from '../xbrief/types.js';
 import {
@@ -59,7 +59,7 @@ export async function activeOrderBookIssues(
     return project ? resolveStateReadHomeSync(project).root : null;
   })();
   if (!stateRoot) return new Set();
-  const book = (deps.getBook ?? getOrderBook)(stateRoot, bookId);
+  const book = await (deps.getBook ?? getOrderBook)(stateRoot, bookId);
   return new Set(book?.items.map((item) => item.issue.toUpperCase()) ?? []);
 }
 
@@ -362,6 +362,7 @@ export async function spawnFlywheelAgent(runId: string, options: FlywheelLifecyc
     registerConversation: true,
     resumeSessionId: options.resumeSessionId,
     flywheelRunId: runId,
+    startedBy: `flywheel:${runId}`,
   });
 }
 

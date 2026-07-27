@@ -26,7 +26,7 @@ const AGENTS_TABLE_COLUMNS = new Set([
   'pausedAt', 'troubled', 'troubledAt', 'consecutiveFailures',
   'firstFailureInRunAt', 'lastFailureAt', 'lastFailureReason',
   'lastFailureNextRetryAt', 'branch', 'costSoFar', 'sessionId', 'phase',
-  'workType', 'flywheelRunId', 'roleRunHead', 'reviewSubRole', 'reviewRunId',
+  'workType', 'flywheelRunId', 'startedBy', 'roleRunHead', 'reviewSubRole', 'reviewRunId',
   'reviewSynthesisAgentId', 'reviewOutputPath', 'reviewDeadlineAt',
   'reviewMonitorSignaled', 'reviewRetryAttempt', 'hostOverride',
   'inspectSubRole', 'deliveryMethod', 'supervisorEnabled', 'channelsEnabled',
@@ -99,16 +99,16 @@ function classifyReviewStatusColumn(column: string): string {
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('PAN-1908 no-loss audit', () => {
-  it('classifies every AgentState field (43 total)', () => {
+  it('classifies every AgentState field (44 total)', () => {
     const fields = allAgentStateFields();
-    expect(fields.length).toBe(43);
+    expect(fields.length).toBe(44);
 
     const unclassified = fields.filter((f) => classifyAgentField(f) === 'unclassified');
     expect(unclassified).toEqual([]);
   });
 
-  it('exactly 43 AgentState fields map to the agents table', () => {
-    expect(AGENTS_TABLE_COLUMNS.size).toBe(43);
+  it('exactly 44 AgentState fields map to the agents table', () => {
+    expect(AGENTS_TABLE_COLUMNS.size).toBe(44);
   });
 
   it('maps every AgentState field to exactly one home', () => {
@@ -138,7 +138,7 @@ describe('PAN-1908 no-loss audit', () => {
       'firstFailureInRunAt', 'lastFailureAt', 'lastFailureReason',
       'lastFailureNextRetryAt', 'branch', 'costSoFar', 'sessionId', 'phase',
       'workType', 'channelsEnabled', 'supervisorEnabled',
-      'deliveryMethod', 'roleRunHead', 'flywheelRunId', 'reviewSubRole',
+      'deliveryMethod', 'roleRunHead', 'flywheelRunId', 'startedBy', 'reviewSubRole',
       'reviewRunId', 'reviewOutputPath', 'reviewSynthesisAgentId',
       'reviewDeadlineAt', 'reviewMonitorSignaled', 'reviewRetryAttempt',
       'hostOverride', 'inspectSubRole',

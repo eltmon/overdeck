@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildPlanningAgentState, buildPlanningPrompt, writeFeatureContext, type PlanningIssue } from '../spawn-planning-session.js';
+import { buildPlanningAgentState, buildPlanningPrompt, buildPlanningSessionEnv, writeFeatureContext, type PlanningIssue } from '../spawn-planning-session.js';
 import { PAN_DIRNAME, WORKSPACE_RUNTIME_DIRNAME, PAN_CONTEXT_FILENAME } from '../../pan-dir/index.js';
 
 describe('buildPlanningPrompt', () => {
@@ -101,6 +101,15 @@ describe('buildPlanningPrompt', () => {
   });
 });
 
+describe('buildPlanningSessionEnv', () => {
+  it('exports the accepted immediate origin to the planning process', () => {
+    expect(buildPlanningSessionEnv('planning-auto-handoff')).toMatchObject({
+      TERM: 'xterm-256color',
+      OVERDECK_AGENT_STARTED_BY: 'planning-auto-handoff',
+    });
+  });
+});
+
 describe('buildPlanningAgentState', () => {
   const baseState = {
     sessionName: 'planning-pan-123',
@@ -109,6 +118,7 @@ describe('buildPlanningAgentState', () => {
     model: 'claude-opus-4-7',
     harness: 'claude-code' as const,
     workspaceLocation: 'local' as const,
+    startedBy: 'test:planning-session',
     startedAt: '2026-06-12T00:00:00.000Z',
   };
 
@@ -127,6 +137,15 @@ describe('buildPlanningAgentState', () => {
       auto: true,
     })).toMatchObject({
       auto: true,
+    });
+  });
+
+  it('persists planning start provenance', () => {
+    expect(buildPlanningAgentState({
+      ...baseState,
+      startedBy: 'flywheel:RUN-81',
+    })).toMatchObject({
+      startedBy: 'flywheel:RUN-81',
     });
   });
 

@@ -134,6 +134,7 @@ describe('knowledgeCommand', () => {
       effort: 'high',
       extraEnvExports: ['export PATH="$HOME/.overdeck/bin:$PATH"'],
       prompt: expect.stringContaining('/okf study "billing flows"'),
+      startedBy: 'operator:cli:pan-knowledge',
     });
     expect(agentMocks.spawnRun.mock.calls[0][2].prompt).toContain('/okf retro');
     expect(agentMocks.spawnRun.mock.calls[0][2].prompt).toContain('/okf sync --topic "billing flows"');

@@ -223,7 +223,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
     const state = agents.getAgentStateSync(agentId);
 
     expect(resumed).toEqual([]);
-    expect(resumeAgentMock).toHaveBeenCalledWith(agentId);
+    expect(resumeAgentMock).toHaveBeenCalledWith(agentId, undefined, { startedBy: 'deacon:auto-resume' });
     expect(state?.consecutiveFailures).toBe(1);
     expect(state?.lastFailureReason).toContain('tmux crashed');
     expect(state?.lastFailureNextRetryAt).toBe(new Date(BASE_TIME.getTime() + 5_000).toISOString());
@@ -327,7 +327,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
 
     const resumed = await autoResumeStoppedWorkAgents();
 
-    expect(resumeAgentMock).toHaveBeenCalledWith(agentId);
+    expect(resumeAgentMock).toHaveBeenCalledWith(agentId, undefined, { startedBy: 'deacon:auto-resume' });
     expect(resumed).toEqual([agentId]);
   });
 

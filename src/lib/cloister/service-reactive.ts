@@ -9,6 +9,10 @@ import {
   decideAutonomousPlanDispatch,
   gatherAutonomousPlanDispatchInput,
 } from './autonomous-plan-dispatch.js';
+import {
+  decideAutonomousWorkDispatch,
+  gatherAutonomousWorkDispatchInput,
+} from './autonomous-work-dispatch.js';
 import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { isIssueClosed } from './issue-closed.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
@@ -321,6 +325,7 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
       const run = await spawnRun(normalizedIssueId, 'plan', {
         prompt: buildReactiveRolePrompt(normalizedIssueId, newState, 'plan'),
         model: decision.model,
+        startedBy: 'reactive-lifecycle',
       });
       const message = `${normalizedIssueId}: ${role} role started from lifecycle state '${newState}' as ${run.id}`;
       console.log(`[cloister] ${message}`);
@@ -328,8 +333,30 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
       return;
     }
 
+    let autoSpawnConsentRequired = false;
+    if (role === 'work') {
+      const decision = decideAutonomousWorkDispatch(
+        await gatherAutonomousWorkDispatchInput(normalizedIssueId),
+      );
+      if (!decision.allow) {
+        const message = `${normalizedIssueId}: ${decision.reason}`;
+        console.log(`[cloister] ${message}`);
+        emitActivityEntrySync({ source: 'cloister', level: 'warn', message, issueId: normalizedIssueId });
+        await recordDeadEndNeedsYou(
+          normalizedIssueId,
+          'reactive-work-dispatch-pickup-gate',
+          newState,
+          message,
+        );
+        return;
+      }
+      autoSpawnConsentRequired = decision.releaseSource === 'planning-consent';
+    }
+
     const run = await spawnRun(normalizedIssueId, role, {
       prompt: buildReactiveRolePrompt(normalizedIssueId, newState, role),
+      startedBy: 'reactive-lifecycle',
+      ...(role === 'work' ? { autoSpawnConsentRequired } : {}),
     });
     const message = `${normalizedIssueId}: ${role} role started from lifecycle state '${newState}' as ${run.id}`;
     console.log(`[cloister] ${message}`);

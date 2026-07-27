@@ -454,7 +454,7 @@ export function initSchema(db: SqliteDatabase): void {
       last_failure_at TEXT,
       last_failure_reason TEXT,
       last_failure_next_retry_at TEXT,
-      flywheel_run_id TEXT,
+      flywheel_run_id TEXT, started_by TEXT,
       role_run_head TEXT,
       review_sub_role TEXT,
       review_run_id TEXT,
@@ -786,9 +786,9 @@ export function initSchema(db: SqliteDatabase): void {
  */
 export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   const currentVersion = db.pragma('user_version', { simple: true }) as number;
-
   if (currentVersion === SCHEMA_VERSION) {
     tryIdempotentDdl(db, SCHEMA_VERSION, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
+    tryIdempotentDdl(db, SCHEMA_VERSION, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
   }
   if (currentVersion >= SCHEMA_VERSION) {
     return; // Already at or ahead of this build's schema version
@@ -1721,6 +1721,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   // v60 -> v61: PAN-1491 store parsed affected v1.0 criteria on substrate bugs.
   if (currentVersion < 61) {
     tryIdempotentDdl(db, 61, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
+    tryIdempotentDdl(db, 61, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
   }
 
   // v61 -> v62: PAN-3151 store review cycle history for convergence detection.

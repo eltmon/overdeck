@@ -951,7 +951,6 @@ export async function dispatchNextWave(
       actions.push(`[swarm] deferred ${item.id} for ${issueId}: swarm dispatch budget exhausted`);
       continue;
     }
-
     try {
       await deps.applyTaskOperationToPlanFile(issueId, {
         type: 'claim',
@@ -983,6 +982,7 @@ export async function dispatchNextWave(
         slotIndex,
         slotItemId: item.id,
         prompt: promptForDispatchItem(issueId, doc, item),
+        startedBy: 'deacon:swarm-slot',
       });
       occupiedSlotIndexes.add(slotIndex);
       selectedItemIds.push(item.id);

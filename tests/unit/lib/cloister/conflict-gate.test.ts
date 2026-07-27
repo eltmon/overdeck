@@ -317,6 +317,7 @@ describe('buildRealConflictGateDeps', () => {
 
     expect(spawnRun).toHaveBeenCalledWith('PAN-1765', 'work', {
       prompt: expect.stringContaining('Rebase this branch onto origin/main'),
+      startedBy: 'conflict-gate',
     });
     const prompt = spawnRun.mock.calls[0][2].prompt;
     expect(prompt).toContain('BOTH intents are preserved');

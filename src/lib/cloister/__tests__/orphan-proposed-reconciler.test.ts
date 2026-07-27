@@ -32,6 +32,10 @@ const internalTokenMocks = vi.hoisted(() => ({
   getInternalTokenSync: vi.fn(() => 'test-internal-token'),
 }));
 
+const deadEndTripMocks = vi.hoisted(() => ({
+  recordDeadEndNeedsYou: vi.fn(async () => undefined),
+}));
+
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
   return { ...actual, exec: childProcessMocks.exec };
@@ -46,11 +50,16 @@ vi.mock('../../internal-token.js', async (importOriginal) => ({
   getInternalTokenSync: internalTokenMocks.getInternalTokenSync,
 }));
 
+vi.mock('../dead-end-trip.js', () => ({
+  recordDeadEndNeedsYou: deadEndTripMocks.recordDeadEndNeedsYou,
+}));
+
 vi.mock('../../review-status.js', () => ({
   getReviewStatusSync: reviewStatusStore.getReviewStatusSync,
 }));
 
-vi.mock('../../github-app.js', () => ({
+vi.mock('../../github-app.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../github-app.js')>(),
   isGitHubAppConfigured: githubAppMocks.isGitHubAppConfigured,
   listPullRequestsForHead: githubAppMocks.listPullRequestsForHead,
 }));
@@ -81,9 +90,11 @@ vi.mock('../../tasks/presence.js', () => ({
 }));
 
 import { INTERNAL_TOKEN_HEADER } from '../../internal-token.js';
+import { readAutoSpawnOnFinalizeFlag, withAutoSpawnConsentClaim, writeAutoSpawnOnFinalizeFlag } from '../../planning/spawn-planning-session.js';
 import {
   clearOrphanProposedAttemptCooldowns,
   findOrphanProposedSpecsForReconciler,
+  handleOrphanProposedSpec,
   hasReviewPipelinePresence,
   reconcileOrphanProposedSpecs,
   spawnWorkAgentThroughAgentsEndpoint,
@@ -91,6 +102,7 @@ import {
 } from '../orphan-proposed-reconciler.js';
 
 let testDir: string;
+let previousOverdeckHome: string | undefined;
 
 function writeSpec(
   projectPath: string,
@@ -141,9 +153,13 @@ function writeRedirectTasks(projectPath: string, issueId: string, taskCount = 2)
   writeFileSync(join(sharedTasksDir, 'issues.jsonl'), lines.join('\n'));
 }
 
+const allowPickupGate = async () => ({ allow: true as const, releaseSource: 'released-label' as const });
+
 describe('orphan proposed spec reconciler', () => {
   beforeEach(() => {
     testDir = mkdtempSync(join(tmpdir(), 'orphan-proposed-reconciler-'));
+    previousOverdeckHome = process.env['OVERDECK_HOME'];
+    process.env['OVERDECK_HOME'] = testDir;
     activityLogger.emitActivityEntrySync.mockReset();
     reviewStatusStore.getReviewStatusSync.mockReset();
     reviewStatusStore.getReviewStatusSync.mockReturnValue(null);
@@ -158,6 +174,8 @@ describe('orphan proposed spec reconciler', () => {
       callback(null, '[]', '');
       return {} as never;
     });
+    deadEndTripMocks.recordDeadEndNeedsYou.mockReset();
+    deadEndTripMocks.recordDeadEndNeedsYou.mockResolvedValue(undefined);
     clearOrphanProposedAttemptCooldowns();
   });
 
@@ -165,6 +183,8 @@ describe('orphan proposed spec reconciler', () => {
     vi.unstubAllGlobals();
     clearOrphanProposedAttemptCooldowns();
     if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
+    if (previousOverdeckHome === undefined) delete process.env['OVERDECK_HOME'];
+    else process.env['OVERDECK_HOME'] = previousOverdeckHome;
   });
 
   it('returns false when review pipeline status is absent or all pending', () => {
@@ -209,6 +229,7 @@ describe('orphan proposed spec reconciler', () => {
 
     await expect(findOrphanProposedSpecsForReconciler(options)).resolves.toEqual([]);
     await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate: allowPickupGate,
       ...options,
       now: new Date('2026-05-25T20:00:00.000Z'),
       config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
@@ -347,6 +368,237 @@ describe('orphan proposed spec reconciler', () => {
     ]);
   });
 
+  it.each([
+    ['not-ready', 'The issue is not ready.'],
+    ['not-released', 'The issue is not released.'],
+    ['labels-unavailable', 'Tracker labels are unavailable.'],
+  ] as const)('refuses autonomous work when the pickup gate returns %s', async (code, reason) => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3091', 'proposed');
+    writeTasks(projectPath, 'PAN-3091');
+    const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3091' }));
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+
+    await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate: async () => ({ allow: false, code, reason }),
+      projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent,
+    })).resolves.toEqual([`Skipped orphan proposed spec PAN-3091: pickup-gate:${code}`]);
+
+    expect(spawnWorkAgent).not.toHaveBeenCalled();
+    expect(deadEndTripMocks.recordDeadEndNeedsYou).toHaveBeenCalledWith(
+      'PAN-3091',
+      'orphan-proposed-pickup-gate',
+      'proposed',
+      reason,
+    );
+    expect(debugSpy).toHaveBeenCalledWith(
+      '[orphan-proposed-reconciler] spawn-skipped',
+      { issueId: 'PAN-3091', reason: `pickup-gate:${code}` },
+    );
+    expect(activityLogger.emitActivityEntrySync).not.toHaveBeenCalled();
+    debugSpy.mockRestore();
+  });
+
+  it('persists an unchanged pickup refusal only once across patrols', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3093', 'proposed');
+    writeTasks(projectPath, 'PAN-3093');
+    const projects = [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }];
+    const evaluatePickupGate = vi.fn(async () => ({
+      allow: false as const,
+      code: 'not-released' as const,
+      reason: 'The issue is not released.',
+    }));
+
+    let currentTime = Date.parse('2026-07-26T10:00:00.000Z');
+    vi.spyOn(Date, 'now').mockImplementation(() => currentTime);
+    for (const timestamp of [
+      '2026-07-26T10:00:00.000Z',
+      '2026-07-26T10:06:00.000Z',
+    ]) {
+      currentTime = Date.parse(timestamp);
+      await reconcileOrphanProposedSpecs({
+        evaluatePickupGate,
+        projects,
+        tmuxSessionNames: [],
+        getAgentStateForIssue: async () => null,
+        closedIssueIds: new Set(),
+        config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+        spawnWorkAgent: vi.fn(),
+      });
+    }
+
+    expect(evaluatePickupGate).toHaveBeenCalledTimes(2);
+    expect(deadEndTripMocks.recordDeadEndNeedsYou).toHaveBeenCalledTimes(1);
+  });
+
+  it('prunes refusal deduplication when an issue leaves the candidate set', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3094', 'proposed');
+    writeTasks(projectPath, 'PAN-3094');
+    const projects = [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }];
+    const evaluatePickupGate = vi.fn(async () => ({
+      allow: false as const,
+      code: 'not-released' as const,
+      reason: 'The issue is not released.',
+    }));
+    let currentTime = Date.parse('2026-07-26T10:00:00.000Z');
+    vi.spyOn(Date, 'now').mockImplementation(() => currentTime);
+    const run = () => reconcileOrphanProposedSpecs({
+      evaluatePickupGate,
+      projects,
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent: vi.fn(),
+    });
+
+    await run();
+    currentTime += 6 * 60 * 1000;
+    writeSpec(projectPath, 'PAN-3094', 'active');
+    await run();
+    currentTime += 6 * 60 * 1000;
+    writeSpec(projectPath, 'PAN-3094', 'proposed');
+    await run();
+
+    expect(deadEndTripMocks.recordDeadEndNeedsYou).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds reactive refusal deduplication when patrol pruning has not run', async () => {
+    let currentTime = Date.parse('2026-07-26T10:00:00.000Z');
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => currentTime);
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+    const evaluatePickupGate = async () => ({
+      allow: false as const,
+      code: 'not-released' as const,
+      reason: 'The issue is not released.',
+    });
+    const specDoc = {
+      xBRIEFInfo: { version: '0.8', created: '2026-07-26T10:00:00.000Z' },
+      plan: { id: 'PAN-1', title: 'PAN-1', status: 'proposed', items: [{ id: 'item-1', title: 'Item 1' }], edges: [] },
+    };
+
+    try {
+      for (let index = 1; index <= 513; index += 1) {
+        const issueId = `PAN-${index}`;
+        await handleOrphanProposedSpec(issueId, {
+          project: { projectKey: 'overdeck', projectPath: '/tmp/project' },
+          spec: { path: `/tmp/${issueId}.xbrief.json`, doc: specDoc as never },
+          evaluatePickupGate,
+          config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+        });
+      }
+
+      currentTime += 6 * 60 * 1000;
+      await handleOrphanProposedSpec('PAN-1', {
+        project: { projectKey: 'overdeck', projectPath: '/tmp/project' },
+        spec: { path: '/tmp/PAN-1.xbrief.json', doc: specDoc as never },
+        evaluatePickupGate,
+        config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      });
+
+      expect(deadEndTripMocks.recordDeadEndNeedsYou).toHaveBeenCalledTimes(514);
+    } finally {
+      nowSpy.mockRestore();
+      debugSpy.mockRestore();
+    }
+  });
+
+  it('fails closed per candidate when pickup evaluation throws and continues the scan', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    for (const issueId of ['PAN-3095', 'PAN-3096']) {
+      writeSpec(projectPath, issueId, 'proposed');
+      writeTasks(projectPath, issueId);
+    }
+    const evaluatePickupGate = vi.fn()
+      .mockRejectedValueOnce(new Error('settings unavailable'))
+      .mockResolvedValue({ allow: true as const, releaseSource: 'released-label' as const });
+    const spawnWorkAgent = vi.fn(async (issueId: string) => ({ spawned: true, agentId: `agent-${issueId.toLowerCase()}` }));
+
+    await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate,
+      projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent,
+    })).resolves.toEqual([
+      'Skipped orphan proposed spec PAN-3095: pickup-gate:labels-unavailable',
+      'Spawned work agent for orphan proposed spec PAN-3096',
+    ]);
+    expect(deadEndTripMocks.recordDeadEndNeedsYou).toHaveBeenCalledWith(
+      'PAN-3095',
+      'orphan-proposed-pickup-gate',
+      'proposed',
+      expect.stringContaining('settings unavailable'),
+    );
+    expect(spawnWorkAgent).toHaveBeenCalledWith('PAN-3096', false);
+  });
+
+  it.each([
+    ['ready and released labels', 'released-label', false],
+    ['auto-spawn-on-finalize consent', 'planning-consent', true],
+  ] as const)('preserves orphan work spawning when the pickup gate allows %s', async (_label, releaseSource, consentRequired) => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3092', 'proposed');
+    writeTasks(projectPath, 'PAN-3092');
+    await writeAutoSpawnOnFinalizeFlag('PAN-3092', true);
+    if (!consentRequired) {
+      writeFileSync(join(testDir, 'agents', 'planning-pan-3092', 'auto-spawn-on-finalize.json'), '{invalid-json');
+    }
+    const spawnWorkAgent = vi.fn((issueId: string, requireConsent: boolean) => (
+      requireConsent
+        ? withAutoSpawnConsentClaim(issueId, async () => ({ spawned: true, agentId: 'agent-pan-3092' }))
+        : Promise.resolve({ spawned: true, agentId: 'agent-pan-3092' })
+    ));
+
+    await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate: async () => ({ allow: true, releaseSource }),
+      projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent,
+    })).resolves.toEqual(['Spawned work agent for orphan proposed spec PAN-3092']);
+
+    expect(spawnWorkAgent).toHaveBeenCalledWith('PAN-3092', consentRequired);
+    expect(readAutoSpawnOnFinalizeFlag('PAN-3092')).toBe(false);
+    expect(deadEndTripMocks.recordDeadEndNeedsYou).not.toHaveBeenCalled();
+  });
+
+  it('retains consent when orphan recovery only queues container startup', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3097', 'proposed');
+    writeTasks(projectPath, 'PAN-3097');
+    await writeAutoSpawnOnFinalizeFlag('PAN-3097', true);
+
+    await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate: allowPickupGate,
+      projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent: async () => ({ spawned: true, queued: true, agentId: 'agent-pan-3097' }),
+    })).resolves.toEqual(['Queued container startup for orphan proposed spec PAN-3097']);
+
+    expect(readAutoSpawnOnFinalizeFlag('PAN-3097')).toBe(true);
+  });
+
   it('spawns each orphan at most once per five minutes', async () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
@@ -356,6 +608,7 @@ describe('orphan proposed spec reconciler', () => {
     const projects = [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }];
 
     await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate: allowPickupGate,
       projects,
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
@@ -366,6 +619,7 @@ describe('orphan proposed spec reconciler', () => {
     })).resolves.toEqual(['Spawned work agent for orphan proposed spec PAN-3101']);
 
     await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate: allowPickupGate,
       projects,
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
@@ -387,6 +641,7 @@ describe('orphan proposed spec reconciler', () => {
     const hasOpenPrForBranch = vi.fn(async () => true);
 
     await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate: allowPickupGate,
       projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
@@ -413,6 +668,7 @@ describe('orphan proposed spec reconciler', () => {
     });
 
     await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate: allowPickupGate,
       projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
@@ -423,7 +679,7 @@ describe('orphan proposed spec reconciler', () => {
       spawnWorkAgent,
     })).resolves.toEqual(['Spawned work agent for orphan proposed spec PAN-3602']);
 
-    expect(spawnWorkAgent).toHaveBeenCalledWith('PAN-3602');
+    expect(spawnWorkAgent).toHaveBeenCalledWith('PAN-3602', false);
   });
 
   it('checks open PRs with gh from the project directory for the feature branch', async () => {
@@ -438,6 +694,7 @@ describe('orphan proposed spec reconciler', () => {
     const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3603' }));
 
     await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate: allowPickupGate,
       projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
@@ -470,6 +727,7 @@ describe('orphan proposed spec reconciler', () => {
     const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-zzz-9042' }));
 
     await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate: allowPickupGate,
       projects: [{ key: 'other', config: { name: 'Non-GitHub Project', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
@@ -480,7 +738,7 @@ describe('orphan proposed spec reconciler', () => {
     })).resolves.toEqual(['Spawned work agent for orphan proposed spec ZZZ-9042']);
 
     expect(childProcessMocks.exec).not.toHaveBeenCalled();
-    expect(spawnWorkAgent).toHaveBeenCalledWith('ZZZ-9042');
+    expect(spawnWorkAgent).toHaveBeenCalledWith('ZZZ-9042', false);
   });
 
   it('checks open PRs with GitHub App REST when configured', async () => {
@@ -496,6 +754,7 @@ describe('orphan proposed spec reconciler', () => {
     const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3604' }));
 
     await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate: allowPickupGate,
       projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
@@ -517,6 +776,7 @@ describe('orphan proposed spec reconciler', () => {
     writeTasks(projectPath, 'PAN-3151');
 
     await reconcileOrphanProposedSpecs({
+      evaluatePickupGate: allowPickupGate,
       projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
@@ -568,11 +828,13 @@ describe('orphan proposed spec reconciler', () => {
     };
 
     await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate: allowPickupGate,
       ...baseOpts,
       now: new Date('2026-05-25T20:00:00.000Z'),
     })).resolves.toEqual(['Skipped orphan proposed spec PAN-3153: closed-issue']);
 
     await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate: allowPickupGate,
       ...baseOpts,
       now: new Date('2026-05-25T20:06:00.000Z'),
     })).resolves.toEqual([]);
@@ -593,6 +855,7 @@ describe('orphan proposed spec reconciler', () => {
       getAgentStateForIssue: async () => null,
       closedIssueIds: new Set<string>(),
       config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      evaluatePickupGate: allowPickupGate,
       spawnWorkAgent: async () => ({ spawned: true, agentId: 'agent-pan-3152' }),
     };
 
@@ -609,6 +872,7 @@ describe('orphan proposed spec reconciler', () => {
     const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3201' }));
 
     await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate: allowPickupGate,
       projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: join(testDir, 'missing') } }],
       config: { enabled: false },
       spawnWorkAgent,
@@ -634,7 +898,26 @@ describe('orphan proposed spec reconciler', () => {
       origin: 'http://127.0.0.1:3011',
       [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
     });
-    expect(JSON.parse(String(init?.body))).toEqual({ issueId: 'PAN-3301', role: 'work' });
+    expect(JSON.parse(String(init?.body))).toEqual({
+      issueId: 'PAN-3301',
+      role: 'work',
+      startedBy: 'orphan-proposed-reconciler',
+      autoSpawnConsentRequired: false,
+    });
+  });
+
+  it('distinguishes queued container startup from an accepted work launch', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      startingContainers: true,
+      agentId: 'agent-pan-3301',
+    }), { status: 200 })));
+
+    await expect(spawnWorkAgentThroughAgentsEndpoint('PAN-3301', 'http://127.0.0.1:3011')).resolves.toEqual({
+      spawned: true,
+      queued: true,
+      agentId: 'agent-pan-3301',
+    });
   });
 
   it('classifies unauthorized spawn responses explicitly', async () => {
@@ -663,6 +946,7 @@ describe('orphan proposed spec reconciler', () => {
       origin: 'http://127.0.0.1:3011',
       [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
     });
+    expect(JSON.parse(String(init?.body))).toEqual({ startedBy: 'workspace-rebuild-recovery' });
   });
 
   it('reports a failed rebuild-and-start without throwing', async () => {

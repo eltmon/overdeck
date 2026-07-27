@@ -75,6 +75,7 @@ function makeAgent(overrides: Partial<Agent> = {}): Agent {
     lastFailureReason: null,
     lastFailureNextRetryAt: null,
     flywheelRunId: null,
+    startedBy: null,
     roleRunHead: null,
     reviewSubRole: null,
     reviewRunId: null,
@@ -96,7 +97,7 @@ function makeAgent(overrides: Partial<Agent> = {}): Agent {
 
 describe('agents-db', () => {
   it('upsertAgent persists a row keyed by id and returns the stored shape', () => {
-    const agent = makeAgent();
+    const agent = makeAgent({ startedBy: 'operator:cli:pan-start' });
     const stored = upsertAgent(agent);
 
     expect(stored.id).toBe(agent.id);
@@ -106,6 +107,7 @@ describe('agents-db', () => {
     expect(stored.workspace).toBe(agent.workspace);
     expect(stored.harness).toBe(agent.harness);
     expect(stored.model).toBe(agent.model);
+    expect(stored.startedBy).toBe('operator:cli:pan-start');
     expect(stored.supervisorEnabled).toBe(true);
     expect(stored.channelsEnabled).toBe(false);
     expect(stored.updatedAt).toBe(agent.updatedAt);

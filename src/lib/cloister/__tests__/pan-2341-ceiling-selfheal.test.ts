@@ -237,6 +237,7 @@ describe('PAN-2341 ceiling self-heal regression', () => {
     expect(mocks.spawnRun).toHaveBeenCalledWith('PAN-4002', 'test', {
       workspace: '/repo/workspaces/feature-pan-4002',
       prompt: 'test prompt',
+      startedBy: 'deacon:orphan-test-recovery',
     });
   });
 

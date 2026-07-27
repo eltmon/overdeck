@@ -222,7 +222,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
       const result = await handleAgentStoppedEvent('agent-pan-1908');
 
       expect(result).toBe('agent-pan-1908');
-      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908');
+      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908', undefined, { startedBy: 'deacon:auto-resume' });
     });
 
     // PAN-2974 root cause A: while the boot-reconciliation decision is pending
@@ -274,7 +274,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
       const result = await handleAgentStoppedEvent('agent-pan-1908');
 
       expect(result).toBe('agent-pan-1908');
-      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908');
+      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908', undefined, { startedBy: 'deacon:auto-resume' });
     });
 
     it('does not gate the batch path (skipGlobalGates) on the pending window — the batch owns its own gate', async () => {
@@ -291,7 +291,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
       const result = await handleAgentStoppedEvent('agent-pan-1908', { skipGlobalGates: true });
 
       expect(result).toBe('agent-pan-1908');
-      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908');
+      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908', undefined, { startedBy: 'deacon:auto-resume' });
     });
 
     it('does not resume a deliberately killed agent without completed marker', async () => {
@@ -315,7 +315,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
       const result = await handleAgentStoppedEvent('agent-pan-1908', { overrideStoppedByUser: true });
 
       expect(result).toBe('agent-pan-1908');
-      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908');
+      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908', undefined, { startedBy: 'deacon:auto-resume' });
     });
 
     it('defers when concurrency slots are exhausted', async () => {
@@ -404,7 +404,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
       const result = await handleAgentStoppedEvent('agent-pan-1908');
 
       expect(result).toBe('agent-pan-1908');
-      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908');
+      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908', undefined, { startedBy: 'deacon:auto-resume' });
     });
   });
 

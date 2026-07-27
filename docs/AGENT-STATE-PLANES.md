@@ -69,6 +69,15 @@ status, lifecycle events, and conversations. It is a disposable cache rebuilt
 from Git state, JSONL transcripts, tracker data, and tmux through the canonical
 domain resolvers.
 
+### Agent spawn provenance
+
+Agent state records two complementary provenance fields:
+
+- `flywheelRunId` is the active `RUN-…` identity when a Flywheel run owns the spawn. Spawn options and the inherited Flywheel environment feed it into `state.json` and the agents-table `flywheel_run_id` column.
+- `startedBy` identifies the immediate launch path. Stable values include operator CLI/dashboard starts, `flywheel:<runId>`, planning auto-handoff, orphan reconciliation, reactive lifecycle dispatch, Deacon resume/crash recovery, handoff, and merge strike. It persists in `state.json` and the agents-table `started_by` column.
+
+Browser dashboard requests receive server-derived `operator:dashboard` provenance; request bodies cannot impersonate autonomous origins. Internal-token callers may select only registered internal origins such as `planning-auto-handoff`, `orphan-proposed-reconciler`, and `operator:cli:pan-start`. Detached `pan start` children receive the validated token through `OVERDECK_AGENT_STARTED_BY`; direct CLI invocation defaults to `operator:cli:pan-start`. Planning routes apply the same boundary and persist the validated token on planning-agent state. Fresh launch option types require `startedBy`, so a new production spawn path that omits provenance fails typecheck.
+
 ### Agents-table event invariant
 
 The agents table is the authoritative runtime registry, but event-derived

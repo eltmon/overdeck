@@ -114,6 +114,8 @@ export interface AgentState {
 
   /** Flywheel run that spawned this agent, if any. Absent for operator-started agents (PAN-1812). */
   flywheelRunId?: string;
+  /** Origin token identifying the command or autonomous path that started this agent. */
+  startedBy?: string;
 
   /** True when a planning session was launched with `pan plan --auto`. */
   auto?: boolean;
@@ -244,6 +246,8 @@ function cleanAgentState(raw: AgentState): AgentState {
     costSoFar: raw.costSoFar,
     sessionId: raw.sessionId,
     roleRunHead: raw.roleRunHead,
+    flywheelRunId: raw.flywheelRunId,
+    startedBy: raw.startedBy,
     channelsEnabled: raw.channelsEnabled,
     supervisorEnabled: raw.supervisorEnabled,
     deliveryMethod: raw.deliveryMethod,
