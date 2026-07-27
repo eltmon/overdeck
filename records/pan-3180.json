@@ -3,16 +3,19 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-27T01:12:19.024Z",
-  "updated": "2026-07-27T01:54:27.470Z",
+  "updated": "2026-07-27T02:44:45.097Z",
   "pipeline": {
     "issueId": "PAN-3180",
     "reviewStatus": "pending",
-    "testStatus": "pending",
+    "testStatus": "skipped",
+    "verificationStatus": "skipped",
     "mergeStatus": "failed",
     "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T01:54:26.052Z",
+    "updatedAt": "2026-07-27T02:44:45.072Z",
+    "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
+    "verificationNotes": "Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)",
     "mergeNotes": "Merge pipeline error: Cannot find package 'effect' imported from /home/eltmon/.overdeck/deployments/dashboard/.pan-reload-generation-b/dist/dashboard/deploy-window-B9kL4buI.js",
     "strikeLandingState": "landed",
     "strikeRecoveryCount": 0,
@@ -32,7 +35,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-27T01:54:27.465Z"
+        "pricingAsOf": "2026-07-27T02:44:45.082Z"
       }
     },
     "merges": [],
