@@ -7677,3 +7677,10 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - MIN-879 unchanged, still waiting on the operator's `sudo rm`.
 - **RUN TOTALS: 41 close-outs, 10 merges, merge queue 15 → 0, 9 substrate bugs filed of which 6 fixed, merged and closed out.**
 - **LESSON: an empty queue is not an ended run.** Six consecutive ticks found nothing, and the temptation to call quiescence "done" grew with each one. **The run's remaining value was entirely in being present when a single in-flight review finally passed** — a merge that arrives hours after the last one still needs someone holding the lane.
+
+## RUN-72 tick 26 (2026-07-27 12:24Z) — PAN-3111 CLOSED 8/8; the whole PAN pipeline is now clear
+- **Deployed `8780991d45` → `a84fff500898`** (clean, pid 1298254, parent = systemd, deacon `False`→`True`) after checking CI as its own command (green on all three heads) and confirming **no verifications running**. Then **PAN-3111 CLOSED OUT WITH ALL 8 ROWS PASS**.
+- **Row 5 cleared itself exactly as predicted from PAN-3194's precedent.** I had queued an investigation into why `postMergeLifecycle` had not fired, and again there was nothing to investigate — the row was waiting on its preconditions, not broken. **Twice now, resisting the urge to root-cause a transient row was the right call**, and the discriminator both times was having seen the same shape resolve before.
+- **PAN-3187's fix is visibly live in the gate's own language** — rows 1–3 now read *"or tracker-closed with landed work and no negative review verdict"* rather than the bare `reviewStatus: passed`. **A fix I merged this run is now changing the text of the tool I use to verify the next one.**
+- Post-close sweep: ready queue empty, merge-blockers `[]`, both trains enabled and empty. **MIN-879 is now the only item in the queue lane with any path forward**, and it needs the operator's `sudo rm`.
+- **RUN TOTALS: 42 close-outs, 10 merges, merge queue 15 → 0, 9 substrate bugs filed of which 6 fixed, merged and closed out.**
