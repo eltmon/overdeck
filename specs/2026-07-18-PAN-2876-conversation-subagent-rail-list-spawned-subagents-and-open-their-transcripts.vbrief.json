@@ -4,17 +4,17 @@
     "created": "2026-07-18T12:11:59Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2876: Conversation subagent rail: list spawned subagents and open their transcripts",
-    "updated": "2026-07-27T04:42:14.771Z"
+    "updated": "2026-07-27T08:25:08.978Z"
   },
   "plan": {
     "id": "pan-2876",
     "title": "Conversation subagent rail: list spawned subagents and open their transcripts",
-    "status": "running",
+    "status": "completed",
     "uid": "a7d1d6e5-e2af-4d6f-bc38-9ca64bcad1a6",
     "author": "agent:claude-fable-5",
-    "sequence": 7,
+    "sequence": 8,
     "created": "2026-07-18T12:11:59Z",
-    "updated": "2026-07-27T04:42:14.771Z",
+    "updated": "2026-07-27T08:25:08.978Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2876",
@@ -818,5 +818,5 @@
       "canonicalFilename": "2026-07-18-PAN-2876-conversation-subagent-rail-list-spawned-subagents-and-open-their-transcripts.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
