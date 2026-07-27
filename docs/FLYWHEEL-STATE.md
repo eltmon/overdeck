@@ -7646,3 +7646,8 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - **PAN-3111 is on its fourth review cycle** — PR #3144's head moved to `168a05aaca` with `review_status: pending`. Reported only, per lane. Four cycles is worth naming as a trend rather than a status: the work keeps being revised and re-reviewed rather than converging, which is a different problem from being stuck.
 - **RUN TOTALS UNCHANGED: 41 close-outs, 9 merges, merge queue 15 → 0, 9 substrate bugs filed of which 6 fixed, merged and closed out.**
 - **LESSON: a watch tick's output should be short in proportion to how little changed.** Tonight's long entries earned their length with findings — the git-guard inversion, the DoD rows, the frontend typecheck gap. **An entry of that size describing "no change" would dilute the record**, and durable memory is only useful if its density tracks what actually happened.
+
+## RUN-72 tick 21 (2026-07-27 09:45Z) — third watch tick, unchanged
+- Ready queue empty, merge-blockers `[]`, MIN-879 cache still present, **zero code files** on main past the live build. Nothing actionable.
+- **The cohort has reached quiescence, but the run is NOT complete** — and the distinction is worth stating rather than reaching for `pan flywheel report`. **PAN-3111 is still in review, and its merge is this lane's job the moment it passes.** Ending the run now would remove the merge path for the operator's in-flight work, so the correct posture is to keep watching, not to declare done because the queues happen to be empty.
+- **RUN TOTALS UNCHANGED: 41 close-outs, 9 merges, merge queue 15 → 0, 9 substrate bugs filed of which 6 fixed, merged and closed out.**
