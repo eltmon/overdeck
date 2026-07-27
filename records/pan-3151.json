@@ -331,17 +331,17 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T15:05:47.135Z",
+  "updated": "2026-07-27T15:05:49.212Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T15:05:47.099Z",
+    "updatedAt": "2026-07-27T15:05:47.724Z",
     "reviewNotes": "Agent re-review request (17/25): Fixed review issues: bumped to SCHEMA_VERSION 63 with v62→v63 migration and comprehensive regression tests",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "fc19e669a59088966a8149057824ab6a8db87946",
@@ -376,10 +376,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 4625,
-            "output": 185876,
-            "cacheRead": 108660115,
-            "cacheWrite": 5202565
+            "input": 4630,
+            "output": 185976,
+            "cacheRead": 108820366,
+            "cacheWrite": 5203079
           }
         }
       },
@@ -403,15 +403,15 @@
           "cacheWrite": 473562
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 4625,
-          "output": 185876,
-          "cacheRead": 108660115,
-          "cacheWrite": 5202565
+          "input": 4630,
+          "output": 185976,
+          "cacheRead": 108820366,
+          "cacheWrite": 5203079
         }
       },
       "costAtCloseOut": {
-        "usd": 270.0298953,
-        "pricingAsOf": "2026-07-27T15:05:47.132Z"
+        "usd": 270.0470683,
+        "pricingAsOf": "2026-07-27T15:05:49.209Z"
       }
     },
     "merges": [
