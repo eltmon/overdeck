@@ -207,7 +207,7 @@
     "recordedAt": "2026-07-03T12:29:10.111Z"
   },
   "created": "2026-07-03T02:32:35.471Z",
-  "updated": "2026-07-27T06:01:59.249Z",
+  "updated": "2026-07-27T16:33:14.678Z",
   "pipeline": {
     "issueId": "PAN-2148",
     "reviewStatus": "pending",
@@ -215,7 +215,7 @@
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T06:01:59.218Z",
+    "updatedAt": "2026-07-27T16:33:14.656Z",
     "inspectNotes": "Spec fidelity passed: added issues no-loss audit test for the 29 route method/path pairs from the PAN-2148 PRD, and the live regex enumeration matches 29 routes. Constraint compliance passed: the test follows the sanctioned source-introspection pattern, no delay/retry fake-timer requirement applies, no destructive endpoint is invoked, routes/issues.ts is under 1000 lines, door modules are under 1000 lines, baseline no longer carries routes/issues.ts, and routes/issues.js remains referenced only by server.ts.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2299",
     "reviewRequestedAt": "2026-07-03T12:30:36.829Z",
@@ -281,7 +281,7 @@
       "recordedAt": "2026-07-03T12:29:10.111Z"
     },
     "closedOut": true,
-    "closedOutAt": "2026-07-27T06:01:59.218Z"
+    "closedOutAt": "2026-07-27T16:33:14.656Z"
   },
   "closeOut": {
     "usage": {
@@ -363,7 +363,7 @@
     ],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-27T06:01:59.245Z",
+      "evaluatedAt": "2026-07-27T16:33:14.676Z",
       "rows": [
         {
           "id": "review",
@@ -420,7 +420,7 @@
           "num": 7,
           "title": "Deployed",
           "expected": "live server build includes the merged commit",
-          "observed": "build commit 3297fb26 contains merge 13207404",
+          "observed": "build commit d44fa122 contains merge 13207404",
           "status": "pass"
         },
         {
