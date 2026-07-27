@@ -99,7 +99,7 @@
     "recordedAt": "2026-07-27T11:05:50.125Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T11:20:11.162Z",
+  "updated": "2026-07-27T11:20:16.709Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
@@ -109,10 +109,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T11:09:21.628Z",
-    "updatedAt": "2026-07-27T11:20:10.522Z",
+    "updatedAt": "2026-07-27T11:20:16.701Z",
     "reviewNotes": "canonical overdeck.db lacks review_cycle_history, so review-status writes fail",
     "verificationNotes": "Verification FAILED at lint (19666ms):\n\n\n> @overdeck/core@0.46.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.46.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.46.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.46.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.46.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n\n--- stderr ---\n✗ overdeck boundary gate: 1 site(s) across 1 file(s) still on the OLD panopticon.db\n\nsrc/lib/review-status-reconcile.ts:3:import { markWorkspaceStuck } from './database/review-status-db.js';\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
+    "reviewedAtCommit": "eeb293b9fae67d69195340016d005d602f995a0f",
     "reviewRequestedAt": "2026-07-27T11:09:21.628Z",
     "reviewSpawnedAt": "2026-07-27T11:07:34.479Z",
     "scopeDrift": {
@@ -241,7 +242,7 @@
       },
       "costAtCloseOut": {
         "usd": 26.9287513,
-        "pricingAsOf": "2026-07-27T11:20:10.542Z"
+        "pricingAsOf": "2026-07-27T11:20:16.704Z"
       }
     },
     "merges": [
