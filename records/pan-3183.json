@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:30:47.797Z",
-  "updated": "2026-07-27T05:01:04.229Z",
+  "updated": "2026-07-27T05:11:58.769Z",
   "pipeline": {
     "issueId": "PAN-3183",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "backfill-reports-marked-stopped": {
-        "writerId": "agent-pan-3183",
-        "agentId": "agent-pan-3183",
-        "pid": 3545836,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:01:04.229Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3183",
@@ -64,12 +56,27 @@
         "outcome": "completed",
         "reason": "Confirmed dashboard boot reconstruct -> backfillAgentsSync as the 02:52:14Z writer; found zero agent.* events in 02:51-02:53Z; posted complete SQL/Drizzle writer audit in issue comment 5087434327 and workspace .pan/audits.",
         "releasedAt": "2026-07-27T05:00:35.571Z"
+      },
+      {
+        "writerId": "agent-pan-3183",
+        "agentId": "agent-pan-3183",
+        "pid": 3545836,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:01:04.229Z",
+        "itemId": "backfill-reports-marked-stopped",
+        "outcome": "completed",
+        "reason": "backfillAgentsSync now returns markedStoppedIds with previousStatus, writes lifecycle logs before mutating status, and ReconstructResult propagates the additive field. Targeted tests and typecheck pass; a second same-item commit preserved the agents.ts file-size ratchet after pre-push rejected growth.",
+        "releasedAt": "2026-07-27T05:11:58.769Z"
       }
     ],
     "statusReasons": {
       "confirm-writer-and-audit-doors": {
         "reason": "Confirmed dashboard boot reconstruct -> backfillAgentsSync as the 02:52:14Z writer; found zero agent.* events in 02:51-02:53Z; posted complete SQL/Drizzle writer audit in issue comment 5087434327 and workspace .pan/audits.",
         "updatedAt": "2026-07-27T05:00:35.571Z"
+      },
+      "backfill-reports-marked-stopped": {
+        "reason": "backfillAgentsSync now returns markedStoppedIds with previousStatus, writes lifecycle logs before mutating status, and ReconstructResult propagates the additive field. Targeted tests and typecheck pass; a second same-item commit preserved the agents.ts file-size ratchet after pre-push rejected growth.",
+        "updatedAt": "2026-07-27T05:11:58.769Z"
       }
     }
   },
@@ -77,6 +84,9 @@
     "confirm-writer-and-audit-doors": "completed",
     "confirm-writer-and-audit-doors.confirm-writer-and-audit-doors.ac1": "completed",
     "confirm-writer-and-audit-doors.confirm-writer-and-audit-doors.ac2": "completed",
-    "backfill-reports-marked-stopped": "running"
+    "backfill-reports-marked-stopped": "completed",
+    "backfill-reports-marked-stopped.backfill-reports-marked-stopped.ac1": "completed",
+    "backfill-reports-marked-stopped.backfill-reports-marked-stopped.ac2": "completed",
+    "backfill-reports-marked-stopped.backfill-reports-marked-stopped.ac3": "completed"
   }
 }
