@@ -206,7 +206,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T05:05:13.938Z",
+  "updated": "2026-07-27T05:13:57.922Z",
   "pipeline": {
     "issueId": "PAN-2876",
     "reviewStatus": "pending",
@@ -279,16 +279,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "rest-subagent-messages": {
-        "writerId": "agent-pan-2876",
-        "agentId": "agent-pan-2876",
-        "pid": 3867069,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:05:13.938Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2876",
@@ -333,6 +325,17 @@
         "outcome": "completed",
         "reason": "Parent Claude JSONL streams now emit initial and change-detected subagent lists, restamp running state on transcript deltas, and stop the 2-second fake-timer-tested poller on unsubscribe.",
         "releasedAt": "2026-07-27T05:04:57.078Z"
+      },
+      {
+        "writerId": "agent-pan-2876",
+        "agentId": "agent-pan-2876",
+        "pid": 3867069,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:05:13.938Z",
+        "itemId": "rest-subagent-messages",
+        "outcome": "completed",
+        "reason": "Extended the canonical conversation read door and REST query route to resolve safe subagent transcripts, reject unsafe ids with 400, and include ended subagents as done in parent responses; tests and typecheck pass.",
+        "releasedAt": "2026-07-27T05:13:57.922Z"
       }
     ],
     "statusReasons": {
@@ -351,6 +354,10 @@
       "ws-subagent-list-emission": {
         "reason": "Parent Claude JSONL streams now emit initial and change-detected subagent lists, restamp running state on transcript deltas, and stop the 2-second fake-timer-tested poller on unsubscribe.",
         "updatedAt": "2026-07-27T05:04:57.078Z"
+      },
+      "rest-subagent-messages": {
+        "reason": "Extended the canonical conversation read door and REST query route to resolve safe subagent transcripts, reject unsafe ids with 400, and include ended subagents as done in parent responses; tests and typecheck pass.",
+        "updatedAt": "2026-07-27T05:13:57.922Z"
       }
     }
   },
@@ -376,6 +383,9 @@
     "ws-subagent-list-emission.ws-subagent-list-emission.ac3": "completed",
     "ws-subagent-list-emission.ws-subagent-list-emission.ac4": "completed",
     "ws-subagent-list-emission.ws-subagent-list-emission.ac5": "completed",
-    "rest-subagent-messages": "running"
+    "rest-subagent-messages": "completed",
+    "rest-subagent-messages.rest-subagent-messages.ac1": "completed",
+    "rest-subagent-messages.rest-subagent-messages.ac2": "completed",
+    "rest-subagent-messages.rest-subagent-messages.ac3": "completed"
   }
 }
