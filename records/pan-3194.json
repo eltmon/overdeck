@@ -64,25 +64,26 @@
     "recordedAt": "2026-07-27T06:16:25.496Z"
   },
   "created": "2026-07-27T04:42:41.037Z",
-  "updated": "2026-07-27T08:24:37.959Z",
+  "updated": "2026-07-27T08:24:41.406Z",
   "pipeline": {
     "issueId": "PAN-3194",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "mergeStatus": "merged",
     "mergeStep": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T06:17:16.404Z",
-    "updatedAt": "2026-07-27T08:04:44.620Z",
+    "updatedAt": "2026-07-27T08:24:41.385Z",
     "reviewNotes": "No blocking findings; the main merge preserves transcript-verified fresh recovery and all reviewed integration gates pass.",
     "testNotes": "Backend-only change (resume probes, lifecycle state, pure decideResumeSpawnPlan module, docs) — no UI/dashboard-visible surface per acceptance criteria, so browser UAT was not required. Gates run from workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3194 on branch feature/pan-3194: npm run typecheck (clean, incl. dashboard-types guard, 62 known baseline errors unchanged), npm run lint (clean, all guards incl. circular-deps/ratchet/quarantine/pipeline-membership passed), targeted suites (paths.test.ts, work-agent-lifecycle-transcript-probe.test.ts, resume-spawn-plan.test.ts, resume.test.ts, tests/lib/work-agent-lifecycle.test.ts, resume-gate.test.ts, stopped-agent-lifecycle.test.ts, deploy-queue.test.ts, app-server-host.test.ts: 9 files / 65 tests passed), and full npm test gate: 1234 test files / 11459 tests passed (3 files / 50 tests skipped, 0 failed) plus frontend issueActions suites (3 files / 51 tests passed, 0 failed).",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3200",
     "reviewedAtCommit": "298669b0daae601d820bc847d29781329aa59fc9",
     "lastVerifiedCommit": "5564e76b17961c26952edd964fabfdf0d8fee8a9",
-    "reviewSpawnedAt": "2026-07-27T07:47:25.277Z"
+    "reviewSpawnedAt": "2026-07-27T07:47:25.277Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T08:24:41.385Z"
   },
   "closeOut": {
     "usage": {
@@ -134,7 +135,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3200"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T08:24:41.405Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at 5564e76b17961c26952edd964fabfdf0d8fee8a9",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3200 MERGED at 2026-07-27T08:04:15Z",
+          "status": "pass",
+          "mergedAt": "2026-07-27T08:04:15Z",
+          "mergeCommit": "7e7f6925f715489610a70ba05dbc2a5701fb84c6"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "8 check-runs concluded successfully on 7e7f6925f715489610a70ba05dbc2a5701fb84c6",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 8780991d contains merge 7e7f6925",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Removed 4 agent state directories; No strike branch strike/pan-3194 found; Pruned 122 checkpoint ref(s) for agent-pan-3194, planning-pan-3194, strike-pan-3194; No specialist registry entries for PAN-3194"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
