@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T11:00:28.008Z",
+  "updated": "2026-07-27T11:02:12.046Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -37,16 +37,8 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "pan-show-trend": {
-        "writerId": "agent-pan-3151",
-        "agentId": "agent-pan-3151",
-        "pid": 2810332,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T11:00:28.007Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3151",
@@ -131,6 +123,16 @@
         "itemId": "dashboard-trend-display",
         "outcome": "completed",
         "releasedAt": "2026-07-27T11:00:22.923Z"
+      },
+      {
+        "writerId": "agent-pan-3151",
+        "agentId": "agent-pan-3151",
+        "pid": 2810332,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T11:00:28.007Z",
+        "itemId": "pan-show-trend",
+        "outcome": "completed",
+        "releasedAt": "2026-07-27T11:02:12.046Z"
       }
     ],
     "statusReasons": {
@@ -185,6 +187,8 @@
     "dashboard-trend-display": "completed",
     "dashboard-trend-display.dashboard-trend-display.ac1": "completed",
     "dashboard-trend-display.dashboard-trend-display.ac2": "completed",
-    "pan-show-trend": "running"
+    "pan-show-trend": "completed",
+    "pan-show-trend.pan-show-trend.ac1": "completed",
+    "pan-show-trend.pan-show-trend.ac2": "completed"
   }
 }
