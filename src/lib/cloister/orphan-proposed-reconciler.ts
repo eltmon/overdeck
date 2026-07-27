@@ -98,6 +98,8 @@ export interface HandleOrphanProposedSpecOptions {
   project?: { projectKey: string; projectPath: string };
   /** Spec override so the safety net does not re-read the file. */
   spec?: { path: string; doc: XBriefDocument };
+  /** Tmux session-list override for tests / callers that already resolved it. */
+  tmuxSessionNames?: readonly string[];
 }
 
 async function findSpecPathForIssue(projectPath: string, issueId: string): Promise<string | null> {
@@ -442,7 +444,7 @@ export async function handleOrphanProposedSpec(
   }
 
   // Any tmux session for the issue means the pipeline is active here.
-  const sessions = await Effect.runPromise(listSessionNames().pipe(Effect.catch(() => Effect.succeed([]))));
+  const sessions = await loadTmuxSessionNames(options.tmuxSessionNames);
   if (hasIssueScopedSession(sessions, agentId)) {
     logReconcilerDiagnostic('spawn-skipped', { issueId: upperIssueId, reason: 'issue-scoped-session' });
     return [];
@@ -559,6 +561,7 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
         config: { enabled: true, minAttemptIntervalMs: loadedConfig.minAttemptIntervalMs },
         project: { projectKey: candidate.projectKey, projectPath: candidate.projectPath },
         spec: { path: candidate.specPath, doc: planDoc },
+        tmuxSessionNames: options.tmuxSessionNames,
       });
       actions.push(...result);
     }
