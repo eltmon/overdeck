@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T05:05:03.150Z",
+  "updated": "2026-07-27T05:11:28.071Z",
   "pipeline": {
     "issueId": "PAN-3191",
     "reviewStatus": "pending",
@@ -38,16 +38,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "cancel-reports-remaining-rows": {
-        "writerId": "agent-pan-3191",
-        "agentId": "agent-pan-3191",
-        "pid": 3855468,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:05:03.150Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3191",
@@ -70,6 +62,17 @@
         "outcome": "completed",
         "reason": "Added a deacon reconciler that cancels closed-out pending/problem rows, confirms late merges through the forge, closes duplicate rows together, cools down unsuccessful checks, and leaves merging rows untouched; wired it into patrol with seven regression cases.",
         "releasedAt": "2026-07-27T05:04:51.709Z"
+      },
+      {
+        "writerId": "agent-pan-3191",
+        "agentId": "agent-pan-3191",
+        "pid": 3855468,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:05:03.150Z",
+        "itemId": "cancel-reports-remaining-rows",
+        "outcome": "completed",
+        "reason": "Added an actionable-row count, returned it from successful cancel responses, printed duplicate-row guidance in the CLI, documented one-row cancellation semantics, and covered DB/route/CLI behavior.",
+        "releasedAt": "2026-07-27T05:11:28.071Z"
       }
     ],
     "statusReasons": {
@@ -80,6 +83,10 @@
       "auto-merge-rows-reconciler": {
         "reason": "Added a deacon reconciler that cancels closed-out pending/problem rows, confirms late merges through the forge, closes duplicate rows together, cools down unsuccessful checks, and leaves merging rows untouched; wired it into patrol with seven regression cases.",
         "updatedAt": "2026-07-27T05:04:51.709Z"
+      },
+      "cancel-reports-remaining-rows": {
+        "reason": "Added an actionable-row count, returned it from successful cancel responses, printed duplicate-row guidance in the CLI, documented one-row cancellation semantics, and covered DB/route/CLI behavior.",
+        "updatedAt": "2026-07-27T05:11:28.071Z"
       }
     }
   },
@@ -94,6 +101,10 @@
     "auto-merge-rows-reconciler.auto-merge-rows-reconciler.ac3": "completed",
     "auto-merge-rows-reconciler.auto-merge-rows-reconciler.ac4": "completed",
     "auto-merge-rows-reconciler.auto-merge-rows-reconciler.ac5": "completed",
-    "cancel-reports-remaining-rows": "running"
+    "cancel-reports-remaining-rows": "completed",
+    "cancel-reports-remaining-rows.cancel-reports-remaining-rows.ac1": "completed",
+    "cancel-reports-remaining-rows.cancel-reports-remaining-rows.ac2": "completed",
+    "cancel-reports-remaining-rows.cancel-reports-remaining-rows.ac3": "completed",
+    "cancel-reports-remaining-rows.cancel-reports-remaining-rows.ac4": "completed"
   }
 }
