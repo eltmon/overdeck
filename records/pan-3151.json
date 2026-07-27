@@ -296,18 +296,18 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:44:19.956Z",
+  "updated": "2026-07-27T14:49:40.699Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:44:19.948Z",
-    "reviewNotes": "forward compatibility is fixed, but current-version review_status repairs still leave 2 migration tests failing",
+    "updatedAt": "2026-07-27T14:49:40.672Z",
+    "reviewNotes": "Agent re-review request (14/25): Fixed: schema repairs only run for SCHEMA_VERSION, and tests now create review_status table",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "3986d07bdd7a1a9d417581e7b3deec7773921746",
     "reviewSpawnedAt": "2026-07-27T14:42:42.855Z"
@@ -325,9 +325,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 26365960,
-            "output": 598413,
-            "cacheRead": 144674816,
+            "input": 26379147,
+            "output": 603589,
+            "cacheRead": 146304512,
             "cacheWrite": 0
           }
         },
@@ -341,10 +341,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 4219,
-            "output": 163389,
-            "cacheRead": 100084165,
-            "cacheWrite": 4614441
+            "input": 4319,
+            "output": 167147,
+            "cacheRead": 101819885,
+            "cacheWrite": 4707641
           }
         }
       },
@@ -356,9 +356,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 26365960,
-          "output": 598413,
-          "cacheRead": 144674816,
+          "input": 26379147,
+          "output": 603589,
+          "cacheRead": 146304512,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -368,15 +368,15 @@
           "cacheWrite": 473562
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 4219,
-          "output": 163389,
-          "cacheRead": 100084165,
-          "cacheWrite": 4614441
+          "input": 4319,
+          "output": 167147,
+          "cacheRead": 101819885,
+          "cacheWrite": 4707641
         }
       },
       "costAtCloseOut": {
-        "usd": 245.7383033,
-        "pricingAsOf": "2026-07-27T14:44:19.952Z"
+        "usd": 247.0833283,
+        "pricingAsOf": "2026-07-27T14:49:40.697Z"
       }
     },
     "merges": [
