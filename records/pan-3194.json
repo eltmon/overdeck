@@ -64,7 +64,7 @@
     "recordedAt": "2026-07-27T06:16:25.496Z"
   },
   "created": "2026-07-27T04:42:41.037Z",
-  "updated": "2026-07-27T08:04:19.557Z",
+  "updated": "2026-07-27T08:04:44.544Z",
   "pipeline": {
     "issueId": "PAN-3194",
     "reviewStatus": "passed",
@@ -72,10 +72,10 @@
     "verificationStatus": "passed",
     "mergeStatus": "merged",
     "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T06:17:16.404Z",
-    "updatedAt": "2026-07-27T08:04:17.902Z",
+    "updatedAt": "2026-07-27T08:04:44.507Z",
     "reviewNotes": "No blocking findings; the main merge preserves transcript-verified fresh recovery and all reviewed integration gates pass.",
     "testNotes": "Backend-only change (resume probes, lifecycle state, pure decideResumeSpawnPlan module, docs) — no UI/dashboard-visible surface per acceptance criteria, so browser UAT was not required. Gates run from workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3194 on branch feature/pan-3194: npm run typecheck (clean, incl. dashboard-types guard, 62 known baseline errors unchanged), npm run lint (clean, all guards incl. circular-deps/ratchet/quarantine/pipeline-membership passed), targeted suites (paths.test.ts, work-agent-lifecycle-transcript-probe.test.ts, resume-spawn-plan.test.ts, resume.test.ts, tests/lib/work-agent-lifecycle.test.ts, resume-gate.test.ts, stopped-agent-lifecycle.test.ts, deploy-queue.test.ts, app-server-host.test.ts: 9 files / 65 tests passed), and full npm test gate: 1234 test files / 11459 tests passed (3 files / 50 tests skipped, 0 failed) plus frontend issueActions suites (3 files / 51 tests passed, 0 failed).",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -128,7 +128,7 @@
       },
       "costAtCloseOut": {
         "usd": 78.647227,
-        "pricingAsOf": "2026-07-27T08:04:19.553Z"
+        "pricingAsOf": "2026-07-27T08:04:44.509Z"
       }
     },
     "merges": [
@@ -137,7 +137,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "k3[1m]",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 10,
