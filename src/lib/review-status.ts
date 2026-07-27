@@ -11,6 +11,7 @@ import {
   getReviewStatusesFromDb,
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
+  clearWorkspaceStuckAndResetHistory as dbClearStuckAndResetHistory,
 } from './overdeck/review-status-sync.js';
 import {
   registerCanonicalReviewStatusResolver,
@@ -871,10 +872,22 @@ export function markWorkspaceStuck(
  * Called when the human clicks "Unstick" in the dashboard.
  * Re-enables Deacon patrol for this workspace.
  */
-export function clearWorkspaceStuck(issueId: string, reason?: string): void {
+export function clearWorkspaceStuck(issueId: string): void {
   try {
-    dbClearStuck(issueId, reason);
+    dbClearStuck(issueId);
     console.log(`[review-status] Cleared stuck state for ${issueId}`);
+    const updated = getReviewStatusSync(issueId);
+    if (updated) notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
+  } catch (err) {
+    console.error(`[review-status] Failed to clear stuck state for ${issueId}:`, err);
+  }
+}
+
+/** PAN-3151: clear stuck and reset review cycle history when unsticking from review-not-converging. */
+export function clearWorkspaceStuckAndResetHistory(issueId: string): void {
+  try {
+    dbClearStuckAndResetHistory(issueId);
+    console.log(`[review-status] Cleared stuck state and reset cycle history for ${issueId}`);
     const updated = getReviewStatusSync(issueId);
     if (updated) notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
   } catch (err) {

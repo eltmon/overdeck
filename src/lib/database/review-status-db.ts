@@ -602,14 +602,22 @@ export function setAutoMerge(issueId: string, autoMerge: boolean | null): void {
  * Clear the stuck flag for a workspace (called when the human clicks "Unstick").
  * Re-enables Deacon patrol for this workspace.
  */
-export function clearWorkspaceStuck(issueId: string, reason?: string): void {
+export function clearWorkspaceStuck(issueId: string): void {
   const db = getDatabase();
   const now = new Date().toISOString();
-  // PAN-3151: when unsticking due to review-not-converging, also reset history
-  const isReviewConvergenceGate = reason === 'review-not-converging';
   db.prepare(`
     UPDATE review_status
-    SET stuck = 0, stuck_reason = NULL, stuck_at = NULL, stuck_details = NULL, review_cycle_history = ?, updated_at = ?
+    SET stuck = 0, stuck_reason = NULL, stuck_at = NULL, stuck_details = NULL, updated_at = ?
     WHERE issue_id = ?
-  `).run(isReviewConvergenceGate ? null : undefined, now, issueId);
+  `).run(now, issueId);
+}
+
+export function clearWorkspaceStuckAndResetHistory(issueId: string): void {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE review_status
+    SET stuck = 0, stuck_reason = NULL, stuck_at = NULL, stuck_details = NULL, review_cycle_history = NULL, updated_at = ?
+    WHERE issue_id = ?
+  `).run(now, issueId);
 }
