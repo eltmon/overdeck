@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:30:47.797Z",
-  "updated": "2026-07-27T05:16:41.529Z",
+  "updated": "2026-07-27T05:20:47.433Z",
   "pipeline": {
     "issueId": "PAN-3183",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "runtime-merge-table-wins": {
-        "writerId": "agent-pan-3183",
-        "agentId": "agent-pan-3183",
-        "pid": 495840,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:16:41.528Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3183",
@@ -86,6 +78,17 @@
         "outcome": "completed",
         "reason": "Legacy backfill now returns markedStoppedIds with previousStatus, logs each boot reconciliation before upsert, and is covered by the existing legacy backfill test suite. Targeted tests and typecheck pass.",
         "releasedAt": "2026-07-27T05:16:23.886Z"
+      },
+      {
+        "writerId": "agent-pan-3183",
+        "agentId": "agent-pan-3183",
+        "pid": 495840,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:16:41.528Z",
+        "itemId": "runtime-merge-table-wins",
+        "outcome": "completed",
+        "reason": "mergeRuntimeBySequence now lets a source-reconstructed stopped snapshot win over stale higher-sequence runtime events only when the existing AgentSnapshot liveness field says tmux is absent. Added tests for no-tmux stop precedence, live-tmux preservation, and unchanged sequence precedence; targeted tests and typecheck pass.",
+        "releasedAt": "2026-07-27T05:20:47.433Z"
       }
     ],
     "statusReasons": {
@@ -100,6 +103,10 @@
       "legacy-backfill-parity": {
         "reason": "Legacy backfill now returns markedStoppedIds with previousStatus, logs each boot reconciliation before upsert, and is covered by the existing legacy backfill test suite. Targeted tests and typecheck pass.",
         "updatedAt": "2026-07-27T05:16:23.886Z"
+      },
+      "runtime-merge-table-wins": {
+        "reason": "mergeRuntimeBySequence now lets a source-reconstructed stopped snapshot win over stale higher-sequence runtime events only when the existing AgentSnapshot liveness field says tmux is absent. Added tests for no-tmux stop precedence, live-tmux preservation, and unchanged sequence precedence; targeted tests and typecheck pass.",
+        "updatedAt": "2026-07-27T05:20:47.433Z"
       }
     }
   },
@@ -114,6 +121,9 @@
     "legacy-backfill-parity": "completed",
     "legacy-backfill-parity.legacy-backfill-parity.ac1": "completed",
     "legacy-backfill-parity.legacy-backfill-parity.ac2": "completed",
-    "runtime-merge-table-wins": "running"
+    "runtime-merge-table-wins": "completed",
+    "runtime-merge-table-wins.runtime-merge-table-wins.ac1": "completed",
+    "runtime-merge-table-wins.runtime-merge-table-wins.ac2": "completed",
+    "runtime-merge-table-wins.runtime-merge-table-wins.ac3": "completed"
   }
 }
