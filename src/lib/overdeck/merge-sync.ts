@@ -469,6 +469,60 @@ export function upsertMergeSet(mergeSet: MergeSet): void {
   tx(mergeSet);
 }
 
+export interface MergeSetRepoPatch {
+  repoKey: string;
+  expected: Pick<MergeSetRepoState, 'sourceBranch' | 'targetBranch' | 'artifactUrl' | 'artifactId'>;
+  patch: Partial<Pick<MergeSetRepoState, 'artifactUrl' | 'artifactId' | 'mergeStatus'>>;
+}
+
+const MERGE_SET_REPO_CAS_FAILED = new Error('merge-set-repo-cas-failed');
+
+export function patchMergeSetRepos(issueId: string, patches: MergeSetRepoPatch[]): boolean {
+  const db = getOverdeckDatabaseSync();
+  const effective = patches.filter(({ patch }) => Object.values(patch).some((value) => value !== undefined));
+  if (effective.length === 0) return true;
+
+  try {
+    db.transaction(() => {
+      for (const { repoKey, expected, patch } of effective) {
+        const assignments: string[] = [];
+        const values: unknown[] = [];
+        if (patch.artifactUrl !== undefined) { assignments.push('artifact_url = ?'); values.push(patch.artifactUrl); }
+        if (patch.artifactId !== undefined) { assignments.push('artifact_id = ?'); values.push(patch.artifactId); }
+        if (patch.mergeStatus !== undefined) { assignments.push('merge_status = ?'); values.push(patch.mergeStatus); }
+        const result = db.prepare(`
+          UPDATE merge_set_repos SET ${assignments.join(', ')}
+          WHERE issue_id = ? AND repo_key = ? AND source_branch = ? AND target_branch = ?
+            AND artifact_url IS ? AND artifact_id IS ?
+        `).run(
+          ...values,
+          issueId,
+          repoKey,
+          expected.sourceBranch,
+          expected.targetBranch,
+          expected.artifactUrl ?? null,
+          expected.artifactId ?? null,
+        );
+        if (result.changes !== 1) throw MERGE_SET_REPO_CAS_FAILED;
+      }
+      db.prepare('UPDATE merge_sets SET updated_at = ? WHERE issue_id = ?').run(nowMillis(), issueId);
+    })();
+    return true;
+  } catch (error) {
+    if (error === MERGE_SET_REPO_CAS_FAILED) return false;
+    throw error;
+  }
+}
+
+export function patchMergeSetRepo(
+  issueId: string,
+  repoKey: string,
+  expected: MergeSetRepoPatch['expected'],
+  patch: MergeSetRepoPatch['patch'],
+): boolean {
+  return patchMergeSetRepos(issueId, [{ repoKey, expected, patch }]);
+}
+
 /** Drop-in for getMergeSetFromDb() from merge-set-db.ts. */
 export function getMergeSetFromDb(issueId: string): MergeSet | null {
   const db = getOverdeckDatabaseSync();
