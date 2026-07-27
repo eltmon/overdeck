@@ -1,0 +1,23 @@
+{
+  "issueId": "PAN-3189",
+  "schemaVersion": 2,
+  "created": "2026-07-27T04:02:41.420Z",
+  "updated": "2026-07-27T04:02:41.420Z",
+  "pipeline": {
+    "issueId": "PAN-3189",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-27T04:02:41.420Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "claude-opus-5"
+}
