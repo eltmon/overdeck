@@ -10,8 +10,41 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/FLYWHEEL.md",
+      "src/cli/commands/__tests__/merge.test.ts",
+      "src/cli/commands/merge.ts",
+      "src/dashboard/server/routes/__tests__/flywheel.test.ts",
+      "src/dashboard/server/routes/flywheel.ts",
+      "src/lib/cloister/deacon-auto-merge-reconcile.ts",
+      "src/lib/cloister/deacon-merge.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/overdeck/merge-sync.ts",
+      "sync-sources/skills/pan-merge/SKILL.md",
+      "tests/unit/lib/cloister/deacon-auto-merge-reconcile.test.ts",
+      "tests/unit/lib/overdeck/merge-sync-pending-auto-merges.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/FLYWHEEL.md",
+      "src/cli/commands/__tests__/merge.test.ts",
+      "src/cli/commands/merge.ts",
+      "src/dashboard/server/routes/__tests__/flywheel.test.ts",
+      "src/dashboard/server/routes/flywheel.ts",
+      "src/lib/cloister/deacon-auto-merge-reconcile.ts",
+      "src/lib/cloister/deacon-merge.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/overdeck/merge-sync.ts",
+      "sync-sources/skills/pan-merge/SKILL.md",
+      "tests/unit/lib/cloister/deacon-auto-merge-reconcile.test.ts",
+      "tests/unit/lib/overdeck/merge-sync-pending-auto-merges.test.ts"
+    ],
+    "recordedAt": "2026-07-27T05:19:11.339Z"
+  },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T05:19:13.970Z",
+  "updated": "2026-07-27T05:19:15.835Z",
   "pipeline": {
     "issueId": "PAN-3191",
     "reviewStatus": "pending",
@@ -20,7 +53,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T05:19:13.968Z",
+    "updatedAt": "2026-07-27T05:19:14.946Z",
+    "reviewNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-27T04:22:17.553Z by deploy-patrol, merge-step0). It re-runs automatically after the deploy.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
     "reviewRequestedAt": "2026-07-27T05:19:13.968Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -54,19 +89,36 @@
         "tests/unit/lib/overdeck/merge-sync-pending-auto-merges.test.ts"
       ],
       "recordedAt": "2026-07-27T05:19:11.339Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3197"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 670280,
+            "output": 78640,
+            "cacheRead": 25288192,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 670280,
+          "output": 78640,
+          "cacheRead": 25288192,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-27T04:53:52.536Z"
+        "usd": 18.354696,
+        "pricingAsOf": "2026-07-27T05:19:15.035Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3197"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -159,38 +211,5 @@
     "docs-flywheel-reconciliation": "completed",
     "docs-flywheel-reconciliation.docs-flywheel-reconciliation.ac1": "completed",
     "docs-flywheel-reconciliation.docs-flywheel-reconciliation.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/FLYWHEEL.md",
-      "src/cli/commands/__tests__/merge.test.ts",
-      "src/cli/commands/merge.ts",
-      "src/dashboard/server/routes/__tests__/flywheel.test.ts",
-      "src/dashboard/server/routes/flywheel.ts",
-      "src/lib/cloister/deacon-auto-merge-reconcile.ts",
-      "src/lib/cloister/deacon-merge.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/overdeck/merge-sync.ts",
-      "sync-sources/skills/pan-merge/SKILL.md",
-      "tests/unit/lib/cloister/deacon-auto-merge-reconcile.test.ts",
-      "tests/unit/lib/overdeck/merge-sync-pending-auto-merges.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/FLYWHEEL.md",
-      "src/cli/commands/__tests__/merge.test.ts",
-      "src/cli/commands/merge.ts",
-      "src/dashboard/server/routes/__tests__/flywheel.test.ts",
-      "src/dashboard/server/routes/flywheel.ts",
-      "src/lib/cloister/deacon-auto-merge-reconcile.ts",
-      "src/lib/cloister/deacon-merge.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/overdeck/merge-sync.ts",
-      "sync-sources/skills/pan-merge/SKILL.md",
-      "tests/unit/lib/cloister/deacon-auto-merge-reconcile.test.ts",
-      "tests/unit/lib/overdeck/merge-sync-pending-auto-merges.test.ts"
-    ],
-    "recordedAt": "2026-07-27T05:19:11.339Z"
   }
 }
