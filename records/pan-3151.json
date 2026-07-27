@@ -231,7 +231,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T13:47:24.138Z",
+  "updated": "2026-07-27T13:47:29.676Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
@@ -241,7 +241,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T13:47:23.460Z",
+    "updatedAt": "2026-07-27T13:47:29.666Z",
     "reviewNotes": "v61 migration repair now works but lacks the required regression test that fails on the two prior broken implementations",
     "conflictsSince": {
       "sha": "f47f84d8b5ac81a247ea22ebca72fe8e3e2193c7",
@@ -256,7 +256,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
-    "reviewedAtCommit": "034101c4277583a76a973d900ab471d43b06c093",
+    "reviewedAtCommit": "0c1e7737f7552e3b4aae95a9bf60dd438cfe530d",
     "reviewSpawnedAt": "2026-07-27T13:44:08.330Z"
   },
   "closeOut": {
@@ -323,7 +323,7 @@
       },
       "costAtCloseOut": {
         "usd": 167.9709563,
-        "pricingAsOf": "2026-07-27T13:47:23.477Z"
+        "pricingAsOf": "2026-07-27T13:47:29.671Z"
       }
     },
     "merges": [
