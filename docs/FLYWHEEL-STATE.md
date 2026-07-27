@@ -7716,3 +7716,10 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - PR #3197 is `MERGEABLE`, 0 failing, **7 checks in flight**. **Merging on CI green, consistent with every other merge tonight** — the operator's local gates are good evidence and CI is the gate that actually blocks.
 - **RUN TOTALS: 43 close-outs, 11 merges, 9 substrate bugs filed of which 6 fixed, merged and closed out.**
 - **LESSON: "no behaviour change" is a claim you can usually verify in one command, so verify it.** The whole case for carrying a verdict across a rebase rests on that single property. **Accepting it on report would have made the merge indistinguishable from a rubber stamp; checking it took one `git show` and made the bypass defensible.**
+
+## RUN-72 tick 31 (2026-07-27 13:50Z) — PAN-3191 MERGED on the carry-forward verdict
+- **Re-confirmed the head was still `db41648a0a` before merging** — the carry-forward grounds are head-specific, so a moved head would have voided them. It had not moved. All 7 checks green, `MERGEABLE/CLEAN`. **Merged: `145ec8e3dc`, verified an ancestor of `origin/main`.**
+- **Close-out blocks on rows 1, 5, 6 and 7 — and row 1 is the interesting one.** Rows 5/6/7 are the familiar transient trio (CI `in_progress` on the merge commit, deploy owed) and will clear. **Row 1 is PAN-3206 itself made visible in the gate: the APPROVED verdict exists on disk, the review ran, and `review_status` was never updated — so the close-out gate now reports the same lost write that forced this whole merge decision.**
+  * **Worth watching rather than assuming:** PAN-3187's row-1 fix added the alternative *"or tracker-closed with landed work and no negative review verdict"*. Once the issue reaches a closed state that clause may satisfy row 1 without any override. **If it does not, row 1 is a genuine `--accept-review` operator call — not a transient — and I will say so plainly rather than waiting on it indefinitely.**
+- Post-merge sweep: ready queue empty.
+- **RUN TOTALS: 43 close-outs, 12 merges, 9 substrate bugs filed of which 6 fixed, merged and closed out.**
