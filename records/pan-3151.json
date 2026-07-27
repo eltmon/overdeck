@@ -142,6 +142,11 @@
       "reason": "feedback",
       "note": "[2026-07-27T14:26Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-27T14:26:05.061Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-27T14:27:06.669Z"
     }
   ],
   "feedback": [],
@@ -233,21 +238,21 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:27:04.474Z",
+  "updated": "2026-07-27T14:27:06.681Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:27:03.589Z",
+    "updatedAt": "2026-07-27T14:27:04.501Z",
     "reviewNotes": "Agent re-review request (8/25): Fixed v62 repair to handle databases already at v62 before these columns existed",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "d31e1b54458f16a5789b52b8bf26e4d895f9e500",
-    "reviewSpawnedAt": "2026-07-27T14:19:37.995Z"
+    "reviewSpawnedAt": "2026-07-27T14:27:04.500Z"
   },
   "closeOut": {
     "usage": {
@@ -313,7 +318,7 @@
       },
       "costAtCloseOut": {
         "usd": 204.9059363,
-        "pricingAsOf": "2026-07-27T14:27:03.637Z"
+        "pricingAsOf": "2026-07-27T14:27:04.774Z"
       }
     },
     "merges": [
@@ -322,7 +327,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 20,
     "claims": {},
