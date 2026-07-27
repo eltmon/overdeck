@@ -41,12 +41,11 @@
     "issueId": "PAN-2374",
     "reviewStatus": "passed",
     "testStatus": "failed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T08:24:16.101Z",
+    "updatedAt": "2026-07-27T16:38:31.888Z",
     "reviewNotes": "Main merge reviewed; no blockers",
     "testNotes": "typecheck passed; lint passed (including lint:no-coderabbit-merge-gate); npm test failed with 5 unrelated timeout failures (conversation-supervisor-uat hook, deacon-context-overflow hook, deacon-test-signal hook, cloister-control-surface test, agents-switch-model test). PAN-2374-specific unit tests passed 44/44 (coderabbit-ingestion, no-coderabbit-merge-gate, review-context). No browser UAT required by PRD/vBRIEF/issue notes (backend/CLI feature). AC-5 unmet: full suite not green.",
     "inspectNotes": "Bead cr-ingest-module ack: fetchCodeRabbitFindings returns [] on absence/PR-resolution-failure/gh-api-error (verified via resolveOwnerRepo catch, prNumber null-check, and per-fetch .catch()), returns findings with body+path/line for coderabbitai[bot] reviews and inline comments, zero execSync matches, CodeRabbitFinding type exported cleanly, 115 lines, quota invariant documented inline.",
@@ -102,7 +101,9 @@
         "tests/unit/lib/cloister/no-coderabbit-merge-gate.test.ts"
       ],
       "recordedAt": "2026-07-07T11:59:20.265Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T16:38:31.888Z"
   },
   "closeOut": {
     "usage": {
@@ -196,8 +197,81 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2459"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T16:38:31.907Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: failed; superseded because the tracker issue is closed, merged work is landed, and main verification passed",
+          "status": "skip"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at 43ea4db0264a42d54fd8662969ecc817ec85de0f",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Feature branch is absent; positive merge evidence is required; PR #2459 MERGED at 2026-07-07T12:29:47Z; durable close-out record contains 1 merge artifact(s)",
+          "status": "pass",
+          "mergedAt": "2026-07-07T12:29:47Z",
+          "mergeCommit": "3346d6e3000d1bbe1b346b4ee60915135644de67"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "7 check-runs concluded successfully on 3346d6e3000d1bbe1b346b4ee60915135644de67",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit d44fa122 contains merge 3346d6e3",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; Removed 3 agent state directories; No strike branch strike/pan-2374 found; Pruned 0 checkpoint ref(s) for agent-pan-2374, planning-pan-2374, strike-pan-2374; No specialist registry entries for PAN-2374"
+        }
+      ],
+      "accepted": []
+    }
   },
   "created": "2026-07-07T12:02:57.295Z",
-  "updated": "2026-07-27T08:24:16.898Z"
+  "updated": "2026-07-27T16:38:31.907Z"
 }
