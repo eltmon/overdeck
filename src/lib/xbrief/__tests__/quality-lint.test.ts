@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lintPlanQuality, OBSERVABLE_TERMS, PLACEHOLDER_AC_PATTERNS, DOCS_ONLY_AC_PATTERNS, VAGUE_AC_PATTERNS, qualityLintErrors } from '../quality-lint.js';
+import { lintPlanQuality, OBSERVABLE_TERMS, PLACEHOLDER_AC_PATTERNS, DOCS_ONLY_AC_PATTERNS, VAGUE_AC_PATTERNS, qualityLintErrors, PROJECTED_SURFACE_MAX_FILES, PROJECTED_SURFACE_MAX_SUBSYSTEMS } from '../quality-lint.js';
 import type { XBriefDocument, XBriefItem } from '../types.js';
 
 function ac(id: string, title: string) {
@@ -455,5 +455,104 @@ describe('lintPlanQuality observable-term tuning (PAN-1796)', () => {
   it('still bans "passes tests" even though "passes" is observable', () => {
     const errors = lintPlanQuality(planWith('The feature passes tests')).filter((i: any) => i.severity === 'error');
     expect(errors.some((i: any) => i.rule === 'ac-banned-phrase')).toBe(true);
+  });
+});
+
+describe('lintPlanQuality projected-surface (PAN-3151)', () => {
+  it('flags plan with more than 25 files and no sizeJustification', () => {
+    const items = Array.from({ length: 30 }, (_, i) => item({
+      id: `item-${i}`,
+      metadata: {
+        requiresInspection: false,
+        files_scope: [`src/module-${i}/file-${i}.ts`],
+        files_scope_confidence: 'high',
+        readiness: 'sequential',
+      },
+    }));
+    const issues = lintPlanQuality(doc(items));
+    expect(issues.map(i => i.rule)).toContain('projected-surface');
+  });
+
+  it('passes with 1-5 files and no sizeJustification', () => {
+    const items = Array.from({ length: 5 }, (_, i) => item({
+      id: `item-${i}`,
+      metadata: {
+        requiresInspection: false,
+        files_scope: [`src/file-${i}.ts`],
+        files_scope_confidence: 'high',
+        readiness: 'sequential',
+      },
+    }));
+    const issues = lintPlanQuality(doc(items));
+    expect(issues.map(i => i.rule)).not.toContain('projected-surface');
+  });
+
+  it('flags plan with more than 6 subsystems and no sizeJustification', () => {
+    const items = Array.from({ length: 8 }, (_, i) => item({
+      id: `item-${i}`,
+      metadata: {
+        requiresInspection: false,
+        files_scope: [`src/subsys-${i}/file.ts`],
+        files_scope_confidence: 'high',
+        readiness: 'sequential',
+      },
+    }));
+    const issues = lintPlanQuality(doc(items));
+    expect(issues.map(i => i.rule)).toContain('projected-surface');
+  });
+
+  it('passes with 3 subsystems and no sizeJustification', () => {
+    const items = Array.from({ length: 3 }, (_, i) => item({
+      id: `item-${i}`,
+      metadata: {
+        requiresInspection: false,
+        files_scope: [`src/subsys-${i}/file.ts`],
+        files_scope_confidence: 'high',
+        readiness: 'sequential',
+      },
+    }));
+    const issues = lintPlanQuality(doc(items));
+    expect(issues.map(i => i.rule)).not.toContain('projected-surface');
+  });
+
+  it('suppresses projected-surface error with sizeJustification', () => {
+    const items = Array.from({ length: 30 }, (_, i) => item({
+      id: `item-${i}`,
+      metadata: {
+        requiresInspection: false,
+        files_scope: [`src/file-${i}.ts`],
+        files_scope_confidence: 'high',
+        readiness: 'sequential',
+      },
+    }));
+    const issues = lintPlanQuality(doc(items, { sizeJustification: 'This is genuinely inseparable work.' }));
+    expect(issues.map(i => i.rule)).not.toContain('projected-surface');
+  });
+
+  it('excludes cancelled items from file and subsystem counts', () => {
+    const items = [
+      ...Array.from({ length: 26 }, (_, i) => item({
+        id: `item-${i}`,
+        metadata: {
+          requiresInspection: false,
+          files_scope: [`src/file-${i}.ts`],
+          files_scope_confidence: 'high',
+          readiness: 'sequential',
+        },
+      })),
+      item({
+        id: 'cancelled-item',
+        status: 'cancelled',
+        metadata: {
+          requiresInspection: false,
+          files_scope: ['src/excluded/file.ts'],
+          files_scope_confidence: 'high',
+          readiness: 'sequential',
+        },
+      }),
+    ];
+    const issues = lintPlanQuality(doc(items));
+    // 26 files (not counting the cancelled one), so should error
+    expect(issues.map(i => i.rule)).toContain('projected-surface');
   });
 });

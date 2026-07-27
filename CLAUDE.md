@@ -383,6 +383,10 @@ before advancing to the review role. If typecheck/lint/test fail, feedback is se
 agent's tmux session and the completion marker is NOT processed (allowing retry).
 After 3 consecutive failures, verification is bypassed to prevent permanent blocking.
 
+## Review Convergence Gate (PAN-3151)
+
+When a change enters the `blocked` review state, the blocking-finding count is recorded into a `reviewCycleHistory` series. When ≥3 cycles are recorded and the series shows a reversal (latest count > previous) or stall (two consecutive non-decreases), the issue is marked `stuck` with `stuckReason: 'review-not-converging'`. Automatic rework re-drive is suppressed; feedback file is written and PR comment posted, but the work agent is not messaged. A needs-you escalation surfaces with the cycle count series and guidance to decompose the change into sibling issues or run `pan unstick <issueId>` to clear the gate and attempt rework. Distinguish from the prompt-level convergence gate (`roles/review.md:62`), which governs single-reviewer filtering within one cycle.
+
 ## Agent Auto-Resume Gates
 
 Deacon auto-resume is intentionally suppressible through the unified

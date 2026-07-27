@@ -147,6 +147,7 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_transport_retry_count` integer');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_next_attempt_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_landing_attempts` text');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `review_cycle_history` text');
   // PAN-3154: main-head SHA/paths that first made this branch conflict.
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `conflicts_since` text');
   ensureReleaseSetTablesSync(db);

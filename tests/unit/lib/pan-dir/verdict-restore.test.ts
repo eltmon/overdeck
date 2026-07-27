@@ -352,6 +352,7 @@ describe('restoreReviewStatusFromRecords', () => {
       'merge_step',
       'release_status',
       'release_notes',
+      'review_cycle_history',
       'conflicts_since',
     ]);
 

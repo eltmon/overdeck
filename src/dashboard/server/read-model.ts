@@ -334,6 +334,9 @@ export function toReviewStatusSnapshot(status: ReviewStatusSnapshotInput): Revie
     stuckReason: status.stuckReason || undefined,
     stuckAt: status.stuckAt || undefined,
     stuckDetails: status.stuckDetails || undefined,
+    reviewCycleHistory: status.reviewCycleHistory && status.reviewCycleHistory.length > 0
+      ? status.reviewCycleHistory
+      : undefined,
     reviewedAtCommit: status.reviewedAtCommit || undefined,
     reviewSpawnedAt: typeof status.reviewSpawnedAt === 'number'
       ? new Date(status.reviewSpawnedAt).toISOString()

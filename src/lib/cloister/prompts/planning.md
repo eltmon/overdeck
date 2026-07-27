@@ -214,7 +214,7 @@ If the user ever asks "should this be one task or many?", the answer is almost a
 
 Author every implementation item as a **vertical tracer-bullet slice**: a small end-to-end change that can be verified independently from user-facing or system-observable behavior. Reject horizontal layer-slices such as "all the DB work", "all the API work", or "all the UI work"; split those into vertical items that each carry their own data, API, UI, docs, and tests as needed.
 
-Prefer splitting a large issue into independently shippable sibling issues over one mega-xBRIEF when the slices can each pass review, test, and UAT on their own. Sibling issues parallelize through the flywheel with full per-unit review/test/UAT; one mega-xBRIEF should be reserved for genuinely inseparable work.
+Prefer splitting a large issue into independently shippable sibling issues over one mega-xBRIEF when the slices can each pass review, test, and UAT on their own. Sibling issues parallelize through the flywheel with full per-unit review/test/UAT; one mega-xBRIEF should be reserved for genuinely inseparable work. **Plan finalize quality-lints the projected surface: plans with more than 25 distinct `files_scope` files or more than 6 subsystems fail finalize and must be decomposed into sibling issues.** Set `plan.metadata.sizeJustification` for genuinely inseparable work, but decomposition is the rule — use the escape only when you can defend it on the page.
 
 Every item MUST declare these metadata fields:
 - `kind: "docs" | "api" | "backend" | "frontend" | "infra" | "test" | "refactor" | "design" | "spike"` — subject-matter routing category. Emit it on every item; when the category is unclear or mixed, use `"backend"` as the default.

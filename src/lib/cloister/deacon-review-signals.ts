@@ -11,6 +11,7 @@ import { logDeaconEventSync } from '../persistent-logger.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { capturePane, isPaneDead, killSession, listSessionNames, sessionExists, sessionExistsSync } from '../tmux.js';
 import { applyCodexAuthBurnFlag, paneShowsCodexAuthBurn } from '../codex-auth.js';
+import { extractMarkdownSection, findBlockingFindings } from '../review-findings.js';
 
 const REVIEWER_IDLE_FAILURE_MS = 3 * 60 * 1000;
 const REVIEW_REPORTS_PRESENT_NUDGE_COOLDOWN_MS = 60 * 1000;
@@ -23,24 +24,6 @@ type DeaconReviewSynthesis = {
   /** PAN-1862 (FR-6): per-sub-role outcome derived from each report's blocking findings. */
   reviewerVerdicts: Record<string, { status: 'passed' | 'blocked'; findingsPath?: string }>;
 };
-
-function extractMarkdownSection(markdown: string, heading: string): string {
-  const pattern = new RegExp(`^##\\s+${heading}\\s*\\r?\\n([\\s\\S]*?)(?=^##\\s+|(?![\\s\\S]))`, 'im');
-  return markdown.match(pattern)?.[1]?.trim() ?? '';
-}
-
-function findBlockingFindings(markdown: string): string[] {
-  const findings = extractMarkdownSection(markdown, 'Findings');
-  if (!findings || /^none\.?$/i.test(findings)) return [];
-
-  const blockers: string[] = [];
-  const headingPattern = /^###\s*(?:!|⊗)\s+(.+)$/gm;
-  let match: RegExpExecArray | null;
-  while ((match = headingPattern.exec(findings)) !== null) {
-    blockers.push(match[1]!.trim());
-  }
-  return blockers;
-}
 
 export function synthesizeReviewFromReports(opts: {
   issueId: string;
