@@ -25,19 +25,19 @@
   ],
   "feedback": [],
   "created": "2026-07-04T18:19:57.401Z",
-  "updated": "2026-07-07T03:12:23.196Z",
+  "updated": "2026-07-27T16:40:43.896Z",
   "pipeline": {
     "issueId": "PAN-2357",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T03:12:23.195Z",
+    "updatedAt": "2026-07-27T16:40:43.877Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2361",
     "lastVerifiedCommit": "140ba58013ea783069b1533a6c8c2222c579bd73",
     "reviewRequestedAt": "2026-07-04T19:00:19.291Z",
     "closedOut": true,
-    "closedOutAt": "2026-07-07T03:12:23.195Z"
+    "closedOutAt": "2026-07-27T16:40:43.877Z"
   },
   "closeOut": {
     "usage": {
@@ -67,7 +67,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2361"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T16:40:43.895Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: reviewing from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: missing at 140ba58013ea783069b1533a6c8c2222c579bd73 (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "PR #2361 is squash-merged and feature/pan-2357 matches the merged PR head; PR #2361 is squash-merged and origin/feature/pan-2357 matches the merged PR head; PR #2361 MERGED at 2026-07-04T19:13:38Z",
+          "status": "pass",
+          "mergedAt": "2026-07-04T19:13:38Z",
+          "mergeCommit": "d10a604868ca14feb8be4271b708f079bb696918"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "6 check-runs concluded successfully on d10a604868ca14feb8be4271b708f079bb696918",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit d44fa122 contains merge d10a6048",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; No strike branch strike/pan-2357 found; Pruned 0 checkpoint ref(s) for agent-pan-2357, planning-pan-2357, strike-pan-2357; No specialist registry entries for PAN-2357"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "codex",
   "model": "gpt-5.5",
