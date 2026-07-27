@@ -66,7 +66,6 @@
     }
   ],
   "resumePoint": null,
-  "beadsMapping": {},
   "sessionHistory": [
     {
       "reason": "planning",
@@ -76,35 +75,43 @@
     }
   ],
   "feedback": [],
+  "beadsMapping": {},
   "created": "2026-06-21T00:15:38.290Z",
-  "updated": "2026-07-08T16:01:27.592Z",
+  "updated": "2026-07-27T06:01:26.078Z",
   "pipeline": {
     "issueId": "PAN-1832",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "mergeStatus": "merged",
+    "verificationStatus": "passed",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T03:00:50.772Z",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2003",
-    "reviewRequestedAt": "2026-06-24T17:16:28.588Z",
     "closedOut": true,
-    "closedOutAt": "2026-07-07T03:00:50.772Z"
+    "closedOutAt": "2026-07-07T03:00:50.772Z",
+    "updatedAt": "2026-07-27T06:01:25.982Z",
+    "verificationNotes": "uat-promotion: operator UAT of batch uat/pan-slate-0624 promoted to main at 58be98c4b (PAN-3114)",
+    "lastVerifiedCommit": "cbbceb86a08768873e68a9c4dc6f4f08b11566e9"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "implementation": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 0,
+            "output": 1032,
+            "cacheRead": 222229,
+            "cacheWrite": 521
+          },
           "anthropic/claude-opus-4-8": {
-            "input": 12249,
-            "output": 13003,
-            "cacheRead": 3288278,
-            "cacheWrite": 66329
+            "input": 18074,
+            "output": 95097,
+            "cacheRead": 11683722,
+            "cacheWrite": 358611
           }
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 77323,
-            "output": 19697,
+            "input": 78325,
+            "output": 19831,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -119,10 +126,10 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 7964,
-            "output": 9739,
-            "cacheRead": 4492839,
-            "cacheWrite": 297932
+            "input": 8071,
+            "output": 17943,
+            "cacheRead": 8156304,
+            "cacheWrite": 553274
           }
         },
         "work": {
@@ -135,23 +142,23 @@
         }
       },
       "totals": {
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 8071,
+          "output": 18975,
+          "cacheRead": 8378533,
+          "cacheWrite": 553795
+        },
         "anthropic/claude-opus-4-8": {
-          "input": 47971,
-          "output": 97696,
-          "cacheRead": 9521026,
-          "cacheWrite": 616754
+          "input": 53796,
+          "output": 179790,
+          "cacheRead": 17916470,
+          "cacheWrite": 909036
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 77323,
-          "output": 19697,
+          "input": 78325,
+          "output": 19831,
           "cacheRead": 0,
           "cacheWrite": 0
-        },
-        "anthropic/claude-haiku-4-5-20251001": {
-          "input": 7964,
-          "output": 9739,
-          "cacheRead": 4492839,
-          "cacheWrite": 297932
         },
         "anthropic/claude-sonnet-4-6": {
           "input": 483,
@@ -161,8 +168,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 36.332213,
-        "pricingAsOf": "2026-06-24T17:16:50.495Z"
+        "usd": 45.192865,
+        "pricingAsOf": "2026-07-27T06:01:26.066Z"
       }
     },
     "merges": [
