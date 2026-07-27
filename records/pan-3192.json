@@ -52,7 +52,7 @@
     "recordedAt": "2026-07-27T05:24:46.200Z"
   },
   "created": "2026-07-27T04:32:47.311Z",
-  "updated": "2026-07-27T06:10:55.840Z",
+  "updated": "2026-07-27T06:26:08.217Z",
   "pipeline": {
     "issueId": "PAN-3192",
     "reviewStatus": "passed",
@@ -60,13 +60,13 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-27T05:25:06.787Z",
-    "updatedAt": "2026-07-27T06:10:50.783Z",
+    "updatedAt": "2026-07-27T06:26:08.144Z",
     "reviewNotes": "All review dimensions pass; compiler-crash false-green is fixed and covered by regression tests",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3198",
     "reviewedAtCommit": "0f467b7e06c57b3fa97dc98e56ebdd0c4058739d",
+    "lastVerifiedCommit": "0f467b7e06c57b3fa97dc98e56ebdd0c4058739d",
     "reviewSpawnedAt": "2026-07-27T05:52:17.782Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -103,10 +103,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 30,
-            "output": 3846,
-            "cacheRead": 2182406,
-            "cacheWrite": 181883
+            "input": 34,
+            "output": 4707,
+            "cacheRead": 2547248,
+            "cacheWrite": 184074
           }
         },
         "work": {
@@ -126,15 +126,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 30,
-          "output": 3846,
-          "cacheRead": 2182406,
-          "cacheWrite": 181883
+          "input": 34,
+          "output": 4707,
+          "cacheRead": 2547248,
+          "cacheWrite": 184074
         }
       },
       "costAtCloseOut": {
-        "usd": 35.822185,
-        "pricingAsOf": "2026-07-27T06:10:55.524Z"
+        "usd": 35.909249,
+        "pricingAsOf": "2026-07-27T06:26:08.204Z"
       }
     },
     "merges": [
