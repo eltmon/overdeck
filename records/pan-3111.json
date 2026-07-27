@@ -612,10 +612,10 @@
     "recordedAt": "2026-07-27T04:09:15.777Z"
   },
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-27T05:00:06.870Z",
+  "updated": "2026-07-27T05:00:14.394Z",
   "pipeline": {
     "issueId": "PAN-3111",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -623,13 +623,9 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T04:09:09.083Z",
-    "updatedAt": "2026-07-27T04:45:56.555Z",
-    "reviewNotes": "The follow-up commit does not touch the three prior P1s: container-wait provenance and consent lifecycle remain incorrect.",
+    "updatedAt": "2026-07-27T05:00:14.363Z",
     "inspectNotes": "AC1-3 met at this tree state (bead work landed in a4c6729fa9; ec66e8f8 is a behavior-preserving extraction). AC1: agents-state-db.test.ts:92 round-trips 'operator:cli:pan-start' through state.json and the agents-table started_by column with getAgentStateSync returning it; verified both read paths (overdeck agent-state-sync.ts:175 and parseAgentState agent-state.ts:250) and confirmed the insert column list ('flywheel_run_id','started_by','cost_so_far') aligns positionally with the values array (state.flywheelRunId, state.startedBy, state.costSoFar) -- no off-by-one. AC2: resolveAgentStartedBy preserves the exact explicit ?? env ?? flywheel order, and the environmentToken default parameter is evaluated per call so env mutation is still observed; spawn-flywheel-provenance.test.ts covers explicit token, env-over-flywheel precedence, flywheel:<runId>, and undefined. AC3: schema-migrations.test.ts:71 adds started_by to a current-version agents table without throwing; both the currentVersion===SCHEMA_VERSION top-up and the <61 block apply it, and tryIdempotentDdl swallows duplicate-column. Non-blocking observation for the review convoy: this commit is line-count golf for a file ratchet (joining 'flywheel_run_id TEXT, started_by TEXT' onto one CREATE TABLE line, deleting two blank lines in runMigrations, compressing the OVERDECK_AGENT_COLUMNS comment and dropping its 0000_overdeck_init.sql reference) -- semantically inert, but shrinking declarations to fit a ratchet suppresses the growth signal the ratchet exists to surface.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3144",
-    "reviewedAtCommit": "442f94212e7e535ae585eba6c7768b211dca463f",
-    "lastVerifiedCommit": "0a79c2f1a95fabc6da23e8282975cff1ba16de8b",
-    "reviewSpawnedAt": "2026-07-27T04:43:11.070Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/concerns.md",
@@ -839,9 +835,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 7568256,
-            "output": 284661,
-            "cacheRead": 61912576,
+            "input": 7573378,
+            "output": 284853,
+            "cacheRead": 62509568,
             "cacheWrite": 0
           }
         },
@@ -879,24 +875,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 10042676,
-            "output": 667758,
-            "cacheRead": 520468992,
+            "input": 10760426,
+            "output": 697193,
+            "cacheRead": 535766016,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 34531243,
-          "output": 1326941,
-          "cacheRead": 651127296,
+          "input": 35254115,
+          "output": 1356568,
+          "cacheRead": 667021312,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 538.028093,
-        "pricingAsOf": "2026-07-27T04:45:56.563Z"
+        "usd": 550.478271,
+        "pricingAsOf": "2026-07-27T05:00:14.388Z"
       }
     },
     "merges": [
@@ -905,7 +901,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3[1m]",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 14,
