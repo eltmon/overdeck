@@ -2,15 +2,15 @@
   "issueId": "PAN-2194",
   "schemaVersion": 2,
   "created": "2026-07-03T14:12:28.276Z",
-  "updated": "2026-07-07T03:08:59.737Z",
+  "updated": "2026-07-27T17:38:31.996Z",
   "pipeline": {
     "issueId": "PAN-2194",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T03:08:59.737Z",
+    "updatedAt": "2026-07-27T17:38:31.969Z",
     "closedOut": true,
-    "closedOutAt": "2026-07-07T03:08:59.737Z",
+    "closedOutAt": "2026-07-27T17:38:31.969Z",
     "mergeStatus": "merged"
   },
   "closeOut": {
@@ -19,7 +19,105 @@
       "totals": {}
     },
     "merges": [],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T17:38:31.989Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: pending from pipeline journal",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-review",
+            "by": "conv-20260727-4876",
+            "at": "2026-07-27T17:38:25.310Z"
+          }
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: pending from pipeline journal",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-tests",
+            "by": "conv-20260727-4876",
+            "at": "2026-07-27T17:38:25.310Z"
+          }
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: missing (from pipeline journal)",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-verification",
+            "by": "conv-20260727-4876",
+            "at": "2026-07-27T17:38:25.310Z"
+          }
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "feature/pan-2194 has 2 commit(s) after merged PR #2362 that are not on origin/main: d7a84e2164db7c3206db21745aa5df3838b7d58d, 113ad32504e0658b8073cb911485bf040569f433; PR #2362 MERGED at 2026-07-04T19:45:14Z",
+          "status": "miss",
+          "mergedAt": "2026-07-04T19:45:14Z",
+          "mergeCommit": "c3809661b74bda7a3995c45cb8539118d2b9b869",
+          "acceptedBy": {
+            "flag": "--accept-merged",
+            "by": "conv-20260727-4876",
+            "at": "2026-07-27T17:38:25.310Z"
+          }
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "6 check-runs concluded successfully on c3809661b74bda7a3995c45cb8539118d2b9b869",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 7d8cc5e3 contains merge c3809661",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; No strike branch strike/pan-2194 found; Pruned 0 checkpoint ref(s) for agent-pan-2194, planning-pan-2194, strike-pan-2194; No specialist registry entries for PAN-2194"
+        }
+      ],
+      "accepted": [
+        "review",
+        "tests",
+        "verification",
+        "merged"
+      ]
+    }
   },
   "sessionHistory": [
     {
