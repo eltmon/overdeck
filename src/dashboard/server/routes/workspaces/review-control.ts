@@ -271,6 +271,8 @@ export function processUnstickRequest(
     };
   }
   // Single atomic write: clear stuck fields and reset lifecycle to pending.
+  // PAN-3151: for review-not-converging gate, also reset cycle history.
+  const isConvergenceGate = currentStatus.stuckReason === 'review-not-converging';
   setReviewStatusBase(issueId, {
     reviewStatus: 'pending',
     testStatus: 'pending',
@@ -285,6 +287,8 @@ export function processUnstickRequest(
     // again so legitimate transient failures don't inherit prior cycle counts.
     reviewRetryCount: 0,
     recoveryStartedAt: undefined,
+    // PAN-3151: clear cycle history when unsticking review-not-converging gate
+    ...(isConvergenceGate && { reviewCycleHistory: undefined }),
   });
   console.log(`[unstick] Cleared stuck flag and reset lifecycle for ${issueId} (was: ${currentStatus.stuckReason ?? 'unknown'})`);
   return { httpStatus: 200, body: { success: true, issueId, previousReason: currentStatus.stuckReason } };
