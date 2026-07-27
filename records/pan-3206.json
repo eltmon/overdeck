@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T13:35:42.946Z",
-  "updated": "2026-07-27T18:11:07.596Z",
+  "updated": "2026-07-27T18:13:25.463Z",
   "pipeline": {
     "issueId": "PAN-3206",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "pending-sweep-regression-tests": {
-        "writerId": "agent-pan-3206",
-        "agentId": "agent-pan-3206",
-        "pid": 1442721,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T18:11:07.596Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3206",
@@ -136,6 +128,17 @@
         "outcome": "completed",
         "reason": "Moved all existing review verdict readers to the shared synthesis.md/review.md finder and full-vocabulary parser",
         "releasedAt": "2026-07-27T18:10:55.305Z"
+      },
+      {
+        "writerId": "agent-pan-3206",
+        "agentId": "agent-pan-3206",
+        "pid": 1442721,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T18:11:07.596Z",
+        "itemId": "pending-sweep-regression-tests",
+        "outcome": "completed",
+        "reason": "Added seven regression cases for pending verdict application, blocked feedback, stale/new/settle guards, live-session grace, and missing spawn stamps",
+        "releasedAt": "2026-07-27T18:13:25.462Z"
       }
     ],
     "statusReasons": {
@@ -158,6 +161,10 @@
       "existing-readers-adopt-helper": {
         "reason": "Moved all existing review verdict readers to the shared synthesis.md/review.md finder and full-vocabulary parser",
         "updatedAt": "2026-07-27T18:10:55.305Z"
+      },
+      "pending-sweep-regression-tests": {
+        "reason": "Added seven regression cases for pending verdict application, blocked feedback, stale/new/settle guards, live-session grace, and missing spawn stamps",
+        "updatedAt": "2026-07-27T18:13:25.462Z"
       }
     }
   },
@@ -183,6 +190,10 @@
     "existing-readers-adopt-helper.existing-readers-adopt-helper.ac1": "completed",
     "existing-readers-adopt-helper.existing-readers-adopt-helper.ac2": "completed",
     "existing-readers-adopt-helper.existing-readers-adopt-helper.ac3": "completed",
-    "pending-sweep-regression-tests": "running"
+    "pending-sweep-regression-tests": "completed",
+    "pending-sweep-regression-tests.pending-sweep-regression-tests.ac1": "completed",
+    "pending-sweep-regression-tests.pending-sweep-regression-tests.ac2": "completed",
+    "pending-sweep-regression-tests.pending-sweep-regression-tests.ac3": "completed",
+    "pending-sweep-regression-tests.pending-sweep-regression-tests.ac4": "completed"
   }
 }
