@@ -303,18 +303,18 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:57:29.588Z",
+  "updated": "2026-07-27T14:59:12.787Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:57:22.954Z",
-    "reviewNotes": "The targeted migration suite is green, but the changed fixtures only accommodate the exact-SCHEMA_VERSION repair and do not add the required v62→later-version regression. A user skipping this build can still advance from the shipped v62 schema without review_cycle_history; bump to v63 and test the real v62 state.",
+    "updatedAt": "2026-07-27T14:59:12.759Z",
+    "reviewNotes": "Agent re-review request (15/25): Fixed review issues: added v62→v63 regression test for missing review_cycle_history",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewSpawnedAt": "2026-07-27T14:57:22.953Z"
   },
@@ -331,9 +331,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 28285260,
-            "output": 631374,
-            "cacheRead": 151116800,
+            "input": 28662501,
+            "output": 638272,
+            "cacheRead": 153214464,
             "cacheWrite": 0
           }
         },
@@ -347,10 +347,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 4411,
-            "output": 171850,
-            "cacheRead": 103658573,
-            "cacheWrite": 4816282
+            "input": 4417,
+            "output": 171869,
+            "cacheRead": 103787227,
+            "cacheWrite": 4816485
           }
         }
       },
@@ -362,9 +362,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 28285260,
-          "output": 631374,
-          "cacheRead": 151116800,
+          "input": 28662501,
+          "output": 638272,
+          "cacheRead": 153214464,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -374,15 +374,15 @@
           "cacheWrite": 473562
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 4411,
-          "output": 171850,
-          "cacheRead": 103658573,
-          "cacheWrite": 4816282
+          "input": 4417,
+          "output": 171869,
+          "cacheRead": 103787227,
+          "cacheWrite": 4816485
         }
       },
       "costAtCloseOut": {
-        "usd": 260.1968633,
-        "pricingAsOf": "2026-07-27T14:57:25.238Z"
+        "usd": 263.3520603,
+        "pricingAsOf": "2026-07-27T14:59:12.785Z"
       }
     },
     "merges": [
@@ -391,7 +391,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "tasks": {
     "sequence": 20,
     "claims": {},
