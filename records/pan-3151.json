@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T10:27:54.053Z",
+  "updated": "2026-07-27T10:27:59.657Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -37,7 +37,7 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 7,
+    "sequence": 8,
     "claims": {
       "cycle-history-persistence": {
         "writerId": "agent-pan-3151",
@@ -45,6 +45,13 @@
         "pid": 1218459,
         "host": "eltmon-z790",
         "claimedAt": "2026-07-27T10:25:33.869Z"
+      },
+      "planning-prompt-guidance": {
+        "writerId": "agent-pan-3151",
+        "agentId": "agent-pan-3151",
+        "pid": 1395870,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T10:27:59.657Z"
       }
     },
     "claimHistory": [
@@ -111,6 +118,7 @@
     "planning-size-lint": "completed",
     "planning-size-lint.planning-size-lint.ac1": "completed",
     "planning-size-lint.planning-size-lint.ac2": "completed",
-    "planning-size-lint.planning-size-lint.ac3": "completed"
+    "planning-size-lint.planning-size-lint.ac3": "completed",
+    "planning-prompt-guidance": "running"
   }
 }
