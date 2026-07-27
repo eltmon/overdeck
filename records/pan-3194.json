@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:42:41.037Z",
-  "updated": "2026-07-27T05:04:59.544Z",
+  "updated": "2026-07-27T05:07:52.752Z",
   "pipeline": {
     "issueId": "PAN-3194",
     "reviewStatus": "pending",
@@ -43,18 +43,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "transcript-probe-predicate": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3194",
         "agentId": "agent-pan-3194",
         "pid": 3852009,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:04:59.544Z"
+        "claimedAt": "2026-07-27T05:04:59.544Z",
+        "itemId": "transcript-probe-predicate",
+        "outcome": "completed",
+        "reason": "Added the shared Claude transcript existence predicate, adopted it in resume recovery, and covered present/absent transcript paths.",
+        "releasedAt": "2026-07-27T05:07:52.752Z"
+      }
+    ],
+    "statusReasons": {
+      "transcript-probe-predicate": {
+        "reason": "Added the shared Claude transcript existence predicate, adopted it in resume recovery, and covered present/absent transcript paths.",
+        "updatedAt": "2026-07-27T05:07:52.752Z"
       }
     }
   },
   "statusOverrides": {
-    "transcript-probe-predicate": "running"
+    "transcript-probe-predicate": "completed",
+    "transcript-probe-predicate.transcript-probe-predicate.ac1": "completed",
+    "transcript-probe-predicate.transcript-probe-predicate.ac2": "completed",
+    "transcript-probe-predicate.transcript-probe-predicate.ac3": "completed"
   }
 }
