@@ -10,18 +10,18 @@
   ],
   "feedback": [],
   "created": "2026-07-03T02:51:28.037Z",
-  "updated": "2026-07-27T06:00:18.850Z",
+  "updated": "2026-07-27T06:00:31.301Z",
   "pipeline": {
     "issueId": "PAN-2258",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T06:00:18.800Z",
+    "updatedAt": "2026-07-27T06:00:31.275Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2269",
     "reviewRequestedAt": "2026-07-03T03:09:29.582Z",
     "closedOut": true,
-    "closedOutAt": "2026-07-27T06:00:18.800Z"
+    "closedOutAt": "2026-07-27T06:00:31.275Z"
   },
   "closeOut": {
     "usage": {
@@ -53,14 +53,14 @@
     ],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-27T06:00:18.838Z",
+      "evaluatedAt": "2026-07-27T06:00:31.300Z",
       "rows": [
         {
           "id": "review",
           "num": 1,
           "title": "Review passed",
           "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
-          "observed": "reviewStatus: pending; settled because the tracker issue is closed and merged work is landed",
+          "observed": "reviewStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
           "status": "skip"
         },
         {
@@ -68,7 +68,7 @@
           "num": 2,
           "title": "Tests passed",
           "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "testStatus: pending; settled because the tracker issue is closed and merged work is landed",
+          "observed": "testStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
           "status": "skip"
         },
         {
@@ -76,7 +76,7 @@
           "num": 3,
           "title": "Verification green on the branch",
           "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "verificationStatus: pending; settled because the tracker issue is closed and merged work is landed",
+          "observed": "verificationStatus: missing (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
           "status": "skip"
         },
         {
@@ -120,7 +120,7 @@
           "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
           "overridable": false,
           "status": "pass",
-          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; Removed 3 agent state directories; Preserved local branch strike/pan-2258 — not merged to main; Preserved remote branch strike/pan-2258 — not merged to main; Pruned 1 checkpoint ref(s) for agent-pan-2258, planning-pan-2258, strike-pan-2258; No specialist registry entries for PAN-2258"
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; Preserved local branch strike/pan-2258 — not merged to main; Preserved remote branch strike/pan-2258 — not merged to main; Pruned 0 checkpoint ref(s) for agent-pan-2258, planning-pan-2258, strike-pan-2258; No specialist registry entries for PAN-2258"
         }
       ],
       "accepted": []
