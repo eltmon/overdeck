@@ -2,8 +2,8 @@
   "issueId": "PAN-2214",
   "schemaVersion": 2,
   "feedback": [],
-  "harness": "claude-code",
-  "model": "claude-fable-5",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2214",
     "reviewStatus": "pending",
@@ -96,7 +96,7 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-02T20:12:46.644Z",
-  "updated": "2026-07-06T12:55:37.231Z",
+  "updated": "2026-07-27T17:46:13.334Z",
   "statusOverrides": {
     "salvage-merge-prune": "completed",
     "salvage-merge-prune.salvage-merge-prune.ac1": "completed",
