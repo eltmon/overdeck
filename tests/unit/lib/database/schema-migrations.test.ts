@@ -104,26 +104,50 @@ describe('schema migrations', () => {
     expect(db.pragma('user_version', { simple: true })).toBe(62);
   });
 
-  it('v62 -> v63: a database from prior build missing review_cycle_history still gets the column when advancing to v63', () => {
-    // Regression: a v62 database from a prior build (before this PR shipped) may
-    // not have review_cycle_history or conflicts_since. When a future build ships
-    // with SCHEMA_VERSION = 63, those databases will have currentVersion = 62 > SCHEMA_VERSION is false,
-    // but they still need the columns. This test verifies a v62 database missing the
-    // columns gets them added when running under a build that knows about them.
+  it('v62 -> v63: repair path adds review_cycle_history to a database that skipped this build release', () => {
+    // Regression: a user with v62 (pre-PR) who skips to v63+ needs to get review_cycle_history.
+    // When they run v63+ code, their database is at v62 < SCHEMA_VERSION (63), so the migration
+    // ladder runs. Since v61→v62 (this PR) added those columns via repair and migration,
+    // they get added. This test verifies the v61→v62 migration block (which runs for v62 < 62
+    // is false, so this tests the repair at currentVersion === 62) adds both columns.
     db.exec('CREATE TABLE flywheel_substrate_bugs (issue_id TEXT PRIMARY KEY, affected_criteria TEXT)');
     db.exec('CREATE TABLE agents (id TEXT PRIMARY KEY, started_by TEXT)');
     db.exec('CREATE TABLE review_status (issue_id TEXT PRIMARY KEY)');
-    // Simulate a v62 database from before this PR, missing review_cycle_history
+    // v62 database from before this PR was shipped — missing review_cycle_history
     db.pragma('user_version = 62');
 
-    // Even though currentVersion (62) equals the shipped v62 version without the column,
-    // the repairs should add it
+    // Process through migrations. With SCHEMA_VERSION = 62 and currentVersion = 62,
+    // the repair block runs and adds the missing columns.
     expect(() => runMigrations(db)).not.toThrow();
 
     const reviewStatusColumns = db.prepare('PRAGMA table_info(review_status)').all() as Array<{ name: string }>;
-    expect(reviewStatusColumns.map((c) => c.name)).toContain('review_cycle_history');
-    expect(reviewStatusColumns.map((c) => c.name)).toContain('conflicts_since');
-    expect(db.pragma('user_version', { simple: true })).toBe(62);
+    const columnNames = reviewStatusColumns.map((c) => c.name);
+    expect(columnNames).toContain('review_cycle_history');
+    expect(columnNames).toContain('conflicts_since');
+    // Version should advance to SCHEMA_VERSION (62 in this build)
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+  });
+
+  it('v61 skipping to v62+: the v61→v62 migration block still adds review_cycle_history even if someone upgrades after this PR to a future v63 build', () => {
+    // Complete regression test: a v61 database running through v61→v62 migrations
+    // (which happens if upgraded to this PR or to a future v63+ that still applies v61→v62 migrations)
+    // must get review_cycle_history and conflicts_since from the migration block.
+    db.exec('CREATE TABLE flywheel_substrate_bugs (issue_id TEXT PRIMARY KEY, affected_criteria TEXT)');
+    db.exec('CREATE TABLE agents (id TEXT PRIMARY KEY, started_by TEXT)');
+    db.exec('CREATE TABLE review_status (issue_id TEXT PRIMARY KEY)');
+    // Start at v61 (simulates user before this PR)
+    db.pragma('user_version = 61');
+
+    // When runMigrations processes a v61 database with SCHEMA_VERSION=62,
+    // the currentVersion < 62 block runs, adding the columns
+    expect(() => runMigrations(db)).not.toThrow();
+
+    const reviewStatusColumns = db.prepare('PRAGMA table_info(review_status)').all() as Array<{ name: string }>;
+    const columnNames = reviewStatusColumns.map((c) => c.name);
+    expect(columnNames).toContain('review_cycle_history');
+    expect(columnNames).toContain('conflicts_since');
+    // Should advance to SCHEMA_VERSION
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
   });
 
   it('does not advance v60 when the affected_criteria migration fails', () => {
