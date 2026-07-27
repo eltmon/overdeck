@@ -90,6 +90,7 @@ export interface FindOrphanProposedOptions {
 
 export interface SpawnWorkAgentResult {
   spawned: boolean;
+  queued?: boolean;
   agentId?: string;
   skippedReason?: string;
   error?: string;
@@ -287,7 +288,7 @@ export async function spawnWorkAgentThroughAgentsEndpoint(issueId: string, dashb
   const agentId = typeof body['agentId'] === 'string' ? body['agentId'] : `agent-${issueId.toLowerCase()}`;
 
   if (response.ok && body['success'] !== false) {
-    return { spawned: true, agentId };
+    return { spawned: true, ...(body['startingContainers'] === true ? { queued: true } : {}), agentId };
   }
 
   return {
@@ -539,14 +540,18 @@ export async function handleOrphanProposedSpec(
   try {
     const spawn = await (options.spawnWorkAgent ?? ((id) => spawnWorkAgentThroughAgentsEndpoint(id, options.dashboardOrigin)))(upperIssueId);
     if (spawn.spawned) {
-      await updateAutoSpawnConsentAfterWorkStart(upperIssueId, true);
+      if (!spawn.queued) await updateAutoSpawnConsentAfterWorkStart(upperIssueId, true);
       emitReconcilerActivity(
         'success',
-        `Started work agent for ${upperIssueId} — proposed spec had tasks but no running agent`,
-        { issueId: upperIssueId, agentId: spawn.agentId, projectKey, projectPath },
+        spawn.queued
+          ? `Queued container startup for ${upperIssueId} before work-agent spawn`
+          : `Started work agent for ${upperIssueId} — proposed spec had tasks but no running agent`,
+        { issueId: upperIssueId, agentId: spawn.agentId, queued: spawn.queued === true, projectKey, projectPath },
         upperIssueId,
       );
-      return [`Spawned work agent for orphan proposed spec ${upperIssueId}`];
+      return [spawn.queued
+        ? `Queued container startup for orphan proposed spec ${upperIssueId}`
+        : `Spawned work agent for orphan proposed spec ${upperIssueId}`];
     }
 
     const reason = spawn.skippedReason ?? 'spawn-failed';

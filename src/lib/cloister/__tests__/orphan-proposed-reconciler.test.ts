@@ -572,6 +572,26 @@ describe('orphan proposed spec reconciler', () => {
     expect(deadEndTripMocks.recordDeadEndNeedsYou).not.toHaveBeenCalled();
   });
 
+  it('retains consent when orphan recovery only queues container startup', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3097', 'proposed');
+    writeTasks(projectPath, 'PAN-3097');
+    await writeAutoSpawnOnFinalizeFlag('PAN-3097', true);
+
+    await expect(reconcileOrphanProposedSpecs({
+      evaluatePickupGate: allowPickupGate,
+      projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent: async () => ({ spawned: true, queued: true, agentId: 'agent-pan-3097' }),
+    })).resolves.toEqual(['Queued container startup for orphan proposed spec PAN-3097']);
+
+    expect(readAutoSpawnOnFinalizeFlag('PAN-3097')).toBe(true);
+  });
+
   it('spawns each orphan at most once per five minutes', async () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
@@ -875,6 +895,20 @@ describe('orphan proposed spec reconciler', () => {
       issueId: 'PAN-3301',
       role: 'work',
       startedBy: 'orphan-proposed-reconciler',
+    });
+  });
+
+  it('distinguishes queued container startup from an accepted work launch', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      startingContainers: true,
+      agentId: 'agent-pan-3301',
+    }), { status: 200 })));
+
+    await expect(spawnWorkAgentThroughAgentsEndpoint('PAN-3301', 'http://127.0.0.1:3011')).resolves.toEqual({
+      spawned: true,
+      queued: true,
+      agentId: 'agent-pan-3301',
     });
   });
 

@@ -396,6 +396,27 @@ describe('completePlanningArtifacts', () => {
     expect(consumeAutoSpawnConsent).toHaveBeenCalledWith('PAN-1146');
   });
 
+  it('retains consent when the accepted response only queues container startup', async () => {
+    const consumeAutoSpawnConsent = vi.fn(async () => undefined);
+
+    await expect(completePlanningAutoSpawn({
+      issueId: 'PAN-1146',
+      autoSpawn: true,
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl: async () => new Response(JSON.stringify({
+        success: true,
+        startingContainers: true,
+        agentId: 'agent-pan-1146',
+      }), { status: 200 }),
+      consumeAutoSpawnConsent,
+    })).resolves.toEqual({
+      workAgentSpawned: true,
+      workAgentQueued: true,
+      workAgentSession: 'agent-pan-1146',
+    });
+    expect(consumeAutoSpawnConsent).not.toHaveBeenCalled();
+  });
+
   it('reports a successful auto-spawn when consent cleanup fails', async () => {
     const logWarning = vi.fn();
 

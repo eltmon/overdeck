@@ -91,6 +91,7 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
 
 export interface CompletePlanningAutoSpawnResult {
   workAgentSpawned: boolean;
+  workAgentQueued?: boolean;
   workAgentSession?: string;
   workAgentError?: string;
   workAgentSkipReason?: 'stack-unhealthy' | 'guardrails' | 'paused' | 'troubled' | 'unauthorized' | 'spawn-failed';
@@ -358,16 +359,25 @@ export async function completePlanningAutoSpawn(options: {
       : `agent-${options.issueId.toLowerCase()}`;
 
     if (response.ok && body['success'] !== false) {
-      try {
-        await (options.consumeAutoSpawnConsent ?? ((issueId) => updateAutoSpawnConsentAfterWorkStart(issueId, true)))(options.issueId);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        (options.logWarning ?? console.warn)(
-          `[complete-planning] Work start for ${options.issueId.toUpperCase()} succeeded, but auto-start consent cleanup failed: ${message}`,
-        );
+      const workAgentQueued = body['startingContainers'] === true;
+      if (!workAgentQueued) {
+        try {
+          await (options.consumeAutoSpawnConsent ?? ((issueId) => updateAutoSpawnConsentAfterWorkStart(issueId, true)))(options.issueId);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          (options.logWarning ?? console.warn)(
+            `[complete-planning] Work start for ${options.issueId.toUpperCase()} succeeded, but auto-start consent cleanup failed: ${message}`,
+          );
+        }
       }
-      emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'success', 'work agent spawn requested', { agentId });
-      return { workAgentSpawned: true, workAgentSession: agentId };
+      emitCompletePlanningPhase(
+        options.issueId,
+        'autoSpawn',
+        'success',
+        workAgentQueued ? 'container startup queued before work-agent spawn' : 'work agent spawn requested',
+        { agentId },
+      );
+      return { workAgentSpawned: true, ...(workAgentQueued ? { workAgentQueued: true } : {}), workAgentSession: agentId };
     }
 
     const error = typeof body['error'] === 'string'
