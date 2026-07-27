@@ -74,19 +74,21 @@
     "recordedAt": "2026-07-27T06:16:36.976Z"
   },
   "created": "2026-07-27T04:30:47.797Z",
-  "updated": "2026-07-27T07:06:10.521Z",
+  "updated": "2026-07-27T07:11:23.830Z",
   "pipeline": {
     "issueId": "PAN-3183",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T06:17:16.404Z",
-    "updatedAt": "2026-07-27T07:06:08.928Z",
-    "reviewNotes": "Boot reconciliation treats failed event/upsert writes as committed transitions, so two-door drift can recur.",
+    "updatedAt": "2026-07-27T07:11:23.753Z",
+    "reviewNotes": "Previous blockers are fixed; correctness, security, requirements, and performance review passed.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3201",
+    "reviewedAtCommit": "7f1c66a332708d8b4ac6b6a9ad8c166985167a64",
     "reviewSpawnedAt": "2026-07-27T07:06:08.927Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -137,9 +139,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1217739,
-            "output": 136064,
-            "cacheRead": 17569792,
+            "input": 2391015,
+            "output": 162099,
+            "cacheRead": 25178624,
             "cacheWrite": 0
           }
         },
@@ -154,15 +156,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 5110399,
-          "output": 377754,
-          "cacheRead": 175861760,
+          "input": 6283675,
+          "output": 403789,
+          "cacheRead": 183470592,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 124.815495,
-        "pricingAsOf": "2026-07-27T07:06:10.508Z"
+        "usd": 135.267341,
+        "pricingAsOf": "2026-07-27T07:11:23.819Z"
       }
     },
     "merges": [
