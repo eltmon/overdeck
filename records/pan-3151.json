@@ -198,7 +198,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T13:35:00.527Z",
+  "updated": "2026-07-27T13:36:51.238Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
@@ -208,10 +208,17 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T13:35:00.512Z",
+    "updatedAt": "2026-07-27T13:36:51.224Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since f47f84d (6 paths): drizzle/overdeck/0000_overdeck_init.sql, scripts/file-size-allowlist.txt, src/lib/database/schema.ts, …",
+        "detectedAt": "2026-07-27T13:36:46.629Z"
+      }
+    ],
     "conflictsSince": {
-      "sha": "e8db7692138eae57ee18ab775be114a1e8bb4b3d",
-      "detectedAt": "2026-07-27T13:34:13.514Z",
+      "sha": "f47f84d8b5ac81a247ea22ebca72fe8e3e2193c7",
+      "detectedAt": "2026-07-27T13:36:46.629Z",
       "paths": [
         "drizzle/overdeck/0000_overdeck_init.sql",
         "scripts/file-size-allowlist.txt",
@@ -254,10 +261,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3251,
-            "output": 130619,
-            "cacheRead": 78059598,
-            "cacheWrite": 3255912
+            "input": 3268,
+            "output": 131085,
+            "cacheRead": 78346853,
+            "cacheWrite": 3258189
           }
         }
       },
@@ -281,15 +288,15 @@
           "cacheWrite": 255526
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3251,
-          "output": 130619,
-          "cacheRead": 78059598,
-          "cacheWrite": 3255912
+          "input": 3268,
+          "output": 131085,
+          "cacheRead": 78346853,
+          "cacheWrite": 3258189
         }
       },
       "costAtCloseOut": {
-        "usd": 140.0023093,
-        "pricingAsOf": "2026-07-27T13:35:00.523Z"
+        "usd": 140.0362283,
+        "pricingAsOf": "2026-07-27T13:36:51.229Z"
       }
     },
     "merges": [
