@@ -124,15 +124,7 @@
       "timestamp": "2026-07-27T13:42:26.622Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T13:42:26Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nv61 repair remains inside currentVersion < 61, so version-61 databases still skip started_by and affected_criteria before advancing to v62\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -221,17 +213,17 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T13:44:07.458Z",
+  "updated": "2026-07-27T13:44:09.697Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T13:44:04.962Z",
+    "updatedAt": "2026-07-27T13:44:08.331Z",
     "reviewNotes": "Agent re-review request (5/25): Fixed v60→v61 repairs to run unconditionally for databases already at v61",
     "conflictsSince": {
       "sha": "f47f84d8b5ac81a247ea22ebca72fe8e3e2193c7",
@@ -247,7 +239,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "034101c4277583a76a973d900ab471d43b06c093",
-    "reviewSpawnedAt": "2026-07-27T13:40:33.441Z"
+    "reviewSpawnedAt": "2026-07-27T13:44:08.330Z"
   },
   "closeOut": {
     "usage": {
@@ -313,7 +305,7 @@
       },
       "costAtCloseOut": {
         "usd": 157.6957383,
-        "pricingAsOf": "2026-07-27T13:44:07.454Z"
+        "pricingAsOf": "2026-07-27T13:44:08.392Z"
       }
     },
     "merges": [
