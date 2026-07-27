@@ -26,7 +26,8 @@ const execFileAsync = promisify(execFile);
 interface CloseOutOptions {
   force?: boolean;
   json?: boolean;
-  [key: string]: boolean | undefined;
+  abandon?: string;
+  [key: string]: boolean | string | undefined;
 }
 
 function optionNameForRow(id: DodRowId): string {
@@ -61,6 +62,10 @@ export function registerCloseCommand(program: Command): void {
       `Accept a missed DoD row ${row.num} (${row.title}) — recorded as an explicit override in the close-out record`,
     );
   }
+  command.option(
+    '--abandon <reason>',
+    'Record an abandoned disposition (PAN-3211): skip the DoD gate and close without landing evidence. Operator-conversation only; cannot be combined with --accept-* flags',
+  );
   command.action((id, options) => closeOutCommand(id, options));
 }
 
@@ -168,6 +173,29 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
     return exitCli(1);
   }
 
+  // PAN-3211: --abandon records an honest closed-without-landing disposition.
+  // It is a bigger judgment than --accept (it says "this work never landed"),
+  // so it is operator-conversation-only, mutually exclusive with --accept-*,
+  // and (for GitHub issues) requires the tracker to confirm the issue is
+  // already closed — abandoning live work through this path is refused.
+  const abandonReason = typeof options.abandon === 'string' && options.abandon.trim().length > 0
+    ? options.abandon.trim()
+    : null;
+  if (options.abandon !== undefined && !abandonReason) {
+    console.error(chalk.red('--abandon requires a non-empty reason recorded in the durable record.'));
+    return exitCli(1);
+  }
+  if (abandonReason) {
+    if (dodAcceptedRows.length > 0) {
+      console.error(chalk.red('--abandon cannot be combined with --accept-* flags: a close either proves landing (accept overrides) or declares no landing (abandon).'));
+      return exitCli(1);
+    }
+    if (!isOperatorConversation) {
+      console.error(chalk.red('--abandon is operator-conversation-only (conv-*). Pipeline agents and the flywheel may not declare an issue abandoned.'));
+      return exitCli(1);
+    }
+  }
+
   const issueLower = issueId.toLowerCase();
   const issueUpper = issueId.toUpperCase();
 
@@ -216,7 +244,20 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
     try {
       canonicalState = await readGitHubCanonicalState(owner, repo, number);
     } catch (error) {
-      canonicalStateError = error instanceof Error ? error.message : String(error);
+      canonicalStateError = error instanceof Error ? error.message : String(error);    }
+  }
+
+  // PAN-3211: abandon requires positive tracker-closed evidence. For GitHub
+  // issues the canonical read above must report a terminal state; for
+  // non-GitHub issues there is no read here, so refuse rather than guess.
+  if (abandonReason) {
+    if (!isGitHub) {
+      console.error(chalk.red('--abandon currently verifies tracker-closed via GitHub only; use the standard close-out path (with operator judgment) for tracker issues from other forges.'));
+      return exitCli(1);
+    }
+    if (canonicalState !== 'done' && canonicalState !== 'canceled') {
+      console.error(chalk.red(`--abandon requires the tracker issue to already be closed; canonical state is '${canonicalState ?? `unavailable${canonicalStateError ? `: ${canonicalStateError}` : ''}`}'. Abandoning live work is refused.`));
+      return exitCli(1);
     }
   }
 
@@ -265,6 +306,9 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
   const result = await Effect.runPromise(closeOut(ctx, {
     dodAcceptedRows,
     dodAcceptedBy: process.env.OVERDECK_AGENT_ID || userInfo().username,
+    ...(abandonReason
+      ? { abandonDisposition: { reason: abandonReason, by: process.env.OVERDECK_AGENT_ID || userInfo().username } }
+      : {}),
   }));
 
   if (options.json) {

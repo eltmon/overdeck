@@ -64,6 +64,8 @@ export interface PanIssueCloseOutRecord {
     evaluatedAt: string;
     rows: DodRowResult[];
     accepted: string[];
+    /** PAN-3211: set when the issue left via an abandoned disposition, not the gate. */
+    disposition?: { reason: string; by: string };
   };
 }
 

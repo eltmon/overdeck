@@ -102,4 +102,25 @@ export interface DodGateResult {
   passed: boolean;
   misses: DodRowId[];
   accepted: DodRowId[];
+  /** PAN-3211: set only for abandoned dispositions, persisted beside the gate rows. */
+  disposition?: { reason: string; by: string };
+}
+
+/**
+ * PAN-3211: the gate result for an abandoned disposition — every row skipped
+ * with the operator's note, so the durable audit shows the gate was
+ * deliberately not evaluated rather than silently green.
+ */
+export function buildAbandonedDodGate(reason: string, by: string): DodGateResult {
+  return {
+    rows: DOD_ROWS.map(row => ({
+      ...row,
+      status: 'skip' as const,
+      observed: `gate not evaluated — abandoned disposition recorded by ${by}: ${reason}`,
+    })),
+    misses: [],
+    accepted: [],
+    passed: true,
+    disposition: { reason, by },
+  };
 }

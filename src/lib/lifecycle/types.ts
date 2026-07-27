@@ -32,6 +32,13 @@ export interface WorkflowResult {
 export interface CloseOutOptions {
   dodAcceptedRows?: DodRowId[];
   dodAcceptedBy?: string;
+  /**
+   * PAN-3211: honest disposition for tracker-closed issues whose work never
+   * landed anywhere (no merged PR, no containment, no commits). Skips the DoD
+   * gate — every override would record fiction — and instead records the
+   * operator's disposition note as the reason the issue leaves the pipeline.
+   */
+  abandonDisposition?: { reason: string; by: string };
 }
 
 /** Context shared across lifecycle operations */
