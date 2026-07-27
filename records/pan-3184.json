@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T05:08:44.161Z",
+  "updated": "2026-07-27T05:08:59.527Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "clean-shutdown-marker": {
+        "writerId": "agent-pan-3184",
+        "agentId": "agent-pan-3184",
+        "pid": 4091816,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:08:59.527Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3184",
@@ -106,6 +114,7 @@
     "widen-candidacy.widen-candidacy.ac4": "completed",
     "vacuous-hold-auto-release": "completed",
     "vacuous-hold-auto-release.vacuous-hold-auto-release.ac1": "completed",
-    "vacuous-hold-auto-release.vacuous-hold-auto-release.ac2": "completed"
+    "vacuous-hold-auto-release.vacuous-hold-auto-release.ac2": "completed",
+    "clean-shutdown-marker": "running"
   }
 }
