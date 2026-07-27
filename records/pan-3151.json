@@ -228,7 +228,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:19:39.883Z",
+  "updated": "2026-07-27T14:19:43.456Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "reviewing",
@@ -238,7 +238,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:19:37.996Z",
+    "updatedAt": "2026-07-27T14:19:43.428Z",
     "reviewNotes": "Agent re-review request (7/25): Merged with origin/main: resolved conflicts preserving both PAN-3151 (review_cycle_history, unconditional v61 repairs) and PAN-3154 (conflicts_since) features",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewSpawnedAt": "2026-07-27T14:19:37.995Z"
@@ -307,7 +307,7 @@
       },
       "costAtCloseOut": {
         "usd": 184.8690813,
-        "pricingAsOf": "2026-07-27T14:19:39.878Z"
+        "pricingAsOf": "2026-07-27T14:19:43.452Z"
       }
     },
     "merges": [
