@@ -7668,3 +7668,12 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 ## RUN-72 tick 24 (2026-07-27 11:20Z) — sixth watch tick, unchanged
 - Ready queue empty, merge-blockers `[]`, both trains enabled and empty, MIN-879 cache still present, zero code on main past the live build. Nothing actionable; both remaining items still wait on the operator.
 - Totals unchanged: 41 close-outs, 9 merges, 9 substrate bugs filed / 6 fixed, merged and closed out.
+
+## RUN-72 tick 25 (2026-07-27 12:06Z) — PAN-3111 finally converged and merged after FOUR review cycles
+- **PAN-3111 passed review and test and is MERGED (`120fd02625`, confirmed an ancestor of `origin/main`).** This is the event the last six watch ticks were holding for — and the reason declaring the run complete at tick 21 would have been wrong. **Had I read "both queues empty" as the stop condition, the flywheel would not have been here to merge it.**
+- Hand-merged per the project-specific policy: **panopticon-cli is hand-merge-on-green (mine outright); MYN is train-only.** PR #3144 was `MERGEABLE/CLEAN`, 0 failing, 0 in flight at head `90e16077b2`. Note it was *also* sitting in the panopticon-cli train queue at `mergeOrder: 1` — the policy makes hand-merge correct for PAN, so I took it rather than leaving it to the train.
+- Close-out blocks on the familiar transient trio — row 5 (post-merge lifecycle not yet fired), row 6 (CI `in_progress` on `120fd02625`), row 7 (deploy). **Exactly PAN-3194's shape, which resolved on its own once CI and the deploy landed**, so no `--accept-*` and no investigation.
+- Checked CI as its own command and read it before deciding: `120fd02625 in_progress` → **no deploy this tick.**
+- MIN-879 unchanged, still waiting on the operator's `sudo rm`.
+- **RUN TOTALS: 41 close-outs, 10 merges, merge queue 15 → 0, 9 substrate bugs filed of which 6 fixed, merged and closed out.**
+- **LESSON: an empty queue is not an ended run.** Six consecutive ticks found nothing, and the temptation to call quiescence "done" grew with each one. **The run's remaining value was entirely in being present when a single in-flight review finally passed** — a merge that arrives hours after the last one still needs someone holding the lane.
