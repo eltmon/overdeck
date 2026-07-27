@@ -471,6 +471,19 @@ prior context — and then propose a default, never an open question. Record dec
 - **Strike harness routing.** Do not pass `--harness`/`--model` unless the operator asked —
   provider defaults route correctly (kimi→ohmypi, gpt-5.5/gpt-5.6→codex, claude-*→claude-code). Never
   force `--harness claude-code` on a kimi/gpt model: the 200k-window illusion deadlocks it (PAN-1865).
+- **Inert-but-alive agents: `pan start <id> --fresh` is your recovery door (PAN-3150).** An agent
+  whose harness process is alive but whose cost/output has not moved across several ticks while its
+  role still owes work is *inert*, not crashed. `--fresh` replaces the live session itself — it no
+  longer refuses and points you at the forbidden `pan kill`. Workspace, branch, commits, xBRIEF, and
+  `.pan/continue.json` all survive; only the harness process is cycled, and the new agent re-reads
+  that state. Use it instead of parking the issue as an operator decision.
+- **A lingering `strike-<id>` session does not block a re-strike (PAN-3150).** A strike that finished
+  normally leaves its tmux session behind on purpose, so its transcript stays readable — that is a
+  *completed* agent, not a stuck one. `pan strike <id>` now replaces such a session instead of
+  refusing, because it checks whether a harness process is actually alive rather than trusting the
+  last recorded activity. Only a genuinely running strike still refuses. Use `pan strike <id>` to
+  dispatch follow-up work (a rebase, a conflict fix) on a finished strike branch, and
+  `pan recover <id>` when the issue's registered agent is a strike rather than a work agent.
 - **Never (one-way doors).** `pan tell`, `pan approve`, `pan resume`, `pan wake`, `pan kill`,
   `pan wipe`; **creating, editing, or committing ANY file** (code, PRD, xBRIEF/spec, draft, doc)
   anywhere — `main` or a branch — except `docs/FLYWHEEL-STATE.md` and the emit-status snapshot;

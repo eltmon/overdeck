@@ -752,6 +752,7 @@ export async function resumeFlywheelRun(): Promise<{ before: FlywheelGateSnapsho
   const brief = await requireFlywheelBrief(launch.workspace, launch.briefPath);
   const roleConfig = await resolveFlywheelRoleConfig();
   await resumeFlywheel({
+    resumeCause: 'operator',
     workspace: launch.workspace,
     briefPath: brief.absolutePath,
     model: roleConfig.model,

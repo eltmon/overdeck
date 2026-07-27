@@ -53,6 +53,7 @@ import {
   assertWorkspaceStackHealthyForSpawn,
   buildAgentLaunchConfig,
 } from './spawn-prep.js';
+import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
 
 /**
  * Resume a suspended agent (PAN-80)
@@ -119,7 +120,7 @@ export async function buildCompactRecoverySeed(agentId: string): Promise<{ seed:
   };
 }
 
-export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean; recoverGated?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
+export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean; recoverGated?: boolean; resumeCause?: ResumeCause }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
   const requestedModel = normalizeModelOverrideSync(opts?.model);
   logAgentLifecycleSync(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'}, harness=${opts?.harness || 'unchanged'})`);
@@ -400,12 +401,13 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // seed (summary + reseed instructions) IS the opening prompt of the fresh
     // session; a caller-supplied message rides along after it.
     const issueId = agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
+    const resumeCause = opts?.resumeCause ?? (agentState.stoppedByUser === true ? 'operator' : message ? 'message' : 'system');
     const defaultResumeMessage = buildResumeContinueMessage(agentState);
     const resumeMessage: { message?: string; redeliveringKickoff: boolean; error?: string } = compactSeed
-      ? { message: message ? `${compactSeed}\n\n${message}` : compactSeed, redeliveringKickoff: false }
+      ? { message: `${message ? `${compactSeed}\n\n${message}` : compactSeed}\n\n${buildResumeContract(resumeCause)}`, redeliveringKickoff: false }
       : resumeDriftReasons.length > 0
-        ? { message: message ?? defaultResumeMessage, redeliveringKickoff: false }
-      : await buildResumeMessageForAgent(agentState, defaultResumeMessage, message);
+        ? { message: `${message ?? defaultResumeMessage}\n\n${buildResumeContract(resumeCause)}`, redeliveringKickoff: false }
+      : await buildResumeMessageForAgent(agentState, defaultResumeMessage, message, resumeCause);
     if (resumeMessage.error) {
       console.error(`[resumeAgent] ${resumeMessage.error}`);
       emitActivityEntrySync({

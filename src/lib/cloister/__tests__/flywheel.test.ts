@@ -264,4 +264,12 @@ describe('buildFlywheelResumePrompt (PAN-2006 FR-8)', () => {
     expect(prompt).toContain('FLYWHEEL RESUME');
     expect(prompt).not.toContain('Standing brief');
   });
+
+  it('states the resume cause and explicitly re-arms the tick machinery', () => {
+    const prompt = buildFlywheelResumePrompt('', undefined, 'system');
+    expect(prompt).toContain('prior process ended unexpectedly');
+    expect(prompt).not.toContain('paused by the operator');
+    expect(prompt).toContain('ScheduleWakeup(delaySeconds:1000)');
+    expect(prompt).toContain('timers or wakeups, monitors, background processes, loops, or cron work');
+  });
 });

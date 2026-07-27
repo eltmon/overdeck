@@ -14,6 +14,7 @@ const agentMocks = vi.hoisted(() => ({
 
 const tmuxMocks = vi.hoisted(() => ({
   sessionExists: vi.fn(),
+  isHarnessProcessAlive: vi.fn(),
 }));
 
 vi.mock('../../../lib/agents.js', () => ({
@@ -24,6 +25,7 @@ vi.mock('../../../lib/agents.js', () => ({
 
 vi.mock('../../../lib/tmux.js', () => ({
   sessionExists: tmuxMocks.sessionExists,
+  isHarnessProcessAlive: tmuxMocks.isHarnessProcessAlive,
 }));
 
 import { strikeCommand, __testInternals } from '../strike.js';
@@ -42,6 +44,8 @@ describe('strikeCommand', () => {
     agentMocks.spawnAgent.mockReset();
     agentMocks.stopAgent.mockReset();
     tmuxMocks.sessionExists.mockReset();
+    tmuxMocks.isHarnessProcessAlive.mockReset();
+    tmuxMocks.isHarnessProcessAlive.mockResolvedValue(true);
   });
 
   it('exports a function', () => {
@@ -147,6 +151,52 @@ describe('strikeCommand', () => {
     await expect(__testInternals.clearIdlePriorStrike(fakePlan)).rejects.toThrow(/already running/);
 
     expect(agentMocks.stopAgent).not.toHaveBeenCalled();
+  });
+
+  // PAN-3150: a strike that finished normally leaves its session behind with
+  // `active` as its last recorded activity. Refusing on that state alone left
+  // the strike namespace with no recovery door for the flywheel, which cannot
+  // run `pan kill`.
+  it('replaces a completed strike session whose recorded state is stale but whose harness is gone', async () => {
+    const fakePlan = {
+      issueId: 'PAN-3150',
+      workspace: '/tmp/feature-pan-3150-strike',
+      branch: 'strike/pan-3150',
+      sessionName: 'strike-pan-3150',
+      projectRoot: '/tmp/project',
+    };
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
+    agentMocks.getAgentRuntimeState.mockReturnValue(Effect.succeed({
+      state: 'active',
+      lastActivity: '2026-07-26T18:47:19.000Z',
+    }));
+    tmuxMocks.isHarnessProcessAlive.mockResolvedValue(false);
+    agentMocks.stopAgent.mockReturnValue(Effect.void);
+
+    await expect(__testInternals.clearIdlePriorStrike(fakePlan)).resolves.toBe(true);
+
+    expect(tmuxMocks.isHarnessProcessAlive).toHaveBeenCalledWith('strike-pan-3150');
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('strike-pan-3150');
+  });
+
+  it('does not consult the process tree when the recorded state is already replaceable', async () => {
+    const fakePlan = {
+      issueId: 'PAN-3150',
+      workspace: '/tmp/feature-pan-3150-strike',
+      branch: 'strike/pan-3150',
+      sessionName: 'strike-pan-3150',
+      projectRoot: '/tmp/project',
+    };
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
+    agentMocks.getAgentRuntimeState.mockReturnValue(Effect.succeed({
+      state: 'stopped',
+      lastActivity: '2026-07-26T18:47:19.000Z',
+    }));
+    agentMocks.stopAgent.mockReturnValue(Effect.void);
+
+    await expect(__testInternals.clearIdlePriorStrike(fakePlan)).resolves.toBe(true);
+
+    expect(tmuxMocks.isHarnessProcessAlive).not.toHaveBeenCalled();
   });
 
   it('replaces a stale strike directory with a registered worktree on the strike branch', async () => {

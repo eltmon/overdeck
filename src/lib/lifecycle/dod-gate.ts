@@ -137,6 +137,7 @@ export interface EvaluateDodGateDeps {
     mergedAt?: string;
     mergeCommit?: string;
     mergedRowStatus?: DodRowResult['status'];
+    mainVerifyRowStatus?: DodRowResult['status'];
   }) => DodRowResult | Promise<DodRowResult>;
   now: () => string;
 }
@@ -384,6 +385,25 @@ export async function checkPostMergeRow(
     const agentsObserved = runningAgents.length > 0
       ? `running agents: ${runningAgents.map(agent => agent.id).join(', ')}`
       : 'no running work/planning agents';
+    // PAN-3188 (row 5): terminal canonical states settle this row. 'done'
+    // proves the post-merge lifecycle already ran to close-out; 'canceled'
+    // makes it moot. Requiring the transient verifying_on_main marker here
+    // wedges every re-evaluated terminal issue (the 11 closed issues that
+    // blocked close-out sweeps on 'canonical state: done').
+    if (canonicalState === 'done') {
+      return result(
+        'post-merge',
+        runningAgents.length === 0 ? 'pass' : 'miss',
+        `terminal canonical state: done — the post-merge lifecycle already ran to close-out; ${agentsObserved}`,
+      );
+    }
+    if (canonicalState === 'canceled') {
+      return result(
+        'post-merge',
+        runningAgents.length === 0 ? 'skip' : 'miss',
+        `terminal canonical state: canceled — post-merge lifecycle not applicable; ${agentsObserved}`,
+      );
+    }
     const lifecycleObserved = canonicalState === 'verifying_on_main' || mergeStatus === 'merged';
     // PAN-3180: `postMergeLifecycle()` is the work-agent handoff — it pauses the
     // work/planning agents, stops the workspace stack, and applies
@@ -454,6 +474,7 @@ export async function checkDeployRow(
     mergedAt?: string;
     mergeCommit?: string;
     mergedRowStatus?: DodRowResult['status'];
+    mainVerifyRowStatus?: DodRowResult['status'];
   },
   deps: DeployRowDeps = defaultDeployRowDeps,
 ): Promise<DodRowResult> {
@@ -463,6 +484,18 @@ export async function checkDeployRow(
         'deploy',
         'skip',
         'no merge commit resolved because the merged row missed — deploy ancestry depends on row 4; build ancestry unchecked',
+      );
+    }
+    // PAN-3188: row 6 (main-verify) skips whenever no merge commit is
+    // resolvable — the no-durable-anchor landing class (e.g. GitLab-backed
+    // landings whose row 4 evidence is the merge specialist's confirmation).
+    // Row 7 must agree: same missing anchor, same skip. Only when main-verify
+    // did NOT skip is the absent commit an integrity problem worth a miss.
+    if (merge.mainVerifyRowStatus === 'skip') {
+      return result(
+        'deploy',
+        'skip',
+        'verified-on-main skipped — no merge commit resolvable, so deploy build-ancestry has no durable anchor either (same landing class as DoD row 6 skip)',
       );
     }
     return result('deploy', 'miss', 'merged row passed without a resolvable merge commit; build ancestry cannot be checked');
@@ -538,19 +571,23 @@ export async function evaluateDodGate(
   const merged = opts.verifyMerged
     ? await checkMergedRow(ctx, { ...defaultMergedRowDeps, verifyMerged: opts.verifyMerged })
     : await deps.merged(ctx);
-  const rows = await Promise.all([
+  const [review, tests, verification, postMerge] = await Promise.all([
     deps.review(ctx.issueId),
     deps.tests(ctx.issueId),
     deps.verification(ctx.issueId),
-    Promise.resolve(merged),
     deps.postMerge(ctx, merged),
-    deps.mainVerify(ctx, merged.mergeCommit),
-    deps.deploy(ctx, {
-      mergedAt: merged.mergedAt,
-      mergeCommit: merged.mergeCommit,
-      mergedRowStatus: merged.status,
-    }),
   ]);
+  // Main-verify computes before deploy because deploy's no-merge-commit
+  // branch keys on main-verify's outcome (PAN-3188: row 7 skips when row 6
+  // skips — both mean "no durable anchor" for this landing class).
+  const mainVerify = await deps.mainVerify(ctx, merged.mergeCommit);
+  const deploy = await deps.deploy(ctx, {
+    mergedAt: merged.mergedAt,
+    mergeCommit: merged.mergeCommit,
+    mergedRowStatus: merged.status,
+    mainVerifyRowStatus: mainVerify.status,
+  });
+  const rows = [review, tests, verification, merged, postMerge, mainVerify, deploy];
   for (const row of rows) {
     if (row.status === 'miss' && acceptedRows.has(row.id)) {
       row.acceptedBy = { flag: acceptFlagFor(rowDefinition(row.id)), by, at: deps.now() };

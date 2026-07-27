@@ -11,6 +11,7 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { getProviderForModelSync } from '../providers.js';
 import { writePtyToken } from '../pty-token.js';
+import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
 import { capturePane, sendRawKeystroke } from '../tmux.js';
 import {
   getAgentDir,
@@ -70,9 +71,11 @@ export async function buildResumeMessageForAgent(
   state: AgentState,
   fallbackMessage: string,
   callerMessage?: string,
+  cause: ResumeCause = state.stoppedByUser === true ? 'operator' : callerMessage ? 'message' : 'system',
 ): Promise<{ message?: string; redeliveringKickoff: boolean; error?: string }> {
+  const contract = buildResumeContract(cause);
   if (state.role !== 'work' || state.kickoffDelivered !== false) {
-    return { message: callerMessage ?? fallbackMessage, redeliveringKickoff: false };
+    return { message: `${callerMessage ?? fallbackMessage}\n\n${contract}`, redeliveringKickoff: false };
   }
 
   const promptPath = join(getAgentDir(state.id), 'initial-prompt.md');
@@ -81,7 +84,7 @@ export async function buildResumeMessageForAgent(
     const suffix = callerMessage
       ? `\n\n---\n\nAdditional message delivered during resume:\n\n${callerMessage}`
       : '';
-    return { message: `${kickoffPrompt}${suffix}`, redeliveringKickoff: true };
+    return { message: `${kickoffPrompt}${suffix}\n\n${contract}`, redeliveringKickoff: true };
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     return {
