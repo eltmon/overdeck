@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:42:41.037Z",
-  "updated": "2026-07-27T06:16:17.120Z",
+  "updated": "2026-07-27T06:16:25.497Z",
   "pipeline": {
     "issueId": "PAN-3194",
     "reviewStatus": "pending",
@@ -149,5 +149,43 @@
     "docs-agent-state-planes": "completed",
     "docs-agent-state-planes.docs-agent-state-planes.ac1": "completed",
     "docs-agent-state-planes.docs-agent-state-planes.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/lib/codex/__tests__/app-server-host.test.ts",
+      "tests/lib/work-agent-lifecycle.test.ts",
+      "tests/unit/dashboard/server/routes/resume-gate.test.ts",
+      "tests/unit/dashboard/server/routes/stopped-agent-lifecycle.test.ts",
+      "tests/unit/lib/deploy/deploy-queue.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/AGENT-STATE-PLANES.md",
+      "src/dashboard/server/routes/agents/shared.ts",
+      "src/lib/__tests__/paths.test.ts",
+      "src/lib/__tests__/work-agent-lifecycle-transcript-probe.test.ts",
+      "src/lib/agents/__tests__/resume-spawn-plan.test.ts",
+      "src/lib/agents/resume-spawn-plan.ts",
+      "src/lib/agents/resume.ts",
+      "src/lib/paths.ts",
+      "src/lib/work-agent-lifecycle.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/AGENT-STATE-PLANES.md",
+      "src/dashboard/server/routes/agents/shared.ts",
+      "src/lib/__tests__/paths.test.ts",
+      "src/lib/__tests__/work-agent-lifecycle-transcript-probe.test.ts",
+      "src/lib/agents/__tests__/resume-spawn-plan.test.ts",
+      "src/lib/agents/resume-spawn-plan.ts",
+      "src/lib/agents/resume.ts",
+      "src/lib/codex/__tests__/app-server-host.test.ts",
+      "src/lib/paths.ts",
+      "src/lib/work-agent-lifecycle.ts",
+      "tests/lib/work-agent-lifecycle.test.ts",
+      "tests/unit/dashboard/server/routes/resume-gate.test.ts",
+      "tests/unit/dashboard/server/routes/stopped-agent-lifecycle.test.ts",
+      "tests/unit/lib/deploy/deploy-queue.test.ts"
+    ],
+    "recordedAt": "2026-07-27T06:16:25.496Z"
   }
 }
