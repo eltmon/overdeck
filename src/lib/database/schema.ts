@@ -1711,17 +1711,15 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
     ]) {
       tryIdempotentDdl(db, 61, `ALTER TABLE review_status ADD COLUMN ${column}`);
     }
+    // v60 -> v61: PAN-1491 store parsed affected v1.0 criteria on substrate bugs.
+    tryIdempotentDdl(db, 61, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
+    tryIdempotentDdl(db, 61, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
   }
+
   // v59 -> v60: add release status columns to review_status.
   if (currentVersion < 60) {
     tryIdempotentDdl(db, 60, `ALTER TABLE review_status ADD COLUMN release_status TEXT`);
     tryIdempotentDdl(db, 60, `ALTER TABLE review_status ADD COLUMN release_notes TEXT`);
-  }
-
-  // v60 -> v61: PAN-1491 store parsed affected v1.0 criteria on substrate bugs.
-  if (currentVersion < 61) {
-    tryIdempotentDdl(db, 61, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
-    tryIdempotentDdl(db, 61, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
   }
 
   // v61 -> v62: PAN-3151 store review cycle history for convergence detection.
