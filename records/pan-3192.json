@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:32:47.311Z",
-  "updated": "2026-07-27T05:13:25.671Z",
+  "updated": "2026-07-27T05:14:14.173Z",
   "pipeline": {
     "issueId": "PAN-3192",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "docs-quality-gates-frontend": {
-        "writerId": "agent-pan-3192",
-        "agentId": "agent-pan-3192",
-        "pid": 266075,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:13:25.671Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3192",
@@ -86,6 +78,17 @@
         "outcome": "completed",
         "reason": "Added six hermetic Vitest cases covering parity, growth labeling, shrink/update, update refusal, missing baseline, and line-shift normalization; all six pass with a PATH-stubbed npx.",
         "releasedAt": "2026-07-27T05:13:14.100Z"
+      },
+      {
+        "writerId": "agent-pan-3192",
+        "agentId": "agent-pan-3192",
+        "pid": 266075,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:13:25.671Z",
+        "itemId": "docs-quality-gates-frontend",
+        "outcome": "completed",
+        "reason": "Updated the workspace quality-gates guidance to name the server and frontend shrink-only typecheck ratchets.",
+        "releasedAt": "2026-07-27T05:14:14.172Z"
       }
     ],
     "statusReasons": {
@@ -100,6 +103,10 @@
       "frontend-types-ratchet-test": {
         "reason": "Added six hermetic Vitest cases covering parity, growth labeling, shrink/update, update refusal, missing baseline, and line-shift normalization; all six pass with a PATH-stubbed npx.",
         "updatedAt": "2026-07-27T05:13:14.100Z"
+      },
+      "docs-quality-gates-frontend": {
+        "reason": "Updated the workspace quality-gates guidance to name the server and frontend shrink-only typecheck ratchets.",
+        "updatedAt": "2026-07-27T05:14:14.172Z"
       }
     }
   },
@@ -118,6 +125,8 @@
     "frontend-types-ratchet-test.frontend-types-ratchet-test.ac2": "completed",
     "frontend-types-ratchet-test.frontend-types-ratchet-test.ac3": "completed",
     "frontend-types-ratchet-test.frontend-types-ratchet-test.ac4": "completed",
-    "docs-quality-gates-frontend": "running"
+    "docs-quality-gates-frontend": "completed",
+    "docs-quality-gates-frontend.docs-quality-gates-frontend.ac1": "completed",
+    "docs-quality-gates-frontend.docs-quality-gates-frontend.ac2": "completed"
   }
 }
