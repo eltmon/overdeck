@@ -386,7 +386,6 @@
       "drizzle/overdeck/0000_overdeck_init.sql",
       "packages/contracts/src/types.ts",
       "scripts/dashboard-types-baseline.txt",
-      "scripts/file-size-baseline.txt",
       "src/cli/commands/__tests__/knowledge.test.ts",
       "src/cli/commands/__tests__/plan.test.ts",
       "src/cli/commands/__tests__/start-running-noop.test.ts",
@@ -492,7 +491,6 @@
       "drizzle/overdeck/0000_overdeck_init.sql",
       "packages/contracts/src/types.ts",
       "scripts/dashboard-types-baseline.txt",
-      "scripts/file-size-baseline.txt",
       "src/cli/commands/__tests__/knowledge.test.ts",
       "src/cli/commands/__tests__/plan.test.ts",
       "src/cli/commands/__tests__/start-running-noop.test.ts",
@@ -583,10 +581,10 @@
       "tests/unit/lib/overdeck/agent-discovery-columns.test.ts",
       "tests/unit/lib/pan-1908-no-loss-audit.test.ts"
     ],
-    "recordedAt": "2026-07-26T18:10:24.117Z"
+    "recordedAt": "2026-07-27T04:09:15.777Z"
   },
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-27T04:09:14.485Z",
+  "updated": "2026-07-27T04:09:15.784Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "pending",
