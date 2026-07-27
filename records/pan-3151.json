@@ -144,15 +144,7 @@
       "timestamp": "2026-07-27T14:26:05.061Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T14:26:05Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nmain already ships schema version 62, so merged PAN-3151 skips review_cycle_history on existing v62 databases\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -241,17 +233,17 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:27:00.212Z",
+  "updated": "2026-07-27T14:27:04.474Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:27:00.165Z",
+    "updatedAt": "2026-07-27T14:27:03.589Z",
     "reviewNotes": "Agent re-review request (8/25): Fixed v62 repair to handle databases already at v62 before these columns existed",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "d31e1b54458f16a5789b52b8bf26e4d895f9e500",
@@ -321,7 +313,7 @@
       },
       "costAtCloseOut": {
         "usd": 204.9059363,
-        "pricingAsOf": "2026-07-27T14:27:00.208Z"
+        "pricingAsOf": "2026-07-27T14:27:03.637Z"
       }
     },
     "merges": [
