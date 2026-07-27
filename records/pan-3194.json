@@ -64,17 +64,17 @@
     "recordedAt": "2026-07-27T06:16:25.496Z"
   },
   "created": "2026-07-27T04:42:41.037Z",
-  "updated": "2026-07-27T07:52:00.347Z",
+  "updated": "2026-07-27T07:52:05.302Z",
   "pipeline": {
     "issueId": "PAN-3194",
     "reviewStatus": "passed",
-    "testStatus": "passed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T06:17:16.404Z",
-    "updatedAt": "2026-07-27T07:51:58.395Z",
+    "updatedAt": "2026-07-27T07:52:05.289Z",
     "reviewNotes": "No blocking findings; the main merge preserves transcript-verified fresh recovery and all reviewed integration gates pass.",
     "testNotes": "Backend-only change (resume probes, lifecycle state, pure decideResumeSpawnPlan module, docs) — no UI/dashboard-visible surface per acceptance criteria, so browser UAT was not required. Gates run from workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3194 on branch feature/pan-3194: npm run typecheck (clean, incl. dashboard-types guard, 62 known baseline errors unchanged), npm run lint (clean, all guards incl. circular-deps/ratchet/quarantine/pipeline-membership passed), targeted suites (paths.test.ts, work-agent-lifecycle-transcript-probe.test.ts, resume-spawn-plan.test.ts, resume.test.ts, tests/lib/work-agent-lifecycle.test.ts, resume-gate.test.ts, stopped-agent-lifecycle.test.ts, deploy-queue.test.ts, app-server-host.test.ts: 9 files / 65 tests passed), and full npm test gate: 1234 test files / 11459 tests passed (3 files / 50 tests skipped, 0 failed) plus frontend issueActions suites (3 files / 51 tests passed, 0 failed).",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -88,9 +88,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4432558,
-            "output": 106100,
-            "cacheRead": 25622528,
+            "input": 4436428,
+            "output": 106332,
+            "cacheRead": 26080256,
             "cacheWrite": 0
           }
         },
@@ -113,9 +113,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 6374818,
-          "output": 261540,
-          "cacheRead": 73598976,
+          "input": 6378688,
+          "output": 261772,
+          "cacheRead": 74056704,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -126,8 +126,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 77.361026,
-        "pricingAsOf": "2026-07-27T07:51:58.884Z"
+        "usd": 77.6162,
+        "pricingAsOf": "2026-07-27T07:52:05.295Z"
       }
     },
     "merges": [
