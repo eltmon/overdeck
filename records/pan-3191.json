@@ -79,17 +79,17 @@
     "recordedAt": "2026-07-27T05:19:11.339Z"
   },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T07:01:17.085Z",
+  "updated": "2026-07-27T07:01:24.071Z",
   "pipeline": {
     "issueId": "PAN-3191",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:20:05.037Z",
-    "updatedAt": "2026-07-27T07:01:16.235Z",
+    "updatedAt": "2026-07-27T07:01:24.055Z",
     "reviewNotes": "Approved: bounded fair forge batching and GitHub/GitLab repository identity resolve all remaining blockers",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
@@ -134,9 +134,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6378141,
-            "output": 266556,
-            "cacheRead": 36045824,
+            "input": 6384701,
+            "output": 273268,
+            "cacheRead": 37621760,
             "cacheWrite": 0
           }
         },
@@ -151,15 +151,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 8697952,
-          "output": 472023,
-          "cacheRead": 106554880,
+          "input": 8704512,
+          "output": 478735,
+          "cacheRead": 108130816,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 110.92789,
-        "pricingAsOf": "2026-07-27T07:01:16.300Z"
+        "usd": 111.950018,
+        "pricingAsOf": "2026-07-27T07:01:24.060Z"
       }
     },
     "merges": [
@@ -168,7 +168,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 8,
