@@ -153,18 +153,19 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:10:39.005Z",
+  "updated": "2026-07-27T12:14:53.708Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T11:59:30.892Z",
-    "updatedAt": "2026-07-27T12:10:32.560Z",
+    "updatedAt": "2026-07-27T12:14:53.617Z",
     "reviewNotes": "unstick regression test never seeds reviewCycleHistory and passes vacuously",
+    "verificationNotes": "Verification FAILED at test (473566ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3151/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3151\n\n\n Test Files  138 passed (138)\n      Tests  1524 passed (1524)\n   Start at  08:10:44\n   Duration  13.62s (transform 30.64s, setup 27.23s, import 116.53s, tests 50.92s, environment 61.91s)\n\nstdout | src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts > orphan proposed spec reconciler > surfaces only the actioned spawn outcome in the activity feed, with a human-readable message (PAN-1626)\n[orphan-proposed-reconciler] spawn-skipped { issueId: 'PAN-3151', reason: 'issue-scoped-session' }\n\nstdout | src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts > orphan proposed spec reconciler > surfaces only the actioned spawn outcome in the activity feed, with a human-readable message (PAN-1626)\n[orphan-proposed-reconciler] spawn-skipped { issueId: 'PAN-3151', reason: 'issue-scoped-session' }\n\n ❯ |root| src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts (28 tests | 1 failed) 2099ms\n     × surfaces only the actioned spawn outcome in the activity feed, with a human-readable message (PAN-1626) 10ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-NabpfS/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-rec\n…(1401 chars elided)…\nfeature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-egcDdW/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-egcDdW/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-conte\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewSpawnedAt": "2026-07-27T12:10:32.560Z",
     "scopeDrift": {
@@ -268,9 +269,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 8084444,
-            "output": 225480,
-            "cacheRead": 67759104,
+            "input": 8535581,
+            "output": 249392,
+            "cacheRead": 71813632,
             "cacheWrite": 0
           }
         },
@@ -291,9 +292,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 8084444,
-          "output": 225480,
-          "cacheRead": 67759104,
+          "input": 8535581,
+          "output": 249392,
+          "cacheRead": 71813632,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -304,8 +305,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 91.1889783,
-        "pricingAsOf": "2026-07-27T12:10:34.542Z"
+        "usd": 96.1892873,
+        "pricingAsOf": "2026-07-27T12:14:53.675Z"
       }
     },
     "merges": [
@@ -314,7 +315,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "tasks": {
     "sequence": 20,
     "claims": {},
