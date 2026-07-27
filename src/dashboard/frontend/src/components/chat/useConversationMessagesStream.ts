@@ -1,12 +1,14 @@
-import { useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stream } from 'effect';
 import { getHarnessBehavior, WS_METHODS } from '@overdeck/contracts';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
+import { fetchWithTimeout } from '../../lib/apiFetch';
 import type { Conversation } from '../CommandDeck/ConversationList';
-import type { ChatMessage, CompactBoundary, ContextUsage, ConversationEvent, ProposedPlan, WorkLogEntry } from './chat-types';
+import type { ChatMessage, CompactBoundary, ContextUsage, ConversationEvent, ProposedPlan, SubagentSummary, WorkLogEntry } from './chat-types';
 
 export const conversationMessagesQueryKey = (name: string) => ['conversation-messages', name] as const;
+export const subagentTranscriptQueryKey = (name: string, agentId: string) => ['conversation-messages', name, 'subagent', agentId] as const;
 
 
 function allSequencesAfter<T extends { sequence?: number }>(sequence: number, items: T[]): boolean {
@@ -47,10 +49,11 @@ function mergeById<T extends { id: string; sequence?: number }>(previous: T[], n
   return Array.from(merged.values());
 }
 
-interface ConversationMessagesCache {
+export interface ConversationMessagesCache {
   messages: ChatMessage[];
   workLog: WorkLogEntry[];
   streaming: boolean;
+  subagents?: SubagentSummary[];
   discovering?: boolean;
   totalCost?: number;
   proposedPlan?: ProposedPlan;
@@ -71,6 +74,15 @@ export function applyConversationMessagesEvent(
       streaming: previous?.streaming ?? true,
       ...previous,
       discovering: true,
+    };
+  }
+  if (event.kind === 'subagents') {
+    return {
+      messages: previous?.messages ?? [],
+      workLog: previous?.workLog ?? [],
+      streaming: previous?.streaming ?? true,
+      ...previous,
+      subagents: event.subagents,
     };
   }
 
@@ -162,4 +174,47 @@ export function useConversationMessagesStream(conversation: Pick<Conversation, '
   }, [conversation.name, enabled, queryClient]);
 
   return enabled;
+}
+
+export function useSubagentTranscript(
+  conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number; endedAt?: string | null },
+  agentId: string | null,
+) {
+  const queryClient = useQueryClient();
+  const streaming = agentId !== null && shouldStreamConversationMessages(conversation);
+  const queryKey = useMemo(
+    () => subagentTranscriptQueryKey(conversation.name, agentId ?? ''),
+    [agentId, conversation.name],
+  );
+
+  useEffect(() => {
+    if (!agentId || !streaming) return;
+
+    void queryClient.cancelQueries({ queryKey });
+    const unsubscribe = getTransport().subscribe(
+      (client) =>
+        (client as PanRpcProtocolClient)[WS_METHODS.subscribeConversationMessages]({
+          conversationName: conversation.name,
+          agentId,
+        }) as Stream.Stream<ConversationEvent, Error>,
+      (event) => {
+        queryClient.setQueryData<ConversationMessagesCache>(queryKey, (previous) =>
+          applyConversationMessagesEvent(previous, event));
+      },
+    );
+    return () => unsubscribe();
+  }, [agentId, conversation.name, queryClient, queryKey, streaming]);
+
+  return useQuery<ConversationMessagesCache>({
+    queryKey,
+    queryFn: async ({ signal }) => {
+      const response = await fetchWithTimeout(
+        `/api/conversations/${encodeURIComponent(conversation.name)}/messages?agentId=${encodeURIComponent(agentId ?? '')}`,
+        { signal },
+      );
+      if (!response.ok) throw new Error('Failed to fetch subagent messages');
+      return response.json() as Promise<ConversationMessagesCache>;
+    },
+    enabled: agentId !== null && !streaming,
+  });
 }
