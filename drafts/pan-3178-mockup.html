@@ -292,8 +292,14 @@
             <span>Cursor</span>
             <span>20260726-9613</span>
           </div>
+          <div class="tabs" style="margin:10px -12px -12px; border-top:1px solid var(--border-soft)">
+            <button class="tab active" style="padding:7px 10px">Conversation</button>
+            <button class="tab" style="padding:7px 10px; font-family:var(--mono); font-size:11px">index.html <span style="color:var(--green)">+170</span> <span style="color:var(--red)">−7</span> <span style="color:var(--faint)">✕</span></button>
+            <button class="tab" style="padding:7px 10px">Terminal</button>
+            <button class="tab" style="padding:7px 10px">About</button>
+          </div>
         </div>
-        <div class="note-strip">Conversations in a project get <code>workspaces/conv-&lt;slug&gt;/</code> on branch <code>conv/&lt;slug&gt;</code> at creation — automatically, and <b>best-effort</b>: if prerequisites aren't set up the conversation still spawns, the skip is recorded, and a <b>"Create worktree &amp; restart"</b> action appears here in the header. The badge sits in the meta row next to the branch chip, so "where am I" and "what changed" read as one glance. Polyrepo: primary repo worktree first, more repos added lazily.</div>
+        <div class="note-strip">Conversations in a project get <code>workspaces/conv-&lt;slug&gt;/</code> on branch <code>conv/&lt;slug&gt;</code> at creation — automatically, and <b>best-effort</b>: if prerequisites aren't set up the conversation still spawns, the skip is recorded, and a <b>"Create worktree &amp; restart"</b> action appears here in the header. The badge sits in the meta row next to the branch chip. In the message flow, each touched file is a <b>visible chip</b> (<code>path +A −D</code>) — hover peeks a mini-diff, click opens the file's diff as a <b>sub-tab</b> in the conversation pane (shown above). Polyrepo: primary repo worktree first, more repos added lazily.</div>
       </div>
     </div>
   </div>
