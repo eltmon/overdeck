@@ -2,7 +2,7 @@
   "issueId": "PAN-3191",
   "schemaVersion": 2,
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T04:32:15.417Z",
+  "updated": "2026-07-27T04:32:16.616Z",
   "pipeline": {
     "issueId": "PAN-3191",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3191: Auto-merge rows strand forever: failed/blocked can never reach 'merged' and nothing reconciles them — 15 stale rows, all 13 issues merged and closed out",
       "timestamp": "2026-07-27T04:32:15.417Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
