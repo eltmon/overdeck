@@ -67,7 +67,7 @@
     "recordedAt": "2026-07-27T18:36:56.906Z"
   },
   "created": "2026-07-27T13:35:42.946Z",
-  "updated": "2026-07-27T18:45:43.602Z",
+  "updated": "2026-07-27T18:45:45.632Z",
   "pipeline": {
     "issueId": "PAN-3206",
     "reviewStatus": "pending",
@@ -77,8 +77,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T18:45:43.531Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed verification error: regenerated the slash-command manifest after the latest main sync",
+    "updatedAt": "2026-07-27T18:45:43.800Z",
+    "reviewNotes": "Verification infrastructure error: Verification worker 2080968 exited before writing a result",
     "inspectNotes": "All 3 ACs verified: parse maps APPROVED/PASSED->passed, FAILED->failed, CHANGES REQUESTED suffix (em/en dash, colon, hyphen) -> blocked with blocker, bare form -> first ### under ## Blocking Findings, null otherwise; findVerdictReport prefers synthesis.md then review.md then null; vitest review-verdict-report.test.ts 9/9 passed and npm run typecheck clean (dashboard/frontend ratchets none-new).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3213",
     "scopeDrift": {
@@ -155,7 +155,7 @@
       },
       "costAtCloseOut": {
         "usd": 72.446302,
-        "pricingAsOf": "2026-07-27T18:45:43.569Z"
+        "pricingAsOf": "2026-07-27T18:45:45.631Z"
       }
     },
     "merges": [
