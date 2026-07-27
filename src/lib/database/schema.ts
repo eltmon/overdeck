@@ -1727,6 +1727,12 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   // v61 -> v62: PAN-3154 record the main-head SHA/paths that first made a branch conflict.
   if (currentVersion < 62) {
     tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN conflicts_since TEXT');
+    // A database already stamped exactly v61 hits neither the `currentVersion < 61`
+    // block above nor the `currentVersion === SCHEMA_VERSION` no-version-bump top-up
+    // (SCHEMA_VERSION is now 62, not 61) — repeat these two idempotent v61 top-ups
+    // here so a v61 -> v62 upgrade never stamps v62 while missing them.
+    tryIdempotentDdl(db, 62, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
+    tryIdempotentDdl(db, 62, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
   }
 
   // After all migrations, set the version
