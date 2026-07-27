@@ -38,10 +38,23 @@ fi
 
 baseline_count=$(grep -cvE '^[[:space:]]*(#|$)' "$BASELINE_FILE" || true)
 
-# tsc exits non-zero when it reports errors; count them rather than trust status.
-output=$(npx tsc --noEmit -p "$TSCONFIG" 2>&1 || true)
+# tsc exits non-zero when it reports type errors, but launcher failures and
+# crashes can also exit non-zero without completing the typecheck. Preserve the
+# status so only parseable TypeScript diagnostics enter the ratchet path.
+if output=$(npx tsc --noEmit -p "$TSCONFIG" 2>&1); then
+  tsc_status=0
+else
+  tsc_status=$?
+fi
 current=$(printf '%s\n' "$output" | grep -E 'error TS' | sort || true)
 count=$(printf '%s\n' "$current" | grep -cE 'error TS' || true)
+
+if (( tsc_status != 0 && count == 0 )); then
+  echo "✖ dashboard frontend typecheck command failed (exit $tsc_status) without TypeScript diagnostics." >&2
+  printf '%s\n' "$output" >&2
+  echo "  Reproduce: npx tsc --noEmit -p $TSCONFIG" >&2
+  exit 1
+fi
 
 # Normalized comparison key: strip the (line,col) position so an edit that
 # shifts a pre-existing error's line does not relabel it as NEW when annotating.

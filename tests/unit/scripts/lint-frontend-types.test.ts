@@ -30,7 +30,7 @@ function makeTempGuard(baselineErrors: string[]): string {
   );
   writeFileSync(
     join(root, 'bin', 'npx'),
-    '#!/usr/bin/env bash\ncat "$FAKE_TSC_OUTPUT"\n',
+    '#!/usr/bin/env bash\ncat "$FAKE_TSC_OUTPUT"\nexit "${FAKE_TSC_EXIT:-0}"\n',
     { mode: 0o755 },
   );
   writeFileSync(join(root, 'tsc-output.txt'), 'tsc diagnostic noise\n');
@@ -42,7 +42,7 @@ function writeTscOutput(root: string, errors: string[]): void {
   writeFileSync(join(root, 'tsc-output.txt'), `tsc diagnostic noise\n${errors.join('\n')}\n`);
 }
 
-function runGuard(root: string, args: string[] = []): GuardResult {
+function runGuard(root: string, args: string[] = [], tscExit = 0): GuardResult {
   try {
     const output = execFileSync('bash', [join(root, 'scripts', 'lint-frontend-types.sh'), ...args], {
       cwd: root,
@@ -51,6 +51,7 @@ function runGuard(root: string, args: string[] = []): GuardResult {
         ...process.env,
         PATH: `${join(root, 'bin')}:${process.env.PATH ?? ''}`,
         FAKE_TSC_OUTPUT: join(root, 'tsc-output.txt'),
+        FAKE_TSC_EXIT: String(tscExit),
       },
     });
     return { ok: true, output };
@@ -123,6 +124,17 @@ describe('lint-frontend-types.sh', () => {
 
     expect(result.ok).toBe(false);
     expect(result.output).toContain('✖ missing scripts/frontend-types-baseline.txt');
+  });
+
+  it('fails when the compiler exits without TypeScript diagnostics', () => {
+    const root = makeTempGuard([]);
+    writeFileSync(join(root, 'tsc-output.txt'), 'simulated compiler crash\n');
+
+    const result = runGuard(root, [], 137);
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain('typecheck command failed (exit 137) without TypeScript diagnostics');
+    expect(result.output).toContain('simulated compiler crash');
   });
 
   it('does not relabel a line-shifted known error as new', () => {
