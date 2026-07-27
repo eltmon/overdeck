@@ -77,17 +77,18 @@
     "recordedAt": "2026-07-27T18:36:56.906Z"
   },
   "created": "2026-07-27T13:35:42.946Z",
-  "updated": "2026-07-27T19:29:51.360Z",
+  "updated": "2026-07-27T20:02:22.429Z",
   "pipeline": {
     "issueId": "PAN-3206",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-27T19:29:51.312Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-27T20:02:22.412Z",
     "reviewNotes": "Prior blockers are fixed; focused tests and typecheck pass with no remaining merge-blocking findings",
     "testNotes": "Reconciled from green GitHub Actions CI on 02f918c6: guard (https://github.com/eltmon/overdeck/actions/runs/30297407779/job/90081713150)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -177,7 +178,7 @@
       },
       "costAtCloseOut": {
         "usd": 119.342225,
-        "pricingAsOf": "2026-07-27T19:29:51.356Z"
+        "pricingAsOf": "2026-07-27T20:02:22.420Z"
       }
     },
     "merges": [
