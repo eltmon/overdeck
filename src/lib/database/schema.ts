@@ -11,7 +11,7 @@ import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 61;
+export const SCHEMA_VERSION = 62;
 
 function tryIdempotentDdl(db: SqliteDatabase, targetVersion: number, statement: string): void {
   try {
@@ -1719,6 +1719,11 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   // v60 -> v61: PAN-1491 store parsed affected v1.0 criteria on substrate bugs.
   if (currentVersion < 61) {
     tryIdempotentDdl(db, 61, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
+  }
+
+  // v61 -> v62: PAN-3151 store review cycle history for convergence detection.
+  if (currentVersion < 62) {
+    tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN review_cycle_history TEXT');
   }
 
   // After all migrations, set the version

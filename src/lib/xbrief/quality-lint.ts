@@ -376,7 +376,7 @@ function lintProjectedSurface(doc: XBriefDocument): QualityIssue[] {
   if ((fileCount > PROJECTED_SURFACE_MAX_FILES || subsystemCount > PROJECTED_SURFACE_MAX_SUBSYSTEMS) && !hasJustification) {
     issues.push(
       issue(
-        undefined,
+        null,
         'projected-surface',
         `Plan touches ${fileCount} files (limit: ${PROJECTED_SURFACE_MAX_FILES}) and ${subsystemCount} subsystems (limit: ${PROJECTED_SURFACE_MAX_SUBSYSTEMS}). Split into independently-shippable sibling issues per the swarm contract, or set plan.metadata.sizeJustification for genuinely inseparable work.`,
       ),

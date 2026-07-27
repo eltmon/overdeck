@@ -58,9 +58,10 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         blocker_reasons,
         last_verified_commit,
         merge_step,
-        auto_merge
+        auto_merge,
+        review_cycle_history
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
@@ -102,7 +103,8 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         blocker_reasons       = excluded.blocker_reasons,
         last_verified_commit  = excluded.last_verified_commit,
         merge_step            = excluded.merge_step,
-        auto_merge            = excluded.auto_merge
+        auto_merge            = excluded.auto_merge,
+        review_cycle_history  = excluded.review_cycle_history
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -145,6 +147,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.lastVerifiedCommit ?? null,
       s.mergeStep ?? null,
       s.autoMerge === undefined ? null : (s.autoMerge ? 1 : 0),
+      s.reviewCycleHistory ? JSON.stringify(s.reviewCycleHistory) : null,
     );
 
     // Append new history entries (deduplicate by timestamp to avoid re-inserting)
@@ -444,6 +447,8 @@ interface DbReviewStatusRow {
   merge_step: string | null;
   // PAN-1691: per-issue auto-merge routing key (null=project default, 1=auto, 0=hold-for-UAT)
   auto_merge: number | null;
+  // PAN-3151: review cycle history for convergence detection
+  review_cycle_history: string | null;
 }
 
 function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]): ReviewStatus {
@@ -489,6 +494,7 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     lastVerifiedCommit: row.last_verified_commit ?? undefined,
     mergeStep: row.merge_step ?? undefined,
     autoMerge: row.auto_merge === null || row.auto_merge === undefined ? undefined : row.auto_merge === 1,
+    reviewCycleHistory: row.review_cycle_history ? JSON.parse(row.review_cycle_history) : undefined,
     history: history.length > 0 ? history : undefined,
   });
 }

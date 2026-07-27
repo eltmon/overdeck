@@ -134,6 +134,7 @@ function projectPipeline(
     deaconIgnoredAt: status.deaconIgnoredAt,
     deaconIgnoredReason: status.deaconIgnoredReason,
     reviewerVerdicts: (status as { reviewerVerdicts?: unknown }).reviewerVerdicts,
+    reviewCycleHistory: (status as { reviewCycleHistory?: unknown }).reviewCycleHistory,
     strikeReadyHead: status.strikeReadyHead,
     strikeReadyAt: status.strikeReadyAt,
     strikeLandingState: status.strikeLandingState,

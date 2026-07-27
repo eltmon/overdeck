@@ -4,6 +4,7 @@ import type { readJournalStatusSync } from './overdeck/review-status-record-sync
 import type { InspectionStatusFields } from './inspection-status.js';
 import type { StrikeLandingStatus } from './strike-landing.js';
 import type { ScopeDriftRecord } from './xbrief/continue-state.js';
+import type { ReviewCycleEntry } from './cloister/review-convergence.js';
 
 export interface StatusHistoryEntry {
   type: 'review' | 'test' | 'merge' | 'inspect' | 'uat' | 'release';
@@ -67,6 +68,7 @@ export interface ReviewStatus extends StrikeLandingStatus, InspectionStatusField
     atCommit?: string;
     findingsPath?: string;
   }>>;
+  reviewCycleHistory?: ReviewCycleEntry[];
 }
 
 type ReviewStatusJournal = NonNullable<ReturnType<typeof readJournalStatusSync>>;

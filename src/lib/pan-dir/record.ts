@@ -181,6 +181,7 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   closedOut?: boolean;
   closedOutAt?: string;
   reviewerVerdicts?: unknown;
+  reviewCycleHistory?: unknown;
   updatedAt: string;
 }
 
