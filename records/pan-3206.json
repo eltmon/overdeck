@@ -77,18 +77,19 @@
     "recordedAt": "2026-07-27T18:36:56.906Z"
   },
   "created": "2026-07-27T13:35:42.946Z",
-  "updated": "2026-07-27T19:18:49.305Z",
+  "updated": "2026-07-27T19:29:51.360Z",
   "pipeline": {
     "issueId": "PAN-3206",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-27T19:18:49.264Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-27T19:29:51.312Z",
     "reviewNotes": "Prior blockers are fixed; focused tests and typecheck pass with no remaining merge-blocking findings",
+    "testNotes": "Reconciled from green GitHub Actions CI on 02f918c6: guard (https://github.com/eltmon/overdeck/actions/runs/30297407779/job/90081713150)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 3 ACs verified: parse maps APPROVED/PASSED->passed, FAILED->failed, CHANGES REQUESTED suffix (em/en dash, colon, hyphen) -> blocked with blocker, bare form -> first ### under ## Blocking Findings, null otherwise; findVerdictReport prefers synthesis.md then review.md then null; vitest review-verdict-report.test.ts 9/9 passed and npm run typecheck clean (dashboard/frontend ratchets none-new).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3213",
@@ -151,9 +152,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2103445,
-            "output": 116559,
-            "cacheRead": 24402432,
+            "input": 2139781,
+            "output": 126459,
+            "cacheRead": 26325504,
             "cacheWrite": 0
           }
         },
@@ -168,15 +169,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 5456349,
-          "output": 350604,
-          "cacheRead": 160204288,
+          "input": 5492685,
+          "output": 360504,
+          "cacheRead": 162127360,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 117.902009,
-        "pricingAsOf": "2026-07-27T19:18:49.297Z"
+        "usd": 119.342225,
+        "pricingAsOf": "2026-07-27T19:29:51.356Z"
       }
     },
     "merges": [
