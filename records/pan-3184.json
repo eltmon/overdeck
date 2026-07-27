@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T05:33:27.550Z",
+  "updated": "2026-07-27T05:33:45.969Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 14,
-    "claims": {},
+    "sequence": 15,
+    "claims": {
+      "docs-failsafe-amendment": {
+        "writerId": "agent-pan-3184",
+        "agentId": "agent-pan-3184",
+        "pid": 1799061,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:33:45.969Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3184",
@@ -202,6 +210,7 @@
     "banner-live-held": "completed",
     "banner-live-held.banner-live-held.ac1": "completed",
     "banner-live-held.banner-live-held.ac2": "completed",
-    "banner-live-held.banner-live-held.ac3": "completed"
+    "banner-live-held.banner-live-held.ac3": "completed",
+    "docs-failsafe-amendment": "running"
   }
 }
