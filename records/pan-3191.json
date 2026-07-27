@@ -72,20 +72,19 @@
     "recordedAt": "2026-07-27T05:19:11.339Z"
   },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T05:59:54.674Z",
+  "updated": "2026-07-27T06:33:09.927Z",
   "pipeline": {
     "issueId": "PAN-3191",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:20:05.037Z",
-    "updatedAt": "2026-07-27T05:59:54.658Z",
+    "updatedAt": "2026-07-27T06:33:09.882Z",
     "reviewNotes": "GitLab/polyrepo rows still cannot resolve repository identity, so merged MRs remain stranded",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
-    "reviewedAtCommit": "b60d7098294a232fb845e54ceacaaa56602caee6",
     "reviewSpawnedAt": "2026-07-27T05:58:11.918Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -126,32 +125,32 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2617170,
-            "output": 169482,
-            "cacheRead": 23961600,
+            "input": 2622582,
+            "output": 169718,
+            "cacheRead": 24388608,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1264793,
-            "output": 104428,
-            "cacheRead": 34687488,
+            "input": 1452601,
+            "output": 138824,
+            "cacheRead": 55150592,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 3881963,
-          "output": 273910,
-          "cacheRead": 58649088,
+          "input": 4075183,
+          "output": 308542,
+          "cacheRead": 79539200,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 56.951659,
-        "pricingAsOf": "2026-07-27T05:59:54.665Z"
+        "usd": 69.401775,
+        "pricingAsOf": "2026-07-27T06:33:09.920Z"
       }
     },
     "merges": [
