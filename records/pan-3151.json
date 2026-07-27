@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T10:13:19.052Z",
+  "updated": "2026-07-27T10:13:24.140Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -37,18 +37,32 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "shared-findings-parser": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3151",
         "agentId": "agent-pan-3151",
         "pid": 608935,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T10:13:19.052Z"
+        "claimedAt": "2026-07-27T10:13:19.052Z",
+        "itemId": "shared-findings-parser",
+        "outcome": "completed",
+        "reason": "Extracted blocking-findings parser into shared module; all AC met",
+        "releasedAt": "2026-07-27T10:13:24.140Z"
+      }
+    ],
+    "statusReasons": {
+      "shared-findings-parser": {
+        "reason": "Extracted blocking-findings parser into shared module; all AC met",
+        "updatedAt": "2026-07-27T10:13:24.140Z"
       }
     }
   },
   "statusOverrides": {
-    "shared-findings-parser": "running"
+    "shared-findings-parser": "completed",
+    "shared-findings-parser.shared-findings-parser.ac1": "completed",
+    "shared-findings-parser.shared-findings-parser.ac2": "completed",
+    "shared-findings-parser.shared-findings-parser.ac3": "completed"
   }
 }
