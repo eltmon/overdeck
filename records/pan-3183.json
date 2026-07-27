@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:30:47.797Z",
-  "updated": "2026-07-27T05:11:58.769Z",
+  "updated": "2026-07-27T05:12:23.765Z",
   "pipeline": {
     "issueId": "PAN-3183",
     "reviewStatus": "pending",
@@ -43,8 +43,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "legacy-backfill-parity": {
+        "writerId": "agent-pan-3183",
+        "agentId": "agent-pan-3183",
+        "pid": 186953,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:12:23.765Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3183",
@@ -87,6 +95,7 @@
     "backfill-reports-marked-stopped": "completed",
     "backfill-reports-marked-stopped.backfill-reports-marked-stopped.ac1": "completed",
     "backfill-reports-marked-stopped.backfill-reports-marked-stopped.ac2": "completed",
-    "backfill-reports-marked-stopped.backfill-reports-marked-stopped.ac3": "completed"
+    "backfill-reports-marked-stopped.backfill-reports-marked-stopped.ac3": "completed",
+    "legacy-backfill-parity": "running"
   }
 }
