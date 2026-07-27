@@ -815,10 +815,12 @@ describe('flywheel auto-merge routes', () => {
       scheduledMergeAt: '2026-05-25T10:05:00.000Z',
     });
     const announce = vi.fn();
+    const countRemaining = vi.fn(() => 2);
 
     expect(deleteAutoMergePayload('pan-1486', {
       now: () => new Date('2026-05-25T10:01:00.000Z'),
       announce,
+      countRemaining,
     })).toMatchObject({
       status: 200,
       body: {
@@ -826,8 +828,10 @@ describe('flywheel auto-merge routes', () => {
         status: 'cancelled',
         cancelledAt: '2026-05-25T10:01:00.000Z',
         cancelledBy: 'operator',
+        remainingActionable: 2,
       },
     });
+    expect(countRemaining).toHaveBeenCalledWith('PAN-1486');
     expect(getPendingAutoMergePayload()).toEqual([]);
     expect(announce).toHaveBeenCalledTimes(1);
     expect(announce).toHaveBeenCalledWith('PAN-1486');

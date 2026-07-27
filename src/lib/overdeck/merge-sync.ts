@@ -216,6 +216,14 @@ export function getActionableAutoMerge(issueId: string): PendingAutoMerge | null
   return row ? rowToPendingAutoMerge(row) : null;
 }
 
+export function countActionableAutoMerges(issueId: string): number {
+  const db = getOverdeckDatabaseSync();
+  const row = db.prepare(
+    "SELECT COUNT(*) AS n FROM pending_auto_merges WHERE issue_id = ? AND status IN ('pending','merging','blocked','failed')",
+  ).get(issueId) as { n: number } | undefined;
+  return row?.n ?? 0;
+}
+
 /** Drop-in for listActiveAutoMerges() from pending-auto-merges-db.ts. */
 export function listActiveAutoMerges(limit = 100): PendingAutoMerge[] {
   const db = getOverdeckDatabaseSync();
