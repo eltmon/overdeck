@@ -374,6 +374,16 @@ export type AgentSnapshot = typeof AgentSnapshot.Type
 
 // ─── Review / Pipeline ────────────────────────────────────────────────────────
 
+/** PAN-3151: A recorded cycle in the review convergence tracking series */
+export const ReviewCycleEntry = Schema.Struct({
+  cycle: Schema.Number,
+  runId: Schema.String,
+  atCommit: Schema.optional(Schema.String),
+  blockingCount: Schema.Number,
+  recordedAt: Schema.String,
+})
+export type ReviewCycleEntry = typeof ReviewCycleEntry.Type
+
 export const ReviewStatusSnapshot = Schema.Struct({
   issueId: IssueId,
   reviewStatus: Schema.optional(ReviewStatusValue),
@@ -394,6 +404,8 @@ export const ReviewStatusSnapshot = Schema.Struct({
   stuckReason: Schema.optional(Schema.String),
   stuckAt: Schema.optional(Schema.String),
   stuckDetails: Schema.optional(Schema.String),
+  /** PAN-3151: review cycle history for convergence detection */
+  reviewCycleHistory: Schema.optional(Schema.Array(ReviewCycleEntry)),
   /** Commit SHA at which review passed; deacon uses this to detect new pushes after review */
   reviewedAtCommit: Schema.optional(Schema.String),
   /** Commit SHA at which the pre-review verification gate last passed */

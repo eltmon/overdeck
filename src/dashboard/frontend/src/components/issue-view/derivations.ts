@@ -32,6 +32,14 @@ export function mergeStep(reviewStatus: ReviewStatusData | undefined): string | 
   return rs?.mergeStep ?? rs?.mergeStatus ?? null;
 }
 
+/** Review cycle history as a formatted series string (e.g., "12 → 7 → 5 → 4"). */
+export function reviewCycleSeries(reviewStatus: ReviewStatusData | undefined): string | null {
+  const rs = reviewStatus as (ReviewStatusData & { reviewCycleHistory?: Array<{ blockingCount: number }> }) | undefined;
+  const history = rs?.reviewCycleHistory;
+  if (!history || history.length === 0) return null;
+  return history.map(e => String(e.blockingCount)).join(' → ');
+}
+
 /** Human-readable reason the issue is stuck or blocked. */
 export function stuckReason(reviewStatus: ReviewStatusData | undefined): string {
   const explicitReason = (reviewStatus as (ReviewStatusData & { stuckReason?: string }) | undefined)?.stuckReason;

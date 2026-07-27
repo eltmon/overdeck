@@ -223,6 +223,13 @@ export interface ReviewStatusData {
   releaseNotes?: string;
   readyForMerge: boolean;
   updatedAt: string;
+  /** PAN-653: stuck flag and reason */
+  stuck?: boolean;
+  stuckReason?: string;
+  stuckAt?: string;
+  stuckDetails?: string;
+  /** PAN-3151: review cycle history for convergence detection */
+  reviewCycleHistory?: Array<{ cycle: number; runId: string; atCommit?: string; blockingCount: number; recordedAt: string }>;
   /** PAN-905: GitHub-native merge blocker reasons */
   blockerReasons?: BlockerReason[];
   /** PAN-366: Queue position — null = not queued, 0 = active, 1+ = position */

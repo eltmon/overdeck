@@ -4,6 +4,7 @@ import {
   CheckCircle2, Loader2, AlertCircle, CircleDot,
 } from 'lucide-react';
 import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
+import { reviewCycleSeries } from '../../issue-view/derivations';
 import { ActivitySparkline, type SparklineEvent } from '../ActivitySparkline';
 import {
   useActivityQuery,
@@ -358,6 +359,35 @@ export function IssueHeader({ issueId, title, url }: IssueHeaderProps) {
         >
           <AlertTriangle size={12} />
           Pipeline stuck — review, test, or merge failed. Use Recover to retry.
+        </div>
+      )}
+
+      {/* PAN-3151: Review convergence warning */}
+      {reviewStatus?.stuckReason === 'review-not-converging' && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 12px',
+            fontSize: 11,
+            color: 'var(--warning)',
+            background: 'color-mix(in srgb, var(--warning) 8%, transparent)',
+            borderBottom: '1px dashed var(--border)',
+          }}
+        >
+          <AlertTriangle size={12} />
+          <span>
+            Review cycles:
+            {' '}
+            <strong>{reviewCycleSeries(reviewStatus) ?? 'unknown'}</strong>
+            {' '}
+            — not converging. Consider decomposing into sibling issues, or
+            {' '}
+            <em>unstick</em>
+            {' '}
+            to continue rework.
+          </span>
         </div>
       )}
 
