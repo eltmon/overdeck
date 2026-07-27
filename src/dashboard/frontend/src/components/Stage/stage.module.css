@@ -180,6 +180,40 @@
   font-weight: 700;
 }
 
+/* Project rename affordance on the `# <project>` title (PAN-3156). */
+.wsNameInput {
+  font: inherit;
+  color: inherit;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 6px;
+  outline: none;
+}
+
+.wsNameInput:focus {
+  border-color: var(--ring);
+}
+
+.wsRename {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted-foreground);
+}
+
+.wsRename:hover {
+  color: var(--foreground);
+}
+
+.wsRenameError {
+  font-size: 12px;
+  color: var(--destructive-foreground);
+}
+
 /* Agent pill brand logo (PAN-1561) — sizes the shared ProviderIcon to the pill. */
 .agentLogo {
   display: inline-flex;
