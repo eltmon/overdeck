@@ -202,9 +202,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-27T14:49:45.532Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-27T14:54Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-27T14:54:25.914Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-27T14:54:25Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nThe targeted migration suite is green, but the changed fixtures only accommodate the exact-SCHEMA_VERSION repair and do not add the required v62→later-version regression. A user skipping this build can still advance from the shipped v62 schema without review_cycle_history; bump to v63 and test the real v62 state.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -293,7 +306,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:54:25.303Z",
+  "updated": "2026-07-27T14:54:25.915Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
