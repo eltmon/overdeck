@@ -127,9 +127,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-27T13:44:10.019Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-27T13:47Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-27T13:47:24.138Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-27T13:47:24Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nv61 migration repair now works but lacks the required regression test that fails on the two prior broken implementations\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -218,7 +231,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T13:47:23.483Z",
+  "updated": "2026-07-27T13:47:24.138Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
