@@ -49,10 +49,10 @@
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
       "scripts/file-size-allowlist.txt",
-      "src/lib/cloister/orphan-proposed-reconciler.ts",
       "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
       "src/lib/overdeck/infra.ts",
       "src/lib/pan-dir/verdict-restore.ts",
+      "tests/unit/lib/database/schema-migrations.test.ts",
       "tests/unit/lib/pan-dir/verdict-restore.test.ts"
     ],
     "declaredScopeUntouched": [
@@ -87,7 +87,6 @@
       "src/lib/cloister/branch-invalidation.ts",
       "src/lib/cloister/conflict-gate.ts",
       "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/orphan-proposed-reconciler.ts",
       "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
       "src/lib/database/schema.ts",
       "src/lib/overdeck/infra.ts",
@@ -99,13 +98,14 @@
       "src/lib/review-status-reconcile.ts",
       "tests/unit/lib/cloister/branch-invalidation.test.ts",
       "tests/unit/lib/cloister/conflict-gate.test.ts",
+      "tests/unit/lib/database/schema-migrations.test.ts",
       "tests/unit/lib/overdeck/review-status-sync.test.ts",
       "tests/unit/lib/pan-dir/verdict-restore.test.ts"
     ],
-    "recordedAt": "2026-07-27T11:59:06.536Z"
+    "recordedAt": "2026-07-27T12:29:11.863Z"
   },
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T12:29:08.960Z",
+  "updated": "2026-07-27T12:29:11.865Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "reviewing",
