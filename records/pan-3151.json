@@ -223,7 +223,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:09:04.444Z",
+  "updated": "2026-07-27T14:12:02.504Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "passed",
@@ -233,7 +233,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:09:04.427Z",
+    "updatedAt": "2026-07-27T14:12:02.487Z",
     "conflictsSince": {
       "sha": "050c54fb3ec155db17aaa23ddcba7a05d3f345a4",
       "detectedAt": "2026-07-27T14:08:42.556Z",
@@ -271,18 +271,18 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 254,
-            "output": 68230,
-            "cacheRead": 23492805,
-            "cacheWrite": 462717
+            "input": 268,
+            "output": 71673,
+            "cacheRead": 24963087,
+            "cacheWrite": 470393
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3594,
-            "output": 141391,
-            "cacheRead": 84601434,
-            "cacheWrite": 3583312
+            "input": 3647,
+            "output": 142444,
+            "cacheRead": 85859016,
+            "cacheWrite": 3588324
           }
         }
       },
@@ -300,21 +300,21 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 254,
-          "output": 68230,
-          "cacheRead": 23492805,
-          "cacheWrite": 462717
+          "input": 268,
+          "output": 71673,
+          "cacheRead": 24963087,
+          "cacheWrite": 470393
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3594,
-          "output": 141391,
-          "cacheRead": 84601434,
-          "cacheWrite": 3583312
+          "input": 3647,
+          "output": 142444,
+          "cacheRead": 85859016,
+          "cacheWrite": 3588324
         }
       },
       "costAtCloseOut": {
-        "usd": 183.6053753,
-        "pricingAsOf": "2026-07-27T14:09:04.439Z"
+        "usd": 184.0904213,
+        "pricingAsOf": "2026-07-27T14:12:02.501Z"
       }
     },
     "merges": [
