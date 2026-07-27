@@ -586,7 +586,7 @@
     "recordedAt": "2026-07-26T18:10:24.117Z"
   },
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-27T04:09:08.189Z",
+  "updated": "2026-07-27T04:09:10.092Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "pending",
@@ -806,7 +806,9 @@
         "tests/unit/lib/pan-1908-no-loss-audit.test.ts"
       ],
       "recordedAt": "2026-07-26T18:10:24.117Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-27T04:09:09.083Z",
+    "panDoneRecoveredAt": "2026-07-27T04:09:09.083Z"
   },
   "closeOut": {
     "usage": {
