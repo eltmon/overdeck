@@ -94,6 +94,7 @@ import { readAutoSpawnOnFinalizeFlag, writeAutoSpawnOnFinalizeFlag } from '../..
 import {
   clearOrphanProposedAttemptCooldowns,
   findOrphanProposedSpecsForReconciler,
+  handleOrphanProposedSpec,
   hasReviewPipelinePresence,
   reconcileOrphanProposedSpecs,
   spawnWorkAgentThroughAgentsEndpoint,
@@ -470,6 +471,46 @@ describe('orphan proposed spec reconciler', () => {
     await run();
 
     expect(deadEndTripMocks.recordDeadEndNeedsYou).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds reactive refusal deduplication when patrol pruning has not run', async () => {
+    let currentTime = Date.parse('2026-07-26T10:00:00.000Z');
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => currentTime);
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+    const evaluatePickupGate = async () => ({
+      allow: false as const,
+      code: 'not-released' as const,
+      reason: 'The issue is not released.',
+    });
+    const specDoc = {
+      xBRIEFInfo: { version: '0.8', created: '2026-07-26T10:00:00.000Z' },
+      plan: { id: 'PAN-1', title: 'PAN-1', status: 'proposed', items: [{ id: 'item-1', title: 'Item 1' }], edges: [] },
+    };
+
+    try {
+      for (let index = 1; index <= 513; index += 1) {
+        const issueId = `PAN-${index}`;
+        await handleOrphanProposedSpec(issueId, {
+          project: { projectKey: 'overdeck', projectPath: '/tmp/project' },
+          spec: { path: `/tmp/${issueId}.xbrief.json`, doc: specDoc as never },
+          evaluatePickupGate,
+          config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+        });
+      }
+
+      currentTime += 6 * 60 * 1000;
+      await handleOrphanProposedSpec('PAN-1', {
+        project: { projectKey: 'overdeck', projectPath: '/tmp/project' },
+        spec: { path: '/tmp/PAN-1.xbrief.json', doc: specDoc as never },
+        evaluatePickupGate,
+        config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      });
+
+      expect(deadEndTripMocks.recordDeadEndNeedsYou).toHaveBeenCalledTimes(514);
+    } finally {
+      nowSpy.mockRestore();
+      debugSpy.mockRestore();
+    }
   });
 
   it('fails closed per candidate when pickup evaluation throws and continues the scan', async () => {

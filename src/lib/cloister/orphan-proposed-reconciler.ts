@@ -33,6 +33,7 @@ import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { clearIssueClosedCache, isIssueClosed } from './issue-closed.js';
 
 const DEFAULT_ATTEMPT_INTERVAL_MS = 5 * 60 * 1000;
+const MAX_PICKUP_REFUSAL_REASONS = 512;
 const execAsync = promisify(exec);
 const attemptCooldowns = new Map<string, number>();
 const pickupRefusalReasons = new Map<string, string>();
@@ -387,6 +388,10 @@ async function recordPickupRefusal(
   logReconcilerDiagnostic('spawn-skipped', { issueId, reason });
   attemptCooldowns.set(issueId, now);
   if (pickupRefusalReasons.get(issueId) !== decision.reason) {
+    if (!pickupRefusalReasons.has(issueId) && pickupRefusalReasons.size >= MAX_PICKUP_REFUSAL_REASONS) {
+      const oldestIssueId = pickupRefusalReasons.keys().next().value;
+      if (oldestIssueId) pickupRefusalReasons.delete(oldestIssueId);
+    }
     pickupRefusalReasons.set(issueId, decision.reason);
     await recordDeadEndNeedsYou(issueId, 'orphan-proposed-pickup-gate', 'proposed', decision.reason);
   }
