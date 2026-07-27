@@ -27,6 +27,7 @@ import { buildClassifyLookups } from '../backlog/lookups.js';
 import { computeCohort } from '../backlog/pickup.js';
 import { gatherProjectLensSignals } from '../pipeline-membership-gather.js';
 import { resolvePipelineMembership, type PipelineMembership } from '../pipeline-membership.js';
+import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
 
 export const FLYWHEEL_ORCHESTRATOR_AGENT_ID = 'flywheel-orchestrator';
 
@@ -82,6 +83,7 @@ export interface FlywheelLifecycleOptions {
   requireUatBeforeMerge?: boolean;
   env?: NodeJS.ProcessEnv;
   resumeSessionId?: string;
+  resumeCause?: ResumeCause;
 }
 
 export interface FlywheelPauseResult {
@@ -307,10 +309,11 @@ export function isFlywheelDevcontainerRuntime(env: NodeJS.ProcessEnv = process.e
  * resume + context compaction — the pre-PAN-2006 resume prompt only pointed at
  * FLYWHEEL-STATE.md and a long-running orchestrator could drift off-brief.
  */
-export function buildFlywheelResumePrompt(configSection: string, briefContent?: string): string {
+export function buildFlywheelResumePrompt(configSection: string, briefContent?: string, cause: ResumeCause = 'system'): string {
   const base =
-    'FLYWHEEL RESUME: You were paused by the operator. Resume the tick loop from your prior ' +
-    'state. Check `docs/FLYWHEEL-STATE.md` and the latest status snapshot for context.';
+    `FLYWHEEL RESUME: ${buildResumeContract(cause)} Resume the tick loop from your prior ` +
+    'state, run a full tick now, and call ScheduleWakeup(delaySeconds:1000) to arm the next tick. ' +
+    'Check `docs/FLYWHEEL-STATE.md` and the latest status snapshot for context.';
   const brief = briefContent
     ? `\n\n--- Standing brief (re-read it — it governs pickup, unblocking, and never-block) ---\n\n${briefContent}`
     : '';
@@ -346,7 +349,7 @@ export async function spawnFlywheelAgent(runId: string, options: FlywheelLifecyc
     briefOverlayContent,
   );
   const prompt = options.resumeSessionId
-    ? buildFlywheelResumePrompt(await flywheelRunConfigurationSection(options, runId), briefContent)
+    ? buildFlywheelResumePrompt(await flywheelRunConfigurationSection(options, runId), briefContent, options.resumeCause)
     : (options.prompt ?? (await defaultFlywheelPrompt(runId, { ...options, briefPath }, briefContent)));
   return spawnRun(runId, 'flywheel', {
     agentId: FLYWHEEL_ORCHESTRATOR_AGENT_ID,
