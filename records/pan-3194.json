@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:42:41.037Z",
-  "updated": "2026-07-27T05:23:59.048Z",
+  "updated": "2026-07-27T05:25:00.341Z",
   "pipeline": {
     "issueId": "PAN-3194",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "docs-agent-state-planes": {
-        "writerId": "agent-pan-3194",
-        "agentId": "agent-pan-3194",
-        "pid": 1125886,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:23:59.048Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3194",
@@ -97,6 +89,17 @@
         "outcome": "completed",
         "reason": "Extracted the pure resume spawn decision matrix, preserved existing refusal and recovery precedence, and added five no-mock regression cases.",
         "releasedAt": "2026-07-27T05:23:37.445Z"
+      },
+      {
+        "writerId": "agent-pan-3194",
+        "agentId": "agent-pan-3194",
+        "pid": 1125886,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:23:59.048Z",
+        "itemId": "docs-agent-state-planes",
+        "outcome": "completed",
+        "reason": "Documented transcript-verified resumability across CLI, dashboard, and Deacon probes, including fresh-launch routing and recovery-owned pointer clearing.",
+        "releasedAt": "2026-07-27T05:25:00.341Z"
       }
     ],
     "statusReasons": {
@@ -115,6 +118,10 @@
       "resume-spawn-plan-decider": {
         "reason": "Extracted the pure resume spawn decision matrix, preserved existing refusal and recovery precedence, and added five no-mock regression cases.",
         "updatedAt": "2026-07-27T05:23:37.445Z"
+      },
+      "docs-agent-state-planes": {
+        "reason": "Documented transcript-verified resumability across CLI, dashboard, and Deacon probes, including fresh-launch routing and recovery-owned pointer clearing.",
+        "updatedAt": "2026-07-27T05:25:00.341Z"
       }
     }
   },
@@ -139,6 +146,8 @@
     "resume-spawn-plan-decider.resume-spawn-plan-decider.ac3": "completed",
     "resume-spawn-plan-decider.resume-spawn-plan-decider.ac4": "completed",
     "resume-spawn-plan-decider.resume-spawn-plan-decider.ac5": "completed",
-    "docs-agent-state-planes": "running"
+    "docs-agent-state-planes": "completed",
+    "docs-agent-state-planes.docs-agent-state-planes.ac1": "completed",
+    "docs-agent-state-planes.docs-agent-state-planes.ac2": "completed"
   }
 }
