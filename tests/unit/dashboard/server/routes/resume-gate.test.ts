@@ -31,6 +31,7 @@ import { Effect } from 'effect';
 import { setAgentRuntimeMirror } from '../../../../../src/lib/agent-runtime-mirror.js';
 import { getWorkAgentLifecycleStateSync } from '../../../../../src/lib/work-agent-lifecycle.js';
 import type { WorkAgentLifecycleState } from '../../../../../src/lib/work-agent-lifecycle.js';
+import * as paths from '../../../../../src/lib/paths.js';
 import * as tmux from '../../../../../src/lib/tmux.js';
 
 /** The resume route's gate predicate — extracted for contract testing. */
@@ -145,6 +146,7 @@ describe('resume route gate predicate', () => {
     saveSessionId(agentId, 'session-stopped');
 
     const sessionSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
+    const transcriptSpy = vi.spyOn(paths, 'claudeSessionTranscriptExists').mockReturnValue(true);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     // Gate must ALLOW — canResumeSession:true (stopped + saved session).
@@ -153,6 +155,7 @@ describe('resume route gate predicate', () => {
     expect(lifecycle.canResumeSession).toBe(true);
     expect(resumeGateAllows(lifecycle)).toBe(true); // → 200
 
+    transcriptSpy.mockRestore();
     sessionSpy.mockRestore();
   });
 

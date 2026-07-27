@@ -13,7 +13,7 @@ export interface WorkAgentLifecycleState {
   hasAgentState: boolean;
   hasLiveTmuxSession: boolean;
   hasSavedSession: boolean;
-  hasResumableTranscript?: boolean;
+  hasResumableTranscript: boolean;
   hasWorkspace: boolean;
   isPlaceholder: boolean;
   isOrphaned: boolean;
