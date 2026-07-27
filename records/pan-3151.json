@@ -198,7 +198,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:55:45.504Z",
+  "updated": "2026-07-27T12:55:50.116Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "reviewing",
@@ -208,7 +208,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T12:55:44.237Z",
+    "updatedAt": "2026-07-27T12:55:50.102Z",
     "reviewNotes": "Agent re-review request (3/25): Resolved merge conflict with origin/main, preserving both schema migrations",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewSpawnedAt": "2026-07-27T12:55:44.237Z"
@@ -277,7 +277,7 @@
       },
       "costAtCloseOut": {
         "usd": 128.1320973,
-        "pricingAsOf": "2026-07-27T12:55:44.353Z"
+        "pricingAsOf": "2026-07-27T12:55:50.114Z"
       }
     },
     "merges": [
@@ -286,7 +286,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "tasks": {
     "sequence": 20,
     "claims": {},
