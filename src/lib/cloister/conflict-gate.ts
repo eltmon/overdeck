@@ -209,7 +209,11 @@ export async function resolveConflictGate(
     const remainingBlockers = (status.blockerReasons ?? []).filter((blocker) => !isMergeBlocker(blocker));
     await deps.setReviewStatus(
       issueId,
-      { blockerReasons: remainingBlockers.length > 0 ? remainingBlockers : undefined },
+      {
+        blockerReasons: remainingBlockers.length > 0 ? remainingBlockers : undefined,
+        // PAN-3154: clear the branch-invalidation marker in the same write that clears the blocker.
+        conflictsSince: undefined,
+      },
       status,
     );
     deps.log?.(`[conflict-gate] ${issueId}: cleared stale merge blocker; review can proceed`);

@@ -271,10 +271,30 @@ describe('resolveConflictGate', () => {
 
     expect(deps.setReviewStatus).toHaveBeenCalledWith(
       'PAN-1765',
-      { blockerReasons: [nonMergeBlocker] },
+      { blockerReasons: [nonMergeBlocker], conflictsSince: undefined },
       status,
     );
     expect(deps.dispatchResolver).not.toHaveBeenCalled();
+  });
+
+  it('clears conflictsSince in the same write that clears stale merge blockers (PAN-3154)', async () => {
+    const status = makeStatus({
+      blockerReasons: [mergeBlocker],
+      conflictsSince: {
+        sha: '6ac4a3dc11',
+        detectedAt: '2026-07-26T18:58:00.000Z',
+        paths: ['a.txt'],
+      },
+    });
+    const deps = makeGateDeps(status, 'clean');
+
+    await resolveConflictGate('PAN-1765', '/workspace', 'main', deps);
+
+    expect(deps.setReviewStatus).toHaveBeenCalledWith(
+      'PAN-1765',
+      { blockerReasons: undefined, conflictsSince: undefined },
+      status,
+    );
   });
 
   it('gates and dispatches a resolver once for a real conflict within the throttle window', async () => {
