@@ -206,7 +206,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T06:51:23.265Z",
+  "updated": "2026-07-27T06:51:31.027Z",
   "pipeline": {
     "issueId": "PAN-2876",
     "reviewStatus": "pending",
@@ -485,5 +485,70 @@
     "docs-conversation-subagents.docs-conversation-subagents.ac1": "completed",
     "docs-conversation-subagents.docs-conversation-subagents.ac2": "completed",
     "docs-conversation-subagents.docs-conversation-subagents.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/__tests__/dashboard-cwd-guard.test.ts",
+      "src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx",
+      "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.test.tsx",
+      "src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts",
+      "src/dashboard/server/services/__tests__/format-tool-input.test.ts",
+      "src/lib/conversations/__tests__/summary-fork-handoff.test.ts",
+      "src/lib/overdeck/conversation-reads.ts"
+    ],
+    "declaredScopeUntouched": [
+      "tests/unit/dashboard/server/services/format-tool-input.test.ts"
+    ],
+    "declaredScope": [
+      "docs/CONVERSATION-SUBAGENTS.md",
+      "docs/INDEX.md",
+      "packages/contracts/src/rpc.test.ts",
+      "packages/contracts/src/rpc.ts",
+      "reference/architecture.mdx",
+      "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+      "src/dashboard/frontend/src/components/chat/SubagentRail.test.tsx",
+      "src/dashboard/frontend/src/components/chat/SubagentRail.tsx",
+      "src/dashboard/frontend/src/components/chat/chat-types.ts",
+      "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+      "src/dashboard/frontend/src/components/chat/messagesTimeline/workLogRows.tsx",
+      "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.test.ts",
+      "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
+      "src/dashboard/server/routes/conversations.ts",
+      "src/dashboard/server/services/conversation/subagents.ts",
+      "src/dashboard/server/services/format-tool-input.ts",
+      "src/dashboard/server/ws-rpc.ts",
+      "tests/unit/dashboard/server/routes/conversation-subagent-messages.test.ts",
+      "tests/unit/dashboard/server/services/conversation/subagents.test.ts",
+      "tests/unit/dashboard/server/services/format-tool-input.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/CONVERSATION-SUBAGENTS.md",
+      "docs/INDEX.md",
+      "packages/contracts/src/rpc.test.ts",
+      "packages/contracts/src/rpc.ts",
+      "reference/architecture.mdx",
+      "src/cli/commands/__tests__/dashboard-cwd-guard.test.ts",
+      "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+      "src/dashboard/frontend/src/components/chat/SubagentRail.test.tsx",
+      "src/dashboard/frontend/src/components/chat/SubagentRail.tsx",
+      "src/dashboard/frontend/src/components/chat/chat-types.ts",
+      "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+      "src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx",
+      "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.test.tsx",
+      "src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts",
+      "src/dashboard/frontend/src/components/chat/messagesTimeline/workLogRows.tsx",
+      "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.test.ts",
+      "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
+      "src/dashboard/server/routes/conversations.ts",
+      "src/dashboard/server/services/__tests__/format-tool-input.test.ts",
+      "src/dashboard/server/services/conversation/subagents.ts",
+      "src/dashboard/server/services/format-tool-input.ts",
+      "src/dashboard/server/ws-rpc.ts",
+      "src/lib/conversations/__tests__/summary-fork-handoff.test.ts",
+      "src/lib/overdeck/conversation-reads.ts",
+      "tests/unit/dashboard/server/routes/conversation-subagent-messages.test.ts",
+      "tests/unit/dashboard/server/services/conversation/subagents.test.ts"
+    ],
+    "recordedAt": "2026-07-27T06:51:31.024Z"
   }
 }
