@@ -115,7 +115,7 @@
     "recordedAt": "2026-07-27T12:29:11.863Z"
   },
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T12:47:17.634Z",
+  "updated": "2026-07-27T12:47:19.457Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "passed",
@@ -124,9 +124,9 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:29:58.912Z",
-    "updatedAt": "2026-07-27T12:47:17.565Z",
+    "updatedAt": "2026-07-27T12:47:17.581Z",
     "reviewNotes": "Unchanged approved HEAD; no correctness, security, requirements, or performance findings",
     "testNotes": "Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3154, branch feature/pan-3154, HEAD 2fbbaba87b (matches record.reviewedAtCommit). Ran: npm run typecheck (PASSED - root, hooks, evals, dashboard 62 known/0 new, frontend 0 known/0 new), npx vitest run --configLoader runner full suite (PASSED - 1243 files/11558 tests passed, 3 files/50 tests skipped, 0 failed), npx vitest run on the three PAN-3154-specific unit test files (conflict-gate.test.ts, branch-invalidation.test.ts, review-status-sync.test.ts) individually (PASSED - 58/58). npm run lint FAILED at the lint:file-size step: 'src/cli/commands/start.ts is 1277 lines (allowed 1276)'. Verified this is NOT caused by PAN-3154's own changes: `git log $(git merge-base HEAD origin/main)..HEAD -- src/cli/commands/start.ts` is empty (this branch never touched the file); `git diff origin/main HEAD -- src/cli/commands/start.ts` shows the branch is missing a provenance/startedBy feature that landed on main after this branch's base, net +1 line from unrelated formatting drift. This is main-drift staleness on an unrelated file, not a PAN-3154 defect, but the gate genuinely fails as configured today and blocks the pipeline until the branch rebases onto current origin/main (or gets an audited allowlist entry). UAT: not required - PAN-3154 is backend-only (deacon patrol, conflict-gate probe, review-status/DB schema plumbing, docs); its own PRD lists 'No dedicated dashboard badge for conflictsSince' as an explicit NonGoal, and no acceptance criteria reference UI/dashboard behavior. No browser verification performed.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -254,7 +254,7 @@
       },
       "costAtCloseOut": {
         "usd": 117.0631613,
-        "pricingAsOf": "2026-07-27T12:47:17.618Z"
+        "pricingAsOf": "2026-07-27T12:47:19.454Z"
       }
     },
     "merges": [
