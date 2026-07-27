@@ -14,7 +14,6 @@ import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
-import { sessionRotationRefused } from '../session-rotation.js';
 import { appendContinueSessionEntryForIssue } from '../xbrief/lifecycle-io.js';
 import { createSession, isPaneDead, killSession, listPaneValues, sessionExists } from '../tmux.js';
 import {
@@ -38,6 +37,7 @@ import {
   saveAgentRuntimeState,
   sessionResumeDriftReasons,
 } from './runtime-state.js';
+import { decideResumeSpawnPlan } from './resume-spawn-plan.js';
 import {
   hasAgentRuntimeInSubtree,
   writeLauncherScriptAtomic,
@@ -341,37 +341,33 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       // never reuse a session across a harness change.
       resumeDriftReasons.push(`legacy harness ${priorHarness}→${effectiveHarness} (PAN-1797 re-default)`);
     }
-    // PAN-2009: a dead ohmypi process is fresh-launchable recovery — force a fresh
-    // session (no `omp --resume`, which would hang waiting for ready.json) instead
-    // of a doomed resume-by-id. This is NOT session rotation (no live session or
-    // transcript exists to protect), so it is exempt from the PAN-1980 refusal
-    // below — it adds no compact seed and no drift reason. Live (suspended) omp and
-    // compact/drift resumes are unaffected.
-    const piDeadRecovery = effectiveHarness === 'ohmypi' && !piProcessWasAlive
-      && !compactSeed && resumeDriftReasons.length === 0;
+    const expectedClaudeJsonl = sessionFilePath(agentState.workspace, sessionId);
+    const spawnPlan = decideResumeSpawnPlan({
+      harness: effectiveHarness,
+      compactSeed: Boolean(compactSeed),
+      driftReasons: resumeDriftReasons,
+      piProcessWasAlive,
+      transcriptExists: effectiveHarness !== 'claude-code'
+        || claudeSessionTranscriptExists(agentState.workspace, sessionId),
+      allowExplicitRecovery: opts?.compact === true && opts.recoverGated === true,
+    });
+    const piDeadRecovery = spawnPlan.freshReason === 'pi-dead-recovery';
     if (piDeadRecovery) {
       logAgentLifecycleSync(normalizedId, 'resumeAgent: dead ohmypi process — fresh-launching for recovery instead of omp --resume (PAN-2009)');
     }
-    const expectedClaudeJsonl = sessionFilePath(agentState.workspace, sessionId);
-    const claudeJsonlMissingRecovery = effectiveHarness === 'claude-code'
-      && !compactSeed
-      && resumeDriftReasons.length === 0
-      && !claudeSessionTranscriptExists(agentState.workspace, sessionId);
-    if (claudeJsonlMissingRecovery) {
+    const claudeJsonlMissingRecovery = spawnPlan.freshReason === 'claude-jsonl-missing';
+    if (spawnPlan.clearSessionPointers) {
       logAgentLifecycleSync(
         normalizedId,
         `resumeAgent: saved Claude transcript is missing at ${expectedClaudeJsonl} — clearing stale pointers and fresh-launching (PAN-2895)`,
       );
       await clearAgentSessionPointers(normalizedId);
     }
-    const shouldResumeSavedSession = !compactSeed
-      && resumeDriftReasons.length === 0
-      && !piDeadRecovery
-      && !claudeJsonlMissingRecovery;
+    const shouldResumeSavedSession = spawnPlan.mode === 'resume-saved';
     // PAN-1980: refuse to rotate to a new session. A resume that would need a
     // fresh session — compact/overflow recovery or model/harness drift — now
     // errors and stops instead of starting a new transcript.
-    if (sessionRotationRefused({ compactSeed: Boolean(compactSeed), driftReasons: resumeDriftReasons, allowExplicitRecovery: opts?.compact === true && opts.recoverGated === true })) {
+    if (spawnPlan.rotationRefused) {
       const reason = compactSeed
         ? 'context-overflow compaction would respawn a fresh session'
         : `session drift (${resumeDriftReasons.join(', ')})`;
