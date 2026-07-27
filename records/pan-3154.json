@@ -108,7 +108,7 @@
     "recordedAt": "2026-07-27T11:59:06.536Z"
   },
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T12:23:03.816Z",
+  "updated": "2026-07-27T12:26:36.615Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "blocked",
@@ -118,7 +118,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-27T11:59:30.892Z",
     "updatedAt": "2026-07-27T12:23:03.803Z",
     "reviewNotes": "The merged v61-to-v62 migration can stamp schema 62 without adding started_by or affected_criteria",
     "testNotes": "retry",
