@@ -75,17 +75,17 @@
     "recordedAt": "2026-07-27T06:36:31.990Z"
   },
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T06:36:31.991Z",
+  "updated": "2026-07-27T06:36:32.926Z",
   "pipeline": {
     "issueId": "PAN-3184",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T06:36:13.041Z",
+    "updatedAt": "2026-07-27T06:36:32.925Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3184-review",
     "inspectNotes": "All 4 ACs met: isAutoResumableRole(work|strike) admits strikes (boot-reconciliation.ts:94-99); the hasCompletionMarker/stoppedByUser gate is gone so in-window stoppedByUser agents qualify while isRecentBootCandidate still rejects out-of-window ones; handleAgentStoppedEvent now gates on isAutoResumableRole and logs 'not auto-resumable' (deacon-auto-resume.ts:640-643). Verified end-to-end: applyBootReconciliationDecision resumes via handleAgentStoppedEvent, so admitted strikes are not dead-ended, and the removed workspace-path completion check is still covered by bootReconciliationSkipReason's agent-dir marker check. vitest boot-reconciliation.test.ts 22/22 pass, npm run typecheck clean. Non-blocking note for follow-up beads: deacon-auto-resume.ts:868 and :935 still filter role==='work', so strikes stay invisible to the batch patrol and reconcile safety net outside the boot window.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3199",
@@ -95,7 +95,9 @@
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/cloister/__tests__/pan-1908-reactive-liveness.test.ts",
-        "src/lib/cloister/deacon.ts"
+        "src/lib/cloister/deacon.ts",
+        "src/lib/codex/__tests__/app-server-host.test.ts",
+        "tests/unit/lib/overdeck/control-settings.test.ts"
       ],
       "declaredScopeUntouched": [],
       "declaredScope": [
@@ -128,10 +130,13 @@
         "src/lib/cloister/config.ts",
         "src/lib/cloister/deacon-auto-resume.ts",
         "src/lib/cloister/deacon.ts",
-        "src/lib/overdeck/control-settings.ts"
+        "src/lib/codex/__tests__/app-server-host.test.ts",
+        "src/lib/overdeck/control-settings.ts",
+        "tests/unit/lib/overdeck/control-settings.test.ts"
       ],
-      "recordedAt": "2026-07-27T05:50:18.081Z"
-    }
+      "recordedAt": "2026-07-27T06:36:31.990Z"
+    },
+    "reviewRequestedAt": "2026-07-27T06:36:32.925Z"
   },
   "closeOut": {
     "usage": {
