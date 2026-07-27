@@ -206,7 +206,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T04:42:56.733Z",
+  "updated": "2026-07-27T04:47:37.240Z",
   "pipeline": {
     "issueId": "PAN-2876",
     "reviewStatus": "pending",
@@ -249,18 +249,33 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "contracts-subagent-schema": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2876",
         "agentId": "agent-pan-2876",
         "pid": 2758020,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T04:42:56.733Z"
+        "claimedAt": "2026-07-27T04:42:56.733Z",
+        "itemId": "contracts-subagent-schema",
+        "outcome": "completed",
+        "reason": "Added shared SubagentSummary and ConversationResponse schemas, subagents event support, optional agentId subscription payload, frontend mirror types, and decoding tests.",
+        "releasedAt": "2026-07-27T04:47:37.240Z"
+      }
+    ],
+    "statusReasons": {
+      "contracts-subagent-schema": {
+        "reason": "Added shared SubagentSummary and ConversationResponse schemas, subagents event support, optional agentId subscription payload, frontend mirror types, and decoding tests.",
+        "updatedAt": "2026-07-27T04:47:37.240Z"
       }
     }
   },
   "statusOverrides": {
-    "contracts-subagent-schema": "running"
+    "contracts-subagent-schema": "completed",
+    "contracts-subagent-schema.contracts-subagent-schema.ac1": "completed",
+    "contracts-subagent-schema.contracts-subagent-schema.ac2": "completed",
+    "contracts-subagent-schema.contracts-subagent-schema.ac3": "completed",
+    "contracts-subagent-schema.contracts-subagent-schema.ac4": "completed"
   }
 }
