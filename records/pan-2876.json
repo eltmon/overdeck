@@ -202,6 +202,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-19T18:26:09.240Z"
+    },
+    {
+      "timestamp": "2026-07-27T06:51:38.050Z",
+      "reason": "end",
+      "note": "Anomalies: canonical overdeck-state auto-push repeatedly lost concurrent ref-lock races; no manual state git operations were used. The default 5s full-suite run exposed unrelated load-sensitive DB hooks, so I fixed non-hermetic dashboard spawn fixtures and added 20s suite timeouts for database-backed handoff tests; the final root suite passed 11,442 tests with 20s load-tolerant timeouts, and the full frontend suite passed 2,551 tests. No feature scope was skipped. Delivered subagent discovery, shared contracts, live/REST transcript transport, isolated frontend caching, the URL-backed rail, Agent-row transcript links, Agent/Task rendering parity, and docs. The user-facing Subagents note is in reference/architecture.mdx, the nearest published page."
     }
   ],
   "feedback": [],
@@ -271,7 +276,7 @@
     "recordedAt": "2026-07-27T06:51:31.024Z"
   },
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T06:51:36.414Z",
+  "updated": "2026-07-27T06:51:38.050Z",
   "pipeline": {
     "issueId": "PAN-2876",
     "reviewStatus": "pending",
