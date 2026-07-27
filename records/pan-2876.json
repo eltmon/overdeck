@@ -276,7 +276,7 @@
     "recordedAt": "2026-07-27T06:51:31.024Z"
   },
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T06:52:08.372Z",
+  "updated": "2026-07-27T06:52:10.857Z",
   "pipeline": {
     "issueId": "PAN-2876",
     "reviewStatus": "pending",
@@ -286,7 +286,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T06:52:07.895Z",
+    "updatedAt": "2026-07-27T06:52:07.925Z",
     "reviewNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-27T06:44:15.236Z by flywheel-orchestrator). It re-runs automatically after the deploy.",
     "inspectNotes": "All 4 ACs verified: contracts builds clean (tsdown), rpc.test.ts 3/3 pass covering subagents event decode, subscribeConversationMessages payload with+without agentId, and ConversationResponse with+without subagents (legacy shape still decodes); root npm run typecheck passes with chat-types.ts ConversationEvent extended. Note (non-blocking): ConversationResponse moved from interface to Schema.Struct so arrays are now ReadonlyArray — no consumer broke today, watch it if a caller ever mutates the result in place.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3204",
@@ -407,7 +407,7 @@
       },
       "costAtCloseOut": {
         "usd": 95.625694,
-        "pricingAsOf": "2026-07-27T06:52:07.949Z"
+        "pricingAsOf": "2026-07-27T06:52:10.853Z"
       }
     },
     "merges": [
