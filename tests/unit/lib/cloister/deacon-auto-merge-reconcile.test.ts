@@ -9,6 +9,7 @@ import {
   type PendingAutoMergeStatus,
 } from '../../../../src/lib/overdeck/merge-sync.js';
 import {
+  AUTO_MERGE_RECONCILE_FORGE_LIMIT,
   reconcileAutoMergeRowsWithDeps,
   type AutoMergeReconcileDeps,
 } from '../../../../src/lib/cloister/deacon-auto-merge-reconcile.js';
@@ -105,6 +106,7 @@ describe('reconcileAutoMergeRowsWithDeps', () => {
     expect(findMergedArtifact).toHaveBeenCalledWith({
       sourceBranch: 'feature/pan-101',
       artifactUrl: 'https://github.com/eltmon/overdeck/pull/101',
+      repository: 'eltmon/overdeck',
       cwd: '/tmp/overdeck',
     });
     expect(row(id).status).toBe('merged');
@@ -260,6 +262,41 @@ describe('reconcileAutoMergeRowsWithDeps', () => {
     expect(deps.warn).toHaveBeenCalledWith(expect.stringContaining('forge unavailable'));
   });
 
+  it('bounds forge checks per patrol and starts the batch concurrently', async () => {
+    const ids = Array.from(
+      { length: AUTO_MERGE_RECONCILE_FORGE_LIMIT + 1 },
+      (_, index) => `PAN-${4000 + index}`,
+    );
+    for (const issueId of ids) {
+      seedIssue(issueId);
+      seedAutoMerge(issueId, 'failed');
+    }
+    let active = 0;
+    let maxActive = 0;
+    const releases: Array<() => void> = [];
+    const findMergedArtifact = vi.fn(() => new Promise<null>((resolve) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      releases.push(() => {
+        active -= 1;
+        resolve(null);
+      });
+    }));
+    const deps = makeDeps({
+      getForgeAdapter: vi.fn(() => forgeAdapter(findMergedArtifact)),
+    });
+
+    const reconciliation = reconcileAutoMergeRowsWithDeps(deps);
+    await vi.waitFor(() => {
+      expect(findMergedArtifact).toHaveBeenCalledTimes(AUTO_MERGE_RECONCILE_FORGE_LIMIT);
+    });
+
+    expect(maxActive).toBe(AUTO_MERGE_RECONCILE_FORGE_LIMIT);
+    for (const release of releases) release();
+    await reconciliation;
+    expect(findMergedArtifact).toHaveBeenCalledTimes(AUTO_MERGE_RECONCILE_FORGE_LIMIT);
+  });
+
   it('reconciles problem rows beyond the default 100-row route page', async () => {
     const ids = Array.from({ length: 101 }, (_, index) => `PAN-${2000 + index}`);
     for (const issueId of ids) {
@@ -270,13 +307,21 @@ describe('reconcileAutoMergeRowsWithDeps', () => {
     const findMergedArtifact = vi.fn(async (input: { artifactUrl?: string }) => (
       input.artifactUrl?.endsWith(`/${targetIssue.slice(4)}`) ? mergedArtifact() : null
     ));
+    let now = NOW;
     const deps = makeDeps({
+      now: vi.fn(() => now),
       getForgeAdapter: vi.fn(() => forgeAdapter(findMergedArtifact)),
     });
 
-    await reconcileAutoMergeRowsWithDeps(deps);
+    const patrols = Math.ceil(ids.length / AUTO_MERGE_RECONCILE_FORGE_LIMIT);
+    for (let run = 0; run < patrols; run += 1) {
+      const callsBefore = findMergedArtifact.mock.calls.length;
+      await reconcileAutoMergeRowsWithDeps(deps);
+      expect(findMergedArtifact.mock.calls.length - callsBefore)
+        .toBeLessThanOrEqual(AUTO_MERGE_RECONCILE_FORGE_LIMIT);
+      now += 10 * 60 * 1000 + 1;
+    }
 
-    expect(findMergedArtifact).toHaveBeenCalledTimes(101);
     expect(listProblemAutoMerges(200).find((entry) => entry.issueId === targetIssue)).toBeUndefined();
   });
 
