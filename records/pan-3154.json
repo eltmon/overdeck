@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T11:02:31.343Z",
+  "updated": "2026-07-27T11:07:10.522Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "invalidation-agent-notify": {
-        "writerId": "agent-pan-3154",
-        "agentId": "agent-pan-3154",
-        "pid": 2847555,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T11:02:31.343Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3154",
@@ -112,6 +104,17 @@
         "outcome": "completed",
         "reason": "Added src/lib/cloister/branch-invalidation.ts (reconcileBranchInvalidation) with injectable deps: watches each project's origin/main head SHA on a 120s cooldown via git ls-remote (async, 30s timeout); on change, probes every in-pipeline branch with WI-1's probeBranchConflictPaths, marks newly-conflicting issues with conflictsSince + a replacing merge_conflict blocker (non-merge blockers preserved), emits per-issue + summary activity entries, dedups per SHA. Workspace resolution: agents-table workspace column first, then feature-<issue>* prefix scan covering -strike/-slot-N. Wired into deacon.ts runPatrol after reconcileStaleMergeBlockers. Extended conflict-gate.ts's clean-recovery path to clear conflictsSince alongside the blocker (FR-6) with a new regression test. 12 new branch-invalidation tests + 1 new conflict-gate test, all pass; full deacon/cloister suite (814+870 tests) green; full npm test: 11545 passed, only the pre-existing unrelated orphan-proposed-reconciler live-tmux-collision flake failed (same as before this item, a real dev-machine tmux session for PAN-3151 colliding with an unmocked listSessionNames() call). Deviation from PRD: used src/lib/overdeck/control-settings.ts getSetting/setSetting instead of the PRD-cited database/app-settings.js, because the overdeck-boundaries lint gate forbids cloister/* from importing the legacy panopticon.db surface directly -- control-settings.ts exposes the identical signature over the live app_settings table. Bumped scripts/file-size-allowlist.txt for deacon.ts (already at ceiling on origin/main), audited under PAN-3154. typecheck and lint both pass clean.",
         "releasedAt": "2026-07-27T10:57:20.216Z"
+      },
+      {
+        "writerId": "agent-pan-3154",
+        "agentId": "agent-pan-3154",
+        "pid": 2847555,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T11:02:31.343Z",
+        "itemId": "invalidation-agent-notify",
+        "outcome": "completed",
+        "reason": "Added notifyBranchInvalidated to branch-invalidation.ts, called from sweepProject for each newly-marked issue via resolveIssueFeedbackTarget: needsYou skipped silently (no second nudge channel for stopped agents), live target gets messageAgent(agentId, message, 'internal') naming the SHA and every conflicting path with pan sync-main rebase guidance. Dedup is structural via the existing conflictsSince.sha check. Threaded resolveFeedbackTarget/messageAgent through the deps interface for testability. 4 new/extended tests (AC-1/2/3 + folded-in assertions on the existing mark test) all pass; full cloister suite (818 tests) green; typecheck and lint clean.",
+        "releasedAt": "2026-07-27T11:07:10.522Z"
       }
     ],
     "statusReasons": {
@@ -126,6 +129,10 @@
       "branch-invalidation-sweep": {
         "reason": "Added src/lib/cloister/branch-invalidation.ts (reconcileBranchInvalidation) with injectable deps: watches each project's origin/main head SHA on a 120s cooldown via git ls-remote (async, 30s timeout); on change, probes every in-pipeline branch with WI-1's probeBranchConflictPaths, marks newly-conflicting issues with conflictsSince + a replacing merge_conflict blocker (non-merge blockers preserved), emits per-issue + summary activity entries, dedups per SHA. Workspace resolution: agents-table workspace column first, then feature-<issue>* prefix scan covering -strike/-slot-N. Wired into deacon.ts runPatrol after reconcileStaleMergeBlockers. Extended conflict-gate.ts's clean-recovery path to clear conflictsSince alongside the blocker (FR-6) with a new regression test. 12 new branch-invalidation tests + 1 new conflict-gate test, all pass; full deacon/cloister suite (814+870 tests) green; full npm test: 11545 passed, only the pre-existing unrelated orphan-proposed-reconciler live-tmux-collision flake failed (same as before this item, a real dev-machine tmux session for PAN-3151 colliding with an unmocked listSessionNames() call). Deviation from PRD: used src/lib/overdeck/control-settings.ts getSetting/setSetting instead of the PRD-cited database/app-settings.js, because the overdeck-boundaries lint gate forbids cloister/* from importing the legacy panopticon.db surface directly -- control-settings.ts exposes the identical signature over the live app_settings table. Bumped scripts/file-size-allowlist.txt for deacon.ts (already at ceiling on origin/main), audited under PAN-3154. typecheck and lint both pass clean.",
         "updatedAt": "2026-07-27T10:57:20.216Z"
+      },
+      "invalidation-agent-notify": {
+        "reason": "Added notifyBranchInvalidated to branch-invalidation.ts, called from sweepProject for each newly-marked issue via resolveIssueFeedbackTarget: needsYou skipped silently (no second nudge channel for stopped agents), live target gets messageAgent(agentId, message, 'internal') naming the SHA and every conflicting path with pan sync-main rebase guidance. Dedup is structural via the existing conflictsSince.sha check. Threaded resolveFeedbackTarget/messageAgent through the deps interface for testability. 4 new/extended tests (AC-1/2/3 + folded-in assertions on the existing mark test) all pass; full cloister suite (818 tests) green; typecheck and lint clean.",
+        "updatedAt": "2026-07-27T11:07:10.522Z"
       }
     }
   },
@@ -146,6 +153,9 @@
     "branch-invalidation-sweep.branch-invalidation-sweep.ac3": "completed",
     "branch-invalidation-sweep.branch-invalidation-sweep.ac4": "completed",
     "branch-invalidation-sweep.branch-invalidation-sweep.ac5": "completed",
-    "invalidation-agent-notify": "running"
+    "invalidation-agent-notify": "completed",
+    "invalidation-agent-notify.invalidation-agent-notify.ac1": "completed",
+    "invalidation-agent-notify.invalidation-agent-notify.ac2": "completed",
+    "invalidation-agent-notify.invalidation-agent-notify.ac3": "completed"
   }
 }
