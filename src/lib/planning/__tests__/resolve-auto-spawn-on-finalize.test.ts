@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  autoSpawnConsentSpentMarkerPath,
   readAutoSpawnOnFinalizeFlag,
   resolveAutoSpawnOnFinalize,
   updateAutoSpawnConsentAfterWorkStart,
@@ -71,15 +72,25 @@ describe('resolveAutoSpawnOnFinalize', () => {
     expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(false);
   });
 
-  it('keeps a successful work start successful when consent cleanup fails', async () => {
+  it('records durable spent consent when primary cleanup fails', async () => {
+    stampFlag(true);
     const logWarning = vi.fn();
+    const spentMarker = autoSpawnConsentSpentMarkerPath(ISSUE);
 
     await expect(updateAutoSpawnConsentAfterWorkStart(ISSUE, true, {
-      writeFlag: async () => { throw new Error('read-only filesystem'); },
+      writeFlag: async () => { throw new Error('read-only consent file'); },
       logWarning,
+      now: () => '2026-07-27T06:00:00.000Z',
     })).resolves.toBeUndefined();
 
-    expect(logWarning).toHaveBeenCalledWith(expect.stringContaining('consent cleanup failed: read-only filesystem'));
+    expect(existsSync(spentMarker)).toBe(true);
+    expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(false);
+    await expect(resolveAutoSpawnOnFinalize(undefined, ISSUE)).resolves.toBe(false);
+    expect(logWarning).toHaveBeenCalledWith(expect.stringContaining('durable spent marker was recorded'));
+
+    await writeAutoSpawnOnFinalizeFlag(ISSUE, true);
+    expect(existsSync(spentMarker)).toBe(false);
+    expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(true);
   });
 
   it('falls back to the current-cycle flag when the request omits autoSpawn', async () => {

@@ -61,9 +61,18 @@ export function autoSpawnOnFinalizeFlagPath(issueId: string): string {
   return join(overdeckHome, 'agents', `planning-${issueId.toLowerCase()}`, 'auto-spawn-on-finalize.json');
 }
 
+export function autoSpawnConsentSpentMarkerPath(issueId: string): string {
+  const overdeckHome = process.env['OVERDECK_HOME'] ?? join(homedir(), '.overdeck');
+  return join(overdeckHome, 'pending', 'auto-spawn-consent', `${issueId.toLowerCase()}.json`);
+}
+
+const spentAutoSpawnConsentInProcess = new Set<string>();
+
 /** Read the persisted auto-spawn-on-finalize flag for an issue (false if unset/unreadable). */
 export function readAutoSpawnOnFinalizeFlag(issueId: string): boolean {
   try {
+    const spentMarker = autoSpawnConsentSpentMarkerPath(issueId);
+    if (spentAutoSpawnConsentInProcess.has(spentMarker) || existsSync(spentMarker)) return false;
     const flagFile = autoSpawnOnFinalizeFlagPath(issueId);
     if (!existsSync(flagFile)) return false;
     const flag = JSON.parse(readFileSync(flagFile, 'utf-8')) as { autoSpawnOnFinalize?: unknown };
@@ -75,6 +84,12 @@ export function readAutoSpawnOnFinalizeFlag(issueId: string): boolean {
 
 export async function readAutoSpawnOnFinalizeFlagAsync(issueId: string): Promise<boolean> {
   try {
+    const spentMarker = autoSpawnConsentSpentMarkerPath(issueId);
+    if (spentAutoSpawnConsentInProcess.has(spentMarker)) return false;
+    try {
+      await access(spentMarker);
+      return false;
+    } catch { /* no compensating spent marker */ }
     const flag = JSON.parse(await readFile(autoSpawnOnFinalizeFlagPath(issueId), 'utf-8')) as { autoSpawnOnFinalize?: unknown };
     return flag.autoSpawnOnFinalize === true;
   } catch {
@@ -84,8 +99,11 @@ export async function readAutoSpawnOnFinalizeFlagAsync(issueId: string): Promise
 
 export async function writeAutoSpawnOnFinalizeFlag(issueId: string, enabled: boolean): Promise<void> {
   const flagFile = autoSpawnOnFinalizeFlagPath(issueId);
+  const spentMarker = autoSpawnConsentSpentMarkerPath(issueId);
   await mkdir(dirname(flagFile), { recursive: true });
   await writeFile(flagFile, JSON.stringify({ autoSpawnOnFinalize: enabled }));
+  await rm(spentMarker, { force: true });
+  spentAutoSpawnConsentInProcess.delete(spentMarker);
 }
 
 export async function updateAutoSpawnConsentAfterWorkStart(
@@ -93,17 +111,38 @@ export async function updateAutoSpawnConsentAfterWorkStart(
   accepted: boolean,
   dependencies: {
     writeFlag?: typeof writeAutoSpawnOnFinalizeFlag;
+    writeSpentMarker?: (issueId: string, cleanupError: string) => Promise<void>;
     logWarning?: (message: string) => void;
+    now?: () => string;
   } = {},
 ): Promise<void> {
   if (!accepted) return;
   try {
     await (dependencies.writeFlag ?? writeAutoSpawnOnFinalizeFlag)(issueId, false);
+    return;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    (dependencies.logWarning ?? console.warn)(
-      `[planning] Work start for ${issueId.toUpperCase()} succeeded, but auto-start consent cleanup failed: ${message}`,
-    );
+    const cleanupError = error instanceof Error ? error.message : String(error);
+    const spentMarker = autoSpawnConsentSpentMarkerPath(issueId);
+    spentAutoSpawnConsentInProcess.add(spentMarker);
+    try {
+      await (dependencies.writeSpentMarker ?? (async (markerIssueId, markerCleanupError) => {
+        const markerPath = autoSpawnConsentSpentMarkerPath(markerIssueId);
+        await mkdir(dirname(markerPath), { recursive: true });
+        await writeFile(markerPath, JSON.stringify({
+          issueId: markerIssueId.toUpperCase(),
+          spentAt: (dependencies.now ?? (() => new Date().toISOString()))(),
+          cleanupError: markerCleanupError,
+        }));
+      }))(issueId, cleanupError);
+      (dependencies.logWarning ?? console.warn)(
+        `[planning] Work start for ${issueId.toUpperCase()} succeeded; primary consent cleanup failed, so a durable spent marker was recorded: ${cleanupError}`,
+      );
+    } catch (markerError) {
+      const markerMessage = markerError instanceof Error ? markerError.message : String(markerError);
+      (dependencies.logWarning ?? console.warn)(
+        `[planning] Work start for ${issueId.toUpperCase()} succeeded, but consent cleanup and durable spent-marker persistence both failed; consent is fail-closed for this process: ${cleanupError}; marker: ${markerMessage}`,
+      );
+    }
   }
 }
 
