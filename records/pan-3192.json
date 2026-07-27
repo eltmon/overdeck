@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:32:47.311Z",
-  "updated": "2026-07-27T05:24:09.510Z",
+  "updated": "2026-07-27T05:24:12.291Z",
   "pipeline": {
     "issueId": "PAN-3192",
     "reviewStatus": "pending",
@@ -25,7 +25,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T04:58:17.773Z"
+    "updatedAt": "2026-07-27T04:58:17.773Z",
+    "reviewRequestedAt": "2026-07-27T05:24:11.924Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3198",
+    "panDoneRecoveredAt": "2026-07-27T05:24:11.924Z"
   },
   "closeOut": {
     "usage": {
