@@ -343,17 +343,17 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T15:11:57.422Z",
+  "updated": "2026-07-27T15:12:03.368Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "passed",
-    "testStatus": "passed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T15:11:55.319Z",
+    "updatedAt": "2026-07-27T15:12:03.342Z",
     "reviewNotes": "Agent re-review request (19/25): Fixed review issues",
     "testNotes": "Workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3151, branch feature/pan-3151, HEAD 403b8c71ba (matches reviewedAtCommit; review already passed cycle 9). Gates: bun install --frozen-lockfile OK; npm run typecheck OK (root, hooks, evals, dashboard 61/0 new, frontend 0/0 new); npm run lint OK (eslint + all custom guards incl. file-size/circular/ratchet/quarantine, exit 0); npm run build OK (both CLI and frontend bundles). Tests: root `npx vitest run --configLoader runner --no-file-parallelism` = 11641 passed, 2 failed, 50 skipped (1253 files, 1 failed file). The 2 failures are in src/lib/__tests__/spawn-provenance-contract.test.ts (resolveAgentStartedBy fail-closed + flywheel-origin normalization) — verified via `git diff main...HEAD` that this test file AND its implementation (src/lib/agents/spawn-prep.ts, spawn.ts) are byte-identical to main, i.e. completely outside PAN-3151's diff; re-ran the file in isolation and the failure is deterministic (not flaky), so it is a pre-existing bug already on main, unrelated to and unaffected by this branch. Frontend `npm test` (src/dashboard/frontend) = 276 files / 2556 tests, all passed. UAT: dashboard-trend-display (IssueHeader.tsx banner gated on stuckReason==='review-not-converging', rendering the reviewCycleHistory series) and pan-show-trend (show.ts review-cycles line) are UI/CLI-facing changes with no dedicated automated test proving their acceptance criteria (noted gap, not fixed per test-role boundary: no code/test edits). No live tracker-backed issue with reviewCycleHistory data exists anywhere to exercise end-to-end: this feature is unmerged so no review cycle in production ever ran through this branch's own recording logic (review/test roles run from project root/main); confirmed via read-only query against ~/.overdeck/overdeck.db that PAN-3151's own review_status row has review_cycle_history=null despite 9 real review cycles, and no other row in the DB has it populated. Rebuilt and used this workspace's own isolated devcontainer (feature-pan-3151.overdeck.localhost / api-feature-pan-3151.overdeck.localhost, OVERDECK_DISABLE_DEACON=1 peer dashboard) rather than the shared production dashboard, to avoid disrupting the ~124 other active agents. App boots cleanly, one unrelated console error (PostHog init without token, dev-sandbox noise only). Verified live in-browser via dynamic import of the actual Vite-served module: `reviewCycleSeries({reviewCycleHistory:[12,7,5,4,12]})` returns exactly \"12 → 7 → 5 → 4 → 12\" (matches dashboard-trend-display.ac1's expected string verbatim) and returns null for no history. Source-inspected the IssueHeader.tsx JSX: reuses var(--warning) styling matching the existing sibling 'Stash warning ribbon (PAN-847)' pattern in the same file, consistent with the pan-style-guide 'no new color semantics' requirement from the item narrative. Source-inspected show.ts diff: correctly reads pipelineStatus.reviewCycleHistory, joins with ' → ', prints under a dimmed 'review-cycles' label when not stuck, and separately surfaces parsed.counts inline on the 'blocked' line when stuckReason==='review-not-converging'; minor deviation from the item narrative's literal '(N blocked cycles)' suffix (count is implicit in the series, not restated), judged cosmetic and non-blocking given review already passed this exact commit. Live `pan show PAN-3151` confirmed the negative-case behavior (no reviewCycleHistory → no review-cycles line printed), matching pan-show-trend.ac2. Confirmed docs items present: CLAUDE.md:386 'Review Convergence Gate (PAN-3151)', docs/REVIEW-AGENT-ARCHITECTURE.md:450 'Review convergence gate (PAN-3151)', docs/XBRIEF.md:533 projected-surface thresholds and sizeJustification escape.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
@@ -373,9 +373,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 30909851,
-            "output": 675344,
-            "cacheRead": 167093760,
+            "input": 30925928,
+            "output": 680022,
+            "cacheRead": 168471552,
             "cacheWrite": 0
           }
         },
@@ -404,9 +404,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 30909851,
-          "output": 675344,
-          "cacheRead": 167093760,
+          "input": 30925928,
+          "output": 680022,
+          "cacheRead": 168471552,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -423,8 +423,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 284.2833333,
-        "pricingAsOf": "2026-07-27T15:11:57.417Z"
+        "usd": 285.1929543,
+        "pricingAsOf": "2026-07-27T15:12:03.355Z"
       }
     },
     "merges": [
