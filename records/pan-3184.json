@@ -75,22 +75,23 @@
     "recordedAt": "2026-07-27T06:36:31.990Z"
   },
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T06:40:08.119Z",
+  "updated": "2026-07-27T06:42:44.846Z",
   "pipeline": {
     "issueId": "PAN-3184",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T06:36:49.685Z",
-    "updatedAt": "2026-07-27T06:40:08.087Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3184-review",
+    "updatedAt": "2026-07-27T06:42:44.734Z",
+    "reviewNotes": "Cycle-1 blockers are fixed; all requirements are covered and no blocking correctness, security, or performance findings remain",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs met: isAutoResumableRole(work|strike) admits strikes (boot-reconciliation.ts:94-99); the hasCompletionMarker/stoppedByUser gate is gone so in-window stoppedByUser agents qualify while isRecentBootCandidate still rejects out-of-window ones; handleAgentStoppedEvent now gates on isAutoResumableRole and logs 'not auto-resumable' (deacon-auto-resume.ts:640-643). Verified end-to-end: applyBootReconciliationDecision resumes via handleAgentStoppedEvent, so admitted strikes are not dead-ended, and the removed workspace-path completion check is still covered by bootReconciliationSkipReason's agent-dir marker check. vitest boot-reconciliation.test.ts 22/22 pass, npm run typecheck clean. Non-blocking note for follow-up beads: deacon-auto-resume.ts:868 and :935 still filter role==='work', so strikes stay invisible to the batch patrol and reconcile safety net outside the boot window.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3199",
-    "reviewedAtCommit": "b1e438f61ee3667983010a6fdaf6059fd160ff3a",
+    "reviewedAtCommit": "ebe5feb29370aabba5291d5fbba4213ceb9c88db",
     "lastVerifiedCommit": "b1e438f61ee3667983010a6fdaf6059fd160ff3a",
     "reviewRequestedAt": "2026-07-27T06:36:49.685Z",
     "reviewSpawnedAt": "2026-07-27T06:36:13.039Z",
@@ -144,9 +145,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2613314,
-            "output": 107555,
-            "cacheRead": 25954816,
+            "input": 2674506,
+            "output": 138025,
+            "cacheRead": 30022656,
             "cacheWrite": 0
           }
         },
@@ -161,15 +162,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 5632967,
-          "output": 262430,
-          "cacheRead": 138012672,
+          "input": 5694159,
+          "output": 292900,
+          "cacheRead": 142080512,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 105.044071,
-        "pricingAsOf": "2026-07-27T06:40:08.115Z"
+        "usd": 108.298051,
+        "pricingAsOf": "2026-07-27T06:42:44.836Z"
       }
     },
     "merges": [
