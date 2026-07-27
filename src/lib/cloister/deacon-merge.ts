@@ -11,10 +11,14 @@ import { withConcurrencyLimit } from '../concurrency.js';
 import { loadReviewStatuses, setReviewStatusSync, reviewGatesPassedSync } from '../review-status.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { getMergeSetSync } from '../merge-set.js';
 import { sessionExistsSync, sendKeys } from '../tmux.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { loadCloisterConfig } from './config.js';
 import { getAutoCloseOutCanonicalState, sweepAutoCloseOutCache } from './deacon-canonical-state.js';
+import { isStuckMergingState, observeGitHubBranchMerge } from './deacon-stuck-merging.js';
+
+export { reconcileStuckMergingStates } from './deacon-stuck-merging.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -150,11 +154,18 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
     for (const [issueId, status] of Object.entries(statuses)) {
       const postMergeIncomplete = status.mergeStatus === 'merged' && status.mergeStep === 'post-merge-cleanup';
       if (status.mergeStatus === 'merged' && !postMergeIncomplete) continue;
+      if (isStuckMergingState(status, Date.now())) continue;
       if (!postMergeIncomplete && staleMergeReconciled.has(issueId)) continue;
 
       const project = resolveProjectFromIssueSync(issueId);
       if (!project) continue;
 
+      const mergeSet = getMergeSetSync(issueId);
+      const shouldObserveForge = !resolveGitHubIssueSync(issueId).isGitHub
+        || mergeSet?.repos.some((repo) => repo.forge !== 'github') === true;
+      const mergeRelevant = status.readyForMerge === true
+        || ['merging', 'verifying', 'queued', 'failed'].includes(status.mergeStatus ?? '')
+        || ['merging', 'failed'].includes(mergeSet?.status ?? '');
       // Closed-out issues are TERMINAL: close-out flips the spec to
       // completed/cancelled and clears review status. Treating the cleared/
       // resurrected row as "stale" here re-fires the post-merge handoff,
@@ -207,25 +218,19 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
       // unrelated commits landed on main with `(PAN-977)` references and the
       // deacon trusted them. GitHub's API is the only authoritative source.
       if (!isMerged) {
-        const { resolveGitHubIssueSync: _resolveGitHubIssue } = await import('../tracker-utils.js');
-        const ghResolved = _resolveGitHubIssue(issueId);
-        if (ghResolved.isGitHub) {
-          try {
-            const repoArg = `${ghResolved.owner}/${ghResolved.repo}`;
-            const { stdout } = await execFileAsync(
-              'gh', ['pr', 'list', '--repo', repoArg, '--head', branch, '--state', 'all', '--json', 'number,mergedAt,mergeCommit', '--limit', '5'],
-              { cwd: project.projectPath },
-            );
-            const prs = JSON.parse(stdout || '[]') as Array<{ number: number; mergedAt: string | null; mergeCommit: unknown | null }>;
-            if (prs.some((pr) => pr.mergedAt || pr.mergeCommit)) {
-              isMerged = true;
-            }
-          } catch {
-            // gh query failed — leave isMerged as false rather than guess.
-          }
+        const githubObservation = await observeGitHubBranchMerge(issueId, branch, project.projectPath);
+        isMerged = githubObservation.merged;
+      }
+      if (shouldObserveForge && mergeRelevant) {
+        try {
+          const observation = await (await import('./merge-completeness.js')).observeForgeMergeState(issueId);
+          const blocker = observation.repos.find((repo) => repo.state === 'unverifiable');
+          if (blocker) { console.warn(`[deacon] ${issueId}: forge merge state is unverifiable — ${blocker.reason}`); continue; }
+          isMerged = observation.complete && observation.hasPositiveMergedEvidence;
+        } catch (error) {
+          console.warn(`[deacon] ${issueId}: forge merge observation failed — ${error instanceof Error ? error.message : String(error)}`); continue;
         }
       }
-
       if (isMerged) {
         // PAN-1994: Defer terminalization only when a genuine re-plan is in
         // progress. An active planning-<issue> agent or a spec back at

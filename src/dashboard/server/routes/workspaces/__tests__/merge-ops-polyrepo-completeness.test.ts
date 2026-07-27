@@ -108,6 +108,40 @@ vi.mock('../../../services/merge-queue-service.js', () => ({
 vi.mock('../../../../../lib/merge-set.js', () => ({
   ensureMergeSetForIssueSync: vi.fn(() => mocks.mergeSet),
   getMergeSetSync: vi.fn(() => mocks.mergeSet),
+  patchMergeSetRepoSync: vi.fn((_issueId: string, repoKey: string, expected: any, patch: any) => {
+    const current = mocks.mergeSet?.repos.find((repo: any) => repo.repoKey === repoKey);
+    if (!current
+      || current.sourceBranch !== expected.sourceBranch
+      || current.targetBranch !== expected.targetBranch
+      || current.artifactUrl !== expected.artifactUrl
+      || current.artifactId !== expected.artifactId) return false;
+    mocks.mergeSet = {
+      ...mocks.mergeSet,
+      repos: mocks.mergeSet.repos.map((repo: any) => (
+        repo.repoKey === repoKey ? { ...repo, ...patch } : repo
+      )),
+    };
+    return true;
+  }),
+  patchMergeSetReposSync: vi.fn((_issueId: string, patches: any[]) => {
+    const matches = patches.every(({ repoKey, expected }) => {
+      const current = mocks.mergeSet?.repos.find((repo: any) => repo.repoKey === repoKey);
+      return current
+        && current.sourceBranch === expected.sourceBranch
+        && current.targetBranch === expected.targetBranch
+        && current.artifactUrl === expected.artifactUrl
+        && current.artifactId === expected.artifactId;
+    });
+    if (!matches) return false;
+    mocks.mergeSet = {
+      ...mocks.mergeSet,
+      repos: mocks.mergeSet.repos.map((repo: any) => {
+        const planned = patches.find(({ repoKey }) => repoKey === repo.repoKey);
+        return planned ? { ...repo, ...planned.patch } : repo;
+      }),
+    };
+    return true;
+  }),
   upsertMergeSetSync: (mergeSet: any) => {
     mocks.mergeSet = mergeSet;
     mocks.upsertMergeSet(mergeSet);
@@ -176,7 +210,12 @@ describe('coordinated polyrepo merge completeness gate', () => {
     mocks.discoverArtifact.mockResolvedValue(null);
     mocks.findMergedArtifact.mockResolvedValue(null);
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
-    mocks.exec.mockResolvedValue({ stdout: '', stderr: '' });
+    mocks.exec.mockImplementation(async (command) => ({
+      stdout: command.includes('rev-list --count')
+        ? '2\n'
+        : command.includes('rev-parse') ? 'current-head-sha\n' : '',
+      stderr: '',
+    }));
   });
 
   it('blocks the merge before lifecycle when a required sibling is stranded', async () => {
@@ -185,7 +224,9 @@ describe('coordinated polyrepo merge completeness gate', () => {
       repo('repo-b'),
     ]);
     mocks.exec.mockImplementation(async (command) => ({
-      stdout: command.includes('rev-list --count') ? '2\n' : '',
+      stdout: command.includes('rev-list --count')
+        ? '2\n'
+        : command.includes('rev-parse') ? 'current-head-sha\n' : '',
       stderr: '',
     }));
 
@@ -228,5 +269,85 @@ describe('coordinated polyrepo merge completeness gate', () => {
     expect(mocks.mergeSet.status).toBe('merged');
     expect(mocks.reviewStatus).toEqual(expect.objectContaining({ mergeStatus: 'merged' }));
     expect(mocks.postMergeLifecycle).toHaveBeenCalledTimes(1);
+  });
+
+  it('self-heals a fully forge-merged set without issuing another merge request', async () => {
+    mocks.mergeSet = mergeSet([
+      repo('repo-a', {
+        artifactUrl: 'https://github.com/org/repo-a/pull/1',
+        mergeStatus: 'failed',
+      }),
+      repo('repo-b', {
+        artifactUrl: 'https://github.com/org/repo-b/pull/2',
+        mergeStatus: 'pending',
+      }),
+    ]);
+    mocks.findMergedArtifact.mockImplementation(async ({ cwd }: { cwd: string }) => ({
+      forge: 'github',
+      created: false,
+      id: cwd.endsWith('repo-a') ? '1' : '2',
+      url: cwd.endsWith('repo-a')
+        ? 'https://github.com/org/repo-a/pull/1'
+        : 'https://github.com/org/repo-b/pull/2',
+    }));
+
+    const result = await triggerMerge('PAN-2467');
+
+    expect(result).toEqual(expect.objectContaining({
+      success: true,
+      statusCode: 200,
+      message: 'No changed repos remain for PAN-2467',
+      mergeStatus: 'merged',
+      repos: [],
+    }));
+    expect(mocks.mergeSet.repos).toEqual([
+      expect.objectContaining({ repoKey: 'repo-a', mergeStatus: 'merged' }),
+      expect.objectContaining({ repoKey: 'repo-b', mergeStatus: 'merged' }),
+    ]);
+    expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
+    expect(mocks.reviewStatus).toEqual(expect.objectContaining({ mergeStatus: 'merged' }));
+    expect(mocks.postMergeLifecycle).toHaveBeenCalledTimes(1);
+  });
+
+  it('merges and verifies only repos that remain unmerged after forge refresh', async () => {
+    mocks.mergeSet = mergeSet([
+      repo('repo-a', {
+        artifactUrl: 'https://github.com/org/repo-a/pull/1',
+        mergeStatus: 'failed',
+      }),
+      repo('repo-b', {
+        artifactUrl: 'https://github.com/org/repo-b/pull/2',
+        mergeStatus: 'pending',
+      }),
+    ]);
+    mocks.findMergedArtifact.mockImplementation(async ({ cwd }: { cwd: string }) => (
+      cwd.endsWith('repo-a')
+        ? {
+            forge: 'github',
+            created: false,
+            id: '1',
+            url: 'https://github.com/org/repo-a/pull/1',
+          }
+        : null
+    ));
+
+    const result = await triggerMerge('PAN-2467');
+
+    expect(result).toEqual(expect.objectContaining({
+      success: true,
+      mergeStatus: 'merged',
+      repos: [{ repo: 'repo-b', success: true, message: 'Merged via github' }],
+    }));
+    expect(mocks.mergeReviewArtifact).toHaveBeenCalledTimes(1);
+    expect(mocks.mergeReviewArtifact).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'https://github.com/org/repo-b/pull/2',
+    }));
+    expect(mocks.mergeReviewArtifact).not.toHaveBeenCalledWith(expect.objectContaining({
+      url: 'https://github.com/org/repo-a/pull/1',
+    }));
+    expect(mocks.mergeSet.repos).toEqual([
+      expect.objectContaining({ repoKey: 'repo-a', verificationStatus: 'passed', mergeStatus: 'merged' }),
+      expect.objectContaining({ repoKey: 'repo-b', verificationStatus: 'skipped', mergeStatus: 'merged' }),
+    ]);
   });
 });

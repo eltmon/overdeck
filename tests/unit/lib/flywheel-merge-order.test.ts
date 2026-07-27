@@ -276,12 +276,14 @@ describe('listEligibleCandidatesByProject eligibility gate (PAN-1759, moved by P
         'PAN-3': { readyForMerge: true, reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', prNumber: 3 },
         'PAN-4': { readyForMerge: true, reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', deaconIgnored: true, prNumber: 4 },
         'PAN-5': { readyForMerge: false, reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', prNumber: 5 },
+        'PAN-6': { readyForMerge: true, reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', mergeStatus: 'merged', prNumber: 6 },
         'MIN-9': { readyForMerge: true, reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', prNumber: 9 },
       }),
-      mergeGateEligibility: (rs: { reviewStatus?: string; testStatus?: string; verificationStatus?: string }) => {
+      mergeGateEligibility: (rs: { reviewStatus?: string; testStatus?: string; verificationStatus?: string; mergeStatus?: string }) => {
         if (rs.reviewStatus !== 'passed') return { eligible: false, reason: `review is ${rs.reviewStatus}` };
         if (rs.testStatus !== 'passed' && rs.testStatus !== 'skipped') return { eligible: false, reason: `test is ${rs.testStatus}` };
         if (rs.verificationStatus === 'failed') return { eligible: false, reason: 'verification failed' };
+        if (rs.mergeStatus === 'merged') return { eligible: false, reason: 'already merged' };
         return { eligible: true };
       },
     }));
@@ -290,7 +292,7 @@ describe('listEligibleCandidatesByProject eligibility gate (PAN-1759, moved by P
     const candidates = listEligibleCandidatesByProject('/repo/overdeck');
 
     // PAN-3 alone survives: PAN-1 is mid-review, PAN-2 still testing, PAN-4 is
-    // deacon-ignored, PAN-5 is not ready, and MIN-9 belongs to another project.
+    // deacon-ignored, PAN-5 is not ready, PAN-6 is merged, and MIN-9 belongs to another project.
     expect(candidates.map((candidate) => candidate.issueId)).toEqual(['PAN-3']);
     expect(candidates[0]).toMatchObject({ issueId: 'PAN-3', pr: 3 });
     vi.resetModules();
