@@ -7747,3 +7747,9 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
   * **The failure was silent**: `gh issue comment` returned a URL and exit 0, and the issue closed normally. Nothing indicated the body had been gutted. **Only re-reading the posted artifact revealed it.**
 - **RUN TOTALS: 45 close-outs (PAN-2802 closed as fixed-elsewhere), 12 merges, 9 substrate bugs filed of which 7 fixed, merged and closed out.**
 - **LESSON: verify what you published, not just that publishing succeeded.** A zero exit code and a returned URL attest to delivery, never to content. **The same discipline I applied all night to other systems' claims — check the artifact, not the report — applies to my own output, and I nearly skipped it because the command "worked".**
+
+## RUN-72 tick 36 (2026-07-27 16:03Z) — PAN-3151 came up green and merged
+- **PAN-3151 went review+test green during the watch and is MERGED (`8dfaa9cbe3`, confirmed in `origin/main`).** PR #3207 was `MERGEABLE/CLEAN`, 0 failing, 0 in flight. Hand-merged per PAN policy; also sat in the panopticon-cli train at `mergeOrder: 1`, same as the last three.
+- **Fourth watch tick to catch newly-green work** (PAN-3111, PAN-3154, PAN-3191, now PAN-3151). **The arrival pattern is genuinely unpredictable — long quiet stretches then a merge — which is the whole argument for sweeping properly on every tick rather than trusting the previous tick's emptiness.**
+- Close-out blocks on the established transient trio; CI `in_progress` on the merge commit, so no deploy this tick. Checked CI as its own command.
+- **RUN TOTALS: 45 close-outs, 13 merges, 9 substrate bugs filed of which 7 fixed, merged and closed out.**
