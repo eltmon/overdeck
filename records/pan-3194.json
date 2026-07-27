@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:42:41.037Z",
-  "updated": "2026-07-27T05:14:37.188Z",
+  "updated": "2026-07-27T05:19:21.567Z",
   "pipeline": {
     "issueId": "PAN-3194",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "stopped-listing-probe": {
-        "writerId": "agent-pan-3194",
-        "agentId": "agent-pan-3194",
-        "pid": 369021,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:14:37.188Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3194",
@@ -75,6 +67,17 @@
         "outcome": "completed",
         "reason": "Verified saved Claude session IDs against their JSONL transcript in sync and async lifecycle probes, routed missing transcripts to fresh start, and added regression coverage.",
         "releasedAt": "2026-07-27T05:14:20.917Z"
+      },
+      {
+        "writerId": "agent-pan-3194",
+        "agentId": "agent-pan-3194",
+        "pid": 369021,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:14:37.188Z",
+        "itemId": "stopped-listing-probe",
+        "outcome": "completed",
+        "reason": "Applied the shared transcript existence predicate to stopped-agent lifecycle listings, preserved present-transcript resume offers, and added route regression coverage.",
+        "releasedAt": "2026-07-27T05:19:21.566Z"
       }
     ],
     "statusReasons": {
@@ -85,6 +88,10 @@
       "lifecycle-probe-verifies-transcript": {
         "reason": "Verified saved Claude session IDs against their JSONL transcript in sync and async lifecycle probes, routed missing transcripts to fresh start, and added regression coverage.",
         "updatedAt": "2026-07-27T05:14:20.917Z"
+      },
+      "stopped-listing-probe": {
+        "reason": "Applied the shared transcript existence predicate to stopped-agent lifecycle listings, preserved present-transcript resume offers, and added route regression coverage.",
+        "updatedAt": "2026-07-27T05:19:21.566Z"
       }
     }
   },
@@ -99,6 +106,9 @@
     "lifecycle-probe-verifies-transcript.lifecycle-probe-verifies-transcript.ac3": "completed",
     "lifecycle-probe-verifies-transcript.lifecycle-probe-verifies-transcript.ac4": "completed",
     "lifecycle-probe-verifies-transcript.lifecycle-probe-verifies-transcript.ac5": "completed",
-    "stopped-listing-probe": "running"
+    "stopped-listing-probe": "completed",
+    "stopped-listing-probe.stopped-listing-probe.ac1": "completed",
+    "stopped-listing-probe.stopped-listing-probe.ac2": "completed",
+    "stopped-listing-probe.stopped-listing-probe.ac3": "completed"
   }
 }
