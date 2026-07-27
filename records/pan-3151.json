@@ -146,20 +146,20 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T11:58:39.125Z",
+  "updated": "2026-07-27T11:58:39.975Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T11:56:49.719Z",
+    "updatedAt": "2026-07-27T11:58:39.973Z",
     "reviewNotes": "Verification failed at typecheck — fix and resubmit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "fcd59501d8a1e325be9872f32e4c1f9833f757f5",
-    "reviewRequestedAt": "2026-07-27T11:56:21.606Z",
+    "reviewRequestedAt": "2026-07-27T11:58:39.973Z",
     "reviewSpawnedAt": "2026-07-27T11:53:32.566Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -246,7 +246,7 @@
         "tests/unit/lib/pan-dir/verdict-restore.test.ts",
         "tests/unit/lib/review-findings.test.ts"
       ],
-      "recordedAt": "2026-07-27T11:56:05.744Z"
+      "recordedAt": "2026-07-27T11:58:39.123Z"
     }
   },
   "closeOut": {
