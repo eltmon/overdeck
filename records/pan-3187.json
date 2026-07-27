@@ -27,9 +27,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-27T07:03:14.973Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-27T07:08Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-27T07:08:48.533Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-27T07:08:48Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3187\n\nThe recurring review sweep performs synchronous record reads and serial tracker calls across every pending request, stalling Deacon patrols.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3187 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -70,7 +83,7 @@
     "recordedAt": "2026-07-27T06:31:44.584Z"
   },
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T07:08:47.878Z",
+  "updated": "2026-07-27T07:08:48.533Z",
   "pipeline": {
     "issueId": "PAN-3187",
     "reviewStatus": "blocked",
