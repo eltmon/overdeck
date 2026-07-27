@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-26T17:59:50.911Z",
-  "updated": "2026-07-27T04:01:09.861Z",
+  "updated": "2026-07-27T04:06:05.348Z",
   "pipeline": {
     "issueId": "PAN-3150",
     "reviewStatus": "pending",
@@ -13,13 +13,15 @@
     "mergeStep": "rebasing",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T04:01:09.825Z",
-    "mergeNotes": "Work agent already running; sent merge preparation request. Waiting for strike/pan-3150 to be rebased and pushed.",
+    "updatedAt": "2026-07-27T04:06:05.342Z",
+    "mergeNotes": "Strike merge request failed: fetch failed",
     "lastVerifiedCommit": "1d3e1f8ecfa15cf674c294c2af999d1aee1c5897",
     "strikeReadyHead": "0d7082c0243c3e03e6f55ede7908454740445f3d",
     "strikeReadyAt": "2026-07-27T04:00:38.138Z",
-    "strikeLandingState": "landing",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
+    "strikeTransportRetryCount": 1,
+    "strikeNextAttemptAt": "2026-07-27T04:07:05.337Z",
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-07-26T18:52:20.543Z",
@@ -34,6 +36,13 @@
         "mainHead": "6ac4a3dc11d35931934da26f74dbd9105882ca2e",
         "outcome": "failed",
         "detail": "GitHub PR #3153 is CONFLICTING with main. Resolve conflicts before merging — see https://github.com/eltmon/overdeck/pull/3153."
+      },
+      {
+        "timestamp": "2026-07-27T04:06:05.337Z",
+        "strikeHead": "0d7082c0243c3e03e6f55ede7908454740445f3d",
+        "mainHead": "7f0b7668e7a17a2b0d0dbcf7d67292653409e3a3",
+        "outcome": "transport-failed",
+        "detail": "Strike merge request failed: fetch failed"
       }
     ]
   },
@@ -43,7 +52,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-27T04:01:09.856Z"
+        "pricingAsOf": "2026-07-27T04:06:05.345Z"
       }
     },
     "merges": [],
