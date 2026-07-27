@@ -231,17 +231,18 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T13:51:00.895Z",
+  "updated": "2026-07-27T13:52:36.589Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T13:51:00.826Z",
+    "updatedAt": "2026-07-27T13:52:36.548Z",
+    "reviewNotes": "Agent re-review request (6/25): Added regression test for v61 repair (affected_criteria and started_by columns)",
     "conflictsSince": {
       "sha": "5ae5d217844e7391d328cfee02c7cc0431b1c18c",
       "detectedAt": "2026-07-27T13:50:37.309Z",
@@ -287,10 +288,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3482,
-            "output": 138876,
-            "cacheRead": 82198856,
-            "cacheWrite": 3464677
+            "input": 3542,
+            "output": 140145,
+            "cacheRead": 83631897,
+            "cacheWrite": 3469001
           }
         }
       },
@@ -314,15 +315,15 @@
           "cacheWrite": 255526
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3482,
-          "output": 138876,
-          "cacheRead": 82198856,
-          "cacheWrite": 3464677
+          "input": 3542,
+          "output": 140145,
+          "cacheRead": 83631897,
+          "cacheWrite": 3469001
         }
       },
       "costAtCloseOut": {
-        "usd": 169.6774163,
-        "pricingAsOf": "2026-07-27T13:51:00.870Z"
+        "usd": 169.8325283,
+        "pricingAsOf": "2026-07-27T13:52:36.586Z"
       }
     },
     "merges": [
