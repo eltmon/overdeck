@@ -32,9 +32,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-27T12:20:22.450Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-27T12:22Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-27T12:22:58.289Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-27T12:22:58Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3154\n\nThe merged v61-to-v62 migration can stamp schema 62 without adding started_by or affected_criteria\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3154 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -95,7 +108,7 @@
     "recordedAt": "2026-07-27T11:59:06.536Z"
   },
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T12:22:57.592Z",
+  "updated": "2026-07-27T12:22:58.289Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "blocked",
