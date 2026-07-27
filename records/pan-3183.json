@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:30:47.797Z",
-  "updated": "2026-07-27T05:40:53.330Z",
+  "updated": "2026-07-27T05:44:18.729Z",
   "pipeline": {
     "issueId": "PAN-3183",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "docs-agent-state-planes-invariant": {
-        "writerId": "agent-pan-3183",
-        "agentId": "agent-pan-3183",
-        "pid": 2310872,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:40:53.330Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3183",
@@ -119,6 +111,17 @@
         "outcome": "completed",
         "reason": "lint-state-writes now rejects raw SQL and Drizzle agents-table mutations outside individually documented write modules. Clean tree and full npm lint pass; a tracked src/index.ts UPDATE agents fixture was rejected with the file named, then fully reverted.",
         "releasedAt": "2026-07-27T05:40:32.655Z"
+      },
+      {
+        "writerId": "agent-pan-3183",
+        "agentId": "agent-pan-3183",
+        "pid": 2310872,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:40:53.330Z",
+        "itemId": "docs-agent-state-planes-invariant",
+        "outcome": "completed",
+        "reason": "AGENT-STATE-PLANES now documents the same-boot event invariant for agents-table status transitions, the PAN-3183 phantom-running failure mode, the lint gate and audited modules, and stopped-without-tmux bootstrap precedence. Full lint passes.",
+        "releasedAt": "2026-07-27T05:44:18.729Z"
       }
     ],
     "statusReasons": {
@@ -145,6 +148,10 @@
       "lint-guard-agents-status-writes": {
         "reason": "lint-state-writes now rejects raw SQL and Drizzle agents-table mutations outside individually documented write modules. Clean tree and full npm lint pass; a tracked src/index.ts UPDATE agents fixture was rejected with the file named, then fully reverted.",
         "updatedAt": "2026-07-27T05:40:32.655Z"
+      },
+      "docs-agent-state-planes-invariant": {
+        "reason": "AGENT-STATE-PLANES now documents the same-boot event invariant for agents-table status transitions, the PAN-3183 phantom-running failure mode, the lint gate and audited modules, and stopped-without-tmux bootstrap precedence. Full lint passes.",
+        "updatedAt": "2026-07-27T05:44:18.729Z"
       }
     }
   },
@@ -171,6 +178,8 @@
     "lint-guard-agents-status-writes.lint-guard-agents-status-writes.ac1": "completed",
     "lint-guard-agents-status-writes.lint-guard-agents-status-writes.ac2": "completed",
     "lint-guard-agents-status-writes.lint-guard-agents-status-writes.ac3": "completed",
-    "docs-agent-state-planes-invariant": "running"
+    "docs-agent-state-planes-invariant": "completed",
+    "docs-agent-state-planes-invariant.docs-agent-state-planes-invariant.ac1": "completed",
+    "docs-agent-state-planes-invariant.docs-agent-state-planes-invariant.ac2": "completed"
   }
 }
