@@ -80,17 +80,17 @@
     "recordedAt": "2026-07-27T06:31:44.584Z"
   },
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T07:37:37.804Z",
+  "updated": "2026-07-27T07:37:44.860Z",
   "pipeline": {
     "issueId": "PAN-3187",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T07:37:36.869Z",
+    "updatedAt": "2026-07-27T07:37:44.850Z",
     "reviewNotes": "Cycle-three rework uses asynchronous journal reads and four-wide tracker batches; no blocking findings remain.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "AC1-AC4 met and locked: pending/missing verdicts settle to skip only when trackerClosed && landedWork (dod-gate.ts:258); review negatives never supersede (id !== 'review' guard, dod-gate.ts:267); tests/verification negatives settle only on mainVerifyStatus==='pass'. AC5: every settled observed string prefixes the original ${observed}; evaluateDodGate computes merged then mainVerify then trackerClosed before the verdict Promise.all, locked by the call-order assertion. NOTE on AC5 wording: 'npx vitest run src/lib/lifecycle' exits 1 with 'No test files found' for ANY implementation — vitest include globs put the suite at tests/unit/lib/lifecycle, which runs 7 files / 137 passed / 1 skipped, exit 0. AC path is mis-specified, not an implementation defect. Sole production caller (workflows.ts:195) passes no deps override so it uses the real isIssueClosed with its 5-min cache; optional trackerClosed dep keeps pre-existing deps objects working.",
@@ -142,9 +142,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2895639,
-            "output": 167076,
-            "cacheRead": 33901568,
+            "input": 2902025,
+            "output": 171065,
+            "cacheRead": 35058176,
             "cacheWrite": 0
           }
         },
@@ -159,15 +159,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 7097605,
-          "output": 466555,
-          "cacheRead": 161095680,
+          "input": 7103991,
+          "output": 470544,
+          "cacheRead": 162252288,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 130.032515,
-        "pricingAsOf": "2026-07-27T07:37:36.938Z"
+        "usd": 130.762419,
+        "pricingAsOf": "2026-07-27T07:37:44.854Z"
       }
     },
     "merges": [
@@ -176,7 +176,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 14,
