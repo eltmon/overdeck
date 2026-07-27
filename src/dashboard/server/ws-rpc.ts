@@ -903,20 +903,14 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               ? yield* Effect.promise(() => readLauncherPinnedSessionId(launcherTmuxSession))
               : null;
             const resolvedSessionId = pinnedSessionId ?? conv.claudeSessionId;
-            let sessionFile = resolvedSessionId
-              ? sessionFilePath(conv.cwd, resolvedSessionId)
-              : null;
+            const parentSessionFile = resolvedSessionId ? sessionFilePath(conv.cwd, resolvedSessionId) : null;
+            const sessionFile = parentSessionFile && input.agentId ? subagentTranscriptPath(parentSessionFile, input.agentId) : parentSessionFile;
             const model = conv.model ?? null;
 
             if (!sessionFile) {
               // Session file not yet discovered — keep the subscription alive
               // without causing the client to reconnect in a tight loop.
               return conversationDiscoveringStream();
-            }
-
-            if (input.agentId) {
-              sessionFile = subagentTranscriptPath(sessionFile, input.agentId);
-              if (!sessionFile) return conversationDiscoveringStream();
             }
 
             if (isPiSessionFile(sessionFile)) {
