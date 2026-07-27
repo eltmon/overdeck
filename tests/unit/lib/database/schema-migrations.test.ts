@@ -59,6 +59,7 @@ describe('schema migrations', () => {
   it('adds affected_criteria to a current-version database that predates the column', () => {
     db.exec('CREATE TABLE flywheel_substrate_bugs (issue_id TEXT PRIMARY KEY)');
     db.exec('CREATE TABLE agents (id TEXT PRIMARY KEY)');
+    db.exec('CREATE TABLE review_status (issue_id TEXT PRIMARY KEY)');
     db.pragma(`user_version = ${SCHEMA_VERSION}`);
 
     runMigrations(db);
@@ -71,6 +72,7 @@ describe('schema migrations', () => {
   it('adds started_by to a current-version agents table that predates the column', () => {
     db.exec('CREATE TABLE flywheel_substrate_bugs (issue_id TEXT PRIMARY KEY, affected_criteria TEXT)');
     db.exec('CREATE TABLE agents (id TEXT PRIMARY KEY)');
+    db.exec('CREATE TABLE review_status (issue_id TEXT PRIMARY KEY)');
     db.pragma(`user_version = ${SCHEMA_VERSION}`);
 
     expect(() => runMigrations(db)).not.toThrow();
