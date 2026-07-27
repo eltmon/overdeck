@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T10:35:07.138Z",
+  "updated": "2026-07-27T10:42:48.192Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -37,16 +37,8 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "cycle-history-persistence": {
-        "writerId": "agent-pan-3151",
-        "agentId": "agent-pan-3151",
-        "pid": 1218459,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T10:25:33.869Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3151",
@@ -91,6 +83,16 @@
         "outcome": "completed",
         "reason": "Updated planning prompt with size thresholds",
         "releasedAt": "2026-07-27T10:28:22.623Z"
+      },
+      {
+        "writerId": "agent-pan-3151",
+        "agentId": "agent-pan-3151",
+        "pid": 1218459,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T10:25:33.869Z",
+        "itemId": "cycle-history-persistence",
+        "outcome": "completed",
+        "releasedAt": "2026-07-27T10:42:48.192Z"
       }
     ],
     "statusReasons": {
@@ -122,13 +124,16 @@
     "cycle-counting.cycle-counting.ac2": "completed",
     "cycle-counting.cycle-counting.ac3": "completed",
     "cycle-counting.cycle-counting.ac4": "completed",
-    "cycle-history-persistence": "running",
+    "cycle-history-persistence": "completed",
     "planning-size-lint": "completed",
     "planning-size-lint.planning-size-lint.ac1": "completed",
     "planning-size-lint.planning-size-lint.ac2": "completed",
     "planning-size-lint.planning-size-lint.ac3": "completed",
     "planning-prompt-guidance": "completed",
     "planning-prompt-guidance.planning-prompt-guidance.ac1": "completed",
-    "planning-prompt-guidance.planning-prompt-guidance.ac2": "completed"
+    "planning-prompt-guidance.planning-prompt-guidance.ac2": "completed",
+    "cycle-history-persistence.cycle-history-persistence.ac1": "completed",
+    "cycle-history-persistence.cycle-history-persistence.ac2": "completed",
+    "cycle-history-persistence.cycle-history-persistence.ac3": "completed"
   }
 }
