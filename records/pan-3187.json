@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T05:24:07.877Z",
+  "updated": "2026-07-27T05:32:22.212Z",
   "pipeline": {
     "issueId": "PAN-3187",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "reap-closed-issue-review-requests": {
-        "writerId": "agent-pan-3187",
-        "agentId": "agent-pan-3187",
-        "pid": 1138307,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:24:07.877Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3187",
@@ -104,6 +96,17 @@
         "outcome": "completed",
         "reason": "Cleared expired review intent through setReviewStatusSync using the reconciled status as the merge base, deduplicated repairs per process, and covered stale versus fresh read paths.",
         "releasedAt": "2026-07-27T05:23:54.667Z"
+      },
+      {
+        "writerId": "agent-pan-3187",
+        "agentId": "agent-pan-3187",
+        "pid": 1138307,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:24:07.877Z",
+        "itemId": "reap-closed-issue-review-requests",
+        "outcome": "completed",
+        "reason": "Added a patrol sweep that overlays durable journal intent, filters to tracker-closed unserviced pending requests, and clears only request timestamps through the review-status write surface.",
+        "releasedAt": "2026-07-27T05:32:22.212Z"
       }
     ],
     "statusReasons": {
@@ -118,6 +121,10 @@
       "clear-stale-review-request-on-read": {
         "reason": "Cleared expired review intent through setReviewStatusSync using the reconciled status as the merge base, deduplicated repairs per process, and covered stale versus fresh read paths.",
         "updatedAt": "2026-07-27T05:23:54.667Z"
+      },
+      "reap-closed-issue-review-requests": {
+        "reason": "Added a patrol sweep that overlays durable journal intent, filters to tracker-closed unserviced pending requests, and clears only request timestamps through the review-status write surface.",
+        "updatedAt": "2026-07-27T05:32:22.212Z"
       }
     }
   },
@@ -134,6 +141,10 @@
     "clear-stale-review-request-on-read.clear-stale-review-request-on-read.ac1": "completed",
     "clear-stale-review-request-on-read.clear-stale-review-request-on-read.ac2": "completed",
     "clear-stale-review-request-on-read.clear-stale-review-request-on-read.ac3": "completed",
-    "reap-closed-issue-review-requests": "running"
+    "reap-closed-issue-review-requests": "completed",
+    "reap-closed-issue-review-requests.reap-closed-issue-review-requests.ac1": "completed",
+    "reap-closed-issue-review-requests.reap-closed-issue-review-requests.ac2": "completed",
+    "reap-closed-issue-review-requests.reap-closed-issue-review-requests.ac3": "completed",
+    "reap-closed-issue-review-requests.reap-closed-issue-review-requests.ac4": "completed"
   }
 }
