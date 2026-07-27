@@ -2573,7 +2573,7 @@
     "recordedAt": "2026-07-06T18:49:52.519Z"
   },
   "created": "2026-07-06T16:43:28.780Z",
-  "updated": "2026-07-27T08:23:10.223Z",
+  "updated": "2026-07-27T08:24:02.692Z",
   "pipeline": {
     "issueId": "PAN-2207",
     "reviewStatus": "failed",
@@ -2582,11 +2582,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-14T16:00:04.257Z",
+    "updatedAt": "2026-07-27T08:24:02.494Z",
     "reviewNotes": "Review role spawn failed: Workspace for PAN-2207 does not exist at /home/eltmon/Projects/overdeck/workspaces/feature-pan-2207 — refusing to spawn review. A missing workspace would land the agent in $HOME at the folder-trust prompt. Recreate the workspace ('pan workspace rebuild PAN-2207') before retrying.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2425",
     "lastVerifiedCommit": "a503ddcd26d36251ac9ff67e32d3c03ee6e00572",
-    "reviewRequestedAt": "2026-07-06T18:51:15.117Z",
     "reviewSpawnedAt": "2026-07-14T16:00:04.216Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -2741,7 +2740,7 @@
       },
       "costAtCloseOut": {
         "usd": 68.122604,
-        "pricingAsOf": "2026-07-14T16:00:06.096Z"
+        "pricingAsOf": "2026-07-27T08:24:02.555Z"
       }
     },
     "merges": [
