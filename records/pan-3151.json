@@ -104,15 +104,7 @@
       "timestamp": "2026-07-27T12:30:17.579Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T12:29:23Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nclaimed double-serialization fix still calls JSON.stringify, so the regression fixture remains a string instead of ReviewCycleEntry[]\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -201,20 +193,20 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:55:42.267Z",
+  "updated": "2026-07-27T12:55:44.417Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T12:55:40.789Z",
+    "updatedAt": "2026-07-27T12:55:44.237Z",
     "reviewNotes": "Agent re-review request (3/25): Resolved merge conflict with origin/main, preserving both schema migrations",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
-    "reviewSpawnedAt": "2026-07-27T12:30:16.311Z"
+    "reviewSpawnedAt": "2026-07-27T12:55:44.237Z"
   },
   "closeOut": {
     "usage": {
@@ -280,7 +272,7 @@
       },
       "costAtCloseOut": {
         "usd": 128.1320973,
-        "pricingAsOf": "2026-07-27T12:55:42.265Z"
+        "pricingAsOf": "2026-07-27T12:55:44.353Z"
       }
     },
     "merges": [
