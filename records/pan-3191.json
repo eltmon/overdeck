@@ -89,7 +89,7 @@
     "recordedAt": "2026-07-27T05:19:11.339Z"
   },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T13:49:37.685Z",
+  "updated": "2026-07-27T13:49:48.227Z",
   "pipeline": {
     "issueId": "PAN-3191",
     "reviewStatus": "passed",
@@ -97,10 +97,10 @@
     "verificationStatus": "passed",
     "mergeStatus": "merged",
     "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:20:05.037Z",
-    "updatedAt": "2026-07-27T13:49:37.573Z",
+    "updatedAt": "2026-07-27T13:49:48.194Z",
     "reviewNotes": "Review reset by deacon: no active review session after 31min",
     "testNotes": "Skipped: issue is already merged",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
@@ -185,7 +185,7 @@
       },
       "costAtCloseOut": {
         "usd": 113.570584,
-        "pricingAsOf": "2026-07-27T13:49:37.586Z"
+        "pricingAsOf": "2026-07-27T13:49:48.197Z"
       }
     },
     "merges": [
@@ -194,7 +194,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "k3[1m]",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 8,
