@@ -77,18 +77,17 @@
     "recordedAt": "2026-07-27T18:36:56.906Z"
   },
   "created": "2026-07-27T13:35:42.946Z",
-  "updated": "2026-07-27T20:18:23.836Z",
+  "updated": "2026-07-27T20:19:41.702Z",
   "pipeline": {
     "issueId": "PAN-3206",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T20:18:22.056Z",
+    "updatedAt": "2026-07-27T20:19:41.682Z",
     "reviewNotes": "Prior blockers are fixed; focused tests and typecheck pass with no remaining merge-blocking findings",
     "testNotes": "Reconciled from green GitHub Actions CI on 02f918c6: guard (https://github.com/eltmon/overdeck/actions/runs/30297407779/job/90081713150)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -146,7 +145,9 @@
         "tests/unit/scripts/lint-ratchet-audit.test.ts"
       ],
       "recordedAt": "2026-07-27T18:36:56.906Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T20:19:41.682Z"
   },
   "closeOut": {
     "usage": {
@@ -184,7 +185,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3213"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T20:19:41.701Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed (no lastVerifiedCommit recorded)",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3213 MERGED at 2026-07-27T20:01:46Z",
+          "status": "pass",
+          "mergedAt": "2026-07-27T20:01:46Z",
+          "mergeCommit": "d4d143ff32d2df228158ae7242f37c7724e3a57b"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "8 check-runs concluded successfully on d4d143ff32d2df228158ae7242f37c7724e3a57b",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 2f3b9228 contains merge d4d143ff",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Removed 5 agent state directories; No strike branch strike/pan-3206 found; Pruned 271 checkpoint ref(s) for agent-pan-3206, planning-pan-3206, strike-pan-3206; No specialist registry entries for PAN-3206"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
