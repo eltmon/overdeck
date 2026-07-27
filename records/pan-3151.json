@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T10:44:05.090Z",
+  "updated": "2026-07-27T10:46:29.263Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -37,16 +37,8 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "reconcile-gate-wiring": {
-        "writerId": "agent-pan-3151",
-        "agentId": "agent-pan-3151",
-        "pid": 2050728,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T10:44:05.090Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3151",
@@ -101,6 +93,16 @@
         "itemId": "cycle-history-persistence",
         "outcome": "completed",
         "releasedAt": "2026-07-27T10:42:48.192Z"
+      },
+      {
+        "writerId": "agent-pan-3151",
+        "agentId": "agent-pan-3151",
+        "pid": 2050728,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T10:44:05.090Z",
+        "itemId": "reconcile-gate-wiring",
+        "outcome": "completed",
+        "releasedAt": "2026-07-27T10:46:29.263Z"
       }
     ],
     "statusReasons": {
@@ -143,6 +145,11 @@
     "cycle-history-persistence.cycle-history-persistence.ac1": "completed",
     "cycle-history-persistence.cycle-history-persistence.ac2": "completed",
     "cycle-history-persistence.cycle-history-persistence.ac3": "completed",
-    "reconcile-gate-wiring": "running"
+    "reconcile-gate-wiring": "completed",
+    "reconcile-gate-wiring.reconcile-gate-wiring.ac1": "completed",
+    "reconcile-gate-wiring.reconcile-gate-wiring.ac2": "completed",
+    "reconcile-gate-wiring.reconcile-gate-wiring.ac3": "completed",
+    "reconcile-gate-wiring.reconcile-gate-wiring.ac4": "completed",
+    "reconcile-gate-wiring.reconcile-gate-wiring.ac5": "completed"
   }
 }
