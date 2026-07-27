@@ -1,11 +1,20 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Circle, Wrench } from 'lucide-react';
-import type { WorkLogEntry } from '../chat-types';
+import type { SubagentSummary, WorkLogEntry } from '../chat-types';
 import { ChatMarkdown } from '../ChatMarkdown';
 import styles from '../../CommandDeck/styles/command-deck.module.css';
 import { MAX_VISIBLE_WORK_LOG_ENTRIES } from './helpers';
 
-export function WorkLogGroup({ entries, hideToolCalls, cwd, issueId }: { entries: WorkLogEntry[]; hideToolCalls?: boolean; cwd?: string; issueId?: string | null }) {
+interface WorkLogGroupProps {
+  entries: WorkLogEntry[];
+  hideToolCalls?: boolean;
+  cwd?: string;
+  issueId?: string | null;
+  subagentByToolUseId?: ReadonlyMap<string, SubagentSummary>;
+  onOpenSubagent?: (toolUseId: string) => void;
+}
+
+export function WorkLogGroup({ entries, hideToolCalls, cwd, issueId, subagentByToolUseId, onOpenSubagent }: WorkLogGroupProps) {
   const [expanded, setExpanded] = useState(false);
 
   const onlyToolEntries = entries.every((entry) => entry.tone === 'tool' || entry.tone === 'error');
@@ -53,7 +62,7 @@ export function WorkLogGroup({ entries, hideToolCalls, cwd, issueId }: { entries
         </button>
       )}
       {visible.map((entry) => (
-        <SimpleWorkEntryRow key={entry.id} entry={entry} cwd={cwd} issueId={issueId} />
+        <SimpleWorkEntryRow key={entry.id} entry={entry} cwd={cwd} issueId={issueId} subagentByToolUseId={subagentByToolUseId} onOpenSubagent={onOpenSubagent} />
       ))}
       {expanded && (
         <button
@@ -96,10 +105,14 @@ function ToolUseExpanded({
   entry,
   cwd,
   issueId,
+  subagentByToolUseId,
+  onOpenSubagent,
 }: {
   entry: WorkLogEntry;
   cwd?: string;
   issueId?: string | null;
+  subagentByToolUseId?: ReadonlyMap<string, SubagentSummary>;
+  onOpenSubagent?: (toolUseId: string) => void;
 }) {
   const tool = entry.toolTitle ?? entry.label;
   const input = entry.toolInput;
@@ -208,6 +221,15 @@ function ToolUseExpanded({
       const prompt = asString(input.prompt);
       return (
         <div className={styles.workLogResult}>
+          {subagentByToolUseId?.has(entry.id) && onOpenSubagent && (
+            <button
+              type="button"
+              className="mb-2 text-xs font-medium text-primary transition-colors hover:text-primary/80"
+              onClick={() => onOpenSubagent(entry.id)}
+            >
+              Open subagent transcript
+            </button>
+          )}
           {(subagent || description) && (
             <div className={styles.workLogToolHeader}>
               {subagent && <code>{subagent}</code>}
@@ -271,7 +293,13 @@ function ToolUseExpanded({
   );
 }
 
-function SimpleWorkEntryRow({ entry, cwd, issueId }: { entry: WorkLogEntry; cwd?: string; issueId?: string | null }) {
+function SimpleWorkEntryRow({ entry, cwd, issueId, subagentByToolUseId, onOpenSubagent }: {
+  entry: WorkLogEntry;
+  cwd?: string;
+  issueId?: string | null;
+  subagentByToolUseId?: ReadonlyMap<string, SubagentSummary>;
+  onOpenSubagent?: (toolUseId: string) => void;
+}) {
   const [showResult, setShowResult] = useState(false);
   const toneColor: Record<WorkLogEntry['tone'], string> = {
     thinking: 'var(--muted-foreground)',
@@ -334,7 +362,7 @@ function SimpleWorkEntryRow({ entry, cwd, issueId }: { entry: WorkLogEntry; cwd?
       </div>
       {showResult && (
         <>
-          {hasToolBody && <ToolUseExpanded entry={entry} cwd={cwd} issueId={issueId} />}
+          {hasToolBody && <ToolUseExpanded entry={entry} cwd={cwd} issueId={issueId} subagentByToolUseId={subagentByToolUseId} onOpenSubagent={onOpenSubagent} />}
           {isThinking && entry.detail && (
             <div className={styles.workLogResult}>
               <ChatMarkdown text={entry.detail} cwd={cwd} issueId={issueId} />

@@ -15,7 +15,7 @@ function readSelectedSubagent(): string | null {
   return new URLSearchParams(window.location.search).get('subagent');
 }
 
-function updateSelectedSubagent(agentId: string | null): void {
+export function updateSelectedSubagent(agentId: string | null): void {
   const searchParams = new URLSearchParams(window.location.search);
   if (agentId) searchParams.set('subagent', agentId);
   else searchParams.delete('subagent');

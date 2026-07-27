@@ -8,7 +8,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TurnBody } from './messageRows';
 import { WorkLogGroup } from './workLogRows';
-import type { WorkLogEntry } from '../chat-types';
+import type { SubagentSummary, WorkLogEntry } from '../chat-types';
 
 // ChatMarkdown pulls in the syntax-highlight chain; the gate asserts budget
 // behavior, not markdown fidelity.
@@ -89,5 +89,50 @@ describe('C-VERB gate: command groups collapse (pre-existing)', () => {
     expect(screen.getByText(/payload-10/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Collapse/ }));
     expect(screen.queryByText(/payload-10/)).not.toBeInTheDocument();
+  });
+});
+
+describe('subagent transcript action', () => {
+  const entry: WorkLogEntry = {
+    id: 'toolu-subagent',
+    createdAt: '2026-07-20T00:00:00Z',
+    label: 'Task',
+    toolTitle: 'Task',
+    tone: 'tool',
+    toolInput: {
+      subagent_type: 'Explore',
+      description: 'Trace the parser',
+      prompt: 'Find the relevant message path.',
+    },
+  };
+  const subagent: SubagentSummary = {
+    agentId: 'subagent-1',
+    agentType: 'Explore',
+    description: 'Trace the parser',
+    toolUseId: entry.id,
+    spawnDepth: 1,
+    status: 'done',
+  };
+
+  it('opens the matching subagent from an expanded Task row', () => {
+    const onOpenSubagent = vi.fn();
+    render(
+      <WorkLogGroup
+        entries={[entry]}
+        subagentByToolUseId={new Map([[entry.id, subagent]])}
+        onOpenSubagent={onOpenSubagent}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Task'));
+    fireEvent.click(screen.getByRole('button', { name: 'Open subagent transcript' }));
+    expect(onOpenSubagent).toHaveBeenCalledWith(entry.id);
+  });
+
+  it('omits the action when no subagent matches the tool use id', () => {
+    render(<WorkLogGroup entries={[entry]} subagentByToolUseId={new Map()} onOpenSubagent={vi.fn()} />);
+
+    fireEvent.click(screen.getByText('Task'));
+    expect(screen.queryByRole('button', { name: 'Open subagent transcript' })).not.toBeInTheDocument();
   });
 });

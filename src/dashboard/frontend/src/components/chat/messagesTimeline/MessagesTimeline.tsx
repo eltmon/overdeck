@@ -64,6 +64,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   conversationName,
   cwd,
   issueId,
+  subagentByToolUseId,
+  onOpenSubagent,
   turnDiffSummaryByAssistantMessageId,
   onOpenTurnDiff,
   resolvedTheme,
@@ -478,6 +480,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     conversationName={conversationName}
                     cwd={cwd}
                     issueId={issueId}
+                    subagentByToolUseId={subagentByToolUseId}
+                    onOpenSubagent={onOpenSubagent}
                     turnDiffSummary={row.kind === 'message' && row.message.role === 'assistant' ? turnDiffSummaryByAssistantMessageId?.get(row.message.id) : undefined}
                     onOpenTurnDiff={onOpenTurnDiff}
                     resolvedTheme={resolvedTheme}
@@ -518,6 +522,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                 conversationName={conversationName}
                 cwd={cwd}
                 issueId={issueId}
+                subagentByToolUseId={subagentByToolUseId}
+                onOpenSubagent={onOpenSubagent}
                 turnDiffSummary={row.kind === 'message' && row.message.role === 'assistant' ? turnDiffSummaryByAssistantMessageId?.get(row.message.id) : undefined}
                 onOpenTurnDiff={onOpenTurnDiff}
                 resolvedTheme={resolvedTheme}
