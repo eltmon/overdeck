@@ -226,13 +226,14 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     // unstick must clear the cycle history so a fresh attempt doesn't immediately re-trigger the gate.
     // Regression: without clearing, the history series would re-engage convergence detection immediately.
 
-    // Seed cycle history as production array structure: [12 blocks → 8 blocks → 7 blocks]
+    // Seed cycle history with production array structure: [12 blocks → 8 blocks → 7 blocks]
     // This sequence triggers the convergence gate (reversal in cycle 1→2 shows not-converging).
-    const cycleHistory = JSON.stringify([
+    // Note: stored as JSON string in DB, but setReviewStatusSync accepts the array and handles serialization.
+    const cycleHistory = [
       { cycle: 1, runId: 'agent-run-1', atCommit: 'abc123', blockingCount: 12, recordedAt: '2026-07-27T10:00:00Z' },
       { cycle: 2, runId: 'agent-run-2', atCommit: 'abc123', blockingCount: 8, recordedAt: '2026-07-27T10:30:00Z' },
       { cycle: 3, runId: 'agent-run-3', atCommit: 'abc123', blockingCount: 7, recordedAt: '2026-07-27T11:00:00Z' },
-    ]);
+    ];
 
     setReviewStatusSync('PAN-CONV-CLEAR', {
       reviewStatus: 'blocked',
