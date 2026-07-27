@@ -85,4 +85,37 @@ describe('backfillAgentsSync FK-safety on a fresh overdeck.db (PAN-1938)', () =>
     expect(odb.raw().prepare('SELECT status FROM agents WHERE id = ?').get('agent-pan-9998'))
       .toEqual(expect.objectContaining({ status: 'stopped' }));
   });
+
+  it('does not report or log a stop when the row upsert fails', () => {
+    const agentDir = join(odb.home, 'agents', 'agent-pan-9997');
+    mkdirSync(agentDir, { recursive: true });
+    const statePath = join(agentDir, 'state.json');
+    const validState = {
+      id: 'agent-pan-9997',
+      issueId: 'PAN-9997',
+      role: 'work',
+      status: 'running',
+      workspace: '/tmp/ws',
+      model: 'x',
+      harness: 'claude-code',
+      startedAt: new Date().toISOString(),
+    };
+    writeFileSync(statePath, JSON.stringify(validState));
+    backfillAgentsSync({ listLiveSessions: () => new Set(['agent-pan-9997']) });
+    vi.clearAllMocks();
+    const { issueId: _issueId, ...invalidState } = validState;
+    writeFileSync(statePath, JSON.stringify(invalidState));
+
+    const result = backfillAgentsSync({ listLiveSessions: () => new Set() });
+
+    expect(result).toEqual(expect.objectContaining({
+      processed: 0,
+      skipped: 1,
+      markedStopped: 0,
+      markedStoppedIds: [],
+    }));
+    expect(logAgentLifecycleSync).not.toHaveBeenCalled();
+    expect(odb.raw().prepare('SELECT status FROM agents WHERE id = ?').get('agent-pan-9997'))
+      .toEqual(expect.objectContaining({ status: 'running' }));
+  });
 });

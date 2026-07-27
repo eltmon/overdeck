@@ -132,6 +132,30 @@ describe('backfillAgentsFromStateJsonSync', () => {
     expect(row?.stoppedAt).toBeDefined();
   });
 
+  it('does not log a stop when the transaction rolls back', () => {
+    const validState = {
+      id: 'agent-pan-1907',
+      issueId: 'PAN-1907',
+      role: 'work',
+      status: 'running',
+      workspace: '/workspaces/feature-pan-1907',
+      startedAt: '2026-06-15T00:00:00.000Z',
+    };
+    writeAgentState('agent-pan-1907', validState);
+    backfillAgentsFromStateJsonSync(testDb, {
+      listLiveSessions: () => new Set(['agent-pan-1907']),
+    });
+    vi.clearAllMocks();
+    const { issueId: _issueId, ...invalidState } = validState;
+    writeAgentState('agent-pan-1907', invalidState);
+
+    expect(() => backfillAgentsFromStateJsonSync(testDb, {
+      listLiveSessions: () => new Set(),
+    })).toThrow();
+    expect(logAgentLifecycleSync).not.toHaveBeenCalled();
+    expect(getAgent('agent-pan-1907')?.status).toBe('running');
+  });
+
   it('keeps running agents running when a live tmux session matches', () => {
     writeAgentState('agent-pan-1908', {
       id: 'agent-pan-1908',

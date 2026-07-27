@@ -190,7 +190,7 @@ describe('ReadModelService bootstrap (PAN-1938 source-swap)', () => {
       ...fakeReconstructResult,
       markedStoppedIds: [{ id: 'agent-pan-1920', previousStatus: 'running' }],
     } as any);
-    appendAsyncSpy.mockRejectedValueOnce(new Error('event store unavailable'));
+    appendAsyncSpy.mockResolvedValueOnce(0);
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const layer = ReadModelServiceLive.pipe(Layer.provide(MockAgentsResolverLive));
 

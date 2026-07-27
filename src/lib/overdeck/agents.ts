@@ -881,14 +881,13 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
 
   let processed = 0;
   let skipped = 0;
-  let markedStopped = 0;
   const markedStoppedIds: Array<{ id: string; previousStatus: string }> = [];
 
   let entries: string[] = [];
   try {
     entries = readdirSync(agentsDir);
   } catch {
-    return { processed, skipped, markedStopped, markedStoppedIds };
+    return { processed, skipped, markedStopped: 0, markedStoppedIds };
   }
 
   const cols = OVERDECK_AGENT_COLUMNS.join(', ');
@@ -930,14 +929,11 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
         continue;
       }
 
-      // Reconcile: mark stopped if no live tmux session
+      let reconciledStop: { id: string; previousStatus: string } | undefined;
       if ((state.status === 'running' || state.status === 'starting') && !liveSessions.has(state.id)) {
-        const previousStatus = state.status;
-        logAgentLifecycleSync(state.id, `status changed: ${previousStatus} → stopped (boot backfill reconcile: no live tmux session)`);
-        markedStoppedIds.push({ id: state.id, previousStatus });
+        reconciledStop = { id: state.id, previousStatus: state.status };
         state.status = 'stopped';
         state.stoppedAt = state.stoppedAt ?? new Date().toISOString();
-        markedStopped++;
       }
 
       // Per-row resilience (PAN-1972): the disposable agents cache is rebuilt
@@ -950,6 +946,7 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
         const row = agentStateToOverdeckRow(state);
         ensureIssue.run(row[issueIdIdx], Date.now());
         upsert.run(...row);
+        if (reconciledStop) markedStoppedIds.push(reconciledStop);
         processed++;
         if (options?.verbose) {
           console.log(`[backfill] ${state.id} -> ${state.status}`);
@@ -962,7 +959,10 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
   });
 
   tx();
-  return { processed, skipped, markedStopped, markedStoppedIds };
+  for (const { id, previousStatus } of markedStoppedIds) {
+    logAgentLifecycleSync(id, `status changed: ${previousStatus} → stopped (boot backfill reconcile: no live tmux session)`);
+  }
+  return { processed, skipped, markedStopped: markedStoppedIds.length, markedStoppedIds };
 }
 
 /**
