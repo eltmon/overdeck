@@ -318,18 +318,18 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T15:02:31.563Z",
+  "updated": "2026-07-27T15:03:51.485Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T15:02:31.512Z",
-    "reviewNotes": "Agent re-review request (16/25): Fixed review issues: added comprehensive v61/v62 regression tests",
+    "updatedAt": "2026-07-27T15:03:51.460Z",
+    "reviewNotes": "The expanded regression tests still never execute a v62→v63 migration: the v62 fixture runs the exact-v62 repair and remains at 62, while the v61 fixture only tests v61→v62. They pass without covering the skipped-release defect; implement SCHEMA_VERSION 63 and test a real v62→v63 transition.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "436787102da30f6e9a845238c6af81b5717948a0",
     "reviewSpawnedAt": "2026-07-27T15:02:26.073Z"
@@ -347,9 +347,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 28915233,
-            "output": 641386,
-            "cacheRead": 153570816,
+            "input": 29341620,
+            "output": 646917,
+            "cacheRead": 156137984,
             "cacheWrite": 0
           }
         },
@@ -378,9 +378,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 28915233,
-          "output": 641386,
-          "cacheRead": 153570816,
+          "input": 29341620,
+          "output": 646917,
+          "cacheRead": 156137984,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -397,8 +397,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 265.2999903,
-        "pricingAsOf": "2026-07-27T15:02:31.556Z"
+        "usd": 268.8814393,
+        "pricingAsOf": "2026-07-27T15:03:51.481Z"
       }
     },
     "merges": [
