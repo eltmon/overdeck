@@ -4,17 +4,17 @@
     "created": "2026-07-27T04:46:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3184: Boot reconciliation latches hold_all over an empty candidate set — fleet parks silently, banner self-hides, resume_all resumes nothing",
-    "updated": "2026-07-27T04:56:51.835Z"
+    "updated": "2026-07-27T04:56:53.889Z"
   },
   "plan": {
     "id": "pan-3184",
     "title": "Boot reconciliation latches hold_all over an empty candidate set — fleet parks silently, banner self-hides, resume_all resumes nothing",
-    "status": "approved",
+    "status": "running",
     "uid": "d54a1753-6787-4dd0-806a-ee189b1d0989",
     "author": "agent:k3[1m]",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-07-27T04:46:00Z",
-    "updated": "2026-07-27T04:56:51.835Z",
+    "updated": "2026-07-27T04:56:53.889Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3184",
