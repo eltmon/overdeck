@@ -183,7 +183,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:22:31.092Z",
+  "updated": "2026-07-27T12:22:35.093Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -193,8 +193,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T12:22:31.027Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: validate JSON storage format in regression test",
+    "updatedAt": "2026-07-27T12:22:35.066Z",
+    "reviewNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-27T12:18:16.725Z by deploy-patrol). It re-runs automatically after the deploy.",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "ecb052b11abcc37ce65513e76fb782775e108759",
@@ -338,7 +338,7 @@
       },
       "costAtCloseOut": {
         "usd": 103.2715753,
-        "pricingAsOf": "2026-07-27T12:22:31.074Z"
+        "pricingAsOf": "2026-07-27T12:22:35.087Z"
       }
     },
     "merges": [
