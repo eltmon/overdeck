@@ -96,6 +96,25 @@ child over stdio and renders a readable event feed into the pane. Deacon still
 patrols the tmux session; it does not treat the Codex child process as a
 separate liveness source.
 
+## Transcript-verified resumability (PAN-3194)
+
+A stored Claude session ID is resumable only when its JSONL transcript exists at
+`sessionFilePath(workspace, sessionId)`. Every resume probe uses
+`claudeSessionTranscriptExists()` from `src/lib/paths.ts` for this check.
+
+The check applies at three surfaces:
+
+- `pan start` uses `work-agent-lifecycle.ts` before refusing a fresh start.
+- `/api/agents/:id/has-session` and the stopped-agent listing expose the result
+  through `canResumeSession` and `buildStoppedAgentLifecycle()`.
+- Deacon auto-resume reaches `resumeAgent()`, whose spawn plan decides between
+  the saved session and a fresh launch.
+
+When the transcript is missing, the probes report the session as non-resumable
+and route the agent to a fresh launch. Read paths never clear session pointers;
+`resumeAgent()` owns that recovery mutation through
+`clearAgentSessionPointers()` before it starts the replacement session.
+
 ## Resume classifier and intent policy
 
 `getAgentResumeGateBlockReason()` is the only classifier for `paused`, `troubled`,

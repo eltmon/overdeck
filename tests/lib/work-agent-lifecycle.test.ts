@@ -11,6 +11,7 @@ import {
 import { Effect } from 'effect';
 import { setAgentRuntimeMirror } from '../../src/lib/agent-runtime-mirror.js';
 import { getWorkAgentLifecycleStateSync } from '../../src/lib/work-agent-lifecycle.js';
+import * as paths from '../../src/lib/paths.js';
 import * as tmux from '../../src/lib/tmux.js';
 
 describe('work-agent-lifecycle', () => {
@@ -57,6 +58,7 @@ describe('work-agent-lifecycle', () => {
     saveSessionId(agentId, 'session-123');
 
     const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
+    const transcriptExistsSpy = vi.spyOn(paths, 'claudeSessionTranscriptExists').mockReturnValue(true);
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.canResumeSession).toBe(true);
@@ -64,6 +66,7 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.requiresSessionResetBeforeFreshStart).toBe(true);
     expect(lifecycle.recommendedAction).toBe('resume');
 
+    transcriptExistsSpy.mockRestore();
     sessionExistsSpy.mockRestore();
   });
 
