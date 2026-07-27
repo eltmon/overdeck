@@ -53,6 +53,7 @@ vi.mock('../../../../src/lib/cloister/specialists.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/git-utils.js', () => ({
+  rehydrateHeadAnchor: (anchor: string) => anchor,
   snapshotWorkspaceHeadsPromise: (...args: unknown[]) => mocks.snapshotWorkspaceHeads(...args),
 }));
 
@@ -64,7 +65,11 @@ vi.mock('../../../../src/lib/activity-logger.js', () => ({
   emitActivityEntrySync: (...args: unknown[]) => mocks.emitActivityEntry(...args),
 }));
 
-import { reconcileUnappliedReviewVerdicts } from '../../../../src/lib/cloister/deacon-review-unsignaled.js';
+import {
+  buildReviewCompletionCommand,
+  checkCompletedButUnsignaledReviews,
+  reconcileUnappliedReviewVerdicts,
+} from '../../../../src/lib/cloister/deacon-review-unsignaled.js';
 
 const temporaryDirectories: string[] = [];
 
@@ -73,15 +78,18 @@ async function writeReviewFixture(options: {
   body: string;
   ageMs?: number;
   headSha?: string;
+  repos?: Array<{ repoKey: string; headSha: string }>;
+  runId?: string;
 }): Promise<string> {
   const workspace = await mkdtemp(join(tmpdir(), 'unapplied-review-verdict-'));
   temporaryDirectories.push(workspace);
   mocks.workspace = workspace;
-  const reviewDir = join(workspace, '.pan', 'review', RUN_ID);
+  const reviewDir = join(workspace, '.pan', 'review', options.runId ?? RUN_ID);
   await mkdir(reviewDir, { recursive: true });
   await writeFile(join(reviewDir, 'context.json'), JSON.stringify({
     generatedAt: new Date(NOW.getTime() - 20 * 60 * 1000).toISOString(),
     headSha: options.headSha ?? HEAD,
+    ...(options.repos ? { repos: options.repos } : {}),
   }));
   const reportPath = join(reviewDir, options.filename ?? 'synthesis.md');
   await writeFile(reportPath, options.body);
@@ -135,7 +143,13 @@ describe('reconcileUnappliedReviewVerdicts', () => {
     expect(mocks.setReviewStatus).toHaveBeenCalledWith(ISSUE_ID, {
       reviewStatus: 'passed',
       reviewNotes: 'Review passed applied by deacon sweep from on-disk synthesis.md',
+      reviewedAtCommit: HEAD,
     });
+    const recoveredAnchor = mocks.setReviewStatus.mock.calls[0]?.[1]?.reviewedAtCommit;
+    expect(recoveredAnchor).toBe(HEAD);
+    mocks.snapshotWorkspaceHeads.mockResolvedValueOnce('b'.repeat(40));
+    const subsequentHead = await mocks.snapshotWorkspaceHeads();
+    expect(subsequentHead).not.toBe(recoveredAnchor);
     expect(mocks.emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
       source: 'cloister',
       level: 'warn',
@@ -178,6 +192,68 @@ describe('reconcileUnappliedReviewVerdicts', () => {
     expect(mocks.setReviewStatus).not.toHaveBeenCalled();
   });
 
+  it('applies a polyrepo verdict when every reviewed repository HEAD matches', async () => {
+    const apiHead = 'c'.repeat(40);
+    const compositeHead = `fe@${HEAD} api@${apiHead}`;
+    await writeReviewFixture({
+      body: '## Verdict: APPROVED',
+      repos: [
+        { repoKey: 'fe', headSha: HEAD },
+        { repoKey: 'api', headSha: apiHead },
+      ],
+    });
+    mocks.statuses[ISSUE_ID] = pendingStatus({ lastVerifiedCommit: compositeHead });
+    mocks.snapshotWorkspaceHeads.mockResolvedValue(compositeHead);
+
+    await reconcileUnappliedReviewVerdicts();
+
+    expect(mocks.setReviewStatus).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({
+      reviewStatus: 'passed',
+      reviewedAtCommit: compositeHead,
+    }));
+  });
+
+  it('skips a polyrepo verdict when one reviewed repository HEAD has moved', async () => {
+    const apiHead = 'c'.repeat(40);
+    await writeReviewFixture({
+      body: '## Verdict: APPROVED',
+      repos: [
+        { repoKey: 'fe', headSha: HEAD },
+        { repoKey: 'api', headSha: apiHead },
+      ],
+    });
+    mocks.statuses[ISSUE_ID] = pendingStatus();
+    mocks.snapshotWorkspaceHeads.mockResolvedValue(`fe@${HEAD} api@${'d'.repeat(40)}`);
+
+    await reconcileUnappliedReviewVerdicts();
+
+    expect(mocks.setReviewStatus).not.toHaveBeenCalled();
+  });
+
+  it('continues past a malformed review run and applies the valid run', async () => {
+    await writeReviewFixture({ body: '## Verdict: APPROVED' });
+    const malformedDir = join(
+      mocks.workspace,
+      '.pan',
+      'review',
+      'agent-pan-3206-review-malformed',
+    );
+    await mkdir(malformedDir, { recursive: true });
+    await writeFile(join(malformedDir, 'context.json'), '{not-json');
+    const malformedReport = join(malformedDir, 'synthesis.md');
+    await writeFile(malformedReport, '## Verdict: FAILED');
+    const reportTime = new Date(NOW.getTime() - 6 * 60 * 1000);
+    await utimes(malformedReport, reportTime, reportTime);
+    mocks.statuses[ISSUE_ID] = pendingStatus();
+
+    await reconcileUnappliedReviewVerdicts();
+
+    expect(mocks.setReviewStatus).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({
+      reviewStatus: 'passed',
+      reviewedAtCommit: HEAD,
+    }));
+  });
+
   it('skips a verdict older than a newer review request', async () => {
     await writeReviewFixture({ body: '## Verdict: APPROVED' });
     mocks.statuses[ISSUE_ID] = pendingStatus({
@@ -217,6 +293,54 @@ describe('reconcileUnappliedReviewVerdicts', () => {
     expect(mocks.setReviewStatus).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({
       reviewStatus: 'passed',
     }));
+  });
+
+  it('shell-quotes every report-derived completion argument', () => {
+    const notes = 'double " single \' backtick `cmd` substitution $(cmd)\nnext line';
+    const runId = 'agent-pan-3206-review-run\';$(cmd)`tick`';
+
+    const command = buildReviewCompletionCommand(ISSUE_ID, 'blocked', notes, runId);
+
+    expect(command).toContain("--notes 'double \" single '\\'' backtick `cmd` substitution $(cmd)\nnext line'");
+    expect(command).toContain("--run-id 'agent-pan-3206-review-run'\\'';$(cmd)`tick`'");
+  });
+
+  it('uses shell-quoted report text in the pending-verdict nudge path', async () => {
+    const blocker = 'quote " single \' backtick `cmd` substitution $(cmd)';
+    const runId = 'agent-pan-3206-review-run\';$(cmd)`tick`';
+    await writeReviewFixture({
+      body: `## Verdict: CHANGES REQUESTED — ${blocker}`,
+      runId,
+    });
+    mocks.statuses[ISSUE_ID] = pendingStatus();
+    mocks.sessionAlive = true;
+
+    await reconcileUnappliedReviewVerdicts();
+
+    const expectedCommand = buildReviewCompletionCommand(ISSUE_ID, 'blocked', blocker, runId);
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'agent-pan-3206-review',
+      expect.stringContaining(expectedCommand),
+    );
+  });
+
+  it('uses shell-quoted report text in the reviewing fallback nudge path', async () => {
+    const blocker = 'quote " single \' backtick `cmd` substitution $(cmd)';
+    const runId = 'agent-pan-3206-review-run\';$(cmd)`tick`';
+    await writeReviewFixture({
+      body: `## Verdict: CHANGES REQUESTED — ${blocker}`,
+      runId,
+    });
+    mocks.statuses[ISSUE_ID] = pendingStatus({ reviewStatus: 'reviewing' });
+    mocks.sessionAlive = true;
+
+    await checkCompletedButUnsignaledReviews();
+
+    const expectedCommand = buildReviewCompletionCommand(ISSUE_ID, 'blocked', blocker, runId);
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'agent-pan-3206-review',
+      expect.stringContaining(expectedCommand),
+    );
   });
 
   it('skips pending review state without a reviewSpawnedAt stamp', async () => {

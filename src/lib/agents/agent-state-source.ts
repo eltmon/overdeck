@@ -1,6 +1,7 @@
 export interface FeedbackAgentState {
   id: string;
   issueId: string;
+  role: string;
 }
 
 type FeedbackAgentStateReader = () => FeedbackAgentState[];

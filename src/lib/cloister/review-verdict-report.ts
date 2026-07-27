@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export const VERDICT_REPORT_FILENAMES = ['synthesis.md', 'review.md'] as const;
@@ -20,6 +21,19 @@ export function findVerdictReport(dirPath: string): VerdictReport | null {
   for (const filename of VERDICT_REPORT_FILENAMES) {
     const path = join(dirPath, filename);
     if (existsSync(path)) return { path, filename };
+  }
+  return null;
+}
+
+export async function findVerdictReportAsync(dirPath: string): Promise<VerdictReport | null> {
+  for (const filename of VERDICT_REPORT_FILENAMES) {
+    const path = join(dirPath, filename);
+    try {
+      await access(path);
+      return { path, filename };
+    } catch {
+      // Try the next supported artifact name.
+    }
   }
   return null;
 }

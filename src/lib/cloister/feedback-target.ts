@@ -20,10 +20,8 @@ async function isLiveSession(agentId: string): Promise<boolean> {
   return Effect.runPromise(sessionExists(agentId));
 }
 
-function isWorkFeedbackTarget(agentId: string): boolean {
-  const normalizedId = agentId.toLowerCase();
-  if (normalizedId.startsWith('conv-') || normalizedId.startsWith('planning-')) return false;
-  return !/-(?:review|test|inspect|ship|plan)$/.test(normalizedId);
+function isWorkFeedbackTarget(role: string): boolean {
+  return role === 'work';
 }
 
 function slotAgentId(issueId: string, slotIndex: number, assignedAgentId?: string): string {
@@ -112,7 +110,7 @@ export async function resolveIssueFeedbackTarget(
   if (registeredAgents) {
     for (const agent of registeredAgents) {
       if (agent.issueId.toUpperCase() !== normalizedIssue) continue;
-      if (!isWorkFeedbackTarget(agent.id)) continue;
+      if (!isWorkFeedbackTarget(agent.role)) continue;
       if (await isLiveSession(agent.id)) return { agentId: agent.id };
     }
   }

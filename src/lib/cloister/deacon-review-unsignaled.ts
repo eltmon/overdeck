@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { basename, join } from 'path';
 import { Effect } from 'effect';
 import { getAgentRuntimeStateSync, getAgentStateSync, listRunningAgents } from '../agents.js';
@@ -11,7 +12,7 @@ import { isPaneDead, sessionExistsSync } from '../tmux.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { evaluateReviewConvoyLiveness, reviewTimestampMs } from './review-convoy-liveness.js';
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
-import { findVerdictReport, parseVerdictReport } from './review-verdict-report.js';
+import { findVerdictReport, findVerdictReportAsync, parseVerdictReport } from './review-verdict-report.js';
 
 // ============================================================================
 // Stuck review detection (PAN-733)
@@ -119,7 +120,63 @@ const pendingVerdictNudges = new Map<string, number>();
 type ReviewRunContext = {
   generatedAt?: string;
   headSha?: string;
+  repos?: Array<{
+    repoKey?: string;
+    headSha?: string;
+  }>;
 };
+
+function reviewAnchorFromContext(context: ReviewRunContext): string | undefined {
+  if (context.repos) {
+    if (context.repos.length === 0) return undefined;
+    const heads: string[] = [];
+    for (const repo of context.repos) {
+      if (!repo.repoKey?.trim() || !repo.headSha?.trim()) return undefined;
+      heads.push(`${repo.repoKey.trim()}@${repo.headSha.trim()}`);
+    }
+    return heads.join(' ');
+  }
+  return context.headSha?.trim() || undefined;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+export function buildReviewCompletionCommand(
+  issueId: string,
+  verdict: 'passed' | 'blocked' | 'failed',
+  notes: string,
+  runId: string,
+): string {
+  let command = `pan admin specialists done review ${shellQuote(issueId)} --status ${shellQuote(verdict)}`;
+  if (verdict === 'blocked' || verdict === 'failed') {
+    command += ` --notes ${shellQuote(notes)}`;
+  }
+  return `${command} --run-id ${shellQuote(runId)}`;
+}
+
+function isReviewContextForActiveRun(
+  context: ReviewRunContext,
+  status: Pick<ReviewStatus, 'reviewSpawnedAt' | 'lastVerifiedCommit'>,
+  reportMtimeMs: number,
+): boolean {
+  if (!status.reviewSpawnedAt) return true;
+
+  const spawnedAtMs = reviewTimestampMs(status.reviewSpawnedAt);
+  if (!Number.isFinite(spawnedAtMs)) return true;
+  if (reportMtimeMs < spawnedAtMs) return false;
+
+  if (context.generatedAt) {
+    const generatedAtMs = Date.parse(context.generatedAt);
+    if (Number.isFinite(generatedAtMs) && generatedAtMs < spawnedAtMs) return false;
+  }
+
+  const reviewedAnchor = reviewAnchorFromContext(context);
+  return !status.lastVerifiedCommit
+    || !reviewedAnchor
+    || reviewedAnchor === status.lastVerifiedCommit;
+}
 
 export function isSynthesisForActiveReviewRun(
   dirPath: string,
@@ -127,31 +184,15 @@ export function isSynthesisForActiveReviewRun(
   synthesisMtimeMs: number,
 ): boolean {
   if (!status.reviewSpawnedAt) return true;
-
-  const spawnedAtMs = reviewTimestampMs(status.reviewSpawnedAt);
-  if (!Number.isFinite(spawnedAtMs)) return true;
-  if (synthesisMtimeMs < spawnedAtMs) return false;
-
   const contextPath = join(dirPath, 'context.json');
   if (!existsSync(contextPath)) return false;
 
-  let context: ReviewRunContext;
   try {
-    context = JSON.parse(readFileSync(contextPath, 'utf8')) as ReviewRunContext;
+    const context = JSON.parse(readFileSync(contextPath, 'utf8')) as ReviewRunContext;
+    return isReviewContextForActiveRun(context, status, synthesisMtimeMs);
   } catch {
     return false;
   }
-
-  if (context.generatedAt) {
-    const generatedAtMs = Date.parse(context.generatedAt);
-    if (Number.isFinite(generatedAtMs) && generatedAtMs < spawnedAtMs) return false;
-  }
-
-  if (status.lastVerifiedCommit && context.headSha && context.headSha !== status.lastVerifiedCommit) {
-    return false;
-  }
-
-  return true;
 }
 
 /**
@@ -172,114 +213,138 @@ export async function reconcileUnappliedReviewVerdicts(): Promise<string[]> {
     for (const [issueId, status] of Object.entries(statuses)) {
       if (status.reviewStatus !== 'pending' || !status.reviewSpawnedAt) continue;
 
-      const resolved = resolveProjectFromIssueSync(issueId);
-      if (!resolved) continue;
-      const wsPath = findWorkspacePath(resolved.projectPath, issueId.toLowerCase());
-      if (!wsPath) continue;
-
-      const reviewBaseDir = join(wsPath, '.pan', 'review');
-      if (!existsSync(reviewBaseDir)) continue;
-
-      let latestDir: string | null = null;
-      let latestReport: ReturnType<typeof findVerdictReport> = null;
-      let latestMtime = 0;
-      for (const entry of readdirSync(reviewBaseDir)) {
-        if (!entry.startsWith(`agent-${issueId.toLowerCase()}-review`)) continue;
-        const dirPath = join(reviewBaseDir, entry);
-        const report = findVerdictReport(dirPath);
-        if (!report) continue;
-        const mtime = statSync(report.path).mtimeMs;
-        if (!isSynthesisForActiveReviewRun(dirPath, status, mtime)) continue;
-        if (mtime > latestMtime) {
-          latestDir = dirPath;
-          latestReport = report;
-          latestMtime = mtime;
-        }
-      }
-      if (!latestDir || !latestReport) continue;
-      if (now - latestMtime < VERDICT_SETTLE_MS) continue;
-
-      const requestedAtMs = status.reviewRequestedAt ? Date.parse(status.reviewRequestedAt) : Number.NaN;
-      if (Number.isFinite(requestedAtMs) && requestedAtMs > latestMtime) continue;
-
-      let context: ReviewRunContext = {};
       try {
-        context = JSON.parse(readFileSync(join(latestDir, 'context.json'), 'utf8')) as ReviewRunContext;
-      } catch {
-        continue;
-      }
+        const resolved = resolveProjectFromIssueSync(issueId);
+        if (!resolved) continue;
+        const wsPath = findWorkspacePath(resolved.projectPath, issueId.toLowerCase());
+        if (!wsPath) continue;
 
-      let currentHead: HeadAnchor | undefined;
-      try {
-        const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
-        currentHead = await snapshotWorkspaceHeadsPromise(issueId, wsPath);
-      } catch {
-        continue;
-      }
-      if (context.headSha && currentHead !== context.headSha) continue;
-
-      let parsed: ReturnType<typeof parseVerdictReport>;
-      try {
-        parsed = parseVerdictReport(readFileSync(latestReport.path, 'utf8'));
-      } catch {
-        continue;
-      }
-      if (!parsed) continue;
-
-      const reviewSession = `agent-${issueId.toLowerCase()}-review`;
-      const sessionAlive = sessionExistsSync(reviewSession);
-      const paneDead = sessionAlive ? await Effect.runPromise(isPaneDead(reviewSession)).catch(() => true) : true;
-      if (sessionAlive && !paneDead) {
-        const lastNudged = pendingVerdictNudges.get(latestDir);
-        if (!lastNudged) {
-          const notes = parsed.topBlocker || `See ${latestReport.filename}`;
-          const cmd = `pan admin specialists done review ${issueId} --status ${parsed.verdict}${parsed.verdict === 'blocked' || parsed.verdict === 'failed' ? ` --notes "${notes}"` : ''} --run-id "${basename(latestDir)}"`;
-          const nudge = `Your review verdict is already written on disk but review status is still pending. Your ONLY remaining task is to execute this Bash command immediately — do not analyze, do not summarize, do not ask questions, just run it:\n\n${cmd}\n\nRun this command NOW. Do not write any other response before executing it.`;
-          try {
-            const { messageAgent } = await import('../agents.js');
-            await messageAgent(reviewSession, nudge);
-            pendingVerdictNudges.set(latestDir, now);
-            const action = `Nudged ${reviewSession} to apply pending ${parsed.verdict} verdict from ${latestReport.filename}`;
-            actions.push(action);
-            console.log(`[deacon] ${action}`);
-          } catch (err: unknown) {
-            console.error(`[deacon] Failed to nudge ${reviewSession}:`, err instanceof Error ? err.message : String(err));
-          }
+        const reviewBaseDir = join(wsPath, '.pan', 'review');
+        let reviewEntries: string[];
+        try {
+          reviewEntries = await readdir(reviewBaseDir);
+        } catch {
           continue;
         }
-        if (now - lastNudged < NUDGE_GRACE_MS) continue;
-      }
 
-      const attribution = `applied by deacon sweep from on-disk ${latestReport.filename}`;
-      const reviewNotes = parsed.topBlocker
-        ? `${parsed.topBlocker} — ${attribution}`
-        : `Review ${parsed.verdict} ${attribution}`;
-      setReviewStatusSync(issueId, {
-        reviewStatus: parsed.verdict,
-        reviewNotes,
-        ...(parsed.verdict === 'blocked' && currentHead ? { reviewedAtCommit: currentHead } : {}),
-      });
-
-      if (parsed.verdict === 'blocked') {
-        try {
-          await Effect.runPromise(deliverReviewVerdictFeedback({
-            issueId,
-            verdict: 'blocked',
-            notes: parsed.topBlocker || reviewNotes,
-            workspacePath: wsPath,
-            prUrl: status.prUrl,
-            runId: basename(latestDir),
-          }));
-        } catch (err: unknown) {
-          console.error(`[deacon] Failed to deliver reconciled review verdict for ${issueId}:`, err instanceof Error ? err.message : String(err));
+        let latestDir: string | null = null;
+        let latestReport: Awaited<ReturnType<typeof findVerdictReportAsync>> = null;
+        let latestContext: ReviewRunContext | null = null;
+        let latestMtime = 0;
+        for (const entry of reviewEntries) {
+          if (!entry.startsWith(`agent-${issueId.toLowerCase()}-review`)) continue;
+          const dirPath = join(reviewBaseDir, entry);
+          try {
+            const report = await findVerdictReportAsync(dirPath);
+            if (!report) continue;
+            const [reportStat, contextContent] = await Promise.all([
+              stat(report.path),
+              readFile(join(dirPath, 'context.json'), 'utf8'),
+            ]);
+            const context = JSON.parse(contextContent) as ReviewRunContext;
+            if (!isReviewContextForActiveRun(context, status, reportStat.mtimeMs)) continue;
+            if (reportStat.mtimeMs > latestMtime) {
+              latestDir = dirPath;
+              latestReport = report;
+              latestContext = context;
+              latestMtime = reportStat.mtimeMs;
+            }
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            console.error(`[deacon] Error reading review run ${dirPath}:`, msg);
+          }
         }
-      }
+        if (!latestDir || !latestReport || !latestContext) continue;
+        if (now - latestMtime < VERDICT_SETTLE_MS) continue;
 
-      pendingVerdictNudges.delete(latestDir);
-      const action = `reconcileUnappliedReviewVerdicts deacon sweep applied ${parsed.verdict} for ${issueId} from ${latestReport.filename}`;
-      actions.push(action);
-      emitActivityEntrySync({ source: 'cloister', level: 'warn', message: action, issueId });
-      console.log(`[deacon] ${action}`);
+        const requestedAtMs = status.reviewRequestedAt ? Date.parse(status.reviewRequestedAt) : Number.NaN;
+        if (Number.isFinite(requestedAtMs) && requestedAtMs > latestMtime) continue;
+
+        let currentHead: HeadAnchor | undefined;
+        let reviewedHead: HeadAnchor | undefined;
+        try {
+          const { rehydrateHeadAnchor, snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
+          currentHead = await snapshotWorkspaceHeadsPromise(issueId, wsPath);
+          const persistedAnchor = reviewAnchorFromContext(latestContext);
+          reviewedHead = persistedAnchor ? rehydrateHeadAnchor(persistedAnchor) : undefined;
+        } catch {
+          continue;
+        }
+        if (!reviewedHead || currentHead !== reviewedHead) continue;
+
+        let parsed: ReturnType<typeof parseVerdictReport>;
+        try {
+          parsed = parseVerdictReport(await readFile(latestReport.path, 'utf8'));
+        } catch {
+          continue;
+        }
+        if (!parsed) continue;
+
+        const reviewSession = `agent-${issueId.toLowerCase()}-review`;
+        const sessionAlive = sessionExistsSync(reviewSession);
+        const paneDead = sessionAlive ? await Effect.runPromise(isPaneDead(reviewSession)).catch(() => true) : true;
+        if (sessionAlive && !paneDead) {
+          const lastNudged = pendingVerdictNudges.get(latestDir);
+          if (!lastNudged) {
+            const notes = parsed.topBlocker || `See ${latestReport.filename}`;
+            const cmd = buildReviewCompletionCommand(
+              issueId,
+              parsed.verdict,
+              notes,
+              basename(latestDir),
+            );
+            const nudge = `Your review verdict is already written on disk but review status is still pending. Your ONLY remaining task is to execute this Bash command immediately — do not analyze, do not summarize, do not ask questions, just run it:\n\n${cmd}\n\nRun this command NOW. Do not write any other response before executing it.`;
+            try {
+              const { messageAgent } = await import('../agents.js');
+              await messageAgent(reviewSession, nudge);
+              pendingVerdictNudges.set(latestDir, now);
+              const action = `Nudged ${reviewSession} to apply pending ${parsed.verdict} verdict from ${latestReport.filename}`;
+              actions.push(action);
+              console.log(`[deacon] ${action}`);
+            } catch (err: unknown) {
+              console.error(`[deacon] Failed to nudge ${reviewSession}:`, err instanceof Error ? err.message : String(err));
+            }
+            continue;
+          }
+          if (now - lastNudged < NUDGE_GRACE_MS) continue;
+        }
+
+        const attribution = `applied by deacon sweep from on-disk ${latestReport.filename}`;
+        const reviewNotes = parsed.topBlocker
+          ? `${parsed.topBlocker} — ${attribution}`
+          : `Review ${parsed.verdict} ${attribution}`;
+        setReviewStatusSync(issueId, {
+          reviewStatus: parsed.verdict,
+          reviewNotes,
+          ...((parsed.verdict === 'passed' || parsed.verdict === 'blocked') && currentHead
+            ? { reviewedAtCommit: currentHead }
+            : {}),
+        });
+
+        if (parsed.verdict === 'blocked') {
+          try {
+            await Effect.runPromise(deliverReviewVerdictFeedback({
+              issueId,
+              verdict: 'blocked',
+              notes: parsed.topBlocker || reviewNotes,
+              workspacePath: wsPath,
+              prUrl: status.prUrl,
+              runId: basename(latestDir),
+            }));
+          } catch (err: unknown) {
+            console.error(`[deacon] Failed to deliver reconciled review verdict for ${issueId}:`, err instanceof Error ? err.message : String(err));
+          }
+        }
+
+        pendingVerdictNudges.delete(latestDir);
+        const action = `reconcileUnappliedReviewVerdicts deacon sweep applied ${parsed.verdict} for ${issueId} from ${latestReport.filename}`;
+        actions.push(action);
+        emitActivityEntrySync({ source: 'cloister', level: 'warn', message: action, issueId });
+        console.log(`[deacon] ${action}`);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`[deacon] Error reconciling unapplied review verdict for ${issueId}:`, msg);
+      }
     }
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -365,7 +430,12 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
         }
 
         // Agent is alive but idle — nudge it to signal completion
-        const cmd = `pan admin specialists done review ${issueId} --status ${verdict}${verdict === 'blocked' || verdict === 'failed' ? ` --notes "${topBlocker || `See ${latestReport.filename}`}"` : ''} --run-id "${basename(latestDir)}"`;
+        const cmd = buildReviewCompletionCommand(
+          issueId,
+          verdict,
+          topBlocker || `See ${latestReport.filename}`,
+          basename(latestDir),
+        );
         const nudge = `Your review verdict in ${latestReport.filename} is already written and saved. Your ONLY remaining task is to execute this Bash command immediately — do not analyze, do not summarize, do not ask questions, just run it:\n\n${cmd}\n\nRun this command NOW. Do not write any other response before executing it.`;
         try {
           const { messageAgent } = await import('../agents.js');
