@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T13:35:42.946Z",
-  "updated": "2026-07-27T18:06:57.847Z",
+  "updated": "2026-07-27T18:07:00.856Z",
   "pipeline": {
     "issueId": "PAN-3206",
     "reviewStatus": "pending",
@@ -71,15 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
+    "sequence": 7,
     "claims": {
-      "feedback-target-agents-table-tier": {
-        "writerId": "agent-pan-3206",
-        "agentId": "agent-pan-3206",
-        "pid": 3340303,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T14:35:47.266Z"
-      },
       "docs-and-role-prompt-fixes": {
         "writerId": "agent-pan-3206",
         "agentId": "agent-pan-3206",
@@ -110,6 +103,17 @@
         "outcome": "completed",
         "reason": "Added the pending-status verdict reconciliation sweep, wired it into Deacon patrol, preserved HEAD/newer-request/settle guards, and delivered blocked feedback",
         "releasedAt": "2026-07-27T18:06:57.847Z"
+      },
+      {
+        "writerId": "agent-pan-3206",
+        "agentId": "agent-pan-3206",
+        "pid": 3340303,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T14:35:47.266Z",
+        "itemId": "feedback-target-agents-table-tier",
+        "outcome": "completed",
+        "reason": "Added an agents-table-backed live work-session fallback and excluded review/test/inspect/ship/plan/conversation/planning sessions with regression coverage",
+        "releasedAt": "2026-07-27T18:07:00.856Z"
       }
     ],
     "statusReasons": {
@@ -120,6 +124,10 @@
       "pending-verdict-sweep": {
         "reason": "Added the pending-status verdict reconciliation sweep, wired it into Deacon patrol, preserved HEAD/newer-request/settle guards, and delivered blocked feedback",
         "updatedAt": "2026-07-27T18:06:57.847Z"
+      },
+      "feedback-target-agents-table-tier": {
+        "reason": "Added an agents-table-backed live work-session fallback and excluded review/test/inspect/ship/plan/conversation/planning sessions with regression coverage",
+        "updatedAt": "2026-07-27T18:07:00.856Z"
       }
     }
   },
@@ -129,12 +137,15 @@
     "verdict-report-helper.verdict-report-helper.ac2": "completed",
     "verdict-report-helper.verdict-report-helper.ac3": "completed",
     "pending-verdict-sweep": "completed",
-    "feedback-target-agents-table-tier": "running",
+    "feedback-target-agents-table-tier": "completed",
     "docs-and-role-prompt-fixes": "running",
     "pending-verdict-sweep.pending-verdict-sweep.ac1": "completed",
     "pending-verdict-sweep.pending-verdict-sweep.ac2": "completed",
     "pending-verdict-sweep.pending-verdict-sweep.ac3": "completed",
     "pending-verdict-sweep.pending-verdict-sweep.ac4": "completed",
-    "pending-verdict-sweep.pending-verdict-sweep.ac5": "completed"
+    "pending-verdict-sweep.pending-verdict-sweep.ac5": "completed",
+    "feedback-target-agents-table-tier.feedback-target-agents-table-tier.ac1": "completed",
+    "feedback-target-agents-table-tier.feedback-target-agents-table-tier.ac2": "completed",
+    "feedback-target-agents-table-tier.feedback-target-agents-table-tier.ac3": "completed"
   }
 }
