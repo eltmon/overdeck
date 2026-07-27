@@ -4,6 +4,8 @@ import {
   buildRealConflictGateDeps,
   checkBranchMergeability,
   getCachedConflictGateMergeability,
+  parseMergeTreeNameOnly,
+  probeBranchConflictPaths,
   resolveConflictGate,
   type ExecRunner,
   type ResolveConflictGateDeps,
@@ -126,6 +128,116 @@ describe('checkBranchMergeability', () => {
   });
 });
 
+describe('parseMergeTreeNameOnly', () => {
+  it('extracts a single conflicting path between the tree OID and the blank line', () => {
+    const stdout = [
+      '372a91d087defa345fe76a0b369984fcf527c796',
+      'a.txt',
+      '',
+      'Auto-merging a.txt',
+      'CONFLICT (content): Merge conflict in a.txt',
+      '',
+    ].join('\n');
+
+    expect(parseMergeTreeNameOnly(stdout)).toEqual(['a.txt']);
+  });
+
+  it('extracts multiple conflicting paths in output order', () => {
+    const stdout = [
+      '372a91d087defa345fe76a0b369984fcf527c796',
+      'a.txt',
+      'b.txt',
+      'c.txt',
+      '',
+      'Auto-merging a.txt',
+      'CONFLICT (content): Merge conflict in a.txt',
+    ].join('\n');
+
+    expect(parseMergeTreeNameOnly(stdout)).toEqual(['a.txt', 'b.txt', 'c.txt']);
+  });
+
+  it('returns an empty array for the clean case (tree OID only)', () => {
+    expect(parseMergeTreeNameOnly('cae77a980c249d3659de60a47ca6d238132e3015\n')).toEqual([]);
+  });
+});
+
+describe('probeBranchConflictPaths', () => {
+  it('returns conflicts with the single conflicting path', async () => {
+    const exec = makeRunner([
+      { stdout: '' },
+      commandError('merge-tree failed', {
+        code: 1,
+        stdout: [
+          '372a91d087defa345fe76a0b369984fcf527c796',
+          'a.txt',
+          '',
+          'Auto-merging a.txt',
+          'CONFLICT (content): Merge conflict in a.txt',
+          '',
+        ].join('\n'),
+      }),
+    ]);
+
+    await expect(probeBranchConflictPaths('/workspace', 'main', { exec })).resolves.toEqual({
+      mergeability: 'conflicts',
+      paths: ['a.txt'],
+    });
+  });
+
+  it('returns conflicts with all three conflicting paths in order', async () => {
+    const exec = makeRunner([
+      { stdout: '' },
+      commandError('merge-tree failed', {
+        code: 1,
+        stdout: [
+          '372a91d087defa345fe76a0b369984fcf527c796',
+          'a.txt',
+          'b.txt',
+          'c.txt',
+          '',
+          'Auto-merging a.txt',
+          'CONFLICT (content): Merge conflict in a.txt',
+        ].join('\n'),
+      }),
+    ]);
+
+    await expect(probeBranchConflictPaths('/workspace', 'main', { exec })).resolves.toEqual({
+      mergeability: 'conflicts',
+      paths: ['a.txt', 'b.txt', 'c.txt'],
+    });
+  });
+
+  it('returns clean with an empty paths array', async () => {
+    const exec = makeRunner([{ stdout: '' }, { stdout: 'cae77a980c249d3659de60a47ca6d238132e3015\n' }]);
+
+    await expect(probeBranchConflictPaths('/workspace', 'main', { exec })).resolves.toEqual({
+      mergeability: 'clean',
+      paths: [],
+    });
+  });
+
+  it('returns unknown with an empty paths array for a fatal merge-tree failure', async () => {
+    const exec = makeRunner([
+      { stdout: '' },
+      commandError('old git', { code: 129, stderr: 'usage: git merge-tree [--write-tree]' }),
+    ]);
+
+    await expect(probeBranchConflictPaths('/workspace', 'main', { exec })).resolves.toEqual({
+      mergeability: 'unknown',
+      paths: [],
+    });
+  });
+
+  it('returns unknown with an empty paths array when fetch fails', async () => {
+    const exec = makeRunner([commandError('network failed', { code: 128, stderr: 'fatal: unable to access origin' })]);
+
+    await expect(probeBranchConflictPaths('/workspace', 'main', { exec })).resolves.toEqual({
+      mergeability: 'unknown',
+      paths: [],
+    });
+  });
+});
+
 describe('resolveConflictGate', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -159,10 +271,30 @@ describe('resolveConflictGate', () => {
 
     expect(deps.setReviewStatus).toHaveBeenCalledWith(
       'PAN-1765',
-      { blockerReasons: [nonMergeBlocker] },
+      { blockerReasons: [nonMergeBlocker], conflictsSince: undefined },
       status,
     );
     expect(deps.dispatchResolver).not.toHaveBeenCalled();
+  });
+
+  it('clears conflictsSince in the same write that clears stale merge blockers (PAN-3154)', async () => {
+    const status = makeStatus({
+      blockerReasons: [mergeBlocker],
+      conflictsSince: {
+        sha: '6ac4a3dc11',
+        detectedAt: '2026-07-26T18:58:00.000Z',
+        paths: ['a.txt'],
+      },
+    });
+    const deps = makeGateDeps(status, 'clean');
+
+    await resolveConflictGate('PAN-1765', '/workspace', 'main', deps);
+
+    expect(deps.setReviewStatus).toHaveBeenCalledWith(
+      'PAN-1765',
+      { blockerReasons: undefined, conflictsSince: undefined },
+      status,
+    );
   });
 
   it('gates and dispatches a resolver once for a real conflict within the throttle window', async () => {

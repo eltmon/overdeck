@@ -50,6 +50,7 @@ import { getMergeBlockersPayload } from '../../../lib/cloister/merge-blockers.js
 import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
 import {
   cancelPending,
+  countActionableAutoMerges,
   getActionableAutoMerge,
   listActiveAutoMerges,
   listProblemAutoMerges,
@@ -268,6 +269,7 @@ interface AutoMergeCancelDeps {
   now?: () => Date;
   getPending?: (issueId: string) => PendingAutoMerge | null;
   cancel?: (id: number, cancelledBy: string) => boolean;
+  countRemaining?: (issueId: string) => number;
   announce?: (issueId: string) => void;
 }
 
@@ -385,6 +387,7 @@ export function deleteAutoMergePayload(issueIdParam: string, deps: AutoMergeCanc
       status: 'cancelled' as const,
       cancelledAt,
       cancelledBy: 'operator',
+      remainingActionable: (deps.countRemaining ?? countActionableAutoMerges)(issueId),
     },
   };
 }

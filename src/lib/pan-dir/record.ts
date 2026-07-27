@@ -160,6 +160,8 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   inspectNotes?: string;
   mergeNotes?: string;
   blockerReasons?: unknown[];
+  /** PAN-3154: main-head SHA/paths that first made this branch conflict. */
+  conflictsSince?: { sha: string; detectedAt: string; paths: string[] };
   prUrl?: string;
   prNumber?: number;
   prHeadSha?: string;

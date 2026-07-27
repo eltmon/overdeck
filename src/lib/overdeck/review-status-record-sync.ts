@@ -151,6 +151,7 @@ function durableSubset(p: PanIssuePipelineRecord): DurableStatusFields {
     strikeTransportRetryCount: p.strikeTransportRetryCount,
     strikeNextAttemptAt: p.strikeNextAttemptAt,
     strikeLandingAttempts: p.strikeLandingAttempts,
+    conflictsSince: p.conflictsSince,
     closedOut: p.closedOut,
     closedOutAt: p.closedOutAt,
   };

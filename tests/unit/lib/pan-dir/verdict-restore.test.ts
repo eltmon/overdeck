@@ -181,6 +181,11 @@ describe('restoreReviewStatusFromRecords', () => {
       deaconIgnored: true,
       deaconIgnoredAt: '2026-06-15T01:00:00.000Z',
       deaconIgnoredReason: 'operator request',
+      conflictsSince: {
+        sha: '6ac4a3dc11',
+        detectedAt: '2026-07-26T18:58:00.000Z',
+        paths: ['scripts/file-size-baseline.txt'],
+      },
     });
 
     const result = await restoreReviewStatusFromRecords({ issueId: 'PAN-1922' });
@@ -210,6 +215,11 @@ describe('restoreReviewStatusFromRecords', () => {
     expect(status!.deaconIgnored).toBe(true);
     expect(status!.deaconIgnoredAt).toBe('2026-06-15T01:00:00.000Z');
     expect(status!.deaconIgnoredReason).toBe('operator request');
+    expect(status!.conflictsSince).toEqual({
+      sha: '6ac4a3dc11',
+      detectedAt: '2026-07-26T18:58:00.000Z',
+      paths: ['scripts/file-size-baseline.txt'],
+    });
   });
 
   it('skips issues with no per-issue record and creates no row', async () => {
@@ -343,6 +353,7 @@ describe('restoreReviewStatusFromRecords', () => {
       'release_status',
       'release_notes',
       'review_cycle_history',
+      'conflicts_since',
     ]);
 
     // Columns re-derived live or computed by the write path after restore

@@ -19,6 +19,7 @@ import { getAutoCloseOutCanonicalState, sweepAutoCloseOutCache } from './deacon-
 import { isStuckMergingState, observeGitHubBranchMerge } from './deacon-stuck-merging.js';
 
 export { reconcileStuckMergingStates } from './deacon-stuck-merging.js';
+export { reconcileAutoMergeRows } from './deacon-auto-merge-reconcile.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);

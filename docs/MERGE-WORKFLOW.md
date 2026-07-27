@@ -173,6 +173,48 @@ Both were sources of "the oracles disagree" bugs (notably PAN-1024 in May
 2026). Explicit batch-promotion evidence remains separately verified by commit
 ancestry in each repository.
 
+## Branch invalidation sweep
+
+A merge to `main` can silently invalidate every other open branch touching the
+same files — the branch stops applying, but nothing tells its agent until the
+merge gate discovers the conflict, by which point the divergence has grown.
+`reconcileBranchInvalidation()` (`src/lib/cloister/branch-invalidation.ts`,
+PAN-3154) closes that gap as a Deacon patrol reconciler:
+
+1. **Main-head watcher.** Per project, on a 120-second cooldown, it runs `git
+   ls-remote origin refs/heads/main` and compares the SHA against the
+   last-seen value stored in the `app_settings` key
+   `branch_invalidation.main_head.<projectKey>`. An unchanged SHA skips the
+   rest of the sweep entirely — no workspace probing happens on a quiet tick.
+2. **Conflict fan-out.** When the head moves, the sweep resolves every
+   in-pipeline issue of that project (`mergeStatus !== 'merged'`), finds its
+   workspace (the agents-table workspace column first, then a
+   `feature-<issue>*` prefix scan covering `-strike`/`-slot-N` variants), and
+   probes it with `probeBranchConflictPaths()` against the new `main`.
+3. **Marking.** A newly-conflicting branch (dedup keyed on
+   `conflictsSince.sha`) gets `conflictsSince: { sha, detectedAt, paths }` on
+   its review status plus a `merge_conflict` blocker (replacing any prior
+   merge blocker, non-merge blockers preserved). That blocker alone forces
+   `readyForMerge = false` and routes the issue through the existing
+   conflict-gate machinery — review-dispatch defer, resolver dispatch,
+   dashboard `stuckReason` — with no separate marker to wire up.
+4. **Notification.** The live owning agent (resolved via
+   `resolveIssueFeedbackTarget`) gets a message naming the causing SHA and the
+   conflicting paths, with `pan sync-main <ISSUE>` rebase guidance. No live
+   agent (`needsYou`) is skipped silently — the blocker plus the existing
+   conflict-resolver dispatch already cover stopped agents.
+5. **Reporting.** Each sweep that marks at least one branch emits a summary
+   activity entry ("main `<sha7>` invalidated N branch(es): …") plus a
+   per-issue warn entry, so the fallout of a merge is visible in the activity
+   feed without hunting PR by PR.
+6. **Recovery.** When a marked branch becomes mergeable again,
+   `resolveConflictGate`'s existing clean path clears `conflictsSince` in the
+   same write that clears the blocker — no separate cleanup step.
+
+An `unknown` probe result (fetch failure, lock contention) writes nothing and
+does **not** advance the stored main-head SHA, so the next patrol cycle
+retries the same head instead of silently skipping that branch forever.
+
 ## Polyrepo completeness blocker
 
 `unmerged_sibling_repo` means a required sibling repository still has commits on

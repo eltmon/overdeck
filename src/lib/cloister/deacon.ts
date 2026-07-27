@@ -35,7 +35,8 @@ import { checkPostReviewCommits } from './deacon-post-review-commits.js';
 import { patrolStrikeLandings } from './deacon-strike-landing.js';
 import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, monitorReviewConvoySignals, cleanupOrphanedReviewSessions, checkStalledReviewDiscovery, checkStalledReviewParents, checkReviewForkCacheMisses } from './deacon-review.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
-import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileStuckMergingStates, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
+import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileStuckMergingStates, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileAutoMergeRows, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
+import { reconcileBranchInvalidation } from './branch-invalidation.js';
 import { reconcileTraefikNetworks } from '../workspace/traefik-connect.js';
 import { coordinateSwarmSlots } from './deacon-swarm.js';
 import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
@@ -139,7 +140,7 @@ const unlinkPath = (path: string): Effect.Effect<void, FsError> =>
 /** Re-exported for symmetry with the additive pattern in the rest of src/lib. */
 export { GitError, ProcessTimeoutError };
 export { checkInspectAgentTimeouts, INSPECT_TIMEOUT_MS } from './deacon-inspect.js';
-export { reconcileStaleMergeStatus, reconcileStuckMergingStates, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
+export { reconcileStaleMergeStatus, reconcileStuckMergingStates, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileAutoMergeRows, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 export { coordinateSwarmSlots } from './deacon-swarm.js';
 export { nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, isRapidPostResumeDeath, isPreKickoffLaunchDeath } from './deacon-auto-resume.js';
 
@@ -2950,7 +2951,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // state). Best-effort against the forge; 10-min per-issue cooldown.
   const closedPrReadyActions = await reconcileClosedPrReadyForMerge();
   actions.push(...closedPrReadyActions);
-  for (const a of closedPrReadyActions) addLog('action', a, state.patrolCycle);
+  for (const a of closedPrReadyActions) addLog('action', a, state.patrolCycle); for (const a of await reconcileAutoMergeRows()) { actions.push(a); addLog('action', a, state.patrolCycle); }
 
   // PAN-2143: re-evaluate stale merge-blockers. resolveConflictGate clears a
   // stale merge_conflict/not_mergeable blocker once the branch is mergeable
@@ -2961,6 +2962,14 @@ export async function runPatrol(): Promise<PatrolResult> {
   const staleMergeBlockerActions = await reconcileStaleMergeBlockers();
   actions.push(...staleMergeBlockerActions);
   for (const a of staleMergeBlockerActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-3154: detect when a merge to main invalidates open branches. Watches
+  // each project's origin/main head on a cooldown; on change, probes every
+  // in-pipeline branch for newly-created conflicts and marks + notifies them
+  // via the existing conflict-gate/blocker machinery.
+  const branchInvalidationActions = await reconcileBranchInvalidation();
+  actions.push(...branchInvalidationActions);
+  for (const a of branchInvalidationActions) addLog('action', a, state.patrolCycle);
 
   // PAN-2198: re-derive readyForMerge for the no-blocker "stuck after review" strand
   // (review+test+verify passed, no blocker, but readyForMerge stuck false) so it

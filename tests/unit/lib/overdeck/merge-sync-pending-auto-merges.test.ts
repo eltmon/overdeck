@@ -15,6 +15,7 @@ import {
 } from '../../../helpers/overdeck-test-db.js';
 import {
   listDuePendingAutoMerges,
+  countActionableAutoMerges,
   transitionToMerging,
   markFailed,
   markBlocked,
@@ -96,6 +97,22 @@ describe('listDuePendingAutoMerges', () => {
     expect(entry.scheduledAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     // pr_number not in overdeck schema — should be undefined
     expect(entry.prNumber).toBeUndefined();
+  });
+});
+
+describe('countActionableAutoMerges', () => {
+  it('counts actionable rows and excludes merged and cancelled rows', () => {
+    const db = odb.raw();
+    seedIssue(db, 'PAN-1');
+    seedPendingAutoMerge(db, { issueId: 'PAN-1', status: 'failed' });
+    seedPendingAutoMerge(db, { issueId: 'PAN-1', status: 'blocked' });
+    const activeId = seedPendingAutoMerge(db, { issueId: 'PAN-1', status: 'pending' });
+    seedPendingAutoMerge(db, { issueId: 'PAN-1', status: 'merged' });
+    seedPendingAutoMerge(db, { issueId: 'PAN-1', status: 'cancelled' });
+
+    expect(countActionableAutoMerges('PAN-1')).toBe(3);
+    expect(transitionToMerging(activeId)).toBe(true);
+    expect(countActionableAutoMerges('PAN-1')).toBe(3);
   });
 });
 
@@ -182,6 +199,28 @@ describe('markMerged', () => {
     const row = db.prepare('SELECT status, merged_at FROM pending_auto_merges WHERE id = ?').get(id) as any;
     expect(row.status).toBe('merged');
     expect(row.merged_at).toBeGreaterThan(0); // stored as integer millis
+  });
+
+  it.each(['failed', 'blocked', 'pending'])('marks %s → merged and sets merged_at', (status) => {
+    const db = odb.raw();
+    seedIssue(db, 'PAN-1');
+    const id = seedPendingAutoMerge(db, { issueId: 'PAN-1', status });
+
+    expect(markMerged(id)).toBe(true);
+    const row = db.prepare('SELECT status, merged_at FROM pending_auto_merges WHERE id = ?').get(id) as any;
+    expect(row.status).toBe('merged');
+    expect(row.merged_at).toBeGreaterThan(0);
+  });
+
+  it.each(['merged', 'cancelled'])('preserves a row already in %s status', (status) => {
+    const db = odb.raw();
+    seedIssue(db, 'PAN-1');
+    const id = seedPendingAutoMerge(db, { issueId: 'PAN-1', status });
+    const before = db.prepare('SELECT status, merged_at FROM pending_auto_merges WHERE id = ?').get(id);
+
+    expect(markMerged(id)).toBe(false);
+    const after = db.prepare('SELECT status, merged_at FROM pending_auto_merges WHERE id = ?').get(id);
+    expect(after).toEqual(before);
   });
 });
 
