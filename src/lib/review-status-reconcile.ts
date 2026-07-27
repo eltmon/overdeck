@@ -1,6 +1,5 @@
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
-import { upsertReviewStatusSync as dbUpsert } from './overdeck/review-status-sync.js';
-import { markWorkspaceStuck } from './database/review-status-db.js';
+import { upsertReviewStatusSync as dbUpsert, markWorkspaceStuck } from './overdeck/review-status-sync.js';
 import type { readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import type { InspectionStatusFields } from './inspection-status.js';
 import type { StrikeLandingStatus } from './strike-landing.js';
