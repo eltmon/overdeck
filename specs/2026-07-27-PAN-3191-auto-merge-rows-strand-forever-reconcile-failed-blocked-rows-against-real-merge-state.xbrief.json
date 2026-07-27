@@ -4,17 +4,17 @@
     "created": "2026-07-27T04:48:04.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3191: Auto-merge rows strand forever: failed/blocked can never reach 'merged' and nothing reconciles them",
-    "updated": "2026-07-27T04:54:00.872Z"
+    "updated": "2026-07-27T14:07:28.493Z"
   },
   "plan": {
     "id": "pan-3191",
     "title": "Auto-merge rows strand forever: reconcile failed/blocked rows against real merge state",
-    "status": "running",
+    "status": "completed",
     "uid": "2629977f-6246-4ba1-8201-7cffa22ddafa",
     "author": "agent:k3[1m]",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-27T04:48:04.000Z",
-    "updated": "2026-07-27T04:54:00.872Z",
+    "updated": "2026-07-27T14:07:28.493Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3191",
@@ -333,5 +333,5 @@
       "canonicalFilename": "2026-07-27-PAN-3191-auto-merge-rows-strand-forever-reconcile-failed-blocked-rows-against-real-merge-state.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
