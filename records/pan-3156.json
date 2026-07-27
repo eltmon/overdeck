@@ -3,20 +3,19 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-26T20:09:18.080Z",
-  "updated": "2026-07-27T06:22:40.339Z",
+  "updated": "2026-07-27T06:22:42.663Z",
   "pipeline": {
     "issueId": "PAN-3156",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "skipped",
     "verificationStatus": "skipped",
-    "mergeStatus": "failed",
-    "mergeStep": "verifying",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T06:22:40.267Z",
+    "updatedAt": "2026-07-27T06:22:40.860Z",
     "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
     "verificationNotes": "Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)",
-    "mergeNotes": "Post-rebase verification failed at frontend-typecheck",
     "strikeReadyHead": "1c52e47b68a099368cfbd4232b5ba184ad908213",
     "strikeReadyAt": "2026-07-27T04:06:56.527Z",
     "strikeLandingState": "ready",
@@ -37,7 +36,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-27T06:22:40.311Z"
+        "pricingAsOf": "2026-07-27T06:22:42.647Z"
       }
     },
     "merges": [],
