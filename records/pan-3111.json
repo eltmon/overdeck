@@ -442,6 +442,11 @@
       "reason": "feedback",
       "note": "[2026-07-27T07:43Z] verification-gate → FAILED — seq 2",
       "timestamp": "2026-07-27T07:43:58.797Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-27T07:45:20.336Z"
     }
   ],
   "feedback": [],
@@ -649,7 +654,7 @@
     "recordedAt": "2026-07-27T05:54:26.480Z"
   },
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-27T07:45:19.102Z",
+  "updated": "2026-07-27T07:45:20.337Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "reviewing",
