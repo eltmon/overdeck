@@ -4,7 +4,7 @@
     "created": "2026-07-27T04:52:30.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3187: Review-status auto-dispatch floods on 11 wedged closed issues — stale reviewRequestedAt never ages out, CLI processes attempt handler-less dispatch; expanded per operator direction to the DoD rows 1/2/3 terminal-settling rule for the 22-issue close-out backlog",
-    "updated": "2026-07-27T05:09:37.806Z"
+    "updated": "2026-07-27T05:09:40.055Z"
   },
   "plan": {
     "id": "pan-3187",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "251778ca-fd7a-4cbf-8adb-8081f818f2d0",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-07-27T04:52:30.000Z",
-    "updated": "2026-07-27T05:09:37.806Z",
+    "updated": "2026-07-27T05:09:40.055Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3187",
