@@ -4,17 +4,17 @@
     "created": "2026-07-26T19:30:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3154: A merge to main silently invalidates open branches: no agent is notified when its base stops applying",
-    "updated": "2026-07-27T10:08:56.924Z"
+    "updated": "2026-07-27T10:08:58.697Z"
   },
   "plan": {
     "id": "pan-3154",
     "title": "A merge to main silently invalidates open branches: no agent is notified when its base stops applying",
-    "status": "approved",
+    "status": "running",
     "uid": "d5fe8005-4a64-4e7e-a677-8cdb4b816ae0",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-26T19:30:04Z",
-    "updated": "2026-07-27T10:08:56.924Z",
+    "updated": "2026-07-27T10:08:58.697Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3154",
