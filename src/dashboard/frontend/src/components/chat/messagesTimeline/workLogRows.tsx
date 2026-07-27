@@ -215,7 +215,8 @@ function ToolUseExpanded({
       );
     }
 
-    case 'Task': {
+    case 'Task':
+    case 'Agent': {
       const subagent = asString(input.subagent_type);
       const description = asString(input.description);
       const prompt = asString(input.prompt);

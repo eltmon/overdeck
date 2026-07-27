@@ -114,17 +114,21 @@ describe('subagent transcript action', () => {
     status: 'done',
   };
 
-  it('opens the matching subagent from an expanded Task row', () => {
+  it('opens the matching subagent from an expanded Agent row without a raw JSON fallback', () => {
+    const agentEntry = { ...entry, label: 'Agent', toolTitle: 'Agent' };
     const onOpenSubagent = vi.fn();
     render(
       <WorkLogGroup
-        entries={[entry]}
+        entries={[agentEntry]}
         subagentByToolUseId={new Map([[entry.id, subagent]])}
         onOpenSubagent={onOpenSubagent}
       />,
     );
 
-    fireEvent.click(screen.getByText('Task'));
+    fireEvent.click(screen.getByText('Agent'));
+    expect(screen.getByText('Explore')).toBeInTheDocument();
+    expect(screen.getByTestId('md')).toHaveTextContent('Find the relevant message path.');
+    expect(screen.queryByText(/"subagent_type"/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open subagent transcript' }));
     expect(onOpenSubagent).toHaveBeenCalledWith(entry.id);
   });
