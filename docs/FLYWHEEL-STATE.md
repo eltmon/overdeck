@@ -7651,3 +7651,12 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - Ready queue empty, merge-blockers `[]`, MIN-879 cache still present, **zero code files** on main past the live build. Nothing actionable.
 - **The cohort has reached quiescence, but the run is NOT complete** — and the distinction is worth stating rather than reaching for `pan flywheel report`. **PAN-3111 is still in review, and its merge is this lane's job the moment it passes.** Ending the run now would remove the merge path for the operator's in-flight work, so the correct posture is to keep watching, not to declare done because the queues happen to be empty.
 - **RUN TOTALS UNCHANGED: 41 close-outs, 9 merges, merge queue 15 → 0, 9 substrate bugs filed of which 6 fixed, merged and closed out.**
+
+## RUN-72 tick 22 (2026-07-27 10:08Z) — STANDING MYN DIRECTIVE: merge train only, no hand-merges
+- **OPERATOR DIRECTIVE, recorded so it survives compaction and outlives this run:**
+  * **What is already merged for mind-your-now STAYS merged** — the operator will UAT the batch on waking; it is on the status page now. Do not revisit or unwind any MYN merge.
+  * **Remaining MYN items — MIN-839, MIN-864, MIN-874, MIN-896, and MIN-879 once its close-out clears — route through the MERGE TRAIN. No individual hand-merges.** This is a deliberate narrowing of the queue-drain authority I hold for panopticon-cli: for MYN I assemble and observe, the train lands.
+  * MIN-879's root-owned cache awaits the operator's `sudo rm`; when it clears its close-out runs clean — **its DoD passes in full**, verified earlier, with only teardown wedged.
+- Both merge-train queues (`panopticon-cli`, `mind-your-now`) are **enabled with empty queues**; ready queue empty; MIN-879 cache still present. Nothing actionable this tick.
+- **Worth noting the asymmetry rather than flattening it**: hand-merging is right for PAN (I own that queue outright, confirmed by the operator at tick 15) and wrong for MYN (batch UAT means merges must arrive as a reviewable generation, not a trickle). **Same verb, opposite correctness, decided by how the project ships** — which is exactly the kind of rule that gets misapplied once it is remembered as "drain the queue".
+- **RUN TOTALS UNCHANGED: 41 close-outs, 9 merges, merge queue 15 → 0, 9 substrate bugs filed of which 6 fixed, merged and closed out.**
