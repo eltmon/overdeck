@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T05:10:35.717Z",
+  "updated": "2026-07-27T05:13:39.244Z",
   "pipeline": {
     "issueId": "PAN-3187",
     "reviewStatus": "pending",
@@ -43,18 +43,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "age-out-stale-review-requests": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3187",
         "agentId": "agent-pan-3187",
         "pid": 4178735,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:10:35.717Z"
+        "claimedAt": "2026-07-27T05:10:35.717Z",
+        "itemId": "age-out-stale-review-requests",
+        "outcome": "completed",
+        "reason": "Added a pure seven-day staleness predicate, gated dispatch decisions on request age, and made both regression suites deterministic with boundary and override coverage.",
+        "releasedAt": "2026-07-27T05:13:39.244Z"
+      }
+    ],
+    "statusReasons": {
+      "age-out-stale-review-requests": {
+        "reason": "Added a pure seven-day staleness predicate, gated dispatch decisions on request age, and made both regression suites deterministic with boundary and override coverage.",
+        "updatedAt": "2026-07-27T05:13:39.244Z"
       }
     }
   },
   "statusOverrides": {
-    "age-out-stale-review-requests": "running"
+    "age-out-stale-review-requests": "completed",
+    "age-out-stale-review-requests.age-out-stale-review-requests.ac1": "completed",
+    "age-out-stale-review-requests.age-out-stale-review-requests.ac2": "completed",
+    "age-out-stale-review-requests.age-out-stale-review-requests.ac3": "completed"
   }
 }
