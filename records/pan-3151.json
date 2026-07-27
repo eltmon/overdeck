@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T10:07:57.616Z",
+  "updated": "2026-07-27T10:13:19.052Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -35,5 +35,20 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5"
+  "model": "claude-haiku-4-5",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "shared-findings-parser": {
+        "writerId": "agent-pan-3151",
+        "agentId": "agent-pan-3151",
+        "pid": 608935,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T10:13:19.052Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "shared-findings-parser": "running"
+  }
 }
