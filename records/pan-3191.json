@@ -22,9 +22,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-27T05:58:13.036Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-27T05:59Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-27T05:59:49.449Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-27T05:59:49Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3191\n\nGitLab/polyrepo rows still cannot resolve repository identity, so merged MRs remain stranded\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3191 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -59,18 +72,18 @@
     "recordedAt": "2026-07-27T05:19:11.339Z"
   },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T05:58:13.036Z",
+  "updated": "2026-07-27T05:59:49.449Z",
   "pipeline": {
     "issueId": "PAN-3191",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:20:05.037Z",
-    "updatedAt": "2026-07-27T05:58:11.920Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-27T05:59:48.812Z",
+    "reviewNotes": "GitLab/polyrepo rows still cannot resolve repository identity, so merged MRs remain stranded",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
     "reviewedAtCommit": "4e70e23b3d350414e916d6a4fb3120eac6d9cf5f",
     "reviewSpawnedAt": "2026-07-27T05:58:11.918Z",
@@ -113,9 +126,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1134803,
-            "output": 148324,
-            "cacheRead": 20883456,
+            "input": 2617170,
+            "output": 169482,
+            "cacheRead": 23961600,
             "cacheWrite": 0
           }
         },
@@ -130,15 +143,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2399596,
-          "output": 252752,
-          "cacheRead": 55570944,
+          "input": 3881963,
+          "output": 273910,
+          "cacheRead": 58649088,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 47.366012,
-        "pricingAsOf": "2026-07-27T05:58:11.935Z"
+        "usd": 56.951659,
+        "pricingAsOf": "2026-07-27T05:59:48.852Z"
       }
     },
     "merges": [
