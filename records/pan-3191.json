@@ -82,7 +82,7 @@
     "recordedAt": "2026-07-27T05:19:11.339Z"
   },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T06:35:58.510Z",
+  "updated": "2026-07-27T06:36:03.664Z",
   "pipeline": {
     "issueId": "PAN-3191",
     "reviewStatus": "blocked",
@@ -92,9 +92,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:20:05.037Z",
-    "updatedAt": "2026-07-27T06:35:57.839Z",
+    "updatedAt": "2026-07-27T06:36:03.657Z",
     "reviewNotes": "Unbounded serial forge checks still monopolize the Deacon patrol; GitHub App repository identity also remains omitted",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
+    "reviewedAtCommit": "a55a750c29932cd571eb42691d9d43c946cfc6db",
     "reviewSpawnedAt": "2026-07-27T06:33:10.562Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -160,7 +161,7 @@
       },
       "costAtCloseOut": {
         "usd": 82.855218,
-        "pricingAsOf": "2026-07-27T06:35:57.867Z"
+        "pricingAsOf": "2026-07-27T06:36:03.660Z"
       }
     },
     "merges": [
