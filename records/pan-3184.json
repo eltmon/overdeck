@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T04:57:47.451Z",
+  "updated": "2026-07-27T05:03:25.980Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "pending",
@@ -43,18 +43,33 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "widen-candidacy": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3184",
         "agentId": "agent-pan-3184",
         "pid": 3353106,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T04:57:47.451Z"
+        "claimedAt": "2026-07-27T04:57:47.451Z",
+        "itemId": "widen-candidacy",
+        "outcome": "completed",
+        "reason": "Added shared work/strike auto-resumable role eligibility, made boot recency the stoppedByUser discriminator, applied the role helper to stopped-event handling, and added passing candidacy regressions.",
+        "releasedAt": "2026-07-27T05:03:25.979Z"
+      }
+    ],
+    "statusReasons": {
+      "widen-candidacy": {
+        "reason": "Added shared work/strike auto-resumable role eligibility, made boot recency the stoppedByUser discriminator, applied the role helper to stopped-event handling, and added passing candidacy regressions.",
+        "updatedAt": "2026-07-27T05:03:25.979Z"
       }
     }
   },
   "statusOverrides": {
-    "widen-candidacy": "running"
+    "widen-candidacy": "completed",
+    "widen-candidacy.widen-candidacy.ac1": "completed",
+    "widen-candidacy.widen-candidacy.ac2": "completed",
+    "widen-candidacy.widen-candidacy.ac3": "completed",
+    "widen-candidacy.widen-candidacy.ac4": "completed"
   }
 }
