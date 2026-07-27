@@ -231,7 +231,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T13:50:41.957Z",
+  "updated": "2026-07-27T13:51:00.895Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
@@ -241,15 +241,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T13:50:41.942Z",
-    "reviewNotes": "v61 migration repair now works but lacks the required regression test that fails on the two prior broken implementations",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 5ae5d21 (6 paths): drizzle/overdeck/0000_overdeck_init.sql, scripts/file-size-allowlist.txt, src/lib/database/schema.ts, …",
-        "detectedAt": "2026-07-27T13:50:37.309Z"
-      }
-    ],
+    "updatedAt": "2026-07-27T13:51:00.826Z",
     "conflictsSince": {
       "sha": "5ae5d217844e7391d328cfee02c7cc0431b1c18c",
       "detectedAt": "2026-07-27T13:50:37.309Z",
@@ -330,7 +322,7 @@
       },
       "costAtCloseOut": {
         "usd": 169.6774163,
-        "pricingAsOf": "2026-07-27T13:50:41.947Z"
+        "pricingAsOf": "2026-07-27T13:51:00.870Z"
       }
     },
     "merges": [
