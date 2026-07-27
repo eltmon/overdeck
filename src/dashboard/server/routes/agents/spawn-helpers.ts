@@ -92,6 +92,44 @@ export function buildAgentStartPlaceholder(input: {
   };
 }
 
+export function buildContainerStartState(input: {
+  agentSessionName: string;
+  issueId: string;
+  workspacePath: string;
+  role: Role;
+  effectiveHarness: PlaceholderHarness;
+  startedBy: string;
+  allowHost: boolean;
+  status: 'starting' | 'error';
+  startedAt: string;
+}): AgentState {
+  return {
+    id: input.agentSessionName,
+    issueId: input.issueId,
+    ...(input.effectiveHarness ? { harness: input.effectiveHarness } : {}),
+    model: 'pending-container-start',
+    status: input.status,
+    startedAt: input.startedAt,
+    workspace: input.workspacePath,
+    role: input.role,
+    startedBy: input.startedBy,
+    hostOverride: input.allowHost || undefined,
+  };
+}
+
+export async function requestWorkStartAfterContainers(input: {
+  args: string[];
+  workspacePath: string;
+  spawnPanCommand: SpawnPanCommand;
+  markWorkStartAccepted: () => Promise<void>;
+  updateIssueStatus: () => Promise<void>;
+}): Promise<string> {
+  const activityId = await input.spawnPanCommand(input.args, input.workspacePath);
+  await input.markWorkStartAccepted();
+  await input.updateIssueStatus();
+  return activityId;
+}
+
 export function handleRemoteAgentSpawn(input: {
   issueId: string;
   workspacePath: string;
