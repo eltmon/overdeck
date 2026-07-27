@@ -221,7 +221,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T13:42:26.623Z",
+  "updated": "2026-07-27T13:42:32.198Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
@@ -231,7 +231,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T13:42:25.923Z",
+    "updatedAt": "2026-07-27T13:42:32.188Z",
     "reviewNotes": "v61 repair remains inside currentVersion < 61, so version-61 databases still skip started_by and affected_criteria before advancing to v62",
     "conflictsSince": {
       "sha": "f47f84d8b5ac81a247ea22ebca72fe8e3e2193c7",
@@ -246,6 +246,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
+    "reviewedAtCommit": "034101c4277583a76a973d900ab471d43b06c093",
     "reviewSpawnedAt": "2026-07-27T13:40:33.441Z"
   },
   "closeOut": {
@@ -312,7 +313,7 @@
       },
       "costAtCloseOut": {
         "usd": 155.6380163,
-        "pricingAsOf": "2026-07-27T13:42:25.954Z"
+        "pricingAsOf": "2026-07-27T13:42:32.194Z"
       }
     },
     "merges": [
