@@ -583,6 +583,34 @@ describe('spawnAgent PTY supervisor wiring', () => {
     );
   });
 
+  it('claims planning consent for fresh autonomous spawnRun work launches', async () => {
+    writeSupervisorArtifact();
+    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlag } = await import('../planning/auto-spawn-consent.js');
+    const { spawnRun } = await import('../agents.js');
+    await writeAutoSpawnOnFinalizeFlag('PAN-1405', true);
+
+    await spawnRun('PAN-1405', 'work', {
+      workspace,
+      model: 'claude-sonnet-4-6',
+      startedBy: 'reactive-lifecycle',
+    });
+
+    expect(readAutoSpawnOnFinalizeFlag('PAN-1405')).toBe(false);
+  });
+
+  it('does not inspect planning consent for specialist spawnRun launches', async () => {
+    const consentDir = join(tmpHome, 'agents', 'planning-pan-1405');
+    mkdirSync(consentDir, { recursive: true });
+    writeFileSync(join(consentDir, 'auto-spawn-on-finalize.json'), '{invalid-json');
+    const { spawnRun } = await import('../agents.js');
+
+    await expect(spawnRun('PAN-1405', 'review', {
+      workspace,
+      model: 'gpt-5.5',
+      startedBy: 'reactive-lifecycle',
+    })).resolves.toMatchObject({ role: 'review' });
+  });
+
   it('threads active flywheel provenance env into spawnRun work agents', async () => {
     const supervisorScriptPath = writeSupervisorArtifact();
     activeFlywheelRunId = 'RUN-777';

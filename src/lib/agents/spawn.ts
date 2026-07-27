@@ -85,7 +85,23 @@ import { withAutoSpawnConsentClaim } from '../planning/auto-spawn-consent.js';
 import { isOperatorStartedBy } from './provenance.js';
 import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './registered-slot-spawn.js';
 const execAsync = promisify(exec);
+
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
+  if (role !== 'work') return spawnRunWithoutConsentClaim(issueId, role, options);
+
+  const flywheelRunId = resolveFlywheelSpawnEnv(role, options.flywheelRunId).OVERDECK_FLYWHEEL_RUN_ID;
+  const startedBy = resolveAgentStartedBy(options.startedBy, flywheelRunId);
+  const resolvedOptions = { ...options, startedBy };
+  if (isOperatorStartedBy(startedBy)) return spawnRunWithoutConsentClaim(issueId, role, resolvedOptions);
+
+  return withAutoSpawnConsentClaim(
+    issueId,
+    () => spawnRunWithoutConsentClaim(issueId, role, resolvedOptions),
+    { isAccepted: (state) => state.status === 'running' && state.kickoffDelivered !== false },
+  );
+}
+
+async function spawnRunWithoutConsentClaim(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
   const modelSpawnKey = `${role}:${issueId}`;
   const selectedModel = determineModel({ model: options.model, role, spawnKey: modelSpawnKey });
@@ -112,7 +128,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     const prompt = slot
       ? buildRegisteredSlotPrompt(issueId, workspace, slot, options.prompt)
       : options.prompt;
-    return spawnAgent({
+    return spawnAgentWithoutConsentClaim({
       issueId,
       workspace: slot?.workspace ?? workspace,
       agentId: slot?.agentId,
