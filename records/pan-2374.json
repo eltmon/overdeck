@@ -44,15 +44,15 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T12:05:07.009Z",
+    "updatedAt": "2026-07-27T08:24:16.101Z",
     "reviewNotes": "Main merge reviewed; no blockers",
     "testNotes": "typecheck passed; lint passed (including lint:no-coderabbit-merge-gate); npm test failed with 5 unrelated timeout failures (conversation-supervisor-uat hook, deacon-context-overflow hook, deacon-test-signal hook, cloister-control-surface test, agents-switch-model test). PAN-2374-specific unit tests passed 44/44 (coderabbit-ingestion, no-coderabbit-merge-gate, review-context). No browser UAT required by PRD/vBRIEF/issue notes (backend/CLI feature). AC-5 unmet: full suite not green.",
     "inspectNotes": "Bead cr-ingest-module ack: fetchCodeRabbitFindings returns [] on absence/PR-resolution-failure/gh-api-error (verified via resolveOwnerRepo catch, prNumber null-check, and per-fetch .catch()), returns findings with body+path/line for coderabbitai[bot] reviews and inline comments, zero execSync matches, CodeRabbitFinding type exported cleanly, 115 lines, quota invariant documented inline.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2459",
     "reviewedAtCommit": "43ea4db0264a42d54fd8662969ecc817ec85de0f",
     "lastVerifiedCommit": "43ea4db0264a42d54fd8662969ecc817ec85de0f",
-    "reviewRequestedAt": "2026-07-07T12:00:29.397Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".beads/issues.jsonl",
@@ -125,9 +125,9 @@
         },
         "review": {
           "unknown": {
-            "input": 11522279,
-            "output": 37327,
-            "cacheRead": 10395520,
+            "input": 12620165,
+            "output": 39428,
+            "cacheRead": 11485184,
             "cacheWrite": 0
           }
         },
@@ -141,17 +141,17 @@
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 494577,
-            "output": 13347,
-            "cacheRead": 2013952,
+            "input": 719335,
+            "output": 17950,
+            "cacheRead": 3181056,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1541317,
-            "output": 252819,
-            "cacheRead": 67230208,
+            "input": 1569043,
+            "output": 267647,
+            "cacheRead": 70887424,
             "cacheWrite": 0
           }
         }
@@ -170,9 +170,9 @@
           "cacheWrite": 173126
         },
         "unknown": {
-          "input": 11522279,
-          "output": 37327,
-          "cacheRead": 10395520,
+          "input": 12620165,
+          "output": 39428,
+          "cacheRead": 11485184,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -182,15 +182,15 @@
           "cacheWrite": 77553
         },
         "custom/kimi-k2.7-code": {
-          "input": 2035894,
-          "output": 266166,
-          "cacheRead": 69244160,
+          "input": 2288378,
+          "output": 285597,
+          "cacheRead": 74068480,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 33.193419,
-        "pricingAsOf": "2026-07-07T12:05:07.046Z"
+        "usd": 35.076593,
+        "pricingAsOf": "2026-07-27T08:24:16.250Z"
       }
     },
     "merges": [
@@ -199,5 +199,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-07T12:02:57.295Z",
-  "updated": "2026-07-07T12:05:07.048Z"
+  "updated": "2026-07-27T08:24:16.898Z"
 }
