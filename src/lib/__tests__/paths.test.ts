@@ -2,7 +2,19 @@ import { join } from 'path';
 import { describe, expect } from '@effect/vitest';
 import { it } from '@effect/vitest';
 import { Effect } from 'effect';
+import { vi } from 'vitest';
+
+const existsSyncMock = vi.fn<(path: string) => boolean>();
+vi.mock('fs', async () => {
+  const actual = await vi.importActual<typeof import('fs')>('fs');
+  return {
+    ...actual,
+    existsSync: (path: string) => existsSyncMock(path),
+  };
+});
+
 import {
+  claudeSessionTranscriptExists,
   getDocsBudgetStatePath,
   getDocsDir,
   getDocsDisableStatePath,
@@ -12,7 +24,36 @@ import {
   packageRoot,
   piExtensionCandidates,
   resolvePackageRootForDir,
+  sessionFilePath,
 } from '../paths.js';
+
+describe('Claude session transcript paths', () => {
+  it.effect('reports a present transcript', () =>
+    Effect.sync(() => {
+      const cwd = '/tmp/overdeck-present';
+      const sessionId = 'present-session';
+      const expectedPath = sessionFilePath(cwd, sessionId);
+      existsSyncMock.mockReset();
+      existsSyncMock.mockImplementation((path) => path === expectedPath);
+
+      expect(claudeSessionTranscriptExists(cwd, sessionId)).toBe(true);
+      expect(existsSyncMock).toHaveBeenCalledWith(expectedPath);
+    })
+  );
+
+  it.effect('reports an absent transcript', () =>
+    Effect.sync(() => {
+      const cwd = '/tmp/overdeck-absent';
+      const sessionId = 'absent-session';
+      const expectedPath = sessionFilePath(cwd, sessionId);
+      existsSyncMock.mockReset();
+      existsSyncMock.mockReturnValue(false);
+
+      expect(claudeSessionTranscriptExists(cwd, sessionId)).toBe(false);
+      expect(existsSyncMock).toHaveBeenCalledWith(expectedPath);
+    })
+  );
+});
 
 describe('docs RAG paths', () => {
   it.effect('resolves docs state under OVERDECK_HOME', () =>

@@ -288,6 +288,15 @@ export function sessionFilePath(cwd: string, sessionId: string): string {
   return join(homedir(), '.claude', 'projects', encodedCwd, `${sessionId}.jsonl`);
 }
 
+/**
+ * Single existence check every Claude resume probe must use. Mirrors the
+ * JSONL resolver's `jsonl-missing` detection so stale session IDs are never
+ * treated as resumable (PAN-3194).
+ */
+export function claudeSessionTranscriptExists(cwd: string, sessionId: string): boolean {
+  return existsSync(sessionFilePath(cwd, sessionId));
+}
+
 /** Extract the session UUID from a full JSONL file path. */
 export function sessionIdFromFile(sessionFile: string | null | undefined): string | undefined {
   if (!sessionFile) return undefined;

@@ -9,7 +9,7 @@ import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { normalizeModelOverrideSync, requireModelOverrideSync } from '../model-validation.js';
 import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
-import { sessionFilePath } from '../paths.js';
+import { claudeSessionTranscriptExists, sessionFilePath } from '../paths.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
@@ -356,7 +356,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     const claudeJsonlMissingRecovery = effectiveHarness === 'claude-code'
       && !compactSeed
       && resumeDriftReasons.length === 0
-      && !existsSync(expectedClaudeJsonl);
+      && !claudeSessionTranscriptExists(agentState.workspace, sessionId);
     if (claudeJsonlMissingRecovery) {
       logAgentLifecycleSync(
         normalizedId,
