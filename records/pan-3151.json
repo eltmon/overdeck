@@ -132,6 +132,11 @@
       "reason": "feedback",
       "note": "[2026-07-27T13:47Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-27T13:47:24.138Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-27T14:19:39.359Z"
     }
   ],
   "feedback": [],
@@ -223,39 +228,20 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:19:37.978Z",
+  "updated": "2026-07-27T14:19:39.883Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:19:37.004Z",
+    "updatedAt": "2026-07-27T14:19:37.996Z",
     "reviewNotes": "Agent re-review request (7/25): Merged with origin/main: resolved conflicts preserving both PAN-3151 (review_cycle_history, unconditional v61 repairs) and PAN-3154 (conflicts_since) features",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-07-27T14:13:03.586Z"
-      }
-    ],
-    "conflictsSince": {
-      "sha": "050c54fb3ec155db17aaa23ddcba7a05d3f345a4",
-      "detectedAt": "2026-07-27T14:08:42.556Z",
-      "paths": [
-        "drizzle/overdeck/0000_overdeck_init.sql",
-        "scripts/file-size-allowlist.txt",
-        "src/lib/database/schema.ts",
-        "src/lib/overdeck/infra.ts",
-        "src/lib/overdeck/review-status-sync.ts",
-        "tests/unit/lib/pan-dir/verdict-restore.test.ts"
-      ]
-    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
-    "reviewSpawnedAt": "2026-07-27T13:52:41.101Z"
+    "reviewSpawnedAt": "2026-07-27T14:19:37.995Z"
   },
   "closeOut": {
     "usage": {
@@ -321,7 +307,7 @@
       },
       "costAtCloseOut": {
         "usd": 184.8690813,
-        "pricingAsOf": "2026-07-27T14:19:37.031Z"
+        "pricingAsOf": "2026-07-27T14:19:39.878Z"
       }
     },
     "merges": [
