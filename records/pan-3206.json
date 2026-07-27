@@ -19,15 +19,7 @@
       "timestamp": "2026-07-27T18:53:39.271Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T18:53:39Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3206\n\nRecovered verdicts omit passed anchors, fail polyrepo HEAD matching, and can misroute or inject feedback commands\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3206 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-allowlist.txt",
@@ -80,22 +72,22 @@
     "recordedAt": "2026-07-27T18:36:56.906Z"
   },
   "created": "2026-07-27T13:35:42.946Z",
-  "updated": "2026-07-27T19:14:57.566Z",
+  "updated": "2026-07-27T19:15:32.125Z",
   "pipeline": {
     "issueId": "PAN-3206",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T19:14:55.800Z",
+    "updatedAt": "2026-07-27T19:15:32.105Z",
     "reviewNotes": "Verification infrastructure error: Verification worker 2482226 exited before writing a result",
     "inspectNotes": "All 3 ACs verified: parse maps APPROVED/PASSED->passed, FAILED->failed, CHANGES REQUESTED suffix (em/en dash, colon, hyphen) -> blocked with blocker, bare form -> first ### under ## Blocking Findings, null otherwise; findVerdictReport prefers synthesis.md then review.md then null; vitest review-verdict-report.test.ts 9/9 passed and npm run typecheck clean (dashboard/frontend ratchets none-new).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3213",
     "reviewedAtCommit": "3d6be59b2013e40cfb35460e797d832a8d03abbd",
-    "reviewSpawnedAt": "2026-07-27T18:46:26.441Z",
+    "reviewSpawnedAt": "2026-07-27T19:15:32.104Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt",
@@ -161,24 +153,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3352434,
-            "output": 233907,
-            "cacheRead": 135464960,
+            "input": 3352904,
+            "output": 234045,
+            "cacheRead": 135801856,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 4154230,
-          "output": 324135,
-          "cacheRead": 152401920,
+          "input": 4154700,
+          "output": 324273,
+          "cacheRead": 152738816,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 106.69616,
-        "pricingAsOf": "2026-07-27T19:14:57.564Z"
+        "usd": 106.871098,
+        "pricingAsOf": "2026-07-27T19:15:32.118Z"
       }
     },
     "merges": [
