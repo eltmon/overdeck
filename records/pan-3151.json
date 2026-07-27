@@ -328,7 +328,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T15:05:52.617Z",
+  "updated": "2026-07-27T15:05:58.098Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "reviewing",
@@ -338,7 +338,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T15:05:51.110Z",
+    "updatedAt": "2026-07-27T15:05:58.047Z",
     "reviewNotes": "Agent re-review request (17/25): Fixed review issues: bumped to SCHEMA_VERSION 63 with v62→v63 migration and comprehensive regression tests",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "fc19e669a59088966a8149057824ab6a8db87946",
@@ -408,7 +408,7 @@
       },
       "costAtCloseOut": {
         "usd": 270.0470683,
-        "pricingAsOf": "2026-07-27T15:05:51.220Z"
+        "pricingAsOf": "2026-07-27T15:05:58.084Z"
       }
     },
     "merges": [
@@ -417,7 +417,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "tasks": {
     "sequence": 20,
     "claims": {},
