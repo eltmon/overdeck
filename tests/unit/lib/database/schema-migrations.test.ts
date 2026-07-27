@@ -104,6 +104,28 @@ describe('schema migrations', () => {
     expect(db.pragma('user_version', { simple: true })).toBe(62);
   });
 
+  it('v62 -> v63: a database from prior build missing review_cycle_history still gets the column when advancing to v63', () => {
+    // Regression: a v62 database from a prior build (before this PR shipped) may
+    // not have review_cycle_history or conflicts_since. When a future build ships
+    // with SCHEMA_VERSION = 63, those databases will have currentVersion = 62 > SCHEMA_VERSION is false,
+    // but they still need the columns. This test verifies a v62 database missing the
+    // columns gets them added when running under a build that knows about them.
+    db.exec('CREATE TABLE flywheel_substrate_bugs (issue_id TEXT PRIMARY KEY, affected_criteria TEXT)');
+    db.exec('CREATE TABLE agents (id TEXT PRIMARY KEY, started_by TEXT)');
+    db.exec('CREATE TABLE review_status (issue_id TEXT PRIMARY KEY)');
+    // Simulate a v62 database from before this PR, missing review_cycle_history
+    db.pragma('user_version = 62');
+
+    // Even though currentVersion (62) equals the shipped v62 version without the column,
+    // the repairs should add it
+    expect(() => runMigrations(db)).not.toThrow();
+
+    const reviewStatusColumns = db.prepare('PRAGMA table_info(review_status)').all() as Array<{ name: string }>;
+    expect(reviewStatusColumns.map((c) => c.name)).toContain('review_cycle_history');
+    expect(reviewStatusColumns.map((c) => c.name)).toContain('conflicts_since');
+    expect(db.pragma('user_version', { simple: true })).toBe(62);
+  });
+
   it('does not advance v60 when the affected_criteria migration fails', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     initSchema(db);
