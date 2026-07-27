@@ -282,18 +282,18 @@
         </div>
       </div>
       <div class="pl-card">
-        <h4>Same badge — conversation chrome (with conv worktree)</h4>
+        <h4>Same badge — conversation chrome meta row (with conv worktree)</h4>
         <div class="conv-head-mock">
-          <div class="ct">Overdeck agent-to-agent communication design
-            <span class="chg-badge flat" style="cursor:default"><span class="a">+73</span><span class="d">−0</span></span>
-          </div>
+          <div class="ct">@pierre/diffs capabilities and feature gaps</div>
           <div class="cmeta">
             <span>● active</span>
-            <span class="branch-chip new-wt" title="Created automatically at conversation start">worktree conv/a2a-comms-design</span>
+            <span class="branch-chip new-wt" title="Created automatically at conversation start">worktree conv/pierre-diffs-gaps</span>
+            <span class="chg-badge flat" style="cursor:default"><span class="a">+594</span><span class="d">−0</span></span>
             <span>Cursor</span>
+            <span>20260726-9613</span>
           </div>
         </div>
-        <div class="note-strip">Conversations in a project get <code>workspaces/conv-&lt;slug&gt;/</code> on branch <code>conv/&lt;slug&gt;</code> at creation — so this badge is real git state, edits never touch the primary checkout, and the conversation's Changes view is the same surface as the issue's. Polyrepo: primary repo worktree first, more repos added lazily.</div>
+        <div class="note-strip">Conversations in a project get <code>workspaces/conv-&lt;slug&gt;/</code> on branch <code>conv/&lt;slug&gt;</code> at creation — automatically, and <b>best-effort</b>: if prerequisites aren't set up the conversation still spawns, the skip is recorded, and a <b>"Create worktree &amp; restart"</b> action appears here in the header. The badge sits in the meta row next to the branch chip, so "where am I" and "what changed" read as one glance. Polyrepo: primary repo worktree first, more repos added lazily.</div>
       </div>
     </div>
   </div>
