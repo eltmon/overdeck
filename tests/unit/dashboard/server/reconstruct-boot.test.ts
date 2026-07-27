@@ -4,6 +4,7 @@ import { Effect, Layer } from 'effect';
 const fakeReconstructResult = {
   issuesEnumerated: 1,
   agentsRebuilt: 2,
+  markedStoppedIds: [],
   phaseCounts: { work: 1, review: 0, merge: 0, done: 0 },
   agentsById: {
     'agent-pan-1920': {

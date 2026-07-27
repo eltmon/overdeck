@@ -10,6 +10,7 @@ import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 import { Db, EventBus, Records, Tmux, getOverdeckDatabaseSync } from './infra.js';
 import { IssueId } from './issues.js';
 import { getOverdeckHome } from '../paths.js';
+import { logAgentLifecycleSync } from '../persistent-logger.js';
 import type { AgentState } from '../agents.js';
 export { getIssueStageSync, isTerminalIssueStage } from './issue-stage-sync.js';
 
@@ -829,6 +830,7 @@ export interface BackfillAgentsSyncResult {
   processed: number;
   skipped: number;
   markedStopped: number;
+  markedStoppedIds: Array<{ id: string; previousStatus: string }>;
 }
 
 /**
@@ -886,12 +888,13 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
   let processed = 0;
   let skipped = 0;
   let markedStopped = 0;
+  const markedStoppedIds: Array<{ id: string; previousStatus: string }> = [];
 
   let entries: string[] = [];
   try {
     entries = readdirSync(agentsDir);
   } catch {
-    return { processed, skipped, markedStopped };
+    return { processed, skipped, markedStopped, markedStoppedIds };
   }
 
   const cols = OVERDECK_AGENT_COLUMNS.join(', ');
@@ -935,6 +938,12 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
 
       // Reconcile: mark stopped if no live tmux session
       if ((state.status === 'running' || state.status === 'starting') && !liveSessions.has(state.id)) {
+        const previousStatus = state.status;
+        logAgentLifecycleSync(
+          state.id,
+          `status changed: ${previousStatus} → stopped (boot backfill reconcile: no live tmux session)`,
+        );
+        markedStoppedIds.push({ id: state.id, previousStatus });
         state.status = 'stopped';
         state.stoppedAt = state.stoppedAt ?? new Date().toISOString();
         markedStopped++;
@@ -962,7 +971,7 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
   });
 
   tx();
-  return { processed, skipped, markedStopped };
+  return { processed, skipped, markedStopped, markedStoppedIds };
 }
 
 /**
