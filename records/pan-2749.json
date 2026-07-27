@@ -3,17 +3,17 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T00:57:15.378Z",
-  "updated": "2026-07-27T05:01:56.852Z",
+  "updated": "2026-07-27T05:01:58.844Z",
   "pipeline": {
     "issueId": "PAN-2749",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "mergeStatus": "merging",
-    "mergeStep": "stripping-planning",
+    "mergeStatus": "queued",
+    "mergeStep": "queued",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T05:01:56.749Z",
-    "mergeNotes": "Stale strike signal: recorded HEAD 286c9b19c79bd8c3f91f6466693dc2aead478690 differs from origin/strike/pan-2749 at 8c4ba381f166af639854c0e32f3f65b9cbc552d5",
+    "updatedAt": "2026-07-27T05:01:57.144Z",
+    "mergeNotes": "Post-rebase verification deferred: Verification deferred: a dashboard deploy is queued (requested 2026-07-27T04:22:17.553Z by merge-step0). It re-runs automatically after the deploy. — merge retries after the deploy.",
     "strikeReadyHead": "8c4ba381f166af639854c0e32f3f65b9cbc552d5",
     "strikeReadyAt": "2026-07-27T05:00:36.928Z",
     "strikeLandingState": "landing",
@@ -76,7 +76,7 @@
       },
       "costAtCloseOut": {
         "usd": 15.280934,
-        "pricingAsOf": "2026-07-27T05:01:56.845Z"
+        "pricingAsOf": "2026-07-27T05:01:58.839Z"
       }
     },
     "merges": [],
