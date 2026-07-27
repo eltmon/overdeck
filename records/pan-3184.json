@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T05:24:41.323Z",
+  "updated": "2026-07-27T05:28:05.941Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "heldcount-route": {
-        "writerId": "agent-pan-3184",
-        "agentId": "agent-pan-3184",
-        "pid": 1185150,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:24:41.323Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3184",
@@ -126,6 +118,17 @@
         "outcome": "completed",
         "reason": "Auto-origin apply filters stoppedByUser candidates; operator-origin apply threads overrideStoppedByUser through the deacon wrapper and route, with regressions for forwarding, refusal bypass, and hold_all. A second formatting-only commit preserved the deacon.ts file-size ratchet after the first push was blocked.",
         "releasedAt": "2026-07-27T05:24:30.681Z"
+      },
+      {
+        "writerId": "agent-pan-3184",
+        "agentId": "agent-pan-3184",
+        "pid": 1185150,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:24:41.323Z",
+        "itemId": "heldcount-route",
+        "outcome": "completed",
+        "reason": "GET boot reconciliation now exposes live heldCount, stoppedByUser row state, accurate operator-stop copy, and includes both work and strike candidates so the set matches the decision surface; route regressions pass.",
+        "releasedAt": "2026-07-27T05:28:05.941Z"
       }
     ],
     "statusReasons": {
@@ -148,6 +151,10 @@
       "apply-origin-and-override": {
         "reason": "Auto-origin apply filters stoppedByUser candidates; operator-origin apply threads overrideStoppedByUser through the deacon wrapper and route, with regressions for forwarding, refusal bypass, and hold_all. A second formatting-only commit preserved the deacon.ts file-size ratchet after the first push was blocked.",
         "updatedAt": "2026-07-27T05:24:30.681Z"
+      },
+      "heldcount-route": {
+        "reason": "GET boot reconciliation now exposes live heldCount, stoppedByUser row state, accurate operator-stop copy, and includes both work and strike candidates so the set matches the decision surface; route regressions pass.",
+        "updatedAt": "2026-07-27T05:28:05.941Z"
       }
     }
   },
@@ -173,6 +180,9 @@
     "apply-origin-and-override.apply-origin-and-override.ac2": "completed",
     "apply-origin-and-override.apply-origin-and-override.ac3": "completed",
     "apply-origin-and-override.apply-origin-and-override.ac4": "completed",
-    "heldcount-route": "running"
+    "heldcount-route": "completed",
+    "heldcount-route.heldcount-route.ac1": "completed",
+    "heldcount-route.heldcount-route.ac2": "completed",
+    "heldcount-route.heldcount-route.ac3": "completed"
   }
 }
