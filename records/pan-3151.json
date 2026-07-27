@@ -171,7 +171,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:16:30.286Z",
+  "updated": "2026-07-27T12:16:34.791Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -180,10 +180,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T12:14:59.525Z",
+    "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
+    "updatedAt": "2026-07-27T12:16:29.595Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
-    "verificationNotes": "Verification FAILED at test (473566ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3151/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3151\n\n\n Test Files  138 passed (138)\n      Tests  1524 passed (1524)\n   Start at  08:10:44\n   Duration  13.62s (transform 30.64s, setup 27.23s, import 116.53s, tests 50.92s, environment 61.91s)\n\nstdout | src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts > orphan proposed spec reconciler > surfaces only the actioned spawn outcome in the activity feed, with a human-readable message (PAN-1626)\n[orphan-proposed-reconciler] spawn-skipped { issueId: 'PAN-3151', reason: 'issue-scoped-session' }\n\nstdout | src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts > orphan proposed spec reconciler > surfaces only the actioned spawn outcome in the activity feed, with a human-readable message (PAN-1626)\n[orphan-proposed-reconciler] spawn-skipped { issueId: 'PAN-3151', reason: 'issue-scoped-session' }\n\n ❯ |root| src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts (28 tests | 1 failed) 2099ms\n     × surfaces only the actioned spawn outcome in the activity feed, with a human-readable message (PAN-1626) 10ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-NabpfS/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-rec\n…(1401 chars elided)…\nfeature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-egcDdW/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-egcDdW/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-conte\n...(truncated)",
+    "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
+    "reviewRequestedAt": "2026-07-27T12:16:28.373Z",
     "reviewSpawnedAt": "2026-07-27T12:10:32.560Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -271,9 +273,7 @@
         "tests/unit/lib/review-findings.test.ts"
       ],
       "recordedAt": "2026-07-27T11:58:39.123Z"
-    },
-    "reviewRequestedAt": "2026-07-27T12:16:28.373Z",
-    "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -288,18 +288,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 8535581,
-            "output": 249392,
-            "cacheRead": 71813632,
+            "input": 8600891,
+            "output": 264572,
+            "cacheRead": 74645504,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2808,
-            "output": 113548,
-            "cacheRead": 66915390,
-            "cacheWrite": 2276002
+            "input": 2931,
+            "output": 117139,
+            "cacheRead": 69738341,
+            "cacheWrite": 2519295
           }
         }
       },
@@ -311,21 +311,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 8535581,
-          "output": 249392,
-          "cacheRead": 71813632,
+          "input": 8600891,
+          "output": 264572,
+          "cacheRead": 74645504,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2808,
-          "output": 113548,
-          "cacheRead": 66915390,
-          "cacheWrite": 2276002
+          "input": 2931,
+          "output": 117139,
+          "cacheRead": 69738341,
+          "cacheWrite": 2519295
         }
       },
       "costAtCloseOut": {
-        "usd": 96.1892873,
-        "pricingAsOf": "2026-07-27T12:15:02.675Z"
+        "usd": 98.9916623,
+        "pricingAsOf": "2026-07-27T12:16:34.788Z"
       }
     },
     "merges": [
