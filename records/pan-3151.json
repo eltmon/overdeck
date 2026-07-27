@@ -57,6 +57,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-27T12:02:22.628Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-27T12:10:33.671Z"
     }
   ],
   "feedback": [],
@@ -148,20 +153,20 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:10:32.539Z",
+  "updated": "2026-07-27T12:10:34.555Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T11:59:30.892Z",
-    "updatedAt": "2026-07-27T12:10:32.182Z",
+    "updatedAt": "2026-07-27T12:10:32.560Z",
     "reviewNotes": "unstick regression test never seeds reviewCycleHistory and passes vacuously",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
-    "reviewSpawnedAt": "2026-07-27T12:02:21.613Z",
+    "reviewSpawnedAt": "2026-07-27T12:10:32.560Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -300,7 +305,7 @@
       },
       "costAtCloseOut": {
         "usd": 91.1889783,
-        "pricingAsOf": "2026-07-27T12:10:32.211Z"
+        "pricingAsOf": "2026-07-27T12:10:34.542Z"
       }
     },
     "merges": [
