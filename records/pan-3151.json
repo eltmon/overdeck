@@ -223,7 +223,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T13:52:43.659Z",
+  "updated": "2026-07-27T13:52:48.610Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "reviewing",
@@ -233,7 +233,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T13:52:41.102Z",
+    "updatedAt": "2026-07-27T13:52:48.584Z",
     "reviewNotes": "Agent re-review request (6/25): Added regression test for v61 repair (affected_criteria and started_by columns)",
     "conflictsSince": {
       "sha": "5ae5d217844e7391d328cfee02c7cc0431b1c18c",
@@ -315,7 +315,7 @@
       },
       "costAtCloseOut": {
         "usd": 169.8325283,
-        "pricingAsOf": "2026-07-27T13:52:43.522Z"
+        "pricingAsOf": "2026-07-27T13:52:48.606Z"
       }
     },
     "merges": [
