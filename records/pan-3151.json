@@ -198,18 +198,18 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:55:50.116Z",
+  "updated": "2026-07-27T13:00:17.452Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T12:55:50.102Z",
-    "reviewNotes": "Agent re-review request (3/25): Resolved merge conflict with origin/main, preserving both schema migrations",
+    "updatedAt": "2026-07-27T13:00:17.427Z",
+    "reviewNotes": "v62 merge resolution skips v61 same-version started_by and affected_criteria repairs before advancing the database",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewSpawnedAt": "2026-07-27T12:55:44.237Z"
   },
@@ -226,9 +226,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 11437557,
-            "output": 344956,
-            "cacheRead": 88223232,
+            "input": 12622298,
+            "output": 372371,
+            "cacheRead": 96448512,
             "cacheWrite": 0
           }
         },
@@ -257,9 +257,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 11437557,
-          "output": 344956,
-          "cacheRead": 88223232,
+          "input": 12622298,
+          "output": 372371,
+          "cacheRead": 96448512,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -276,8 +276,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 128.1320973,
-        "pricingAsOf": "2026-07-27T12:55:50.114Z"
+        "usd": 138.9908923,
+        "pricingAsOf": "2026-07-27T13:00:17.446Z"
       }
     },
     "merges": [
