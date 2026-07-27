@@ -91,19 +91,19 @@
     "recordedAt": "2026-07-08T23:32:23.025Z"
   },
   "created": "2026-07-08T21:36:56.346Z",
-  "updated": "2026-07-27T05:59:54.318Z",
+  "updated": "2026-07-27T16:34:29.843Z",
   "pipeline": {
     "issueId": "PAN-2167",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "passed",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "closedOut": true,
     "closedOutAt": "2026-07-27T05:59:54.280Z",
-    "updatedAt": "2026-07-27T05:59:54.280Z",
+    "updatedAt": "2026-07-27T16:34:29.805Z",
     "verificationNotes": "uat-promotion: operator UAT of batch uat/pan-cedar-0708 promoted to main at 5fb71d3ba (PAN-3114)",
-    "lastVerifiedCommit": "eeb33cc5d718ad2abe5ff8ae44ca138582fa68fb",
-    "mergeStatus": "merged"
+    "lastVerifiedCommit": "eeb33cc5d718ad2abe5ff8ae44ca138582fa68fb"
   },
   "closeOut": {
     "usage": {
@@ -181,86 +181,13 @@
       },
       "costAtCloseOut": {
         "usd": 25.673782,
-        "pricingAsOf": "2026-07-27T05:59:45.050Z"
+        "pricingAsOf": "2026-07-27T16:34:29.840Z"
       }
     },
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2512"
     ],
-    "ranOn": "eltmon-z790",
-    "dodGate": {
-      "evaluatedAt": "2026-07-27T05:59:54.311Z",
-      "rows": [
-        {
-          "id": "review",
-          "num": 1,
-          "title": "Review passed",
-          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
-          "observed": "reviewStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
-          "status": "skip"
-        },
-        {
-          "id": "tests",
-          "num": 2,
-          "title": "Tests passed",
-          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "testStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
-          "status": "skip"
-        },
-        {
-          "id": "verification",
-          "num": 3,
-          "title": "Verification green on the branch",
-          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "verificationStatus: passed at eeb33cc5d718ad2abe5ff8ae44ca138582fa68fb (from pipeline journal)",
-          "status": "pass"
-        },
-        {
-          "id": "merged",
-          "num": 4,
-          "title": "Merged to main",
-          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
-          "observed": "Feature branch is absent; positive merge evidence is required; PR #2512 MERGED at 2026-07-08T23:59:29Z; durable close-out record contains 1 merge artifact(s)",
-          "status": "pass",
-          "mergedAt": "2026-07-08T23:59:29Z",
-          "mergeCommit": "91922e19108683440475b7d7107c37cda3cedd33"
-        },
-        {
-          "id": "post-merge",
-          "num": 5,
-          "title": "Post-merge lifecycle ran",
-          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
-          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
-          "status": "pass"
-        },
-        {
-          "id": "main-verify",
-          "num": 6,
-          "title": "Verified on main",
-          "expected": "merged commit verified on main",
-          "observed": "1 check-runs concluded successfully on 91922e19108683440475b7d7107c37cda3cedd33",
-          "status": "pass"
-        },
-        {
-          "id": "deploy",
-          "num": 7,
-          "title": "Deployed",
-          "expected": "live server build includes the merged commit",
-          "observed": "build commit 3297fb26 contains merge 91922e19",
-          "status": "pass"
-        },
-        {
-          "id": "teardown",
-          "num": 8,
-          "title": "Close-out teardown verified",
-          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
-          "overridable": false,
-          "status": "pass",
-          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; No strike branch strike/pan-2167 found; Pruned 0 checkpoint ref(s) for agent-pan-2167, planning-pan-2167, strike-pan-2167; No specialist registry entries for PAN-2167"
-        }
-      ],
-      "accepted": []
-    }
+    "ranOn": "eltmon-z790"
   },
   "harness": "codex",
   "model": "gpt-5.5",
