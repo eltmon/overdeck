@@ -146,18 +146,18 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T11:59:37.251Z",
+  "updated": "2026-07-27T12:00:35.282Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T11:59:30.892Z",
-    "updatedAt": "2026-07-27T11:59:31.216Z",
-    "reviewNotes": "Verification failed at typecheck — fix and resubmit",
+    "updatedAt": "2026-07-27T12:00:35.258Z",
+    "reviewNotes": "convergence unstick branch lacks the required history-clear regression test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "fcd59501d8a1e325be9872f32e4c1f9833f757f5",
     "reviewRequestedAt": "2026-07-27T11:59:30.892Z",
@@ -263,9 +263,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5989670,
-            "output": 210109,
-            "cacheRead": 61445632,
+            "input": 6005411,
+            "output": 216681,
+            "cacheRead": 64375808,
             "cacheWrite": 0
           }
         },
@@ -286,9 +286,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 5989670,
-          "output": 210109,
-          "cacheRead": 61445632,
+          "input": 6005411,
+          "output": 216681,
+          "cacheRead": 64375808,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -299,8 +299,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 76.4821133,
-        "pricingAsOf": "2026-07-27T11:59:37.247Z"
+        "usd": 78.2230663,
+        "pricingAsOf": "2026-07-27T12:00:35.277Z"
       }
     },
     "merges": [
