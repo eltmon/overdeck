@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T06:31:37.175Z",
+  "updated": "2026-07-27T06:31:44.586Z",
   "pipeline": {
     "issueId": "PAN-3187",
     "reviewStatus": "pending",
@@ -204,5 +204,44 @@
     "repair-closeout-backlog.repair-closeout-backlog.ac1": "completed",
     "repair-closeout-backlog.repair-closeout-backlog.ac2": "completed",
     "repair-closeout-backlog.repair-closeout-backlog.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "scripts/repair-pan-3187-closed-review-residue.sh",
+      "src/lib/__tests__/review-dispatch-decision.test.ts",
+      "src/lib/__tests__/review-status-stale-clear.test.ts",
+      "src/lib/cloister/__tests__/closed-issue-reaper.test.ts",
+      "src/lib/cloister/__tests__/durable-review-pipeline.test.ts",
+      "src/lib/cloister/closed-issue-reaper.ts",
+      "src/lib/cloister/durable-review-pipeline.ts",
+      "src/lib/lifecycle/dod-gate.ts",
+      "src/lib/lifecycle/dod.ts",
+      "src/lib/review-dispatch-decision.ts",
+      "src/lib/review-status.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts",
+      "tests/unit/lib/review-dispatch-decision.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "scripts/repair-pan-3187-closed-review-residue.sh",
+      "src/lib/__tests__/review-dispatch-decision.test.ts",
+      "src/lib/__tests__/review-status-stale-clear.test.ts",
+      "src/lib/cloister/__tests__/closed-issue-reaper.test.ts",
+      "src/lib/cloister/__tests__/durable-review-pipeline.test.ts",
+      "src/lib/cloister/closed-issue-reaper.ts",
+      "src/lib/cloister/durable-review-pipeline.ts",
+      "src/lib/lifecycle/dod-gate.ts",
+      "src/lib/lifecycle/dod.ts",
+      "src/lib/review-dispatch-decision.ts",
+      "src/lib/review-status.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts",
+      "tests/unit/lib/review-dispatch-decision.test.ts"
+    ],
+    "recordedAt": "2026-07-27T06:31:44.584Z"
   }
 }
