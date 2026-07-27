@@ -186,7 +186,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:27:15.943Z",
+  "updated": "2026-07-27T12:27:21.527Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
@@ -196,11 +196,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T12:27:15.180Z",
+    "updatedAt": "2026-07-27T12:27:21.522Z",
     "reviewNotes": "regression test double-serializes reviewCycleHistory and asserts a string instead of the production array contract",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
-    "reviewedAtCommit": "ecb052b11abcc37ce65513e76fb782775e108759",
+    "reviewedAtCommit": "d41e7959ffcf47379f544d51c4c21851fcb987c3",
     "reviewSpawnedAt": "2026-07-27T12:25:46.686Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -340,7 +340,7 @@
       },
       "costAtCloseOut": {
         "usd": 108.7605113,
-        "pricingAsOf": "2026-07-27T12:27:15.202Z"
+        "pricingAsOf": "2026-07-27T12:27:21.525Z"
       }
     },
     "merges": [
