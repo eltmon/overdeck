@@ -158,20 +158,19 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:00:41.505Z",
+  "updated": "2026-07-27T12:02:21.080Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T11:59:30.892Z",
-    "updatedAt": "2026-07-27T12:00:41.495Z",
+    "updatedAt": "2026-07-27T12:02:21.047Z",
     "reviewNotes": "convergence unstick branch lacks the required history-clear regression test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
-    "reviewedAtCommit": "718409fa3a78ebb8ba13f87743047716380fb7d8",
     "reviewRequestedAt": "2026-07-27T11:59:30.892Z",
     "reviewSpawnedAt": "2026-07-27T11:53:32.566Z",
     "scopeDrift": {
@@ -275,18 +274,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6005411,
-            "output": 216681,
-            "cacheRead": 64375808,
+            "input": 6009061,
+            "output": 216843,
+            "cacheRead": 65030144,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2623,
-            "output": 106656,
-            "cacheRead": 62724659,
-            "cacheWrite": 2146875
+            "input": 2692,
+            "output": 109466,
+            "cacheRead": 64195448,
+            "cacheWrite": 2162584
           }
         }
       },
@@ -298,21 +297,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 6005411,
-          "output": 216681,
-          "cacheRead": 64375808,
+          "input": 6009061,
+          "output": 216843,
+          "cacheRead": 65030144,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2623,
-          "output": 106656,
-          "cacheRead": 62724659,
-          "cacheWrite": 2146875
+          "input": 2692,
+          "output": 109466,
+          "cacheRead": 64195448,
+          "cacheWrite": 2162584
         }
       },
       "costAtCloseOut": {
-        "usd": 78.2230663,
-        "pricingAsOf": "2026-07-27T12:00:41.500Z"
+        "usd": 78.7541793,
+        "pricingAsOf": "2026-07-27T12:02:21.076Z"
       }
     },
     "merges": [
