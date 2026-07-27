@@ -206,7 +206,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T04:49:59.594Z",
+  "updated": "2026-07-27T04:53:25.458Z",
   "pipeline": {
     "issueId": "PAN-2876",
     "reviewStatus": "pending",
@@ -279,16 +279,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "server-subagent-discovery": {
-        "writerId": "agent-pan-2876",
-        "agentId": "agent-pan-2876",
-        "pid": 3075861,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T04:49:59.594Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2876",
@@ -300,12 +292,27 @@
         "outcome": "completed",
         "reason": "Added shared SubagentSummary and ConversationResponse schemas, subagents event support, optional agentId subscription payload, frontend mirror types, and decoding tests.",
         "releasedAt": "2026-07-27T04:47:37.240Z"
+      },
+      {
+        "writerId": "agent-pan-2876",
+        "agentId": "agent-pan-2876",
+        "pid": 3075861,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T04:49:59.594Z",
+        "itemId": "server-subagent-discovery",
+        "outcome": "completed",
+        "reason": "Added async, read-only subagent metadata discovery with memoized parsing and traversal-safe transcript path resolution, covered by filesystem unit tests.",
+        "releasedAt": "2026-07-27T04:53:25.458Z"
       }
     ],
     "statusReasons": {
       "contracts-subagent-schema": {
         "reason": "Added shared SubagentSummary and ConversationResponse schemas, subagents event support, optional agentId subscription payload, frontend mirror types, and decoding tests.",
         "updatedAt": "2026-07-27T04:47:37.240Z"
+      },
+      "server-subagent-discovery": {
+        "reason": "Added async, read-only subagent metadata discovery with memoized parsing and traversal-safe transcript path resolution, covered by filesystem unit tests.",
+        "updatedAt": "2026-07-27T04:53:25.458Z"
       }
     }
   },
@@ -315,6 +322,10 @@
     "contracts-subagent-schema.contracts-subagent-schema.ac2": "completed",
     "contracts-subagent-schema.contracts-subagent-schema.ac3": "completed",
     "contracts-subagent-schema.contracts-subagent-schema.ac4": "completed",
-    "server-subagent-discovery": "running"
+    "server-subagent-discovery": "completed",
+    "server-subagent-discovery.server-subagent-discovery.ac1": "completed",
+    "server-subagent-discovery.server-subagent-discovery.ac2": "completed",
+    "server-subagent-discovery.server-subagent-discovery.ac3": "completed",
+    "server-subagent-discovery.server-subagent-discovery.ac4": "completed"
   }
 }
