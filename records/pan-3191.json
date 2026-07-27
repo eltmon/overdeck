@@ -69,18 +69,18 @@
     "recordedAt": "2026-07-27T05:19:11.339Z"
   },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T06:33:12.057Z",
+  "updated": "2026-07-27T06:35:57.874Z",
   "pipeline": {
     "issueId": "PAN-3191",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:20:05.037Z",
-    "updatedAt": "2026-07-27T06:33:10.563Z",
-    "reviewNotes": "GitLab/polyrepo rows still cannot resolve repository identity, so merged MRs remain stranded",
+    "updatedAt": "2026-07-27T06:35:57.839Z",
+    "reviewNotes": "Unbounded serial forge checks still monopolize the Deacon patrol; GitHub App repository identity also remains omitted",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
     "reviewSpawnedAt": "2026-07-27T06:33:10.562Z",
     "scopeDrift": {
@@ -122,9 +122,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2622582,
-            "output": 169718,
-            "cacheRead": 24388608,
+            "input": 4368259,
+            "output": 225989,
+            "cacheRead": 30462464,
             "cacheWrite": 0
           }
         },
@@ -139,15 +139,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 4075183,
-          "output": 308542,
-          "cacheRead": 79539200,
+          "input": 5820860,
+          "output": 364813,
+          "cacheRead": 85613056,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 69.401775,
-        "pricingAsOf": "2026-07-27T06:33:11.962Z"
+        "usd": 82.855218,
+        "pricingAsOf": "2026-07-27T06:35:57.867Z"
       }
     },
     "merges": [
