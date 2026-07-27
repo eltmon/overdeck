@@ -206,7 +206,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T04:58:15.373Z",
+  "updated": "2026-07-27T05:04:57.079Z",
   "pipeline": {
     "issueId": "PAN-2876",
     "reviewStatus": "pending",
@@ -279,16 +279,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "ws-subagent-list-emission": {
-        "writerId": "agent-pan-2876",
-        "agentId": "agent-pan-2876",
-        "pid": 3388340,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T04:58:15.373Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2876",
@@ -322,6 +314,17 @@
         "outcome": "completed",
         "reason": "Routed optional agentId subscriptions through the traversal-safe subagent transcript resolver before reusing the existing snapshot, watcher, and append-only guard flow; server tests and typecheck pass.",
         "releasedAt": "2026-07-27T04:57:59.723Z"
+      },
+      {
+        "writerId": "agent-pan-2876",
+        "agentId": "agent-pan-2876",
+        "pid": 3388340,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T04:58:15.373Z",
+        "itemId": "ws-subagent-list-emission",
+        "outcome": "completed",
+        "reason": "Parent Claude JSONL streams now emit initial and change-detected subagent lists, restamp running state on transcript deltas, and stop the 2-second fake-timer-tested poller on unsubscribe.",
+        "releasedAt": "2026-07-27T05:04:57.078Z"
       }
     ],
     "statusReasons": {
@@ -336,6 +339,10 @@
       "ws-subagent-transcript-branch": {
         "reason": "Routed optional agentId subscriptions through the traversal-safe subagent transcript resolver before reusing the existing snapshot, watcher, and append-only guard flow; server tests and typecheck pass.",
         "updatedAt": "2026-07-27T04:57:59.723Z"
+      },
+      "ws-subagent-list-emission": {
+        "reason": "Parent Claude JSONL streams now emit initial and change-detected subagent lists, restamp running state on transcript deltas, and stop the 2-second fake-timer-tested poller on unsubscribe.",
+        "updatedAt": "2026-07-27T05:04:57.078Z"
       }
     }
   },
@@ -355,6 +362,11 @@
     "ws-subagent-transcript-branch.ws-subagent-transcript-branch.ac2": "completed",
     "ws-subagent-transcript-branch.ws-subagent-transcript-branch.ac3": "completed",
     "ws-subagent-transcript-branch.ws-subagent-transcript-branch.ac4": "completed",
-    "ws-subagent-list-emission": "running"
+    "ws-subagent-list-emission": "completed",
+    "ws-subagent-list-emission.ws-subagent-list-emission.ac1": "completed",
+    "ws-subagent-list-emission.ws-subagent-list-emission.ac2": "completed",
+    "ws-subagent-list-emission.ws-subagent-list-emission.ac3": "completed",
+    "ws-subagent-list-emission.ws-subagent-list-emission.ac4": "completed",
+    "ws-subagent-list-emission.ws-subagent-list-emission.ac5": "completed"
   }
 }
