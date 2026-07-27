@@ -261,17 +261,17 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:32:45.067Z",
+  "updated": "2026-07-27T14:32:46.944Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:32:45.038Z",
+    "updatedAt": "2026-07-27T14:32:45.493Z",
     "reviewNotes": "Agent re-review request (10/25): Fixed: removed redundant v62 repairs causing test failures",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "1a4b8b91f4d83cb2dda724be2292b1ccb85334b1",
@@ -341,7 +341,7 @@
       },
       "costAtCloseOut": {
         "usd": 219.0545943,
-        "pricingAsOf": "2026-07-27T14:32:45.064Z"
+        "pricingAsOf": "2026-07-27T14:32:46.942Z"
       }
     },
     "merges": [
