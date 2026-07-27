@@ -62,9 +62,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-27T12:10:33.671Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-27T12:16Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-07-27T12:16:30.192Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-07-27T12:16:30.286Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-27T12:16:30Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-3151 (attempt 3/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3151 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -153,7 +171,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:16:28.764Z",
+  "updated": "2026-07-27T12:16:30.286Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
