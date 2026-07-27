@@ -513,7 +513,7 @@ program
   .option('--plan-model <model>', 'Planning model override when this start auto-plans (defaults to roles.plan.model); the work model stays --model')
   .option('--auto', '[deprecated: use --plan skip] Skip planning agent by synthesizing a minimal xBRIEF from the issue title/body')
   .option('--force', 'Clear a paused agent gate and start anyway')
-  .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — e.g. to switch a stopped agent\'s model')
+  .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — replaces a live session too, so it recovers an inert agent without a separate pan kill')
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
   .option('--yes', 'Confirm --host in non-interactive contexts').option('--off-book', 'Allow one work-agent dispatch outside the active order book and log the override')
   .action(startCommand);

@@ -95,6 +95,7 @@ import { checkActiveOrderDispatch } from '../../lib/orders/dispatch-gate.js';
 import { withActiveOrderDispatchReservation } from '../../lib/orders/dispatch-reservation.js';
 import type { IssueOptions } from './start-options.js';
 import { applyStartPolicyOptions } from './start-policy-overrides.js';
+import { prepareFreshWorkAgentSession } from './start-fresh-session.js';
 
 /**
  * Determine workspace location based on flags and config
@@ -803,8 +804,14 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   // Paused/troubled cases are handled above; stopped-but-resumable cases are
   // left for assertCanStartFreshSync below so the user sees the resume/fresh
   // guidance unchanged (hazard H2).
+  //
+  // PAN-3150: --fresh is an explicit request to REPLACE the current session, so
+  // it must not be swallowed by this no-op. An inert-but-alive agent still reads
+  // as `isRunning`, and the flywheel is forbidden `pan kill` — without this the
+  // only recovery door for a frozen agent is closed to the one role that runs
+  // unattended.
   const lifecycleState = getWorkAgentLifecycleStateSync(agentId);
-  if (lifecycleState.isRunning && !lifecycleState.isRunningButStuck) {
+  if (lifecycleState.isRunning && !lifecycleState.isRunningButStuck && !options.fresh) {
     console.log(chalk.green(`Work agent for ${id} is already running.`));
     console.log('');
     console.log(chalk.dim('Message it:'), chalk.cyan(`pan tell ${id} "..."`));
@@ -931,39 +938,15 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       // mode === 'skip': fall through to the existing auto-synthesize path.
     }
 
-    // --fresh: wipe the work agent's state directory under
-    // ~/.overdeck/agents/agent-<id>/ (PAN-1985) so the start below opens a
-    // brand-new session against a clean dir. The new agent reads
-    // .pan/continue.json, the xBRIEF, the beads, and the branch state to
-    // pick up where the prior run left off.
-    //
-    // Operator note: --fresh is the deliberate override for harness/model
-    // switches (where the saved Claude session cannot be resumed under a
-    // different harness) and for "I want a clean work run" recovery. The
-    // NORMAL review flow continues the same session across re-dispatches
-    // (PAN-1862); --fresh is the escape hatch that pays the re-research
-    // cost. Workspace, xBRIEF, beads, .pan/continue.json, .pan/feedback/,
-    // branch, and commit history are all left untouched.
-    //
-    // Refuses if a live tmux session is alive (the wipe would race with it).
-    // For the narrow "just clear the four session tracking files" reset, use
-    // `pan reset-session <id>` directly — it's intentionally non-destructive
-    // and is used by the harness-policy subsystem as a building block.
+    // --fresh drops the saved session and, since PAN-3150, cycles a live one
+    // itself. See start-fresh-session.ts for the full contract.
     if (options.fresh) {
-      const agentIdForFresh = `agent-${id.toLowerCase()}`;
-      const priorState = getAgentStateSync(agentIdForFresh);
-      if (priorState) {
-        const { sessionExistsSync } = await import('../../lib/tmux.js');
-        if (sessionExistsSync(agentIdForFresh)) {
-          console.error(chalk.red(`Agent ${agentIdForFresh} has a live tmux session. Run 'pan kill ${id}' first, then retry --fresh.`));
-          return exitCli(1);
-        }
-        const { wipeAgentStateDirs } = await import('../../lib/agents.js');
-        const wipeResult = await wipeAgentStateDirs(id);
-        console.log(chalk.dim(`  --fresh: wiped ${wipeResult.removed.length} agent state director${wipeResult.removed.length === 1 ? 'y' : 'ies'} for ${id} (path: ${wipeResult.path})`));
+      const fresh = await prepareFreshWorkAgentSession(id);
+      for (const line of fresh.messages) console.log(chalk.dim(line));
+      if (!fresh.ok) {
+        console.error(chalk.red(fresh.error));
+        return exitCli(1);
       }
-      // No prior state → nothing to wipe; fall through to the normal start
-      // path (which will create the agent dir fresh).
     }
 
     // Refuse fresh start when a resumable session still exists after the
