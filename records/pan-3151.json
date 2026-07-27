@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T11:02:17.994Z",
+  "updated": "2026-07-27T11:05:24.917Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -37,16 +37,8 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "docs-convergence-gate": {
-        "writerId": "agent-pan-3151",
-        "agentId": "agent-pan-3151",
-        "pid": 2843379,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T11:02:17.994Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3151",
@@ -141,6 +133,16 @@
         "itemId": "pan-show-trend",
         "outcome": "completed",
         "releasedAt": "2026-07-27T11:02:12.046Z"
+      },
+      {
+        "writerId": "agent-pan-3151",
+        "agentId": "agent-pan-3151",
+        "pid": 2843379,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T11:02:17.994Z",
+        "itemId": "docs-convergence-gate",
+        "outcome": "completed",
+        "releasedAt": "2026-07-27T11:05:24.917Z"
       }
     ],
     "statusReasons": {
@@ -198,6 +200,9 @@
     "pan-show-trend": "completed",
     "pan-show-trend.pan-show-trend.ac1": "completed",
     "pan-show-trend.pan-show-trend.ac2": "completed",
-    "docs-convergence-gate": "running"
+    "docs-convergence-gate": "completed",
+    "docs-convergence-gate.docs-convergence-gate.ac1": "completed",
+    "docs-convergence-gate.docs-convergence-gate.ac2": "completed",
+    "docs-convergence-gate.docs-convergence-gate.ac3": "completed"
   }
 }
