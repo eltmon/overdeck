@@ -39,15 +39,7 @@
       "timestamp": "2026-07-27T06:35:58.510Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T06:35:58Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3191\n\nUnbounded serial forge checks still monopolize the Deacon patrol; GitHub App repository identity also remains omitted\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3191 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -82,20 +74,19 @@
     "recordedAt": "2026-07-27T05:19:11.339Z"
   },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T06:36:03.664Z",
+  "updated": "2026-07-27T06:59:16.689Z",
   "pipeline": {
     "issueId": "PAN-3191",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:20:05.037Z",
-    "updatedAt": "2026-07-27T06:36:03.657Z",
+    "updatedAt": "2026-07-27T06:59:16.109Z",
     "reviewNotes": "Unbounded serial forge checks still monopolize the Deacon patrol; GitHub App repository identity also remains omitted",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
-    "reviewedAtCommit": "a55a750c29932cd571eb42691d9d43c946cfc6db",
     "reviewSpawnedAt": "2026-07-27T06:33:10.562Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -136,32 +127,32 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4368259,
-            "output": 225989,
-            "cacheRead": 30462464,
+            "input": 4375451,
+            "output": 226193,
+            "cacheRead": 30934528,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1452601,
-            "output": 138824,
-            "cacheRead": 55150592,
+            "input": 2319811,
+            "output": 205467,
+            "cacheRead": 70509056,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 5820860,
-          "output": 364813,
-          "cacheRead": 85613056,
+          "input": 6695262,
+          "output": 431660,
+          "cacheRead": 101443584,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 82.855218,
-        "pricingAsOf": "2026-07-27T06:36:03.660Z"
+        "usd": 97.147902,
+        "pricingAsOf": "2026-07-27T06:59:16.147Z"
       }
     },
     "merges": [
