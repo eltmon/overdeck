@@ -1,0 +1,337 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-27T04:48:04.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3191: Auto-merge rows strand forever: failed/blocked can never reach 'merged' and nothing reconciles them",
+    "updated": "2026-07-27T04:53:14.329Z"
+  },
+  "plan": {
+    "id": "pan-3191",
+    "title": "Auto-merge rows strand forever: reconcile failed/blocked rows against real merge state",
+    "status": "proposed",
+    "uid": "2629977f-6246-4ba1-8201-7cffa22ddafa",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-27T04:48:04.000Z",
+    "updated": "2026-07-27T04:53:14.329Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3191",
+        "label": "PAN-3191",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "auto-merge",
+      "deacon",
+      "reconciliation",
+      "state-drift"
+    ],
+    "narratives": {
+      "Problem": "A pending_auto_merges row that reaches failed or blocked is stranded permanently: markMerged (src/lib/overdeck/merge-sync.ts:193) requires status='merging', which a failed/blocked row can never satisfy again, and no patrol reconciles rows against real merge state. The operator-facing problems list (GET /api/flywheel/auto-merge/problems) currently holds 15 residue rows across 13 issues, every one merged and closed-out weeks ago, making genuinely stuck merges indistinguishable from shipped work. pan merge cancel (fixed by PAN-3190) clears only ONE row per invocation, so duplicate rows (PAN-2297, PAN-1644) survive a cancel that reports success.",
+      "Proposal": "Three changes plus docs. (1) Widen markMerged's precondition to status IN ('pending','blocked','failed','merging'). (2) New deacon reconciler reconcileAutoMergeRows in src/lib/cloister/deacon-auto-merge-reconcile.ts, wired into the deacon patrol after reconcileClosedPrReadyForMerge: group all actionable rows by issue (every row transitioned, not just the newest); tier 1 cancels pending/blocked/failed rows for closed-out issues via cancelPending(id,'auto-merge-reconciler') with no forge call; tier 2 calls findMergedArtifact for non-closed-out issues with blocked/failed rows and markMerged's every blocked/failed row on positive evidence; per-issue 10-min in-memory cooldown bounds forge cost; errors never leave a row cleared or escape the patrol. (3) DELETE /api/flywheel/auto-merge/:id returns remainingActionable via a new countActionableAutoMerges helper, and pan merge cancel prints the remaining count with re-run guidance; sync-sources/skills/pan-merge/SKILL.md updated in the same commit. (4) docs/FLYWHEEL.md gains a Reconciliation subsection. Full detail in .pan/drafts/PAN-3191.md.",
+      "NonGoals": "- Reconciling rows stuck in 'merging' (separate mid-merge-crash failure class; follow-up issue if observed)\n- Cancel-all semantics or a --all flag for pan merge cancel (single-row contract preserved; reporting only)\n- On-read filtering or forge/git/tracker calls inside GET /api/flywheel/auto-merge/problems (it stays a pure DB read)\n- One-off SQL or migration to clear the current 15 rows (the reconciler clears them on its first patrol after deploy)\n- Changes to the auto-merge executor's retry/requeue/circuit-breaker policy"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Reconcile on deacon patrol, not on HTTP read",
+        "rationale": "The issue allows 'on read or on patrol'. On-read puts forge/git calls in a request handler (latency and rate-limit failure modes in the operator UI path); the deacon reconciler pattern (reconcileClosedPrReadyForMerge, reconcileStuckMergingStates) is the established home for this exact drift class, and rows leaving via status transitions keeps the endpoint a pure DB read."
+      },
+      {
+        "summary": "Closed-out issues' rows are cancelled without a forge call, not marked merged",
+        "rationale": "pan close is the mechanical DoD gate and only runs after the merge is verified, so re-proving the merge buys nothing; the issue explicitly authorizes age-out 'regardless of merge evidence'. cancelledBy='auto-merge-reconciler' records why the row left the queue, and the common residue sweep costs zero network calls."
+      },
+      {
+        "summary": "Tier-2 evidence via findMergedArtifact, not observeForgeMergeState",
+        "rationale": "observeForgeMergeState does a git fetch plus merge-base per repo and patches merge-set rows — heavier than needed and mutates unrelated state. findMergedArtifact with the row's prUrl is one PR-state API call and is forge-agnostic (GitLab adapter implements it too)."
+      },
+      {
+        "summary": "pan merge cancel keeps single-row semantics; only remaining-row reporting is added",
+        "rationale": "The flywheel design note asked for a remaining-rows report, not cancel-all. Single-row cancel has deliberate race handling; a remainingActionable count in the DELETE response plus CLI guidance fixes the silent-residue UX (PAN-2297/PAN-1644 duplicates) without changing the operator contract."
+      },
+      {
+        "summary": "Stuck 'merging' rows are out of scope",
+        "rationale": "A row orphaned in 'merging' by a mid-merge crash is a distinct failure class (it also wedges the unique active-issue index) and is not one of the issue's three expected behaviors; recorded as hazard H1 for a follow-up issue rather than expanding scope."
+      }
+    ],
+    "items": [
+      {
+        "id": "widen-markmerged-precondition",
+        "title": "Widen markMerged precondition to accept pending/blocked/failed/merging",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:48:04.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/merge-sync.ts",
+            "tests/unit/lib/overdeck/merge-sync-pending-auto-merges.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm test -- tests/unit/lib/overdeck/merge-sync-pending-auto-merges.test.ts"
+          ],
+          "expected_outputs": [
+            "all markMerged describe-block tests pass, including new pending/blocked/failed transition cases and merged/cancelled no-op cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/overdeck/merge-sync.ts:196, change markMerged's UPDATE WHERE clause from `AND status = 'merging'` to `AND status IN ('pending','blocked','failed','merging')` (PRD WI-1). Extend the markMerged describe block in tests/unit/lib/overdeck/merge-sync-pending-auto-merges.test.ts using the existing seedPendingAutoMerge helper: seed failed, blocked, and pending rows and assert markMerged returns true and persists status='merged' with merged_at set; seed merged and cancelled rows and assert markMerged returns false and leaves the row unchanged. The existing 'marks merging → merged' test must pass unmodified."
+        },
+        "items": [
+          {
+            "id": "widen-markmerged-precondition.ac1",
+            "title": "Given a row seeded in failed, blocked, or pending status, when markMerged(id) runs, then it returns true and persists status='merged' with merged_at set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-markmerged-precondition.ac2",
+            "title": "Given a row seeded in merged or cancelled status, when markMerged(id) runs, then it returns false and preserves the row unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-markmerged-precondition.ac3",
+            "title": "The pre-existing 'marks merging → merged and sets merged_at' test passes unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auto-merge-rows-reconciler",
+        "title": "Add reconcileAutoMergeRows deacon reconciler for failed/blocked/pending auto-merge rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:48:04.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-auto-merge-reconcile.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/deacon-merge.ts",
+            "tests/unit/lib/cloister/deacon-auto-merge-reconcile.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm test -- tests/unit/lib/cloister/deacon-auto-merge-reconcile.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all seven reconciler test cases pass, including the regression case (seeded failed row + merged PR leaves listProblemAutoMerges after one run) and the duplicate-row case (both rows of one issue transition in a single run)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/deacon-auto-merge-reconcile.ts shaped after reconcileStuckMergingStatesWithDeps (src/lib/cloister/deacon-stuck-merging.ts:92): export reconcileAutoMergeRowsWithDeps(deps) with the logic and reconcileAutoMergeRows() binding production deps (listProblemAutoMerges, listActiveAutoMerges, cancelPending, markMerged, readJournalStatusSync, resolveProjectFromIssueSync, getForgeAdapter, console.log). Per run (PRD Proposal §2): collect listProblemAutoMerges() rows plus pending-only rows from listActiveAutoMerges() (never touch 'merging'); group by issueId and process EVERY row of an issue; skip issues inside a module-local 10-minute cooldown Map<string,number> (pattern: closedPrReadyReconcileCooldowns, deacon-merge.ts:334). Tier 1: if readJournalStatusSync(issueId)?.durable.closedOut === true, cancelPending(id,'auto-merge-reconciler') every pending/blocked/failed row — no forge call. Tier 2 (non-closed-out issues with blocked/failed rows only): getForgeAdapter(row.forge).findMergedArtifact({ sourceBranch: 'feature/<issueId-lowercase>', artifactUrl: row.prUrl, cwd: resolveProjectFromIssueSync(issueId).path }); non-null ⇒ markMerged(id) for each blocked/failed row; null ⇒ leave rows and set cooldown; throw ⇒ leave rows, set cooldown, console.warn, continue. Return action strings; never throw past the patrol. Wire-up: re-export through src/lib/cloister/deacon-merge.ts next to line 21 (`export { reconcileAutoMergeRows } from './deacon-auto-merge-reconcile.js';`), add to the import list at src/lib/cloister/deacon.ts:38 and the re-export list at deacon.ts:142, and invoke it in the deacon patrol immediately after the reconcileClosedPrReadyForMerge() block (~line 2950) with the same actions.push/addLog('action', a, state.patrolCycle) pattern. Tests: new tests/unit/lib/cloister/deacon-auto-merge-reconcile.test.ts with setupOverdeckTestDb and injected deps covering PRD WI-2 cases 1-7 (regression AC, closed-out tier-1 short-circuit with findMergedArtifact NOT called, pending+closed-out cancel, duplicate rows both transition, unmerged PR leaves row + cooldown suppresses immediate re-check, forge throw leaves row and nothing escapes, 'merging' rows untouched). Do not add forge/git calls to the problems route — rows leave the list via status transitions only (NFR-1)."
+        },
+        "items": [
+          {
+            "id": "auto-merge-rows-reconciler.ac1",
+            "title": "Given a seeded failed row whose findMergedArtifact returns a merged artifact, when reconcileAutoMergeRows runs, then it persists status='merged' and listProblemAutoMerges() no longer returns the row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-merge-rows-reconciler.ac2",
+            "title": "Given seeded pending/blocked/failed rows whose issue journal has closedOut: true, when the reconciler runs, then it cancels every one with cancelled_by='auto-merge-reconciler' and never calls findMergedArtifact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-merge-rows-reconciler.ac3",
+            "title": "Given two failed rows for the same issue and positive merge evidence, when the reconciler runs once, then it transitions BOTH rows to merged in that single run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-merge-rows-reconciler.ac4",
+            "title": "Given a failed row whose findMergedArtifact returns null or throws, when the reconciler runs, then it preserves the row in the problems list, sets the per-issue cooldown (a second immediate run skips the forge call), and no exception escapes to the caller",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-merge-rows-reconciler.ac5",
+            "title": "The reconciler preserves every 'merging' row untouched, and the deacon.ts patrol block calls reconcileAutoMergeRows immediately after the reconcileClosedPrReadyForMerge block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cancel-reports-remaining-rows",
+        "title": "pan merge cancel reports remaining actionable rows for the issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-27T04:48:04.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/merge-sync.ts",
+            "src/dashboard/server/routes/flywheel.ts",
+            "src/cli/commands/merge.ts",
+            "sync-sources/skills/pan-merge/SKILL.md",
+            "tests/unit/lib/overdeck/merge-sync-pending-auto-merges.test.ts",
+            "src/dashboard/server/routes/__tests__/flywheel.test.ts",
+            "src/cli/commands/__tests__/merge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm test -- tests/unit/lib/overdeck/merge-sync-pending-auto-merges.test.ts src/cli/commands/__tests__/merge.test.ts src/dashboard/server/routes/__tests__/flywheel.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "countActionableAutoMerges, deleteAutoMergePayload remainingActionable, and mergeCancelCommand output tests pass",
+            "lint (including scripts/lint-skills.sh) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Keep single-row cancel semantics; surface duplicates (PRD Proposal §3). Add countActionableAutoMerges(issueId) to src/lib/overdeck/merge-sync.ts: SELECT COUNT(*) AS n FROM pending_auto_merges WHERE issue_id = ? AND status IN ('pending','merging','blocked','failed'). In deleteAutoMergePayload (src/dashboard/server/routes/flywheel.ts:381-389), after a successful cancel include remainingActionable: countActionableAutoMerges(issueId) in the 200 body, threaded through AutoMergeCancelDeps as an injectable countRemaining dep defaulting to countActionableAutoMerges. In mergeCancelCommand (src/cli/commands/merge.ts:35-38) parse the JSON body and, when remainingActionable > 0, print `Cancelled auto-merge for <ID> (<N> actionable row(s) remain — re-run 'pan merge cancel <id>' to clear the next one)`; otherwise keep the current message. Update sync-sources/skills/pan-merge/SKILL.md in the SAME commit (skills-convention rule): document that cancel clears one row per invocation, that an issue can hold duplicate rows, and what the remaining-rows output means. Tests: countActionableAutoMerges counts pending/merging/blocked/failed and excludes merged/cancelled (merge-sync-pending-auto-merges.test.ts); deleteAutoMergePayload 200 body carries remainingActionable from the injected dep (flywheel.test.ts); mergeCancelCommand with a fake fetchImpl returning remainingActionable: 2 prints the '2 actionable row(s) remain' guidance (merge.test.ts)."
+        },
+        "items": [
+          {
+            "id": "cancel-reports-remaining-rows.ac1",
+            "title": "countActionableAutoMerges returns the count of pending/merging/blocked/failed rows for an issue and excludes merged/cancelled rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-reports-remaining-rows.ac2",
+            "title": "Given a successful cancel with further actionable rows, DELETE /api/flywheel/auto-merge/:id responds 200 with a body containing remainingActionable equal to the injected count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-reports-remaining-rows.ac3",
+            "title": "Given a DELETE response with remainingActionable: 2, pan merge cancel prints guidance containing '2 actionable row(s) remain' and the re-run command; with 0 it prints the unchanged success message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cancel-reports-remaining-rows.ac4",
+            "title": "sync-sources/skills/pan-merge/SKILL.md states the one-row-per-invocation semantics and the remaining-rows output, and npm run lint (lint-skills.sh) passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-flywheel-reconciliation",
+        "title": "Document auto-merge row reconciliation in docs/FLYWHEEL.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-27T04:48:04.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FLYWHEEL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Reconciliation' docs/FLYWHEEL.md"
+          ],
+          "expected_outputs": [
+            "grep finds a Reconciliation subsection after the Scheduled auto-merge recovery section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/FLYWHEEL.md, immediately after the 'Scheduled auto-merge recovery' bullet list (section starts at line 159), add a terse (~8 line) '### Reconciliation' subsection per PRD Proposal §4: failed/blocked are not terminal-residue states — a deacon reconciler flips rows to merged when the forge shows the PR merged, cancels actionable rows whose issue is closed-out, throttles forge checks per issue, and pan merge cancel clears one row per invocation and reports how many actionable rows remain."
+        },
+        "items": [
+          {
+            "id": "docs-flywheel-reconciliation.ac1",
+            "title": "docs/FLYWHEEL.md contains a '### Reconciliation' subsection after 'Scheduled auto-merge recovery' stating that closed-out issues' rows are cancelled and merged-elsewhere rows flip to merged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-flywheel-reconciliation.ac2",
+            "title": "The subsection records that pan merge cancel clears one row per invocation and prints the remaining actionable-row count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "widen-markmerged-precondition",
+        "to": "auto-merge-rows-reconciler",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-27-PAN-3191-auto-merge-rows-strand-forever-reconcile-failed-blocked-rows-against-real-merge-state.xbrief.json"
+    }
+  },
+  "status": "proposed"
+}
