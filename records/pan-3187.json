@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T05:45:12.140Z",
+  "updated": "2026-07-27T05:47:07.372Z",
   "pipeline": {
     "issueId": "PAN-3187",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "docs-intent-lifecycle-and-settling": {
-        "writerId": "agent-pan-3187",
-        "agentId": "agent-pan-3187",
-        "pid": 2672575,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:45:12.140Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3187",
@@ -126,6 +118,17 @@
         "outcome": "completed",
         "reason": "Added tracker-closure and landed-work evidence to the DoD gate, settled absent non-negative verdicts, superseded negative test/verification verdicts only after green main verification, and preserved negative review verdicts.",
         "releasedAt": "2026-07-27T05:43:29.793Z"
+      },
+      {
+        "writerId": "agent-pan-3187",
+        "agentId": "agent-pan-3187",
+        "pid": 2672575,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:45:12.140Z",
+        "itemId": "docs-intent-lifecycle-and-settling",
+        "outcome": "completed",
+        "reason": "Documented seven-day review intent expiry, closed-issue cleanup, server-only dispatch, and the exact DoD terminal-settling and non-settling rules.",
+        "releasedAt": "2026-07-27T05:47:07.371Z"
       }
     ],
     "statusReasons": {
@@ -148,6 +151,10 @@
       "dod-terminal-settling-rows-1-2-3": {
         "reason": "Added tracker-closure and landed-work evidence to the DoD gate, settled absent non-negative verdicts, superseded negative test/verification verdicts only after green main verification, and preserved negative review verdicts.",
         "updatedAt": "2026-07-27T05:43:29.793Z"
+      },
+      "docs-intent-lifecycle-and-settling": {
+        "reason": "Documented seven-day review intent expiry, closed-issue cleanup, server-only dispatch, and the exact DoD terminal-settling and non-settling rules.",
+        "updatedAt": "2026-07-27T05:47:07.371Z"
       }
     }
   },
@@ -175,6 +182,8 @@
     "dod-terminal-settling-rows-1-2-3.dod-terminal-settling-rows-1-2-3.ac3": "completed",
     "dod-terminal-settling-rows-1-2-3.dod-terminal-settling-rows-1-2-3.ac4": "completed",
     "dod-terminal-settling-rows-1-2-3.dod-terminal-settling-rows-1-2-3.ac5": "completed",
-    "docs-intent-lifecycle-and-settling": "running"
+    "docs-intent-lifecycle-and-settling": "completed",
+    "docs-intent-lifecycle-and-settling.docs-intent-lifecycle-and-settling.ac1": "completed",
+    "docs-intent-lifecycle-and-settling.docs-intent-lifecycle-and-settling.ac2": "completed"
   }
 }
