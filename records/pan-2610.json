@@ -3814,20 +3814,21 @@
     }
   ],
   "created": "2026-07-12T22:50:33.242Z",
-  "updated": "2026-07-27T16:27:25.209Z",
+  "updated": "2026-07-27T16:28:09.153Z",
   "pipeline": {
     "issueId": "PAN-2610",
     "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "failed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T09:43:39.466Z",
+    "updatedAt": "2026-07-27T16:28:09.129Z",
     "reviewNotes": "Verification failed at typecheck",
     "verificationNotes": "Verification FAILED at typecheck (112ms):\n\nnpm error code ENOENT\nnpm error syscall open\nnpm error path /home/eltmon/Projects/overdeck/workspaces/package.json\nnpm error errno -2\nnpm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/home/eltmon/Projects/overdeck/workspaces/package.json'\nnpm error enoent This is related to npm not being able to find a file.\nnpm error enoent\nnpm error A complete log of this run can be found in: /home/eltmon/.npm/_logs/2026-07-13T02_52_19_616Z-debug-0.log\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2620",
-    "reviewSpawnedAt": "2026-07-13T02:52:15.760Z"
+    "reviewSpawnedAt": "2026-07-13T02:52:15.760Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T16:28:09.129Z"
   },
   "closeOut": {
     "usage": {
@@ -3881,7 +3882,87 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2620"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T16:28:09.151Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: failed",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-review",
+            "by": "conv-20260727-4876",
+            "at": "2026-07-27T16:27:59.782Z"
+          }
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: pending; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: failed; superseded because the tracker issue is closed, merged work is landed, and main verification passed",
+          "status": "skip"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Issue already closed on GitHub; 1 unmerged commit(s) remain on remote feature/pan-2610; PR #2617 MERGED at 2026-07-13T04:06:23Z",
+          "status": "pass",
+          "mergedAt": "2026-07-13T04:06:23Z",
+          "mergeCommit": "913a733af03c8eaabbbe9c5bba1ff7781049ac5f"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "8 check-runs concluded successfully on 913a733af03c8eaabbbe9c5bba1ff7781049ac5f",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit d44fa122 contains merge 913a733a",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 5 agent state directories; Preserved local branch strike/pan-2610 — not merged to main; Preserved remote branch strike/pan-2610 — not merged to main; Pruned 0 checkpoint ref(s) for agent-pan-2610, planning-pan-2610, strike-pan-2610; No specialist registry entries for PAN-2610"
+        }
+      ],
+      "accepted": [
+        "review"
+      ]
+    }
   },
   "harness": "codex",
   "model": "gpt-5.5",
