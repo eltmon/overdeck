@@ -1,0 +1,488 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-27T04:43:21Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3183: Boot-path writer batch-stops agents directly in the agents table, bypassing the event door — phantom running agents in the read model",
+    "updated": "2026-07-27T04:49:48.763Z"
+  },
+  "plan": {
+    "id": "pan-3183",
+    "title": "Boot-path writer batch-stops agents directly in the agents table, bypassing the event door — phantom running agents in the read model",
+    "status": "proposed",
+    "uid": "23d7627d-b04a-4090-a59c-fa6aebd60617",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-27T04:43:21Z",
+    "updated": "2026-07-27T04:49:48.763Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3183",
+        "label": "PAN-3183",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "agents",
+      "event-sourcing",
+      "read-model",
+      "boot",
+      "two-door",
+      "state-planes"
+    ],
+    "narratives": {
+      "Problem": "After the 2026-07-27 02:50Z reboot, 8 ancient agents rendered as RUNNING in the WS-snapshot read model while the agents table and REST /api/agents correctly said stopped. The batch stop at 02:52:14Z was a single-transaction INSERT OR REPLACE with zero domain events and zero lifecycle log lines — the signature of backfillAgentsSync (src/lib/overdeck/agents.ts:881), which reconciles running/starting agents to stopped against live tmux on the dashboard boot path via reconstructCacheAuto (read-model.ts:546, agent-state-service.ts:109). Because no agent.status_changed/agent.stopped event ever reached the event log, event-derived projections keep the pre-reboot 'running' events as the last word — phantom running agents.",
+      "Proposal": "Close the hole at the writer and harden the projection: (1) backfillAgentsSync reports markedStoppedIds and writes lifecycle log lines per flipped agent; (2) the legacy twin backfillAgentsFromStateJsonSync gets the same parity; (3) both dashboard boot callers of reconstructCacheAuto emit agent.status_changed (stopped, hasLiveTmuxSession:false) through the event store for each reported id; (4) mergeRuntimeBySequence gives a source-reconstructed stopped-without-tmux precedence over an event-folded running entry regardless of sequence; (5) a lint rule in scripts/lint-state-writes.sh fails the build on direct agents-table status mutations outside allowlisted door modules; (6) docs/AGENT-STATE-PLANES.md documents the invariant.",
+      "NonGoals": "- No redesign of the event store, read model, or two-door architecture\n- No frontend changes (RunningAgentsPill/Agents page read the store correctly once events exist)\n- No healing of historical phantom state (in-memory; corrects on next dashboard boot)\n- No changes to deacon stop paths (already emit via notifiers)\n- No change to the one-time v54→v55 schema migration semantics\n- No removal of the legacy src/lib/database/agent-backfill.ts module"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Emit stop events from the dashboard boot callers, not inside backfillAgentsSync",
+        "rationale": "The backfill also runs in CLI processes (pan admin db rebuild-agents) where no event store exists; making it emit would crash or silently no-op there. The backfill stays sync + dependency-free and instead reports markedStoppedIds; the dashboard callers own emission."
+      },
+      {
+        "summary": "Fix the legacy twin backfillAgentsFromStateJsonSync with parity reporting rather than deleting it",
+        "rationale": "Deletion needs its own no-loss audit of the v54→v55 migration path; parity reporting is a small change that closes the latent hole without touching migration semantics."
+      },
+      {
+        "summary": "Boot-reconcile stops emit agent.status_changed, not agent.stopped",
+        "rationale": "The status_changed reducer already strips pending-input fields on stop (PAN-1591) and carries previousStatus + hasLiveTmuxSession, matching the boot-reconcile fact pattern; agent.stopped carries user-stop semantics (stoppedByUser) that a boot reconcile must not set."
+      },
+      {
+        "summary": "All items requiresInspection:false",
+        "rationale": "Every change is a leaf with named tests that fail loudly on a wrong implementation (event emission, merge precedence, lint rule); no item lays an interface foundation another item depends on beyond the additive markedStoppedIds field, which typecheck pins down."
+      }
+    ],
+    "items": [
+      {
+        "id": "confirm-writer-and-audit-doors",
+        "title": "Confirm the 02:52:14Z writer from live evidence and audit all direct agents-table status writers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-27T04:43:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "spike",
+          "issueLabel": "pan-3183",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/audits/PAN-3183-agents-table-writers.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "sqlite3 ~/.overdeck/overdeck.db \"SELECT seq, type, timestamp FROM events WHERE timestamp BETWEEN '2026-07-27T02:51:00Z' AND '2026-07-27T02:53:00Z' ORDER BY seq\""
+          ],
+          "expected_outputs": [
+            "a query result showing no agent.* events in the window (confirming the bypass) or the events that exist"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Read-only live forensics, then a written audit. (1) Query the live ~/.overdeck/overdeck.db events table for the 2026-07-27 02:51–02:53Z window and confirm zero agent lifecycle events around the 02:52:14Z batch stop. (2) Check dashboard boot-timing log lines and desktop/supervisor logs for a dashboard instance that ran reconstruct before 02:52:34Z (desktop autostart spawn at login ~02:51:50Z that lost the port). Decision rule: if the process identity stays inconclusive, record that and proceed — items 2–6 fix every candidate found in code regardless. (3) No-loss audit: git grep the tree for every direct agents-table status mutation (INSERT OR REPLACE INTO agents, UPDATE agents, DELETE FROM agents) outside src/dashboard/server/services/agent-projection.ts and the AgentWriterService verbs in src/lib/overdeck/agents.ts, and write the resulting list (writer, file:line, emits events? y/n) to .pan/audits/PAN-3183-agents-table-writers.md in the workspace AND as a comment on the GitHub issue PAN-3183 — this list is the allowlist the lint item 6 encodes."
+        },
+        "items": [
+          {
+            "id": "confirm-writer-and-audit-doors.ac1",
+            "title": "Given the live overdeck.db, when the events table is queried for 02:51–02:53Z on 2026-07-27, then the result confirms whether any agent.* events exist in that window and the finding is recorded in the issue comment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "confirm-writer-and-audit-doors.ac2",
+            "title": "The audit comment on PAN-3183 enumerates every direct agents-table status writer in the tree with file:line and an emits-events yes/no, including backfillAgentsSync (src/lib/overdeck/agents.ts:907) and backfillAgentsFromStateJsonSync (src/lib/database/agent-backfill.ts:198)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "backfill-reports-marked-stopped",
+        "title": "backfillAgentsSync reports marked-stopped ids and writes lifecycle log lines per flipped agent",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:43:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3183",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/agents.ts",
+            "src/lib/reconstruct/reconstruct-cache.ts",
+            "src/cli/commands/db.ts",
+            "tests/unit/lib/overdeck/backfill-agents-fk.test.ts",
+            "tests/unit/lib/reconstruct/reconstruct-cache.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/backfill-agents-fk.test.ts tests/unit/lib/reconstruct/reconstruct-cache.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "named test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/overdeck/agents.ts backfillAgentsSync (~line 881): (1) collect { id, previousStatus } for every agent the reconcile flips to stopped into a new result field markedStoppedIds: Array<{ id: string; previousStatus: string }> on BackfillAgentsSyncResult (additive — processed/skipped/markedStopped stay). (2) In the same flip branch (~line 937-941), call logAgentLifecycleSync(state.id, `status changed: ${state.status} → stopped (boot backfill reconcile: no live tmux session)`) BEFORE mutating state.status, matching the format used by markAgentStopped in src/lib/agents/agent-state.ts:859; import logAgentLifecycleSync from ../persistent-logger.js. Keep the function synchronous and free of event-store imports (NFR-1). (3) In src/lib/reconstruct/reconstruct-cache.ts reconstructCache (~line 285): capture the backfill result and re-expose markedStoppedIds on ReconstructResult (additive field, default [] when absent). (4) src/cli/commands/db.ts rebuild-agents: keep current printed output; no new output required (NFR-2). Tests: extend or add a unit test that seeds a state.json with status running, stubs listLiveSessions to an empty set, runs backfillAgentsSync, and asserts (a) result.markedStoppedIds contains the id with previousStatus 'running', (b) logAgentLifecycleSync was called with the agent id and a message containing 'boot backfill reconcile'. Use the existing mock patterns in tests/unit/lib/overdeck/backfill-agents-fk.test.ts."
+        },
+        "items": [
+          {
+            "id": "backfill-reports-marked-stopped.ac1",
+            "title": "Given a state.json with status running and no live tmux session, when backfillAgentsSync runs, then its result's markedStoppedIds contains that agent id with previousStatus 'running'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backfill-reports-marked-stopped.ac2",
+            "title": "Given the same flip, when backfillAgentsSync runs, then logAgentLifecycleSync is called for that agent with a message containing 'boot backfill reconcile' before the row is upserted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backfill-reports-marked-stopped.ac3",
+            "title": "ReconstructResult's type includes markedStoppedIds, npm run typecheck completes without errors, and pan admin db rebuild-agents prints the same counts output shape as before (additive field only)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "legacy-backfill-parity",
+        "title": "Legacy backfillAgentsFromStateJsonSync gets the same marked-stopped reporting and lifecycle logging",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-27T04:43:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3183",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/database/agent-backfill.ts",
+            "tests/unit/lib/database/agent-backfill.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/database/agent-backfill.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-backfill test file passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Mirror item backfill-reports-marked-stopped in the legacy layer src/lib/database/agent-backfill.ts: (1) add markedStoppedIds: Array<{ id: string; previousStatus: string }> to BackfillAgentsResult; populate it in reconcileAgentStatus's caller branch (~line 227-230) where reconciled.status === 'stopped' && state.status !== 'stopped'. (2) Call logAgentLifecycleSync with the same 'boot backfill reconcile' message shape (import from ../persistent-logger.js — verify the module resolves from src/lib/database/; if the import graph would create a cycle, inline the same message via the logger the module already uses, and note the deviation in the commit message). Do NOT change the v54→v55 migration caller in src/lib/database/schema.ts:1611 beyond what typecheck requires. Tests: extend tests/unit/lib/database/agent-backfill.test.ts with the same two assertions as item 2."
+        },
+        "items": [
+          {
+            "id": "legacy-backfill-parity.ac1",
+            "title": "Given a running agent with no live session, when backfillAgentsFromStateJsonSync runs, then its result's markedStoppedIds contains the id with the previous status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "legacy-backfill-parity.ac2",
+            "title": "Given the same flip, when the legacy backfill runs, then a lifecycle log line containing 'boot backfill reconcile' is written for the agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "boot-callers-emit-stop-events",
+        "title": "Dashboard boot callers emit agent.status_changed for each backfill-marked stop",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:43:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3183",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/read-model.ts",
+            "src/dashboard/server/services/agent-state-service.ts",
+            "tests/unit/dashboard/server/reconstruct-boot.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/reconstruct-boot.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reconstruct-boot test file passes including the new emission assertions",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Wire FR-1's report into the event door at both dashboard boot call sites. (1) src/dashboard/server/read-model.ts bootstrap (~line 546-553): after reconstructCacheAuto() resolves, for each entry in result.markedStoppedIds append an agent.status_changed event { payload: { agentId: id, status: 'stopped', previousStatus, hasLiveTmuxSession: false }, timestamp: new Date().toISOString() } via the event store (getEventStore()/appendAsync) — inside the SAME try/catch pattern the bootstrap already uses for the event store (~line 562-573), so a store failure never aborts boot. (2) src/dashboard/server/services/agent-state-service.ts seedFromSources (~line 109-125): after reconstructCacheAuto() resolves, emit the same per-id events through the service's own store.appendAsync before/while merging the seeded map, so the event fold and the durable log agree. Do not emit for agents whose id is absent from the seeded map (defensive: nothing was actually flipped for them). Events must be durable before bootstrap continues (await, not fire-and-forget) — this is what makes the next replay window correct. Tests: extend tests/unit/dashboard/server/reconstruct-boot.test.ts (or the agent-state-service test file if one exists — check tests/unit/dashboard/server/services/) with: given reconstructCacheAuto stubbed to return markedStoppedIds [{id:'agent-x', previousStatus:'running'}], when bootstrap/seed runs, then the event store receives one agent.status_changed with status 'stopped', previousStatus 'running', hasLiveTmuxSession false."
+        },
+        "items": [
+          {
+            "id": "boot-callers-emit-stop-events.ac1",
+            "title": "Given reconstructCacheAuto returns markedStoppedIds [{id, previousStatus:'running'}], when the read-model bootstrap runs, then the event store durably appends an agent.status_changed with status 'stopped' and hasLiveTmuxSession false for that id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-callers-emit-stop-events.ac2",
+            "title": "Given the same stub, when AgentStateService seedFromSources runs, then store.appendAsync receives the same agent.status_changed event before the seeded map merge completes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-callers-emit-stop-events.ac3",
+            "title": "Given the event store throws during emission, when bootstrap runs, then boot continues and the failure is logged, not thrown (idempotent self-heal on next boot)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runtime-merge-table-wins",
+        "title": "mergeRuntimeBySequence gives source-reconstructed stopped-without-tmux precedence over event-folded running",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:43:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3183",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/agent-state-service.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-state-service tests pass including both merge directions",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/agent-state-service.ts mergeRuntimeBySequence (~line 160-178): before the sequence comparison, add the table-wins branch — when the reconstructed entry has status 'stopped' AND no live tmux session (use the same liveness signal the snapshot carries, e.g. hasLiveTmuxSession === false / tmuxActive false — inspect AgentRuntimeSnapshot fields in packages/contracts/src/types.ts and use the existing one; do not add a new field), the reconstructed entry wins even if the current event-folded entry says running/starting with a higher sequence. All other pairs keep the existing currentSeq >= reconSeq rule. Tests: add a unit test file for mergeRuntimeBySequence (or extend the existing agent-state-service test) covering: (a) reconstructed stopped + no tmux vs current running seq 726958 → merged holds stopped; (b) reconstructed stopped vs current running WITH live tmux → current (running) wins, because a live session outranks a stale table row; (c) both running → existing sequence rule unchanged."
+        },
+        "items": [
+          {
+            "id": "runtime-merge-table-wins.ac1",
+            "title": "Given a current event-folded running entry with high sequence and a reconstructed stopped entry with no live tmux session, when mergeRuntimeBySequence merges, then the merged map holds stopped for that agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-merge-table-wins.ac2",
+            "title": "Given a reconstructed stopped entry but a current running entry WITH a live tmux session, when merged, then the current running entry wins (live session outranks stale table row)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-merge-table-wins.ac3",
+            "title": "Given both entries running with different sequences, when merged, then the existing sequence comparison decides (regression guard)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lint-guard-agents-status-writes",
+        "title": "Lint guard fails direct agents-table status mutations outside the allowlisted doors",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:43:21Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3183",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-state-writes.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-state-writes.sh",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint-state-writes.sh exits 0 on the clean tree",
+            "npm run lint completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend scripts/lint-state-writes.sh with a new rule (follow the existing Rule-1/Rule-2 shape, including the comment_filter and git-grep path-exclusion pattern): git grep -nE for 'INSERT OR REPLACE INTO agents', 'INSERT INTO agents', 'UPDATE agents', 'DELETE FROM agents' under src/ and packages/, excluding __tests__/.test. files and an allowlist of door modules: src/lib/overdeck/agents.ts, src/lib/overdeck/agent-state-sync.ts, src/lib/overdeck/agent-record-sync.ts, src/lib/database/agents-db.ts, src/lib/database/agent-backfill.ts, src/lib/database/schema.ts (DDL + one-time migration), src/dashboard/server/services/agent-projection.ts. Any hit outside the allowlist fails the script with a message naming the door modules. First run the grep manually and reconcile every hit against the item-1 audit: any legitimate writer found that is missing from this allowlist must be added WITH a comment justifying it, or re-routed through a door in this item (do not silently allowlist a bypass). Verify: (1) script exits 0 on the clean tree; (2) temporarily inject a violating line into a non-allowlisted src file, confirm the script exits 1 and names the file, then revert the injection (do not commit the violation)."
+        },
+        "items": [
+          {
+            "id": "lint-guard-agents-status-writes.ac1",
+            "title": "Given the clean tree, when scripts/lint-state-writes.sh runs, then it exits 0 and npm run lint stays green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-guard-agents-status-writes.ac2",
+            "title": "Given an injected 'UPDATE agents' line in a non-allowlisted src file, when the script runs, then it exits 1 and names the violating file (verified live, then reverted before commit)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-guard-agents-status-writes.ac3",
+            "title": "grep of scripts/lint-state-writes.sh shows one comment line per allowlisted module stating why it is a door, and the allowlist matches the item-1 audit list posted on PAN-3183",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-agent-state-planes-invariant",
+        "title": "docs/AGENT-STATE-PLANES.md documents the boot-path event-door invariant and the lint guard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-27T04:43:21Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3183",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/AGENT-STATE-PLANES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "npm run lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/AGENT-STATE-PLANES.md with a short subsection under the runtime-plane description stating the invariant: every agents-table status transition — including boot-path backfill reconciliation — must persist a matching agent.status_changed/agent.stopped domain event in the same boot, because event-derived projections (AgentStateService runtime map, frontend replay) treat the event log as their source of truth; a status write without an event produces phantom running agents (cite PAN-3183). Name the enforcement point: the agents-table rule in scripts/lint-state-writes.sh and its allowlisted door modules. Also state the precedence rule: when the table and an event-derived projection disagree at bootstrap/seed, the table wins for stopped-without-tmux entries. Keep it under ~15 lines; this is a durable doc, terse is correct. No Mintlify page change (internal invariant, not user-facing)."
+        },
+        "items": [
+          {
+            "id": "docs-agent-state-planes-invariant.ac1",
+            "title": "docs/AGENT-STATE-PLANES.md contains a subsection stating that boot-path agents-table status writes must persist a matching domain event, names scripts/lint-state-writes.sh as the enforcement, and cites PAN-3183",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agent-state-planes-invariant.ac2",
+            "title": "The same doc states the bootstrap precedence rule (table wins over event-derived projection for stopped-without-tmux entries)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "backfill-reports-marked-stopped",
+        "to": "boot-callers-emit-stop-events",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-merge-table-wins",
+        "to": "boot-callers-emit-stop-events",
+        "type": "blocks"
+      },
+      {
+        "from": "confirm-writer-and-audit-doors",
+        "to": "lint-guard-agents-status-writes",
+        "type": "informs"
+      },
+      {
+        "from": "confirm-writer-and-audit-doors",
+        "to": "backfill-reports-marked-stopped",
+        "type": "informs"
+      },
+      {
+        "from": "backfill-reports-marked-stopped",
+        "to": "legacy-backfill-parity",
+        "type": "suggests"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-27-PAN-3183-boot-path-writer-batch-stops-agents-directly-in-the-agents-table-bypassing-the-event-door-phantom-running-agents-in-the-read-model.xbrief.json"
+    }
+  },
+  "status": "proposed"
+}
