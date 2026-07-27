@@ -55,7 +55,7 @@
     "recordedAt": "2026-07-27T05:24:46.200Z"
   },
   "created": "2026-07-27T04:32:47.311Z",
-  "updated": "2026-07-27T05:35:49.358Z",
+  "updated": "2026-07-27T05:35:52.732Z",
   "pipeline": {
     "issueId": "PAN-3192",
     "reviewStatus": "blocked",
@@ -65,9 +65,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:25:06.787Z",
-    "updatedAt": "2026-07-27T05:35:48.522Z",
+    "updatedAt": "2026-07-27T05:35:52.721Z",
     "reviewNotes": "Frontend typecheck guard suppresses compiler failures and can report success without a completed tsc run",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3198",
+    "reviewedAtCommit": "81225321f64733263c8528bec63e395fc1799cd0",
     "reviewSpawnedAt": "2026-07-27T05:27:06.324Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -121,7 +122,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.778789,
-        "pricingAsOf": "2026-07-27T05:35:48.545Z"
+        "pricingAsOf": "2026-07-27T05:35:52.725Z"
       }
     },
     "merges": [
