@@ -2,7 +2,7 @@
   "issueId": "PAN-3194",
   "schemaVersion": 2,
   "created": "2026-07-27T04:42:41.037Z",
-  "updated": "2026-07-27T04:42:41.037Z",
+  "updated": "2026-07-27T04:42:43.954Z",
   "pipeline": {
     "issueId": "PAN-3194",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3194: Resume probes trust stored sessionId without verifying the transcript exists — missing JSONL crash-loops agents into troubled",
       "timestamp": "2026-07-27T04:42:41.037Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
