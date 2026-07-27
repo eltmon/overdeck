@@ -2,7 +2,7 @@
   "issueId": "PAN-2749",
   "schemaVersion": 2,
   "created": "2026-07-16T00:57:15.378Z",
-  "updated": "2026-07-16T00:57:15.378Z",
+  "updated": "2026-07-27T04:35:00.415Z",
   "pipeline": {
     "issueId": "PAN-2749",
     "reviewStatus": "pending",
@@ -18,6 +18,6 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol"
+  "harness": "claude-code",
+  "model": "claude-opus-5"
 }
