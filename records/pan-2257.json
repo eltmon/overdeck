@@ -40,7 +40,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T08:24:16.103Z",
+    "updatedAt": "2026-07-27T08:24:16.249Z",
     "inspectNotes": "Spec fidelity passed: the diff factors gate metadata into readSessionGateFields and applies troubled fields plus queued mail count to planning/work/strike and review/test/ship session nodes. Constraint compliance passed: no prohibited patterns or PRD constraint violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2281",
     "scopeDrift": {
@@ -167,7 +167,7 @@
       },
       "costAtCloseOut": {
         "usd": 8.431191,
-        "pricingAsOf": "2026-07-27T08:24:16.253Z"
+        "pricingAsOf": "2026-07-27T08:24:18.685Z"
       }
     },
     "merges": [
@@ -176,5 +176,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T10:06:21.823Z",
-  "updated": "2026-07-27T08:24:16.874Z"
+  "updated": "2026-07-27T08:24:18.690Z"
 }
