@@ -1,5 +1,6 @@
 import { Effect } from 'effect';
 
+import { readFeedbackAgentStates } from '../agents/agent-state-source.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { readIssueRecordSync, type PanIssueRecord } from '../pan-dir/record.js';
 import { updateIssueRecord } from '../pan-dir/record-update.js';
@@ -107,16 +108,13 @@ export async function resolveIssueFeedbackTarget(
     }
   }
 
-  try {
-    const { listOverdeckAgentStatesSync } = await import('../overdeck/agent-state-sync.js');
-    const registeredAgents = listOverdeckAgentStatesSync();
+  const registeredAgents = readFeedbackAgentStates();
+  if (registeredAgents) {
     for (const agent of registeredAgents) {
-      if (agent.issueId?.toUpperCase() !== normalizedIssue) continue;
+      if (agent.issueId.toUpperCase() !== normalizedIssue) continue;
       if (!isWorkFeedbackTarget(agent.id)) continue;
       if (await isLiveSession(agent.id)) return { agentId: agent.id };
     }
-  } catch {
-    // The agents table is a recovery tier; preserve the resurrection ladder if unavailable.
   }
 
   // PAN-2209 + PAN-2461 — resurrection-first delivery (operator directive 2026-07-11):

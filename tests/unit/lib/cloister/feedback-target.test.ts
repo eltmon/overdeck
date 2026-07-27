@@ -34,8 +34,8 @@ vi.mock('../../../../src/lib/pan-dir/record-update.js', () => ({
   updateIssueRecord: mockUpdateIssueRecord,
 }));
 
-vi.mock('../../../../src/lib/overdeck/agent-state-sync.js', () => ({
-  listOverdeckAgentStatesSync: mockListOverdeckAgentStatesSync,
+vi.mock('../../../../src/lib/agents/agent-state-source.js', () => ({
+  readFeedbackAgentStates: mockListOverdeckAgentStatesSync,
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({

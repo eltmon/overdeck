@@ -1,4 +1,5 @@
 import type { AgentState, Role } from '../agents.js';
+import { registerFeedbackAgentStateReader } from '../agents/agent-state-source.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getOverdeckDatabaseSync } from './infra.js';
 
@@ -259,6 +260,8 @@ export function listOverdeckAgentStatesSync(): AgentState[] {
     .all() as OverdeckAgentRow[];
   return rows.map(overdeckRowToAgentState);
 }
+
+registerFeedbackAgentStateReader(listOverdeckAgentStatesSync);
 
 export function saveOverdeckAgentStateSync(state: AgentState): void {
   const db = getOverdeckDatabaseSync();
