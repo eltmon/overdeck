@@ -22,6 +22,7 @@ import { agentStateToDbAgent } from './agent-mappers.js';
 import type { AgentState } from '../agents.js';
 import type { Agent as DbAgent } from './agents-db.js';
 import { readAgentHarnessModelRecordSync } from '../overdeck/agent-record-sync.js';
+import { logAgentLifecycleSync } from '../persistent-logger.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
 const VALID_ROLES = new Set<AgentState['role']>([
@@ -166,6 +167,7 @@ export interface BackfillAgentsResult {
   processed: number;
   skipped: number;
   markedStopped: number;
+  markedStoppedIds: Array<{ id: string; previousStatus: string }>;
 }
 
 /**
@@ -184,13 +186,13 @@ export function backfillAgentsFromStateJsonSync(
   const readHarnessModel = options?.readHarnessModel ?? readAgentHarnessModelRecordSync;
   let processed = 0;
   let skipped = 0;
-  let markedStopped = 0;
+  const markedStoppedIds: Array<{ id: string; previousStatus: string }> = [];
 
   let entries: string[] = [];
   try {
     entries = readdirSync(agentsDir);
   } catch {
-    return { processed, skipped, markedStopped };
+    return { processed, skipped, markedStopped: 0, markedStoppedIds };
   }
 
   const columns = Object.values(COLUMN_MAP);
@@ -225,9 +227,9 @@ export function backfillAgentsFromStateJsonSync(
       }
 
       const reconciled = reconcileAgentStatus(state, liveSessions);
-      if (reconciled.status === 'stopped' && state.status !== 'stopped') {
-        markedStopped++;
-      }
+      const reconciledStop = reconciled.status === 'stopped' && state.status !== 'stopped'
+        ? { id: state.id, previousStatus: state.status }
+        : undefined;
 
       // PAN-1919: prefer harness/model from the per-issue git-tracked record so
       // rebuild-agents sources from the travelling record, not machine-local state.
@@ -243,6 +245,7 @@ export function backfillAgentsFromStateJsonSync(
 
       const row = agentStateToDbAgent(effective);
       upsert.run(buildNamedParams(row));
+      if (reconciledStop) markedStoppedIds.push(reconciledStop);
       processed++;
 
       if (options?.verbose) {
@@ -252,8 +255,10 @@ export function backfillAgentsFromStateJsonSync(
   });
 
   tx();
-
-  return { processed, skipped, markedStopped };
+  for (const { id, previousStatus } of markedStoppedIds) {
+    logAgentLifecycleSync(id, `status changed: ${previousStatus} → stopped (boot backfill reconcile: no live tmux session)`);
+  }
+  return { processed, skipped, markedStopped: markedStoppedIds.length, markedStoppedIds };
 }
 
 function reconcileAgentStatus(
