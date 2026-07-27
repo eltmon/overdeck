@@ -206,7 +206,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T05:33:45.376Z",
+  "updated": "2026-07-27T05:42:42.422Z",
   "pipeline": {
     "issueId": "PAN-2876",
     "reviewStatus": "pending",
@@ -279,16 +279,8 @@
   "model": "claude-opus-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "frontend-agent-row-link": {
-        "writerId": "agent-pan-2876",
-        "agentId": "agent-pan-2876",
-        "pid": 1709926,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:32:47.312Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2876",
@@ -366,6 +358,17 @@
         "outcome": "completed",
         "reason": "Added a style-guide-conformant subagent rail with URL deep links, list/status/depth rows, full transcript timeline, close handling, and simultaneous flex layout beside the diff panel. Component tests, typecheck, lint, and isolated browser screenshots passed with no console errors.",
         "releasedAt": "2026-07-27T05:32:32.649Z"
+      },
+      {
+        "writerId": "agent-pan-2876",
+        "agentId": "agent-pan-2876",
+        "pid": 1709926,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:32:47.312Z",
+        "itemId": "frontend-agent-row-link",
+        "outcome": "completed",
+        "reason": "Threaded subagent lookup and open callbacks through the timeline, added a matching-only 'Open subagent transcript' action, and wired it to the shared URL selection used by the rail; full frontend tests and typecheck pass.",
+        "releasedAt": "2026-07-27T05:42:42.422Z"
       }
     ],
     "statusReasons": {
@@ -396,6 +399,10 @@
       "frontend-subagent-rail": {
         "reason": "Added a style-guide-conformant subagent rail with URL deep links, list/status/depth rows, full transcript timeline, close handling, and simultaneous flex layout beside the diff panel. Component tests, typecheck, lint, and isolated browser screenshots passed with no console errors.",
         "updatedAt": "2026-07-27T05:32:32.649Z"
+      },
+      "frontend-agent-row-link": {
+        "reason": "Threaded subagent lookup and open callbacks through the timeline, added a matching-only 'Open subagent transcript' action, and wired it to the shared URL selection used by the rail; full frontend tests and typecheck pass.",
+        "updatedAt": "2026-07-27T05:42:42.422Z"
       }
     }
   },
@@ -436,6 +443,9 @@
     "frontend-subagent-rail.frontend-subagent-rail.ac3": "completed",
     "frontend-subagent-rail.frontend-subagent-rail.ac4": "completed",
     "frontend-subagent-rail.frontend-subagent-rail.ac5": "completed",
-    "frontend-agent-row-link": "running"
+    "frontend-agent-row-link": "completed",
+    "frontend-agent-row-link.frontend-agent-row-link.ac1": "completed",
+    "frontend-agent-row-link.frontend-agent-row-link.ac2": "completed",
+    "frontend-agent-row-link.frontend-agent-row-link.ac3": "completed"
   }
 }
