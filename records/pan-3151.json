@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T10:27:59.657Z",
+  "updated": "2026-07-27T10:28:22.624Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -37,7 +37,7 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 8,
+    "sequence": 9,
     "claims": {
       "cycle-history-persistence": {
         "writerId": "agent-pan-3151",
@@ -45,13 +45,6 @@
         "pid": 1218459,
         "host": "eltmon-z790",
         "claimedAt": "2026-07-27T10:25:33.869Z"
-      },
-      "planning-prompt-guidance": {
-        "writerId": "agent-pan-3151",
-        "agentId": "agent-pan-3151",
-        "pid": 1395870,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T10:27:59.657Z"
       }
     },
     "claimHistory": [
@@ -87,6 +80,17 @@
         "outcome": "completed",
         "reason": "Added projected-surface lint rule with comprehensive tests",
         "releasedAt": "2026-07-27T10:27:54.053Z"
+      },
+      {
+        "writerId": "agent-pan-3151",
+        "agentId": "agent-pan-3151",
+        "pid": 1395870,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T10:27:59.657Z",
+        "itemId": "planning-prompt-guidance",
+        "outcome": "completed",
+        "reason": "Updated planning prompt with size thresholds",
+        "releasedAt": "2026-07-27T10:28:22.623Z"
       }
     ],
     "statusReasons": {
@@ -101,6 +105,10 @@
       "planning-size-lint": {
         "reason": "Added projected-surface lint rule with comprehensive tests",
         "updatedAt": "2026-07-27T10:27:54.053Z"
+      },
+      "planning-prompt-guidance": {
+        "reason": "Updated planning prompt with size thresholds",
+        "updatedAt": "2026-07-27T10:28:22.623Z"
       }
     }
   },
@@ -119,6 +127,8 @@
     "planning-size-lint.planning-size-lint.ac1": "completed",
     "planning-size-lint.planning-size-lint.ac2": "completed",
     "planning-size-lint.planning-size-lint.ac3": "completed",
-    "planning-prompt-guidance": "running"
+    "planning-prompt-guidance": "completed",
+    "planning-prompt-guidance.planning-prompt-guidance.ac1": "completed",
+    "planning-prompt-guidance.planning-prompt-guidance.ac2": "completed"
   }
 }
