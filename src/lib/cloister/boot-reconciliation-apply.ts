@@ -29,6 +29,10 @@ import {
 
 export type { BootReconciliationApplyResult, BootReconciliationOutcome, BootReconciliationOutcomeReason } from './boot-reconciliation-outcomes.js';
 
+export interface BootReconciliationApplyOptions {
+  origin?: 'operator' | 'auto';
+}
+
 const appliedBootReconciliationDecisions = new Set<string>();
 const emptyBootReconciliationApplyResult = (): BootReconciliationApplyResult => ({ resumed: [], outcomes: [], skipped: { workspace_missing: 0, merged: 0, completed: 0, other: 0 }, deferred: 0 });
 
@@ -40,7 +44,9 @@ function bootReconciliationDecisionKey(): string | null {
 
 export async function applyBootReconciliationDecision(
   deps: AutoResumeNotifierDeps,
+  opts: BootReconciliationApplyOptions = {},
 ): Promise<BootReconciliationApplyResult> {
+  const origin = opts.origin ?? 'auto';
   const decisionKey = bootReconciliationDecisionKey();
   if (!decisionKey) return emptyBootReconciliationApplyResult();
   if (appliedBootReconciliationDecisions.has(decisionKey)) {
@@ -56,6 +62,14 @@ export async function applyBootReconciliationDecision(
   }
 
   let candidates = listBootReconciliationCandidates();
+  if (origin === 'auto') {
+    const candidateCount = candidates.length;
+    candidates = candidates.filter((agent) => agent.stoppedByUser !== true);
+    const filteredCount = candidateCount - candidates.length;
+    if (filteredCount > 0) {
+      logDeaconEventSync(`applyBootReconciliationDecision: auto origin filtered ${filteredCount} stoppedByUser candidate(s)`);
+    }
+  }
   if (state.decision === 'per_agent') {
     candidates = candidates.filter((agent) => state.perAgent[agent.issueId] === 'resume');
   }
@@ -102,7 +116,11 @@ export async function applyBootReconciliationDecision(
 
     const result = await handleAgentStoppedEvent(
       agent.id,
-      { skipGlobalGates: true, context: 'boot-reconciliation' },
+      {
+        skipGlobalGates: true,
+        context: 'boot-reconciliation',
+        ...(origin === 'operator' ? { overrideStoppedByUser: true } : {}),
+      },
       deps,
     );
     if (result) {

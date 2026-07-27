@@ -615,6 +615,8 @@ interface HandleAgentStoppedOptions {
   skipGlobalGates?: boolean;
   /** Descriptive source for log messages. */
   context?: string;
+  /** Explicit operator resume_all may override a historical manual stop. */
+  overrideStoppedByUser?: boolean;
 }
 
 /**
@@ -627,7 +629,7 @@ export async function handleAgentStoppedEvent(
   opts: HandleAgentStoppedOptions = {},
   deps: AutoResumeNotifierDeps,
 ): Promise<string | null> {
-  const { skipGlobalGates = false, context = 'event' } = opts;
+  const { skipGlobalGates = false, context = 'event', overrideStoppedByUser = false } = opts;
   const state = getAgentStateSync(agentId);
   if (!state) {
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — no state`);
@@ -741,7 +743,9 @@ export async function handleAgentStoppedEvent(
     review?.verificationStatus === 'failed';
 
   const deliberatelyStopped = state.stoppedByUser === true;
-  if (deliberatelyStopped && !(handedOffViaDone && hasPendingReviewFeedback)) {
+  if (deliberatelyStopped && overrideStoppedByUser) {
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} resuming despite stoppedByUser — explicit operator resume_all override`);
+  } else if (deliberatelyStopped && !(handedOffViaDone && hasPendingReviewFeedback)) {
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — deliberately stopped by user (stoppedByUser=true)`);
     return null;
   }
