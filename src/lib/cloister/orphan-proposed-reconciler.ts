@@ -114,6 +114,9 @@ export interface HandleOrphanProposedSpecOptions {
   project?: { projectKey: string; projectPath: string };
   /** Spec override so the safety net does not re-read the file. */
   spec?: { path: string; doc: XBriefDocument };
+  /** Liveness overrides for deterministic scans that already captured a snapshot. */
+  tmuxSessionNames?: readonly string[];
+  getAgentStateForIssue?: (agentId: string) => Promise<Pick<AgentState, 'status' | 'paused' | 'troubled'> | null>;
 }
 
 async function findSpecPathForIssue(projectPath: string, issueId: string): Promise<string | null> {
@@ -483,9 +486,9 @@ export async function handleOrphanProposedSpec(
   const agentId = `agent-${issueLower}`;
 
   // PAN-1908: prefer agents-table state (fast) but fall back to state.json.
-  const agentState = await Effect.runPromise(
-    getAgentState(agentId).pipe(Effect.catch(() => Effect.succeed(null))),
-  );
+  const agentState = options.getAgentStateForIssue
+    ? await options.getAgentStateForIssue(agentId)
+    : await Effect.runPromise(getAgentState(agentId).pipe(Effect.catch(() => Effect.succeed(null))));
   if (agentState?.status === 'starting' || agentState?.status === 'running') {
     logReconcilerDiagnostic('spawn-skipped', { issueId: upperIssueId, reason: 'agent-active' });
     return [];
@@ -496,7 +499,8 @@ export async function handleOrphanProposedSpec(
   }
 
   // Any tmux session for the issue means the pipeline is active here.
-  const sessions = await Effect.runPromise(listSessionNames().pipe(Effect.catch(() => Effect.succeed([]))));
+  const sessions = options.tmuxSessionNames
+    ?? await Effect.runPromise(listSessionNames().pipe(Effect.catch(() => Effect.succeed([]))));
   if (hasIssueScopedSession(sessions, agentId)) {
     logReconcilerDiagnostic('spawn-skipped', { issueId: upperIssueId, reason: 'issue-scoped-session' });
     return [];
@@ -622,6 +626,8 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
         config: { enabled: true, minAttemptIntervalMs: loadedConfig.minAttemptIntervalMs },
         project: { projectKey: candidate.projectKey, projectPath: candidate.projectPath },
         spec: { path: candidate.specPath, doc: planDoc },
+        tmuxSessionNames: options.tmuxSessionNames,
+        getAgentStateForIssue: options.getAgentStateForIssue,
       });
       actions.push(...result);
     }
