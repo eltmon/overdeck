@@ -53,9 +53,11 @@
       "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
       "src/dashboard/server/routes/workspaces/review-control.ts",
       "src/lib/cloister/__tests__/review-convergence.test.ts",
+      "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
       "src/lib/overdeck/infra.ts",
       "src/lib/review-status.ts",
-      "src/lib/xbrief/__tests__/quality-lint.test.ts"
+      "src/lib/xbrief/__tests__/quality-lint.test.ts",
+      "tests/unit/lib/pan-dir/verdict-restore.test.ts"
     ],
     "declaredScopeUntouched": [
       "src/dashboard/frontend/src/components/issue-view/useIssueView.ts",
@@ -112,6 +114,7 @@
       "src/lib/cloister/prompts/planning.md",
       "src/lib/cloister/review-convergence.ts",
       "src/lib/cloister/review-verdict-feedback.ts",
+      "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
       "src/lib/database/review-status-db.ts",
       "src/lib/database/schema.ts",
       "src/lib/overdeck/infra.ts",
@@ -124,12 +127,13 @@
       "src/lib/review-status.ts",
       "src/lib/xbrief/__tests__/quality-lint.test.ts",
       "src/lib/xbrief/quality-lint.ts",
+      "tests/unit/lib/pan-dir/verdict-restore.test.ts",
       "tests/unit/lib/review-findings.test.ts"
     ],
-    "recordedAt": "2026-07-27T11:53:26.358Z"
+    "recordedAt": "2026-07-27T11:56:05.744Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T11:56:02.646Z",
+  "updated": "2026-07-27T11:56:05.747Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "reviewing",
