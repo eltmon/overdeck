@@ -261,7 +261,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:31:50.984Z",
+  "updated": "2026-07-27T14:31:56.521Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
@@ -271,10 +271,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:31:50.083Z",
+    "updatedAt": "2026-07-27T14:31:56.511Z",
     "reviewNotes": "the v62 top-up makes two migration tests fail and is skipped again after the next schema-version bump",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
-    "reviewedAtCommit": "a2ee827fa70532ffd1d941afc332e13473318e33",
+    "reviewedAtCommit": "1a4b8b91f4d83cb2dda724be2292b1ccb85334b1",
     "reviewSpawnedAt": "2026-07-27T14:29:31.282Z"
   },
   "closeOut": {
@@ -341,7 +341,7 @@
       },
       "costAtCloseOut": {
         "usd": 217.3630693,
-        "pricingAsOf": "2026-07-27T14:31:50.101Z"
+        "pricingAsOf": "2026-07-27T14:31:56.516Z"
       }
     },
     "merges": [
