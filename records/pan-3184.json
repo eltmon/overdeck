@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T05:33:45.969Z",
+  "updated": "2026-07-27T05:35:44.324Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "docs-failsafe-amendment": {
-        "writerId": "agent-pan-3184",
-        "agentId": "agent-pan-3184",
-        "pid": 1799061,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:33:45.969Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3184",
@@ -148,6 +140,17 @@
         "outcome": "completed",
         "reason": "Held-banner visibility now uses server heldCount, operator-stopped rows default to hold, and countdown copy states clean-versus-crash expiry. Frontend tests pass via the frontend Vitest config because the root Vitest config excludes src/dashboard/frontend.",
         "releasedAt": "2026-07-27T05:33:27.549Z"
+      },
+      {
+        "writerId": "agent-pan-3184",
+        "agentId": "agent-pan-3184",
+        "pid": 1799061,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:33:45.969Z",
+        "itemId": "docs-failsafe-amendment",
+        "outcome": "completed",
+        "reason": "Documented PAN-3184 clean/crash/vacuous expiry policy in the fail-safe architecture and updated the startup config comment; typecheck passes.",
+        "releasedAt": "2026-07-27T05:35:44.324Z"
       }
     ],
     "statusReasons": {
@@ -178,6 +181,10 @@
       "banner-live-held": {
         "reason": "Held-banner visibility now uses server heldCount, operator-stopped rows default to hold, and countdown copy states clean-versus-crash expiry. Frontend tests pass via the frontend Vitest config because the root Vitest config excludes src/dashboard/frontend.",
         "updatedAt": "2026-07-27T05:33:27.549Z"
+      },
+      "docs-failsafe-amendment": {
+        "reason": "Documented PAN-3184 clean/crash/vacuous expiry policy in the fail-safe architecture and updated the startup config comment; typecheck passes.",
+        "updatedAt": "2026-07-27T05:35:44.324Z"
       }
     }
   },
@@ -211,6 +218,8 @@
     "banner-live-held.banner-live-held.ac1": "completed",
     "banner-live-held.banner-live-held.ac2": "completed",
     "banner-live-held.banner-live-held.ac3": "completed",
-    "docs-failsafe-amendment": "running"
+    "docs-failsafe-amendment": "completed",
+    "docs-failsafe-amendment.docs-failsafe-amendment.ac1": "completed",
+    "docs-failsafe-amendment.docs-failsafe-amendment.ac2": "completed"
   }
 }
