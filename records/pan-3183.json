@@ -24,15 +24,7 @@
       "timestamp": "2026-07-27T06:31:03.798Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T06:31:03Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3183\n\nBoot reconciliation treats failed event/upsert writes as committed transitions, so two-door drift can recur.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3183 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/server/services/boot-reconciled-stop-events.ts",
@@ -77,20 +69,19 @@
     "recordedAt": "2026-07-27T06:16:36.976Z"
   },
   "created": "2026-07-27T04:30:47.797Z",
-  "updated": "2026-07-27T06:31:08.688Z",
+  "updated": "2026-07-27T07:06:08.913Z",
   "pipeline": {
     "issueId": "PAN-3183",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T06:17:16.404Z",
-    "updatedAt": "2026-07-27T06:31:08.681Z",
+    "updatedAt": "2026-07-27T07:06:08.353Z",
     "reviewNotes": "Boot reconciliation treats failed event/upsert writes as committed transitions, so two-door drift can recur.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3201",
-    "reviewedAtCommit": "ef0ad673749eb895ca4613d028ed4f3c321f27ba",
     "reviewSpawnedAt": "2026-07-27T06:19:56.025Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -141,32 +132,32 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1210725,
-            "output": 135842,
-            "cacheRead": 17198080,
+            "input": 1217739,
+            "output": 136064,
+            "cacheRead": 17569792,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2579733,
-            "output": 194679,
-            "cacheRead": 115146240,
+            "input": 3890616,
+            "output": 241320,
+            "cacheRead": 157639680,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 3790458,
-          "output": 330521,
-          "cacheRead": 132344320,
+          "input": 5108355,
+          "output": 377384,
+          "cacheRead": 175209472,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 95.04008,
-        "pricingAsOf": "2026-07-27T06:31:08.685Z"
+        "usd": 124.468031,
+        "pricingAsOf": "2026-07-27T07:06:08.379Z"
       }
     },
     "merges": [
