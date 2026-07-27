@@ -18,7 +18,7 @@ describe('deploy queue', () => {
   });
 
   afterEach(() => {
-    rmSync(home, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
   });
 
   it('returns null when no pending deploy exists', async () => {
