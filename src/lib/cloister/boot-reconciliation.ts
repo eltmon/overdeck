@@ -78,10 +78,15 @@ function isRecentBootCandidate(agent: ReconciliationAgent): boolean {
   return newestTimestampMs >= bootStartedAtMs - maxAgeMs;
 }
 
-export function isCleanShutdownBoot(now: Date = new Date()): boolean {
+export function isCleanShutdownBoot(): boolean {
+  // Classify against boot start so grace extensions cannot age a clean marker into a crash.
+  const state = getBootReconciliationState();
+  const bootStartedAtMs = state.bootStartedAt == null ? NaN : Date.parse(state.bootStartedAt);
   const marker = getLastCleanShutdownAt();
   const markerMs = marker == null ? NaN : Date.parse(marker);
-  return Number.isFinite(markerMs) && now.getTime() - markerMs <= CLEAN_SHUTDOWN_FRESHNESS_MS;
+  return Number.isFinite(bootStartedAtMs)
+    && Number.isFinite(markerMs)
+    && bootStartedAtMs - markerMs <= CLEAN_SHUTDOWN_FRESHNESS_MS;
 }
 
 export function getBootReconciliationGraceSeconds(): number {

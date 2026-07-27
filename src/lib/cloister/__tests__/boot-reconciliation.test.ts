@@ -440,8 +440,8 @@ describe('boot reconciliation', () => {
     expect(onGraceExpired).toHaveBeenCalledTimes(1);
   });
 
-  it('expires to resume_all when the clean shutdown marker is fresh', async () => {
-    mocks.lastCleanShutdownAt = '2026-06-29T14:55:00.000Z';
+  it('expires to resume_all when the marker was fresh at boot but crosses the threshold during grace', async () => {
+    mocks.lastCleanShutdownAt = '2026-06-29T14:30:15.000Z';
     mocks.agents = [
       stoppedWorkAgent(testHome, 'agent-clean-boot', { workspace: workspacePath(testHome, 'clean-boot') }),
     ];
