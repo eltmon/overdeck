@@ -133,6 +133,7 @@ async function sweepProject(
 
   const shortSha = newSha.slice(0, 7);
   const newlyMarkedIssueIds: string[] = [];
+  let hadUnknownProbe = false;
 
   for (const issueId of issueIds) {
     const status = statuses[issueId];
@@ -140,7 +141,8 @@ async function sweepProject(
     if (!workspacePath) continue;
 
     const probe = await deps.probeConflictPaths(workspacePath, 'main');
-    if (probe.mergeability !== 'conflicts') continue; // clean: conflict-gate clears; unknown: NFR-2 no-op
+    if (probe.mergeability === 'unknown') { hadUnknownProbe = true; continue; }
+    if (probe.mergeability !== 'conflicts') continue; // clean: conflict-gate clears
     if (status.conflictsSince?.sha === newSha) continue; // dedup per main head (AC-3)
 
     const detectedAt = new Date(nowMs).toISOString();
@@ -169,7 +171,12 @@ async function sweepProject(
     actions.push(`Marked ${issueId} conflicting with main since ${shortSha}`);
   }
 
-  deps.setSetting(settingKey, newSha);
+  // NFR-2 / AC-4: an 'unknown' probe must not advance the stored main head —
+  // doing so would permanently skip that issue's re-probe at this SHA (the
+  // unchanged-head check above short-circuits every later sweep).
+  if (!hadUnknownProbe) {
+    deps.setSetting(settingKey, newSha);
+  }
 
   if (newlyMarkedIssueIds.length > 0) {
     const summaryMessage = `main ${shortSha} invalidated ${newlyMarkedIssueIds.length} branch(es): ${newlyMarkedIssueIds.join(', ')}`;

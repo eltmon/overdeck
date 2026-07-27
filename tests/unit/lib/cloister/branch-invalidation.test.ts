@@ -215,10 +215,33 @@ describe('reconcileBranchInvalidation', () => {
 
     expect(deps.setReviewStatus).not.toHaveBeenCalled();
     expect(deps.emitActivityEntry).not.toHaveBeenCalled();
-    // The new SHA is still recorded even though no issue was newly marked —
-    // this is not "preserving the stored SHA" in the ls-remote-failure sense,
-    // it is the normal per-sweep bookkeeping.
-    expect(deps.setSetting).toHaveBeenCalled();
+    // An unknown probe must not advance the stored SHA — otherwise the
+    // unchanged-head check permanently skips re-probing this issue at this head.
+    expect(deps.setSetting).not.toHaveBeenCalled();
+  });
+
+  it('does not advance the stored SHA when at least one issue in the project probes unknown, even if another was newly marked', async () => {
+    const clean = makeStatus({ issueId: 'PAN-1111' });
+    const unknown = makeStatus({ issueId: 'PAN-2222' });
+    const deps = makeDeps({
+      loadReviewStatuses: () => ({ 'PAN-1111': clean, 'PAN-2222': unknown }),
+      listAgentWorkspaces: () => [
+        { issueId: 'PAN-1111', workspace: '/projects/pan/workspaces/feature-pan-1111' },
+        { issueId: 'PAN-2222', workspace: '/projects/pan/workspaces/feature-pan-2222' },
+      ],
+      existsSync: () => true,
+      probeConflictPaths: vi.fn(async (workspacePath: string) =>
+        workspacePath.endsWith('1111')
+          ? { mergeability: 'conflicts' as const, paths: ['a.txt'] }
+          : { mergeability: 'unknown' as const, paths: [] },
+      ),
+    });
+
+    await reconcileBranchInvalidation(deps);
+
+    expect(deps.setReviewStatus).toHaveBeenCalledTimes(1);
+    expect(deps.setReviewStatus).toHaveBeenCalledWith('PAN-1111', expect.anything(), clean);
+    expect(deps.setSetting).not.toHaveBeenCalled();
   });
 
   it('produces zero writes and keeps the last-seen SHA when ls-remote fails', async () => {
