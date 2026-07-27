@@ -19,15 +19,7 @@
       "timestamp": "2026-07-27T05:37:52.314Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T05:37:52Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3191\n\nReconciler's fixed 100-row window permanently starves newer auto-merge rows and violates FR-2/FR-4\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3191 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -62,21 +54,21 @@
     "recordedAt": "2026-07-27T05:19:11.339Z"
   },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T05:56:57.666Z",
+  "updated": "2026-07-27T05:58:11.977Z",
   "pipeline": {
     "issueId": "PAN-3191",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:20:05.037Z",
-    "updatedAt": "2026-07-27T05:56:56.258Z",
+    "updatedAt": "2026-07-27T05:58:11.920Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
     "reviewedAtCommit": "4e70e23b3d350414e916d6a4fb3120eac6d9cf5f",
-    "reviewSpawnedAt": "2026-07-27T05:24:04.488Z",
+    "reviewSpawnedAt": "2026-07-27T05:58:11.918Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -124,24 +116,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1255949,
-            "output": 102840,
-            "cacheRead": 33047040,
+            "input": 1264793,
+            "output": 104428,
+            "cacheRead": 34687488,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2390752,
-          "output": 251164,
-          "cacheRead": 53930496,
+          "input": 2399596,
+          "output": 252752,
+          "cacheRead": 55570944,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 46.453928,
-        "pricingAsOf": "2026-07-27T05:56:57.661Z"
+        "usd": 47.366012,
+        "pricingAsOf": "2026-07-27T05:58:11.935Z"
       }
     },
     "merges": [
