@@ -7842,3 +7842,7 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - The dist-externals guard reported `20 external packages across 619 dist files, all declared` — **one fewer external than the previous build**, which is the effect-acp package now correctly bundled rather than externalised. **The guard's own number moved in the direction its fix predicted**, which is the cheapest possible confirmation the hotfix did what it claimed.
 - Queue lane clear again: nothing ready, no blockers, both trains idle.
 - **RUN TOTALS: 147 close-outs, 14 merges, 10 substrate bugs filed of which 7 fixed, merged and closed out.**
+
+## RUN-72 tick 49 (2026-07-27 20:35Z) — watch tick, unchanged
+- All three queues empty, **zero build drift**, live `2f3b92280609` current with HEAD a docs commit. Nothing actionable.
+- Queue lane has been clear since PAN-3206 closed; everything remaining belongs to the operator. Totals unchanged: 147 close-outs, 14 merges, 10 substrate bugs filed / 7 fixed and closed.
