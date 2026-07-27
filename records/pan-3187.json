@@ -16,31 +16,49 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T05:15:15.493Z",
+  "updated": "2026-07-27T05:15:23.692Z",
   "pipeline": {
     "issueId": "PAN-3187",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T05:09:30.686Z"
+    "updatedAt": "2026-07-27T05:15:23.672Z",
+    "inspectNotes": "Inspecting item age-out-stale-review-requests"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 688629,
+            "output": 11664,
+            "cacheRead": 4666368,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 688629,
+          "output": 11664,
+          "cacheRead": 4666368,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-27T05:09:30.706Z"
+        "usd": 6.126249,
+        "pricingAsOf": "2026-07-27T05:15:23.682Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 2,
