@@ -59,7 +59,7 @@
     "recordedAt": "2026-07-27T06:16:36.976Z"
   },
   "created": "2026-07-27T04:30:47.797Z",
-  "updated": "2026-07-27T06:16:49.862Z",
+  "updated": "2026-07-27T06:17:16.815Z",
   "pipeline": {
     "issueId": "PAN-3183",
     "reviewStatus": "pending",
@@ -70,7 +70,7 @@
     "readyForMerge": false,
     "updatedAt": "2026-07-27T06:16:49.710Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3201",
-    "reviewRequestedAt": "2026-07-27T06:16:39.709Z",
+    "reviewRequestedAt": "2026-07-27T06:17:16.404Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/server/services/boot-reconciled-stop-events.ts",
@@ -113,7 +113,8 @@
         "tests/unit/lib/reconstruct/reconstruct-cache.test.ts"
       ],
       "recordedAt": "2026-07-27T06:16:36.976Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-27T06:17:16.404Z"
   },
   "closeOut": {
     "usage": {
