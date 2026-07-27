@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T11:07:24.233Z",
+  "updated": "2026-07-27T11:11:02.569Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "branch-invalidation-docs": {
-        "writerId": "agent-pan-3154",
-        "agentId": "agent-pan-3154",
-        "pid": 3047705,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T11:07:24.233Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3154",
@@ -123,6 +115,17 @@
         "outcome": "completed",
         "reason": "Added notifyBranchInvalidated to branch-invalidation.ts, called from sweepProject for each newly-marked issue via resolveIssueFeedbackTarget: needsYou skipped silently (no second nudge channel for stopped agents), live target gets messageAgent(agentId, message, 'internal') naming the SHA and every conflicting path with pan sync-main rebase guidance. Dedup is structural via the existing conflictsSince.sha check. Threaded resolveFeedbackTarget/messageAgent through the deps interface for testability. 4 new/extended tests (AC-1/2/3 + folded-in assertions on the existing mark test) all pass; full cloister suite (818 tests) green; typecheck and lint clean.",
         "releasedAt": "2026-07-27T11:07:10.522Z"
+      },
+      {
+        "writerId": "agent-pan-3154",
+        "agentId": "agent-pan-3154",
+        "pid": 3047705,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T11:07:24.233Z",
+        "itemId": "branch-invalidation-docs",
+        "outcome": "completed",
+        "reason": "Added '## Branch invalidation sweep' section to docs/MERGE-WORKFLOW.md (after Single Merge Oracle) naming conflictsSince, branch_invalidation.main_head.<projectKey>, and reconcileBranchInvalidation, covering the watcher/probe/mark/notify/report/recovery flow. Extended docs/MERGE-TRAIN.md's supersession banner with a paragraph distinguishing the always-on notify-only sweep from the opt-in rebasing merge train. Added one CLAUDE.md sentence pointing at the sweep from the postMergeLifecycle idempotency section. Both verify_commands greps pass.",
+        "releasedAt": "2026-07-27T11:11:02.569Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +144,10 @@
       "invalidation-agent-notify": {
         "reason": "Added notifyBranchInvalidated to branch-invalidation.ts, called from sweepProject for each newly-marked issue via resolveIssueFeedbackTarget: needsYou skipped silently (no second nudge channel for stopped agents), live target gets messageAgent(agentId, message, 'internal') naming the SHA and every conflicting path with pan sync-main rebase guidance. Dedup is structural via the existing conflictsSince.sha check. Threaded resolveFeedbackTarget/messageAgent through the deps interface for testability. 4 new/extended tests (AC-1/2/3 + folded-in assertions on the existing mark test) all pass; full cloister suite (818 tests) green; typecheck and lint clean.",
         "updatedAt": "2026-07-27T11:07:10.522Z"
+      },
+      "branch-invalidation-docs": {
+        "reason": "Added '## Branch invalidation sweep' section to docs/MERGE-WORKFLOW.md (after Single Merge Oracle) naming conflictsSince, branch_invalidation.main_head.<projectKey>, and reconcileBranchInvalidation, covering the watcher/probe/mark/notify/report/recovery flow. Extended docs/MERGE-TRAIN.md's supersession banner with a paragraph distinguishing the always-on notify-only sweep from the opt-in rebasing merge train. Added one CLAUDE.md sentence pointing at the sweep from the postMergeLifecycle idempotency section. Both verify_commands greps pass.",
+        "updatedAt": "2026-07-27T11:11:02.569Z"
       }
     }
   },
@@ -165,6 +172,9 @@
     "invalidation-agent-notify.invalidation-agent-notify.ac1": "completed",
     "invalidation-agent-notify.invalidation-agent-notify.ac2": "completed",
     "invalidation-agent-notify.invalidation-agent-notify.ac3": "completed",
-    "branch-invalidation-docs": "running"
+    "branch-invalidation-docs": "completed",
+    "branch-invalidation-docs.branch-invalidation-docs.ac1": "completed",
+    "branch-invalidation-docs.branch-invalidation-docs.ac2": "completed",
+    "branch-invalidation-docs.branch-invalidation-docs.ac3": "completed"
   }
 }
