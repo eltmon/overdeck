@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   graceSeconds: 30,
   maxCandidateAgeSeconds: 60 as number | undefined,
   noResumeActive: false,
+  lastCleanShutdownAt: null as string | null,
   logDeaconEventSync: vi.fn(),
   bootState: {
     decision: null as 'pending' | 'resume_all' | 'hold_all' | 'per_agent' | null,
@@ -79,6 +80,7 @@ vi.mock('../../review-status.js', () => ({
 
 vi.mock('../../overdeck/control-settings.js', () => ({
   getBootReconciliationState: vi.fn(() => ({ ...mocks.bootState })),
+  getLastCleanShutdownAt: vi.fn(() => mocks.lastCleanShutdownAt),
   setBootReconciliationDecision: vi.fn((decision, perAgent = {}) => {
     mocks.bootState.decision = decision;
     mocks.bootState.perAgent = perAgent;
@@ -156,6 +158,7 @@ describe('boot reconciliation', () => {
     mocks.graceSeconds = 30;
     mocks.maxCandidateAgeSeconds = 60;
     mocks.noResumeActive = false;
+    mocks.lastCleanShutdownAt = null;
     mocks.logDeaconEventSync.mockClear();
     mocks.bootState = {
       decision: null,
@@ -400,8 +403,9 @@ describe('boot reconciliation', () => {
     expect(getBootReconciliationState().decision).toBe('pending');
   });
 
-  it('stamps pending state and flips to hold_all when the grace timer expires', async () => {
+  it('stamps pending state and flips to hold_all when a crash boot grace timer expires', async () => {
     const onGraceExpired = vi.fn();
+    mocks.lastCleanShutdownAt = null;
     mocks.agents = [
       stoppedWorkAgent(testHome, 'agent-pan-2076', { workspace: workspacePath(testHome, 'workspace') }),
     ];
@@ -430,12 +434,45 @@ describe('boot reconciliation', () => {
     await vi.advanceTimersByTimeAsync(30_000);
 
     expect(getBootReconciliationState().decision).toBe('hold_all');
+    expect(mocks.logDeaconEventSync).toHaveBeenCalledWith(
+      'boot reconciliation grace expired — no clean shutdown marker (crash boot), decision set to hold_all',
+    );
     expect(onGraceExpired).toHaveBeenCalledTimes(1);
   });
 
+  it('expires to resume_all when the clean shutdown marker is fresh', async () => {
+    mocks.lastCleanShutdownAt = '2026-06-29T14:55:00.000Z';
+    mocks.agents = [
+      stoppedWorkAgent(testHome, 'agent-clean-boot', { workspace: workspacePath(testHome, 'clean-boot') }),
+    ];
+
+    startBootReconciliation({ bootId: 'boot-clean', now: BASE_TIME });
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(getBootReconciliationState().decision).toBe('resume_all');
+    expect(mocks.logDeaconEventSync).toHaveBeenCalledWith(
+      'boot reconciliation grace expired — clean shutdown within 30m, decision set to resume_all',
+    );
+  });
+
+  it('expires to hold_all when the clean shutdown marker is stale', async () => {
+    mocks.lastCleanShutdownAt = '2026-06-29T14:15:00.000Z';
+    mocks.agents = [
+      stoppedWorkAgent(testHome, 'agent-stale-marker', { workspace: workspacePath(testHome, 'stale-marker') }),
+    ];
+
+    startBootReconciliation({ bootId: 'boot-stale-marker', now: BASE_TIME });
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(getBootReconciliationState().decision).toBe('hold_all');
+    expect(mocks.logDeaconEventSync).toHaveBeenCalledWith(
+      'boot reconciliation grace expired — no clean shutdown marker (crash boot), decision set to hold_all',
+    );
+  });
+
   // PAN-3052: the boot dialog is the only surface on a deadline and expiry commits
-  // hold_all, so an operator answering a different blocking question must not lose
-  // the window. The extend door buys time; the cap keeps it bounded.
+  // the classified default, so an operator answering a different blocking question
+  // must not lose the window. The extend door buys time; the cap keeps it bounded.
   describe('grace extension while another dialog holds the operator', () => {
     function startPendingBoot(onGraceExpired = vi.fn()) {
       mocks.agents = [

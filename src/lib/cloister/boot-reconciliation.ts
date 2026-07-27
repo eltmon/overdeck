@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import {
   type BootReconciliationDecision,
   getBootReconciliationState,
+  getLastCleanShutdownAt,
   setBootReconciliationDecision,
   setBootReconciliationGrace,
   stampBootReconciliation,
@@ -17,6 +18,7 @@ import { isExplicitNoResumeRequest } from './no-resume-mode.js';
 import { bootReconciliationSkipReason } from './boot-reconciliation-predicates.js';
 
 export const DEFAULT_BOOT_RECONCILIATION_GRACE_SECS = 120;
+export const CLEAN_SHUTDOWN_FRESHNESS_MS = 30 * 60 * 1000;
 
 /**
  * How many times the grace window may be pushed out because the operator is
@@ -74,6 +76,12 @@ function isRecentBootCandidate(agent: ReconciliationAgent): boolean {
   if (!Number.isFinite(bootStartedAtMs) || newestTimestampMs == null) return false;
   const maxAgeMs = getBootReconciliationMaxCandidateAgeSeconds() * 1000;
   return newestTimestampMs >= bootStartedAtMs - maxAgeMs;
+}
+
+export function isCleanShutdownBoot(now: Date = new Date()): boolean {
+  const marker = getLastCleanShutdownAt();
+  const markerMs = marker == null ? NaN : Date.parse(marker);
+  return Number.isFinite(markerMs) && now.getTime() - markerMs <= CLEAN_SHUTDOWN_FRESHNESS_MS;
 }
 
 export function getBootReconciliationGraceSeconds(): number {
@@ -219,8 +227,11 @@ export function armBootReconciliationGraceTimer(
       });
       return;
     }
-    setBootReconciliationDecision('hold_all');
-    logDeaconEventSync('boot reconciliation grace expired — decision set to hold_all');
+    const decision = isCleanShutdownBoot() ? 'resume_all' : 'hold_all';
+    setBootReconciliationDecision(decision);
+    logDeaconEventSync(decision === 'resume_all'
+      ? 'boot reconciliation grace expired — clean shutdown within 30m, decision set to resume_all'
+      : 'boot reconciliation grace expired — no clean shutdown marker (crash boot), decision set to hold_all');
     void Promise.resolve(onGraceExpired()).catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
       logDeaconEventSync(`boot reconciliation grace expiry apply hook failed: ${message}`);
