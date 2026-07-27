@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:32:47.311Z",
-  "updated": "2026-07-27T05:11:02.876Z",
+  "updated": "2026-07-27T05:11:14.148Z",
   "pipeline": {
     "issueId": "PAN-3192",
     "reviewStatus": "pending",
@@ -43,8 +43,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "frontend-types-ratchet-test": {
+        "writerId": "agent-pan-3192",
+        "agentId": "agent-pan-3192",
+        "pid": 73155,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:11:14.148Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3192",
@@ -89,6 +97,7 @@
     "wire-typecheck-gates": "completed",
     "wire-typecheck-gates.wire-typecheck-gates.ac1": "completed",
     "wire-typecheck-gates.wire-typecheck-gates.ac2": "completed",
-    "wire-typecheck-gates.wire-typecheck-gates.ac3": "completed"
+    "wire-typecheck-gates.wire-typecheck-gates.ac3": "completed",
+    "frontend-types-ratchet-test": "running"
   }
 }
