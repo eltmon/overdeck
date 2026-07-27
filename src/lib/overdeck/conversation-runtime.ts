@@ -898,12 +898,18 @@ export async function handleConversationResume(
       await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, canResume, harness);
       await waitForTmuxSession(conv.tmuxSession);
       await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
-      await deliverAgentMessage(
-        conv.tmuxSession,
-        `CONVERSATION RESUME: ${buildResumeContract(resumeCause)}`,
-        'conversation-resume',
-        resolveConversationDeliveryMethod(conv),
-      );
+      // Best-effort: the session is already respawned, so a delivery failure must not
+      // fail the resume itself.
+      try {
+        await deliverAgentMessage(
+          conv.tmuxSession,
+          `CONVERSATION RESUME: ${buildResumeContract(resumeCause)}`,
+          'conversation-resume',
+          resolveConversationDeliveryMethod(conv),
+        );
+      } catch (err: unknown) {
+        console.error(`[conversations] resume contract delivery failed for ${name}:`, err instanceof Error ? err.message : String(err));
+      }
       markConversationActive(name);
       return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });
     } catch (error) {
