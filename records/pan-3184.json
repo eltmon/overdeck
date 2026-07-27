@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T05:28:24.587Z",
+  "updated": "2026-07-27T05:33:27.550Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "banner-live-held": {
-        "writerId": "agent-pan-3184",
-        "agentId": "agent-pan-3184",
-        "pid": 1470021,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:28:24.587Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3184",
@@ -137,6 +129,17 @@
         "outcome": "completed",
         "reason": "GET boot reconciliation now exposes live heldCount, stoppedByUser row state, accurate operator-stop copy, and includes both work and strike candidates so the set matches the decision surface; route regressions pass.",
         "releasedAt": "2026-07-27T05:28:05.941Z"
+      },
+      {
+        "writerId": "agent-pan-3184",
+        "agentId": "agent-pan-3184",
+        "pid": 1470021,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:28:24.587Z",
+        "itemId": "banner-live-held",
+        "outcome": "completed",
+        "reason": "Held-banner visibility now uses server heldCount, operator-stopped rows default to hold, and countdown copy states clean-versus-crash expiry. Frontend tests pass via the frontend Vitest config because the root Vitest config excludes src/dashboard/frontend.",
+        "releasedAt": "2026-07-27T05:33:27.549Z"
       }
     ],
     "statusReasons": {
@@ -163,6 +166,10 @@
       "heldcount-route": {
         "reason": "GET boot reconciliation now exposes live heldCount, stoppedByUser row state, accurate operator-stop copy, and includes both work and strike candidates so the set matches the decision surface; route regressions pass.",
         "updatedAt": "2026-07-27T05:28:05.941Z"
+      },
+      "banner-live-held": {
+        "reason": "Held-banner visibility now uses server heldCount, operator-stopped rows default to hold, and countdown copy states clean-versus-crash expiry. Frontend tests pass via the frontend Vitest config because the root Vitest config excludes src/dashboard/frontend.",
+        "updatedAt": "2026-07-27T05:33:27.549Z"
       }
     }
   },
@@ -192,6 +199,9 @@
     "heldcount-route.heldcount-route.ac1": "completed",
     "heldcount-route.heldcount-route.ac2": "completed",
     "heldcount-route.heldcount-route.ac3": "completed",
-    "banner-live-held": "running"
+    "banner-live-held": "completed",
+    "banner-live-held.banner-live-held.ac1": "completed",
+    "banner-live-held.banner-live-held.ac2": "completed",
+    "banner-live-held.banner-live-held.ac3": "completed"
   }
 }
