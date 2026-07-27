@@ -4,17 +4,17 @@
     "created": "2026-07-27T04:50:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3194: Resume probes trust stored sessionId without verifying the transcript exists — missing JSONL crash-loops agents into troubled",
-    "updated": "2026-07-27T05:04:20.482Z"
+    "updated": "2026-07-27T08:24:26.403Z"
   },
   "plan": {
     "id": "pan-3194",
     "title": "Resume probes trust stored sessionId without verifying the transcript exists — missing JSONL crash-loops agents into troubled",
-    "status": "running",
+    "status": "completed",
     "uid": "3eddd972-77e3-41bf-bed5-34197b9f8839",
     "author": "agent:k3[1m]",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-27T04:50:00.000Z",
-    "updated": "2026-07-27T05:04:20.482Z",
+    "updated": "2026-07-27T08:24:26.403Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3194",
@@ -431,5 +431,5 @@
       "canonicalFilename": "2026-07-27-PAN-3194-resume-probes-trust-stored-sessionid-without-verifying-the-transcript-exists-missing-jsonl-crash-loops-agents-into-troubled.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
