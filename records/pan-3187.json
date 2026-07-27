@@ -73,7 +73,7 @@
     "recordedAt": "2026-07-27T06:31:44.584Z"
   },
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T06:45:49.991Z",
+  "updated": "2026-07-27T06:47:11.965Z",
   "pipeline": {
     "issueId": "PAN-3187",
     "reviewStatus": "blocked",
@@ -83,11 +83,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T06:45:49.969Z",
+    "updatedAt": "2026-07-27T06:47:11.934Z",
     "reviewNotes": "Tracker-open shadow-terminal issues are misclassified as tracker-closed, clearing review intent and waiving DoD rows.",
     "inspectNotes": "AC1-AC4 met and locked: pending/missing verdicts settle to skip only when trackerClosed && landedWork (dod-gate.ts:258); review negatives never supersede (id !== 'review' guard, dod-gate.ts:267); tests/verification negatives settle only on mainVerifyStatus==='pass'. AC5: every settled observed string prefixes the original ${observed}; evaluateDodGate computes merged then mainVerify then trackerClosed before the verdict Promise.all, locked by the call-order assertion. NOTE on AC5 wording: 'npx vitest run src/lib/lifecycle' exits 1 with 'No test files found' for ANY implementation — vitest include globs put the suite at tests/unit/lib/lifecycle, which runs 7 files / 137 passed / 1 skipped, exit 0. AC path is mis-specified, not an implementation defect. Sole production caller (workflows.ts:195) passes no deps override so it uses the real isIssueClosed with its 5-min cache; optional trackerClosed dep keeps pre-existing deps objects working.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3203",
-    "reviewedAtCommit": "5d73c3af09f91fe2b4ee6fbf78443aca89d304f2",
+    "reviewedAtCommit": "0a25021dd1f150bfc29235672bcb092938151f77",
     "reviewSpawnedAt": "2026-07-27T06:32:09.708Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -134,32 +134,32 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 617724,
-            "output": 60781,
-            "cacheRead": 16093696,
+            "input": 680170,
+            "output": 128543,
+            "cacheRead": 19260928,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2829625,
-            "output": 223976,
-            "cacheRead": 86092800,
+            "input": 3388421,
+            "output": 233891,
+            "cacheRead": 91726336,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 3447349,
-          "output": 284757,
-          "cacheRead": 102186496,
+          "input": 4068591,
+          "output": 362434,
+          "cacheRead": 110987264,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 76.872703,
-        "pricingAsOf": "2026-07-27T06:45:49.975Z"
+        "usd": 86.709607,
+        "pricingAsOf": "2026-07-27T06:47:11.944Z"
       }
     },
     "merges": [
