@@ -146,7 +146,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T11:58:39.975Z",
+  "updated": "2026-07-27T11:58:43.744Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -155,7 +155,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T11:58:39.973Z",
+    "updatedAt": "2026-07-27T11:58:43.711Z",
     "reviewNotes": "Verification failed at typecheck — fix and resubmit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "fcd59501d8a1e325be9872f32e4c1f9833f757f5",
@@ -270,10 +270,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2550,
-            "output": 104935,
-            "cacheRead": 61441192,
-            "cacheWrite": 2050808
+            "input": 2601,
+            "output": 106002,
+            "cacheRead": 62259062,
+            "cacheWrite": 2145365
           }
         }
       },
@@ -291,15 +291,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2550,
-          "output": 104935,
-          "cacheRead": 61441192,
-          "cacheWrite": 2050808
+          "input": 2601,
+          "output": 106002,
+          "cacheRead": 62259062,
+          "cacheWrite": 2145365
         }
       },
       "costAtCloseOut": {
-        "usd": 72.8262873,
-        "pricingAsOf": "2026-07-27T11:56:49.740Z"
+        "usd": 73.0316563,
+        "pricingAsOf": "2026-07-27T11:58:43.738Z"
       }
     },
     "merges": [
