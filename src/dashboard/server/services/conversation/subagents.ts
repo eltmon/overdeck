@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
-import type { SubagentSummary } from '@overdeck/contracts';
+import type { ConversationEvent, SubagentSummary } from '@overdeck/contracts';
 
 export type SubagentMeta = Omit<SubagentSummary, 'status'>;
 
@@ -85,4 +85,47 @@ export function subagentTranscriptPath(sessionFile: string, agentId: string): st
     return null;
   }
   return transcriptPath;
+}
+
+export interface SubagentListPoller {
+  refresh: () => Promise<void>;
+  stop: () => void;
+}
+
+export async function startSubagentListPolling(
+  sessionFile: string,
+  pendingToolUseIds: () => ReadonlySet<string>,
+  emit: (event: ConversationEvent) => void,
+): Promise<SubagentListPoller> {
+  let stopped = false;
+  let lastSerialized: string | null = null;
+  let refreshChain = Promise.resolve();
+
+  const refresh = (): Promise<void> => {
+    refreshChain = refreshChain.then(async () => {
+      if (stopped) return;
+      const pending = pendingToolUseIds();
+      const subagents: SubagentSummary[] = (await listSubagentMetas(sessionFile)).map((meta) => ({
+        ...meta,
+        status: pending.has(meta.toolUseId) ? 'running' : 'done',
+      }));
+      const serialized = JSON.stringify(subagents);
+      if (serialized === lastSerialized) return;
+      lastSerialized = serialized;
+      emit({ kind: 'subagents', subagents });
+    }).catch((error) => {
+      console.warn(`[conversation-subagents] Failed to refresh ${sessionFile}:`, error);
+    });
+    return refreshChain;
+  };
+
+  await refresh();
+  const interval = setInterval(() => void refresh(), 2_000);
+  return {
+    refresh,
+    stop: () => {
+      stopped = true;
+      clearInterval(interval);
+    },
+  };
 }

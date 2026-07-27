@@ -43,7 +43,7 @@ import { readWorkspaceFileEffect } from './services/read-workspace-file.js';
 import { resolveFilePathExistsEffect } from './services/resolve-file-path-exists.js';
 import { getHarnessBehavior } from '../../lib/runtimes/behavior.js';
 import { normalizeSessionsFeedFilter, toDiscoveredSessionSnapshot, toSessionsFeedRowSnapshot } from './services/sessions-feed-rpc.js';
-import { subagentTranscriptPath } from './services/conversation/subagents.js';
+import { startSubagentListPolling, subagentTranscriptPath } from './services/conversation/subagents.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -888,16 +888,8 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               return conversationDiscoveringStream();
             }
 
-            // Resolve the live session id from the launcher's pinned --session-id
-            // FIRST (ground truth — the exact session the running pane uses), then
-            // fall back to the conversations-table claudeSessionId. This mirrors
-            // resolveSessionFile() on the REST /messages path. Without it the live
-            // stream resolved ONLY via claudeSessionId, which the read door derives
-            // as the OLDEST conversation_files locator (`ORDER BY created_at ASC`).
-            // For a re-run singleton (e.g. the Backlog Sequencer) that oldest
-            // locator is a stale/never-written session, so the stream tailed a
-            // missing file and the panel showed the empty "How can I help you?"
-            // state even though the terminal showed the live run (PAN-1866).
+            // Prefer the launcher's pinned live session; the oldest stored locator
+            // can point at a stale file when singleton conversations re-run (PAN-1866).
             const launcherTmuxSession = conv.tmuxSession;
             const pinnedSessionId = launcherTmuxSession
               ? yield* Effect.promise(() => readLauncherPinnedSessionId(launcherTmuxSession))
@@ -977,6 +969,8 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                     compactBoundaries: initial.compactBoundaries && initial.compactBoundaries.length > 0 ? initial.compactBoundaries : undefined,
                     contextUsage: currentContextUsage,
                   });
+                  let pendingSubagentToolUseIds = new Set(initial.pendingToolUse.keys());
+                  const subagentPoller = input.agentId ? null : await startSubagentListPolling(sessionFile, () => pendingSubagentToolUseIds, offer);
 
                   // Watch only bytes written after the initial full parse. Subsequent
                   // events are deltas; the client merges them into its cache.
@@ -993,6 +987,8 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                     highWaterCount = gate.highWaterCount;
                     currentByteOffset = result.byteOffset;
                     currentContextUsage = contextUsageFromParseResult(result, model);
+                    pendingSubagentToolUseIds = new Set(result.pendingToolUse.keys());
+                    void subagentPoller?.refresh();
                     if (gate.suppressedShrink) {
                       console.warn(
                         `[conv-stream] suppressed shrinking reset for ${input.conversationName}: ` +
@@ -1012,7 +1008,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                     });
                   }, { byteOffset: initial.byteOffset, priorState });
 
-                  return handle;
+                  return { stop() { handle.stop(); subagentPoller?.stop(); } };
                 }),
                 (handle) =>
                   Effect.sync(() => {
