@@ -193,7 +193,7 @@ export function markMergingBlocked(id: number, reason: string): boolean {
 export function markMerged(id: number): boolean {
   const db = getOverdeckDatabaseSync();
   const result = db.prepare(
-    "UPDATE pending_auto_merges SET status = 'merged', merged_at = ? WHERE id = ? AND status = 'merging'",
+    "UPDATE pending_auto_merges SET status = 'merged', merged_at = ? WHERE id = ? AND status IN ('pending','blocked','failed','merging')",
   ).run(nowMillis(), id);
   return result.changes === 1;
 }

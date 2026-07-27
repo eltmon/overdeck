@@ -183,6 +183,28 @@ describe('markMerged', () => {
     expect(row.status).toBe('merged');
     expect(row.merged_at).toBeGreaterThan(0); // stored as integer millis
   });
+
+  it.each(['failed', 'blocked', 'pending'])('marks %s → merged and sets merged_at', (status) => {
+    const db = odb.raw();
+    seedIssue(db, 'PAN-1');
+    const id = seedPendingAutoMerge(db, { issueId: 'PAN-1', status });
+
+    expect(markMerged(id)).toBe(true);
+    const row = db.prepare('SELECT status, merged_at FROM pending_auto_merges WHERE id = ?').get(id) as any;
+    expect(row.status).toBe('merged');
+    expect(row.merged_at).toBeGreaterThan(0);
+  });
+
+  it.each(['merged', 'cancelled'])('preserves a row already in %s status', (status) => {
+    const db = odb.raw();
+    seedIssue(db, 'PAN-1');
+    const id = seedPendingAutoMerge(db, { issueId: 'PAN-1', status });
+    const before = db.prepare('SELECT status, merged_at FROM pending_auto_merges WHERE id = ?').get(id);
+
+    expect(markMerged(id)).toBe(false);
+    const after = db.prepare('SELECT status, merged_at FROM pending_auto_merges WHERE id = ?').get(id);
+    expect(after).toEqual(before);
+  });
 });
 
 describe('requeueToPending', () => {
