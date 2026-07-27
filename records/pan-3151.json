@@ -201,7 +201,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:52:41.982Z",
+  "updated": "2026-07-27T12:53:05.737Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "passed",
@@ -209,101 +209,19 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T12:52:41.951Z",
-    "reviewNotes": "cycle 9 correctly passes ReviewCycleEntry[] to the canonical writer with no new blocking findings",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-27T12:53:05.721Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-27T12:53:05.721Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "1e8831749ede8e830f99e7e5b51604ceda22bb19",
-    "reviewSpawnedAt": "2026-07-27T12:30:16.311Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "drizzle/overdeck/0000_overdeck_init.sql",
-        "scripts/file-size-allowlist.txt",
-        "src/dashboard/frontend/src/components/CommandDeck/SessionView/IssueHeader.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
-        "src/dashboard/server/routes/workspaces/review-control.ts",
-        "src/lib/cloister/__tests__/review-convergence.test.ts",
-        "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
-        "src/lib/overdeck/infra.ts",
-        "src/lib/review-status.ts",
-        "src/lib/xbrief/__tests__/quality-lint.test.ts",
-        "tests/unit/lib/pan-dir/verdict-restore.test.ts"
-      ],
-      "declaredScopeUntouched": [
-        "src/dashboard/frontend/src/components/issue-view/useIssueView.ts",
-        "src/lib/review-status-normalize.ts",
-        "tests/unit/lib/cloister/review-convergence.test.ts",
-        "tests/unit/lib/cloister/review-verdict-feedback.test.ts",
-        "tests/unit/lib/review-status-reconcile.test.ts",
-        "tests/unit/lib/xbrief/quality-lint.test.ts"
-      ],
-      "declaredScope": [
-        "CLAUDE.md",
-        "docs/REVIEW-AGENT-ARCHITECTURE.md",
-        "docs/XBRIEF.md",
-        "packages/contracts/src/types.ts",
-        "src/cli/commands/show.ts",
-        "src/dashboard/frontend/src/components/issue-view/derivations.ts",
-        "src/dashboard/frontend/src/components/issue-view/useIssueView.ts",
-        "src/dashboard/server/read-model.ts",
-        "src/lib/cloister/deacon-review-signals.ts",
-        "src/lib/cloister/prompts/planning.md",
-        "src/lib/cloister/review-convergence.ts",
-        "src/lib/cloister/review-verdict-feedback.ts",
-        "src/lib/database/review-status-db.ts",
-        "src/lib/database/schema.ts",
-        "src/lib/overdeck/review-status-record-sync.ts",
-        "src/lib/overdeck/review-status-sync.ts",
-        "src/lib/pan-dir/record.ts",
-        "src/lib/pan-dir/records.ts",
-        "src/lib/review-findings.ts",
-        "src/lib/review-status-normalize.ts",
-        "src/lib/review-status-reconcile.ts",
-        "src/lib/xbrief/quality-lint.ts",
-        "tests/unit/lib/cloister/review-convergence.test.ts",
-        "tests/unit/lib/cloister/review-verdict-feedback.test.ts",
-        "tests/unit/lib/review-findings.test.ts",
-        "tests/unit/lib/review-status-reconcile.test.ts",
-        "tests/unit/lib/xbrief/quality-lint.test.ts"
-      ],
-      "actualChangedFiles": [
-        "CLAUDE.md",
-        "docs/REVIEW-AGENT-ARCHITECTURE.md",
-        "docs/XBRIEF.md",
-        "drizzle/overdeck/0000_overdeck_init.sql",
-        "packages/contracts/src/types.ts",
-        "scripts/file-size-allowlist.txt",
-        "src/cli/commands/show.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/SessionView/IssueHeader.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
-        "src/dashboard/frontend/src/components/issue-view/derivations.ts",
-        "src/dashboard/server/read-model.ts",
-        "src/dashboard/server/routes/workspaces/review-control.ts",
-        "src/lib/cloister/__tests__/review-convergence.test.ts",
-        "src/lib/cloister/deacon-review-signals.ts",
-        "src/lib/cloister/prompts/planning.md",
-        "src/lib/cloister/review-convergence.ts",
-        "src/lib/cloister/review-verdict-feedback.ts",
-        "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
-        "src/lib/database/review-status-db.ts",
-        "src/lib/database/schema.ts",
-        "src/lib/overdeck/infra.ts",
-        "src/lib/overdeck/review-status-record-sync.ts",
-        "src/lib/overdeck/review-status-sync.ts",
-        "src/lib/pan-dir/record.ts",
-        "src/lib/pan-dir/records.ts",
-        "src/lib/review-findings.ts",
-        "src/lib/review-status-reconcile.ts",
-        "src/lib/review-status.ts",
-        "src/lib/xbrief/__tests__/quality-lint.test.ts",
-        "src/lib/xbrief/quality-lint.ts",
-        "tests/unit/lib/pan-dir/verdict-restore.test.ts",
-        "tests/unit/lib/review-findings.test.ts"
-      ],
-      "recordedAt": "2026-07-27T11:58:39.123Z"
-    }
+    "reviewSpawnedAt": "2026-07-27T12:30:16.311Z"
   },
   "closeOut": {
     "usage": {
@@ -326,10 +244,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 160,
-            "output": 33477,
-            "cacheRead": 15430896,
-            "cacheWrite": 253113
+            "input": 164,
+            "output": 35163,
+            "cacheRead": 15937975,
+            "cacheWrite": 255526
           }
         },
         "work": {
@@ -355,10 +273,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 160,
-          "output": 33477,
-          "cacheRead": 15430896,
-          "cacheWrite": 253113
+          "input": 164,
+          "output": 35163,
+          "cacheRead": 15937975,
+          "cacheWrite": 255526
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 3098,
@@ -368,8 +286,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 127.6298663,
-        "pricingAsOf": "2026-07-27T12:52:41.975Z"
+        "usd": 127.7541823,
+        "pricingAsOf": "2026-07-27T12:53:05.734Z"
       }
     },
     "merges": [
