@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T10:55:38.757Z",
+  "updated": "2026-07-27T11:00:22.924Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -37,16 +37,8 @@
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "dashboard-trend-display": {
-        "writerId": "agent-pan-3151",
-        "agentId": "agent-pan-3151",
-        "pid": 2705105,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T10:55:38.757Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3151",
@@ -121,6 +113,16 @@
         "itemId": "feedback-suppression",
         "outcome": "completed",
         "releasedAt": "2026-07-27T10:49:07.417Z"
+      },
+      {
+        "writerId": "agent-pan-3151",
+        "agentId": "agent-pan-3151",
+        "pid": 2705105,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T10:55:38.757Z",
+        "itemId": "dashboard-trend-display",
+        "outcome": "completed",
+        "releasedAt": "2026-07-27T11:00:22.923Z"
       }
     ],
     "statusReasons": {
@@ -172,6 +174,8 @@
     "feedback-suppression": "completed",
     "feedback-suppression.feedback-suppression.ac1": "completed",
     "feedback-suppression.feedback-suppression.ac2": "completed",
-    "dashboard-trend-display": "running"
+    "dashboard-trend-display": "completed",
+    "dashboard-trend-display.dashboard-trend-display.ac1": "completed",
+    "dashboard-trend-display.dashboard-trend-display.ac2": "completed"
   }
 }
