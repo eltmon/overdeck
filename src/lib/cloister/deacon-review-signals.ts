@@ -4,6 +4,7 @@ import { Effect } from 'effect';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { getAgentRuntimeStateSync, getAgentState, getAgentStateSync, saveAgentStateSync, type AgentState } from '../agents.js';
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
+import { findVerdictReport } from './review-verdict-report.js';
 import { AGENTS_DIR } from '../paths.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import type { HeadAnchor } from '../git-utils.js';
@@ -171,7 +172,7 @@ async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentSt
     // in 'reviewing' forever (observed 3× on 2026-07-13). Since reviewStatus
     // is still 'reviewing' here (guard above), fall through and land the
     // verdict deterministically instead of skipping.
-    const synthesisAlreadyWritten = existsSync(join(reviewDir, 'synthesis.md'));
+    const synthesisAlreadyWritten = findVerdictReport(reviewDir) !== null;
 
     const startedMs = Date.parse(state.startedAt);
     const readyLines: string[] = [];

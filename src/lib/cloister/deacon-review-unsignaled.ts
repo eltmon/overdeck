@@ -310,20 +310,22 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
 
       // Find the most recently modified review run directory
       let latestDir: string | null = null;
+      let latestReport: ReturnType<typeof findVerdictReport> = null;
       let latestMtime = 0;
       for (const entry of readdirSync(reviewBaseDir)) {
         if (!entry.startsWith(`agent-${issueId.toLowerCase()}-review`)) continue;
         const dirPath = join(reviewBaseDir, entry);
-        const synthPath = join(dirPath, 'synthesis.md');
-        if (!existsSync(synthPath)) continue;
-        const mtime = statSync(synthPath).mtimeMs;
+        const report = findVerdictReport(dirPath);
+        if (!report) continue;
+        const mtime = statSync(report.path).mtimeMs;
         if (!isSynthesisForActiveReviewRun(dirPath, status, mtime)) continue;
         if (mtime > latestMtime) {
           latestMtime = mtime;
           latestDir = dirPath;
+          latestReport = report;
         }
       }
-      if (!latestDir) continue;
+      if (!latestDir || !latestReport) continue;
 
       // Wait for synthesis to settle before intervening
       if (now - latestMtime < SYNTHESIS_SETTLE_MS) continue;
@@ -340,24 +342,14 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
         continue;
       }
 
-      const synthesisPath = join(latestDir, 'synthesis.md');
-      let verdict: 'passed' | 'blocked' | 'failed' | null = null;
-      let topBlocker = '';
+      let parsed: ReturnType<typeof parseVerdictReport>;
       try {
-        const content = readFileSync(synthesisPath, 'utf8');
-        const verdictLine = content.match(/## Verdict:\s*(.+)/i);
-        if (verdictLine) {
-          const v = verdictLine[1].trim().toUpperCase();
-          if (v === 'PASSED') verdict = 'passed';
-          else if (v === 'CHANGES REQUESTED') verdict = 'blocked';
-          else if (v === 'FAILED') verdict = 'failed';
-        }
-        const blockerMatch = content.match(/## Blocking Findings\s*\n\s*###\s*\[[^\]]+\]\s*(.+)/);
-        if (blockerMatch) topBlocker = blockerMatch[1].slice(0, 120);
+        parsed = parseVerdictReport(readFileSync(latestReport.path, 'utf8'));
       } catch {
         continue;
       }
-      if (!verdict) continue;
+      if (!parsed) continue;
+      const { verdict, topBlocker } = parsed;
 
       if (sessionAlive && !paneDead) {
         // If we already nudged once and 30+ min have passed with no signal,
@@ -365,21 +357,21 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
         if (lastNudged) {
           setReviewStatusSync(issueId, {
             reviewStatus: verdict,
-            reviewNotes: topBlocker || `Review auto-completed by deacon: ${verdict} (agent alive but unresponsive after nudge, synthesis exists)`,
+            reviewNotes: topBlocker || `Review auto-completed by deacon: ${verdict} (agent alive but unresponsive after nudge, ${latestReport.filename} exists)`,
           });
-          actions.push(`Auto-completed review for ${issueId}: ${verdict} (alive but unresponsive after nudge, synthesis written ${Math.round((now - latestMtime) / 60000)}min ago)`);
+          actions.push(`Auto-completed review for ${issueId}: ${verdict} (alive but unresponsive after nudge, ${latestReport.filename} written ${Math.round((now - latestMtime) / 60000)}min ago)`);
           console.log(`[deacon] Auto-completed review for ${issueId}: ${verdict} (alive but unresponsive after nudge)`);
           continue;
         }
 
         // Agent is alive but idle — nudge it to signal completion
-        const cmd = `pan admin specialists done review ${issueId} --status ${verdict}${verdict === 'blocked' || verdict === 'failed' ? ` --notes "${topBlocker || 'See synthesis.md'}"` : ''} --run-id "${basename(latestDir)}"`;
-        const nudge = `Your review synthesis is already written and saved. Your ONLY remaining task is to execute this Bash command immediately — do not analyze, do not summarize, do not ask questions, just run it:\n\n${cmd}\n\nRun this command NOW. Do not write any other response before executing it.`;
+        const cmd = `pan admin specialists done review ${issueId} --status ${verdict}${verdict === 'blocked' || verdict === 'failed' ? ` --notes "${topBlocker || `See ${latestReport.filename}`}"` : ''} --run-id "${basename(latestDir)}"`;
+        const nudge = `Your review verdict in ${latestReport.filename} is already written and saved. Your ONLY remaining task is to execute this Bash command immediately — do not analyze, do not summarize, do not ask questions, just run it:\n\n${cmd}\n\nRun this command NOW. Do not write any other response before executing it.`;
         try {
           const { messageAgent } = await import('../agents.js');
           await messageAgent(reviewSession, nudge);
           unsignaledReviewNudges.set(latestDir, now);
-          actions.push(`Nudged ${reviewSession} to signal ${verdict} (synthesis written ${Math.round((now - latestMtime) / 60000)}min ago)`);
+          actions.push(`Nudged ${reviewSession} to signal ${verdict} (${latestReport.filename} written ${Math.round((now - latestMtime) / 60000)}min ago)`);
           console.log(`[deacon] Nudged ${reviewSession} to signal ${verdict}`);
         } catch (err: unknown) {
           console.error(`[deacon] Failed to nudge ${reviewSession}:`, err instanceof Error ? err.message : String(err));
@@ -388,9 +380,9 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
         // Session is dead — auto-complete so the pipeline isn't blocked
         setReviewStatusSync(issueId, {
           reviewStatus: verdict,
-          reviewNotes: topBlocker || `Review auto-completed by deacon: ${verdict} (agent dead, synthesis exists)`,
+          reviewNotes: topBlocker || `Review auto-completed by deacon: ${verdict} (agent dead, ${latestReport.filename} exists)`,
         });
-        actions.push(`Auto-completed review for ${issueId}: ${verdict} (dead agent, synthesis written ${Math.round((now - latestMtime) / 60000)}min ago)`);
+        actions.push(`Auto-completed review for ${issueId}: ${verdict} (dead agent, ${latestReport.filename} written ${Math.round((now - latestMtime) / 60000)}min ago)`);
         console.log(`[deacon] Auto-completed review for ${issueId}: ${verdict} (dead agent)`);
       }
     }
