@@ -55,6 +55,7 @@ export interface ReviewStatus extends StrikeLandingStatus, InspectionStatusField
   reviewSpawnedAt?: string | number;
   reviewRequestedAt?: string;
   conflictResolutionDispatchedAt?: string;
+  conflictsSince?: { sha: string; detectedAt: string; paths: string[] };
   testRetryCount?: number;
   reviewRetryCount?: number;
   recoveryStartedAt?: string;

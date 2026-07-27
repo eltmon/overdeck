@@ -11,7 +11,7 @@ import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 61;
+export const SCHEMA_VERSION = 62;
 
 function tryIdempotentDdl(db: SqliteDatabase, targetVersion: number, statement: string): void {
   try {
@@ -249,6 +249,8 @@ export function initSchema(db: SqliteDatabase): void {
       review_spawned_at     TEXT,
       -- PAN-1765: timestamp when conflict resolution was dispatched
       conflict_resolution_dispatched_at TEXT,
+      -- PAN-3154: main-head SHA/paths that first made this branch conflict (JSON)
+      conflicts_since        TEXT,
       -- PAN-699: number of test-agent dispatch retries (circuit breaker)
       test_retry_count      INTEGER DEFAULT 0,
       -- PAN-794: parallel-review re-dispatch retry counter (scoped to current recovery cycle)
@@ -1719,6 +1721,11 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   // v60 -> v61: PAN-1491 store parsed affected v1.0 criteria on substrate bugs.
   if (currentVersion < 61) {
     tryIdempotentDdl(db, 61, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
+  }
+
+  // v61 -> v62: PAN-3154 record the main-head SHA/paths that first made a branch conflict.
+  if (currentVersion < 62) {
+    tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN conflicts_since TEXT');
   }
 
   // After all migrations, set the version
