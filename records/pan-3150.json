@@ -3,17 +3,16 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-26T17:59:50.911Z",
-  "updated": "2026-07-27T04:23:03.529Z",
+  "updated": "2026-07-27T04:54:53.067Z",
   "pipeline": {
     "issueId": "PAN-3150",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "mergeStatus": "merged",
     "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T04:23:03.300Z",
+    "updatedAt": "2026-07-27T04:54:53.036Z",
     "testNotes": "Skipped: issue is already merged",
     "lastVerifiedCommit": "cdf5101cb1713a5dcf7f3659d3ab6292e2e5a71f",
     "strikeLandingState": "landed",
@@ -40,7 +39,9 @@
         "outcome": "transport-failed",
         "detail": "Strike merge request failed: fetch failed"
       }
-    ]
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T04:54:53.036Z"
   },
   "closeOut": {
     "usage": {
@@ -52,7 +53,80 @@
       }
     },
     "merges": [],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T04:54:53.066Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed",
+          "observed": "verificationStatus: passed at cdf5101cb1713a5dcf7f3659d3ab6292e2e5a71f",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3153 MERGED at 2026-07-27T04:22:15Z",
+          "status": "pass",
+          "mergedAt": "2026-07-27T04:22:15Z",
+          "mergeCommit": "5df97422ee30811d7d870e3120b73ae40da5bd26"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "8 check-runs concluded successfully on 5df97422ee30811d7d870e3120b73ae40da5bd26",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 24d03cef contains merge 5df97422",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 4 agent state directories; Preserved local branch strike/pan-3150 — not merged to main; Preserved remote branch strike/pan-3150 — not merged to main; Pruned 83 checkpoint ref(s) for agent-pan-3150, planning-pan-3150, strike-pan-3150; No specialist registry entries for PAN-3150"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "claude-opus-5"
