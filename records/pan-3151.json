@@ -199,15 +199,7 @@
       "timestamp": "2026-07-27T14:44:14.434Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T14:44:14Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nforward compatibility is fixed, but current-version review_status repairs still leave 2 migration tests failing\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -296,21 +288,21 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:49:42.672Z",
+  "updated": "2026-07-27T14:49:44.728Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:49:41.131Z",
+    "updatedAt": "2026-07-27T14:49:44.261Z",
     "reviewNotes": "Agent re-review request (14/25): Fixed: schema repairs only run for SCHEMA_VERSION, and tests now create review_status table",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "3986d07bdd7a1a9d417581e7b3deec7773921746",
-    "reviewSpawnedAt": "2026-07-27T14:42:42.855Z"
+    "reviewSpawnedAt": "2026-07-27T14:49:44.260Z"
   },
   "closeOut": {
     "usage": {
@@ -376,7 +368,7 @@
       },
       "costAtCloseOut": {
         "usd": 247.0964103,
-        "pricingAsOf": "2026-07-27T14:49:42.669Z"
+        "pricingAsOf": "2026-07-27T14:49:44.369Z"
       }
     },
     "merges": [
