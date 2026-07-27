@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T04:54:38.480Z",
+  "updated": "2026-07-27T04:56:20.779Z",
   "pipeline": {
     "issueId": "PAN-3191",
     "reviewStatus": "pending",
@@ -38,18 +38,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "widen-markmerged-precondition": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3191",
         "agentId": "agent-pan-3191",
         "pid": 3186599,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T04:54:38.480Z"
+        "claimedAt": "2026-07-27T04:54:38.480Z",
+        "itemId": "widen-markmerged-precondition",
+        "outcome": "completed",
+        "reason": "Expanded markMerged to close pending, blocked, failed, and merging rows while preserving merged/cancelled rows; added passing regression coverage.",
+        "releasedAt": "2026-07-27T04:56:20.779Z"
+      }
+    ],
+    "statusReasons": {
+      "widen-markmerged-precondition": {
+        "reason": "Expanded markMerged to close pending, blocked, failed, and merging rows while preserving merged/cancelled rows; added passing regression coverage.",
+        "updatedAt": "2026-07-27T04:56:20.779Z"
       }
     }
   },
   "statusOverrides": {
-    "widen-markmerged-precondition": "running"
+    "widen-markmerged-precondition": "completed",
+    "widen-markmerged-precondition.widen-markmerged-precondition.ac1": "completed",
+    "widen-markmerged-precondition.widen-markmerged-precondition.ac2": "completed",
+    "widen-markmerged-precondition.widen-markmerged-precondition.ac3": "completed"
   }
 }
