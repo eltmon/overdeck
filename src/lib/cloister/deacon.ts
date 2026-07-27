@@ -1607,9 +1607,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
   return autoResumeStoppedWorkAgentsWithDeps(autoResumeNotifierDeps());
 }
 
-export async function applyBootReconciliationDecision(
-  opts: BootReconciliationApplyOptions = {},
-): Promise<BootReconciliationApplyResult> {
+export async function applyBootReconciliationDecision(opts: BootReconciliationApplyOptions = {}): Promise<BootReconciliationApplyResult> {
   return applyBootReconciliationDecisionWithDeps(autoResumeNotifierDeps(), opts);
 }
 
