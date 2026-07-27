@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T05:43:44.135Z",
+  "updated": "2026-07-27T05:44:55.492Z",
   "pipeline": {
     "issueId": "PAN-3187",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T05:43:44.111Z",
-    "inspectNotes": "Inspecting item dod-terminal-settling-rows-1-2-3"
+    "updatedAt": "2026-07-27T05:44:55.422Z",
+    "inspectNotes": "AC1-AC4 met and locked: pending/missing verdicts settle to skip only when trackerClosed && landedWork (dod-gate.ts:258); review negatives never supersede (id !== 'review' guard, dod-gate.ts:267); tests/verification negatives settle only on mainVerifyStatus==='pass'. AC5: every settled observed string prefixes the original ${observed}; evaluateDodGate computes merged then mainVerify then trackerClosed before the verdict Promise.all, locked by the call-order assertion. NOTE on AC5 wording: 'npx vitest run src/lib/lifecycle' exits 1 with 'No test files found' for ANY implementation — vitest include globs put the suite at tests/unit/lib/lifecycle, which runs 7 files / 137 passed / 1 skipped, exit 0. AC path is mis-specified, not an implementation defect. Sole production caller (workflows.ts:195) passes no deps override so it uses the real isIssueClosed with its 5-min cache; optional trackerClosed dep keeps pre-existing deps objects working."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1155922,
-            "output": 135262,
-            "cacheRead": 47347200,
+            "input": 1160078,
+            "output": 135392,
+            "cacheRead": 47819264,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1155922,
-          "output": 135262,
-          "cacheRead": 47347200,
+          "input": 1160078,
+          "output": 135392,
+          "cacheRead": 47819264,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 33.51107,
-        "pricingAsOf": "2026-07-27T05:43:44.121Z"
+        "usd": 33.771782,
+        "pricingAsOf": "2026-07-27T05:44:55.475Z"
       }
     },
     "merges": [],
