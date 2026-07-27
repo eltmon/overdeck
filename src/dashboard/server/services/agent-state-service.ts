@@ -28,6 +28,7 @@ import {
 } from '@overdeck/contracts';
 import type {
   AgentRuntimeSnapshot,
+  AgentSnapshot,
   DomainEvent,
 } from '@overdeck/contracts';
 import { initEventStore } from '../event-store.js';
@@ -114,7 +115,7 @@ export const AgentStateServiceLive = Layer.effect(
       const seeded = result.agentRuntimeById;
       if (Object.keys(seeded).length > 0) {
         yield* SubscriptionRef.update(ref, (current) =>
-          mergeRuntimeBySequence(current, seeded),
+          mergeRuntimeBySequence(current, seeded, result.agentsById),
         );
         yield* setAgentRuntimeMirror(yield* SubscriptionRef.get(ref));
         console.log(
@@ -157,15 +158,20 @@ export const AgentStateServiceLive = Layer.effect(
 
 // ─── Internals ────────────────────────────────────────────────────────────────
 
-function mergeRuntimeBySequence(
+export function mergeRuntimeBySequence(
   current: Record<string, AgentRuntimeSnapshot>,
   reconstructed: Record<string, AgentRuntimeSnapshot>,
+  reconstructedAgents: Record<string, AgentSnapshot>,
 ): Record<string, AgentRuntimeSnapshot> {
   const merged: Record<string, AgentRuntimeSnapshot> = { ...reconstructed };
   for (const [id, snap] of Object.entries(current)) {
     const recon = reconstructed[id];
     if (!recon) {
       merged[id] = snap;
+      continue;
+    }
+    const sourceAgent = reconstructedAgents[id];
+    if (recon.activity === 'stopped' && sourceAgent?.hasLiveTmuxSession === false) {
       continue;
     }
     const currentSeq = snap.updatedAtSequence ?? -1;
