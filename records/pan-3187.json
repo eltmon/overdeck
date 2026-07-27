@@ -2,7 +2,7 @@
   "issueId": "PAN-3187",
   "schemaVersion": 2,
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T04:31:45.772Z",
+  "updated": "2026-07-27T04:31:46.949Z",
   "pipeline": {
     "issueId": "PAN-3187",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3187: Review-status auto-dispatch floods on 11 wedged closed issues — stale reviewRequestedAt never ages out, CLI processes attempt handler-less dispatch",
       "timestamp": "2026-07-27T04:31:45.772Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
