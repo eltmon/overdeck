@@ -42,7 +42,7 @@ import {
   resolvePipelineTelemetryContext,
   type PipelineTelemetryContext,
 } from '../telemetry/pipeline.js';
-import { acceptFlagFor, BRANCH_ABSENT_MERGE_ERROR, DOD_ROWS, type DodGateResult } from './dod.js';
+import { acceptFlagFor, BRANCH_ABSENT_MERGE_ERROR, DOD_ROWS, type DodGateResult, type DodRowId } from './dod.js';
 
 const execAsync = promisify(exec);
 
@@ -192,11 +192,27 @@ export function closeOut(
     allSteps.push(uatEvidenceStep);
 
     // 1. Evaluate every pre-teardown Definition-of-Done row before any cleanup.
-    const dodGate = yield* Effect.promise(() => evaluateDodGate(ctx, {
-      acceptedRows: opts.dodAcceptedRows,
-      acceptedBy: opts.dodAcceptedBy,
-      verifyMerged: verifyBranchMergedImpl,
-    }));
+    // PAN-3211: an abandoned disposition skips the gate — the issue is leaving
+    // the pipeline on the operator's recorded note, not on landing evidence.
+    // Every row is recorded as skipped-with-reason so the durable audit shows
+    // the gate was deliberately not evaluated, never silently green.
+    const abandon = opts.abandonDisposition;
+    const dodGate: DodGateResult = abandon
+      ? {
+          rows: DOD_ROWS.map(row => ({
+            ...row,
+            status: 'skip' as const,
+            observed: `gate not evaluated — abandoned disposition recorded by ${abandon.by}: ${abandon.reason}`,
+          })),
+          misses: [] as DodRowId[],
+          accepted: [] as DodRowId[],
+          passed: true,
+        }
+      : yield* Effect.promise(() => evaluateDodGate(ctx, {
+          acceptedRows: opts.dodAcceptedRows,
+          acceptedBy: opts.dodAcceptedBy,
+          verifyMerged: verifyBranchMergedImpl,
+        }));
     for (const row of dodGate.rows) {
       const details = [`expected: ${row.expected}`, `observed: ${row.observed}`];
       if (row.acceptedBy) {
@@ -272,7 +288,9 @@ export function closeOut(
     // 6+7. Close issue + apply label
     const closeSteps = yield* closeIssue(ctx, {
       tracker: opts.tracker,
-      comment: ctx.auto ? 'Closed via automatic close-out ceremony' : 'Closed via close-out ceremony',
+      comment: abandon
+        ? `Closed without landing evidence — disposition recorded: ${abandon.reason}`
+        : ctx.auto ? 'Closed via automatic close-out ceremony' : 'Closed via close-out ceremony',
       applyLabel: true,
     });
     allSteps.push(...closeSteps);
@@ -284,7 +302,7 @@ export function closeOut(
     // 8. Mark durable pipeline terminal before clearing the DB cache.
     const markTerminal = yield* markPipelineClosedOutStep(ctx);
     allSteps.push(markTerminal);
-    const recordDodGate = yield* recordDodGateStep(ctx, dodGate);
+    const recordDodGate = yield* recordDodGateStep(ctx, dodGate, abandon);
     allSteps.push(recordDodGate);
     if (!recordDodGate.success) {
       allSteps.push(stepFailed('close-out:abort', 'Stopped — Definition-of-Done audit could not be persisted; review status preserved'));
@@ -326,7 +344,7 @@ function markPipelineClosedOutStep(ctx: LifecycleContext): Effect.Effect<StepRes
   );
 }
 
-function recordDodGateStep(ctx: LifecycleContext, dodGate: DodGateResult): Effect.Effect<StepResult> {
+function recordDodGateStep(ctx: LifecycleContext, dodGate: DodGateResult, abandonDisposition?: { reason: string; by: string }): Effect.Effect<StepResult> {
   const step = 'close-out:record-dod-gate';
   return Effect.tryPromise({
     try: async () => {
@@ -335,6 +353,7 @@ function recordDodGateStep(ctx: LifecycleContext, dodGate: DodGateResult): Effec
         evaluatedAt: new Date().toISOString(),
         rows: dodGate.rows,
         accepted: dodGate.accepted,
+        ...(abandonDisposition ? { disposition: abandonDisposition } : {}),
       });
       return stepOk(step, ['Recorded Definition-of-Done gate with 8 rows']);
     },

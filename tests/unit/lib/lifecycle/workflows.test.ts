@@ -361,7 +361,6 @@ describe('workflows', () => {
       });
       const tracker = successfulTracker();
       const result = await closeOut({ issueId: 'PAN-100', projectPath: testDir }, { tracker });
-
       expect(result.success).toBe(false);
       expect(result.steps.at(-1)).toMatchObject({
         step: 'close-out:dod-gate',
@@ -369,6 +368,37 @@ describe('workflows', () => {
       });
       expect(result.steps.some(step => step.step.startsWith('archive-planning:'))).toBe(false);
       expect(tracker.transitionIssue).not.toHaveBeenCalled();
+    });
+
+    it('skips the gate and records the disposition for an abandoned issue (PAN-3211)', async () => {
+      const tracker = successfulTracker();
+      const result = await closeOut(
+        { issueId: 'PAN-2794', projectPath: testDir },
+        { tracker, abandonDisposition: { reason: 'no landing evidence — closed without work', by: 'conv-test' } },
+      );
+
+      expect(result.success).toBe(true);
+      // The gate is never evaluated — every override would record fiction.
+      expect(mockEvaluateDodGate).not.toHaveBeenCalled();
+      // Every gate row is recorded skipped with the disposition note — never
+      // silently green. (The teardown row legitimately passes: teardown ran.)
+      const gateRows = result.dodGate?.rows.filter(row => row.id !== 'teardown') ?? [];
+      expect(gateRows.length).toBeGreaterThan(0);
+      expect(gateRows.every(row => row.status === 'skip')).toBe(true);
+      expect(gateRows[0]?.observed).toContain('abandoned disposition recorded by conv-test');
+      // The durable record carries the disposition beside the gate rows.
+      expect(mockWriteCloseOutDodGateSync).toHaveBeenCalledWith(
+        expect.anything(),
+        'PAN-2794',
+        expect.objectContaining({
+          disposition: { reason: 'no landing evidence — closed without work', by: 'conv-test' },
+        }),
+      );
+      // The tracker comment names the disposition, not the generic ceremony text.
+      expect(tracker.addComment).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.stringContaining('Closed without landing evidence — disposition recorded'),
+      );
     });
 
     it('proceeds when a missed row carries an explicit acceptance', async () => {
