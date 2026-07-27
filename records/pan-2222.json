@@ -159,7 +159,7 @@
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T06:03:00.625Z",
+    "updatedAt": "2026-07-27T16:35:45.258Z",
     "testNotes": "npm run typecheck passed; npm run lint initially OOMed during build:cli, rerun passed; npm test under sandbox failed with EPERM for spawn/listen, rerun elevated completed with 1 failed test: src/lib/__tests__/agent-state-role.test.ts > AgentState role persistence > PAN-2017: fails and stops a strike spawn when kickoff delivery fails, ENOTEMPTY rmdir /tmp/pan-agent-role-lmi50p. UAT not required: acceptance is backend/library/config/docs with no UI/dashboard criterion.",
     "inspectNotes": "Bead workspace-eb49q passed inspection: implementation matches the feed-noise-filter spec (shared renderer, exclude pathspecs, subject skip, max_diff_bytes stat fallback, live/replay sharing) and no CLAUDE/PRD constraints are violated.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2249",
@@ -245,7 +245,7 @@
       "recordedAt": "2026-07-03T03:03:41.361Z"
     },
     "closedOut": true,
-    "closedOutAt": "2026-07-27T06:03:00.625Z"
+    "closedOutAt": "2026-07-27T16:35:45.258Z"
   },
   "closeOut": {
     "usage": {
@@ -313,7 +313,7 @@
     ],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-27T06:03:00.637Z",
+      "evaluatedAt": "2026-07-27T16:35:45.277Z",
       "rows": [
         {
           "id": "review",
@@ -370,7 +370,7 @@
           "num": 7,
           "title": "Deployed",
           "expected": "live server build includes the merged commit",
-          "observed": "build commit 3297fb26 contains merge 0c225880",
+          "observed": "build commit d44fa122 contains merge 0c225880",
           "status": "pass"
         },
         {
@@ -398,5 +398,5 @@
     ]
   },
   "created": "2026-07-03T02:56:10.923Z",
-  "updated": "2026-07-27T06:03:00.637Z"
+  "updated": "2026-07-27T16:35:45.278Z"
 }
