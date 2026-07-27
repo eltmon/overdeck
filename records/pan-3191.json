@@ -72,7 +72,7 @@
     "recordedAt": "2026-07-27T05:19:11.339Z"
   },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T05:59:49.449Z",
+  "updated": "2026-07-27T05:59:54.674Z",
   "pipeline": {
     "issueId": "PAN-3191",
     "reviewStatus": "blocked",
@@ -82,10 +82,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:20:05.037Z",
-    "updatedAt": "2026-07-27T05:59:48.812Z",
+    "updatedAt": "2026-07-27T05:59:54.658Z",
     "reviewNotes": "GitLab/polyrepo rows still cannot resolve repository identity, so merged MRs remain stranded",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
-    "reviewedAtCommit": "4e70e23b3d350414e916d6a4fb3120eac6d9cf5f",
+    "reviewedAtCommit": "b60d7098294a232fb845e54ceacaaa56602caee6",
     "reviewSpawnedAt": "2026-07-27T05:58:11.918Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -151,7 +151,7 @@
       },
       "costAtCloseOut": {
         "usd": 56.951659,
-        "pricingAsOf": "2026-07-27T05:59:48.852Z"
+        "pricingAsOf": "2026-07-27T05:59:54.665Z"
       }
     },
     "merges": [
