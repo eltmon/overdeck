@@ -84,7 +84,7 @@
     "recordedAt": "2026-07-09T00:19:08.915Z"
   },
   "created": "2026-07-08T23:07:44.941Z",
-  "updated": "2026-07-27T05:58:55.333Z",
+  "updated": "2026-07-27T16:44:34.637Z",
   "pipeline": {
     "issueId": "PAN-2510",
     "reviewStatus": "pending",
@@ -92,7 +92,7 @@
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T05:58:55.297Z",
+    "updatedAt": "2026-07-27T16:44:34.624Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -147,7 +147,7 @@
       "recordedAt": "2026-07-09T00:19:08.915Z"
     },
     "closedOut": true,
-    "closedOutAt": "2026-07-27T05:58:55.297Z"
+    "closedOutAt": "2026-07-27T16:44:34.624Z"
   },
   "closeOut": {
     "usage": {
@@ -215,7 +215,7 @@
     ],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-27T05:58:55.330Z",
+      "evaluatedAt": "2026-07-27T16:44:34.636Z",
       "rows": [
         {
           "id": "review",
@@ -272,7 +272,7 @@
           "num": 7,
           "title": "Deployed",
           "expected": "live server build includes the merged commit",
-          "observed": "build commit 3297fb26 contains merge 54852367",
+          "observed": "build commit d44fa122 contains merge 54852367",
           "status": "pass"
         },
         {
