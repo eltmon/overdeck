@@ -1733,6 +1733,11 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
     tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN conflicts_since TEXT');
   }
 
+  // v62 repairs: ensure PAN-3151 and PAN-3154 columns exist even on v62 databases
+  // that may have been created before these columns (when main already had v62).
+  tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN review_cycle_history TEXT');
+  tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN conflicts_since TEXT');
+
   // After all migrations, set the version
   db.pragma(`user_version = ${SCHEMA_VERSION}`);
 }
