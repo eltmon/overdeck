@@ -4,17 +4,17 @@
     "created": "2026-07-27T04:44:12Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3192: No mandated quality gate typechecks the dashboard frontend — root tsconfig excludes it and typecheck:dashboard covers only the server",
-    "updated": "2026-07-27T04:58:31.235Z"
+    "updated": "2026-07-27T08:04:29.924Z"
   },
   "plan": {
     "id": "pan-3192",
     "title": "No mandated quality gate typechecks the dashboard frontend — root tsconfig excludes it and typecheck:dashboard covers only the server",
-    "status": "running",
+    "status": "completed",
     "uid": "f0e9f1a5-14d0-4f9b-aac9-8706a46a9e0f",
     "author": "agent:k3[1m]",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-27T04:44:12Z",
-    "updated": "2026-07-27T04:58:31.235Z",
+    "updated": "2026-07-27T08:04:29.924Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3192",
@@ -314,5 +314,5 @@
       "canonicalFilename": "2026-07-27-PAN-3192-no-mandated-quality-gate-typechecks-the-dashboard-frontend-root-tsconfig-excludes-it-and-typecheck-dashboard-covers-only-the-server.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
