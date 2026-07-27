@@ -3,17 +3,16 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-26T21:27:05.281Z",
-  "updated": "2026-07-26T23:01:06.051Z",
+  "updated": "2026-07-27T03:28:21.810Z",
   "pipeline": {
     "issueId": "PAN-3166",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
-    "mergeStatus": "queued",
+    "mergeStatus": "merged",
     "mergeStep": "queued",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T23:01:03.069Z",
+    "updatedAt": "2026-07-27T03:28:21.786Z",
     "mergeNotes": "Post-rebase verification deferred: Verification deferred: a dashboard deploy is queued (requested 2026-07-26T22:34:43.696Z by deploy-patrol). It re-runs automatically after the deploy. — merge retries after the deploy.",
     "lastVerifiedCommit": "55dc93ff7b5cfd1f76b003b64253164c9738546a",
     "strikeLandingState": "landed",
@@ -26,7 +25,9 @@
         "outcome": "failed",
         "detail": "Cannot find package 'effect' imported from /home/eltmon/.overdeck/deployments/dashboard/.pan-reload-generation-b/dist/dashboard/deploy-window-Dchy3FNh.js"
       }
-    ]
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T03:28:21.786Z"
   },
   "closeOut": {
     "usage": {
@@ -38,7 +39,80 @@
       }
     },
     "merges": [],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T03:28:21.805Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: pending; skipped by the strike path (strikeLandingState: landed) — no review specialist is dispatched for a strike",
+          "status": "skip"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: pending; skipped by the strike path (strikeLandingState: landed) — no test specialist is dispatched for a strike",
+          "status": "skip"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed",
+          "observed": "verificationStatus: passed at 55dc93ff7b5cfd1f76b003b64253164c9738546a",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Feature branch is absent; positive merge evidence is required; PR #3173 MERGED at 2026-07-26T22:49:04Z",
+          "status": "pass",
+          "mergedAt": "2026-07-26T22:49:04Z",
+          "mergeCommit": "d122ce89822e2f816f1508e3e475f3a867ed717e"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "strike landing (strikeLandingState: landed) — the work-agent post-merge handoff is not the strike path's lifecycle; canonical state: todo; no running work/planning agents",
+          "status": "skip"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on d122ce89822e2f816f1508e3e475f3a867ed717e",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 08ecbfcd contains merge d122ce89",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 1 agent state directory; Preserved local branch strike/pan-3166 — not merged to main; Preserved remote branch strike/pan-3166 — not merged to main; Pruned 143 checkpoint ref(s) for agent-pan-3166, planning-pan-3166, strike-pan-3166; No specialist registry entries for PAN-3166"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "claude-opus-5"
