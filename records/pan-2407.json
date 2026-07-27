@@ -121,7 +121,7 @@
   ],
   "feedback": [],
   "created": "2026-07-06T14:55:36.922Z",
-  "updated": "2026-07-27T06:00:08.095Z",
+  "updated": "2026-07-27T16:42:09.459Z",
   "pipeline": {
     "issueId": "PAN-2407",
     "reviewStatus": "pending",
@@ -129,12 +129,12 @@
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T06:00:08.056Z",
+    "updatedAt": "2026-07-27T16:42:09.434Z",
     "inspectNotes": "Bead route-unplanned-to-planning ack: fix 599f26fa12 corrects workspaceLocation in the start-planning POST body to use the already-resolved isRemote flag from findWorkspaceWithLocation() instead of raw options.remote, so an existing remote workspace is reported correctly even without --remote; regression test added and verified against findWorkspaceWithLocation/determineWorkspaceLocation source. No regression to the prior 5 ACs.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2415",
     "reviewRequestedAt": "2026-07-06T18:36:20.415Z",
     "closedOut": true,
-    "closedOutAt": "2026-07-27T06:00:08.056Z"
+    "closedOutAt": "2026-07-27T16:42:09.434Z"
   },
   "closeOut": {
     "usage": {
@@ -242,7 +242,7 @@
     ],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-27T06:00:08.091Z",
+      "evaluatedAt": "2026-07-27T16:42:09.453Z",
       "rows": [
         {
           "id": "review",
