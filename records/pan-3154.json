@@ -70,18 +70,18 @@
     "recordedAt": "2026-07-27T11:19:27.194Z"
   },
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T11:20:27.829Z",
+  "updated": "2026-07-27T11:23:16.730Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T11:20:21.402Z",
-    "updatedAt": "2026-07-27T11:20:21.803Z",
+    "updatedAt": "2026-07-27T11:23:16.579Z",
     "inspectNotes": "AC-4 now met; AC-1/2/3/5 re-confirmed unchanged. branch-invalidation.ts:178 gates setSetting on !hadUnknownProbe (flag set at :144), so an unknown probe leaves the stored head at its prior value and the next cycle re-probes at the same SHA; the ls-remote path already returned early at :128. Retry cycle stays correct on the other ACs: an issue marked during the aborted pass hits the conflictsSince.sha === newSha dedup at :146, so no duplicate setReviewStatus, no duplicate per-issue activity entry, and it is absent from newlyMarkedIssueIds so the summary names only new marks — AC-3 holds across the retry path, not just across two clean runs. Test that had asserted the buggy behavior flipped to not.toHaveBeenCalled(), plus a mixed-project regression (one conflicts + one unknown) proving the SHA does not advance even when another issue was newly marked. NON-BLOCKING follow-up: a persistently-unknown workspace (broken remote / corrupted worktree) keeps hadUnknownProbe true indefinitely, so that project re-probes every in-pipeline issue every 120s instead of only on head movement — the direct cost of AC-4 as written, worth bounding later (e.g. advance after N consecutive unknown cycles), not a defect against this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3208",
     "reviewRequestedAt": "2026-07-27T11:20:21.402Z",
@@ -181,7 +181,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.0116693,
-        "pricingAsOf": "2026-07-27T11:20:27.826Z"
+        "pricingAsOf": "2026-07-27T11:23:16.703Z"
       }
     },
     "merges": [
