@@ -286,7 +286,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:38:33.559Z",
+  "updated": "2026-07-27T14:38:39.084Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
@@ -296,10 +296,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:38:32.814Z",
+    "updatedAt": "2026-07-27T14:38:39.074Z",
     "reviewNotes": "the >= current-version repair mutates newer schemas and leaves 3 migration tests failing",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
-    "reviewedAtCommit": "df38e6bf9a658371123f14eb6c2600300231098e",
+    "reviewedAtCommit": "aa784f5d2e07626caf7a535f562b61cb6b2e667a",
     "reviewSpawnedAt": "2026-07-27T14:37:11.594Z"
   },
   "closeOut": {
@@ -366,7 +366,7 @@
       },
       "costAtCloseOut": {
         "usd": 236.8419313,
-        "pricingAsOf": "2026-07-27T14:38:32.832Z"
+        "pricingAsOf": "2026-07-27T14:38:39.079Z"
       }
     },
     "merges": [
