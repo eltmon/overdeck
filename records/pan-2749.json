@@ -3,17 +3,19 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T00:57:15.378Z",
-  "updated": "2026-07-27T05:17:15.868Z",
+  "updated": "2026-07-27T05:17:18.488Z",
   "pipeline": {
     "issueId": "PAN-2749",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "mergeStatus": "merging",
-    "mergeStep": "stripping-planning",
+    "verificationStatus": "passed",
+    "mergeStatus": "verifying",
+    "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T05:17:14.821Z",
-    "mergeNotes": "Post-rebase verification deferred: Verification deferred: a dashboard deploy is queued (requested 2026-07-27T04:22:17.553Z by deploy-patrol, merge-step0). It re-runs automatically after the deploy. — merge retries after the deploy.",
+    "updatedAt": "2026-07-27T05:17:16.235Z",
+    "verificationNotes": "merge-verify: CI green on the merged tip (PAN-2487 local-gate skip)",
+    "lastVerifiedCommit": "695732172e1b79bc66610931f57e2fcc9b71085b",
     "strikeReadyHead": "695732172e1b79bc66610931f57e2fcc9b71085b",
     "strikeReadyAt": "2026-07-27T05:13:39.734Z",
     "strikeLandingState": "landing",
@@ -83,7 +85,7 @@
       },
       "costAtCloseOut": {
         "usd": 15.280934,
-        "pricingAsOf": "2026-07-27T05:17:14.966Z"
+        "pricingAsOf": "2026-07-27T05:17:18.475Z"
       }
     },
     "merges": [],
