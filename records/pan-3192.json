@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:32:47.311Z",
-  "updated": "2026-07-27T05:08:10.846Z",
+  "updated": "2026-07-27T05:11:02.876Z",
   "pipeline": {
     "issueId": "PAN-3192",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "wire-typecheck-gates": {
-        "writerId": "agent-pan-3192",
-        "agentId": "agent-pan-3192",
-        "pid": 4054409,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:08:10.846Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3192",
@@ -64,12 +56,27 @@
         "outcome": "completed",
         "reason": "Added the shrink-only frontend TypeScript ratchet, seeded a zero-error baseline, and verified parity, NEW labeling, and --update refusal.",
         "releasedAt": "2026-07-27T05:07:48.868Z"
+      },
+      {
+        "writerId": "agent-pan-3192",
+        "agentId": "agent-pan-3192",
+        "pid": 4054409,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:08:10.846Z",
+        "itemId": "wire-typecheck-gates",
+        "outcome": "completed",
+        "reason": "Added the frontend package typecheck script and wired the ratcheted guard into the root npm run typecheck chain; both root and package-level typechecks pass.",
+        "releasedAt": "2026-07-27T05:11:02.875Z"
       }
     ],
     "statusReasons": {
       "frontend-types-guard-script": {
         "reason": "Added the shrink-only frontend TypeScript ratchet, seeded a zero-error baseline, and verified parity, NEW labeling, and --update refusal.",
         "updatedAt": "2026-07-27T05:07:48.868Z"
+      },
+      "wire-typecheck-gates": {
+        "reason": "Added the frontend package typecheck script and wired the ratcheted guard into the root npm run typecheck chain; both root and package-level typechecks pass.",
+        "updatedAt": "2026-07-27T05:11:02.875Z"
       }
     }
   },
@@ -79,6 +86,9 @@
     "frontend-types-guard-script.frontend-types-guard-script.ac2": "completed",
     "frontend-types-guard-script.frontend-types-guard-script.ac3": "completed",
     "frontend-types-guard-script.frontend-types-guard-script.ac4": "completed",
-    "wire-typecheck-gates": "running"
+    "wire-typecheck-gates": "completed",
+    "wire-typecheck-gates.wire-typecheck-gates.ac1": "completed",
+    "wire-typecheck-gates.wire-typecheck-gates.ac2": "completed",
+    "wire-typecheck-gates.wire-typecheck-gates.ac3": "completed"
   }
 }
