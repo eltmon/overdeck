@@ -388,6 +388,7 @@ export const FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY = 'flywheel.auto_pickup_backlog';
 export const FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY = 'flywheel.require_uat_before_merge';
 export const FLYWHEEL_MERGE_TRAIN_ENABLED_KEY = 'flywheel.merge_train_enabled';
 export const MERGE_TRAIN_ENABLED_KEY = 'merge_train.enabled';
+export const DASHBOARD_LAST_CLEAN_SHUTDOWN_AT_KEY = 'dashboard.last_clean_shutdown_at';
 export const BOOT_RECONCILIATION_DECISION_KEY = 'boot_reconciliation.decision';
 export const BOOT_RECONCILIATION_PER_AGENT_KEY = 'boot_reconciliation.per_agent';
 export const BOOT_RECONCILIATION_DECIDED_AT_KEY = 'boot_reconciliation.decided_at';
@@ -438,6 +439,14 @@ export function setSetting(key: string, value: string): void {
     `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
   ).run(key, value, now);
+}
+
+export function getLastCleanShutdownAt(): string | null {
+  return getSetting(DASHBOARD_LAST_CLEAN_SHUTDOWN_AT_KEY);
+}
+
+export function setLastCleanShutdownAt(iso: string): void {
+  setSetting(DASHBOARD_LAST_CLEAN_SHUTDOWN_AT_KEY, iso);
 }
 
 function parseBootReconciliationDecision(value: string | null): BootReconciliationDecision | null {

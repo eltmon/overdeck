@@ -3,6 +3,7 @@ import type { ViewMode } from '../chat/ConversationPanel'
 import type { Conversation } from '../CommandDeck/ConversationList'
 import { HomePane } from './HomePane'
 import { WorkspaceHeader } from './HomePane/WorkspaceHeader'
+import { useProjectRename } from './HomePane/useProjectRename'
 import { StatChips } from './HomePane/StatChips'
 import { Launcher } from './HomePane/Launcher'
 import { AgentDock } from './HomePane/AgentDock'
@@ -64,6 +65,8 @@ export function ProjectHome({
 }: ProjectHomeProps) {
   const [launchBusy, setLaunchBusy] = useState(false)
   const [launchError, setLaunchError] = useState<string | null>(null)
+  // The project title itself is the rename affordance (PAN-3156).
+  const rename = useProjectRename(projectName, projectKey)
   const timelineConversations: TimelineConversation[] = useMemo(
     () =>
       conversations.map((c) => ({
@@ -149,7 +152,7 @@ export function ProjectHome({
         detailFirst
         header={
           <>
-            <WorkspaceHeader variant="project" name={projectName} branch={branch} />
+            <WorkspaceHeader variant="project" name={projectName} branch={branch} rename={rename} />
             <StatChips
               conversationCount={conversations.length}
               costUsd={totalCost}
@@ -204,7 +207,7 @@ export function ProjectHome({
       openPane={api.openPane}
       header={
         <>
-          <WorkspaceHeader variant="project" name={projectName} branch={branch} />
+          <WorkspaceHeader variant="project" name={projectName} branch={branch} rename={rename} />
           <StatChips
             conversationCount={conversations.length}
             costUsd={totalCost}

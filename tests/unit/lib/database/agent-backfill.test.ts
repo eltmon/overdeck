@@ -20,6 +20,10 @@ vi.mock('../../../../src/lib/database/index.js', () => ({
   getDatabase: () => testDb,
 }));
 
+vi.mock('../../../../src/lib/persistent-logger.js', () => ({
+  logAgentLifecycleSync: vi.fn(),
+}));
+
 beforeEach(() => {
   testDb = openDatabase(':memory:');
   testDb.pragma('foreign_keys = ON');
@@ -29,6 +33,7 @@ beforeEach(() => {
   originalHome = process.env.OVERDECK_HOME;
   process.env.OVERDECK_HOME = tmpHome;
   delete process.env.OVERDECK_TMUX_SOCKET_NAME;
+  vi.clearAllMocks();
 });
 
 afterEach(() => {
@@ -46,6 +51,7 @@ import {
   type BackfillAgentsResult,
 } from '../../../../src/lib/database/agent-backfill.js';
 import { getAgent } from '../../../../src/lib/database/agents-db.js';
+import { logAgentLifecycleSync } from '../../../../src/lib/persistent-logger.js';
 
 function writeAgentState(agentId: string, state: Record<string, unknown>): void {
   const dir = join(tmpHome, 'agents', agentId);
@@ -114,9 +120,40 @@ describe('backfillAgentsFromStateJsonSync', () => {
     });
 
     expect(result.markedStopped).toBe(1);
+    expect(result.markedStoppedIds).toEqual([
+      { id: 'agent-pan-1908', previousStatus: 'running' },
+    ]);
+    expect(logAgentLifecycleSync).toHaveBeenCalledWith(
+      'agent-pan-1908',
+      expect.stringContaining('boot backfill reconcile'),
+    );
     const row = getAgent('agent-pan-1908');
     expect(row?.status).toBe('stopped');
     expect(row?.stoppedAt).toBeDefined();
+  });
+
+  it('does not log a stop when the transaction rolls back', () => {
+    const validState = {
+      id: 'agent-pan-1907',
+      issueId: 'PAN-1907',
+      role: 'work',
+      status: 'running',
+      workspace: '/workspaces/feature-pan-1907',
+      startedAt: '2026-06-15T00:00:00.000Z',
+    };
+    writeAgentState('agent-pan-1907', validState);
+    backfillAgentsFromStateJsonSync(testDb, {
+      listLiveSessions: () => new Set(['agent-pan-1907']),
+    });
+    vi.clearAllMocks();
+    const { issueId: _issueId, ...invalidState } = validState;
+    writeAgentState('agent-pan-1907', invalidState);
+
+    expect(() => backfillAgentsFromStateJsonSync(testDb, {
+      listLiveSessions: () => new Set(),
+    })).toThrow();
+    expect(logAgentLifecycleSync).not.toHaveBeenCalled();
+    expect(getAgent('agent-pan-1907')?.status).toBe('running');
   });
 
   it('keeps running agents running when a live tmux session matches', () => {

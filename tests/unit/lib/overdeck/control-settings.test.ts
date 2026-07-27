@@ -1,8 +1,10 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { Effect, Layer } from 'effect';
 
-import { Db } from '../../../../src/lib/overdeck/infra.js';
-import { EventBus } from '../../../../src/lib/overdeck/infra.js';
+import { closeOverdeckDatabaseSync, Db, EventBus } from '../../../../src/lib/overdeck/infra.js';
 import {
   SettingsResolver,
   SettingsResolverLive,
@@ -11,7 +13,9 @@ import {
   ConfigResolver,
   ConfigResolverLive,
   FLYWHEEL_MERGE_TRAIN_ENABLED_KEY,
+  getLastCleanShutdownAt,
   MERGE_TRAIN_ENABLED_KEY,
+  setLastCleanShutdownAt,
   type FlywheelConfig,
   type IssuePolicy,
 } from '../../../../src/lib/overdeck/control-settings.js';
@@ -339,6 +343,26 @@ describe('SettingsWriter — issue_policy writes', () => {
     );
 
     expect(result.autoMerge).toBeNull();
+  });
+});
+
+describe('clean shutdown marker', () => {
+  it('round-trips the marker through the synchronous settings door', () => {
+    const previousHome = process.env.OVERDECK_HOME;
+    const testHome = mkdtempSync(join(tmpdir(), 'pan-3184-control-settings-'));
+    const marker = '2026-07-27T05:00:00.000Z';
+    closeOverdeckDatabaseSync();
+    process.env.OVERDECK_HOME = testHome;
+
+    try {
+      setLastCleanShutdownAt(marker);
+      expect(getLastCleanShutdownAt()).toBe(marker);
+    } finally {
+      closeOverdeckDatabaseSync();
+      if (previousHome === undefined) delete process.env.OVERDECK_HOME;
+      else process.env.OVERDECK_HOME = previousHome;
+      rmSync(testHome, { recursive: true, force: true });
+    }
   });
 });
 

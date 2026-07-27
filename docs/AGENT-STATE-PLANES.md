@@ -69,6 +69,20 @@ status, lifecycle events, and conversations. It is a disposable cache rebuilt
 from Git state, JSONL transcripts, tracker data, and tmux through the canonical
 domain resolvers.
 
+### Agents-table event invariant
+
+The agents table is the authoritative runtime registry, but event-derived
+projections consume the event log independently. Every agents-table status
+transition, including boot backfill reconciliation, must persist a matching
+`agent.status_changed` or `agent.stopped` event during the same boot; otherwise
+stale events can produce phantom running agents (PAN-3183). The agents-table
+rule in `scripts/lint-state-writes.sh` enforces the boundary around
+`src/lib/overdeck/{agents,agent-state-sync,agent-record-sync,reconstruction}.ts`,
+`src/lib/database/{agents-db,agent-backfill,schema}.ts`, and
+`src/dashboard/server/services/agent-projection.ts`. During bootstrap/seed, a
+table row that is stopped with no live tmux session overrides a newer
+running/starting event projection; a live tmux session still wins.
+
 ## Liveness oracle — tmux
 
 A session on the `overdeck` tmux socket is the physical liveness authority.
