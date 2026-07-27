@@ -244,15 +244,7 @@
       "timestamp": "2026-07-27T15:07:58.038Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T15:07:58Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nThe real v62→v63 migration is now correct, but the focused migration suite is red: two existing assertions still require version 62 after SCHEMA_VERSION was bumped to 63. Update those expectations/comments and return all 35 targeted tests green.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -341,21 +333,21 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T15:09:20.983Z",
+  "updated": "2026-07-27T15:09:23.201Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T15:09:19.724Z",
+    "updatedAt": "2026-07-27T15:09:23.076Z",
     "reviewNotes": "Agent re-review request (18/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "41af9787162a731722d44d99b4a480ec0fd2fb2c",
-    "reviewSpawnedAt": "2026-07-27T15:05:51.110Z"
+    "reviewSpawnedAt": "2026-07-27T15:09:23.075Z"
   },
   "closeOut": {
     "usage": {
@@ -421,7 +413,7 @@
       },
       "costAtCloseOut": {
         "usd": 275.8043643,
-        "pricingAsOf": "2026-07-27T15:09:20.981Z"
+        "pricingAsOf": "2026-07-27T15:09:23.179Z"
       }
     },
     "merges": [
