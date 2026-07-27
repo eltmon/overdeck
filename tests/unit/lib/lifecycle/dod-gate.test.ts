@@ -1,4 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
+
+const issueClosureMocks = vi.hoisted(() => ({
+  isIssueClosed: vi.fn(),
+  isTrackerIssueClosed: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({
+  isIssueClosed: issueClosureMocks.isIssueClosed,
+  isTrackerIssueClosed: issueClosureMocks.isTrackerIssueClosed,
+}));
+
 import type { ReviewStatus } from '../../../../src/lib/review-status.js';
 import type { PanIssuePipelineRecord } from '../../../../src/lib/pan-dir/record.js';
 import {
@@ -172,6 +183,67 @@ describe('Definition-of-Done status rows', () => {
     const negative = deps(live({ reviewStatus: 'blocked', testStatus: 'failed', strikeLandingState: 'landed' }));
     expect(await checkReviewRow(issueId, negative)).toMatchObject({ status: 'miss', observed: 'reviewStatus: blocked' });
     expect(await checkTestsRow(issueId, negative)).toMatchObject({ status: 'miss', observed: 'testStatus: failed' });
+  });
+
+  it('settles absent or pending verdicts after a tracker-closed issue has landed', async () => {
+    const source = deps(live({
+      reviewStatus: 'pending',
+      testStatus: undefined,
+      verificationStatus: 'pending',
+      lastVerifiedCommit: undefined,
+    }));
+    const settlement = { trackerClosed: true, landedWork: true, mainVerifyStatus: 'skip' as const };
+    const review = await checkReviewRow(issueId, source, settlement);
+    const tests = await checkTestsRow(issueId, source, settlement);
+    const verification = await checkVerificationRow(issueId, source, settlement);
+
+    expect(review).toMatchObject({ status: 'skip', observed: expect.stringContaining('reviewStatus: pending') });
+    expect(tests).toMatchObject({ status: 'skip', observed: expect.stringContaining('testStatus: missing') });
+    expect(verification).toMatchObject({ status: 'skip', observed: expect.stringContaining('verificationStatus: pending') });
+  });
+
+  it('does not settle review without both tracker closure and landed work', async () => {
+    const source = deps(live({ reviewStatus: 'pending' }));
+    const closedWithoutLanding = await checkReviewRow(issueId, source, {
+      trackerClosed: true,
+      landedWork: false,
+      mainVerifyStatus: 'pass',
+    });
+    const openWithLanding = await checkReviewRow(issueId, source, {
+      trackerClosed: false,
+      landedWork: true,
+      mainVerifyStatus: 'pass',
+    });
+
+    expect(closedWithoutLanding).toMatchObject({ status: 'miss', observed: 'reviewStatus: pending' });
+    expect(openWithLanding).toMatchObject({ status: 'miss', observed: 'reviewStatus: pending' });
+  });
+
+  it('never supersedes a negative review verdict', async () => {
+    const row = await checkReviewRow(issueId, deps(live({ reviewStatus: 'blocked' })), {
+      trackerClosed: true,
+      landedWork: true,
+      mainVerifyStatus: 'pass',
+    });
+
+    expect(row).toMatchObject({ status: 'miss', observed: 'reviewStatus: blocked' });
+  });
+
+  it('supersedes a negative test verdict only when landed work is green on main', async () => {
+    const source = deps(live({ testStatus: 'failed' }));
+    const green = await checkTestsRow(issueId, source, {
+      trackerClosed: true,
+      landedWork: true,
+      mainVerifyStatus: 'pass',
+    });
+    const unproved = await checkTestsRow(issueId, source, {
+      trackerClosed: true,
+      landedWork: true,
+      mainVerifyStatus: 'skip',
+    });
+
+    expect(green).toMatchObject({ status: 'skip', observed: expect.stringContaining('testStatus: failed') });
+    expect(unproved).toMatchObject({ status: 'miss', observed: 'testStatus: failed' });
   });
 });
 
@@ -724,6 +796,7 @@ describe('assembled Definition-of-Done gate', () => {
       });
       return makeRow('deploy', deployStatus);
     },
+    trackerClosed: async () => false,
     now: () => '2026-07-15T13:00:00Z',
   });
 
@@ -731,6 +804,77 @@ describe('assembled Definition-of-Done gate', () => {
     const gate = await evaluateDodGate(ctx, {}, deps());
     expect(gate.passed).toBe(true);
     expect(gate.rows.map(row => row.id)).toEqual(DOD_ROWS.slice(0, 7).map(row => row.id));
+  });
+
+  it('computes landed and main-verify evidence before passing terminal settlement to verdict rows', async () => {
+    const calls: string[] = [];
+    const review = vi.fn(async (_issueId: string, settlement?: unknown) => {
+      calls.push('review');
+      expect(settlement).toEqual({ trackerClosed: true, landedWork: true, mainVerifyStatus: 'pass' });
+      return makeRow('review', 'skip');
+    });
+    const gate = await evaluateDodGate(ctx, {}, {
+      review,
+      tests: async (_issueId: string, settlement?: unknown) => {
+        expect(settlement).toEqual({ trackerClosed: true, landedWork: true, mainVerifyStatus: 'pass' });
+        return makeRow('tests', 'skip');
+      },
+      verification: async (_issueId: string, settlement?: unknown) => {
+        expect(settlement).toEqual({ trackerClosed: true, landedWork: true, mainVerifyStatus: 'pass' });
+        return makeRow('verification', 'skip');
+      },
+      merged: async () => {
+        calls.push('merged');
+        return { ...makeRow('merged'), mergeCommit: 'abc123' };
+      },
+      postMerge: async () => makeRow('post-merge'),
+      mainVerify: async () => {
+        calls.push('main-verify');
+        return makeRow('main-verify');
+      },
+      trackerClosed: async () => {
+        calls.push('tracker-closed');
+        return true;
+      },
+      deploy: async () => makeRow('deploy'),
+      now: () => '2026-07-15T13:00:00Z',
+    });
+
+    expect(calls.slice(0, 3)).toEqual(['merged', 'main-verify', 'tracker-closed']);
+    expect(review).toHaveBeenCalledTimes(1);
+    expect(gate.rows.slice(0, 3).map(row => row.status)).toEqual(['skip', 'skip', 'skip']);
+  });
+
+  it('does not settle verdict rows from terminal shadow state while the tracker is open', async () => {
+    vi.clearAllMocks();
+    issueClosureMocks.isIssueClosed.mockResolvedValue(true);
+    issueClosureMocks.isTrackerIssueClosed.mockResolvedValue(false);
+    const settlements: unknown[] = [];
+    const verdictRow = (id: 'review' | 'tests' | 'verification') =>
+      async (_issueId: string, settlement?: unknown) => {
+        settlements.push(settlement);
+        return makeRow(id, 'miss');
+      };
+
+    const gate = await evaluateDodGate(ctx, {}, {
+      review: verdictRow('review'),
+      tests: verdictRow('tests'),
+      verification: verdictRow('verification'),
+      merged: async () => ({ ...makeRow('merged'), mergeCommit: 'abc123' }),
+      postMerge: async () => makeRow('post-merge'),
+      mainVerify: async () => makeRow('main-verify'),
+      deploy: async () => makeRow('deploy'),
+      now: () => '2026-07-15T13:00:00Z',
+    });
+
+    expect(issueClosureMocks.isTrackerIssueClosed).toHaveBeenCalledWith(issueId);
+    expect(issueClosureMocks.isIssueClosed).not.toHaveBeenCalled();
+    expect(settlements).toEqual(Array(3).fill({
+      trackerClosed: false,
+      landedWork: true,
+      mainVerifyStatus: 'pass',
+    }));
+    expect(gate.misses).toEqual(['review', 'tests', 'verification']);
   });
 
   // PAN-3188: a landing with no resolvable merge commit must skip row 7 when
@@ -744,6 +888,7 @@ describe('assembled Definition-of-Done gate', () => {
       merged: async () => ({ ...makeRow('merged'), mergedAt: '2026-07-15T12:00:00Z' }),
       postMerge: async () => makeRow('post-merge'),
       mainVerify: async () => makeRow('main-verify', 'skip'),
+      trackerClosed: async () => false,
       deploy: deploySpy,
       now: () => '2026-07-15T13:00:00Z',
     });
@@ -794,6 +939,7 @@ describe('assembled Definition-of-Done gate', () => {
         listAgents: () => [],
       }),
       mainVerify: async () => makeRow('main-verify', 'skip'),
+      trackerClosed: async () => false,
       deploy: async () => makeRow('deploy', 'skip'),
       now: () => '2026-07-15T13:00:00Z',
     });
@@ -829,6 +975,7 @@ describe('assembled Definition-of-Done gate', () => {
         readStrikeLanded: () => true,
       }),
       mainVerify: async () => makeRow('main-verify'),
+      trackerClosed: async () => false,
       deploy: async () => makeRow('deploy'),
       now: () => '2026-07-26T23:00:00Z',
     });

@@ -17,6 +17,7 @@ import {
   type PanIssuePipelineRecord,
 } from '../pan-dir/record.js';
 import { getAutoCloseOutCanonicalState } from '../cloister/deacon-canonical-state.js';
+import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
 import { fetchCommitCheckRuns, fetchIssuePullRequest } from '../overdeck/pull-requests.js';
 import {
   gatherIssueBranchContainment,
@@ -126,10 +127,16 @@ interface DeployRowDeps {
   commitContains: (repoRoot: string, mergeCommit: string, buildCommit: string) => Promise<boolean>;
 }
 
+export interface TerminalVerdictSettlement {
+  trackerClosed: boolean;
+  landedWork: boolean;
+  mainVerifyStatus: DodRowResult['status'];
+}
+
 export interface EvaluateDodGateDeps {
-  review: (issueId: string) => DodRowResult | Promise<DodRowResult>;
-  tests: (issueId: string) => DodRowResult | Promise<DodRowResult>;
-  verification: (issueId: string) => DodRowResult | Promise<DodRowResult>;
+  review: (issueId: string, settlement?: TerminalVerdictSettlement) => DodRowResult | Promise<DodRowResult>;
+  tests: (issueId: string, settlement?: TerminalVerdictSettlement) => DodRowResult | Promise<DodRowResult>;
+  verification: (issueId: string, settlement?: TerminalVerdictSettlement) => DodRowResult | Promise<DodRowResult>;
   merged: (ctx: LifecycleContext) => MergedDodRowResult | Promise<MergedDodRowResult>;
   postMerge: (ctx: LifecycleContext, merged?: MergedDodRowResult) => DodRowResult | Promise<DodRowResult>;
   mainVerify: (ctx: LifecycleContext, mergeCommit?: string) => DodRowResult | Promise<DodRowResult>;
@@ -139,17 +146,19 @@ export interface EvaluateDodGateDeps {
     mergedRowStatus?: DodRowResult['status'];
     mainVerifyRowStatus?: DodRowResult['status'];
   }) => DodRowResult | Promise<DodRowResult>;
+  trackerClosed?: (issueId: string) => Awaitable<boolean>;
   now: () => string;
 }
 
 const defaultEvaluateDodGateDeps: EvaluateDodGateDeps = {
-  review: checkReviewRow,
-  tests: checkTestsRow,
-  verification: checkVerificationRow,
+  review: (issueId, settlement) => checkReviewRow(issueId, defaultDeps, settlement),
+  tests: (issueId, settlement) => checkTestsRow(issueId, defaultDeps, settlement),
+  verification: (issueId, settlement) => checkVerificationRow(issueId, defaultDeps, settlement),
   merged: checkMergedRow,
   postMerge: checkPostMergeRow,
   mainVerify: checkMainVerifyRow,
   deploy: checkDeployRow,
+  trackerClosed: isTrackerIssueClosed,
   now: () => new Date().toISOString(),
 };
 
@@ -235,11 +244,41 @@ const STRIKE_BYPASS_NOTE: Record<'review' | 'tests', string> = {
  */
 const NEGATIVE_VERDICTS = new Set(['failed', 'blocked', 'dispatch_failed']);
 
+/**
+ * PAN-3187: a tracker-closed issue with landed work cannot produce a verdict it
+ * never produced while active. Negative test/verification verdicts settle only
+ * when main verification proves the landed state green; review negatives remain.
+ */
+function terminalVerdictSettlement(
+  id: 'review' | 'tests' | 'verification',
+  value: string | undefined,
+  observed: string,
+  settlement?: TerminalVerdictSettlement,
+): DodRowResult | null {
+  if (!settlement?.trackerClosed || !settlement.landedWork) return null;
+  if (!NEGATIVE_VERDICTS.has(value ?? '')) {
+    return result(
+      id,
+      'skip',
+      `${observed}; settled because the tracker issue is closed and merged work is landed`,
+    );
+  }
+  if (id !== 'review' && settlement.mainVerifyStatus === 'pass') {
+    return result(
+      id,
+      'skip',
+      `${observed}; superseded because the tracker issue is closed, merged work is landed, and main verification passed`,
+    );
+  }
+  return null;
+}
+
 async function checkVerdict(
   issueId: string,
   id: 'review' | 'tests',
   field: 'reviewStatus' | 'testStatus',
   deps: DodStatusRowDeps,
+  settlement?: TerminalVerdictSettlement,
 ): Promise<DodRowResult> {
   const loaded = await loadStatus(issueId, deps);
   if (!loaded) return result(id, 'miss', 'no review status or journal record found');
@@ -256,18 +295,30 @@ async function checkVerdict(
       `${observed}; skipped by the strike path (strikeLandingState: landed) — ${STRIKE_BYPASS_NOTE[id]}`,
     );
   }
-  return result(id, 'miss', observed);
+  return terminalVerdictSettlement(id, value, observed, settlement) ?? result(id, 'miss', observed);
 }
 
-export function checkReviewRow(issueId: string, deps: DodStatusRowDeps = defaultDeps): Promise<DodRowResult> {
-  return checkVerdict(issueId, 'review', 'reviewStatus', deps);
+export function checkReviewRow(
+  issueId: string,
+  deps: DodStatusRowDeps = defaultDeps,
+  settlement?: TerminalVerdictSettlement,
+): Promise<DodRowResult> {
+  return checkVerdict(issueId, 'review', 'reviewStatus', deps, settlement);
 }
 
-export function checkTestsRow(issueId: string, deps: DodStatusRowDeps = defaultDeps): Promise<DodRowResult> {
-  return checkVerdict(issueId, 'tests', 'testStatus', deps);
+export function checkTestsRow(
+  issueId: string,
+  deps: DodStatusRowDeps = defaultDeps,
+  settlement?: TerminalVerdictSettlement,
+): Promise<DodRowResult> {
+  return checkVerdict(issueId, 'tests', 'testStatus', deps, settlement);
 }
 
-export async function checkVerificationRow(issueId: string, deps: DodStatusRowDeps = defaultDeps): Promise<DodRowResult> {
+export async function checkVerificationRow(
+  issueId: string,
+  deps: DodStatusRowDeps = defaultDeps,
+  settlement?: TerminalVerdictSettlement,
+): Promise<DodRowResult> {
   const loaded = await loadStatus(issueId, deps);
   if (!loaded) return result('verification', 'miss', 'no review status or journal record found');
 
@@ -288,7 +339,9 @@ export async function checkVerificationRow(issueId: string, deps: DodStatusRowDe
   const observed = `verificationStatus: ${value ?? 'missing'}${commit ? ` at ${commit}` : ''}${
     notes.length > 0 ? ` (${notes.join('; ')})` : ''
   }`;
-  return result('verification', accepted ? 'pass' : 'miss', observed);
+  if (accepted) return result('verification', 'pass', observed);
+  return terminalVerdictSettlement('verification', value, observed, settlement) ??
+    result('verification', 'miss', observed);
 }
 
 export async function checkMergedRow(
@@ -571,22 +624,29 @@ export async function evaluateDodGate(
   const merged = opts.verifyMerged
     ? await checkMergedRow(ctx, { ...defaultMergedRowDeps, verifyMerged: opts.verifyMerged })
     : await deps.merged(ctx);
-  const [review, tests, verification, postMerge] = await Promise.all([
-    deps.review(ctx.issueId),
-    deps.tests(ctx.issueId),
-    deps.verification(ctx.issueId),
-    deps.postMerge(ctx, merged),
-  ]);
   // Main-verify computes before deploy because deploy's no-merge-commit
   // branch keys on main-verify's outcome (PAN-3188: row 7 skips when row 6
-  // skips — both mean "no durable anchor" for this landing class).
+  // skips — both mean "no durable anchor" for this landing class). The verdict
+  // rows also need this landed-state evidence before they can settle terminal issues.
   const mainVerify = await deps.mainVerify(ctx, merged.mergeCommit);
-  const deploy = await deps.deploy(ctx, {
-    mergedAt: merged.mergedAt,
-    mergeCommit: merged.mergeCommit,
-    mergedRowStatus: merged.status,
-    mainVerifyRowStatus: mainVerify.status,
-  });
+  const trackerClosed = await (deps.trackerClosed ?? defaultEvaluateDodGateDeps.trackerClosed!)(ctx.issueId);
+  const settlement: TerminalVerdictSettlement = {
+    trackerClosed,
+    landedWork: merged.status === 'pass',
+    mainVerifyStatus: mainVerify.status,
+  };
+  const [review, tests, verification, postMerge, deploy] = await Promise.all([
+    deps.review(ctx.issueId, settlement),
+    deps.tests(ctx.issueId, settlement),
+    deps.verification(ctx.issueId, settlement),
+    deps.postMerge(ctx, merged),
+    deps.deploy(ctx, {
+      mergedAt: merged.mergedAt,
+      mergeCommit: merged.mergeCommit,
+      mergedRowStatus: merged.status,
+      mainVerifyRowStatus: mainVerify.status,
+    }),
+  ]);
   const rows = [review, tests, verification, merged, postMerge, mainVerify, deploy];
   for (const row of rows) {
     if (row.status === 'miss' && acceptedRows.has(row.id)) {

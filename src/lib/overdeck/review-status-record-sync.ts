@@ -1,8 +1,9 @@
 import { existsSync, linkSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { readFile, readdir } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import type { ReviewStatus } from '../review-status.js';
 import { updateIssueRecordForIssue, type PanIssuePipelineRecord } from '../pan-dir/records.js';
-import { readIssueRecordSync } from '../pan-dir/record.js';
+import { readIssueRecord, readIssueRecordSync } from '../pan-dir/record.js';
 import { resolveProjectFromIssueSync, getProjectSync } from '../projects.js';
 
 // PAN-2689: fire-and-forget journal writes die with the process in a short-lived
@@ -59,6 +60,19 @@ function readPipelineSync(issueId: string): PanIssuePipelineRecord | null {
     const project = getProjectSync(resolved.projectKey);
     if (!project) return null;
     const record = readIssueRecordSync(project, issueId);
+    return record?.pipeline ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function readPipeline(issueId: string): Promise<PanIssuePipelineRecord | null> {
+  try {
+    const resolved = resolveProjectFromIssueSync(issueId);
+    if (!resolved) return null;
+    const project = getProjectSync(resolved.projectKey);
+    if (!project) return null;
+    const record = await readIssueRecord(project, issueId);
     return record?.pipeline ?? null;
   } catch {
     return null;
@@ -204,15 +218,31 @@ function writeWorkspaceVerdictFallbackSync(issueId: string, status: ReviewStatus
   }
 }
 
-function parseWorkspaceVerdictFallback(path: string): WorkspaceVerdictFallback | null {
+function decodeWorkspaceVerdictFallback(raw: string): WorkspaceVerdictFallback | null {
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf-8')) as WorkspaceVerdictFallback;
+    const parsed = JSON.parse(raw) as WorkspaceVerdictFallback;
     if (!parsed?.updatedAt || !parsed.pipeline) return null;
     const clearedFields = Array.isArray(parsed.clearedFields)
       ? parsed.clearedFields.filter((field): field is FallbackClearableField =>
           typeof field === 'string' && (FALLBACK_CLEARABLE_FIELDS as readonly string[]).includes(field))
       : [];
     return { ...parsed, clearedFields };
+  } catch {
+    return null;
+  }
+}
+
+function parseWorkspaceVerdictFallback(path: string): WorkspaceVerdictFallback | null {
+  try {
+    return decodeWorkspaceVerdictFallback(readFileSync(path, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+async function parseWorkspaceVerdictFallbackAsync(path: string): Promise<WorkspaceVerdictFallback | null> {
+  try {
+    return decodeWorkspaceVerdictFallback(await readFile(path, 'utf-8'));
   } catch {
     return null;
   }
@@ -311,6 +341,25 @@ function readWorkspaceVerdictFallbackSync(issueId: string): WorkspaceVerdictFall
       consider(parseWorkspaceVerdictFallback(join(dirname(path), entry)));
     }
     return newest;
+  } catch {
+    return null;
+  }
+}
+
+async function readWorkspaceVerdictFallback(issueId: string): Promise<WorkspaceVerdictFallback | null> {
+  try {
+    const path = workspaceVerdictFallbackPath(issueId);
+    if (!path) return null;
+    const dir = dirname(path);
+    const prefix = `${basename(path)}.drain-`;
+    const entries = await readdir(dir);
+    const candidates = [path, ...entries
+      .filter((entry) => entry.startsWith(prefix))
+      .map((entry) => join(dir, entry))];
+    const fallbacks = await Promise.all(candidates.map(parseWorkspaceVerdictFallbackAsync));
+    return fallbacks.reduce<WorkspaceVerdictFallback | null>((newest, candidate) => (
+      candidate && (!newest || newest.updatedAt < candidate.updatedAt) ? candidate : newest
+    ), null);
   } catch {
     return null;
   }
@@ -461,14 +510,19 @@ function scheduleVerdictFallbackDrain(issueId: string): void {
  * a strictly newer fallback wins over the record, and the host's own next journal
  * write folds it back into the canonical record.
  */
-export function readJournalStatusSync(
-  issueId: string,
-): { updatedAt: string; durable: DurableStatusFields; clearedFields?: FallbackClearableField[] } | null {
-  const p = readPipelineSync(issueId);
-  const fallback = readWorkspaceVerdictFallbackSync(issueId);
-  const fallbackNewer = !!fallback && (!p || (p.updatedAt ?? '') < fallback.updatedAt);
+type JournalStatus = {
+  updatedAt: string;
+  durable: DurableStatusFields;
+  clearedFields?: FallbackClearableField[];
+};
+
+function projectJournalStatus(
+  pipeline: PanIssuePipelineRecord | null,
+  fallback: WorkspaceVerdictFallback | null,
+): JournalStatus | null {
+  const fallbackNewer = !!fallback && (!pipeline || (pipeline.updatedAt ?? '') < fallback.updatedAt);
   if (fallback && fallbackNewer) {
-    const base = p ? durableSubset(p) : {};
+    const base = pipeline ? durableSubset(pipeline) : {};
     const overlay = Object.fromEntries(
       Object.entries(fallback.pipeline).filter(([, value]) => value !== undefined),
     ) as DurableStatusFields;
@@ -480,6 +534,22 @@ export function readJournalStatusSync(
       ...(fallback.clearedFields?.length ? { clearedFields: fallback.clearedFields } : {}),
     };
   }
-  if (!p) return null;
-  return { updatedAt: p.updatedAt, durable: durableSubset(p) };
+  if (!pipeline) return null;
+  return { updatedAt: pipeline.updatedAt, durable: durableSubset(pipeline) };
+}
+
+export function readJournalStatusSync(issueId: string): JournalStatus | null {
+  return projectJournalStatus(
+    readPipelineSync(issueId),
+    readWorkspaceVerdictFallbackSync(issueId),
+  );
+}
+
+/** Async journal reader for patrols that must not block the dashboard event loop. */
+export async function readJournalStatus(issueId: string): Promise<JournalStatus | null> {
+  const [pipeline, fallback] = await Promise.all([
+    readPipeline(issueId),
+    readWorkspaceVerdictFallback(issueId),
+  ]);
+  return projectJournalStatus(pipeline, fallback);
 }

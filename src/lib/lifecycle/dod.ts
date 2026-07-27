@@ -19,13 +19,25 @@ export interface DodRowDef {
 }
 
 export const DOD_ROWS: readonly DodRowDef[] = [
-  { id: 'review', num: 1, title: 'Review passed', expected: 'reviewStatus: passed', overridable: true },
-  { id: 'tests', num: 2, title: 'Tests passed', expected: 'testStatus: passed', overridable: true },
+  {
+    id: 'review',
+    num: 1,
+    title: 'Review passed',
+    expected: 'reviewStatus: passed, or tracker-closed with landed work and no negative review verdict',
+    overridable: true,
+  },
+  {
+    id: 'tests',
+    num: 2,
+    title: 'Tests passed',
+    expected: 'testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)',
+    overridable: true,
+  },
   {
     id: 'verification',
     num: 3,
     title: 'Verification green on the branch',
-    expected: 'verificationStatus: passed',
+    expected: 'verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)',
     overridable: true,
   },
   { id: 'merged', num: 4, title: 'Merged to main', expected: 'PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)', overridable: true },
