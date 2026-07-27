@@ -11,6 +11,7 @@ export type { ReviewConvoyLiveness } from './deacon-review-status.js';
 export {
   checkStuckReviewing,
   checkCompletedButUnsignaledReviews,
+  reconcileUnappliedReviewVerdicts,
   isSynthesisForActiveReviewRun,
 } from './deacon-review-unsignaled.js';
 export {

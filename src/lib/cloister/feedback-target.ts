@@ -1,5 +1,6 @@
 import { Effect } from 'effect';
 
+import { readFeedbackAgentStates } from '../agents/agent-state-source.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { readIssueRecordSync, type PanIssueRecord } from '../pan-dir/record.js';
 import { updateIssueRecord } from '../pan-dir/record-update.js';
@@ -17,6 +18,10 @@ export interface ResolveIssueFeedbackTargetOptions {
 
 async function isLiveSession(agentId: string): Promise<boolean> {
   return Effect.runPromise(sessionExists(agentId));
+}
+
+function isWorkFeedbackTarget(role: string): boolean {
+  return role === 'work';
 }
 
 function slotAgentId(issueId: string, slotIndex: number, assignedAgentId?: string): string {
@@ -98,6 +103,15 @@ export async function resolveIssueFeedbackTarget(
     if (fallback) {
       await updateIssueRecord(project, normalizedIssue, (current) => selfHealSlotAssignment(current, fallback.agentId, fallback.slotIndex, requestedItemId));
       return { agentId: fallback.agentId };
+    }
+  }
+
+  const registeredAgents = readFeedbackAgentStates();
+  if (registeredAgents) {
+    for (const agent of registeredAgents) {
+      if (agent.issueId.toUpperCase() !== normalizedIssue) continue;
+      if (!isWorkFeedbackTarget(agent.role)) continue;
+      if (await isLiveSession(agent.id)) return { agentId: agent.id };
     }
   }
 

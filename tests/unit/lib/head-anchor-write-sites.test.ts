@@ -45,6 +45,7 @@ const ALLOWED_WRITE_SITES: AllowedWriteSite[] = [
   allow('src/lib/agents/spawn.ts', 'reviewedAtCommit', 'reviewedAtCommit: preservation.refreshedAnchor', 'Drift evaluator advances a proven-benign anchor before work-agent spawn.'),
   allow('src/lib/cloister/deacon-review-signals.ts', 'reviewedAtCommit', 'reviewedAtCommit: fallbackHead', 'Producer-fed blocked fallback-synthesis review stamp.'),
   allow('src/lib/cloister/deacon-review-status.ts', 'reviewedAtCommit', "reviewUpdate['reviewedAtCommit'] = await snapshotWorkspaceHeadsPromise(issueId, workspacePath)", 'Producer-fed review recovery stamp.'),
+  allow('src/lib/cloister/deacon-review-unsignaled.ts', 'reviewedAtCommit', 'reviewedAtCommit: currentHead', 'Producer-fed pending-verdict recovery stamp after the context anchor matches current HEAD.'),
   allow('src/lib/cloister/deacon.ts', 'reviewedAtCommit', 'reviewedAtCommit: status.reviewedAtCommit', 'Diagnostic nudge payload mirrors persisted status.'),
   allow('src/lib/cloister/deacon.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: status.lastVerifiedCommit', 'Diagnostic nudge payload mirrors persisted status.'),
   allow('src/lib/cloister/deacon.ts', 'reviewedAtCommit', 'reviewedAtCommit', 'Producer-fed verification-bypass stamp.'),

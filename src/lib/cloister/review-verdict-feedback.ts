@@ -23,6 +23,7 @@ import { clearFeedbackDeliveryStuck, getReviewStatusSync } from '../review-statu
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
+import { findVerdictReport } from './review-verdict-report.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -53,11 +54,11 @@ async function findLatestSynthesis(workspacePath: string): Promise<{ path: strin
   const entries = await readdir(reviewRoot, { withFileTypes: true });
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const synthesisPath = join(reviewRoot, entry.name, 'synthesis.md');
-    if (!existsSync(synthesisPath)) continue;
-    const fileStat = await stat(synthesisPath);
+    const report = findVerdictReport(join(reviewRoot, entry.name));
+    if (!report) continue;
+    const fileStat = await stat(report.path);
     if (!latest || fileStat.mtimeMs > latest.mtimeMs) {
-      latest = { path: synthesisPath, mtimeMs: fileStat.mtimeMs };
+      latest = { path: report.path, mtimeMs: fileStat.mtimeMs };
     }
   }
 

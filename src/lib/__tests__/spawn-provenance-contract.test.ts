@@ -21,15 +21,15 @@ describe('spawn provenance contract', () => {
   });
 
   it('fails closed when no immediate or inherited origin is available', () => {
-    expect(() => resolveAgentStartedBy(undefined, undefined, undefined)).toThrow(
+    expect(() => resolveAgentStartedBy(undefined, undefined, '')).toThrow(
       'Agent spawn provenance is required',
     );
   });
 
   it('normalizes explicit and flywheel origins', () => {
-    expect(resolveAgentStartedBy(' operator:cli:pan-start ', undefined, undefined))
+    expect(resolveAgentStartedBy(' operator:cli:pan-start ', undefined, ''))
       .toBe('operator:cli:pan-start');
-    expect(resolveAgentStartedBy(undefined, 'RUN-42', undefined)).toBe('flywheel:RUN-42');
+    expect(resolveAgentStartedBy(undefined, 'RUN-42', '')).toBe('flywheel:RUN-42');
   });
 
   it('treats blank inherited CLI provenance as unset', () => {

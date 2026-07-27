@@ -105,6 +105,38 @@ The full round trip between the work agent and review:
 
 ---
 
+## Verdict application and fallback sweeps
+
+A completed review writes its verdict under `.pan/review/<runId>/`. Full convoy
+reviews write `synthesis.md`; quick self-reviews write `review.md`. Both files
+use the same heading contract: `## Verdict: APPROVED` for a pass or
+`## Verdict: CHANGES REQUESTED — <one-line top blocker>` for a blocked review.
+The shared verdict-report reader accepts both filenames and this vocabulary, so
+recovery does not depend on which review mode produced the report.
+
+Verdict application has three ordered layers:
+
+1. The review agent signals through `pan admin specialists done review`, which
+   durably writes review status and delivers blocked feedback before the run is
+   considered complete.
+2. `checkCompletedButUnsignaledReviews()` recovers a report whose status remains
+   `reviewing`: it nudges a live review parent once, then applies the verdict if
+   the parent stays unresponsive or has died.
+3. `reconcileUnappliedReviewVerdicts()` repairs the incident shape where a
+   report exists but review status has already reset to `pending`. It uses the
+   same nudge-first policy and applies the on-disk verdict after the grace
+   period, with an activity entry naming the sweep.
+
+The fallback sweeps fail closed. They wait for the report settle window, reject
+a report when the current workspace HEAD differs from `context.json`'s review
+anchor, and skip it when a newer `reviewRequestedAt` postdates the report. A
+blocked verdict resolves its work-agent delivery target through the agents table
+before resurrection or escalation, so `feedback_delivery_needs_you` means no
+eligible live registered session was found rather than that only the canonical
+tmux name was checked.
+
+---
+
 ## Polyrepo workspaces (PAN-2948)
 
 For `workspace.type: polyrepo` projects the workspace root is a one-commit

@@ -33,7 +33,7 @@ import { checkInspectAgentTimeouts } from './deacon-inspect.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
 import { checkPostReviewCommits } from './deacon-post-review-commits.js';
 import { patrolStrikeLandings } from './deacon-strike-landing.js';
-import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, monitorReviewConvoySignals, cleanupOrphanedReviewSessions, checkStalledReviewDiscovery, checkStalledReviewParents, checkReviewForkCacheMisses } from './deacon-review.js';
+import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, reconcileUnappliedReviewVerdicts, monitorReviewConvoySignals, cleanupOrphanedReviewSessions, checkStalledReviewDiscovery, checkStalledReviewParents, checkReviewForkCacheMisses } from './deacon-review.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileStuckMergingStates, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileAutoMergeRows, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 import { reconcileBranchInvalidation } from './branch-invalidation.js';
@@ -1137,6 +1137,7 @@ export {
   checkMissingReviewStatuses,
   checkStuckReviewing,
   checkCompletedButUnsignaledReviews,
+  reconcileUnappliedReviewVerdicts,
   monitorReviewConvoySignals,
   cleanupOrphanedReviewSessions,
   synthesizeReviewFromReports,
@@ -2855,6 +2856,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const unsignaledReviewActions = await checkCompletedButUnsignaledReviews();
   actions.push(...unsignaledReviewActions);
   for (const a of unsignaledReviewActions) addLog('action', a, state.patrolCycle);
+
+  // Repair verdicts that reached disk after their review status was reset to pending.
+  const unappliedReviewActions = await reconcileUnappliedReviewVerdicts();
+  actions.push(...unappliedReviewActions);
+  for (const a of unappliedReviewActions) addLog('action', a, state.patrolCycle);
 
   // PAN-796: Bypass review for issues where verification passed but review infra keeps failing
   const verifContradictionActions = await checkVerificationReviewContradiction();
