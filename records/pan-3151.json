@@ -223,7 +223,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T13:54:16.168Z",
+  "updated": "2026-07-27T14:08:47.409Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "passed",
@@ -233,13 +233,20 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T13:54:16.153Z",
+    "updatedAt": "2026-07-27T14:08:47.391Z",
     "reviewNotes": "v61 migration repair is now covered by a regression test that fails on the prior broken implementations",
     "testNotes": "Workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3151, branch feature/pan-3151. Gates: bun install --frozen-lockfile OK; npm run typecheck OK (root, hooks, evals, dashboard 62 known/0 new, frontend 0/0 new); npm run lint OK (eslint + all custom guards, exit 0); npm run build OK. Tests: root `npx vitest run --no-file-parallelism` = 11557 passed, 1 failed, 50 skipped (1247 files, 1 failed). The 1 failure (orphan-proposed-reconciler.test.ts > 'surfaces only the actioned spawn outcome...PAN-1626') is unrelated to this branch: root-caused by reading orphan-proposed-reconciler.ts, which calls the live listSessionNames() directly in its spawn-attempt path (unlike the scan path, which honors the injected tmuxSessionNames option) - it picked up the genuinely live 'agent-pan-3151' tmux session on this machine (this issue's own real work-agent session, confirmed via `tmux -L overdeck list-sessions`), causing a false skip. File not in PAN-3151's diff; pre-existing test-isolation gap unrelated to this change. Frontend `npm test` (src/dashboard/frontend) = 276 files / 2556 tests, all passed. UAT: dashboard-trend-display xBRIEF item adds a UI banner (IssueHeader.tsx, gated on reviewStatus.stuckReason==='review-not-converging', rendering 'Review cycles: <series> - not converging. Consider decomposing...' with var(--warning) styling matching existing warn-banner conventions) - judged UI-facing, so browser UAT required. Rebuilt (npm run build) and restarted this workspace's own isolated devcontainer (feature-pan-3151.overdeck.localhost / api-feature-pan-3151.overdeck.localhost) rather than the shared production dashboard (avoided disrupting 125 other active agents). Verified via Playwright: app boots cleanly on the fresh build, no console errors related to this change (only unrelated dev-sandbox PostHog-token and pending-input-403 noise). Verified via source inspection that the banner logic is correctly wired to the new reviewCycleHistory/stuckReason fields. Could not fully render the live banner end-to-end in the sandbox because the isolated devcontainer has no GitHub-tracker-backed issue data by design (no shared host credentials/state, per single-deacon invariant) - attempted synthetic DB fixture + minimal projects.yaml in the container's own isolated DB to surface a test issue, but the issue list is populated via tracker sync rather than raw DB rows, so the specific banner could not be triggered live; cleaned up the synthetic fixture afterward. Review status: reviewStatus=passed (cycle 9, no new blocking findings), verificationStatus=passed.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since 050c54f (6 paths): drizzle/overdeck/0000_overdeck_init.sql, scripts/file-size-allowlist.txt, src/lib/database/schema.ts, …",
+        "detectedAt": "2026-07-27T14:08:42.556Z"
+      }
+    ],
     "conflictsSince": {
-      "sha": "5ae5d217844e7391d328cfee02c7cc0431b1c18c",
-      "detectedAt": "2026-07-27T13:50:37.309Z",
+      "sha": "050c54fb3ec155db17aaa23ddcba7a05d3f345a4",
+      "detectedAt": "2026-07-27T14:08:42.556Z",
       "paths": [
         "drizzle/overdeck/0000_overdeck_init.sql",
         "scripts/file-size-allowlist.txt",
@@ -274,10 +281,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 164,
-            "output": 35163,
-            "cacheRead": 15937975,
-            "cacheWrite": 255526
+            "input": 254,
+            "output": 68230,
+            "cacheRead": 23492805,
+            "cacheWrite": 462717
           }
         },
         "work": {
@@ -303,10 +310,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 164,
-          "output": 35163,
-          "cacheRead": 15937975,
-          "cacheWrite": 255526
+          "input": 254,
+          "output": 68230,
+          "cacheRead": 23492805,
+          "cacheWrite": 462717
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 3573,
@@ -316,8 +323,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 181.1978343,
-        "pricingAsOf": "2026-07-27T13:54:16.162Z"
+        "usd": 183.5576303,
+        "pricingAsOf": "2026-07-27T14:08:47.400Z"
       }
     },
     "merges": [
