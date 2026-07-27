@@ -12,9 +12,27 @@
       "timestamp": "2026-07-27T04:56:53.891Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-27T06:05Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-27T06:05:17.701Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-27T06:05:17.840Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-27T06:05:17Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3184\n\nFR-3 measures clean-shutdown freshness at grace expiry instead of bootStartedAt; the required marker round-trip test is also missing\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3184 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/cloister/__tests__/pan-1908-reactive-liveness.test.ts",
@@ -56,7 +74,7 @@
     "recordedAt": "2026-07-27T05:50:18.081Z"
   },
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T06:05:17.102Z",
+  "updated": "2026-07-27T06:05:17.841Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "blocked",
