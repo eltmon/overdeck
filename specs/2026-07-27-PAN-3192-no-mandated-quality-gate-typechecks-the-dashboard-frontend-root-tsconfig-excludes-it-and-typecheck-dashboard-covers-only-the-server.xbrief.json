@@ -1,0 +1,318 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-27T04:44:12Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3192: No mandated quality gate typechecks the dashboard frontend — root tsconfig excludes it and typecheck:dashboard covers only the server",
+    "updated": "2026-07-27T04:53:34.602Z"
+  },
+  "plan": {
+    "id": "pan-3192",
+    "title": "No mandated quality gate typechecks the dashboard frontend — root tsconfig excludes it and typecheck:dashboard covers only the server",
+    "status": "proposed",
+    "uid": "f0e9f1a5-14d0-4f9b-aac9-8706a46a9e0f",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-27T04:44:12Z",
+    "updated": "2026-07-27T04:53:34.602Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3192",
+        "label": "PAN-3192",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "quality-gates",
+      "typecheck",
+      "dashboard-frontend",
+      "ratchet",
+      "infra"
+    ],
+    "narratives": {
+      "Problem": "No mandated gate (npm run typecheck / lint / test) typechecks src/dashboard/frontend: the root tsconfig excludes src/dashboard/**, typecheck:dashboard covers only the server, and the frontend has no typecheck script. Frontend-only type errors pass every local gate and fail only in CI — PAN-3156 burned two flywheel runs on a one-line error its agent's gates structurally could not see, and a non-zero backlog let the agent mistake its own error for pre-existing noise.",
+      "Proposal": "Add scripts/lint-frontend-types.sh, a shrink-only ratchet mirroring lint-dashboard-types.sh count semantics, whose baseline file stores the sorted 'error TS' lines (not just an integer) so failure output can label errors with no baseline match as NEW versus the known backlog. Wire it as typecheck:frontend into the root npm run typecheck chain — one edit that covers local agents, the verification runner, and CI — add a typecheck script to the frontend package.json, cover the ratchet with a hermetic six-case regression test, and update the CLAUDE.md quality-gates bullet. The full script content and seed procedure are pinned in the PRD at .pan/drafts/PAN-3192.md; the script was prototype-tested in /tmp against every branch during planning.",
+      "NonGoals": "- Driving the pre-existing frontend type-error backlog to zero (the ratchet only prevents growth; --update lowers it as errors are fixed)\n- Changing what root npm test runs for the frontend (the three named frontend test files stay as-is)\n- Editing .github/workflows/*.yml — the gate rides the existing npm run typecheck CI step\n- Editing ~/.overdeck/projects.yaml (operator-owned; its ratchet-less frontend-typecheck gate may be dropped by the operator after this lands)\n- Changing scripts/lint-dashboard-types.sh or migrating the server guard to the error-list baseline format\n- Extending scripts/lint-ratchet-audit.sh to the new baseline (the script self-enforces shrink-only, same trust model as the server baseline)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Count-based gate with error-list baseline and advisory NEW/known annotation, instead of a fingerprint-based gate",
+        "rationale": "The issue asks both for a ratchet mirroring lint-dashboard-types.sh and for failure output that distinguishes new errors from the backlog. A fingerprint gate would false-fail the pipeline whenever a dependency bump rewords a pre-existing error's message; the count-based gate can never false-fail on drift, and annotation is only needed when the gate is already red — exactly when the agent must find its own error."
+      },
+      {
+        "summary": "Wire the guard into root npm run typecheck; no CI workflow or projects.yaml edits",
+        "rationale": "The verification runner's typecheck gate and CI's build job both already invoke npm run typecheck, so one wiring point covers every mandated surface; the operator-local projects.yaml frontend-typecheck gate is operator-owned config and out of scope."
+      },
+      {
+        "summary": "lint-ratchet-audit.sh not extended to scripts/frontend-types-baseline.txt",
+        "rationale": "The baseline self-enforces shrink-only through --update refusal, identical to the existing dashboard-types baseline which the audit also deliberately does not cover."
+      },
+      {
+        "summary": "Seed the baseline by measuring at implementation time, with exact seed commands for the 0-error and >0-error cases in the PRD",
+        "rationale": "The live count was 0 on main as of 2026-07-27 but main moves; --update cannot be used for seeding because it refuses to raise from an empty baseline."
+      }
+    ],
+    "items": [
+      {
+        "id": "frontend-types-guard-script",
+        "title": "Create scripts/lint-frontend-types.sh ratchet guard and seed scripts/frontend-types-baseline.txt",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:44:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3192",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-frontend-types.sh",
+            "scripts/frontend-types-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-frontend-types.sh"
+          ],
+          "expected_outputs": [
+            "exits 0 and prints '✓ frontend-types guard passed' on the seeded branch"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create scripts/lint-frontend-types.sh (mode 0755) with EXACTLY the content pinned in the PRD at .pan/drafts/PAN-3192.md work item 1 — a shrink-only ratchet over `npx tsc --noEmit -p src/dashboard/frontend/tsconfig.json` whose baseline file stores sorted 'error TS' lines and whose failure output labels NEW vs known errors (position-stripped comparison keys). Then measure the live error count and seed scripts/frontend-types-baseline.txt using the PRD's measure-then-seed rule (header-only when the count is 0; the direct seed command when > 0 — never --update for seeding). Verify the seeded branch passes, then temporarily introduce a frontend type error, confirm the script exits 1 and names it under 'NEW: ', and revert."
+        },
+        "items": [
+          {
+            "id": "frontend-types-guard-script.ac1",
+            "title": "Given a seeded baseline, when `bash scripts/lint-frontend-types.sh` runs from the repo root, then it exits 0 and prints '✓ frontend-types guard passed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-types-guard-script.ac2",
+            "title": "When a frontend type error is temporarily introduced, the script exits 1 and prints that error under a 'NEW: ' label; after the edit is reverted it exits 0 again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-types-guard-script.ac3",
+            "title": "scripts/frontend-types-baseline.txt exists containing '#' header lines plus one sorted 'error TS' line per baselined error (header only when the live count is 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-types-guard-script.ac4",
+            "title": "When the live error count exceeds the baselined count, `bash scripts/lint-frontend-types.sh --update` exits 1 with 'refusing to raise the baseline' and leaves the baseline file unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-typecheck-gates",
+        "title": "Wire the frontend guard into root npm run typecheck and add a typecheck script to the frontend package.json",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:44:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3192",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json",
+            "src/dashboard/frontend/package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "root typecheck chain completes and its output contains '✓ frontend-types guard passed'"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In root package.json, append ' && npm run typecheck:frontend' to the typecheck chain and add '\"typecheck:frontend\": \"bash scripts/lint-frontend-types.sh\"' next to typecheck:dashboard. In src/dashboard/frontend/package.json, add '\"typecheck\": \"tsc --noEmit\"' to scripts. Exact before/after JSON is pinned in the PRD work item 2. No .github/workflows edits — CI's build job already runs npm run typecheck."
+        },
+        "items": [
+          {
+            "id": "wire-typecheck-gates.ac1",
+            "title": "`npm run typecheck` from the repo root runs the frontend guard and its output contains '✓ frontend-types guard passed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-typecheck-gates.ac2",
+            "title": "`cd src/dashboard/frontend && npm run typecheck` runs tsc --noEmit over the frontend and exits 0 on the seeded tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-typecheck-gates.ac3",
+            "title": "`node -p \"require('./package.json').scripts['typecheck:frontend']\"` prints 'bash scripts/lint-frontend-types.sh' and `node -p \"require('./package.json').scripts.typecheck\"` prints a chain ending with '&& npm run typecheck:frontend'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-types-ratchet-test",
+        "title": "Add hermetic regression test for the ratchet's shrink-only behavior",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:44:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3192",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/scripts/lint-frontend-types.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/lint-frontend-types.test.ts"
+          ],
+          "expected_outputs": [
+            "all six cases pass without invoking a real tsc"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/unit/scripts/lint-frontend-types.test.ts mirroring the harness shape of tests/unit/scripts/lint-file-size.test.ts: mkdtempSync a temp dir, copy the real script and a written baseline into <tmp>/scripts/, stub npx via <tmp>/bin/npx (a two-line script that cats $FAKE_TSC_OUTPUT) on PATH, and run via execFileSync('bash', ...). Six cases per PRD work item 3: parity green; growth red with NEW/known labeling; stale-on-shrink then --update lowers; --update refuses to raise (baseline byte-identical); missing baseline hard error; line-shifted pre-existing error not relabeled NEW while a genuinely new error is. The test never runs a real tsc (NFR-2)."
+        },
+        "items": [
+          {
+            "id": "frontend-types-ratchet-test.ac1",
+            "title": "`npx vitest run tests/unit/scripts/lint-frontend-types.test.ts` passes all six cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-types-ratchet-test.ac2",
+            "title": "The suite stubs npx via a PATH-injected fake reading $FAKE_TSC_OUTPUT, so it passes without invoking the repository's real typescript compiler",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-types-ratchet-test.ac3",
+            "title": "One case proves --update refuses growth: it exits 1 with 'refusing to raise the baseline' and the baseline file is byte-identical afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-types-ratchet-test.ac4",
+            "title": "One case exits 1 and prints a NEW section that contains the genuinely new error but not the line-shifted pre-existing error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-quality-gates-frontend",
+        "title": "Update the CLAUDE.md quality-gates bullet to state the frontend is covered",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-27T04:44:12Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3192",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"lint-frontend-types\" CLAUDE.md"
+          ],
+          "expected_outputs": [
+            "prints the quality-gates bullet naming both dashboard ratchet scripts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In CLAUDE.md's '**Quality gates**' section, replace the '- `npm run typecheck` — TypeScript strict mode' bullet with the exact wording pinned in PRD work item 4, naming scripts/lint-dashboard-types.sh and scripts/lint-frontend-types.sh as the shrink-only ratchets guarding the two dashboard halves. No Mintlify page documents the repo's gate scripts, so CLAUDE.md plus the script header is the complete documented surface."
+        },
+        "items": [
+          {
+            "id": "docs-quality-gates-frontend.ac1",
+            "title": "`grep -n \"lint-frontend-types\" CLAUDE.md` prints the quality-gates bullet naming both dashboard ratchet scripts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-quality-gates-frontend.ac2",
+            "title": "`grep -A4 '\\*\\*Quality gates\\*\\*' CLAUDE.md` prints the updated typecheck bullet inside the Quality gates section, above the lint and test bullets",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "frontend-types-guard-script",
+        "to": "wire-typecheck-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-types-guard-script",
+        "to": "frontend-types-ratchet-test",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-27-PAN-3192-no-mandated-quality-gate-typechecks-the-dashboard-frontend-root-tsconfig-excludes-it-and-typecheck-dashboard-covers-only-the-server.xbrief.json"
+    }
+  },
+  "status": "proposed"
+}
