@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T04:56:34.846Z",
+  "updated": "2026-07-27T05:04:51.709Z",
   "pipeline": {
     "issueId": "PAN-3191",
     "reviewStatus": "pending",
@@ -38,16 +38,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "auto-merge-rows-reconciler": {
-        "writerId": "agent-pan-3191",
-        "agentId": "agent-pan-3191",
-        "pid": 3294408,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T04:56:34.846Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3191",
@@ -59,12 +51,27 @@
         "outcome": "completed",
         "reason": "Expanded markMerged to close pending, blocked, failed, and merging rows while preserving merged/cancelled rows; added passing regression coverage.",
         "releasedAt": "2026-07-27T04:56:20.779Z"
+      },
+      {
+        "writerId": "agent-pan-3191",
+        "agentId": "agent-pan-3191",
+        "pid": 3294408,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T04:56:34.846Z",
+        "itemId": "auto-merge-rows-reconciler",
+        "outcome": "completed",
+        "reason": "Added a deacon reconciler that cancels closed-out pending/problem rows, confirms late merges through the forge, closes duplicate rows together, cools down unsuccessful checks, and leaves merging rows untouched; wired it into patrol with seven regression cases.",
+        "releasedAt": "2026-07-27T05:04:51.709Z"
       }
     ],
     "statusReasons": {
       "widen-markmerged-precondition": {
         "reason": "Expanded markMerged to close pending, blocked, failed, and merging rows while preserving merged/cancelled rows; added passing regression coverage.",
         "updatedAt": "2026-07-27T04:56:20.779Z"
+      },
+      "auto-merge-rows-reconciler": {
+        "reason": "Added a deacon reconciler that cancels closed-out pending/problem rows, confirms late merges through the forge, closes duplicate rows together, cools down unsuccessful checks, and leaves merging rows untouched; wired it into patrol with seven regression cases.",
+        "updatedAt": "2026-07-27T05:04:51.709Z"
       }
     }
   },
@@ -73,6 +80,11 @@
     "widen-markmerged-precondition.widen-markmerged-precondition.ac1": "completed",
     "widen-markmerged-precondition.widen-markmerged-precondition.ac2": "completed",
     "widen-markmerged-precondition.widen-markmerged-precondition.ac3": "completed",
-    "auto-merge-rows-reconciler": "running"
+    "auto-merge-rows-reconciler": "completed",
+    "auto-merge-rows-reconciler.auto-merge-rows-reconciler.ac1": "completed",
+    "auto-merge-rows-reconciler.auto-merge-rows-reconciler.ac2": "completed",
+    "auto-merge-rows-reconciler.auto-merge-rows-reconciler.ac3": "completed",
+    "auto-merge-rows-reconciler.auto-merge-rows-reconciler.ac4": "completed",
+    "auto-merge-rows-reconciler.auto-merge-rows-reconciler.ac5": "completed"
   }
 }
