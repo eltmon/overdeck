@@ -1,7 +1,9 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { ConversationEvent } from '@overdeck/contracts';
+import { createConversation } from '../../../../../src/lib/overdeck/conversations.js';
+import { getConversationMessagesRead } from '../../../../../src/lib/overdeck/conversation-reads.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   startSubagentListPolling,
@@ -22,6 +24,19 @@ async function writeMeta(agentId: string, toolUseId: string): Promise<void> {
     toolUseId,
     spawnDepth: 1,
   }));
+}
+
+function createConversationRecord(): string {
+  const name = `subagent-rest-${basename(tempDir)}`;
+  createConversation({ name, tmuxSession: `conv-${name}`, cwd: tempDir });
+  return name;
+}
+
+function readMessages(name: string, agentId?: string) {
+  return getConversationMessagesRead(name, {
+    resolveSessionFile: async () => sessionFile,
+    shouldReportUnresolvedLiveSession: () => false,
+  }, agentId);
 }
 
 describe('conversation subagent list emission', () => {
@@ -110,5 +125,42 @@ describe('conversation subagent list emission', () => {
     await vi.advanceTimersByTimeAsync(4_000);
     await poller.refresh();
     expect(events).toHaveLength(2);
+  });
+
+  it('returns a subagent transcript and includes done subagents in the parent response', async () => {
+    const name = createConversationRecord();
+    await writeFile(sessionFile, `${JSON.stringify({
+      type: 'user',
+      uuid: 'parent-user',
+      timestamp: '2026-07-18T00:00:00.000Z',
+      message: { content: [{ type: 'text', text: 'Parent transcript' }] },
+    })}\n`);
+    await writeMeta('reader', 'toolu_reader');
+    await writeFile(join(subagentsDirFor(sessionFile), 'agent-reader.jsonl'), `${JSON.stringify({
+      type: 'user',
+      uuid: 'subagent-user',
+      timestamp: '2026-07-18T00:01:00.000Z',
+      message: { content: [{ type: 'text', text: 'Subagent transcript' }] },
+    })}\n`);
+
+    const parent = (await readMessages(name)).body as Record<string, unknown>;
+    expect(parent.subagents).toEqual([expect.objectContaining({ agentId: 'reader', status: 'done' })]);
+
+    const subagent = (await readMessages(name, 'reader')).body as {
+      messages: Array<{ text: string }>;
+      subagents?: unknown;
+    };
+    expect(subagent.messages.map((message) => message.text)).toEqual(['Subagent transcript']);
+    expect(subagent.subagents).toBeUndefined();
+  });
+
+  it('rejects traversal-unsafe subagent ids before parsing a transcript', async () => {
+    const name = createConversationRecord();
+    await writeFile(sessionFile, '');
+
+    const response = await readMessages(name, '../evil');
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'Invalid subagent id' });
   });
 });
