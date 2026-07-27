@@ -62,18 +62,18 @@
     "recordedAt": "2026-07-27T05:19:11.339Z"
   },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T05:37:57.431Z",
+  "updated": "2026-07-27T05:56:55.437Z",
   "pipeline": {
     "issueId": "PAN-3191",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:20:05.037Z",
-    "updatedAt": "2026-07-27T05:37:57.417Z",
-    "reviewNotes": "Reconciler's fixed 100-row window permanently starves newer auto-merge rows and violates FR-2/FR-4",
+    "updatedAt": "2026-07-27T05:56:55.374Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
     "reviewedAtCommit": "4e70e23b3d350414e916d6a4fb3120eac6d9cf5f",
     "reviewSpawnedAt": "2026-07-27T05:24:04.488Z",
@@ -116,32 +116,32 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1127407,
-            "output": 147970,
-            "cacheRead": 20493312,
+            "input": 1134803,
+            "output": 148324,
+            "cacheRead": 20883456,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 671868,
-            "output": 79004,
-            "cacheRead": 25672192,
+            "input": 1255949,
+            "output": 102840,
+            "cacheRead": 33047040,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1799275,
-          "output": 226974,
-          "cacheRead": 46165504,
+          "input": 2390752,
+          "output": 251164,
+          "cacheRead": 53930496,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 38.888347,
-        "pricingAsOf": "2026-07-27T05:37:57.423Z"
+        "usd": 46.453928,
+        "pricingAsOf": "2026-07-27T05:56:55.432Z"
       }
     },
     "merges": [
