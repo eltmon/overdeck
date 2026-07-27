@@ -7690,3 +7690,9 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - Close-out blocks on the familiar transient trio (post-merge, CI `in_progress` on the merge commit, deploy). **Third instance of this exact shape; it resolves itself.** No deploy this tick — checked CI as its own command and read `in_progress`.
 - **Second time a watch tick has caught newly-green work.** The queues were empty for six ticks, then PAN-3111; empty again, then PAN-3154. **Staying on watch keeps paying out precisely because the arrivals are unpredictable.**
 - **RUN TOTALS: 42 close-outs, 11 merges, merge queue 15 → 0, 9 substrate bugs filed of which 6 fixed, merged and closed out.**
+
+## RUN-72 tick 28 (2026-07-27 13:06Z) — PAN-3154 closed; third clean run of the deploy-then-close sequence
+- CI green on `127b037f13`, no verifications running, deployed `a84fff5008` → `17f83f376104` (clean, pid 2119133, systemd-parented, deacon `False`→`True`), then **PAN-3154 CLOSED OUT**.
+- **The transient trio cleared itself for the third consecutive time** (PAN-3194, PAN-3111, PAN-3154). That pattern is now well enough established to treat as expected rather than investigated — post-merge, main-verify and deploy simply need CI plus a deploy, and reaching for `--accept-*` on any of them would have been wrong every time.
+- Post-close sweep: ready queue empty, MIN-879 cache still present. **MIN-879 is again the only queue-lane item with a path forward.**
+- **RUN TOTALS: 43 close-outs, 11 merges, merge queue 15 → 0, 9 substrate bugs filed of which 6 fixed, merged and closed out.**
