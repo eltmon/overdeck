@@ -129,7 +129,7 @@
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T05:58:55.904Z",
+    "updatedAt": "2026-07-27T05:59:09.651Z",
     "reviewNotes": "canonicalizer collapses distinct directed cycles with the same member set",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2462",
     "lastVerifiedCommit": "75c9e21e9967d6d7b8ebc6ccfccc97748c620b9f",
@@ -171,7 +171,7 @@
       "recordedAt": "2026-07-07T12:40:16.148Z"
     },
     "closedOut": true,
-    "closedOutAt": "2026-07-27T05:58:55.904Z"
+    "closedOutAt": "2026-07-27T05:59:09.651Z"
   },
   "closeOut": {
     "usage": {
@@ -253,14 +253,14 @@
     ],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-27T05:58:55.930Z",
+      "evaluatedAt": "2026-07-27T05:59:09.674Z",
       "rows": [
         {
           "id": "review",
           "num": 1,
           "title": "Review passed",
           "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
-          "observed": "reviewStatus: pending; settled because the tracker issue is closed and merged work is landed",
+          "observed": "reviewStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
           "status": "skip"
         },
         {
@@ -268,7 +268,7 @@
           "num": 2,
           "title": "Tests passed",
           "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "testStatus: pending; settled because the tracker issue is closed and merged work is landed",
+          "observed": "testStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
           "status": "skip"
         },
         {
@@ -276,8 +276,8 @@
           "num": 3,
           "title": "Verification green on the branch",
           "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "verificationStatus: passed at 75c9e21e9967d6d7b8ebc6ccfccc97748c620b9f",
-          "status": "pass"
+          "observed": "verificationStatus: missing at 75c9e21e9967d6d7b8ebc6ccfccc97748c620b9f (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
         },
         {
           "id": "merged",
@@ -320,13 +320,13 @@
           "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
           "overridable": false,
           "status": "pass",
-          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; Removed 2 agent state directories; No strike branch strike/pan-2230 found; Pruned 0 checkpoint ref(s) for agent-pan-2230, planning-pan-2230, strike-pan-2230; No specialist registry entries for PAN-2230"
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; No strike branch strike/pan-2230 found; Pruned 0 checkpoint ref(s) for agent-pan-2230, planning-pan-2230, strike-pan-2230; No specialist registry entries for PAN-2230"
         }
       ],
       "accepted": []
     }
   },
   "created": "2026-07-07T11:40:53.373Z",
-  "updated": "2026-07-27T05:58:55.936Z",
+  "updated": "2026-07-27T05:59:09.690Z",
   "reviewMode": "quick"
 }
