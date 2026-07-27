@@ -366,8 +366,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toBeNull();
   });
 
-  it('auto-spawns a work agent and consumes current-cycle consent', async () => {
-    const consumeAutoSpawnConsent = vi.fn(async () => undefined);
+  it('auto-spawns a work agent through the launch-owned consent boundary', async () => {
     const fetchImpl: typeof fetch = async (input, init) => {
       expect(String(input)).toBe('http://127.0.0.1:3011/api/agents');
       expect(init?.method).toBe('POST');
@@ -388,17 +387,13 @@ describe('completePlanningArtifacts', () => {
       autoSpawn: true,
       dashboardOrigin: 'http://127.0.0.1:3011',
       fetchImpl,
-      consumeAutoSpawnConsent,
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1146',
     });
-    expect(consumeAutoSpawnConsent).toHaveBeenCalledWith('PAN-1146');
   });
 
-  it('retains consent when the accepted response only queues container startup', async () => {
-    const consumeAutoSpawnConsent = vi.fn(async () => undefined);
-
+  it('reports queued container startup without claiming launch acceptance', async () => {
     await expect(completePlanningAutoSpawn({
       issueId: 'PAN-1146',
       autoSpawn: true,
@@ -408,30 +403,11 @@ describe('completePlanningArtifacts', () => {
         startingContainers: true,
         agentId: 'agent-pan-1146',
       }), { status: 200 }),
-      consumeAutoSpawnConsent,
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentQueued: true,
       workAgentSession: 'agent-pan-1146',
     });
-    expect(consumeAutoSpawnConsent).not.toHaveBeenCalled();
-  });
-
-  it('reports a successful auto-spawn when consent cleanup fails', async () => {
-    const logWarning = vi.fn();
-
-    await expect(completePlanningAutoSpawn({
-      issueId: 'PAN-1146',
-      autoSpawn: true,
-      dashboardOrigin: 'http://127.0.0.1:3011',
-      fetchImpl: async () => new Response(JSON.stringify({ success: true, agentId: 'agent-pan-1146' }), { status: 200 }),
-      consumeAutoSpawnConsent: async () => { throw new Error('read-only filesystem'); },
-      logWarning,
-    })).resolves.toEqual({
-      workAgentSpawned: true,
-      workAgentSession: 'agent-pan-1146',
-    });
-    expect(logWarning).toHaveBeenCalledWith(expect.stringContaining('consent cleanup failed: read-only filesystem'));
   });
 
   it('retains current-cycle consent when auto-spawn fails', async () => {

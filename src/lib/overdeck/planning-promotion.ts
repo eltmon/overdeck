@@ -18,7 +18,7 @@ import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.j
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
 import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
 import { checkPrdGateSync, promoteWorkspacePrdDraft, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue } from '../pan-dir/index.js';
-import { resolveAutoSpawnOnFinalize, updateAutoSpawnConsentAfterWorkStart } from '../planning/spawn-planning-session.js';
+import { resolveAutoSpawnOnFinalize } from '../planning/spawn-planning-session.js';
 import { extractTeamPrefix, findProjectByPathSync, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
 import { markWorkspaceStuck } from '../review-status.js';
 import { isStateMigrated } from '../state-home.js';
@@ -328,8 +328,6 @@ export async function completePlanningAutoSpawn(options: {
   autoSpawn?: boolean;
   fetchImpl?: typeof fetch;
   dashboardOrigin?: string;
-  consumeAutoSpawnConsent?: (issueId: string) => Promise<void>;
-  logWarning?: (message: string) => void;
 }): Promise<CompletePlanningAutoSpawnResult | null> {
   if (options.autoSpawn !== true) {
     emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'skipped', 'autoSpawn not requested');
@@ -360,16 +358,6 @@ export async function completePlanningAutoSpawn(options: {
 
     if (response.ok && body['success'] !== false) {
       const workAgentQueued = body['startingContainers'] === true;
-      if (!workAgentQueued) {
-        try {
-          await (options.consumeAutoSpawnConsent ?? ((issueId) => updateAutoSpawnConsentAfterWorkStart(issueId, true)))(options.issueId);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          (options.logWarning ?? console.warn)(
-            `[complete-planning] Work start for ${options.issueId.toUpperCase()} succeeded, but auto-start consent cleanup failed: ${message}`,
-          );
-        }
-      }
       emitCompletePlanningPhase(
         options.issueId,
         'autoSpawn',

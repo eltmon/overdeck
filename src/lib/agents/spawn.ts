@@ -4,7 +4,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { homedir } from 'os';
-import { dirname, join, resolve } from 'path';
+import { join, resolve } from 'path';
 import { Effect } from 'effect';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
@@ -24,7 +24,6 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { writeBridgeTokenSync } from '../bridge-token.js';
 import { createSession, exactPaneTarget, sessionExists, setOption } from '../tmux.js';
-import { createActiveSlice } from '../xbrief/dag.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import {
   getAgentDir,
@@ -64,7 +63,6 @@ import {
   transitionIssueToInProgress,
   withSpawnTimeMemoryContext,
   assertWorkspaceStackHealthyForSpawn,
-  type RegisteredSlotSpawn,
   type SpawnOptions,
   type SpawnRunOptions,
 } from './spawn-prep.js';
@@ -83,6 +81,8 @@ import {
 import { stopAgent } from './termination.js';
 import { createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
 import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
+import { withAutoSpawnConsentClaim } from '../planning/auto-spawn-consent.js';
+import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './registered-slot-spawn.js';
 const execAsync = promisify(exec);
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
@@ -491,6 +491,16 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 }
 
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
+  const role: 'work' | 'strike' | 'knowledge' = options.role ?? 'work';
+  if (role !== 'work') return spawnAgentWithoutConsentClaim(options);
+  return withAutoSpawnConsentClaim(
+    options.issueId,
+    () => spawnAgentWithoutConsentClaim(options),
+    { isAccepted: (state) => state.status === 'running' && state.kickoffDelivered !== false },
+  );
+}
+
+async function spawnAgentWithoutConsentClaim(options: SpawnOptions): Promise<AgentState> {
   const role: 'work' | 'strike' | 'knowledge' = options.role ?? 'work';
   const sessionPrefix = role === 'strike' ? 'strike' : 'agent';
   const agentId = options.agentId ?? `${sessionPrefix}-${options.issueId.toLowerCase()}`;
@@ -911,69 +921,6 @@ function assertRegisteredSlotCap(issueId: string, configuredCap?: number): void 
     throw new Error(
       `Registered slot cap reached for ${issueId}: ${activeSlots.length}/${cap} active slot agents.`
     );
-  }
-}
-
-function buildRegisteredSlotPrompt(
-  issueId: string,
-  baseWorkspace: string,
-  slot: RegisteredSlotSpawn,
-  extraPrompt?: string,
-): string {
-  const doc = readWorkspacePlanSync(baseWorkspace);
-  if (!doc) {
-    throw new Error(
-      `Registered slot spawn for ${issueId} requires a readable xBRIEF plan in ${baseWorkspace}.`
-    );
-  }
-
-  const slice = createActiveSlice(doc, {
-    issueId: issueId.toUpperCase(),
-    itemId: slot.slotItemId,
-    currentItemIds: [slot.slotItemId],
-  });
-
-  const lines = [
-    `# Registered Slot Assignment: ${slot.slotItemId}`,
-    '',
-    `Issue: ${issueId}`,
-    `Slot: ${slot.slotIndex}`,
-    `Agent: ${slot.agentId}`,
-    `Branch: ${slot.branch}`,
-    `Workspace: ${slot.workspace}`,
-    '',
-    'You are a registered slot work agent. Implement only the target xBRIEF item below, keep changes scoped to that item, and do not merge this slot branch yourself.',
-    '',
-    slice.prompt,
-  ];
-
-  const trimmedExtra = extraPrompt?.trim();
-  if (trimmedExtra) {
-    lines.push('', '## Additional Foreman Instructions', trimmedExtra);
-  }
-
-  return lines.join('\n');
-}
-
-async function ensureRegisteredSlotWorktree(baseWorkspace: string, slot: RegisteredSlotSpawn): Promise<void> {
-  if (existsSync(slot.workspace)) return;
-
-  await mkdir(dirname(slot.workspace), { recursive: true });
-  const branchExists = await gitBranchExists(baseWorkspace, slot.branch);
-  const target = JSON.stringify(slot.workspace);
-  const branch = JSON.stringify(slot.branch);
-  const command = branchExists
-    ? `git worktree add ${target} ${branch}`
-    : `git worktree add -b ${branch} ${target} HEAD`;
-  await execAsync(command, { cwd: baseWorkspace });
-}
-
-async function gitBranchExists(workspace: string, branch: string): Promise<boolean> {
-  try {
-    await execAsync(`git show-ref --verify --quiet ${JSON.stringify(`refs/heads/${branch}`)}`, { cwd: workspace });
-    return true;
-  } catch {
-    return false;
   }
 }
 

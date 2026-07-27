@@ -35,7 +35,6 @@ import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.
 import { writeAutoStartXBrief } from '../../../../lib/xbrief/auto-synthesize.js';
 import { findPlan, readPlan } from '../../../../lib/xbrief/io.js';
 import { transitionXBriefOnMain, updatePlanStatus } from '../../../../lib/xbrief/lifecycle-io.js';
-import { updateAutoSpawnConsentAfterWorkStart } from '../../../../lib/planning/spawn-planning-session.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { ReadModelService } from '../../read-model.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -655,7 +654,6 @@ export const postAgentsRoute = HttpRouter.add(
       if (pipelineStatus?.stuckReason === 'planning_auto_handoff_failed') {
         clearWorkspaceStuck(issueId);
       }
-      await updateAutoSpawnConsentAfterWorkStart(issueId, true);
     };
     if (isRemote && workspaceMetadata) {
       const admitted = yield* Effect.promise(() => withActiveOrderDispatchReservation(

@@ -17,7 +17,6 @@ import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.j
 import { listProjects, resolveProjectFromIssueSync, type ProjectConfig } from '../projects.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { listSessionNames } from '../tmux.js';
-import { updateAutoSpawnConsentAfterWorkStart } from '../planning/spawn-planning-session.js';
 import { findPlanSync, readPlanSync } from '../xbrief/io.js';
 import { isXBriefFilename } from '../xbrief/lifecycle.js';
 import type { XBriefDocument } from '../xbrief/types.js';
@@ -540,7 +539,6 @@ export async function handleOrphanProposedSpec(
   try {
     const spawn = await (options.spawnWorkAgent ?? ((id) => spawnWorkAgentThroughAgentsEndpoint(id, options.dashboardOrigin)))(upperIssueId);
     if (spawn.spawned) {
-      if (!spawn.queued) await updateAutoSpawnConsentAfterWorkStart(upperIssueId, true);
       emitReconcilerActivity(
         'success',
         spawn.queued

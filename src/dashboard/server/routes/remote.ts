@@ -33,7 +33,6 @@ import {
   checkRemoteSpendCap,
 } from '../../../lib/remote/index.js';
 import { loadConfigSync as loadPanConfig } from '../../../lib/config.js';
-import { updateAutoSpawnConsentAfterWorkStart } from '../../../lib/planning/spawn-planning-session.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
 
@@ -278,7 +277,6 @@ const startRemoteAgentRoute = HttpRouter.add(
       },
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
-    yield* Effect.promise(() => updateAutoSpawnConsentAfterWorkStart(issueId, true));
 
     yield* eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } });
     return jsonResponse(state);

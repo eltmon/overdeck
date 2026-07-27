@@ -90,7 +90,7 @@ vi.mock('../../tasks/presence.js', () => ({
 }));
 
 import { INTERNAL_TOKEN_HEADER } from '../../internal-token.js';
-import { readAutoSpawnOnFinalizeFlag, writeAutoSpawnOnFinalizeFlag } from '../../planning/spawn-planning-session.js';
+import { readAutoSpawnOnFinalizeFlag, withAutoSpawnConsentClaim, writeAutoSpawnOnFinalizeFlag } from '../../planning/spawn-planning-session.js';
 import {
   clearOrphanProposedAttemptCooldowns,
   findOrphanProposedSpecsForReconciler,
@@ -555,7 +555,10 @@ describe('orphan proposed spec reconciler', () => {
     writeSpec(projectPath, 'PAN-3092', 'proposed');
     writeTasks(projectPath, 'PAN-3092');
     await writeAutoSpawnOnFinalizeFlag('PAN-3092', true);
-    const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3092' }));
+    const spawnWorkAgent = vi.fn((issueId: string) => withAutoSpawnConsentClaim(
+      issueId,
+      async () => ({ spawned: true, agentId: 'agent-pan-3092' }),
+    ));
 
     await expect(reconcileOrphanProposedSpecs({
       evaluatePickupGate: allowPickupGate,

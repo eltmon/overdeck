@@ -1,12 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  autoSpawnConsentSpentMarkerPath,
+  claimAutoSpawnConsentForWorkStart,
+  completeAutoSpawnConsentClaim,
   readAutoSpawnOnFinalizeFlag,
+  releaseAutoSpawnConsentClaim,
   resolveAutoSpawnOnFinalize,
-  updateAutoSpawnConsentAfterWorkStart,
+  withAutoSpawnConsentClaim,
   writeAutoSpawnOnFinalizeFlag,
 } from '../spawn-planning-session.js';
 
@@ -65,32 +67,31 @@ describe('resolveAutoSpawnOnFinalize', () => {
 
   it('consumes consent only after a work start is accepted', async () => {
     stampFlag(true);
-    await updateAutoSpawnConsentAfterWorkStart(ISSUE, false);
+    await withAutoSpawnConsentClaim(ISSUE, async () => 'not-running', { isAccepted: () => false });
     expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(true);
 
-    await updateAutoSpawnConsentAfterWorkStart(ISSUE, true);
+    await withAutoSpawnConsentClaim(ISSUE, async () => 'running');
     expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(false);
   });
 
-  it('records durable spent consent when primary cleanup fails', async () => {
-    stampFlag(true);
-    const logWarning = vi.fn();
-    const spentMarker = autoSpawnConsentSpentMarkerPath(ISSUE);
-
-    await expect(updateAutoSpawnConsentAfterWorkStart(ISSUE, true, {
-      writeFlag: async () => { throw new Error('read-only consent file'); },
-      logWarning,
-      now: () => '2026-07-27T06:00:00.000Z',
-    })).resolves.toBeUndefined();
-
-    expect(existsSync(spentMarker)).toBe(true);
+  it('keeps old claims from consuming a newer planning cycle', async () => {
+    await writeAutoSpawnOnFinalizeFlag(ISSUE, true);
+    const oldClaim = await claimAutoSpawnConsentForWorkStart(ISSUE);
+    expect(oldClaim).not.toBeNull();
     expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(false);
-    await expect(resolveAutoSpawnOnFinalize(undefined, ISSUE)).resolves.toBe(false);
-    expect(logWarning).toHaveBeenCalledWith(expect.stringContaining('durable spent marker was recorded'));
 
     await writeAutoSpawnOnFinalizeFlag(ISSUE, true);
-    expect(existsSync(spentMarker)).toBe(false);
+    await completeAutoSpawnConsentClaim(oldClaim!);
     expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(true);
+
+    const currentClaim = await claimAutoSpawnConsentForWorkStart(ISSUE);
+    expect(currentClaim).not.toBeNull();
+    await releaseAutoSpawnConsentClaim(currentClaim!);
+    expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(true);
+
+    const acceptedClaim = await claimAutoSpawnConsentForWorkStart(ISSUE);
+    await completeAutoSpawnConsentClaim(acceptedClaim!);
+    expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(false);
   });
 
   it('falls back to the current-cycle flag when the request omits autoSpawn', async () => {

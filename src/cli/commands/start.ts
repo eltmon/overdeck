@@ -23,7 +23,6 @@ import { isGitHubIssueSync, resolveGitHubIssueSync } from '../../lib/tracker-uti
 import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getReadableWorkspacePanPaths } from '../../lib/pan-dir/index.js';
-import { updateAutoSpawnConsentAfterWorkStart } from '../../lib/planning/spawn-planning-session.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync, readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
@@ -433,7 +432,6 @@ async function handleRemoteWorkspace(
       startedBy: resolveCliStartedBy('operator:cli:pan-start'),
       tier: fly.getResiliencyTier(),
     });
-    await updateAutoSpawnConsentAfterWorkStart(issueId, true);
     spinner.succeed(`Remote agent spawned: ${remoteAgent.id}`);
 
     // Handle shadow mode
@@ -1210,7 +1208,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       for (const line of ['', chalk.red(`Kickoff delivery did not land for ${agent.id}.`), chalk.dim('The live session is preserved and the agent may be idle until the kickoff lands.'), chalk.dim('Deacon will retry delivery after the stuck threshold, or you can send a manual message now:'), `  pan tell ${id} "continue from your kickoff brief"`]) console.log(line);
       process.exitCode = 1; return;
     }
-    await updateAutoSpawnConsentAfterWorkStart(id, true);
     spinner.succeed(`Agent spawned: ${agent.id}`);
 
     try {

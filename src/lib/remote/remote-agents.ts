@@ -28,6 +28,7 @@ import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync, getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 import { resolveProjectForIssue } from '../pan-dir/record.js';
 import { isStateMigrated } from '../state-home.js';
+import { withAutoSpawnConsentClaim } from '../planning/auto-spawn-consent.js';
 
 export { sendToRemoteAgentKeyed } from './remote-keyed-delivery.js';
 export type { RemoteKeyedDeliveryOutcome, RemoteKeyedExec } from './remote-keyed-delivery.js';
@@ -545,6 +546,14 @@ export async function writeRemoteFile(
  * Spawn a Claude agent on a remote VM
  */
 export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promise<RemoteAgentState> {
+  return withAutoSpawnConsentClaim(
+    options.issueId,
+    () => spawnRemoteAgentWithoutConsentClaim(options),
+    { isAccepted: (state) => state.status === 'running' },
+  );
+}
+
+async function spawnRemoteAgentWithoutConsentClaim(options: SpawnRemoteAgentOptions): Promise<RemoteAgentState> {
   const { issueId, workspace, startedBy, model = 'claude-sonnet-4-6', prompt } = options;
   const project = resolveProjectForIssue(issueId);
   if (project) assertFlyRemoteStateSupported(issueId, await isStateMigrated(project));
