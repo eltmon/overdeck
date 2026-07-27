@@ -90,10 +90,10 @@
       "tests/unit/lib/overdeck/review-status-sync.test.ts",
       "tests/unit/lib/pan-dir/verdict-restore.test.ts"
     ],
-    "recordedAt": "2026-07-27T11:46:55.052Z"
+    "recordedAt": "2026-07-27T11:59:06.536Z"
   },
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T11:58:58.265Z",
+  "updated": "2026-07-27T11:59:06.538Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "pending",
