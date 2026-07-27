@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T05:18:12.207Z",
+  "updated": "2026-07-27T05:24:30.682Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "apply-origin-and-override": {
-        "writerId": "agent-pan-3184",
-        "agentId": "agent-pan-3184",
-        "pid": 631947,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:18:12.207Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3184",
@@ -115,6 +107,17 @@
         "outcome": "completed",
         "reason": "Grace expiry now classifies fresh clean-shutdown markers within 30 minutes as resume_all and null or stale markers as crash boots with hold_all; fake-timer tests cover fresh, absent, and stale markers.",
         "releasedAt": "2026-07-27T05:17:55.352Z"
+      },
+      {
+        "writerId": "agent-pan-3184",
+        "agentId": "agent-pan-3184",
+        "pid": 631947,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:18:12.207Z",
+        "itemId": "apply-origin-and-override",
+        "outcome": "completed",
+        "reason": "Auto-origin apply filters stoppedByUser candidates; operator-origin apply threads overrideStoppedByUser through the deacon wrapper and route, with regressions for forwarding, refusal bypass, and hold_all. A second formatting-only commit preserved the deacon.ts file-size ratchet after the first push was blocked.",
+        "releasedAt": "2026-07-27T05:24:30.681Z"
       }
     ],
     "statusReasons": {
@@ -133,6 +136,10 @@
       "classified-expiry-default": {
         "reason": "Grace expiry now classifies fresh clean-shutdown markers within 30 minutes as resume_all and null or stale markers as crash boots with hold_all; fake-timer tests cover fresh, absent, and stale markers.",
         "updatedAt": "2026-07-27T05:17:55.352Z"
+      },
+      "apply-origin-and-override": {
+        "reason": "Auto-origin apply filters stoppedByUser candidates; operator-origin apply threads overrideStoppedByUser through the deacon wrapper and route, with regressions for forwarding, refusal bypass, and hold_all. A second formatting-only commit preserved the deacon.ts file-size ratchet after the first push was blocked.",
+        "updatedAt": "2026-07-27T05:24:30.681Z"
       }
     }
   },
@@ -153,6 +160,10 @@
     "classified-expiry-default.classified-expiry-default.ac1": "completed",
     "classified-expiry-default.classified-expiry-default.ac2": "completed",
     "classified-expiry-default.classified-expiry-default.ac3": "completed",
-    "apply-origin-and-override": "running"
+    "apply-origin-and-override": "completed",
+    "apply-origin-and-override.apply-origin-and-override.ac1": "completed",
+    "apply-origin-and-override.apply-origin-and-override.ac2": "completed",
+    "apply-origin-and-override.apply-origin-and-override.ac3": "completed",
+    "apply-origin-and-override.apply-origin-and-override.ac4": "completed"
   }
 }
