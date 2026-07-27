@@ -2,7 +2,7 @@
   "issueId": "PAN-3184",
   "schemaVersion": 2,
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T04:31:12.812Z",
+  "updated": "2026-07-27T04:31:13.933Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3184: Boot reconciliation latches hold_all over an empty candidate set — fleet parks silently, banner self-hides, resume_all resumes nothing",
       "timestamp": "2026-07-27T04:31:12.812Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
