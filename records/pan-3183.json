@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:30:47.797Z",
-  "updated": "2026-07-27T05:34:44.665Z",
+  "updated": "2026-07-27T05:40:32.655Z",
   "pipeline": {
     "issueId": "PAN-3183",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "lint-guard-agents-status-writes": {
-        "writerId": "agent-pan-3183",
-        "agentId": "agent-pan-3183",
-        "pid": 1842557,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:34:44.665Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3183",
@@ -108,6 +100,17 @@
         "outcome": "completed",
         "reason": "ReadModel and AgentStateService boot paths now durably append agent.status_changed events for every backfill-reconciled stop before continuing bootstrap. A shared helper filters absent agents and logs append failures without aborting boot. Targeted tests and typecheck pass.",
         "releasedAt": "2026-07-27T05:34:24.166Z"
+      },
+      {
+        "writerId": "agent-pan-3183",
+        "agentId": "agent-pan-3183",
+        "pid": 1842557,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:34:44.665Z",
+        "itemId": "lint-guard-agents-status-writes",
+        "outcome": "completed",
+        "reason": "lint-state-writes now rejects raw SQL and Drizzle agents-table mutations outside individually documented write modules. Clean tree and full npm lint pass; a tracked src/index.ts UPDATE agents fixture was rejected with the file named, then fully reverted.",
+        "releasedAt": "2026-07-27T05:40:32.655Z"
       }
     ],
     "statusReasons": {
@@ -130,6 +133,10 @@
       "boot-callers-emit-stop-events": {
         "reason": "ReadModel and AgentStateService boot paths now durably append agent.status_changed events for every backfill-reconciled stop before continuing bootstrap. A shared helper filters absent agents and logs append failures without aborting boot. Targeted tests and typecheck pass.",
         "updatedAt": "2026-07-27T05:34:24.166Z"
+      },
+      "lint-guard-agents-status-writes": {
+        "reason": "lint-state-writes now rejects raw SQL and Drizzle agents-table mutations outside individually documented write modules. Clean tree and full npm lint pass; a tracked src/index.ts UPDATE agents fixture was rejected with the file named, then fully reverted.",
+        "updatedAt": "2026-07-27T05:40:32.655Z"
       }
     }
   },
@@ -152,6 +159,9 @@
     "boot-callers-emit-stop-events.boot-callers-emit-stop-events.ac1": "completed",
     "boot-callers-emit-stop-events.boot-callers-emit-stop-events.ac2": "completed",
     "boot-callers-emit-stop-events.boot-callers-emit-stop-events.ac3": "completed",
-    "lint-guard-agents-status-writes": "running"
+    "lint-guard-agents-status-writes": "completed",
+    "lint-guard-agents-status-writes.lint-guard-agents-status-writes.ac1": "completed",
+    "lint-guard-agents-status-writes.lint-guard-agents-status-writes.ac2": "completed",
+    "lint-guard-agents-status-writes.lint-guard-agents-status-writes.ac3": "completed"
   }
 }
