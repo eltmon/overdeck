@@ -2950,11 +2950,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // state). Best-effort against the forge; 10-min per-issue cooldown.
   const closedPrReadyActions = await reconcileClosedPrReadyForMerge();
   actions.push(...closedPrReadyActions);
-  for (const a of closedPrReadyActions) addLog('action', a, state.patrolCycle);
-
-  const autoMergeRowActions = await reconcileAutoMergeRows();
-  actions.push(...autoMergeRowActions);
-  for (const a of autoMergeRowActions) addLog('action', a, state.patrolCycle);
+  for (const a of closedPrReadyActions) addLog('action', a, state.patrolCycle); for (const a of await reconcileAutoMergeRows()) { actions.push(a); addLog('action', a, state.patrolCycle); }
 
   // PAN-2143: re-evaluate stale merge-blockers. resolveConflictGate clears a
   // stale merge_conflict/not_mergeable blocker once the branch is mergeable
