@@ -91,7 +91,7 @@
     "recordedAt": "2026-07-08T23:32:23.025Z"
   },
   "created": "2026-07-08T21:36:56.346Z",
-  "updated": "2026-07-19T23:55:28.616Z",
+  "updated": "2026-07-27T05:59:28.065Z",
   "pipeline": {
     "issueId": "PAN-2167",
     "reviewStatus": "pending",
@@ -101,14 +101,13 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-19T23:55:28.600Z",
+    "updatedAt": "2026-07-27T05:59:27.969Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "Bead state-plane-status-predicate ack: isStatePlaneOnlyStatus/parsePorcelainStatusPaths added to src/lib/state-plane.ts satisfy all 4 ACs (MM/untracked in-plane true, non-plane path false, empty clean true+[], rename dest resolution both directions); 13/13 tests pass independently verified; no any/execSync/oversized files.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2512",
     "lastVerifiedCommit": "de0340c790132fae343c7f45260a5341dbfe79c5",
-    "reviewRequestedAt": "2026-07-08T23:32:29.138Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/pan-2167.md",
@@ -221,7 +220,7 @@
       },
       "costAtCloseOut": {
         "usd": 25.673782,
-        "pricingAsOf": "2026-07-19T23:55:28.611Z"
+        "pricingAsOf": "2026-07-27T05:59:28.052Z"
       }
     },
     "merges": [
