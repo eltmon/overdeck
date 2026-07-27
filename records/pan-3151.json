@@ -318,7 +318,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T15:02:27.698Z",
+  "updated": "2026-07-27T15:02:31.563Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "reviewing",
@@ -328,7 +328,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T15:02:26.074Z",
+    "updatedAt": "2026-07-27T15:02:31.512Z",
     "reviewNotes": "Agent re-review request (16/25): Fixed review issues: added comprehensive v61/v62 regression tests",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "436787102da30f6e9a845238c6af81b5717948a0",
@@ -398,7 +398,7 @@
       },
       "costAtCloseOut": {
         "usd": 265.2999903,
-        "pricingAsOf": "2026-07-27T15:02:27.696Z"
+        "pricingAsOf": "2026-07-27T15:02:31.556Z"
       }
     },
     "merges": [
