@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:42:41.037Z",
-  "updated": "2026-07-27T05:19:32.028Z",
+  "updated": "2026-07-27T05:23:37.445Z",
   "pipeline": {
     "issueId": "PAN-3194",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "resume-spawn-plan-decider": {
-        "writerId": "agent-pan-3194",
-        "agentId": "agent-pan-3194",
-        "pid": 771371,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:19:32.028Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3194",
@@ -86,6 +78,17 @@
         "outcome": "completed",
         "reason": "Applied the shared transcript existence predicate to stopped-agent lifecycle listings, preserved present-transcript resume offers, and added route regression coverage.",
         "releasedAt": "2026-07-27T05:19:21.566Z"
+      },
+      {
+        "writerId": "agent-pan-3194",
+        "agentId": "agent-pan-3194",
+        "pid": 771371,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:19:32.028Z",
+        "itemId": "resume-spawn-plan-decider",
+        "outcome": "completed",
+        "reason": "Extracted the pure resume spawn decision matrix, preserved existing refusal and recovery precedence, and added five no-mock regression cases.",
+        "releasedAt": "2026-07-27T05:23:37.445Z"
       }
     ],
     "statusReasons": {
@@ -100,6 +103,10 @@
       "stopped-listing-probe": {
         "reason": "Applied the shared transcript existence predicate to stopped-agent lifecycle listings, preserved present-transcript resume offers, and added route regression coverage.",
         "updatedAt": "2026-07-27T05:19:21.566Z"
+      },
+      "resume-spawn-plan-decider": {
+        "reason": "Extracted the pure resume spawn decision matrix, preserved existing refusal and recovery precedence, and added five no-mock regression cases.",
+        "updatedAt": "2026-07-27T05:23:37.445Z"
       }
     }
   },
@@ -118,6 +125,11 @@
     "stopped-listing-probe.stopped-listing-probe.ac1": "completed",
     "stopped-listing-probe.stopped-listing-probe.ac2": "completed",
     "stopped-listing-probe.stopped-listing-probe.ac3": "completed",
-    "resume-spawn-plan-decider": "running"
+    "resume-spawn-plan-decider": "completed",
+    "resume-spawn-plan-decider.resume-spawn-plan-decider.ac1": "completed",
+    "resume-spawn-plan-decider.resume-spawn-plan-decider.ac2": "completed",
+    "resume-spawn-plan-decider.resume-spawn-plan-decider.ac3": "completed",
+    "resume-spawn-plan-decider.resume-spawn-plan-decider.ac4": "completed",
+    "resume-spawn-plan-decider.resume-spawn-plan-decider.ac5": "completed"
   }
 }
