@@ -89,15 +89,7 @@
       "timestamp": "2026-07-27T12:27:15.942Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T12:27:15Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nregression test double-serializes reviewCycleHistory and asserts a string instead of the production array contract\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -186,22 +178,22 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:28:11.602Z",
+  "updated": "2026-07-27T12:28:13.825Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T12:28:10.213Z",
+    "updatedAt": "2026-07-27T12:28:13.681Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: removed double-serialization from test",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "d41e7959ffcf47379f544d51c4c21851fcb987c3",
-    "reviewSpawnedAt": "2026-07-27T12:25:46.686Z",
+    "reviewSpawnedAt": "2026-07-27T12:28:13.681Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -340,7 +332,7 @@
       },
       "costAtCloseOut": {
         "usd": 109.8393943,
-        "pricingAsOf": "2026-07-27T12:28:11.600Z"
+        "pricingAsOf": "2026-07-27T12:28:13.771Z"
       }
     },
     "merges": [
