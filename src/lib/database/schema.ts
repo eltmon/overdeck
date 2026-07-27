@@ -789,21 +789,21 @@ export function initSchema(db: SqliteDatabase): void {
 export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   const currentVersion = db.pragma('user_version', { simple: true }) as number;
 
-  // Unconditional repairs: ensure columns from prior migrations exist regardless of version
-  // v60→v61 repairs for databases at current version that may be missing columns
-  tryIdempotentDdl(db, 61, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
-  tryIdempotentDdl(db, 61, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
-  // v61→v62 repairs for databases at current version that may be missing columns (PAN-3151, PAN-3154)
-  tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN review_cycle_history TEXT');
-  tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN conflicts_since TEXT');
-
-  if (currentVersion >= SCHEMA_VERSION) {
-    return; // Already at or ahead of this build's schema version
-  }
-
   if (currentVersion === 0) {
     // Fresh database — just initialize the full schema
     initSchema(db);
+    return;
+  }
+
+  if (currentVersion >= SCHEMA_VERSION) {
+    // At or ahead of this build's schema version.
+    // Run repairs for columns that may be missing on databases at current version.
+    // v60→v61 repairs
+    tryIdempotentDdl(db, 61, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
+    tryIdempotentDdl(db, 61, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
+    // v61→v62 repairs (PAN-3151, PAN-3154)
+    tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN review_cycle_history TEXT');
+    tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN conflicts_since TEXT');
     return;
   }
 
