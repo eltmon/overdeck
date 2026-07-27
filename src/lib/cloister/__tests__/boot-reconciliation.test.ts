@@ -203,11 +203,8 @@ describe('boot reconciliation', () => {
     expect(getBootReconciliationMaxCandidateAgeSeconds()).toBe(90);
   });
 
-  it('lists only stopped work agents that are resumable boot reconciliation candidates', () => {
+  it('lists only stopped auto-resumable agents that are boot reconciliation candidates', () => {
     mocks.bootState.bootStartedAt = BASE_TIME.toISOString();
-    const completedWorkspace = join(testHome, 'completed-workspace');
-    mkdirSync(join(completedWorkspace, '.pan'), { recursive: true });
-    mkdirSync(join(completedWorkspace, '.pan', 'completed.processed'), { recursive: true });
 
     mocks.agents = [
       stoppedWorkAgent(testHome, 'agent-pan-1', { workspace: workspacePath(testHome, 'plain') }),
@@ -216,10 +213,10 @@ describe('boot reconciliation', () => {
       stoppedWorkAgent(testHome, 'agent-pan-4', { workspace: workspacePath(testHome, 'paused'), paused: true }),
       stoppedWorkAgent(testHome, 'agent-pan-5', { workspace: workspacePath(testHome, 'troubled'), troubled: true }),
       stoppedWorkAgent(testHome, 'agent-pan-6', { workspace: workspacePath(testHome, 'killed'), stoppedByUser: true }),
-      stoppedWorkAgent(testHome, 'agent-pan-7', { workspace: completedWorkspace, stoppedByUser: true }),
+      stoppedWorkAgent(testHome, 'agent-pan-7', { role: 'strike', workspace: workspacePath(testHome, 'strike') }),
     ];
 
-    expect(listBootReconciliationCandidateIds()).toEqual(['agent-pan-1', 'agent-pan-7']);
+    expect(listBootReconciliationCandidateIds()).toEqual(['agent-pan-1', 'agent-pan-6', 'agent-pan-7']);
   });
 
   it('rejects stale or missing-workspace stopped work agents', () => {
@@ -242,6 +239,49 @@ describe('boot reconciliation', () => {
     mocks.issueStages['PAN-RECENT'] = 'working';
 
     expect(isBootReconciliationCandidate(agent)).toBe(true);
+  });
+
+  it('accepts recent stopped strike agents with a live workspace and open issue', () => {
+    mocks.bootState.bootStartedAt = BASE_TIME.toISOString();
+    const agent = stoppedWorkAgent(testHome, 'agent-strike', {
+      issueId: 'PAN-STRIKE',
+      role: 'strike',
+      stoppedAt: '2026-06-29T14:59:58.000Z',
+    });
+    mocks.issueStages['PAN-STRIKE'] = 'working';
+
+    expect(isBootReconciliationCandidate(agent)).toBe(true);
+  });
+
+  it('accepts recently stopped work agents even when stoppedByUser is set', () => {
+    mocks.bootState.bootStartedAt = BASE_TIME.toISOString();
+    const agent = stoppedWorkAgent(testHome, 'agent-stopped-by-user', {
+      stoppedAt: '2026-06-29T14:59:58.000Z',
+      stoppedByUser: true,
+    });
+
+    expect(isBootReconciliationCandidate(agent)).toBe(true);
+  });
+
+  it('rejects stoppedByUser work agents outside the max candidate age', () => {
+    mocks.bootState.bootStartedAt = BASE_TIME.toISOString();
+    const agent = stoppedWorkAgent(testHome, 'agent-stale-stopped-by-user', {
+      lastActivity: null,
+      stoppedAt: '2026-06-29T14:58:59.000Z',
+      stoppedByUser: true,
+    });
+
+    expect(isBootReconciliationCandidate(agent)).toBe(false);
+  });
+
+  it('rejects paused strike agents', () => {
+    mocks.bootState.bootStartedAt = BASE_TIME.toISOString();
+    const agent = stoppedWorkAgent(testHome, 'agent-paused-strike', {
+      role: 'strike',
+      paused: true,
+    });
+
+    expect(isBootReconciliationCandidate(agent)).toBe(false);
   });
 
   it('rejects stopped work agents whose issue stage is terminal', () => {

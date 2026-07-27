@@ -10,6 +10,7 @@ import { resumeYieldedAgents } from './preemption.js';
 import {
   getBootReconciliationHeldResumeSet,
   getBootReconciliationPendingHoldSet,
+  isAutoResumableRole,
 } from './boot-reconciliation.js';
 import { bootReconciliationSkipReason } from './boot-reconciliation-predicates.js';
 import { isIssueClosed } from './issue-closed.js';
@@ -636,8 +637,8 @@ export async function handleAgentStoppedEvent(
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — status=${state.status} (not stopped)`);
     return null;
   }
-  if (state.role !== 'work') {
-    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — role=${state.role} (not work)`);
+  if (!isAutoResumableRole(state.role)) {
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — role=${state.role} (not auto-resumable)`);
     return null;
   }
 

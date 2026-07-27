@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import {
   type BootReconciliationDecision,
   getBootReconciliationState,
@@ -61,12 +60,6 @@ let graceTimer: ReturnType<typeof setTimeout> | null = null;
  */
 let graceExpiryHook: (() => void | Promise<void>) | null = null;
 
-function hasCompletionMarker(workspace: string | null): boolean {
-  if (!workspace) return false;
-  return existsSync(join(workspace, '.pan', 'completed'))
-    || existsSync(join(workspace, '.pan', 'completed.processed'));
-}
-
 function newestAgentTimestampMs(agent: ReconciliationAgent): number | null {
   const timestamps = [agent.lastActivity, agent.stoppedAt, agent.startedAt]
     .map((value) => value == null ? NaN : Date.parse(value))
@@ -98,10 +91,13 @@ export function getBootReconciliationMaxCandidateAgeSeconds(): number {
     : getBootReconciliationGraceSeconds() * 2;
 }
 
+export function isAutoResumableRole(role: ReconciliationAgent['role']): boolean {
+  return role === 'work' || role === 'strike';
+}
+
 export function isBootReconciliationCandidate(agent: ReconciliationAgent): boolean {
-  if (agent.role !== 'work' || agent.status !== 'stopped') return false;
+  if (!isAutoResumableRole(agent.role) || agent.status !== 'stopped') return false;
   if (agent.paused === true || agent.troubled === true) return false;
-  if (agent.stoppedByUser === true && !hasCompletionMarker(agent.workspace)) return false;
   if (!isRecentBootCandidate(agent)) return false;
   if (bootReconciliationSkipReason(agent) !== null) return false;
   if (!agent.workspace || !existsSync(agent.workspace)) return false;
