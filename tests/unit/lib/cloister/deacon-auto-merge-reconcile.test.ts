@@ -189,6 +189,45 @@ describe('reconcileAutoMergeRowsWithDeps', () => {
     expect(deps.warn).toHaveBeenCalledWith(expect.stringContaining('forge unavailable'));
   });
 
+  it('reconciles problem rows beyond the default 100-row route page', async () => {
+    const ids = Array.from({ length: 101 }, (_, index) => `PAN-${2000 + index}`);
+    for (const issueId of ids) {
+      seedIssue(issueId);
+      seedAutoMerge(issueId, 'failed');
+    }
+    const targetIssue = ids.at(-1)!;
+    const findMergedArtifact = vi.fn(async (input: { artifactUrl?: string }) => (
+      input.artifactUrl?.endsWith(`/${targetIssue.slice(4)}`) ? mergedArtifact() : null
+    ));
+    const deps = makeDeps({
+      getForgeAdapter: vi.fn(() => forgeAdapter(findMergedArtifact)),
+    });
+
+    await reconcileAutoMergeRowsWithDeps(deps);
+
+    expect(findMergedArtifact).toHaveBeenCalledTimes(101);
+    expect(listProblemAutoMerges(200).find((entry) => entry.issueId === targetIssue)).toBeUndefined();
+  });
+
+  it('cancels closed-out pending rows beyond the default 100-row route page', async () => {
+    const ids = Array.from({ length: 101 }, (_, index) => `PAN-${3000 + index}`);
+    let targetId = 0;
+    for (const issueId of ids) {
+      seedIssue(issueId);
+      targetId = seedAutoMerge(issueId, 'pending');
+    }
+    const deps = makeDeps({
+      readJournalStatus: vi.fn(() => ({
+        updatedAt: new Date(NOW).toISOString(),
+        durable: { closedOut: true },
+      })),
+    });
+
+    await reconcileAutoMergeRowsWithDeps(deps);
+
+    expect(row(targetId)).toMatchObject({ status: 'cancelled', cancelled_by: 'auto-merge-reconciler' });
+  });
+
   it('leaves merging rows untouched', async () => {
     seedIssue('PAN-107');
     const id = seedAutoMerge('PAN-107', 'merging');

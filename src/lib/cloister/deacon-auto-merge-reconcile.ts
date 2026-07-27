@@ -10,6 +10,9 @@ import { readJournalStatusSync } from '../overdeck/review-status-record-sync.js'
 import { resolveProjectFromIssueSync } from '../projects.js';
 
 const AUTO_MERGE_RECONCILE_COOLDOWN_MS = 10 * 60 * 1000;
+// SQLite LIMIT -1 removes the limit. Patrol reconciliation must inspect the
+// whole queue or the oldest unresolved page can starve every newer row.
+const UNBOUNDED_ROW_LIMIT = -1;
 const autoMergeReconcileCooldowns = new Map<string, number>();
 
 export interface AutoMergeReconcileDeps {
@@ -44,8 +47,8 @@ export async function reconcileAutoMergeRowsWithDeps(
 
   try {
     rows = [
-      ...deps.listProblemAutoMerges(),
-      ...deps.listActiveAutoMerges().filter((row) => row.status === 'pending'),
+      ...deps.listProblemAutoMerges(UNBOUNDED_ROW_LIMIT),
+      ...deps.listActiveAutoMerges(UNBOUNDED_ROW_LIMIT).filter((row) => row.status === 'pending'),
     ];
   } catch (error) {
     deps.warn(`[deacon] Auto-merge row reconciliation failed to list rows: ${error instanceof Error ? error.message : String(error)}`);
