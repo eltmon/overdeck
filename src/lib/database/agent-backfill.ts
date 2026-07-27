@@ -22,6 +22,7 @@ import { agentStateToDbAgent } from './agent-mappers.js';
 import type { AgentState } from '../agents.js';
 import type { Agent as DbAgent } from './agents-db.js';
 import { readAgentHarnessModelRecordSync } from '../overdeck/agent-record-sync.js';
+import { logAgentLifecycleSync } from '../persistent-logger.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
 const VALID_ROLES = new Set<AgentState['role']>([
@@ -166,6 +167,7 @@ export interface BackfillAgentsResult {
   processed: number;
   skipped: number;
   markedStopped: number;
+  markedStoppedIds: Array<{ id: string; previousStatus: string }>;
 }
 
 /**
@@ -185,12 +187,13 @@ export function backfillAgentsFromStateJsonSync(
   let processed = 0;
   let skipped = 0;
   let markedStopped = 0;
+  const markedStoppedIds: Array<{ id: string; previousStatus: string }> = [];
 
   let entries: string[] = [];
   try {
     entries = readdirSync(agentsDir);
   } catch {
-    return { processed, skipped, markedStopped };
+    return { processed, skipped, markedStopped, markedStoppedIds };
   }
 
   const columns = Object.values(COLUMN_MAP);
@@ -226,6 +229,9 @@ export function backfillAgentsFromStateJsonSync(
 
       const reconciled = reconcileAgentStatus(state, liveSessions);
       if (reconciled.status === 'stopped' && state.status !== 'stopped') {
+        const previousStatus = state.status;
+        logAgentLifecycleSync(state.id, `status changed: ${previousStatus} → stopped (boot backfill reconcile: no live tmux session)`);
+        markedStoppedIds.push({ id: state.id, previousStatus });
         markedStopped++;
       }
 
@@ -253,7 +259,7 @@ export function backfillAgentsFromStateJsonSync(
 
   tx();
 
-  return { processed, skipped, markedStopped };
+  return { processed, skipped, markedStopped, markedStoppedIds };
 }
 
 function reconcileAgentStatus(

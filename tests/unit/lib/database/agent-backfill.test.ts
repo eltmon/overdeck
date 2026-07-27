@@ -20,6 +20,10 @@ vi.mock('../../../../src/lib/database/index.js', () => ({
   getDatabase: () => testDb,
 }));
 
+vi.mock('../../../../src/lib/persistent-logger.js', () => ({
+  logAgentLifecycleSync: vi.fn(),
+}));
+
 beforeEach(() => {
   testDb = openDatabase(':memory:');
   testDb.pragma('foreign_keys = ON');
@@ -29,6 +33,7 @@ beforeEach(() => {
   originalHome = process.env.OVERDECK_HOME;
   process.env.OVERDECK_HOME = tmpHome;
   delete process.env.OVERDECK_TMUX_SOCKET_NAME;
+  vi.clearAllMocks();
 });
 
 afterEach(() => {
@@ -46,6 +51,7 @@ import {
   type BackfillAgentsResult,
 } from '../../../../src/lib/database/agent-backfill.js';
 import { getAgent } from '../../../../src/lib/database/agents-db.js';
+import { logAgentLifecycleSync } from '../../../../src/lib/persistent-logger.js';
 
 function writeAgentState(agentId: string, state: Record<string, unknown>): void {
   const dir = join(tmpHome, 'agents', agentId);
@@ -114,6 +120,13 @@ describe('backfillAgentsFromStateJsonSync', () => {
     });
 
     expect(result.markedStopped).toBe(1);
+    expect(result.markedStoppedIds).toEqual([
+      { id: 'agent-pan-1908', previousStatus: 'running' },
+    ]);
+    expect(logAgentLifecycleSync).toHaveBeenCalledWith(
+      'agent-pan-1908',
+      expect.stringContaining('boot backfill reconcile'),
+    );
     const row = getAgent('agent-pan-1908');
     expect(row?.status).toBe('stopped');
     expect(row?.stoppedAt).toBeDefined();
