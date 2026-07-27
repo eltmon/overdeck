@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:30:47.797Z",
-  "updated": "2026-07-27T05:12:23.765Z",
+  "updated": "2026-07-27T05:16:23.886Z",
   "pipeline": {
     "issueId": "PAN-3183",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "legacy-backfill-parity": {
-        "writerId": "agent-pan-3183",
-        "agentId": "agent-pan-3183",
-        "pid": 186953,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:12:23.765Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3183",
@@ -75,6 +67,17 @@
         "outcome": "completed",
         "reason": "backfillAgentsSync now returns markedStoppedIds with previousStatus, writes lifecycle logs before mutating status, and ReconstructResult propagates the additive field. Targeted tests and typecheck pass; a second same-item commit preserved the agents.ts file-size ratchet after pre-push rejected growth.",
         "releasedAt": "2026-07-27T05:11:58.769Z"
+      },
+      {
+        "writerId": "agent-pan-3183",
+        "agentId": "agent-pan-3183",
+        "pid": 186953,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:12:23.765Z",
+        "itemId": "legacy-backfill-parity",
+        "outcome": "completed",
+        "reason": "Legacy backfill now returns markedStoppedIds with previousStatus, logs each boot reconciliation before upsert, and is covered by the existing legacy backfill test suite. Targeted tests and typecheck pass.",
+        "releasedAt": "2026-07-27T05:16:23.886Z"
       }
     ],
     "statusReasons": {
@@ -85,6 +88,10 @@
       "backfill-reports-marked-stopped": {
         "reason": "backfillAgentsSync now returns markedStoppedIds with previousStatus, writes lifecycle logs before mutating status, and ReconstructResult propagates the additive field. Targeted tests and typecheck pass; a second same-item commit preserved the agents.ts file-size ratchet after pre-push rejected growth.",
         "updatedAt": "2026-07-27T05:11:58.769Z"
+      },
+      "legacy-backfill-parity": {
+        "reason": "Legacy backfill now returns markedStoppedIds with previousStatus, logs each boot reconciliation before upsert, and is covered by the existing legacy backfill test suite. Targeted tests and typecheck pass.",
+        "updatedAt": "2026-07-27T05:16:23.886Z"
       }
     }
   },
@@ -96,6 +103,8 @@
     "backfill-reports-marked-stopped.backfill-reports-marked-stopped.ac1": "completed",
     "backfill-reports-marked-stopped.backfill-reports-marked-stopped.ac2": "completed",
     "backfill-reports-marked-stopped.backfill-reports-marked-stopped.ac3": "completed",
-    "legacy-backfill-parity": "running"
+    "legacy-backfill-parity": "completed",
+    "legacy-backfill-parity.legacy-backfill-parity.ac1": "completed",
+    "legacy-backfill-parity.legacy-backfill-parity.ac2": "completed"
   }
 }
