@@ -34,15 +34,7 @@
       "timestamp": "2026-07-27T07:08:48.533Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T07:08:48Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3187\n\nThe recurring review sweep performs synchronous record reads and serial tracker calls across every pending request, stalling Deacon patrols.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3187 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -83,22 +75,22 @@
     "recordedAt": "2026-07-27T06:31:44.584Z"
   },
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T07:31:38.716Z",
+  "updated": "2026-07-27T07:32:22.604Z",
   "pipeline": {
     "issueId": "PAN-3187",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T07:31:37.218Z",
+    "updatedAt": "2026-07-27T07:32:22.565Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "AC1-AC4 met and locked: pending/missing verdicts settle to skip only when trackerClosed && landedWork (dod-gate.ts:258); review negatives never supersede (id !== 'review' guard, dod-gate.ts:267); tests/verification negatives settle only on mainVerifyStatus==='pass'. AC5: every settled observed string prefixes the original ${observed}; evaluateDodGate computes merged then mainVerify then trackerClosed before the verdict Promise.all, locked by the call-order assertion. NOTE on AC5 wording: 'npx vitest run src/lib/lifecycle' exits 1 with 'No test files found' for ANY implementation — vitest include globs put the suite at tests/unit/lib/lifecycle, which runs 7 files / 137 passed / 1 skipped, exit 0. AC path is mis-specified, not an implementation defect. Sole production caller (workflows.ts:195) passes no deps override so it uses the real isIssueClosed with its 5-min cache; optional trackerClosed dep keeps pre-existing deps objects working.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3203",
     "reviewedAtCommit": "22a21ec3b99e97d7d78271a896d6a208230c5aa7",
-    "reviewSpawnedAt": "2026-07-27T07:03:13.831Z",
+    "reviewSpawnedAt": "2026-07-27T07:32:22.564Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -169,7 +161,7 @@
       },
       "costAtCloseOut": {
         "usd": 120.150483,
-        "pricingAsOf": "2026-07-27T07:31:38.711Z"
+        "pricingAsOf": "2026-07-27T07:32:22.586Z"
       }
     },
     "merges": [
