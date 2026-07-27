@@ -86,7 +86,8 @@ export function summarizeToolInputForWorkLog(
       return todos ? `${todos.length} item${todos.length === 1 ? '' : 's'}` : undefined;
     }
 
-    case 'Task': {
+    case 'Task':
+    case 'Agent': {
       const description = asString(input.description);
       const subagentType = asString(input.subagent_type);
       if (description && subagentType) return truncate(`${subagentType}: ${description}`);

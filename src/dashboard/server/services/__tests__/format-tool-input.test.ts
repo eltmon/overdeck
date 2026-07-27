@@ -83,9 +83,9 @@ describe('summarizeToolInputForWorkLog', () => {
     expect(summarizeToolInputForWorkLog('TodoWrite', { todos: [{}, {}, {}] })).toBe('3 items');
   });
 
-  it('formats Task with subagent and description', () => {
+  it.each(['Task', 'Agent'])('formats %s with subagent and description', (tool) => {
     expect(
-      summarizeToolInputForWorkLog('Task', {
+      summarizeToolInputForWorkLog(tool, {
         subagent_type: 'general-purpose',
         description: 'Investigate the cache bug',
       }),

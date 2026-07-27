@@ -171,22 +171,34 @@ export const WorkLogEntry = Schema.Struct({
 })
 export type WorkLogEntry = typeof WorkLogEntry.Type
 
+export const SubagentSummary = Schema.Struct({
+  agentId: Schema.String,
+  agentType: Schema.String,
+  description: Schema.String,
+  toolUseId: Schema.String,
+  spawnDepth: Schema.Number,
+  status: Schema.Literals(['running', 'done']),
+})
+export type SubagentSummary = typeof SubagentSummary.Type
+
 /**
  * Response shape for GET /api/agents/:id/conversation.
  * Shared between the dashboard server route and the frontend TerminalPanel.
  */
-export interface ConversationResponse {
-  messages: ChatMessage[];
-  workLog: WorkLogEntry[];
-  streaming: boolean;
-  totalCost: number;
+export const ConversationResponse = Schema.Struct({
+  messages: Schema.Array(ChatMessage),
+  workLog: Schema.Array(WorkLogEntry),
+  streaming: Schema.Boolean,
+  totalCost: Schema.Number,
   /** Total token throughput (input + output + cache read + cache write). */
-  totalTokens?: number;
-  byteOffset: number;
-  proposedPlan?: ProposedPlan;
-  compactBoundaries?: CompactBoundary[];
-  contextUsage?: ContextUsage | null;
-}
+  totalTokens: Schema.optional(Schema.Number),
+  byteOffset: Schema.Number,
+  proposedPlan: Schema.optional(ProposedPlan),
+  compactBoundaries: Schema.optional(Schema.Array(CompactBoundary)),
+  contextUsage: Schema.optional(Schema.NullOr(ContextUsage)),
+  subagents: Schema.optional(Schema.Array(SubagentSummary)),
+})
+export type ConversationResponse = typeof ConversationResponse.Type
 
 export const ConversationEvent = Schema.Union([
   Schema.Struct({
@@ -201,6 +213,10 @@ export const ConversationEvent = Schema.Union([
   }),
   Schema.Struct({
     kind: Schema.Literal('discovering'),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal('subagents'),
+    subagents: Schema.Array(SubagentSummary),
   }),
 ])
 export type ConversationEvent = typeof ConversationEvent.Type
@@ -387,7 +403,10 @@ export const ResizeTerminalRpc = Rpc.make(WS_METHODS.resizeTerminal, {
 
 /** 16. Subscribe to structured conversation messages from a JSONL session file (stream, PAN-451) */
 export const SubscribeConversationMessagesRpc = Rpc.make(WS_METHODS.subscribeConversationMessages, {
-  payload: Schema.Struct({ conversationName: Schema.String }),
+  payload: Schema.Struct({
+    conversationName: Schema.String,
+    agentId: Schema.optional(Schema.String),
+  }),
   success: ConversationEvent,
   error: PanRpcError,
   stream: true,

@@ -1,5 +1,5 @@
 import type { WorkingPhase } from '../../../lib/workingPhase';
-import type { ChatMessage, CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from '../chat-types';
+import type { ChatMessage, CompactBoundary, ProposedPlan, SubagentSummary, TurnDiffSummary, WorkLogEntry } from '../chat-types';
 import type { FailedMessage } from '../ConversationPanel';
 import type { RoundVerdict } from '../../CommandDeck/RoundCard';
 import type { AnsweredPaneChoice, PendingPaneChoice } from '../../../lib/paneChoice';
@@ -44,6 +44,8 @@ export interface MessagesTimelineProps {
   conversationName?: string;
   cwd?: string;
   issueId?: string | null;
+  subagentByToolUseId?: ReadonlyMap<string, SubagentSummary>;
+  onOpenSubagent?: (toolUseId: string) => void;
   turnDiffSummaryByAssistantMessageId?: Map<string, TurnDiffSummary>;
   onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
   resolvedTheme?: 'light' | 'dark';

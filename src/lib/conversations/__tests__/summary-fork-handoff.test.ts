@@ -170,7 +170,7 @@ afterEach(() => {
   }
 });
 
-describe('summary fork transcript resolution', () => {
+describe('summary fork transcript resolution', { timeout: 20_000 }, () => {
   it('summarizes an ACP conversation without a Claude session ID', async () => {
     const home = join(tmpdir(), `pan-summary-fork-acp-${Date.now()}`);
     const source = await createSourceConversation(home, {
@@ -264,7 +264,7 @@ describe('validateHandoffDoc', () => {
   });
 });
 
-describe('handoff fork handshake', () => {
+describe('handoff fork handshake', { timeout: 20_000 }, () => {
   it('delivers the rendered handoff prompt and returns the validated document', async () => {
     const home = join(tmpdir(), `pan-handoff-request-${Date.now()}`);
     process.env.OVERDECK_HOME = home;

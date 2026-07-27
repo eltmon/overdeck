@@ -52,6 +52,12 @@ Because the `projects.yaml` registry (see [Directory Structure](#directory-struc
   alt="God View: aggregate cross-project view of all agent activity across every registered project"
 />
 
+### Conversation subagents
+
+When a Claude Code conversation starts subagents through the `Agent` tool, the conversation panel opens a **Subagents** rail on the right. Each row shows the subagent type, description, live status, and nesting depth. Select a row—or choose **Open subagent transcript** from its expanded tool row—to read the subagent's full transcript without leaving the parent conversation.
+
+The selected subagent is stored in the `?subagent=<id>` URL parameter, so a direct link reopens the same transcript. The rail stays hidden when a conversation has no subagents. Pi and Codex conversations are unchanged because they do not use Claude Code's subagent file layout.
+
 ## Directory Structure
 
 Overdeck stores all runtime state in `~/.overdeck/`:
