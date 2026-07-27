@@ -37,6 +37,11 @@
       "reason": "feedback",
       "note": "[2026-07-27T06:35Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-27T06:35:58.510Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-27T06:59:17.785Z"
     }
   ],
   "feedback": [],
@@ -74,20 +79,20 @@
     "recordedAt": "2026-07-27T05:19:11.339Z"
   },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T06:59:16.689Z",
+  "updated": "2026-07-27T06:59:18.252Z",
   "pipeline": {
     "issueId": "PAN-3191",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:20:05.037Z",
-    "updatedAt": "2026-07-27T06:59:16.109Z",
+    "updatedAt": "2026-07-27T06:59:16.717Z",
     "reviewNotes": "Unbounded serial forge checks still monopolize the Deacon patrol; GitHub App repository identity also remains omitted",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
-    "reviewSpawnedAt": "2026-07-27T06:33:10.562Z",
+    "reviewSpawnedAt": "2026-07-27T06:59:16.716Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -152,7 +157,7 @@
       },
       "costAtCloseOut": {
         "usd": 97.147902,
-        "pricingAsOf": "2026-07-27T06:59:16.147Z"
+        "pricingAsOf": "2026-07-27T06:59:18.248Z"
       }
     },
     "merges": [
