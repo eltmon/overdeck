@@ -7835,3 +7835,10 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - **Notable: PAN-3209 shipped a guard this run and has now needed its own follow-up** — bundling a private workspace package that the dist-externals check surfaced. The guard found a real packaging break in npm install that no test caught.
 - Close-out for PAN-3206 blocks on the established transient trio; CI `in_progress` on the merge commit, so no deploy this tick.
 - **RUN TOTALS: 146 close-outs, 14 merges, 10 substrate bugs filed of which 7 fixed, merged and closed out.**
+
+## RUN-72 tick 48 (2026-07-27 20:20Z) — PAN-3206 closed; npm-install hotfix live
+- Read HEAD by name first (`2f3b922806`, a docs commit — **not** a release commit), CI green on all three heads, no verifications running. Deployed `d2844501e5d0` → `2f3b92280609` (clean, pid 2718326, systemd-parented, deacon `False`→`True`).
+- **Verified BOTH landings by ancestry rather than trusting the build number**: `d4d143ff32` (PAN-3206) **LIVE**, `f3bb306bc2` (PAN-3209 effect-acp bundling, the npm-install unbreak) **LIVE**. Then **PAN-3206 CLOSED OUT**.
+- The dist-externals guard reported `20 external packages across 619 dist files, all declared` — **one fewer external than the previous build**, which is the effect-acp package now correctly bundled rather than externalised. **The guard's own number moved in the direction its fix predicted**, which is the cheapest possible confirmation the hotfix did what it claimed.
+- Queue lane clear again: nothing ready, no blockers, both trains idle.
+- **RUN TOTALS: 147 close-outs, 14 merges, 10 substrate bugs filed of which 7 fixed, merged and closed out.**
