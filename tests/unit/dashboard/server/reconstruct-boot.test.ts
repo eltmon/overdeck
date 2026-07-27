@@ -141,6 +141,30 @@ describe('ReadModelService bootstrap (PAN-1938 source-swap)', () => {
     await vi.waitFor(() => expect(reconstructCacheAutoMock).toHaveBeenCalled());
   });
 
+  it('reads authoritative agent rows after reconstruction finishes', async () => {
+    let reconstructFinished = false;
+    reconstructCacheAutoMock.mockImplementation(async () => {
+      reconstructFinished = true;
+      return fakeReconstructResult as any;
+    });
+    const list = vi.fn(() => {
+      expect(reconstructFinished).toBe(true);
+      return Effect.succeed([]);
+    });
+    const resolverLayer = Layer.succeed(AgentsResolver, AgentsResolver.of({
+      list,
+      get: (_id) => Effect.fail(new Error('not found') as never),
+      isAlive: (_id) => Effect.succeed(false),
+      getRuntime: (_id) => Effect.succeed(null),
+      getHealthHistory: (_id) => Effect.succeed([]),
+    }));
+    const layer = ReadModelServiceLive.pipe(Layer.provide(resolverLayer));
+
+    await Effect.runPromise(Effect.provide(Effect.void, layer));
+
+    expect(list).toHaveBeenCalledOnce();
+  });
+
   it('durably emits each source-reconciled stop during bootstrap', async () => {
     reconstructCacheAutoMock.mockResolvedValue({
       ...fakeReconstructResult,

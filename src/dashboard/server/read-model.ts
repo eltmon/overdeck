@@ -545,10 +545,8 @@ export const ReadModelServiceLive = Layer.effect(
         import('../../lib/reconstruct/reconstruct-cache.js'),
       );
 
-      const [overdeckAgents, result] = yield* Effect.all([
-        agentsResolver.list({}),
-        Effect.promise(() => reconstructCacheAuto()),
-      ]);
+      const result = yield* Effect.promise(() => reconstructCacheAuto());
+      const overdeckAgents = yield* agentsResolver.list({});
 
       const agentsById: Record<string, AgentSnapshot> = Object.fromEntries(
         overdeckAgents.map((a) => [a.id, agentSnapshotFromOverdeck(a)]),
