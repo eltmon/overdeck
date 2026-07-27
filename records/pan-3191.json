@@ -62,7 +62,7 @@
     "recordedAt": "2026-07-27T05:19:11.339Z"
   },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T05:37:52.315Z",
+  "updated": "2026-07-27T05:37:57.431Z",
   "pipeline": {
     "issueId": "PAN-3191",
     "reviewStatus": "blocked",
@@ -72,9 +72,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:20:05.037Z",
-    "updatedAt": "2026-07-27T05:37:51.270Z",
+    "updatedAt": "2026-07-27T05:37:57.417Z",
     "reviewNotes": "Reconciler's fixed 100-row window permanently starves newer auto-merge rows and violates FR-2/FR-4",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
+    "reviewedAtCommit": "4e70e23b3d350414e916d6a4fb3120eac6d9cf5f",
     "reviewSpawnedAt": "2026-07-27T05:24:04.488Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -140,7 +141,7 @@
       },
       "costAtCloseOut": {
         "usd": 38.888347,
-        "pricingAsOf": "2026-07-27T05:37:51.368Z"
+        "pricingAsOf": "2026-07-27T05:37:57.423Z"
       }
     },
     "merges": [
