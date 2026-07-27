@@ -1,0 +1,489 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-27T14:04:47.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3206: Synthesized review verdicts are not durably applied — verdict on disk, status pending for hours, agent never informed",
+    "updated": "2026-07-27T14:13:50.624Z"
+  },
+  "plan": {
+    "id": "pan-3206",
+    "title": "Synthesized review verdicts are not durably applied — verdict on disk, status pending for hours, agent never informed",
+    "status": "proposed",
+    "uid": "5ae2a7cd-1eb9-4819-967e-65baec32f89e",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-27T14:04:47.000Z",
+    "updated": "2026-07-27T14:13:50.624Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3206",
+        "label": "PAN-3206",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "deacon",
+      "review-pipeline",
+      "feedback-delivery",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "A completed review verdict can sit fully synthesized on disk for hours while review_status stays pending, the work agent is never told, and the issue is flagged feedback_delivery_needs_you (PAN-3111 incident, 2026-07-27: verdict written 08:02Z, still pending at 10:26Z; operator hand-pasted the verdict). Three verified root causes: (1) both deacon verdict-recovery sweeps gate on reviewStatus === 'reviewing' (deacon-review-unsignaled.ts:161), so a written verdict with status pending has no reconciliation path despite ~15 reset-to-pending paths; (2) every deacon reader looks only for synthesis.md while self-review writes review.md, and the inline verdict parser rejects the prompt's documented vocabulary ('## Verdict: APPROVED' and 'CHANGES REQUESTED — <blocker>' per roles/review.md:158); (3) resolveIssueFeedbackTarget is tmux-name-bound and never consults the agents table, so a live work agent reachable via pan tell is declared unreachable and needs_you fires with zero delivery attempts.",
+      "Proposal": "Six work items. WI-1: new shared module src/lib/cloister/review-verdict-report.ts with findVerdictReport() (synthesis.md preferred, review.md fallback) and parseVerdictReport() (APPROVED/PASSED/CHANGES REQUESTED — suffix/FAILED) plus unit tests. WI-2: new deacon sweep reconcileUnappliedReviewVerdicts() in deacon-review-unsignaled.ts, registered in runPatrol() after checkCompletedButUnsignaledReviews (deacon.ts:2855): for reviewStatus pending with reviewSpawnedAt set, find the latest run dir with a verdict report passing isSynthesisForActiveReviewRun, fail-closed guards (workspace HEAD must equal reviewed context.json headSha via async snapshotWorkspaceHeadsPromise; no newer reviewRequestedAt; 5-min settle), nudge-first if the review session is alive (30-min grace), else apply via setReviewStatusSync + deliverReviewVerdictFeedback for blocked + emitActivityEntrySync naming the sweep. WI-3: the three existing readers (checkCompletedButUnsignaledReviews, nudgeSynthesisForCompleteReviewerReports' synthesisAlreadyWritten, findLatestSynthesis) adopt the shared helper. WI-4: agents-table-backed live-session tier in resolveIssueFeedbackTarget (listOverdeckAgentStatesSync + tmux liveness, excluding review/test/inspect/ship/plan sessions) before the resurrection ladder, so needs_you requires a genuine miss. WI-5: regression tests for the sweep (incident shape, self-review blocked, stale HEAD, newer request, settle window, live-session nudge, no-spawn skip). WI-6: docs/REVIEW-AGENT-ARCHITECTURE.md gains a 'Verdict application and fallback sweeps' section; roles/review.md stale .overdeck/review/ paths corrected to .pan/review/.",
+      "NonGoals": "- Changing the canonical signal path (pan admin specialists done review) or PR-comment mechanics\n- Auto-applying verdicts when the workspace HEAD has moved (fail-closed by design; deacon-post-review-commits owns re-dispatch)\n- Redesigning the ~15 reviewStatus: 'pending' reset paths — the sweep reconciles their aftermath\n- Convoy/self-review mode selection, or reviewer prompt content beyond path corrections\n- Backfilling historical stuck issues beyond what the first patrol naturally repairs\n- Delivery transport tiers, dedup-key mechanics, or the suppression-loop counter"
+    },
+    "autoDecisions": [
+      {
+        "summary": "New dedicated sweep reconcileUnappliedReviewVerdicts() for 'pending' instead of widening the existing sweep's 'reviewing' gate",
+        "rationale": "The pending case needs stronger anti-stale guards (HEAD anchor, newer-request check) that would be wrong on the reviewing path; existing behavior stays untouched, and an old verdict can pass isSynthesisForActiveReviewRun when reviewSpawnedAt/lastVerifiedCommit are stale"
+      },
+      {
+        "summary": "Fail-closed on HEAD mismatch — never apply a verdict when the workspace HEAD differs from the reviewed headSha",
+        "rationale": "A moved HEAD means deacon-post-review-commits already queued re-review; applying the old verdict would lie about the current tree"
+      },
+      {
+        "summary": "Nudge-first when the review session is alive; direct apply only when dead or unhealed after a 30-minute grace",
+        "rationale": "The canonical CLI path (pan admin specialists done review) also posts the PR comment and does keyed feedback delivery; the sweep should prefer it whenever the agent can still act"
+      },
+      {
+        "summary": "Fix the needs_you misfire inside resolveIssueFeedbackTarget (agents-table tier) rather than at each surfaceIssueFeedbackNeedsYou call site",
+        "rationale": "One fix covers review feedback, verification-runner, and strike-landing callers; call-site patches would leave the same miss in the other paths"
+      },
+      {
+        "summary": "One shared verdict-report module replaces the divergent inline parsers/finders",
+        "rationale": "The current parser rejects prompt-conformant syntheses (APPROVED, CHANGES REQUESTED — suffix) and ignores review.md; three readers had drifted independently"
+      },
+      {
+        "summary": "Also correct the stale .overdeck/review/ references in roles/review.md",
+        "rationale": "Runtime writes .pan/review/<runId>/ (PAN_DIRNAME); the stale references are a literal trap for agents that follow the role file over the spawn prompt's absolute path"
+      }
+    ],
+    "items": [
+      {
+        "id": "verdict-report-helper",
+        "title": "Shared verdict-report module: findVerdictReport + parseVerdictReport with unit tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T14:04:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3206",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pending-verdict-sweep",
+            "existing-readers-adopt-helper",
+            "pending-sweep-regression-tests"
+          ],
+          "files_scope": [
+            "src/lib/cloister/review-verdict-report.ts",
+            "tests/unit/lib/cloister/review-verdict-report.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/review-verdict-report.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "review-verdict-report.test.ts passes all parser and finder cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/review-verdict-report.ts exactly as specified in PRD WI-1 (.pan/drafts/PAN-3206.md): VERDICT_REPORT_FILENAMES = ['synthesis.md','review.md']; findVerdictReport(dirPath) returns {path, filename} for the first existing file; parseVerdictReport(content) matches /^##\\s*Verdict:\\s*(.+)$/im and maps APPROVED/PASSED→passed, CHANGES REQUESTED (optional —/–/:/- suffix captured as topBlocker, else ## Blocking Findings section title)→blocked, FAILED→failed, anything else→null. Add tests/unit/lib/cloister/review-verdict-report.test.ts covering every mapping, the blocker-suffix and Blocking-Findings fallback, garbage→null, and finder preference/fallback/null using a tmp dir."
+        },
+        "items": [
+          {
+            "id": "verdict-report-helper.ac1",
+            "title": "parseVerdictReport maps APPROVED and PASSED to passed, CHANGES REQUESTED — <blocker> to blocked with that blocker, bare CHANGES REQUESTED plus a ## Blocking Findings section to blocked with the section title, FAILED to failed, and returns null for unrecognized content",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-report-helper.ac2",
+            "title": "findVerdictReport returns synthesis.md when both files exist, falls back to review.md when only it exists, and returns null for a dir with neither",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-report-helper.ac3",
+            "title": "npx vitest run tests/unit/lib/cloister/review-verdict-report.test.ts exits 0 and npm run typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pending-verdict-sweep",
+        "title": "Deacon sweep reconcileUnappliedReviewVerdicts: apply on-disk verdicts stranded in reviewStatus pending",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T14:04:47.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3206",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-review-unsignaled.ts",
+            "src/lib/cloister/deacon-review.ts",
+            "src/lib/cloister/deacon.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes (file-size allowlist row added if the ratchet trips)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add reconcileUnappliedReviewVerdicts() to src/lib/cloister/deacon-review-unsignaled.ts per PRD WI-2 pseudo-code: iterate loadReviewStatuses(); gate reviewStatus === 'pending' AND reviewSpawnedAt set; resolve project + workspace like the sibling sweep (:163-166); find the latest agent-<issue>-review* run dir with findVerdictReport passing isSynthesisForActiveReviewRun; skip inside the 5-min settle window; skip when reviewRequestedAt postdates the verdict mtime; HEAD anchor — read context.json headSha and skip when async snapshotWorkspaceHeadsPromise(issueId, wsPath) returns a different sha (NO execSync — server code); parse via parseVerdictReport. Alive review session → nudge once with the same pan admin specialists done review command shape as :236-237 (pendingVerdictNudges map, 30-min dedup), apply directly only after a 30-min unhealed grace; dead session → apply directly. Apply = setReviewStatusSync(verdict, reviewNotes with 'applied by deacon sweep from on-disk <filename>' attribution, reviewedAtCommit for blocked when head known) + deliverReviewVerdictFeedback for blocked (runId: basename(latestDir)) + emitActivityEntrySync({source:'cloister', level:'warn', message naming the deacon sweep}). Wire up: re-export from deacon-review.ts; import in deacon.ts:36; call in runPatrol() immediately after checkCompletedButUnsignaledReviews() (:2855) with actions.push + addLog; add to the deacon.ts:1130-1145 re-export list. If scripts/lint-file-size.sh trips, add an audited scripts/file-size-allowlist.txt row '<lines> <path> # PAN-3206' in the same commit."
+        },
+        "items": [
+          {
+            "id": "pending-verdict-sweep.ac1",
+            "title": "Given a run dir with a settled verdict file, reviewStatus pending with reviewSpawnedAt set, HEAD matching context.json headSha, and a dead review session, one call to reconcileUnappliedReviewVerdicts() persists the verdict via setReviewStatusSync and emits an activity entry whose message names the deacon sweep",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-verdict-sweep.ac2",
+            "title": "For a blocked verdict the sweep sends the parsed blocker and the run id to deliverReviewVerdictFeedback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-verdict-sweep.ac3",
+            "title": "The sweep produces no status write when the workspace HEAD differs from the reviewed headSha, when reviewRequestedAt postdates the verdict mtime, when the verdict is younger than 5 minutes, or when reviewSpawnedAt is unset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-verdict-sweep.ac4",
+            "title": "With a live review session the sweep nudges the agent with a pan admin specialists done review command instead of writing status directly, and applies directly only when a prior nudge is older than 30 minutes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-verdict-sweep.ac5",
+            "title": "The deacon-review.ts barrel export returns reconcileUnappliedReviewVerdicts, and runPatrol() in deacon.ts logs its action lines immediately after the checkCompletedButUnsignaledReviews call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "existing-readers-adopt-helper",
+        "title": "Existing verdict readers adopt the shared helper (review.md + full vocabulary)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T14:04:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3206",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-review-unsignaled.ts",
+            "src/lib/cloister/deacon-review-signals.ts",
+            "src/lib/cloister/review-verdict-feedback.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deacon-review-synthesis.test.ts tests/unit/lib/cloister/review-verdict-feedback.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "existing synthesis and feedback tests still pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3: (1) checkCompletedButUnsignaledReviews (deacon-review-unsignaled.ts): replace the synthesis.md-only probe at :177-178 with findVerdictReport(dirPath) and take mtime from report.path; replace the inline verdict regex block at :203-220 with parseVerdictReport(content); use report.filename in nudge/action text. (2) deacon-review-signals.ts:191: synthesisAlreadyWritten becomes findVerdictReport(reviewDir) !== null so a written review.md also suppresses the deacon's own synthesis. (3) findLatestSynthesis in review-verdict-feedback.ts:48-66: per run dir use findVerdictReport so self-review review.md bodies are included in feedback. No exported symbol is removed; behavior is strictly additive."
+        },
+        "items": [
+          {
+            "id": "existing-readers-adopt-helper.ac1",
+            "title": "checkCompletedButUnsignaledReviews accepts a run dir containing only review.md and parses a '## Verdict: APPROVED' synthesis that the old inline regex rejected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "existing-readers-adopt-helper.ac2",
+            "title": "deacon-review-signals treats an existing review.md as 'synthesis already written' and findLatestSynthesis returns review.md content when no synthesis.md exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "existing-readers-adopt-helper.ac3",
+            "title": "npx vitest run tests/unit/lib/cloister/deacon-review-synthesis.test.ts tests/unit/lib/cloister/review-verdict-feedback.test.ts exits 0 and npm run typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feedback-target-agents-table-tier",
+        "title": "resolveIssueFeedbackTarget gains an agents-table-backed live-session tier before needsYou",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T14:04:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3206",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/feedback-target.ts",
+            "tests/unit/lib/cloister/review-verdict-feedback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/review-verdict-feedback.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new tier test cases pass: live non-canonical work session resolved, review/test sessions not selected",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4: in resolveIssueFeedbackTarget (src/lib/cloister/feedback-target.ts:65-132), insert a new tier after the unregistered-slot self-heal scan (:96-102) and before the resurrection ladder (:112-126): enumerate listOverdeckAgentStatesSync() (dynamic import from ../overdeck/agent-state-sync.js, same resolver pan tell uses via resolveAgentTargetSync), filter to the issue (issueId uppercase match), exclude conv-/planning- prefixes and ids ending in -(review|test|inspect|ship|plan), and return {agentId} for the first id whose tmux session exists (isLiveSession). Wrap in try/catch falling through to the resurrection ladder. Add test cases (extend tests/unit/lib/cloister/review-verdict-feedback.test.ts or a new feedback-target test): a live registered agent-pan-x-slot-2 absent from the record's slotAssignments is returned and needsYou is not surfaced; a live agent-pan-x-review session is NOT selected."
+        },
+        "items": [
+          {
+            "id": "feedback-target-agents-table-tier.ac1",
+            "title": "With no agent-<issue> tmux session but a live registered work-capable session for the issue, resolveIssueFeedbackTarget returns that agent id instead of { needsYou: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-target-agents-table-tier.ac2",
+            "title": "resolveIssueFeedbackTarget refuses to return agent-<issue>-review/-test/-inspect/-ship/-plan, conv-, or planning- sessions as the feedback target",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-target-agents-table-tier.ac3",
+            "title": "When no live session exists anywhere, the function still falls through to the resurrection ladder and then needsYou unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pending-sweep-regression-tests",
+        "title": "Regression tests for reconcileUnappliedReviewVerdicts (incident shape + guards)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T14:04:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3206",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/cloister/deacon-review-unapplied-verdicts.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deacon-review-unapplied-verdicts.test.ts"
+          ],
+          "expected_outputs": [
+            "all seven cases pass: incident shape, self-review blocked, stale HEAD, newer request, settle window, live-session nudge, no-spawn skip"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/unit/lib/cloister/deacon-review-unapplied-verdicts.test.ts per PRD WI-5, following the module-mocking pattern of tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts: vi.mock review-status.js (loadReviewStatuses, setReviewStatusSync), projects.js, tmux.js, git-utils.js (snapshotWorkspaceHeadsPromise), review-verdict-feedback.js, activity-logger.js; build a tmp workspace with .pan/review/<runId>/{context.json, synthesis.md|review.md} fixtures. Cases: (1) incident shape — pending + spawned + APPROVED synthesis + dead session → setReviewStatusSync(passed) + activity event naming the sweep; (2) review.md CHANGES REQUESTED — blocker → blocked + deliverReviewVerdictFeedback with blocker and runId; (3) HEAD mismatch → no write; (4) reviewRequestedAt after verdict mtime → no write; (5) verdict younger than 5 min → no write; (6) live session → messageAgent nudge containing 'pan admin specialists done review', no direct write, direct write after 30-min grace; (7) reviewSpawnedAt unset → skipped. Use vi.useFakeTimers where nudge-age grace is exercised."
+        },
+        "items": [
+          {
+            "id": "pending-sweep-regression-tests.ac1",
+            "title": "The incident-shape test asserts the sweep persists the parsed verdict via setReviewStatusSync and emits an activity entry naming the deacon sweep as applier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-sweep-regression-tests.ac2",
+            "title": "Guard tests assert the sweep produces no status write for stale HEAD, newer reviewRequestedAt, in-settle-window verdict, and unset reviewSpawnedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-sweep-regression-tests.ac3",
+            "title": "The live-session test asserts a messageAgent nudge containing 'pan admin specialists done review' and no direct status write, then a direct write once the nudge age exceeds 30 minutes (fake timers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-sweep-regression-tests.ac4",
+            "title": "npx vitest run tests/unit/lib/cloister/deacon-review-unapplied-verdicts.test.ts exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-role-prompt-fixes",
+        "title": "Document verdict-application fallback layers; correct .overdeck/review paths in roles/review.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-27T14:04:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3206",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "roles/review.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '\\.overdeck/review' roles/review.md; test $? -eq 1",
+            "grep -n 'Verdict application and fallback sweeps' docs/REVIEW-AGENT-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "grep finds no .overdeck/review references in roles/review.md",
+            "the new docs section exists and names all three application layers"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6: (1) docs/REVIEW-AGENT-ARCHITECTURE.md — add a 'Verdict application and fallback sweeps' section documenting the verdict-file contract (.pan/review/<runId>/, synthesis.md convoy / review.md self-review, '## Verdict: APPROVED | CHANGES REQUESTED — <blocker>' vocabulary), the three application layers (agent CLI signal → checkCompletedButUnsignaledReviews for reviewing → reconcileUnappliedReviewVerdicts for pending), the fail-closed guards (HEAD anchor, newer-request, settle window), and that feedback_delivery_needs_you now requires an agents-table-backed miss. (2) roles/review.md — change the four stale .overdeck/review/<runId>/… references (lines 47, 86, 153, 195) to .pan/review/<runId>/…."
+        },
+        "items": [
+          {
+            "id": "docs-and-role-prompt-fixes.ac1",
+            "title": "The new docs/REVIEW-AGENT-ARCHITECTURE.md section contains all three verdict-application layers and the fail-closed guards (HEAD anchor, newer-request, settle window)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-role-prompt-fixes.ac2",
+            "title": "grep -n '\\.overdeck/review' roles/review.md produces no matches after the edit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "verdict-report-helper",
+        "to": "pending-verdict-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "verdict-report-helper",
+        "to": "existing-readers-adopt-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "pending-verdict-sweep",
+        "to": "pending-sweep-regression-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "verdict-report-helper",
+        "to": "pending-sweep-regression-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "pending-verdict-sweep",
+        "to": "docs-and-role-prompt-fixes",
+        "type": "informs"
+      },
+      {
+        "from": "pending-verdict-sweep",
+        "to": "existing-readers-adopt-helper",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-27-PAN-3206-synthesized-review-verdicts-are-not-durably-applied-verdict-on-disk-status-pending-for-hours-agent-never-informed.xbrief.json"
+    }
+  },
+  "status": "proposed"
+}
