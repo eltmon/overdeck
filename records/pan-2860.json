@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-18T00:47:17.084Z",
-  "updated": "2026-07-18T16:57:36.911Z",
+  "updated": "2026-07-27T16:52:27.782Z",
   "pipeline": {
     "issueId": "PAN-2860",
     "reviewStatus": "pending",
@@ -11,7 +11,7 @@
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T16:57:36.890Z",
+    "updatedAt": "2026-07-27T16:52:27.752Z",
     "mergeNotes": "Work agent did not push the rebased branch within 30 minutes",
     "strikeReadyHead": "40998183f1435a6c28f7564fe77d929120f609f1",
     "strikeReadyAt": "2026-07-18T02:18:09.535Z",
@@ -27,7 +27,7 @@
       }
     ],
     "closedOut": true,
-    "closedOutAt": "2026-07-18T16:57:36.890Z"
+    "closedOutAt": "2026-07-27T16:52:27.752Z"
   },
   "closeOut": {
     "usage": {
@@ -57,53 +57,38 @@
     "merges": [],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-18T16:57:36.911Z",
+      "evaluatedAt": "2026-07-27T16:52:27.777Z",
       "rows": [
         {
           "id": "review",
           "num": 1,
           "title": "Review passed",
-          "expected": "reviewStatus: passed",
-          "observed": "reviewStatus: pending",
-          "status": "miss",
-          "acceptedBy": {
-            "flag": "--accept-review",
-            "by": "flywheel-orchestrator",
-            "at": "2026-07-18T16:57:27.138Z"
-          }
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
         },
         {
           "id": "tests",
           "num": 2,
           "title": "Tests passed",
-          "expected": "testStatus: passed",
-          "observed": "testStatus: pending",
-          "status": "miss",
-          "acceptedBy": {
-            "flag": "--accept-tests",
-            "by": "flywheel-orchestrator",
-            "at": "2026-07-18T16:57:27.138Z"
-          }
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
         },
         {
           "id": "verification",
           "num": 3,
           "title": "Verification green on the branch",
-          "expected": "verificationStatus: passed at lastVerifiedCommit",
-          "observed": "verificationStatus: missing",
-          "status": "miss",
-          "acceptedBy": {
-            "flag": "--accept-verification",
-            "by": "flywheel-orchestrator",
-            "at": "2026-07-18T16:57:27.138Z"
-          }
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: missing (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
         },
         {
           "id": "merged",
           "num": 4,
           "title": "Merged to main",
-          "expected": "PR merged on the forge",
-          "observed": "Branch already cleaned up (squash-merged); PR #2871 MERGED at 2026-07-18T16:42:40Z",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Feature branch is absent; positive merge evidence is required; PR #2871 MERGED at 2026-07-18T16:42:40Z",
           "status": "pass",
           "mergedAt": "2026-07-18T16:42:40Z",
           "mergeCommit": "c2edcdf68ae983de56c107d7271bf20b06a0bd4d"
@@ -113,13 +98,8 @@
           "num": 5,
           "title": "Post-merge lifecycle ran",
           "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
-          "observed": "canonical state: todo; no running work/planning agents",
-          "status": "miss",
-          "acceptedBy": {
-            "flag": "--accept-post-merge",
-            "by": "flywheel-orchestrator",
-            "at": "2026-07-18T16:57:27.138Z"
-          }
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
         },
         {
           "id": "main-verify",
@@ -134,7 +114,7 @@
           "num": 7,
           "title": "Deployed",
           "expected": "live server build includes the merged commit",
-          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-18T16:55:31.000Z, dist built 2026-07-18T16:48:56.138Z, merge 2026-07-18T16:42:40.000Z",
+          "observed": "build commit d44fa122 contains merge c2edcdf6",
           "status": "pass"
         },
         {
@@ -144,15 +124,10 @@
           "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
           "overridable": false,
           "status": "pass",
-          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 2 agent state directories; Preserved local branch strike/pan-2860 — not merged to main; Preserved remote branch strike/pan-2860 — not merged to main; Pruned 88 checkpoint ref(s) for agent-pan-2860, planning-pan-2860, strike-pan-2860; No specialist registry entries for PAN-2860"
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; Preserved local branch strike/pan-2860 — not merged to main; Preserved remote branch strike/pan-2860 — not merged to main; Pruned 0 checkpoint ref(s) for agent-pan-2860, planning-pan-2860, strike-pan-2860; No specialist registry entries for PAN-2860"
         }
       ],
-      "accepted": [
-        "review",
-        "tests",
-        "verification",
-        "post-merge"
-      ]
+      "accepted": []
     }
   },
   "harness": "claude-code",
