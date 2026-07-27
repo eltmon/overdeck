@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-07T02:41:17.313Z",
-  "updated": "2026-07-27T05:59:40.945Z",
+  "updated": "2026-07-27T16:41:16.063Z",
   "pipeline": {
     "issueId": "PAN-2375",
     "reviewStatus": "pending",
@@ -35,14 +35,14 @@
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T05:59:40.912Z",
+    "updatedAt": "2026-07-27T16:41:16.042Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "Bead state-plane-predicate ack: commit 2fe848f6 is a pure test-colocation move (tests/unit/lib/state-plane.test.ts -> src/lib/__tests__/state-plane.test.ts, import path fixed), no logic changes; verified all 4 acceptance criteria still pass against current src/lib/state-plane.ts (state-only=true, mixed src+state=false, drafts-only=false, empty-diff=true).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2457",
     "lastVerifiedCommit": "a1e27c714a5596831cc98a8c815180a97a5a87aa",
     "reviewRequestedAt": "2026-07-07T06:33:45.658Z",
     "closedOut": true,
-    "closedOutAt": "2026-07-27T05:59:40.912Z"
+    "closedOutAt": "2026-07-27T16:41:16.042Z"
   },
   "closeOut": {
     "usage": {
@@ -150,7 +150,7 @@
     ],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-27T05:59:40.936Z",
+      "evaluatedAt": "2026-07-27T16:41:16.061Z",
       "rows": [
         {
           "id": "review",
@@ -207,7 +207,7 @@
           "num": 7,
           "title": "Deployed",
           "expected": "live server build includes the merged commit",
-          "observed": "build commit 3297fb26 contains merge f93fb65c",
+          "observed": "build commit d44fa122 contains merge f93fb65c",
           "status": "pass"
         },
         {
