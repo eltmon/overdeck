@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T06:00:19.949Z",
+  "updated": "2026-07-27T06:20:05.906Z",
   "pipeline": {
     "issueId": "PAN-3187",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "claude-opus-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "repair-closeout-backlog": {
-        "writerId": "agent-pan-3187",
-        "agentId": "agent-pan-3187",
-        "pid": 2839976,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:47:22.579Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3187",
@@ -137,6 +129,17 @@
         "outcome": "completed",
         "reason": "Documented seven-day review intent expiry, closed-issue cleanup, server-only dispatch, and the exact DoD terminal-settling and non-settling rules.",
         "releasedAt": "2026-07-27T05:47:07.371Z"
+      },
+      {
+        "writerId": "agent-pan-3187",
+        "agentId": "agent-pan-3187",
+        "pid": 2839976,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:47:22.579Z",
+        "itemId": "repair-closeout-backlog",
+        "outcome": "completed",
+        "reason": "Ran the workspace-built repair without overrides. Discovery found 12 additional records (23 total); 21 reached pipeline.closedOut=true. PAN-2257 refused on row 4 (merged) and PAN-2248 refused on row 6 (main-verify). A fresh CLI boot emitted zero durable-review-pipeline-unavailable lines.",
+        "releasedAt": "2026-07-27T06:20:05.906Z"
       }
     ],
     "statusReasons": {
@@ -163,6 +166,10 @@
       "docs-intent-lifecycle-and-settling": {
         "reason": "Documented seven-day review intent expiry, closed-issue cleanup, server-only dispatch, and the exact DoD terminal-settling and non-settling rules.",
         "updatedAt": "2026-07-27T05:47:07.371Z"
+      },
+      "repair-closeout-backlog": {
+        "reason": "Ran the workspace-built repair without overrides. Discovery found 12 additional records (23 total); 21 reached pipeline.closedOut=true. PAN-2257 refused on row 4 (merged) and PAN-2248 refused on row 6 (main-verify). A fresh CLI boot emitted zero durable-review-pipeline-unavailable lines.",
+        "updatedAt": "2026-07-27T06:20:05.906Z"
       }
     }
   },
@@ -193,6 +200,9 @@
     "docs-intent-lifecycle-and-settling": "completed",
     "docs-intent-lifecycle-and-settling.docs-intent-lifecycle-and-settling.ac1": "completed",
     "docs-intent-lifecycle-and-settling.docs-intent-lifecycle-and-settling.ac2": "completed",
-    "repair-closeout-backlog": "running"
+    "repair-closeout-backlog": "completed",
+    "repair-closeout-backlog.repair-closeout-backlog.ac1": "completed",
+    "repair-closeout-backlog.repair-closeout-backlog.ac2": "completed",
+    "repair-closeout-backlog.repair-closeout-backlog.ac3": "completed"
   }
 }
