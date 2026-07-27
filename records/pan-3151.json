@@ -14,15 +14,7 @@
       "timestamp": "2026-07-27T11:20:11.162Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T11:20:11Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\ncanonical overdeck.db lacks review_cycle_history, so review-status writes fail\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-allowlist.txt",
@@ -99,23 +91,23 @@
     "recordedAt": "2026-07-27T11:05:50.125Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T11:21:46.275Z",
+  "updated": "2026-07-27T11:23:37.986Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T11:09:21.628Z",
-    "updatedAt": "2026-07-27T11:21:46.247Z",
+    "updatedAt": "2026-07-27T11:23:37.945Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (483578ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3151\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3151/src/dashboard/frontend\n\n\n Test Files  138 passed (138)\n      Tests  1524 passed (1524)\n   Start at  07:17:39\n   Duration  15.90s (transform 39.04s, setup 31.09s, import 142.39s, tests 56.23s, environment 72.67s)\n\n ❯ |root| tests/unit/dashboard/unstick-endpoint.test.ts (12 tests | 4 failed) 4622ms\n     × preserves passed reviewStatus/testStatus after clearing stuck via DB helper 137ms (retry x1)\n     × preserves readyForMerge=true after clearing stuck via DB helper 111ms (retry x1)\n     × persists mergeRetryCount across a simulated restart (re-read from DB) 73ms (retry x1)\n     × mergeRetryCount increments and persists correctly across writes 71ms (retry x1)\n ❯ |root| tests/lib/reopen.test.ts (10 tests | 5 failed) 4630ms\n     × resets review/test/merge to pending 157ms (retry x1)\n     × creates initial pending status when no prior status exists 69ms (retry x1)\n     × resets autoRequeueCount to 0 159ms (retry x1)\n     × clears stuck fields on reopen-after-stuck so Deacon resumes the issue 138ms (retry x1)\n     × clears reviewedAtCommit on reopen-after-reviewed so next approve records the new commit 130ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/timestamp-units.test.ts (14 tests | 1 failed) 4605ms\n     × review status history writes status_history.timestamp as epoch MILLISECONDS 66ms (retry x1)\n ❯ |root| tests/unit/lib/review-status-clearstuck.test.ts (9 tests | 2 failed) 3044ms\n     × does not clobber a different issue when two updates race 132ms (retry x1)\n     × setReviewStatus uses single-row read — does not load the entire table 122ms (retry x1)\nstdout | tests/unit/dashboard/server/routes/unstick-route.test.ts > processUnstickRequest — POST /api/workspaces/:issueId/unstick route contract > 200: returns httpStatus=200 and clears stuck flag for a genuinely stuck workspace\n[unstick] Cleared stuck flag and reset lifecyc\n…(13967 chars elided)…\nature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-hpGwSV/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-hpGwSV/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-contex\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "eeb293b9fae67d69195340016d005d602f995a0f",
     "reviewRequestedAt": "2026-07-27T11:09:21.628Z",
-    "reviewSpawnedAt": "2026-07-27T11:07:34.479Z",
+    "reviewSpawnedAt": "2026-07-27T11:23:37.944Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt",
@@ -242,7 +234,7 @@
       },
       "costAtCloseOut": {
         "usd": 27.5239103,
-        "pricingAsOf": "2026-07-27T11:21:46.266Z"
+        "pricingAsOf": "2026-07-27T11:23:37.958Z"
       }
     },
     "merges": [
