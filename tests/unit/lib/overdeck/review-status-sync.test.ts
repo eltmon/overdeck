@@ -67,4 +67,71 @@ describe('overdeck review status sync', () => {
       inspectOwnerSession: 'agent-pan-inspect-owner-review-supervisor',
     }));
   });
+
+  it('round-trips conflictsSince', () => {
+    upsertReviewStatusSync({
+      issueId: 'PAN-CONFLICTS-SINCE',
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      conflictsSince: {
+        sha: '6ac4a3dc11',
+        detectedAt: '2026-07-26T18:58:00.000Z',
+        paths: ['scripts/file-size-baseline.txt'],
+      },
+      updatedAt: new Date().toISOString(),
+      readyForMerge: false,
+    });
+
+    const raw = odb.raw().prepare(
+      'SELECT conflicts_since FROM review_status WHERE issue_id = ?',
+    ).get('PAN-CONFLICTS-SINCE') as { conflicts_since: string };
+    expect(JSON.parse(raw.conflicts_since)).toEqual({
+      sha: '6ac4a3dc11',
+      detectedAt: '2026-07-26T18:58:00.000Z',
+      paths: ['scripts/file-size-baseline.txt'],
+    });
+    expect(getReviewStatusFromDbSync('PAN-CONFLICTS-SINCE')).toEqual(expect.objectContaining({
+      conflictsSince: {
+        sha: '6ac4a3dc11',
+        detectedAt: '2026-07-26T18:58:00.000Z',
+        paths: ['scripts/file-size-baseline.txt'],
+      },
+    }));
+  });
+
+  it('leaves conflictsSince undefined when never set', () => {
+    upsertReviewStatusSync({
+      issueId: 'PAN-NO-CONFLICTS',
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      updatedAt: new Date().toISOString(),
+      readyForMerge: false,
+    });
+
+    expect(getReviewStatusFromDbSync('PAN-NO-CONFLICTS')?.conflictsSince).toBeUndefined();
+  });
+
+  it('clears conflictsSince back to undefined on a subsequent write', () => {
+    upsertReviewStatusSync({
+      issueId: 'PAN-CLEAR-CONFLICTS',
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      conflictsSince: {
+        sha: '6ac4a3dc11',
+        detectedAt: '2026-07-26T18:58:00.000Z',
+        paths: ['a.txt'],
+      },
+      updatedAt: new Date().toISOString(),
+      readyForMerge: false,
+    });
+    upsertReviewStatusSync({
+      issueId: 'PAN-CLEAR-CONFLICTS',
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      updatedAt: new Date().toISOString(),
+      readyForMerge: false,
+    });
+
+    expect(getReviewStatusFromDbSync('PAN-CLEAR-CONFLICTS')?.conflictsSince).toBeUndefined();
+  });
 });

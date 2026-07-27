@@ -37,6 +37,10 @@ export function registerDurableReviewPipelineHandler(
   handler = nextHandler;
 }
 
+export function hasDurableReviewPipelineHandler(): boolean {
+  return handler !== null;
+}
+
 /** Re-enters the dashboard-owned verification → push → review path. */
 export async function startDurableReviewPipelineHostSide(
   input: DurableReviewPipelineInput,

@@ -58,6 +58,7 @@ describe('schema migrations', () => {
 
   it('adds affected_criteria to a current-version database that predates the column', () => {
     db.exec('CREATE TABLE flywheel_substrate_bugs (issue_id TEXT PRIMARY KEY)');
+    db.exec('CREATE TABLE agents (id TEXT PRIMARY KEY)');
     db.pragma(`user_version = ${SCHEMA_VERSION}`);
 
     runMigrations(db);
@@ -65,6 +66,40 @@ describe('schema migrations', () => {
     const columns = db.prepare('PRAGMA table_info(flywheel_substrate_bugs)').all() as Array<{ name: string }>;
     expect(columns.map((column) => column.name)).toContain('affected_criteria');
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+  });
+
+  it('adds started_by to a current-version agents table that predates the column', () => {
+    db.exec('CREATE TABLE flywheel_substrate_bugs (issue_id TEXT PRIMARY KEY, affected_criteria TEXT)');
+    db.exec('CREATE TABLE agents (id TEXT PRIMARY KEY)');
+    db.pragma(`user_version = ${SCHEMA_VERSION}`);
+
+    expect(() => runMigrations(db)).not.toThrow();
+
+    const columns = db.prepare('PRAGMA table_info(agents)').all() as Array<{ name: string }>;
+    expect(columns.map((column) => column.name)).toContain('started_by');
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+  });
+
+  it('v61 -> v62: a database already stamped exactly v61 still receives the late v61 top-ups (started_by, affected_criteria) alongside conflicts_since', () => {
+    // A v61 database that has never run the no-version-bump top-up (this build's
+    // SCHEMA_VERSION is 62, so `currentVersion === SCHEMA_VERSION` no longer
+    // matches 61, and `currentVersion < 61` doesn't match either) — regression
+    // for the migration-composition gap where such a database could stamp
+    // user_version = 62 while missing started_by and affected_criteria.
+    db.exec('CREATE TABLE flywheel_substrate_bugs (issue_id TEXT PRIMARY KEY)');
+    db.exec('CREATE TABLE agents (id TEXT PRIMARY KEY)');
+    db.exec('CREATE TABLE review_status (issue_id TEXT PRIMARY KEY)');
+    db.pragma('user_version = 61');
+
+    expect(() => runMigrations(db)).not.toThrow();
+
+    const substrateBugColumns = db.prepare('PRAGMA table_info(flywheel_substrate_bugs)').all() as Array<{ name: string }>;
+    const agentColumns = db.prepare('PRAGMA table_info(agents)').all() as Array<{ name: string }>;
+    const reviewStatusColumns = db.prepare('PRAGMA table_info(review_status)').all() as Array<{ name: string }>;
+    expect(substrateBugColumns.map((c) => c.name)).toContain('affected_criteria');
+    expect(agentColumns.map((c) => c.name)).toContain('started_by');
+    expect(reviewStatusColumns.map((c) => c.name)).toContain('conflicts_since');
+    expect(db.pragma('user_version', { simple: true })).toBe(62);
   });
 
   it('does not advance v60 when the affected_criteria migration fails', () => {
@@ -500,6 +535,7 @@ describe('schema migrations', () => {
     'last_failure_reason',
     'last_failure_next_retry_at',
     'flywheel_run_id',
+    'started_by',
     'role_run_head',
     'review_sub_role',
     'review_run_id',

@@ -28,6 +28,11 @@ import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync, getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 import { resolveProjectForIssue } from '../pan-dir/record.js';
 import { isStateMigrated } from '../state-home.js';
+import {
+  withAutoSpawnConsentClaim,
+  type AcceptAutoSpawnConsent,
+} from '../planning/auto-spawn-consent.js';
+import { isOperatorStartedBy } from '../agents/provenance.js';
 
 export { sendToRemoteAgentKeyed } from './remote-keyed-delivery.js';
 export type { RemoteKeyedDeliveryOutcome, RemoteKeyedExec } from './remote-keyed-delivery.js';
@@ -286,6 +291,7 @@ export interface RemoteAgentState {
   startedAt: string;
   lastActivity?: string;
   location: 'remote';
+  startedBy: string;
   tier?: 'ephemeral' | 'durable';
 }
 
@@ -485,6 +491,8 @@ export interface SpawnRemoteAgentOptions {
   model?: string;
   prompt?: string;
   phase?: string;
+  startedBy: string;
+  autoSpawnConsentRequired?: boolean;
   tier?: 'ephemeral' | 'durable';
 }
 
@@ -543,7 +551,22 @@ export async function writeRemoteFile(
  * Spawn a Claude agent on a remote VM
  */
 export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promise<RemoteAgentState> {
-  const { issueId, workspace, model = 'claude-sonnet-4-6', prompt } = options;
+  if (isOperatorStartedBy(options.startedBy) || options.autoSpawnConsentRequired !== true) {
+    return spawnRemoteAgentWithoutConsentClaim(options);
+  }
+
+  return withAutoSpawnConsentClaim(
+    options.issueId,
+    (acceptConsent) => spawnRemoteAgentWithoutConsentClaim(options, acceptConsent),
+    { isAccepted: (state) => state.status === 'running' },
+  );
+}
+
+async function spawnRemoteAgentWithoutConsentClaim(
+  options: SpawnRemoteAgentOptions,
+  acceptConsent?: AcceptAutoSpawnConsent,
+): Promise<RemoteAgentState> {
+  const { issueId, workspace, startedBy, model = 'claude-sonnet-4-6', prompt } = options;
   const project = resolveProjectForIssue(issueId);
   if (project) assertFlyRemoteStateSupported(issueId, await isStateMigrated(project));
   const tier = options.tier ?? 'ephemeral';
@@ -580,6 +603,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
     status: 'starting',
     startedAt: new Date().toISOString(),
     location: 'remote',
+    startedBy,
     tier,
   };
 
@@ -604,6 +628,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
       promptFile,
       baseCommand: 'claude',
       permissionFlags: getClaudePermissionFlagsSync(),
+      extraEnvExports: [`export OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)}`],
       model,
     });
     await writeRemoteFile(fly, vmName, launcherScript, launcherContent);
@@ -614,7 +639,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
 
     claudeCmd = `bash ${launcherScript}`;
   } else {
-    claudeCmd = `claude ${getClaudePermissionFlagsStringSync()} --model ${model}`;
+    claudeCmd = `OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)} claude ${getClaudePermissionFlagsStringSync()} --model ${model}`;
   }
 
   console.log(`[claude-invoke] purpose=remote-agent | model=${model} | source=remote-agents.ts | vm=${vmName} | agent=${agentId} | command="${claudeCmd}"`);
@@ -630,6 +655,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
     saveRemoteAgentState(state);
     throw new Error(`Failed to start agent: ${result.stderr}`);
   }
+  await acceptConsent?.();
 
   // Install a continuous commit+push heartbeat daemon in its own tmux session.
   // This runs independently of the agent session and survives agent crashes.

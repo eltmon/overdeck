@@ -10,6 +10,7 @@ import { resumeYieldedAgents } from './preemption.js';
 import {
   getBootReconciliationHeldResumeSet,
   getBootReconciliationPendingHoldSet,
+  isAutoResumableRole,
 } from './boot-reconciliation.js';
 import { bootReconciliationSkipReason } from './boot-reconciliation-predicates.js';
 import { isIssueClosed } from './issue-closed.js';
@@ -614,6 +615,8 @@ interface HandleAgentStoppedOptions {
   skipGlobalGates?: boolean;
   /** Descriptive source for log messages. */
   context?: string;
+  /** Explicit operator resume_all may override a historical manual stop. */
+  overrideStoppedByUser?: boolean;
 }
 
 /**
@@ -626,7 +629,7 @@ export async function handleAgentStoppedEvent(
   opts: HandleAgentStoppedOptions = {},
   deps: AutoResumeNotifierDeps,
 ): Promise<string | null> {
-  const { skipGlobalGates = false, context = 'event' } = opts;
+  const { skipGlobalGates = false, context = 'event', overrideStoppedByUser = false } = opts;
   const state = getAgentStateSync(agentId);
   if (!state) {
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — no state`);
@@ -636,8 +639,8 @@ export async function handleAgentStoppedEvent(
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — status=${state.status} (not stopped)`);
     return null;
   }
-  if (state.role !== 'work') {
-    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — role=${state.role} (not work)`);
+  if (!isAutoResumableRole(state.role)) {
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — role=${state.role} (not auto-resumable)`);
     return null;
   }
 
@@ -740,7 +743,9 @@ export async function handleAgentStoppedEvent(
     review?.verificationStatus === 'failed';
 
   const deliberatelyStopped = state.stoppedByUser === true;
-  if (deliberatelyStopped && !(handedOffViaDone && hasPendingReviewFeedback)) {
+  if (deliberatelyStopped && overrideStoppedByUser) {
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} resuming despite stoppedByUser — explicit operator resume_all override`);
+  } else if (deliberatelyStopped && !(handedOffViaDone && hasPendingReviewFeedback)) {
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — deliberately stopped by user (stoppedByUser=true)`);
     return null;
   }
@@ -781,7 +786,7 @@ export async function handleAgentStoppedEvent(
   const runtimeStateForLog = getAgentRuntimeStateSync(agentId);
   logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} candidate — calling resumeAgent (issueId=${state.issueId}, runtime.state=${runtimeStateForLog?.state || 'null'})`);
   try {
-    const result = await resumeAgent(agentId);
+    const result = await resumeAgent(agentId, undefined, { startedBy: 'deacon:auto-resume' });
     if (result.success) {
       const resumedState = await Effect.runPromise(getAgentState(agentId));
       if (resumedState) {

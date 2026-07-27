@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import type { WorkingPhase } from '../../../lib/workingPhase';
-import type { TurnDiffSummary } from '../chat-types';
+import type { SubagentSummary, TurnDiffSummary } from '../chat-types';
 import type { MessagesTimelineRow } from '../MessagesTimeline.logic';
 import { PlanCard } from '../PlanCard';
 import { AssistantMessageRow, UserMessageRow } from './messageRows';
@@ -20,6 +20,8 @@ interface RowProps {
   conversationName?: string;
   cwd?: string;
   issueId?: string | null;
+  subagentByToolUseId?: ReadonlyMap<string, SubagentSummary>;
+  onOpenSubagent?: (toolUseId: string) => void;
   turnDiffSummary?: TurnDiffSummary;
   onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
   resolvedTheme?: 'light' | 'dark';
@@ -32,12 +34,12 @@ interface RowProps {
   onPaneChoiceAnswered?: (signature: string, label: string) => void;
 }
 
-export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, cwd, issueId, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase, onConfirmCommand, onOpenTerminal, onPaneChoiceAnswered }: RowProps) {
+export const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, cwd, issueId, subagentByToolUseId, onOpenSubagent, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase, onConfirmCommand, onOpenTerminal, onPaneChoiceAnswered }: RowProps) {
   if (row.kind === 'working') {
     return <WorkingIndicator startedAt={row.createdAt} phase={workingPhase} />;
   }
   if (row.kind === 'work') {
-    return <WorkLogGroup entries={row.groupedEntries} hideToolCalls={hideToolCalls} cwd={cwd} issueId={issueId} />;
+    return <WorkLogGroup entries={row.groupedEntries} hideToolCalls={hideToolCalls} cwd={cwd} issueId={issueId} subagentByToolUseId={subagentByToolUseId} onOpenSubagent={onOpenSubagent} />;
   }
   if (row.kind === 'proposed-plan') {
     return <PlanCard plan={row.plan} conversationName={conversationName ?? ''} />;

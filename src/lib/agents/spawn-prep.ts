@@ -22,6 +22,7 @@ import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { getDispatchableItems } from '../xbrief/dag.js';
 import { type Role } from './agent-state.js';
 import type { TierAssignment } from './dispatch-tier.js';
+import { normalizeFlywheelRunId } from './provenance.js';
 import { resolveStaffing } from './staffing.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from './tier-table.js';
 import {
@@ -45,17 +46,21 @@ export type FlywheelSpawnEnv = {
   OVERDECK_FLYWHEEL_AGENT_ROLE?: Role;
 };
 
-export function normalizeFlywheelRunId(runId: string | null | undefined): string | undefined {
-  if (!runId) return undefined;
-  const trimmed = runId.trim();
-  return /^RUN-\d+$/.test(trimmed) ? trimmed : undefined;
-}
-
 export function resolveFlywheelSpawnEnv(role: Role, runIdOverride?: string | null): FlywheelSpawnEnv {
   const runId = normalizeFlywheelRunId(runIdOverride ?? getFlywheelActiveRunIdSync());
   return runId
     ? { OVERDECK_FLYWHEEL_RUN_ID: runId, OVERDECK_FLYWHEEL_AGENT_ROLE: role }
     : {};
+}
+
+export function resolveAgentStartedBy(
+  explicit: string | undefined,
+  flywheelRunId: string | undefined,
+  environmentToken = process.env['OVERDECK_AGENT_STARTED_BY'],
+): string {
+  const resolved = explicit?.trim() || environmentToken?.trim() || (flywheelRunId ? `flywheel:${flywheelRunId}` : '');
+  if (!resolved) throw new Error('Agent spawn provenance is required: pass startedBy at the launch entry point.');
+  return resolved;
 }
 
 export function flywheelEnvExports(env: FlywheelSpawnEnv): string[] {
@@ -96,6 +101,9 @@ export interface SpawnOptions {
   slotItemId?: string;
   allowHost?: boolean;
   flywheelRunId?: string;
+  startedBy: string;
+  /** True only when planning consent was the release authority for this autonomous work launch. */
+  autoSpawnConsentRequired?: boolean;
   /** Claude Code `--effort` level for the spawned session (work/strike). */
   effort?: RoleEffort;
 }
@@ -127,6 +135,9 @@ export interface SpawnRunOptions {
   extraEnvExports?: string[];
   resumeSessionId?: string;
   flywheelRunId?: string;
+  startedBy: string;
+  /** True only when planning consent was the release authority for this autonomous work launch. */
+  autoSpawnConsentRequired?: boolean;
   /** 1-based registered slot index for per-item work-agent spawning. */
   slotIndex?: number;
   /** xBRIEF item id assigned to this registered slot. Required with slotIndex. */

@@ -242,6 +242,7 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
       reviewSynthesisAgentId: synthesisAgentId,
       reviewOutputPath: outputPath,
       allowHost: opts.allowHost ?? false,
+      startedBy: 'review-convoy',
     });
     run.reviewSubRole = opts.subRole;
     run.reviewRunId = opts.runId;

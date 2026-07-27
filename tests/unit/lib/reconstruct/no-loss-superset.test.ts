@@ -76,7 +76,12 @@ function fakeDb(): any {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  backfillMock.mockReturnValue({ processed: 0, skipped: 0, markedStopped: 0 });
+  backfillMock.mockReturnValue({
+    processed: 0,
+    skipped: 0,
+    markedStopped: 0,
+    markedStoppedIds: [],
+  });
   listRunningAgentsMock.mockReturnValue(Effect.succeed([]) as any);
   listAllAgentsMock.mockReturnValue([]);
   listProjectsMock.mockReturnValue([]);

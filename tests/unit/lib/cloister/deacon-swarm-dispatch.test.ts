@@ -149,11 +149,15 @@ describe('deacon-swarm next-wave dispatch', () => {
       workspace: '/repo/workspaces/feature-pan-2203',
       slotIndex: 1,
       slotItemId: 'wi-a',
+      prompt: undefined,
+      startedBy: 'deacon:swarm-slot',
     });
     expect(fakeDeps.spawnRun).toHaveBeenNthCalledWith(2, 'PAN-2203', 'work', {
       workspace: '/repo/workspaces/feature-pan-2203',
       slotIndex: 2,
       slotItemId: 'wi-b',
+      prompt: undefined,
+      startedBy: 'deacon:swarm-slot',
     });
   });
 

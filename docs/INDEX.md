@@ -22,6 +22,7 @@
 |----------|-------------|
 | [AGENTS.md](./AGENTS.md) | Agent directory structure, naming patterns, standard contents, and cleanup |
 | [AGENT-STATE-PLANES.md](./AGENT-STATE-PLANES.md) | Three-plane state model: permanent git records, local SQLite runtime registry, and tmux liveness oracle |
+| [CONVERSATION-SUBAGENTS.md](./CONVERSATION-SUBAGENTS.md) | Claude Code subagent transcript layout, parent-row join, transport, status derivation, and path safety |
 | [CODEBASE-HEALTH-ROADMAP.md](./CODEBASE-HEALTH-ROADMAP.md) | Architecture debt-reduction roadmap (four epics A–D): why fix-work dominates feature-work, the deep-module diagnosis, and the handoff-orchestration execution model. PRDs under [codebase-health/](./codebase-health/) |
 | [PAN-1908-POST-MERGE-RUNBOOK.md](./PAN-1908-POST-MERGE-RUNBOOK.md) | Post-merge close-out runbook for superseded/narrowed issues tracked by PAN-1908 |
 | [Architecture Diagram](./diagrams/overdeck-architecture.png) | Visual overview of Overdeck system architecture (UI → Core → Agents → Infrastructure → Pipeline)
@@ -161,6 +162,7 @@
 
 ### Agent System
 - **"agent"** / **"agents"** → AGENTS.md, SPECIALIST_WORKFLOW.md, CLAUDE.md
+- **"conversation subagent"** / **"subagent transcript"** / **"toolUseId"** → CONVERSATION-SUBAGENTS.md
 - **"lifecycle"** → AGENTS.md, PRD-CLOISTER.md
 - **"specialist"** / **"specialists"** → SPECIALIST_WORKFLOW.md
 - **"worker"** → SPECIALIST_WORKFLOW.md

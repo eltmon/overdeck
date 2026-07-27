@@ -10,6 +10,14 @@
 > the tri-state auto-merge policy, and the reconciler it describes still underpin
 > the batch trains). The verb-contract gap noted in §7 was fixed in
 > [PAN-1736](https://github.com/eltmon/overdeck/issues/1736).
+>
+> **Not the same mechanism as the branch-invalidation sweep (PAN-3154, see
+> [`MERGE-WORKFLOW.md`](./MERGE-WORKFLOW.md#branch-invalidation-sweep)).** The
+> merge train (this doc) only ever touches `readyForMerge` siblings, is opt-in
+> via `merge_train.enabled`, and actually rebases branches onto each other to
+> assemble a batch. The branch-invalidation sweep watches **every** in-pipeline
+> branch regardless of train membership, is always on, and only detects, marks,
+> and notifies — it never rebases anything itself.
 
 > Mind-dump / handoff for PAN-1691 and friends, written 2026-06-09 because the
 > implementing session is near compaction. This is the single source of truth

@@ -10,6 +10,7 @@ import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 import { Db, EventBus, Records, Tmux, getOverdeckDatabaseSync } from './infra.js';
 import { IssueId } from './issues.js';
 import { getOverdeckHome } from '../paths.js';
+import { logAgentLifecycleSync } from '../persistent-logger.js';
 import type { AgentState } from '../agents.js';
 export { getIssueStageSync, isTerminalIssueStage } from './issue-stage-sync.js';
 
@@ -700,10 +701,7 @@ export const AgentsDomainLayer = Layer.mergeAll(
 
 // ── Sync helpers (for CLI and reconstruct paths that cannot use Effect) ────────
 
-/**
- * All columns in the overdeck agents table (matches 0000_overdeck_init.sql).
- * Timestamps are stored as INTEGER (Unix ms); booleans as INTEGER 0/1.
- */
+/** Agent columns matching the init migration; timestamps use ms and booleans use 0/1. */
 const OVERDECK_AGENT_COLUMNS = [
   'id', 'issue_id', 'role', 'status', 'workspace',
   'session_id', 'harness', 'model', 'host_override', 'delivery_method',
@@ -711,7 +709,7 @@ const OVERDECK_AGENT_COLUMNS = [
   'paused', 'paused_reason', 'troubled', 'channels_enabled',
   'consecutive_failures', 'first_failure_in_run_at', 'last_failure_next_retry_at',
   'stopped_at', 'paused_at', 'troubled_at', 'last_activity', 'last_failure_reason',
-  'phase', 'role_run_head', 'flywheel_run_id', 'cost_so_far',
+  'phase', 'role_run_head', 'flywheel_run_id', 'started_by', 'cost_so_far',
   'review_sub_role', 'review_run_id', 'review_synthesis_agent_id',
   'review_output_path', 'review_deadline_at', 'review_monitor_signaled',
   'review_retry_attempt',
@@ -768,6 +766,7 @@ function agentStateToOverdeckRow(state: AgentState): unknown[] {
     state.phase ?? null,
     state.roleRunHead ?? null,
     state.flywheelRunId ?? null,
+    state.startedBy ?? null,
     state.costSoFar ?? null,
     state.reviewSubRole ?? null,
     state.reviewRunId ?? null,
@@ -829,15 +828,10 @@ export interface BackfillAgentsSyncResult {
   processed: number;
   skipped: number;
   markedStopped: number;
+  markedStoppedIds: Array<{ id: string; previousStatus: string }>;
 }
 
-/**
- * Read each agent's state.json from ~/.overdeck/agents/ and upsert rows into
- * the overdeck agents table. Reconciles running/starting agents against live
- * tmux sessions.
- *
- * Replaces database/agent-backfill.ts backfillAgentsAutoSync for the overdeck layer.
- */
+/** Rebuild the agents table from state.json and reconcile statuses against live tmux. */
 /**
  * All agent ids matching a prefix — unions the overdeck.db rows and the on-disk state
  * dirs, so it catches both row-only and dir-only orphans (the two can drift apart).
@@ -885,13 +879,13 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
 
   let processed = 0;
   let skipped = 0;
-  let markedStopped = 0;
+  const markedStoppedIds: Array<{ id: string; previousStatus: string }> = [];
 
   let entries: string[] = [];
   try {
     entries = readdirSync(agentsDir);
   } catch {
-    return { processed, skipped, markedStopped };
+    return { processed, skipped, markedStopped: 0, markedStoppedIds };
   }
 
   const cols = OVERDECK_AGENT_COLUMNS.join(', ');
@@ -933,11 +927,11 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
         continue;
       }
 
-      // Reconcile: mark stopped if no live tmux session
+      let reconciledStop: { id: string; previousStatus: string } | undefined;
       if ((state.status === 'running' || state.status === 'starting') && !liveSessions.has(state.id)) {
+        reconciledStop = { id: state.id, previousStatus: state.status };
         state.status = 'stopped';
         state.stoppedAt = state.stoppedAt ?? new Date().toISOString();
-        markedStopped++;
       }
 
       // Per-row resilience (PAN-1972): the disposable agents cache is rebuilt
@@ -950,6 +944,7 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
         const row = agentStateToOverdeckRow(state);
         ensureIssue.run(row[issueIdIdx], Date.now());
         upsert.run(...row);
+        if (reconciledStop) markedStoppedIds.push(reconciledStop);
         processed++;
         if (options?.verbose) {
           console.log(`[backfill] ${state.id} -> ${state.status}`);
@@ -962,7 +957,10 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
   });
 
   tx();
-  return { processed, skipped, markedStopped };
+  for (const { id, previousStatus } of markedStoppedIds) {
+    logAgentLifecycleSync(id, `status changed: ${previousStatus} → stopped (boot backfill reconcile: no live tmux session)`);
+  }
+  return { processed, skipped, markedStopped: markedStoppedIds.length, markedStoppedIds };
 }
 
 /**
@@ -1029,6 +1027,7 @@ export function listAllAgentsSync(): Array<{
   lastFailureReason: string | null;
   lastFailureNextRetryAt: string | null;
   flywheelRunId: string | null;
+  startedBy: string | null;
   roleRunHead: string | null;
   reviewSubRole: string | null;
   reviewRunId: string | null;
@@ -1051,7 +1050,7 @@ export function listAllAgentsSync(): Array<{
            channels_enabled, consecutive_failures, first_failure_in_run_at,
            last_failure_next_retry_at, stopped_at, paused_at, troubled_at,
            last_activity, last_failure_reason, phase, role_run_head,
-           flywheel_run_id, cost_so_far, review_sub_role, review_run_id,
+           flywheel_run_id, started_by, cost_so_far, review_sub_role, review_run_id,
            updated_at
     FROM agents
   `).all() as Array<Record<string, unknown>>;
@@ -1096,6 +1095,7 @@ export function listAllAgentsSync(): Array<{
     lastFailureReason: (row['last_failure_reason'] as string | null) ?? null,
     lastFailureNextRetryAt: fromMs(row['last_failure_next_retry_at']),
     flywheelRunId: (row['flywheel_run_id'] as string | null) ?? null,
+    startedBy: (row['started_by'] as string | null) ?? null,
     roleRunHead: (row['role_run_head'] as string | null) ?? null,
     reviewSubRole: (row['review_sub_role'] as string | null) ?? null,
     reviewRunId: (row['review_run_id'] as string | null) ?? null,

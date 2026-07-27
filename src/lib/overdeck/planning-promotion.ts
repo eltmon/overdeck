@@ -91,6 +91,7 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
 
 export interface CompletePlanningAutoSpawnResult {
   workAgentSpawned: boolean;
+  workAgentQueued?: boolean;
   workAgentSession?: string;
   workAgentError?: string;
   workAgentSkipReason?: 'stack-unhealthy' | 'guardrails' | 'paused' | 'troubled' | 'unauthorized' | 'spawn-failed';
@@ -347,7 +348,12 @@ export async function completePlanningAutoSpawn(options: {
         origin: dashboardOrigin,
         ...internalTokenHeaders,
       },
-      body: JSON.stringify({ issueId: options.issueId, role: 'work' }),
+      body: JSON.stringify({
+        issueId: options.issueId,
+        role: 'work',
+        startedBy: 'planning-auto-handoff',
+        autoSpawnConsentRequired: true,
+      }),
     });
 
     const body = await response.json().catch(() => ({})) as Record<string, unknown>;
@@ -356,8 +362,15 @@ export async function completePlanningAutoSpawn(options: {
       : `agent-${options.issueId.toLowerCase()}`;
 
     if (response.ok && body['success'] !== false) {
-      emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'success', 'work agent spawn requested', { agentId });
-      return { workAgentSpawned: true, workAgentSession: agentId };
+      const workAgentQueued = body['startingContainers'] === true;
+      emitCompletePlanningPhase(
+        options.issueId,
+        'autoSpawn',
+        'success',
+        workAgentQueued ? 'container startup queued before work-agent spawn' : 'work agent spawn requested',
+        { agentId },
+      );
+      return { workAgentSpawned: true, ...(workAgentQueued ? { workAgentQueued: true } : {}), workAgentSession: agentId };
     }
 
     const error = typeof body['error'] === 'string'
@@ -371,7 +384,11 @@ export async function completePlanningAutoSpawn(options: {
         new URL(`/api/workspaces/${encodeURIComponent(options.issueId)}/rebuild-and-start`, dashboardOrigin),
         {
           method: 'POST',
-          headers: { origin: dashboardOrigin, ...internalTokenHeaders },
+          headers: { 'content-type': 'application/json', origin: dashboardOrigin, ...internalTokenHeaders },
+          body: JSON.stringify({
+            startedBy: 'planning-auto-handoff',
+            autoSpawnConsentRequired: true,
+          }),
         },
       );
       const recoveryBody = await recovery.json().catch(() => ({})) as Record<string, unknown>;
@@ -462,7 +479,7 @@ export async function completePlanningForIssue(options: {
   // spawn the work agent for sessions launched with --auto-start, matching
   // `pan plan finalize`. An explicit body value always wins.
   const bodyAutoSpawn = (body as any)?.autoSpawn;
-  const autoSpawn = resolveAutoSpawnOnFinalize(bodyAutoSpawn, id);
+  const autoSpawn = await resolveAutoSpawnOnFinalize(bodyAutoSpawn, id);
   // PRD-first gate bypass (PAN-2234): `--no-prd` from `pan plan finalize` /
   // `pan plan done` propagates here as body.noPrd. The dashboard Done button
   // never sets it, so a manual Done still requires a qualifying PRD draft.

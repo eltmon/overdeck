@@ -221,7 +221,7 @@ nearly instant (~2s). It correctly resolves `@overdeck/contracts` to the worktre
 `packages/contracts/` via Bun workspace resolution.
 
 **Quality gates** (must pass before `pan done`):
-- `npm run typecheck` — TypeScript strict mode
+- `npm run typecheck` — TypeScript strict mode (root, hooks, evals, and both dashboard halves — server and frontend each guarded by a shrink-only ratchet: `scripts/lint-dashboard-types.sh`, `scripts/lint-frontend-types.sh`)
 - `npm run lint` — ESLint
 - `npm test` — Vitest (root + frontend)
 
@@ -490,6 +490,11 @@ So the rule is just: if you touch the merge-completion path, keep that test
 green. A red guard test means you've reopened the loop. Adding new work to the
 post-merge path (e.g. a rolling re-rebase fan-out) is fine as long as it stays
 idempotent and the test stays green.
+
+A merge to `main` doesn't just complete `postMergeLifecycle` for the merged issue —
+it can silently invalidate every *other* open branch touching the same files; the
+branch-invalidation deacon sweep (PAN-3154) detects, marks, and notifies those
+branches within one patrol cycle, see [`docs/MERGE-WORKFLOW.md`](docs/MERGE-WORKFLOW.md#branch-invalidation-sweep).
 
 ## postMergeLifecycle Verify Handoff and Docker Cleanup
 

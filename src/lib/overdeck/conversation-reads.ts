@@ -44,6 +44,7 @@ import { isPiSessionFile, parsePiConversationMessages } from '../../dashboard/se
 import { isOhmypiSessionFile, parseOhmypiConversationMessages } from '../../dashboard/server/services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../../dashboard/server/services/codex-conversation-parser.js';
 import { isCompacting } from '../../dashboard/server/services/conversation-compaction.js';
+import { listSubagentMetas, subagentTranscriptPath } from '../../dashboard/server/services/conversation/subagents.js';
 import {
   readLauncherPinnedSessionId,
   resolveAgentHarness,
@@ -594,6 +595,7 @@ async function resolveSpecialistSessionFile(name: string): Promise<string | null
 export async function getConversationMessagesRead(
   name: string,
   deps: Pick<ConversationReadDependencies, 'resolveSessionFile' | 'shouldReportUnresolvedLiveSession'>,
+  agentId?: string,
 ): Promise<ConversationReadResult> {
   try {
     const conv = getConversationByName(name);
@@ -618,9 +620,15 @@ export async function getConversationMessagesRead(
       return result({ messages: [], workLog: [], streaming: false });
     }
 
+    const parentSessionFile = sessionFile;
+    if (agentId !== undefined) {
+      sessionFile = subagentTranscriptPath(parentSessionFile, agentId);
+      if (!sessionFile) return result({ error: 'Invalid subagent id' }, 400);
+    }
+
     try {
       const parsed = await getCachedMessages(sessionFile, false);
-      if (conv && (parsed.totalCost > 0 || parsed.totalTokens > 0)) {
+      if (agentId === undefined && conv && (parsed.totalCost > 0 || parsed.totalTokens > 0)) {
         updateConversationCost(name, parsed.totalCost, parsed.totalTokens);
       }
 
@@ -632,6 +640,9 @@ export async function getConversationMessagesRead(
           contextUsage = null;
         }
       }
+      const subagents = agentId === undefined
+        ? (await listSubagentMetas(parentSessionFile)).map((meta) => ({ ...meta, status: 'done' as const }))
+        : undefined;
 
       return result({
         messages: parsed.messages,
@@ -643,6 +654,7 @@ export async function getConversationMessagesRead(
         compactBoundaries: (parsed.compactBoundaries?.length ?? 0) > 0 ? parsed.compactBoundaries : undefined,
         compacting: isCompacting(sessionFile) || undefined,
         contextUsage,
+        subagents,
       });
     } catch (parseErr: unknown) {
       const code = (parseErr as { code?: string })?.code;

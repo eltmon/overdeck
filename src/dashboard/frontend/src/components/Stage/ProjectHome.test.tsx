@@ -1,8 +1,17 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ProjectHome } from './ProjectHome'
 import type { StageApi } from './types'
+
+// ProjectHome owns the project rename mutation (PAN-3156), so every render
+// needs a QueryClientProvider. Shadow render() so existing call sites work.
+function render(ui: Parameters<typeof rtlRender>[0]) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return rtlRender(ui, {
+    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+  })
+}
 
 function api(overrides: Partial<StageApi> = {}): StageApi {
   return {

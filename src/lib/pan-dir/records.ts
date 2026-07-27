@@ -119,6 +119,7 @@ function projectPipeline(
     inspectNotes: status.inspectNotes,
     mergeNotes: status.mergeNotes,
     blockerReasons: status.blockerReasons,
+    conflictsSince: status.conflictsSince,
     prUrl: status.prUrl,
     prNumber: status.prNumber,
     prHeadSha: status.prHeadSha,

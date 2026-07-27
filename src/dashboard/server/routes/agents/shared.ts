@@ -12,7 +12,7 @@ import type { AgentStatus } from '@overdeck/contracts';
 
 import { jsonResponse } from '../../http-helpers.js';
 import { getHeaderFromMap } from '../origin-validation.js';
-import { getOverdeckHome } from '../../../../lib/paths.js';
+import { claudeSessionTranscriptExists, getOverdeckHome } from '../../../../lib/paths.js';
 import { resolvePrimaryWorkspaceRepoDirSync } from '../../../../lib/project-repos.js';
 import {
   appendAgentLifecycleLog,
@@ -44,6 +44,7 @@ import { getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapsh
 import { classifyMemoryPressure } from '../../../../lib/cloister/memory-governor.js';
 import { capturePane } from '../../../../lib/tmux.js';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
+import { normalizeFlywheelRunId } from '../../../../lib/agents/provenance.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -75,6 +76,31 @@ export function buildPanStartArgs(input: {
  * owns process/log lifecycle; this route-compatible wrapper preserves the
  * original behavior by waiting for a successful child exit.
  */
+const INTERNAL_STARTED_BY_TOKENS = new Set([
+  'operator:cli:pan-start',
+  'operator:cli:pan-plan',
+  'planning-auto-handoff',
+  'orphan-proposed-reconciler',
+  'workspace-rebuild-recovery',
+  'resume-agent',
+]);
+
+export function resolveRequestedStartedBy(value: unknown, internalRequest = false): string {
+  if (!internalRequest) return 'operator:dashboard';
+  const token = typeof value === 'string' ? value.trim() : '';
+  const flywheelRunId = token.startsWith('flywheel:') ? normalizeFlywheelRunId(token.slice('flywheel:'.length)) : undefined;
+  if (flywheelRunId) return `flywheel:${flywheelRunId}`;
+  if (!INTERNAL_STARTED_BY_TOKENS.has(token)) throw new Error('Invalid internal startedBy provenance token.');
+  return token;
+}
+
+export async function isInternalAgentRequest(request: HttpServerRequest.HttpServerRequest): Promise<boolean> {
+  const expected = await readInternalTokenForRequest();
+  if (!expected) return false;
+  const provided = getHeaderFromMap(request.headers as Record<string, string | string[] | undefined>, INTERNAL_TOKEN_HEADER);
+  return constantTimeTokenEqual(provided, expected);
+}
+
 export async function spawnPanCommandDetached(input: {
   agentSessionName: string;
   issueId: string;
@@ -82,6 +108,7 @@ export async function spawnPanCommandDetached(input: {
   workspacePath: string;
   args: string[];
   cwd?: string;
+  env?: NodeJS.ProcessEnv;
 }, dependencies: DetachedPanCommandDependencies = {}): Promise<string> {
   const launch = await launchPanCommandDetached(input, dependencies);
   await launch.completion;
@@ -254,8 +281,13 @@ function buildStoppedAgentLifecycle(
   // resumable thread in codex-thread-id, which getLatestSessionIdSync resolves
   // (PAN-1988). Without the fallback the listing reports canResumeSession=false
   // for every stopped codex agent and the UI never offers Resume.
-  const hasSavedSession = !!runtimeData.claudeSessionId || !!getLatestSessionIdSync(agentId);
+  const sessionId = getLatestSessionIdSync(agentId) ?? runtimeData.claudeSessionId ?? null;
+  const hasSavedSession = !!sessionId;
   const hasWorkspace = typeof state.workspace === 'string' && state.workspace.length > 0;
+  const hasResumableTranscript = !sessionId
+    || (!!state.harness && state.harness !== 'claude-code')
+    || !state.workspace
+    || claudeSessionTranscriptExists(state.workspace, sessionId);
   const agentStatus = state.status || 'unknown';
   const runtime = runtimeData.state || 'uninitialized';
   const isCompleted = runtimeData.resolution === 'completed';
@@ -269,7 +301,7 @@ function buildStoppedAgentLifecycle(
     (hasSavedSession && !hasResumableBackingState)
     || (hasAgentState && (!hasWorkspace || isPlaceholder))
   );
-  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableBackingState && (isStopped || isCrashed);
+  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
 
   let recommendedAction: WorkAgentRecommendedAction = 'start';
   let reason: string | undefined;
@@ -282,6 +314,9 @@ function buildStoppedAgentLifecycle(
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
     reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it, or 'pan start ${agentOrIssueId} --fresh' to start a new session (e.g. to switch model).`;
+  } else if (hasSavedSession && !hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed)) {
+    recommendedAction = 'start';
+    reason = `Agent ${agentId} has a saved Claude session id but its transcript is missing on disk (jsonl-missing). Start Agent will create a fresh session in the existing workspace.`;
   } else if (hasAgentState && !hasSavedSession && isStopped) {
     recommendedAction = 'start';
     reason = `Agent ${agentId} is stopped and has no saved Claude session. Start Agent will create a fresh session in the existing workspace.`;
@@ -292,6 +327,7 @@ function buildStoppedAgentLifecycle(
     hasAgentState,
     hasLiveTmuxSession,
     hasSavedSession,
+    hasResumableTranscript,
     hasWorkspace,
     isPlaceholder,
     isOrphaned,
@@ -303,9 +339,9 @@ function buildStoppedAgentLifecycle(
     runtimeState: runtime,
     agentStatus,
     canStartFresh: !requiresSessionResetBeforeFreshStart || isOrphaned,
-    canResumeSession: hasSavedSession && hasResumableBackingState && (isStopped || isCrashed),
+    canResumeSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed),
     canRestartWithContext: hasAgentState && hasWorkspace,
-    canResetSession: hasSavedSession && hasResumableBackingState,
+    canResetSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState,
     requiresSessionResetBeforeFreshStart,
     recommendedAction,
     reason,

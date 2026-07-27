@@ -23,7 +23,7 @@ import {
   verificationSatisfied,
   type BlockerReason, type ReviewStatus, type StatusHistoryEntry,
 } from './review-status-reconcile.js';
-import { needsReviewDispatch } from './review-dispatch-decision.js';
+import { isReviewRequestStale, needsReviewDispatch } from './review-dispatch-decision.js';
 import { resolveJournalReconciledReviewStatusSync } from './review-status-read.js';
 import { capturePipelineStageForIssue } from './telemetry/pipeline.js';
 import type { ReviewStatusUpdate } from './workspace-anchor-drift.js';
@@ -178,8 +178,8 @@ export function setReviewStatusSync(
   // PAN-1988: the merge base goes through getReviewStatusSync (journal-reconciled +
   // notes-enriched), NOT the raw DB read. Otherwise a partial update (e.g. a testStatus
   // change carrying no review notes) would merge against a DB row whose notes/flags lag
-  // the journal and silently erase the journal's feedback. The reconcile inside
-  // getReviewStatusSync never re-enters setReviewStatusSync, so there is no recursion.
+  // the journal and silently erase the journal's feedback. A write triggered by reconciliation
+  // must pass that reconciled status as `existing` so it does not recurse through this read.
   const status: ReviewStatus = existing ?? getReviewStatusSync(issueId) ?? {
     issueId,
     reviewStatus: 'pending' as const,
@@ -520,7 +520,9 @@ async function deliverReviewVerdictFeedbackHostSide(
 }
 
 const reviewDispatchAttemptAt = new Map<string, number>();
+const staleReviewRequestClearAttemptedAt = new Map<string, number>();
 const REVIEW_AUTO_DISPATCH_THROTTLE_MS = 30_000;
+let loggedMissingPipelineHandler = false;
 
 function maybeAutoDispatchReviewHostSide(issueId: string, status: ReviewStatus): void {
   if (!needsReviewDispatch({
@@ -529,18 +531,39 @@ function maybeAutoDispatchReviewHostSide(issueId: string, status: ReviewStatus):
     reviewStatus: status.reviewStatus,
     mergeStatus: status.mergeStatus,
     readyForMerge: status.readyForMerge,
-  })) return;
+  })) {
+    if (!isReviewRequestStale({ reviewRequestedAt: status.reviewRequestedAt }) ||
+        staleReviewRequestClearAttemptedAt.has(issueId)) return;
+    staleReviewRequestClearAttemptedAt.set(issueId, Date.now());
+    try {
+      setReviewStatusSync(issueId, { reviewRequestedAt: undefined }, status);
+      const message = `${issueId} — cleared stale review request older than 7 days`;
+      console.warn(`[review-status] ${message}`);
+      emitActivityEntrySync({ source: 'cloister', level: 'warn', issueId, message });
+    } catch {
+      // Sandboxed read-only callers cannot repair durable state; a host process will retry.
+    }
+    return;
+  }
   const last = reviewDispatchAttemptAt.get(issueId) ?? 0;
   if (Date.now() - last < REVIEW_AUTO_DISPATCH_THROTTLE_MS) return;
   reviewDispatchAttemptAt.set(issueId, Date.now());
   void dispatchReviewHostSide(issueId, status.prUrl);
 }
-async function dispatchReviewHostSide(issueId: string, prUrl?: string): Promise<void> {
+export async function dispatchReviewHostSide(issueId: string, prUrl?: string): Promise<void> {
   try {
-    const [{ startDurableReviewPipelineHostSide }, { spawnReviewRoleForIssue }] = await Promise.all([
-      import('./cloister/durable-review-pipeline.js'),
-      import('./cloister/review-agent.js'),
-    ]);
+    const {
+      hasDurableReviewPipelineHandler,
+      startDurableReviewPipelineHostSide,
+    } = await import('./cloister/durable-review-pipeline.js');
+    if (!hasDurableReviewPipelineHandler()) {
+      if (!loggedMissingPipelineHandler) {
+        loggedMissingPipelineHandler = true;
+        console.debug('[review-status] durable review pipeline handler is not registered; skipping host-side review auto-dispatch');
+      }
+      return;
+    }
+    const { spawnReviewRoleForIssue } = await import('./cloister/review-agent.js');
     const started = await startDurableReviewPipelineHostSide({
       issueId,
       ...(prUrl ? { prUrl } : {}),

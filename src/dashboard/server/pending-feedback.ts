@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { Effect } from 'effect';
-import { messageAgent, getAgentState, type AgentState } from '../../lib/agents.js';
+import { messageAgent, getAgentState as getAgentStateProgram, type AgentState } from '../../lib/agents.js';
 import { getReviewStatusSync, loadReviewStatuses, type ReviewStatus } from '../../lib/review-status.js';
 import { getOverdeckHome } from '../../lib/paths.js';
 import { emitActivityEntrySync } from '../../lib/activity-logger.js';
@@ -115,7 +115,7 @@ export async function processPendingFeedbackDeliveries(options?: {
   const staleThresholdMs = options?.staleThresholdMs ?? STALE_THRESHOLD_MS;
   const now = options?.now ?? Date.now();
   const deliver = options?._deliver ?? messageAgent;
-  const getAgentState = options?._getAgentState ?? ((agentId: string) => Effect.runPromise(getAgentState(agentId)));
+  const getAgentState = options?._getAgentState ?? ((agentId: string) => Effect.runPromise(getAgentStateProgram(agentId)));
   const loadStatuses = options?._loadStatuses ?? loadReviewStatuses;
   const getStatus = options?._getStatus ?? getReviewStatusSync;
 

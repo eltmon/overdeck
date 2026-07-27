@@ -9,10 +9,10 @@
  * "Waiting for session to start..." until the tmux session is ready.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { access, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -46,32 +46,22 @@ import {
 } from '../pan-dir/record.js';
 import { workspaceContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
+import {
+  readAutoSpawnOnFinalizeFlagAsync,
+  writeAutoSpawnOnFinalizeFlag,
+} from './auto-spawn-consent.js';
+export {
+  autoSpawnOnFinalizeFlagPath,
+  claimAutoSpawnConsentForWorkStart,
+  completeAutoSpawnConsentClaim,
+  readAutoSpawnOnFinalizeFlag,
+  readAutoSpawnOnFinalizeFlagAsync,
+  releaseAutoSpawnConsentClaim,
+  withAutoSpawnConsentClaim,
+  writeAutoSpawnOnFinalizeFlag,
+} from './auto-spawn-consent.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-
-/**
- * Path to the per-issue "auto-spawn the work agent on planning finalize" flag,
- * written at planning spawn when the operator launched with --auto-start. This
- * is the single source of the launch-time auto-start intent; every finalize
- * path (CLI `pan plan finalize`, the dashboard Done button, host auto-finalize)
- * reads it so the intent is honored no matter how planning is completed.
- */
-export function autoSpawnOnFinalizeFlagPath(issueId: string): string {
-  const overdeckHome = process.env['OVERDECK_HOME'] ?? join(homedir(), '.overdeck');
-  return join(overdeckHome, 'agents', `planning-${issueId.toLowerCase()}`, 'auto-spawn-on-finalize.json');
-}
-
-/** Read the persisted auto-spawn-on-finalize flag for an issue (false if unset/unreadable). */
-export function readAutoSpawnOnFinalizeFlag(issueId: string): boolean {
-  try {
-    const flagFile = autoSpawnOnFinalizeFlagPath(issueId);
-    if (!existsSync(flagFile)) return false;
-    const flag = JSON.parse(readFileSync(flagFile, 'utf-8')) as { autoSpawnOnFinalize?: unknown };
-    return flag.autoSpawnOnFinalize === true;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Decide whether finalizing planning should auto-spawn the work agent. An
@@ -80,10 +70,12 @@ export function readAutoSpawnOnFinalizeFlag(issueId: string): boolean {
  * the CLI `pan plan finalize`, the dashboard Done button, and host
  * auto-finalize — consistent with how the session was launched.
  */
-export function resolveAutoSpawnOnFinalize(requestedAutoSpawn: unknown, issueId: string): boolean {
-  if (requestedAutoSpawn === true) return true;
-  if (requestedAutoSpawn === false) return false;
-  return readAutoSpawnOnFinalizeFlag(issueId);
+export async function resolveAutoSpawnOnFinalize(requestedAutoSpawn: unknown, issueId: string): Promise<boolean> {
+  if (requestedAutoSpawn === true || requestedAutoSpawn === false) {
+    await writeAutoSpawnOnFinalizeFlag(issueId, requestedAutoSpawn);
+    return requestedAutoSpawn;
+  }
+  return readAutoSpawnOnFinalizeFlagAsync(issueId);
 }
 
 async function getPackageVersion(): Promise<string> {
@@ -173,6 +165,8 @@ export interface SpawnPlanningOptions {
   probe?: boolean;
   /** Automatically start the work agent after finalize; stamped by trusted callers only. */
   autoSpawnOnFinalize?: boolean;
+  /** Origin token for the planning agent state. */
+  startedBy: string;
   /** Optional callback for streaming progress events to the client. */
   onProgress?: (event: PlanningProgress) => void;
 }
@@ -191,6 +185,7 @@ export interface PlanningAgentStateInput {
   workspaceLocation: 'local' | 'remote';
   auto?: boolean;
   autoSpawnOnFinalize?: boolean;
+  startedBy: string;
   startedAt?: string;
 }
 
@@ -207,6 +202,7 @@ export function buildPlanningAgentState(input: PlanningAgentStateInput): Record<
     location: input.workspaceLocation,
     auto: input.auto === true,
     autoSpawnOnFinalize: input.autoSpawnOnFinalize === true,
+    startedBy: input.startedBy,
   };
 }
 
@@ -466,6 +462,10 @@ export async function resolvePlanningSessionHarness(planningModel: string, expli
   return resolveHarness({ explicit, role: 'plan', model: planningModel });
 }
 
+export function buildPlanningSessionEnv(startedBy: string): Record<string, string> {
+  return { ...BLANKED_PROVIDER_ENV, TERM: 'xterm-256color', OVERDECK_AGENT_STARTED_BY: startedBy };
+}
+
 // ─── Main spawn function ─────────────────────────────────────────────────────
 
 /**
@@ -479,7 +479,7 @@ export async function resolvePlanningSessionHarness(planningModel: string, expli
  * is sent. It updates agent state to 'running' on success or 'failed' on error.
  */
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
-  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, probe, autoSpawnOnFinalize, onProgress } = opts;
+  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, probe, autoSpawnOnFinalize, startedBy, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
   const agentStateDir = join(homedir(), '.overdeck', 'agents', sessionName);
 
@@ -489,6 +489,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
   };
 
   try {
+    await writeAutoSpawnOnFinalizeFlag(issue.identifier, autoSpawnOnFinalize === true);
     console.log(`[start-planning] Background setup starting for ${issue.identifier}`);
 
     // ── Step 1: Create workspace if needed ─────────────────────────────────
@@ -717,10 +718,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     await ensureTmuxRunning();
     await Effect.runPromise(createSession(sessionName, workspacePath, `bash '${launcherScript}'`, {
-      env: {
-        ...BLANKED_PROVIDER_ENV,
-        TERM: 'xterm-256color',
-      },
+      env: buildPlanningSessionEnv(startedBy),
     }));
     // Protect the session from being destroyed when clients disconnect.
     // When the dashboard's WebSocket terminal attaches and then detaches,
@@ -745,13 +743,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         role: 'plan',
         harness: effectiveHarness,
         auto: auto === true,
+        startedBy,
       });
-      if (autoSpawnOnFinalize) {
-        await writeFile(
-          join(agentStateDir, 'auto-spawn-on-finalize.json'),
-          JSON.stringify({ autoSpawnOnFinalize: true }),
-        );
-      }
     }
 
     if (behavior.usesCodexHome || behavior.launchCommandKind === 'acp-host') {

@@ -10,9 +10,9 @@ this table and that module from drifting silently.
 
 | # | Gate ID | Step | Mechanical owner | Visible at |
 | --- | --- | --- | --- | --- |
-| 1 | `review` | Review passed (mode per issue policy; full = convoy + synthesis); a strike-landed issue records the row skipped-by-strike because no review specialist is dispatched for a strike (PAN-3180) | review role → `pan admin specialists done review` → review-status write door | `reviewStatus: passed`, or `skip` naming `strikeLandingState: landed` |
-| 2 | `tests` | Tests passed (incl. browser UAT when required); a strike-landed issue records the row skipped-by-strike because no test specialist is dispatched for a strike (PAN-3180) | test role → `pan admin specialists done test` | `testStatus: passed`, or `skip` naming `strikeLandingState: landed` |
-| 3 | `verification` | Verification green on the branch (typecheck, lint, suite, build) | supervised verification worker (`verification-runner.ts` / `verification-worker.ts`); uat-promotion (recorded at batch promotion, PAN-3114) | `verificationStatus: passed` (or `skipped` per issue policy) |
+| 1 | `review` | Review passed (mode per issue policy); strike-landed work skips because no reviewer runs, and tracker-closed landed work skips when no negative review verdict exists | review role → `pan admin specialists done review` → review-status write door; terminal settlement in `evaluateDodGate()` | `reviewStatus: passed`, or `skip` preserving the original verdict and naming the strike/terminal reason |
+| 2 | `tests` | Tests passed (incl. browser UAT when required); strike-landed work skips because no test specialist runs, and tracker-closed landed work may settle under the rule below | test role → `pan admin specialists done test`; terminal settlement in `evaluateDodGate()` | `testStatus: passed`, or `skip` preserving the original verdict and naming the strike/terminal reason |
+| 3 | `verification` | Verification green on the branch (typecheck, lint, suite, build); tracker-closed landed work may settle under the rule below | supervised verification worker (`verification-runner.ts` / `verification-worker.ts`); UAT promotion (PAN-3114); terminal settlement in `evaluateDodGate()` | `verificationStatus: passed` (or policy `skipped`), or terminal `skip` preserving the original verdict |
 | 4 | `merged` | Merged to main: forge/durable merge evidence resolved through either convention head (`feature/<id>` or `strike/<id>`), including forge squash-merge detection; or a non-PR landing where the shared L2-work lens finds at least one convention-branch ref contained in its repository's default branch with the tip off the first-parent line and zero unmerged refs across all configured repositories | merge door: `triggerMerge` → merge specialist (`merge-agent.ts`); fallback: `gatherIssueBranchContainment()` | PR `MERGED`, `mergeStatus: merged`, or branch-containment evidence |
 | 5 | `post-merge` | Post-merge handoff: work/planning agents paused, workspace Docker stack + networks stopped, `verifying-on-main` label; for a containment-evidenced non-PR landing, passes when no work/planning agents are running because no observed merge event could trigger the lifecycle; for a strike landing, skips on the same quiescence test because the strike path never runs the work-agent handoff (PAN-3180) | `postMergeLifecycle()` (`merge-agent.ts`) — at-most-once per merge (PAN-328 in-flight guard); DoD containment and strike fallbacks | issue labels, agent states |
 | 6 | `main-verify` | Verified on main (post-merge verification of the merged commit) | deacon verify-on-main flow | `verifying_on_main` → verified |
@@ -49,6 +49,16 @@ this table and that module from drifting silently.
   non-terminal member at promote time, and close-out heals members of batches promoted before
   that write path existed (PAN-3114). The row still reports the anchor's presence or absence,
   so a reader never has to guess which condition a miss came from.
+- **Terminal closure can settle rows 1–3 without fabricating verdicts** (PAN-3187). When the
+  tracker issue is closed and row 4 proves that work landed, an absent or non-negative pending
+  verdict records `skip`; this covers verdicts that were never produced after stale review intent
+  expired or the closed-issue reaper removed it, but it never turns stale intent into a pass. A
+  negative test or verification verdict settles only when row 6 (`main-verify`) passes, proving
+  that the landed state superseded it. A negative review verdict never settles, because later CI
+  cannot prove that review feedback was addressed. Tracker-open issues, closed issues without
+  landed work, and negative test/verification verdicts without a passing row 6 remain misses.
+  Every settled row's observed string preserves the original missing, pending, or negative value
+  and states why the gate recorded `skip`.
 - **A strike skips rows 1, 2 and 5; it never passes them** (PAN-3180). Bypassing review and
   test is the entire point of the strike path, so "never ran" and "still outstanding" are
   different facts and the gate now tells them apart. The waiver keys on

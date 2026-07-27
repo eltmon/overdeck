@@ -26,6 +26,17 @@ vi.mock('../autonomous-plan-dispatch.js', async (importOriginal) => {
   };
 });
 
+const autonomousWorkMock = vi.hoisted(() => ({
+  decision: { allow: true, releaseSource: 'released-label' } as
+    | { allow: true; releaseSource: 'released-label' | 'auto-pickup' | 'active-order-book' | 'planning-consent' }
+    | { allow: false; code: 'not-ready' | 'not-planned' | 'not-released' | 'labels-unavailable'; reason: string },
+}));
+
+vi.mock('../autonomous-work-dispatch.js', () => ({
+  gatherAutonomousWorkDispatchInput: vi.fn(async () => ({})),
+  decideAutonomousWorkDispatch: vi.fn(() => autonomousWorkMock.decision),
+}));
+
 vi.mock('../dead-end-trip.js', () => ({
   recordDeadEndNeedsYou: vi.fn(async () => undefined),
 }));
@@ -276,6 +287,7 @@ describe('reactive Cloister scheduler', () => {
     autonomousPlanMock.labels = ['released'];
     autonomousPlanMock.recordedModel = undefined;
     autonomousPlanMock.autonomousModel = 'workhorse:cheap';
+    autonomousWorkMock.decision = { allow: true, releaseSource: 'released-label' };
     mockHeadSha = 'newhead1';
   });
 
@@ -326,6 +338,7 @@ describe('reactive Cloister scheduler', () => {
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'plan', {
       prompt: expect.stringContaining('PLAN TASK for PAN-503'),
       model: 'claude-haiku-4-5',
+      startedBy: 'reactive-lifecycle',
     });
   });
 
@@ -337,19 +350,82 @@ describe('reactive Cloister scheduler', () => {
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'plan', {
       prompt: expect.stringContaining('PLAN TASK for PAN-503'),
       model: 'gpt-5.5',
+      startedBy: 'reactive-lifecycle',
     });
   });
 
-  it('keeps work-role dispatch unchanged and does not apply autonomous planning staffing', async () => {
+  it('refuses reactive work dispatch when the pickup gate blocks the issue', async () => {
+    autonomousWorkMock.decision = {
+      allow: false,
+      code: 'not-ready',
+      reason: 'Autonomous work dispatch was refused because the issue is not ready.',
+    };
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
+
+    const message = 'PAN-503: Autonomous work dispatch was refused because the issue is not ready.';
+    expect(spawnRun).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(`[cloister] ${message}`);
+    expect(emitActivityEntrySync).toHaveBeenCalledWith({
+      source: 'cloister',
+      level: 'warn',
+      message,
+      issueId: 'PAN-503',
+    });
+    expect(recordDeadEndNeedsYou).toHaveBeenCalledWith(
+      'PAN-503',
+      'reactive-work-dispatch-pickup-gate',
+      'in_progress',
+      message,
+    );
+
+    logSpy.mockRestore();
+  });
+
+  it('refuses reactive work dispatch without a finalized implementation plan', async () => {
+    autonomousWorkMock.decision = {
+      allow: false,
+      code: 'not-planned',
+      reason: 'Autonomous work dispatch was refused because no active implementation plan with work items is available.',
+    };
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
+
+    expect(spawnRun).not.toHaveBeenCalled();
+    expect(recordDeadEndNeedsYou).toHaveBeenCalledWith(
+      'PAN-503',
+      'reactive-work-dispatch-pickup-gate',
+      'in_progress',
+      expect.stringContaining('no active implementation plan'),
+    );
+  });
+
+  it('preserves reactive work spawning when the pickup gate allows dispatch', async () => {
     autonomousPlanMock.labels = [];
     autonomousPlanMock.autonomousModel = undefined;
+    autonomousWorkMock.decision = { allow: true, releaseSource: 'released-label' };
 
     await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
 
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'work', {
       prompt: expect.stringContaining('WORK TASK for PAN-503'),
+      startedBy: 'reactive-lifecycle',
+      autoSpawnConsentRequired: false,
     });
     expect(recordDeadEndNeedsYou).not.toHaveBeenCalled();
+  });
+
+  it('requires a consent claim when planning consent authorized reactive work', async () => {
+    autonomousWorkMock.decision = { allow: true, releaseSource: 'planning-consent' };
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
+
+    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'work', {
+      prompt: expect.stringContaining('WORK TASK for PAN-503'),
+      startedBy: 'reactive-lifecycle',
+      autoSpawnConsentRequired: true,
+    });
   });
 
   it('starts the review role for an issue state transition via the wrapper', async () => {
@@ -532,7 +608,7 @@ describe('reactive Cloister scheduler', () => {
       payload: { agentId: 'agent-pan-503', issueId: 'PAN-503' },
     }));
 
-    expect(resumeAgent).toHaveBeenCalledWith('agent-pan-503');
+    expect(resumeAgent).toHaveBeenCalledWith('agent-pan-503', undefined, { startedBy: 'deacon:auto-resume' });
   });
 
   it('routes agent.heartbeat_dead events to the deacon orphan handler', async () => {

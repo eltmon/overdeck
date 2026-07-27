@@ -32,6 +32,7 @@ CREATE TABLE `agents` (
 	`phase` text,
 	`role_run_head` text,
 	`flywheel_run_id` text,
+	`started_by` text,
 	`cost_so_far` real,
 	`review_sub_role` text,
 	`review_run_id` text,
@@ -351,7 +352,8 @@ CREATE TABLE `review_status` (
 	`strike_recovery_count` integer DEFAULT 0,
 	`strike_transport_retry_count` integer,
 	`strike_next_attempt_at` integer,
-	`strike_landing_attempts` text
+	`strike_landing_attempts` text,
+	`conflicts_since` text
 );
 --> statement-breakpoint
 CREATE INDEX `review_status_updated_idx` ON `review_status` (`updated_at`);--> statement-breakpoint

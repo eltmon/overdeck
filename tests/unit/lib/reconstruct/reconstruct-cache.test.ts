@@ -72,7 +72,7 @@ function fakeDb(): any {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  backfillMock.mockReturnValue({ processed: 0, skipped: 0, markedStopped: 0 });
+  backfillMock.mockReturnValue({ processed: 0, skipped: 0, markedStopped: 0, markedStoppedIds: [] });
   listRunningAgentsMock.mockReturnValue(Effect.succeed([]) as any);
   listAllAgentsMock.mockReturnValue([]);
   listProjectsMock.mockReturnValue([]);
@@ -86,25 +86,34 @@ describe('reconstructCache', () => {
     const result = await reconstructCache(fakeDb());
     expect(result.issuesEnumerated).toBe(0);
     expect(result.agentsRebuilt).toBe(0);
+    expect(result.markedStoppedIds).toEqual([]);
     expect(result.phaseCounts).toEqual({ work: 0, review: 0, merge: 0, done: 0 });
     expect(Object.keys(result.agentsById)).toEqual([]);
     expect(Object.keys(result.agentRuntimeById)).toEqual([]);
   });
 
-  it('reports agents rebuilt from backfill', async () => {
-    backfillMock.mockReturnValue({ processed: 3, skipped: 0, markedStopped: 0 });
+  it('reports agents rebuilt and marked stopped from backfill', async () => {
+    backfillMock.mockReturnValue({
+      processed: 3,
+      skipped: 0,
+      markedStopped: 1,
+      markedStoppedIds: [{ id: 'agent-pan-old', previousStatus: 'running' }],
+    });
     listRunningAgentsMock.mockReturnValue(Effect.succeed([
       agentState({ id: 'agent-pan-1920', issueId: 'PAN-1920' }),
     ]) as any);
 
     const result = await reconstructCache(fakeDb());
     expect(result.agentsRebuilt).toBe(3);
+    expect(result.markedStoppedIds).toEqual([
+      { id: 'agent-pan-old', previousStatus: 'running' },
+    ]);
     expect(result.agentsById['agent-pan-1920']?.issueId).toBe('PAN-1920');
     expect(result.agentRuntimeById['agent-pan-1920']?.activity).toBe('working');
   });
 
   it('falls back to agents table when listRunningAgents fails', async () => {
-    backfillMock.mockReturnValue({ processed: 1, skipped: 0, markedStopped: 0 });
+    backfillMock.mockReturnValue({ processed: 1, skipped: 0, markedStopped: 0, markedStoppedIds: [] });
     listRunningAgentsMock.mockReturnValue(Effect.fail(new Error('tmux unavailable')) as any);
     listAllAgentsMock.mockReturnValue([{
       id: 'agent-pan-1919',

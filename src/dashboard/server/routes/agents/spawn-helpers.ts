@@ -12,6 +12,7 @@ import {
   saveAgentState,
   saveAgentStateSync,
 } from '../../../../lib/agents.js';
+import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import type { RemoteWorkspaceMetadata } from '../../../../lib/remote/interface.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
@@ -44,11 +45,98 @@ type EventStoreAppend = {
 
 type SpawnPanCommand = (args: string[], cwd?: string) => Promise<string>;
 
+type PlaceholderHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | null;
+
+export function buildAgentStartPlaceholder(input: {
+  agentSessionName: string;
+  issueId: string;
+  workspacePath: string;
+  role: Role;
+  effectiveHarness: PlaceholderHarness;
+  startedBy: string;
+  allowHost: boolean;
+  startedAt: string;
+}) {
+  const state: AgentState = {
+    id: input.agentSessionName,
+    issueId: input.issueId,
+    workspace: input.workspacePath,
+    role: input.role,
+    ...(input.effectiveHarness ? { harness: input.effectiveHarness } : {}),
+    model: 'pending-work-spawn',
+    status: 'starting',
+    startedAt: input.startedAt,
+    startedBy: input.startedBy,
+    hostOverride: input.allowHost || undefined,
+  };
+  return {
+    state,
+    event: {
+      type: 'agent.started' as const,
+      timestamp: input.startedAt,
+      payload: {
+        agentId: input.agentSessionName,
+        issueId: input.issueId,
+        agent: {
+          id: input.agentSessionName,
+          issueId: input.issueId,
+          workspace: input.workspacePath,
+          status: 'starting' as const,
+          startedAt: input.startedAt,
+          role: input.role,
+          startedBy: input.startedBy,
+          ...(input.effectiveHarness ? { runtime: input.effectiveHarness } : {}),
+        },
+      },
+    },
+  };
+}
+
+export function buildContainerStartState(input: {
+  agentSessionName: string;
+  issueId: string;
+  workspacePath: string;
+  role: Role;
+  effectiveHarness: PlaceholderHarness;
+  startedBy: string;
+  allowHost: boolean;
+  status: 'starting' | 'error';
+  startedAt: string;
+}): AgentState {
+  return {
+    id: input.agentSessionName,
+    issueId: input.issueId,
+    ...(input.effectiveHarness ? { harness: input.effectiveHarness } : {}),
+    model: 'pending-container-start',
+    status: input.status,
+    startedAt: input.startedAt,
+    workspace: input.workspacePath,
+    role: input.role,
+    startedBy: input.startedBy,
+    hostOverride: input.allowHost || undefined,
+  };
+}
+
+export async function requestWorkStartAfterContainers(input: {
+  args: string[];
+  workspacePath: string;
+  spawnPanCommand: SpawnPanCommand;
+  markWorkStartAccepted: () => Promise<void>;
+  updateIssueStatus: () => Promise<void>;
+}): Promise<string> {
+  const activityId = await input.spawnPanCommand(input.args, input.workspacePath);
+  await input.markWorkStartAccepted();
+  await input.updateIssueStatus();
+  return activityId;
+}
+
 export function handleRemoteAgentSpawn(input: {
   issueId: string;
   workspacePath: string;
   workspaceMetadata: RemoteWorkspaceMetadata;
   spawnModel: string;
+  startedBy: string;
+  autoSpawnConsentRequired: boolean;
   projectPath: string;
   spawnGuardrails: SpawnGuardrailDecision;
   lifecycle: LifecycleTransition;
@@ -59,6 +147,8 @@ export function handleRemoteAgentSpawn(input: {
       workspacePath,
       workspaceMetadata,
       spawnModel,
+      startedBy,
+      autoSpawnConsentRequired,
       projectPath,
       spawnGuardrails,
       lifecycle,
@@ -94,6 +184,8 @@ export function handleRemoteAgentSpawn(input: {
       workspace: workspaceMetadata,
       prompt: agentPrompt,
       model: spawnModel,
+      startedBy,
+      autoSpawnConsentRequired,
       tier: fly.getResiliencyTier(),
     }));
 
@@ -111,6 +203,7 @@ export function handleRemoteAgentSpawn(input: {
       status: 'starting',
       startedAt: state.startedAt,
       harness: 'claude-code',
+      startedBy,
     });
     updateRegistryForAgentStart(state.issueId, workspacePath, state.id);
 
@@ -140,6 +233,7 @@ export function handleRemoteAgentSpawn(input: {
       status: state.status,
       startedAt: state.startedAt,
       harness: 'claude-code',
+      startedBy,
     }, {
       type: 'agent.started',
       timestamp: new Date().toISOString(),
@@ -154,6 +248,7 @@ export function handleRemoteAgentSpawn(input: {
           status: state.status,
           startedAt: state.startedAt,
           lastActivity: state.lastActivity,
+          startedBy,
         },
       },
     });
@@ -182,12 +277,14 @@ export function handleContainerOrchestration(input: {
   agentSessionName: string;
   role: Role;
   effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | null;
+  startedBy: string;
   allowHost: boolean;
   spawnModel: string;
   spawnGuardrails: SpawnGuardrailDecision;
   projectPath: string;
   eventStore: EventStoreAppend;
   spawnPanCommand: SpawnPanCommand;
+  markWorkStartAccepted: () => Promise<void>;
   updateIssueStatus: () => Promise<void>;
 }) {
   return Effect.gen(function* () {
@@ -198,12 +295,14 @@ export function handleContainerOrchestration(input: {
       agentSessionName,
       role,
       effectiveHarness,
+      startedBy,
       allowHost,
       spawnModel,
       spawnGuardrails,
       projectPath,
       eventStore,
       spawnPanCommand,
+      markWorkStartAccepted,
       updateIssueStatus,
     } = input;
 
@@ -284,18 +383,17 @@ export function handleContainerOrchestration(input: {
           const earlyAgentId = agentSessionName;
           const earlyStateDir = join(homedir(), '.overdeck', 'agents', earlyAgentId);
           yield* Effect.promise(() => mkdir(earlyStateDir, { recursive: true }));
-          // PAN-1048 R2: legacy `runtime` field removed; PAN-1055: persist user-picked harness.
-          saveAgentStateSync({
-            id: earlyAgentId,
+          saveAgentStateSync(buildContainerStartState({
+            agentSessionName: earlyAgentId,
             issueId,
-            ...(effectiveHarness ? { harness: effectiveHarness } : {}),
-            model: 'pending-container-start',
+            workspacePath,
+            role,
+            effectiveHarness,
+            startedBy,
+            allowHost,
             status: 'starting',
             startedAt: new Date().toISOString(),
-            workspace: workspacePath,
-            role,
-            hostOverride: allowHost || undefined,
-          });
+          }));
           updateRegistryForAgentStart(issueId, workspacePath, earlyAgentId);
           yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_waiting_for_containers', {
             issueId,
@@ -353,17 +451,17 @@ export function handleContainerOrchestration(input: {
                   });
 
                   if (!healthy) {
-                    // PAN-1048 R2: legacy `runtime` removed; PAN-1055: persist user-picked harness.
-                    saveAgentStateSync({
-                      id: earlyAgentId,
+                    saveAgentStateSync(buildContainerStartState({
+                      agentSessionName: earlyAgentId,
                       issueId,
-                      ...(effectiveHarness ? { harness: effectiveHarness } : {}),
-                      model: 'pending-container-start',
+                      workspacePath,
+                      role,
+                      effectiveHarness,
+                      startedBy,
+                      allowHost,
                       status: 'error',
                       startedAt: new Date().toISOString(),
-                      workspace: workspacePath,
-                      role,
-                    });
+                    }));
                     return;
                   }
 
@@ -391,20 +489,22 @@ export function handleContainerOrchestration(input: {
                     harness: effectiveHarness,
                   });
                   emitStartAgentPhase(issueId, 'spawn', 'start', 'starting local work agent after containers became healthy', { workspacePath });
-                  const activityId = await spawnPanCommand(
-                    buildPanStartArgs({
+                  const activityId = await requestWorkStartAfterContainers({
+                    args: buildPanStartArgs({
                       issueId,
                       model: spawnModel,
                       harness: effectiveHarness,
                       allowHost,
                     }),
                     workspacePath,
-                  );
+                    spawnPanCommand,
+                    markWorkStartAccepted,
+                    updateIssueStatus,
+                  });
                   emitStartAgentPhase(issueId, 'spawn', 'success', 'local work agent spawn requested after container startup', {
                     workspacePath,
                     activityId,
                   });
-                  await updateIssueStatus();
                 } catch (err: any) {
                   const errorMessage = err instanceof Error ? err.message : String(err);
                   emitStartAgentPhase(issueId, 'spawn', 'failure', errorMessage, { workspacePath });
@@ -412,16 +512,19 @@ export function handleContainerOrchestration(input: {
                     issueId,
                     error: errorMessage,
                   }).catch(() => undefined);
-                  // PAN-1048 R2: legacy `runtime` removed from state writes.
-                  try { saveAgentStateSync({
-                    id: earlyAgentId,
-                    issueId,
-                    model: 'pending-container-start',
-                    status: 'error',
-                    startedAt: new Date().toISOString(),
-                    workspace: workspacePath,
-                    role,
-                  }); } catch { /* non-fatal */ }
+                  try {
+                    saveAgentStateSync(buildContainerStartState({
+                      agentSessionName: earlyAgentId,
+                      issueId,
+                      workspacePath,
+                      role,
+                      effectiveHarness,
+                      startedBy,
+                      allowHost,
+                      status: 'error',
+                      startedAt: new Date().toISOString(),
+                    }));
+                  } catch { /* non-fatal */ }
                   console.error(`[start-agent] Background container startup failed for ${issueId}:`, err);
                 }
               })();

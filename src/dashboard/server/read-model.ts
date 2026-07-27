@@ -24,6 +24,7 @@ import type { ReviewStatus } from '../../lib/review-status.js';
 import { listOverdeckAgentStatesSync } from '../../lib/overdeck/agent-state-sync.js';
 import { computeQueuePositionFromStatusSync } from '../../lib/queue-position.js'
 import { AgentsResolver, type Agent as OverdeckAgent } from '../../lib/overdeck/agents.js';
+import { emitBootReconciledStopEvents } from './services/boot-reconciled-stop-events.js';
 
 // ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
 
@@ -539,18 +540,13 @@ export const ReadModelServiceLive = Layer.effect(
     // ── Bootstrap inline during layer construction ───────────────────────────
     const agentsResolver = yield* AgentsResolver;
     yield* Effect.gen(function* () {
-      // PAN-1938 source-swap: agents now come from overdeck.db via AgentsResolver.
-      // reconstructCache still runs for reviewStatusByIssueId (which reads
-      // git-backed per-issue records, NOT panopticon.db SQLite cache tables)
-      // and for its side effects (agent-backfill sync, checkpoint cleanup).
+      // Agents come from AgentsResolver; reconstructCache supplies git-backed review status and boot side effects.
       const { reconstructCacheAuto } = yield* Effect.promise(() =>
         import('../../lib/reconstruct/reconstruct-cache.js'),
       );
 
-      const [overdeckAgents, result] = yield* Effect.all([
-        agentsResolver.list({}),
-        Effect.promise(() => reconstructCacheAuto()),
-      ]);
+      const result = yield* Effect.promise(() => reconstructCacheAuto());
+      const overdeckAgents = yield* agentsResolver.list({});
 
       const agentsById: Record<string, AgentSnapshot> = Object.fromEntries(
         overdeckAgents.map((a) => [a.id, agentSnapshotFromOverdeck(a)]),
@@ -564,12 +560,13 @@ export const ReadModelServiceLive = Layer.effect(
           () => import('./event-store.js'),
         );
         const eventStore = getEventStore();
+        yield* Effect.promise(() => emitBootReconciledStopEvents(eventStore, result.markedStoppedIds, result.agentsById, '[ReadModel] Failed to emit boot-reconciled stop events:'));
         sequence = eventStore.getLatestSequence();
         recentActivity = activityEntriesFromStoredEvents(
           eventStore.queryByType('activity.entry', MAX_SNAPSHOT_ACTIVITY_ENTRIES),
         );
-      } catch {
-        // Event store may not be initialized yet
+      } catch (err) {
+        console.error('[ReadModel] Failed to emit boot-reconciled stop events:', err);
       }
 
       state = {

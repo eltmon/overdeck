@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -26,11 +26,14 @@ import {
   recordPlanningAutoHandoffFailure,
   resolveCompletePlanningTerminalStatus,
 } from '../../../../lib/overdeck/planning-promotion.js';
+import { readAutoSpawnOnFinalizeFlag, writeAutoSpawnOnFinalizeFlag } from '../../../../lib/planning/spawn-planning-session.js';
 import { applyStatusOverrides } from '../../../../lib/xbrief/io.js';
 import { PlanQualityLintError } from '../../../../lib/xbrief/quality-lint.js';
 import type { XBriefDocument } from '../../../../lib/xbrief/types.js';
 
 let projectRoot: string | null = null;
+let overdeckHome: string;
+let previousOverdeckHome: string | undefined;
 
 const flush = async () => {
   await Promise.resolve();
@@ -154,11 +157,21 @@ function makeRefinalizationDoc(issueId: string, verifyCommand: string): XBriefDo
   return doc;
 }
 
+beforeEach(() => {
+  previousOverdeckHome = process.env['OVERDECK_HOME'];
+  overdeckHome = mkdtempSync(join(tmpdir(), 'complete-planning-home-'));
+  process.env['OVERDECK_HOME'] = overdeckHome;
+});
+
+
 afterEach(() => {
   if (projectRoot) {
     rmSync(projectRoot, { recursive: true, force: true });
     projectRoot = null;
   }
+  rmSync(overdeckHome, { recursive: true, force: true });
+  if (previousOverdeckHome === undefined) delete process.env['OVERDECK_HOME'];
+  else process.env['OVERDECK_HOME'] = previousOverdeckHome;
 });
 
 describe('completePlanningArtifacts', () => {
@@ -353,7 +366,7 @@ describe('completePlanningArtifacts', () => {
     })).resolves.toBeNull();
   });
 
-  it('auto-spawns a work agent through the existing agents endpoint', async () => {
+  it('auto-spawns a work agent through the launch-owned consent boundary', async () => {
     const fetchImpl: typeof fetch = async (input, init) => {
       expect(String(input)).toBe('http://127.0.0.1:3011/api/agents');
       expect(init?.method).toBe('POST');
@@ -361,7 +374,12 @@ describe('completePlanningArtifacts', () => {
         origin: 'http://127.0.0.1:3011',
         [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
       });
-      expect(JSON.parse(String(init?.body))).toEqual({ issueId: 'PAN-1146', role: 'work' });
+      expect(JSON.parse(String(init?.body))).toEqual({
+        issueId: 'PAN-1146',
+        role: 'work',
+        startedBy: 'planning-auto-handoff',
+        autoSpawnConsentRequired: true,
+      });
       return new Response(JSON.stringify({ success: true, agentId: 'agent-pan-1146' }), { status: 200 });
     };
 
@@ -376,7 +394,25 @@ describe('completePlanningArtifacts', () => {
     });
   });
 
-  it('classifies unauthorized auto-spawn responses and fails the terminal phase', async () => {
+  it('reports queued container startup without claiming launch acceptance', async () => {
+    await expect(completePlanningAutoSpawn({
+      issueId: 'PAN-1146',
+      autoSpawn: true,
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl: async () => new Response(JSON.stringify({
+        success: true,
+        startingContainers: true,
+        agentId: 'agent-pan-1146',
+      }), { status: 200 }),
+    })).resolves.toEqual({
+      workAgentSpawned: true,
+      workAgentQueued: true,
+      workAgentSession: 'agent-pan-1146',
+    });
+  });
+
+  it('retains current-cycle consent when auto-spawn fails', async () => {
+    await writeAutoSpawnOnFinalizeFlag('PAN-1146', true);
     const result = await completePlanningAutoSpawn({
       issueId: 'PAN-1146',
       autoSpawn: true,
@@ -393,6 +429,7 @@ describe('completePlanningArtifacts', () => {
       workAgentSkipReason: 'unauthorized',
     });
     expect(resolveCompletePlanningTerminalStatus(true, result)).toBe('failure');
+    expect(readAutoSpawnOnFinalizeFlag('PAN-1146')).toBe(true);
   });
 
   it('records a refused auto-handoff as planning failure and pipeline stuck state', async () => {
@@ -436,7 +473,8 @@ describe('completePlanningArtifacts', () => {
     }));
   });
 
-  it('rebuilds the stack and starts work when the initial auto-spawn finds no healthy stack', async () => {
+  it('queues rebuild-and-start without consuming consent before the chained start succeeds', async () => {
+    const consumeAutoSpawnConsent = vi.fn(async () => undefined);
     const requests: string[] = [];
     const fetchImpl: typeof fetch = async (input, init) => {
       requests.push(String(input));
@@ -450,6 +488,10 @@ describe('completePlanningArtifacts', () => {
           stackHealth: { healthy: false, reasons: ['no containers found'] },
         }), { status: 422 });
       }
+      expect(JSON.parse(String(init?.body))).toEqual({
+        startedBy: 'planning-auto-handoff',
+        autoSpawnConsentRequired: true,
+      });
       return new Response(JSON.stringify({ success: true, activityId: 'activity-rebuild' }), { status: 200 });
     };
 
@@ -458,6 +500,7 @@ describe('completePlanningArtifacts', () => {
       autoSpawn: true,
       dashboardOrigin: 'http://127.0.0.1:3011',
       fetchImpl,
+      consumeAutoSpawnConsent,
     })).resolves.toEqual({
       workAgentSpawned: true,
       workAgentSession: 'agent-pan-1147',
@@ -466,6 +509,7 @@ describe('completePlanningArtifacts', () => {
       'http://127.0.0.1:3011/api/agents',
       'http://127.0.0.1:3011/api/workspaces/PAN-1147/rebuild-and-start',
     ]);
+    expect(consumeAutoSpawnConsent).not.toHaveBeenCalled();
   });
 
   it('kills the planning session immediately after autoSpawn succeeds', async () => {

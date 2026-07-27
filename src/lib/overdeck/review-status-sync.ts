@@ -78,6 +78,7 @@ interface DbRow {
   strike_transport_retry_count: number | null;
   strike_next_attempt_at: number | null;
   strike_landing_attempts: string | null;
+  conflicts_since: string | null;
 }
 
 function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewStatus {
@@ -139,6 +140,9 @@ function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewSta
     strikeLandingAttempts: row.strike_landing_attempts
       ? JSON.parse(row.strike_landing_attempts) as ReviewStatus['strikeLandingAttempts']
       : undefined,
+    conflictsSince: row.conflicts_since
+      ? JSON.parse(row.conflicts_since) as ReviewStatus['conflictsSince']
+      : undefined,
     history: history.length > 0 ? history : undefined,
   });
 }
@@ -192,9 +196,9 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         blocker_reasons, last_verified_commit, merge_step, auto_merge,
         strike_ready_head, strike_ready_at, strike_landing_state,
         strike_recovery_count, strike_transport_retry_count,
-        strike_next_attempt_at, strike_landing_attempts
+        strike_next_attempt_at, strike_landing_attempts, conflicts_since
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status = excluded.review_status,
@@ -244,7 +248,8 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         strike_recovery_count = excluded.strike_recovery_count,
         strike_transport_retry_count = excluded.strike_transport_retry_count,
         strike_next_attempt_at = excluded.strike_next_attempt_at,
-        strike_landing_attempts = excluded.strike_landing_attempts
+        strike_landing_attempts = excluded.strike_landing_attempts,
+        conflicts_since = excluded.conflicts_since
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -295,6 +300,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.strikeTransportRetryCount ?? null,
       isoToMs(s.strikeNextAttemptAt),
       s.strikeLandingAttempts ? JSON.stringify(s.strikeLandingAttempts) : null,
+      s.conflictsSince ? JSON.stringify(s.conflictsSince) : null,
     );
 
     if (s.history && s.history.length > 0) {
