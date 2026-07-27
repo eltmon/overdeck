@@ -80,17 +80,17 @@
     "recordedAt": "2026-07-27T06:31:44.584Z"
   },
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T07:37:59.407Z",
+  "updated": "2026-07-27T07:47:05.194Z",
   "pipeline": {
     "issueId": "PAN-3187",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T07:37:59.390Z",
+    "updatedAt": "2026-07-27T07:47:05.081Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "AC1-AC4 met and locked: pending/missing verdicts settle to skip only when trackerClosed && landedWork (dod-gate.ts:258); review negatives never supersede (id !== 'review' guard, dod-gate.ts:267); tests/verification negatives settle only on mainVerifyStatus==='pass'. AC5: every settled observed string prefixes the original ${observed}; evaluateDodGate computes merged then mainVerify then trackerClosed before the verdict Promise.all, locked by the call-order assertion. NOTE on AC5 wording: 'npx vitest run src/lib/lifecycle' exits 1 with 'No test files found' for ANY implementation — vitest include globs put the suite at tests/unit/lib/lifecycle, which runs 7 files / 137 passed / 1 skipped, exit 0. AC path is mis-specified, not an implementation defect. Sole production caller (workflows.ts:195) passes no deps override so it uses the real isIssueClosed with its 5-min cache; optional trackerClosed dep keeps pre-existing deps objects working.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3203",
@@ -150,10 +150,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 6,
-            "output": 613,
-            "cacheRead": 251328,
-            "cacheWrite": 126406
+            "input": 24,
+            "output": 3171,
+            "cacheRead": 1812168,
+            "cacheWrite": 194519
           }
         },
         "work": {
@@ -173,15 +173,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 6,
-          "output": 613,
-          "cacheRead": 251328,
-          "cacheWrite": 126406
+          "input": 24,
+          "output": 3171,
+          "cacheRead": 1812168,
+          "cacheWrite": 194519
         }
       },
       "costAtCloseOut": {
-        "usd": 131.134841,
-        "pricingAsOf": "2026-07-27T07:37:59.403Z"
+        "usd": 131.642907,
+        "pricingAsOf": "2026-07-27T07:47:05.135Z"
       }
     },
     "merges": [
