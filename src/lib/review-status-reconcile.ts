@@ -171,10 +171,9 @@ export function reconcileJournalIntoCacheSync(
             console.warn(`[review-status] reconcile: cannot count findings for ${issueId}, skipping cycle recording`);
             void hooks.deliverReviewVerdictFeedbackHostSide(issueId, reconciled);
           } else {
-            // Extract runId from directory name (format: agent-*-review-*)
+            // Use full directory basename as runId (format: agent-*-review-*)
             const runDirName = reviewRunDir.split('/').pop() ?? '';
-            const runIdMatch = runDirName.match(/^(agent-.*)-review-/);
-            const runId = runIdMatch?.[1] ?? runDirName;
+            const runId = runDirName;
 
             // Ensure reviewCycleHistory is initialized
             if (!reconciled.reviewCycleHistory) {
