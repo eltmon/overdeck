@@ -472,11 +472,6 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-27T11:01:27.936Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.6-sol",
-      "timestamp": "2026-07-27T11:07:39.676Z"
     }
   ],
   "feedback": [],
@@ -684,10 +679,10 @@
     "recordedAt": "2026-07-27T05:54:26.480Z"
   },
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-27T11:07:39.676Z",
+  "updated": "2026-07-27T11:07:40.485Z",
   "pipeline": {
     "issueId": "PAN-3111",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -695,7 +690,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T06:45:09.568Z",
-    "updatedAt": "2026-07-27T11:07:37.025Z",
+    "updatedAt": "2026-07-27T11:07:33.707Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed cycle-4 findings",
     "inspectNotes": "AC1-3 met at this tree state (bead work landed in a4c6729fa9; ec66e8f8 is a behavior-preserving extraction). AC1: agents-state-db.test.ts:92 round-trips 'operator:cli:pan-start' through state.json and the agents-table started_by column with getAgentStateSync returning it; verified both read paths (overdeck agent-state-sync.ts:175 and parseAgentState agent-state.ts:250) and confirmed the insert column list ('flywheel_run_id','started_by','cost_so_far') aligns positionally with the values array (state.flywheelRunId, state.startedBy, state.costSoFar) -- no off-by-one. AC2: resolveAgentStartedBy preserves the exact explicit ?? env ?? flywheel order, and the environmentToken default parameter is evaluated per call so env mutation is still observed; spawn-flywheel-provenance.test.ts covers explicit token, env-over-flywheel precedence, flywheel:<runId>, and undefined. AC3: schema-migrations.test.ts:71 adds started_by to a current-version agents table without throwing; both the currentVersion===SCHEMA_VERSION top-up and the <61 block apply it, and tryIdempotentDdl swallows duplicate-column. Non-blocking observation for the review convoy: this commit is line-count golf for a file ratchet (joining 'flywheel_run_id TEXT, started_by TEXT' onto one CREATE TABLE line, deleting two blank lines in runMigrations, compressing the OVERDECK_AGENT_COLUMNS comment and dropping its 0000_overdeck_init.sql reference) -- semantically inert, but shrinking declarations to fit a ratchet suppresses the growth signal the ratchet exists to surface.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3144",
@@ -982,7 +977,7 @@
       },
       "costAtCloseOut": {
         "usd": 752.7435073,
-        "pricingAsOf": "2026-07-27T11:07:37.104Z"
+        "pricingAsOf": "2026-07-27T11:07:33.749Z"
       }
     },
     "merges": [
