@@ -31,14 +31,14 @@
   ],
   "feedback": [],
   "created": "2026-06-29T19:19:31.903Z",
-  "updated": "2026-07-27T06:02:35.832Z",
+  "updated": "2026-07-27T16:35:08.827Z",
   "pipeline": {
     "issueId": "PAN-2173",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T06:02:35.811Z",
+    "updatedAt": "2026-07-27T16:35:08.803Z",
     "reviewNotes": "Review passed: no PR-scoped correctness, security, requirements, or performance blockers found",
     "testNotes": "Quality gates: npm run typecheck (✔), npm run lint (✔ all linters passed), npx vitest run --configLoader runner (✔ 7640 tests passed, 52 skipped, 0 failed). PAN-1718 implementation verified: (1) restart lock acquired before pan dev SIGUSR2 branch (reload.ts), (2) append-only restart-events.jsonl journal with concurrent-writer detection (restart-status.ts), (3) supervisor stop/start robustness with wait-for-exit and verify-survival (supervisor.ts). CLI-only fix with no dashboard/UI changes; no browser UAT required.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2184",
@@ -46,7 +46,7 @@
     "lastVerifiedCommit": "7a58095ab9bcf50a09ef02c57ea588c7c9239c1d",
     "reviewRequestedAt": "2026-06-30T02:15:38.288Z",
     "closedOut": true,
-    "closedOutAt": "2026-07-27T06:02:35.811Z"
+    "closedOutAt": "2026-07-27T16:35:08.803Z"
   },
   "closeOut": {
     "usage": {
@@ -106,7 +106,7 @@
     ],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-27T06:02:35.831Z",
+      "evaluatedAt": "2026-07-27T16:35:08.823Z",
       "rows": [
         {
           "id": "review",
@@ -163,7 +163,7 @@
           "num": 7,
           "title": "Deployed",
           "expected": "live server build includes the merged commit",
-          "observed": "build commit 3297fb26 contains merge 26527890",
+          "observed": "build commit d44fa122 contains merge 26527890",
           "status": "pass"
         },
         {
