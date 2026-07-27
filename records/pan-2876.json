@@ -291,21 +291,22 @@
     "recordedAt": "2026-07-27T06:51:31.024Z"
   },
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T07:15:10.101Z",
+  "updated": "2026-07-27T07:17:16.081Z",
   "pipeline": {
     "issueId": "PAN-2876",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T07:15:08.881Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-27T07:17:15.981Z",
+    "reviewNotes": "Approved: AC-4 cache cleanup and transient metadata retry are fixed; no blocking findings remain",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs verified: contracts builds clean (tsdown), rpc.test.ts 3/3 pass covering subagents event decode, subscribeConversationMessages payload with+without agentId, and ConversationResponse with+without subagents (legacy shape still decodes); root npm run typecheck passes with chat-types.ts ConversationEvent extended. Note (non-blocking): ConversationResponse moved from interface to Schema.Struct so arrays are now ReadonlyArray — no consumer broke today, watch it if a caller ever mutates the result in place.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3204",
-    "reviewedAtCommit": "d5591af2e73a6515ac5a24b646d6b5f83d3ae3c6",
+    "reviewedAtCommit": "0e245e89b572149f092d38f0a018d5c6b6279aa3",
     "reviewSpawnedAt": "2026-07-27T07:15:08.879Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -394,9 +395,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1007252,
-            "output": 109745,
-            "cacheRead": 16847872,
+            "input": 2230711,
+            "output": 134195,
+            "cacheRead": 23182336,
             "cacheWrite": 0
           }
         },
@@ -423,15 +424,15 @@
           "cacheWrite": 133023
         },
         "openai/gpt-5.6-sol": {
-          "input": 3560840,
-          "output": 377176,
-          "cacheRead": 172691456,
+          "input": 4784299,
+          "output": 401626,
+          "cacheRead": 179025920,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 120.58997,
-        "pricingAsOf": "2026-07-27T07:15:08.915Z"
+        "usd": 130.607997,
+        "pricingAsOf": "2026-07-27T07:17:16.070Z"
       }
     },
     "merges": [
