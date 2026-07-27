@@ -67,21 +67,20 @@
     "recordedAt": "2026-07-27T18:36:56.906Z"
   },
   "created": "2026-07-27T13:35:42.946Z",
-  "updated": "2026-07-27T18:37:05.710Z",
+  "updated": "2026-07-27T18:37:08.163Z",
   "pipeline": {
     "issueId": "PAN-3206",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T18:37:03.504Z",
-    "reviewNotes": "Verification infrastructure error: Verification worker 2040889 exited before writing a result",
+    "updatedAt": "2026-07-27T18:37:07.982Z",
+    "reviewNotes": "Verification error: Verification worker 2045091 exited before writing a result",
     "inspectNotes": "All 3 ACs verified: parse maps APPROVED/PASSED->passed, FAILED->failed, CHANGES REQUESTED suffix (em/en dash, colon, hyphen) -> blocked with blocker, bare form -> first ### under ## Blocking Findings, null otherwise; findVerdictReport prefers synthesis.md then review.md then null; vitest review-verdict-report.test.ts 9/9 passed and npm run typecheck clean (dashboard/frontend ratchets none-new).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3213",
-    "reviewRequestedAt": "2026-07-27T18:36:59.910Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt",
@@ -156,7 +155,7 @@
       },
       "costAtCloseOut": {
         "usd": 65.515979,
-        "pricingAsOf": "2026-07-27T18:37:05.708Z"
+        "pricingAsOf": "2026-07-27T18:37:08.069Z"
       }
     },
     "merges": [
