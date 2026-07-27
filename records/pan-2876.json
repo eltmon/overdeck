@@ -207,9 +207,27 @@
       "timestamp": "2026-07-27T06:51:38.050Z",
       "reason": "end",
       "note": "Anomalies: canonical overdeck-state auto-push repeatedly lost concurrent ref-lock races; no manual state git operations were used. The default 5s full-suite run exposed unrelated load-sensitive DB hooks, so I fixed non-hermetic dashboard spawn fixtures and added 20s suite timeouts for database-backed handoff tests; the final root suite passed 11,442 tests with 20s load-tolerant timeouts, and the full frontend suite passed 2,551 tests. No feature scope was skipped. Delivered subagent discovery, shared contracts, live/REST transcript transport, isolated frontend caching, the URL-backed rail, Agent-row transcript links, Agent/Task rendering parity, and docs. The user-facing Subagents note is in reference/architecture.mdx, the nearest published page."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-27T07:07Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-27T07:07:12.733Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-27T07:07:12.963Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-27T07:07:12Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2876\n\nAC-4 is unmet: subagent transcript cache entries remain populated after deselection\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2876 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/__tests__/dashboard-cwd-guard.test.ts",
@@ -276,7 +294,7 @@
     "recordedAt": "2026-07-27T06:51:31.024Z"
   },
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T07:07:11.822Z",
+  "updated": "2026-07-27T07:07:12.964Z",
   "pipeline": {
     "issueId": "PAN-2876",
     "reviewStatus": "blocked",
