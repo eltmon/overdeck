@@ -75,7 +75,7 @@
     "recordedAt": "2026-07-27T06:36:31.990Z"
   },
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T06:36:50.156Z",
+  "updated": "2026-07-27T06:36:56.260Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "pending",
@@ -85,7 +85,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T06:36:41.046Z",
+    "panDoneRecoveredAt": "2026-07-27T06:36:49.685Z",
+    "updatedAt": "2026-07-27T06:36:50.147Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3184-review",
     "inspectNotes": "All 4 ACs met: isAutoResumableRole(work|strike) admits strikes (boot-reconciliation.ts:94-99); the hasCompletionMarker/stoppedByUser gate is gone so in-window stoppedByUser agents qualify while isRecentBootCandidate still rejects out-of-window ones; handleAgentStoppedEvent now gates on isAutoResumableRole and logs 'not auto-resumable' (deacon-auto-resume.ts:640-643). Verified end-to-end: applyBootReconciliationDecision resumes via handleAgentStoppedEvent, so admitted strikes are not dead-ended, and the removed workspace-path completion check is still covered by bootReconciliationSkipReason's agent-dir marker check. vitest boot-reconciliation.test.ts 22/22 pass, npm run typecheck clean. Non-blocking note for follow-up beads: deacon-auto-resume.ts:868 and :935 still filter role==='work', so strikes stay invisible to the batch patrol and reconcile safety net outside the boot window.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3199",
@@ -136,40 +137,39 @@
         "tests/unit/lib/overdeck/control-settings.test.ts"
       ],
       "recordedAt": "2026-07-27T06:36:31.990Z"
-    },
-    "panDoneRecoveredAt": "2026-07-27T06:36:49.685Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2420184,
-            "output": 82294,
-            "cacheRead": 19452928,
+            "input": 2455068,
+            "output": 85918,
+            "cacheRead": 20733952,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3014747,
-            "output": 154101,
-            "cacheRead": 110714368,
+            "input": 3019653,
+            "output": 154875,
+            "cacheRead": 112057856,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 5434931,
-          "output": 236395,
-          "cacheRead": 130167296,
+          "input": 5474721,
+          "output": 240793,
+          "cacheRead": 132791808,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 99.350153,
-        "pricingAsOf": "2026-07-27T06:36:41.070Z"
+        "usd": 100.99329900000001,
+        "pricingAsOf": "2026-07-27T06:36:56.245Z"
       }
     },
     "merges": [
