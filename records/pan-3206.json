@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T13:35:42.946Z",
-  "updated": "2026-07-27T18:04:07.825Z",
+  "updated": "2026-07-27T18:06:57.847Z",
   "pipeline": {
     "issueId": "PAN-3206",
     "reviewStatus": "pending",
@@ -71,15 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
+    "sequence": 6,
     "claims": {
-      "pending-verdict-sweep": {
-        "writerId": "agent-pan-3206",
-        "agentId": "agent-pan-3206",
-        "pid": 3083970,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T14:20:53.369Z"
-      },
       "feedback-target-agents-table-tier": {
         "writerId": "agent-pan-3206",
         "agentId": "agent-pan-3206",
@@ -106,12 +99,27 @@
         "outcome": "completed",
         "reason": "Added the shared synthesis/review report finder and verdict parser with unit coverage for all verdict mappings and file fallback order",
         "releasedAt": "2026-07-27T14:18:29.079Z"
+      },
+      {
+        "writerId": "agent-pan-3206",
+        "agentId": "agent-pan-3206",
+        "pid": 3083970,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T14:20:53.369Z",
+        "itemId": "pending-verdict-sweep",
+        "outcome": "completed",
+        "reason": "Added the pending-status verdict reconciliation sweep, wired it into Deacon patrol, preserved HEAD/newer-request/settle guards, and delivered blocked feedback",
+        "releasedAt": "2026-07-27T18:06:57.847Z"
       }
     ],
     "statusReasons": {
       "verdict-report-helper": {
         "reason": "Added the shared synthesis/review report finder and verdict parser with unit coverage for all verdict mappings and file fallback order",
         "updatedAt": "2026-07-27T14:18:29.079Z"
+      },
+      "pending-verdict-sweep": {
+        "reason": "Added the pending-status verdict reconciliation sweep, wired it into Deacon patrol, preserved HEAD/newer-request/settle guards, and delivered blocked feedback",
+        "updatedAt": "2026-07-27T18:06:57.847Z"
       }
     }
   },
@@ -120,8 +128,13 @@
     "verdict-report-helper.verdict-report-helper.ac1": "completed",
     "verdict-report-helper.verdict-report-helper.ac2": "completed",
     "verdict-report-helper.verdict-report-helper.ac3": "completed",
-    "pending-verdict-sweep": "running",
+    "pending-verdict-sweep": "completed",
     "feedback-target-agents-table-tier": "running",
-    "docs-and-role-prompt-fixes": "running"
+    "docs-and-role-prompt-fixes": "running",
+    "pending-verdict-sweep.pending-verdict-sweep.ac1": "completed",
+    "pending-verdict-sweep.pending-verdict-sweep.ac2": "completed",
+    "pending-verdict-sweep.pending-verdict-sweep.ac3": "completed",
+    "pending-verdict-sweep.pending-verdict-sweep.ac4": "completed",
+    "pending-verdict-sweep.pending-verdict-sweep.ac5": "completed"
   }
 }
