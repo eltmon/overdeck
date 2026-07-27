@@ -120,6 +120,59 @@ describe('Definition-of-Done status rows', () => {
       }
     }
   });
+
+  it('marks review and tests skipped-by-strike for a strike-landed issue, never passed', async () => {
+    // PAN-3180: a strike dispatches neither specialist by design, so "never ran"
+    // must resolve as a deliberate skip while still reporting the real verdict.
+    const source = deps(live({ reviewStatus: 'pending', testStatus: 'pending', strikeLandingState: 'landed' }));
+    const [review, tests] = await Promise.all([checkReviewRow(issueId, source), checkTestsRow(issueId, source)]);
+
+    expect(review).toMatchObject({ status: 'skip' });
+    expect(review.observed).toContain('reviewStatus: pending');
+    expect(review.observed).toContain('skipped by the strike path (strikeLandingState: landed)');
+    expect(review.observed).toContain('no review specialist is dispatched for a strike');
+
+    expect(tests).toMatchObject({ status: 'skip' });
+    expect(tests.observed).toContain('testStatus: pending');
+    expect(tests.observed).toContain('no test specialist is dispatched for a strike');
+  });
+
+  it('reads the strike waiver from the durable pipeline journal after live status is cleared', async () => {
+    const source = deps(null, journal({ reviewStatus: 'pending', testStatus: 'pending', strikeLandingState: 'landed' }));
+    for (const row of await Promise.all([checkReviewRow(issueId, source), checkTestsRow(issueId, source)])) {
+      expect(row.status).toBe('skip');
+      expect(row.observed).toContain('from pipeline journal');
+      expect(row.observed).toContain('skipped by the strike path');
+    }
+  });
+
+  it('keeps review and tests blocking for a normal work-agent issue and for an in-flight strike', async () => {
+    const normal = deps(live({ reviewStatus: 'pending', testStatus: 'pending' }));
+    for (const row of await Promise.all([checkReviewRow(issueId, normal), checkTestsRow(issueId, normal)])) {
+      expect(row.status).toBe('miss');
+      expect(row.observed).not.toContain('strike');
+    }
+
+    // Only `landed` is the strike path's statement that the work reached main.
+    for (const state of ['ready', 'landing', 'recovering', 'needs_you'] as const) {
+      const inFlight = deps(live({ reviewStatus: 'pending', testStatus: 'failed', strikeLandingState: state }));
+      for (const row of await Promise.all([checkReviewRow(issueId, inFlight), checkTestsRow(issueId, inFlight)])) {
+        expect(row.status).toBe('miss');
+      }
+    }
+  });
+
+  it('never lets the strike waiver overwrite a verdict a specialist actually produced', async () => {
+    const passed = deps(live({ reviewStatus: 'passed', testStatus: 'passed', strikeLandingState: 'landed' }));
+    expect(await checkReviewRow(issueId, passed)).toMatchObject({ status: 'pass', observed: 'reviewStatus: passed' });
+    expect(await checkTestsRow(issueId, passed)).toMatchObject({ status: 'pass', observed: 'testStatus: passed' });
+
+    // A specialist that ran and rejected the work is a different fact from one
+    // that was never dispatched — those keep blocking until an operator accepts.
+    const negative = deps(live({ reviewStatus: 'blocked', testStatus: 'failed', strikeLandingState: 'landed' }));
+    expect(await checkReviewRow(issueId, negative)).toMatchObject({ status: 'miss', observed: 'reviewStatus: blocked' });
+    expect(await checkTestsRow(issueId, negative)).toMatchObject({ status: 'miss', observed: 'testStatus: failed' });
+  });
 });
 
 describe('Definition-of-Done merged row', () => {
@@ -363,6 +416,47 @@ describe('Definition-of-Done post-merge row', () => {
 
     expect(row).toMatchObject({ status: 'miss' });
     expect(row.observed).toContain('agent-pan-2715');
+  });
+
+  it('marks the work-agent handoff skipped-by-strike for a quiescent strike landing', async () => {
+    // PAN-3180: `postMergeLifecycle()` is the work-agent handoff. A strike has no
+    // work agent to pause and the Deacon owns its landing, so the marker this row
+    // looks for is never written and its absence is not evidence of a gap.
+    const row = await checkPostMergeRow(ctx, undefined, {
+      readCanonicalState: async () => 'in_review',
+      readMergeStatus: () => 'verifying',
+      listAgents: clearAgents,
+      readStrikeLanded: () => true,
+    });
+
+    expect(row).toMatchObject({ status: 'skip' });
+    expect(row.observed).toContain('strikeLandingState: landed');
+    expect(row.observed).toContain('not the strike path');
+    expect(row.observed).toContain('no running work/planning agents');
+  });
+
+  it('keeps a strike landing blocked while an issue work agent is still running', async () => {
+    const row = await checkPostMergeRow(ctx, undefined, {
+      readCanonicalState: async () => 'in_review',
+      readMergeStatus: () => 'verifying',
+      listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
+      readStrikeLanded: () => true,
+    });
+
+    expect(row).toMatchObject({ status: 'miss' });
+    expect(row.observed).toContain('agent-pan-2715');
+  });
+
+  it('prefers the observed work-agent lifecycle over the strike waiver when both are present', async () => {
+    const row = await checkPostMergeRow(ctx, undefined, {
+      readCanonicalState: async () => 'verifying_on_main',
+      readMergeStatus: () => 'merged',
+      listAgents: clearAgents,
+      readStrikeLanded: () => true,
+    });
+
+    expect(row).toMatchObject({ status: 'pass' });
+    expect(row.observed).not.toContain('strikeLandingState');
   });
 });
 
@@ -630,6 +724,46 @@ describe('assembled Definition-of-Done gate', () => {
     expect(gate.misses).toEqual(['review', 'tests', 'verification']);
     expect(gate.rows.find(row => row.id === 'merged')).toMatchObject({ status: 'pass' });
     expect(gate.rows.find(row => row.id === 'post-merge')).toMatchObject({ status: 'pass' });
+  });
+
+  it('resolves every row for a strike-landed close-out without a single --accept-<row> override', async () => {
+    // PAN-3180 regression: rows 1, 2 and 5 resolve from the strike lens (PAN-3155
+    // already covered row 4), so a strike that merged cleanly closes out on its own.
+    const strikeCtx = { issueId: 'PAN-3165', projectPath: '/repo/overdeck' };
+    const strikeStatus: DodStatusRowDeps = {
+      getReviewStatus: () => live({
+        issueId: strikeCtx.issueId,
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        verificationStatus: 'passed',
+        strikeLandingState: 'landed',
+      }),
+      getJournalStatus: () => null,
+    };
+    const gate = await evaluateDodGate(strikeCtx, {}, {
+      review: rowIssueId => checkReviewRow(rowIssueId, strikeStatus),
+      tests: rowIssueId => checkTestsRow(rowIssueId, strikeStatus),
+      verification: rowIssueId => checkVerificationRow(rowIssueId, strikeStatus),
+      merged: async () => ({ ...makeRow('merged'), mergeCommit: 'strike123' }),
+      postMerge: (postMergeCtx, mergedRow) => checkPostMergeRow(postMergeCtx, mergedRow, {
+        readCanonicalState: async () => 'in_review',
+        readMergeStatus: () => 'failed',
+        listAgents: () => [],
+        readStrikeLanded: () => true,
+      }),
+      mainVerify: async () => makeRow('main-verify'),
+      deploy: async () => makeRow('deploy'),
+      now: () => '2026-07-26T23:00:00Z',
+    });
+
+    expect(gate).toMatchObject({ passed: true, misses: [], accepted: [] });
+    // Row 8 is appended by the close-out workflow once teardown succeeds; the gate
+    // itself owns rows 1–7, and none of them may be a silent pass for a strike.
+    expect(gate.rows).toHaveLength(DOD_ROWS.length - 1);
+    expect(gate.rows.filter(row => row.status === 'skip').map(row => row.id)).toEqual(['review', 'tests', 'post-merge']);
+    for (const id of ['review', 'tests', 'post-merge'] as const) {
+      expect(gate.rows.find(row => row.id === id)?.observed).toContain('strike');
+    }
   });
 
   it('rejects Definition-of-Done overrides issued by the autonomous flywheel', async () => {
