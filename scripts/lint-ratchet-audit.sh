@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 #
 # lint-ratchet-audit.sh — require issue references for ratchet increases.
-# Lowering/removing file-size allowlist entries, removing ESLint allowlist
-# entries, and updating circular baseline paths to follow source-file renames
-# are always free. Raising/adding a ratchet must happen in a commit whose
-# message includes an issue reference
-# matching ([A-Z]+-[0-9]+|#[0-9]+).
+# File-size exceptions carry their issue reference in each mandatory allowlist
+# row and are validated by lint-file-size.sh before this audit runs. Removing
+# ESLint allowlist entries and updating circular baseline paths to follow
+# source-file renames are always free. Raising either remaining ratchet must
+# happen in a commit whose message includes an issue reference matching
+# ([A-Z]+-[0-9]+|#[0-9]+).
 #
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -20,17 +21,11 @@ elif [[ $# -ne 0 ]]; then
   exit 2
 fi
 
-FILE_SIZE_ALLOWLIST="scripts/file-size-allowlist.txt"
 CIRCULAR_BASELINE="scripts/circular-deps-baseline.txt"
 ESLINT_ALLOWLIST="eslint-any-allowlist.json"
 ISSUE_REF_RE='([A-Z]+-[0-9]+|#[0-9]+)'
 
 declare -A seen_commits
-
-file_size_allowlist_at() {
-  local rev="$1"
-  { git show "$rev:$FILE_SIZE_ALLOWLIST" 2>/dev/null || true; } | awk '$1 ~ /^[0-9]+$/ && NF >= 2 { print $1, $2 }' | sort -k2
-}
 
 eslint_allowlist_at() {
   local rev="$1"
@@ -50,35 +45,10 @@ parent_circular_baseline_at() {
   done | sort -u
 }
 
-parent_file_size_allowlist_at() {
-  for parent in "$@"; do
-    file_size_allowlist_at "$parent"
-  done | awk '
-    !($2 in max) || $1 > max[$2] { max[$2] = $1 }
-    END { for (path in max) print max[path], path }
-  ' | sort -k2
-}
-
 parent_eslint_allowlist_at() {
   for parent in "$@"; do
     eslint_allowlist_at "$parent"
   done | sort -u
-}
-
-file_size_allowlist_increases_for_commit() {
-  local commit="$1"
-  shift
-  local old_file new_file
-  old_file=$(mktemp)
-  new_file=$(mktemp)
-  parent_file_size_allowlist_at "$@" > "$old_file"
-  file_size_allowlist_at "$commit" > "$new_file"
-  awk '
-    FILENAME == ARGV[1] { old[$2] = $1; next }
-    !($2 in old) { print "file-size allowlist added: " $2 " (" $1 " lines)"; next }
-    $1 > old[$2] { print "file-size allowlist raised: " $2 " " old[$2] " -> " $1 }
-  ' "$old_file" "$new_file"
-  rm -f "$old_file" "$new_file"
 }
 
 eslint_allowlist_increases_for_commit() {
@@ -181,7 +151,6 @@ audit_commit() {
 
   local increases
   increases=$(
-    file_size_allowlist_increases_for_commit "$commit" "${parents[@]}"
     eslint_allowlist_increases_for_commit "$commit" "${parents[@]}"
     circular_baseline_increases_for_commit "$commit" "${parents[@]}"
   )
@@ -211,11 +180,11 @@ commits_for_file() {
   fi
 }
 
-for file in "$FILE_SIZE_ALLOWLIST" "$ESLINT_ALLOWLIST" "$CIRCULAR_BASELINE"; do
+for file in "$ESLINT_ALLOWLIST" "$CIRCULAR_BASELINE"; do
   while IFS= read -r commit; do
     [[ -z "$commit" ]] && continue
     audit_commit "$commit"
   done < <(commits_for_file "$file")
 done
 
-echo "✓ ratchet audit passed (no unaudited file-size/ESLint/circular ratchet increases)"
+echo "✓ ratchet audit passed (no unaudited ESLint/circular ratchet increases)"
