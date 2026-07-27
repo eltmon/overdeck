@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T13:35:42.946Z",
-  "updated": "2026-07-27T18:36:50.507Z",
+  "updated": "2026-07-27T18:36:56.907Z",
   "pipeline": {
     "issueId": "PAN-3206",
     "reviewStatus": "pending",
@@ -195,5 +195,56 @@
     "pending-sweep-regression-tests.pending-sweep-regression-tests.ac2": "completed",
     "pending-sweep-regression-tests.pending-sweep-regression-tests.ac3": "completed",
     "pending-sweep-regression-tests.pending-sweep-regression-tests.ac4": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt",
+      "scripts/lint-ratchet-audit.sh",
+      "src/lib/__tests__/spawn-provenance-contract.test.ts",
+      "src/lib/agents/agent-state-source.ts",
+      "src/lib/overdeck/agent-state-sync.ts",
+      "tests/unit/lib/cloister/feedback-target.test.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts",
+      "tests/unit/scripts/lint-ratchet-audit.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "tests/unit/lib/cloister/review-verdict-feedback.test.ts"
+    ],
+    "declaredScope": [
+      "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "roles/review.md",
+      "src/lib/cloister/deacon-review-signals.ts",
+      "src/lib/cloister/deacon-review-unsignaled.ts",
+      "src/lib/cloister/deacon-review.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/feedback-target.ts",
+      "src/lib/cloister/review-verdict-feedback.ts",
+      "src/lib/cloister/review-verdict-report.ts",
+      "tests/unit/lib/cloister/deacon-review-unapplied-verdicts.test.ts",
+      "tests/unit/lib/cloister/review-verdict-feedback.test.ts",
+      "tests/unit/lib/cloister/review-verdict-report.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "roles/review.md",
+      "scripts/file-size-allowlist.txt",
+      "scripts/lint-ratchet-audit.sh",
+      "src/lib/__tests__/spawn-provenance-contract.test.ts",
+      "src/lib/agents/agent-state-source.ts",
+      "src/lib/cloister/deacon-review-signals.ts",
+      "src/lib/cloister/deacon-review-unsignaled.ts",
+      "src/lib/cloister/deacon-review.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/feedback-target.ts",
+      "src/lib/cloister/review-verdict-feedback.ts",
+      "src/lib/cloister/review-verdict-report.ts",
+      "src/lib/overdeck/agent-state-sync.ts",
+      "tests/unit/lib/cloister/deacon-review-unapplied-verdicts.test.ts",
+      "tests/unit/lib/cloister/feedback-target.test.ts",
+      "tests/unit/lib/cloister/review-verdict-report.test.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts",
+      "tests/unit/scripts/lint-ratchet-audit.test.ts"
+    ],
+    "recordedAt": "2026-07-27T18:36:56.906Z"
   }
 }
