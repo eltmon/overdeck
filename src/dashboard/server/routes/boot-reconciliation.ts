@@ -3,6 +3,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
   extendBootReconciliationGrace,
+  isAutoResumableRole,
   isBootReconciliationCandidate,
   listBootReconciliationCandidates,
   MAX_BOOT_RECONCILIATION_GRACE_EXTENSIONS,
@@ -34,9 +35,7 @@ type BootReconciliationAgent = ReturnType<typeof listAllAgentsSync>[number];
 function bootReconciliationWhyStopped(agent: BootReconciliationAgent): string {
   if (agent.paused === true) return agent.pausedReason ? `paused: ${agent.pausedReason}` : 'paused';
   if (agent.troubled === true) return 'troubled';
-  if (agent.stoppedByUser === true && !isBootReconciliationCandidate(agent)) {
-    return 'stopped by operator';
-  }
+  if (agent.stoppedByUser === true) return 'stopped by operator';
   if (agent.status === 'stopped' && agent.sessionId && !sessionExists(agent.sessionId)) {
     return 'orphaned: tmux session missing';
   }
@@ -74,6 +73,7 @@ const getBootReconciliationRoute = HttpRouter.add(
       lastActivity: agent.lastActivity ?? agent.updatedAt ?? null,
       cost: agent.costSoFar ?? null,
       remote: Boolean(agent.hostOverride),
+      stoppedByUser: agent.stoppedByUser === true,
       readOnly: bootReconciliationReadOnly(agent),
     });
 
@@ -82,19 +82,26 @@ const getBootReconciliationRoute = HttpRouter.add(
     // running remote — goes in `context`, which no decision touches. Mixing the
     // two made a 2-candidate boot render a 22-row dialog under a "Resume all"
     // button, so the operator read "resumed 1" as a failure (PAN-3052).
-    const workAgents = listAllAgentsSync().filter((agent) => agent.role === 'work');
-    const set = workAgents.filter((agent) => candidateIds.has(agent.id)).map(toRow);
-    const context = workAgents
+    const autoResumableAgents = listAllAgentsSync().filter((agent) => isAutoResumableRole(agent.role));
+    const set = autoResumableAgents.filter((agent) => candidateIds.has(agent.id)).map(toRow);
+    const context = autoResumableAgents
       .filter((agent) => !candidateIds.has(agent.id) && (
         agent.paused === true
         || agent.troubled === true
         || Boolean(agent.hostOverride)
       ))
       .map(toRow);
+    let heldCount = 0;
+    if (state.decision === 'hold_all') {
+      heldCount = set.length;
+    } else if (state.decision === 'per_agent') {
+      heldCount = set.filter((agent) => state.perAgent[agent.issueId] !== 'resume').length;
+    }
 
     return jsonResponse({
       ...state,
       maxGraceExtensions: MAX_BOOT_RECONCILIATION_GRACE_EXTENSIONS,
+      heldCount,
       set,
       context,
     });
