@@ -3,18 +3,18 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-26T17:59:50.911Z",
-  "updated": "2026-07-27T04:01:07.667Z",
+  "updated": "2026-07-27T04:01:09.861Z",
   "pipeline": {
     "issueId": "PAN-3150",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "merging",
-    "mergeStep": "preparing-work-agent",
+    "mergeStep": "rebasing",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T04:01:06.919Z",
-    "mergeNotes": "Preparing work agent strike-pan-3150 to rebase strike/pan-3150…",
+    "updatedAt": "2026-07-27T04:01:09.825Z",
+    "mergeNotes": "Work agent already running; sent merge preparation request. Waiting for strike/pan-3150 to be rebased and pushed.",
     "lastVerifiedCommit": "1d3e1f8ecfa15cf674c294c2af999d1aee1c5897",
     "strikeReadyHead": "0d7082c0243c3e03e6f55ede7908454740445f3d",
     "strikeReadyAt": "2026-07-27T04:00:38.138Z",
@@ -43,7 +43,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-27T04:01:06.990Z"
+        "pricingAsOf": "2026-07-27T04:01:09.856Z"
       }
     },
     "merges": [],
