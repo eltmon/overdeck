@@ -291,7 +291,7 @@
     "recordedAt": "2026-07-27T06:51:31.024Z"
   },
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T07:42:31.450Z",
+  "updated": "2026-07-27T07:42:33.367Z",
   "pipeline": {
     "issueId": "PAN-2876",
     "reviewStatus": "passed",
@@ -300,8 +300,8 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-27T07:42:31.367Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-27T07:42:31.383Z",
     "reviewNotes": "Approved: AC-4 cache cleanup and transient metadata retry are fixed; no blocking findings remain",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs verified: contracts builds clean (tsdown), rpc.test.ts 3/3 pass covering subagents event decode, subscribeConversationMessages payload with+without agentId, and ConversationResponse with+without subagents (legacy shape still decodes); root npm run typecheck passes with chat-types.ts ConversationEvent extended. Note (non-blocking): ConversationResponse moved from interface to Schema.Struct so arrays are now ReadonlyArray — no consumer broke today, watch it if a caller ever mutates the result in place.",
@@ -446,7 +446,7 @@
       },
       "costAtCloseOut": {
         "usd": 137.010879,
-        "pricingAsOf": "2026-07-27T07:42:31.429Z"
+        "pricingAsOf": "2026-07-27T07:42:33.356Z"
       }
     },
     "merges": [
