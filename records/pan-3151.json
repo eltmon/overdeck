@@ -328,18 +328,18 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T15:05:58.098Z",
+  "updated": "2026-07-27T15:07:57.332Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T15:05:58.047Z",
-    "reviewNotes": "Agent re-review request (17/25): Fixed review issues: bumped to SCHEMA_VERSION 63 with v62→v63 migration and comprehensive regression tests",
+    "updatedAt": "2026-07-27T15:07:57.303Z",
+    "reviewNotes": "The real v62→v63 migration is now correct, but the focused migration suite is red: two existing assertions still require version 62 after SCHEMA_VERSION was bumped to 63. Update those expectations/comments and return all 35 targeted tests green.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "fc19e669a59088966a8149057824ab6a8db87946",
     "reviewSpawnedAt": "2026-07-27T15:05:51.110Z"
@@ -357,9 +357,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 29353808,
-            "output": 650169,
-            "cacheRead": 156862976,
+            "input": 29884125,
+            "output": 660440,
+            "cacheRead": 160797184,
             "cacheWrite": 0
           }
         },
@@ -388,9 +388,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 29353808,
-          "output": 650169,
-          "cacheRead": 156862976,
+          "input": 29884125,
+          "output": 660440,
+          "cacheRead": 160797184,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -407,8 +407,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 270.0470683,
-        "pricingAsOf": "2026-07-27T15:05:58.084Z"
+        "usd": 274.9738873,
+        "pricingAsOf": "2026-07-27T15:07:57.325Z"
       }
     },
     "merges": [
