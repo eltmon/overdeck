@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T13:35:42.946Z",
-  "updated": "2026-07-27T18:36:56.907Z",
+  "updated": "2026-07-27T18:36:59.911Z",
   "pipeline": {
     "issueId": "PAN-3206",
     "reviewStatus": "pending",
@@ -26,8 +26,61 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T18:04:07.816Z",
-    "inspectNotes": "All 3 ACs verified: parse maps APPROVED/PASSED->passed, FAILED->failed, CHANGES REQUESTED suffix (em/en dash, colon, hyphen) -> blocked with blocker, bare form -> first ### under ## Blocking Findings, null otherwise; findVerdictReport prefers synthesis.md then review.md then null; vitest review-verdict-report.test.ts 9/9 passed and npm run typecheck clean (dashboard/frontend ratchets none-new)."
+    "updatedAt": "2026-07-27T18:36:59.910Z",
+    "inspectNotes": "All 3 ACs verified: parse maps APPROVED/PASSED->passed, FAILED->failed, CHANGES REQUESTED suffix (em/en dash, colon, hyphen) -> blocked with blocker, bare form -> first ### under ## Blocking Findings, null otherwise; findVerdictReport prefers synthesis.md then review.md then null; vitest review-verdict-report.test.ts 9/9 passed and npm run typecheck clean (dashboard/frontend ratchets none-new).",
+    "reviewRequestedAt": "2026-07-27T18:36:59.910Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-allowlist.txt",
+        "scripts/lint-ratchet-audit.sh",
+        "src/lib/__tests__/spawn-provenance-contract.test.ts",
+        "src/lib/agents/agent-state-source.ts",
+        "src/lib/overdeck/agent-state-sync.ts",
+        "tests/unit/lib/cloister/feedback-target.test.ts",
+        "tests/unit/lib/head-anchor-write-sites.test.ts",
+        "tests/unit/scripts/lint-ratchet-audit.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "tests/unit/lib/cloister/review-verdict-feedback.test.ts"
+      ],
+      "declaredScope": [
+        "docs/REVIEW-AGENT-ARCHITECTURE.md",
+        "roles/review.md",
+        "src/lib/cloister/deacon-review-signals.ts",
+        "src/lib/cloister/deacon-review-unsignaled.ts",
+        "src/lib/cloister/deacon-review.ts",
+        "src/lib/cloister/deacon.ts",
+        "src/lib/cloister/feedback-target.ts",
+        "src/lib/cloister/review-verdict-feedback.ts",
+        "src/lib/cloister/review-verdict-report.ts",
+        "tests/unit/lib/cloister/deacon-review-unapplied-verdicts.test.ts",
+        "tests/unit/lib/cloister/review-verdict-feedback.test.ts",
+        "tests/unit/lib/cloister/review-verdict-report.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/REVIEW-AGENT-ARCHITECTURE.md",
+        "roles/review.md",
+        "scripts/file-size-allowlist.txt",
+        "scripts/lint-ratchet-audit.sh",
+        "src/lib/__tests__/spawn-provenance-contract.test.ts",
+        "src/lib/agents/agent-state-source.ts",
+        "src/lib/cloister/deacon-review-signals.ts",
+        "src/lib/cloister/deacon-review-unsignaled.ts",
+        "src/lib/cloister/deacon-review.ts",
+        "src/lib/cloister/deacon.ts",
+        "src/lib/cloister/feedback-target.ts",
+        "src/lib/cloister/review-verdict-feedback.ts",
+        "src/lib/cloister/review-verdict-report.ts",
+        "src/lib/overdeck/agent-state-sync.ts",
+        "tests/unit/lib/cloister/deacon-review-unapplied-verdicts.test.ts",
+        "tests/unit/lib/cloister/feedback-target.test.ts",
+        "tests/unit/lib/cloister/review-verdict-report.test.ts",
+        "tests/unit/lib/head-anchor-write-sites.test.ts",
+        "tests/unit/scripts/lint-ratchet-audit.test.ts"
+      ],
+      "recordedAt": "2026-07-27T18:36:56.906Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3213"
   },
   "closeOut": {
     "usage": {
