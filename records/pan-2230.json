@@ -129,7 +129,7 @@
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T05:59:09.651Z",
+    "updatedAt": "2026-07-27T16:36:13.134Z",
     "reviewNotes": "canonicalizer collapses distinct directed cycles with the same member set",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2462",
     "lastVerifiedCommit": "75c9e21e9967d6d7b8ebc6ccfccc97748c620b9f",
@@ -171,7 +171,7 @@
       "recordedAt": "2026-07-07T12:40:16.148Z"
     },
     "closedOut": true,
-    "closedOutAt": "2026-07-27T05:59:09.651Z"
+    "closedOutAt": "2026-07-27T16:36:13.134Z"
   },
   "closeOut": {
     "usage": {
@@ -253,7 +253,7 @@
     ],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-27T05:59:09.674Z",
+      "evaluatedAt": "2026-07-27T16:36:13.145Z",
       "rows": [
         {
           "id": "review",
@@ -310,7 +310,7 @@
           "num": 7,
           "title": "Deployed",
           "expected": "live server build includes the merged commit",
-          "observed": "build commit 3297fb26 contains merge 27330395",
+          "observed": "build commit d44fa122 contains merge 27330395",
           "status": "pass"
         },
         {
@@ -327,6 +327,6 @@
     }
   },
   "created": "2026-07-07T11:40:53.373Z",
-  "updated": "2026-07-27T05:59:09.690Z",
+  "updated": "2026-07-27T16:36:13.150Z",
   "reviewMode": "quick"
 }
