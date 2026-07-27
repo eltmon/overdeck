@@ -38,11 +38,11 @@
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T11:53:09.339Z",
+    "updatedAt": "2026-07-27T08:24:16.103Z",
     "inspectNotes": "Spec fidelity passed: the diff factors gate metadata into readSessionGateFields and applies troubled fields plus queued mail count to planning/work/strike and review/test/ship session nodes. Constraint compliance passed: no prohibited patterns or PRD constraint violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2281",
-    "reviewRequestedAt": "2026-07-03T09:26:26.633Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2257.md",
@@ -88,26 +88,86 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 29911,
+            "output": 124,
+            "cacheRead": 7040,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 3366724,
+            "output": 9083,
+            "cacheRead": 3209856,
+            "cacheWrite": 0
+          },
+          "unknown": {
+            "input": 3396635,
+            "output": 9207,
+            "cacheRead": 3216896,
+            "cacheWrite": 0
+          }
+        },
+        "implementation": {
+          "custom/kimi-k2.7-code": {
+            "input": 97506,
+            "output": 401,
+            "cacheRead": 24832,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 77886,
-            "output": 1457,
+            "input": 82076,
+            "output": 2078,
             "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 840573,
+            "output": 37095,
+            "cacheRead": 10851584,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 29911,
+          "output": 124,
+          "cacheRead": 7040,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 3366724,
+          "output": 9083,
+          "cacheRead": 3209856,
+          "cacheWrite": 0
+        },
+        "unknown": {
+          "input": 3396635,
+          "output": 9207,
+          "cacheRead": 3216896,
+          "cacheWrite": 0
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 938079,
+          "output": 37496,
+          "cacheRead": 10876416,
+          "cacheWrite": 0
+        },
         "cliproxy/gpt-5.4-mini": {
-          "input": 77886,
-          "output": 1457,
+          "input": 82076,
+          "output": 2078,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-03T11:53:09.362Z"
+        "usd": 8.431191,
+        "pricingAsOf": "2026-07-27T08:24:16.253Z"
       }
     },
     "merges": [
@@ -116,5 +176,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-03T10:06:21.823Z",
-  "updated": "2026-07-03T11:53:09.363Z"
+  "updated": "2026-07-27T08:24:16.874Z"
 }
