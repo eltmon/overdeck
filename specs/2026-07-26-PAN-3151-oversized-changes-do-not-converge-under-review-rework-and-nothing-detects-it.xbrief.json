@@ -4,17 +4,17 @@
     "created": "2026-07-26T18:30:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3151: Oversized changes do not converge under review→rework and nothing detects it",
-    "updated": "2026-07-26T18:34:44.263Z"
+    "updated": "2026-07-27T10:08:12.367Z"
   },
   "plan": {
     "id": "pan-3151",
     "title": "Oversized changes do not converge under review→rework and nothing detects it",
-    "status": "proposed",
+    "status": "approved",
     "uid": "34352b16-b4f2-4182-b75f-5859bb5d6497",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-26T18:30:00.000Z",
-    "updated": "2026-07-26T18:34:44.263Z",
+    "updated": "2026-07-27T10:08:12.367Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3151",
@@ -731,5 +731,5 @@
       "canonicalFilename": "2026-07-26-PAN-3151-oversized-changes-do-not-converge-under-review-rework-and-nothing-detects-it.xbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
