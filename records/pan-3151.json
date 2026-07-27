@@ -258,18 +258,18 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:32:55.671Z",
+  "updated": "2026-07-27T14:34:16.206Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:32:55.632Z",
-    "reviewNotes": "Agent re-review request (10/25): Fixed: removed redundant v62 repairs causing test failures",
+    "updatedAt": "2026-07-27T14:34:16.182Z",
+    "reviewNotes": "removing the v62 repair restores the base-main upgrade bug: current v62 databases still miss review_cycle_history",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "1a4b8b91f4d83cb2dda724be2292b1ccb85334b1",
     "reviewSpawnedAt": "2026-07-27T14:32:48.643Z"
@@ -287,9 +287,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 23344865,
-            "output": 560164,
-            "cacheRead": 125706240,
+            "input": 23878174,
+            "output": 567287,
+            "cacheRead": 129136640,
             "cacheWrite": 0
           }
         },
@@ -318,9 +318,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 23344865,
-          "output": 560164,
-          "cacheRead": 125706240,
+          "input": 23878174,
+          "output": 567287,
+          "cacheRead": 129136640,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -337,8 +337,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 219.0545943,
-        "pricingAsOf": "2026-07-27T14:32:55.663Z"
+        "usd": 223.6500293,
+        "pricingAsOf": "2026-07-27T14:34:16.200Z"
       }
     },
     "merges": [
