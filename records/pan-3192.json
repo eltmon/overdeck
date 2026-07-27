@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:32:47.311Z",
-  "updated": "2026-07-27T05:07:48.869Z",
+  "updated": "2026-07-27T05:08:10.846Z",
   "pipeline": {
     "issueId": "PAN-3192",
     "reviewStatus": "pending",
@@ -43,8 +43,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "wire-typecheck-gates": {
+        "writerId": "agent-pan-3192",
+        "agentId": "agent-pan-3192",
+        "pid": 4054409,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:08:10.846Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3192",
@@ -70,6 +78,7 @@
     "frontend-types-guard-script.frontend-types-guard-script.ac1": "completed",
     "frontend-types-guard-script.frontend-types-guard-script.ac2": "completed",
     "frontend-types-guard-script.frontend-types-guard-script.ac3": "completed",
-    "frontend-types-guard-script.frontend-types-guard-script.ac4": "completed"
+    "frontend-types-guard-script.frontend-types-guard-script.ac4": "completed",
+    "wire-typecheck-gates": "running"
   }
 }
