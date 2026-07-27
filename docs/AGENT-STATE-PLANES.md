@@ -78,6 +78,20 @@ Agent state records two complementary provenance fields:
 
 Browser dashboard requests receive server-derived `operator:dashboard` provenance; request bodies cannot impersonate autonomous origins. Internal-token callers may select only registered internal origins such as `planning-auto-handoff`, `orphan-proposed-reconciler`, and `operator:cli:pan-start`. Detached `pan start` children receive the validated token through `OVERDECK_AGENT_STARTED_BY`; direct CLI invocation defaults to `operator:cli:pan-start`. Planning routes apply the same boundary and persist the validated token on planning-agent state. Fresh launch option types require `startedBy`, so a new production spawn path that omits provenance fails typecheck.
 
+### Agents-table event invariant
+
+The agents table is the authoritative runtime registry, but event-derived
+projections consume the event log independently. Every agents-table status
+transition, including boot backfill reconciliation, must persist a matching
+`agent.status_changed` or `agent.stopped` event during the same boot; otherwise
+stale events can produce phantom running agents (PAN-3183). The agents-table
+rule in `scripts/lint-state-writes.sh` enforces the boundary around
+`src/lib/overdeck/{agents,agent-state-sync,agent-record-sync,reconstruction}.ts`,
+`src/lib/database/{agents-db,agent-backfill,schema}.ts`, and
+`src/dashboard/server/services/agent-projection.ts`. During bootstrap/seed, a
+table row that is stopped with no live tmux session overrides a newer
+running/starting event projection; a live tmux session still wins.
+
 ## Liveness oracle — tmux
 
 A session on the `overdeck` tmux socket is the physical liveness authority.

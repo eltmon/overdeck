@@ -35,6 +35,7 @@ export interface ReconstructOptions {
 export interface ReconstructResult {
   issuesEnumerated: number;
   agentsRebuilt: number;
+  markedStoppedIds: Array<{ id: string; previousStatus: string }>;
   phaseCounts: Record<PipelinePhase, number>;
   agentRuntimeById: Record<string, AgentRuntimeSnapshot>;
   agentsById: Record<string, AgentSnapshot>;
@@ -282,7 +283,10 @@ export async function reconstructCache(
   const verbose = opts?.verbose ?? false;
 
   // 1. Rebuild the agents table from state.json + tmux (sources-only).
-  const { processed: agentsRebuilt } = backfillAgentsSync({
+  const {
+    processed: agentsRebuilt,
+    markedStoppedIds = [],
+  } = backfillAgentsSync({
     verbose,
     listLiveSessions: opts?.listLiveSessions,
   });
@@ -396,6 +400,7 @@ export async function reconstructCache(
   return {
     issuesEnumerated: inFlight.size,
     agentsRebuilt,
+    markedStoppedIds,
     phaseCounts,
     agentRuntimeById,
     agentsById,

@@ -39,6 +39,7 @@ export interface BootReconciliationAgent {
   lastActivity: string | null;
   cost: number | null;
   remote: boolean;
+  stoppedByUser?: boolean;
   readOnly: boolean;
 }
 
@@ -50,6 +51,7 @@ export interface BootReconciliationState {
   graceDeadline: string | null;
   graceExtensions?: number;
   maxGraceExtensions?: number;
+  heldCount?: number;
   /** Exactly what a decision acts on. */
   set: BootReconciliationAgent[];
   /**
@@ -263,7 +265,10 @@ export function BootReconciliationModal() {
     setPerAgent(Object.fromEntries(
       agents
         .filter((agent) => !agent.readOnly)
-        .map((agent) => [agent.issueId, selected[agent.issueId] ?? 'resume']),
+        .map((agent) => [
+          agent.issueId,
+          selected[agent.issueId] ?? (agent.stoppedByUser ? 'hold' : 'resume'),
+        ]),
     ));
   }, [data]);
 
@@ -306,9 +311,10 @@ export function BootReconciliationModal() {
   const secondsLeft = useCountdown(data?.graceDeadline ?? null);
 
   // PAN-3052: the boot dialog is the only surface with a deadline, and expiry
-  // commits `hold_all`. An operator answering an AskUserQuestion or a plan
-  // approval cannot also be watching this clock, so hold the window open while
-  // any other blocking decision is pending. The server caps how many times.
+  // commits the clean/crash classified default. An operator answering an
+  // AskUserQuestion or a plan approval cannot also be watching this clock, so hold
+  // the window open while any other blocking decision is pending. The server caps
+  // how many times.
   const pendingOtherDecisions = usePendingInputSubjects();
   const otherDecisionOpen = pendingOtherDecisions.length > 0;
   const graceExtensions = data?.graceExtensions ?? 0;
@@ -335,7 +341,7 @@ export function BootReconciliationModal() {
     const perAgentChoices = data.perAgent ?? {};
     const heldAgents = (Array.isArray(data.set) ? data.set : []).filter((agent) =>
       !agent.readOnly && (data.decision !== 'per_agent' || perAgentChoices[agent.issueId] !== 'resume'));
-    if (heldAgents.length === 0) return null;
+    if ((data.heldCount ?? 0) === 0) return null;
     const bannerPending = decisionMutation.isPending;
     return (
       <div
@@ -410,19 +416,17 @@ export function BootReconciliationModal() {
               </div>
               <div className="text-sm">
                 {/*
-                  PAN-3052: this used to read "Auto-resuming all in …", which is the
-                  opposite of what the server does. Grace expiry commits `hold_all`
-                  (boot-reconciliation.ts — the safe timeout default from PAN-2076),
-                  so letting the clock run parks every candidate. The copy must state
-                  the outcome the timer actually produces.
+                  PAN-3052: this used to promise unconditional auto-resume. Expiry
+                  now resumes only after a recent clean shutdown; crash or unknown
+                  boots keep candidates stopped. The copy states both outcomes.
                 */}
                 <div className="font-semibold text-warning-foreground">
-                  Keeping {resumableCount === 1 ? 'it' : 'all'} stopped in {formatCountdown(secondsLeft)}
+                  Applying boot default in {formatCountdown(secondsLeft)}
                 </div>
                 <div className="text-xs text-warning-foreground/70">
                   {graceHeldForDialog
                     ? `Paused — answer the other open question first (${graceExtensions}/${maxGraceExtensions} extensions used).`
-                    : 'If the timer runs out, nothing resumes until you say so.'}
+                    : 'If the timer runs out, clean boots resume and crash boots stay stopped.'}
                 </div>
               </div>
             </div>

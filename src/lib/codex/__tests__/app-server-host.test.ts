@@ -190,6 +190,9 @@ describe('CodexAppServerHost', () => {
       activeTurnId: 'turn-1',
       pendingRequests: [{ id: 71, method: 'item/commandExecution/requestApproval', params: { command: 'git status' } }],
     });
+    await vi.waitFor(() => {
+      expect(readEventLog()).toContainEqual(expect.objectContaining({ type: 'request' }));
+    });
   });
 
   it('starts a thread, persists threadId, starts a turn, and logs manager notifications', async () => {

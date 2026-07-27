@@ -72,6 +72,7 @@ import { closeConversationSearchService } from './services/conversation-search-s
 import { startCostReconcileService, stopCostReconcileService } from './services/cost-reconcile-service.js';
 import { startEventLoopMonitor, stopEventLoopMonitor } from './services/event-loop-monitor.js';
 import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
+import { setLastCleanShutdownAt } from '../../lib/overdeck/control-settings.js';
 import { startBootReconciliation } from '../../lib/cloister/boot-reconciliation.js';
 import { startDeaconChild, stopDeaconChild } from './services/deacon-supervisor.js';
 import { stopAllKnowledgeViewers } from './services/knowledge-viewer.js';
@@ -627,6 +628,11 @@ let shuttingDown = false;
 const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   if (shuttingDown) return;
   shuttingDown = true;
+  try {
+    setLastCleanShutdownAt(new Date().toISOString());
+  } catch (err) {
+    console.warn('[overdeck] failed to record clean shutdown marker:', err);
+  }
   console.log(`[overdeck] received ${signal} (pid=${process.pid} ppid=${process.ppid}) — shutting down`);
   try {
     const notifiedClients = broadcastServerRestarting();

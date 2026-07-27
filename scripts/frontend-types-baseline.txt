@@ -1,0 +1,2 @@
+# frontend type-error baseline for lint-frontend-types.sh (PAN-3192).
+# One baselined 'error TS' line per row, sorted. Lower with: bash scripts/lint-frontend-types.sh --update

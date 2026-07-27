@@ -4,6 +4,7 @@ import { Effect, Layer } from 'effect';
 const fakeReconstructResult = {
   issuesEnumerated: 1,
   agentsRebuilt: 2,
+  markedStoppedIds: [],
   phaseCounts: { work: 1, review: 0, merge: 0, done: 0 },
   agentsById: {
     'agent-pan-1920': {
@@ -28,6 +29,8 @@ const fakeReconstructResult = {
 const readFromSpy = vi.fn(() => []);
 const subscribeSpy = vi.fn(() => () => {});
 const appendAsyncSpy = vi.fn(async () => 1);
+const getLatestSequenceSpy = vi.fn(() => 0);
+const queryByTypeSpy = vi.fn(() => []);
 
 vi.mock('../../../../src/lib/reconstruct/reconstruct-cache.js', () => ({
   reconstructCache: vi.fn(),
@@ -36,6 +39,7 @@ vi.mock('../../../../src/lib/reconstruct/reconstruct-cache.js', () => ({
 
 vi.mock('../../../../src/dashboard/server/event-store.js', () => ({
   initEventStore: vi.fn(),
+  getEventStore: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/agent-runtime-mirror.js', () => ({
@@ -45,7 +49,7 @@ vi.mock('../../../../src/lib/agent-runtime-mirror.js', () => ({
 }));
 
 import { reconstructCache, reconstructCacheAuto } from '../../../../src/lib/reconstruct/reconstruct-cache.js';
-import { initEventStore } from '../../../../src/dashboard/server/event-store.js';
+import { getEventStore, initEventStore } from '../../../../src/dashboard/server/event-store.js';
 import { AgentStateServiceLive } from '../../../../src/dashboard/server/services/agent-state-service.js';
 import { ReadModelServiceLive } from '../../../../src/dashboard/server/read-model.js';
 import { AgentsResolver } from '../../../../src/lib/overdeck/agents.js';
@@ -53,17 +57,25 @@ import { AgentsResolver } from '../../../../src/lib/overdeck/agents.js';
 const reconstructCacheMock = vi.mocked(reconstructCache);
 const reconstructCacheAutoMock = vi.mocked(reconstructCacheAuto);
 const initEventStoreMock = vi.mocked(initEventStore);
+const getEventStoreMock = vi.mocked(getEventStore);
 
 beforeEach(() => {
   vi.resetAllMocks();
+  appendAsyncSpy.mockResolvedValue(1);
+  getLatestSequenceSpy.mockReturnValue(0);
+  queryByTypeSpy.mockReturnValue([]);
   reconstructCacheMock.mockResolvedValue(fakeReconstructResult as any);
   reconstructCacheAutoMock.mockResolvedValue(fakeReconstructResult as any);
-  initEventStoreMock.mockResolvedValue({
+  const eventStore = {
     readFrom: readFromSpy,
     subscribe: subscribeSpy,
     appendAsync: appendAsyncSpy,
     emitOnly: vi.fn(),
-  } as any);
+    getLatestSequence: getLatestSequenceSpy,
+    queryByType: queryByTypeSpy,
+  } as any;
+  initEventStoreMock.mockResolvedValue(eventStore);
+  getEventStoreMock.mockReturnValue(eventStore);
 });
 
 describe('AgentStateService bootstrap (PAN-1920)', () => {
@@ -73,6 +85,39 @@ describe('AgentStateService bootstrap (PAN-1920)', () => {
 
     expect(readFromSpy).not.toHaveBeenCalled();
     expect(subscribeSpy).toHaveBeenCalled();
+  });
+
+  it('durably emits each source-reconciled stop before merging the seed', async () => {
+    reconstructCacheAutoMock.mockResolvedValue({
+      ...fakeReconstructResult,
+      markedStoppedIds: [{ id: 'agent-pan-1920', previousStatus: 'running' }],
+      agentsById: {
+        'agent-pan-1920': {
+          ...fakeReconstructResult.agentsById['agent-pan-1920'],
+          status: 'stopped',
+          hasLiveTmuxSession: false,
+        },
+      },
+      agentRuntimeById: {
+        'agent-pan-1920': {
+          ...fakeReconstructResult.agentRuntimeById['agent-pan-1920'],
+          activity: 'stopped',
+        },
+      },
+    } as any);
+
+    await Effect.runPromise(Effect.provide(Effect.void, AgentStateServiceLive));
+    await vi.waitFor(() => expect(appendAsyncSpy).toHaveBeenCalled());
+
+    expect(appendAsyncSpy).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'agent.status_changed',
+      payload: expect.objectContaining({
+        agentId: 'agent-pan-1920',
+        status: 'stopped',
+        previousStatus: 'running',
+        hasLiveTmuxSession: false,
+      }),
+    }));
   });
 });
 
@@ -94,5 +139,66 @@ describe('ReadModelService bootstrap (PAN-1938 source-swap)', () => {
     const layer = ReadModelServiceLive.pipe(Layer.provide(MockAgentsResolverLive));
     await Effect.runPromise(Effect.provide(Effect.void, layer));
     await vi.waitFor(() => expect(reconstructCacheAutoMock).toHaveBeenCalled());
+  });
+
+  it('reads authoritative agent rows after reconstruction finishes', async () => {
+    let reconstructFinished = false;
+    reconstructCacheAutoMock.mockImplementation(async () => {
+      reconstructFinished = true;
+      return fakeReconstructResult as any;
+    });
+    const list = vi.fn(() => {
+      expect(reconstructFinished).toBe(true);
+      return Effect.succeed([]);
+    });
+    const resolverLayer = Layer.succeed(AgentsResolver, AgentsResolver.of({
+      list,
+      get: (_id) => Effect.fail(new Error('not found') as never),
+      isAlive: (_id) => Effect.succeed(false),
+      getRuntime: (_id) => Effect.succeed(null),
+      getHealthHistory: (_id) => Effect.succeed([]),
+    }));
+    const layer = ReadModelServiceLive.pipe(Layer.provide(resolverLayer));
+
+    await Effect.runPromise(Effect.provide(Effect.void, layer));
+
+    expect(list).toHaveBeenCalledOnce();
+  });
+
+  it('durably emits each source-reconciled stop during bootstrap', async () => {
+    reconstructCacheAutoMock.mockResolvedValue({
+      ...fakeReconstructResult,
+      markedStoppedIds: [{ id: 'agent-pan-1920', previousStatus: 'running' }],
+    } as any);
+    const layer = ReadModelServiceLive.pipe(Layer.provide(MockAgentsResolverLive));
+
+    await Effect.runPromise(Effect.provide(Effect.void, layer));
+
+    expect(appendAsyncSpy).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'agent.status_changed',
+      payload: expect.objectContaining({
+        agentId: 'agent-pan-1920',
+        status: 'stopped',
+        previousStatus: 'running',
+        hasLiveTmuxSession: false,
+      }),
+    }));
+  });
+
+  it('logs an append failure and still completes bootstrap', async () => {
+    reconstructCacheAutoMock.mockResolvedValue({
+      ...fakeReconstructResult,
+      markedStoppedIds: [{ id: 'agent-pan-1920', previousStatus: 'running' }],
+    } as any);
+    appendAsyncSpy.mockResolvedValueOnce(0);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const layer = ReadModelServiceLive.pipe(Layer.provide(MockAgentsResolverLive));
+
+    await expect(Effect.runPromise(Effect.provide(Effect.void, layer))).resolves.toBeUndefined();
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[ReadModel] Failed to emit boot-reconciled stop events:',
+      expect.any(Error),
+    );
+    errorSpy.mockRestore();
   });
 });

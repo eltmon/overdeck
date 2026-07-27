@@ -39,7 +39,7 @@ import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileSt
 import { reconcileTraefikNetworks } from '../workspace/traefik-connect.js';
 import { coordinateSwarmSlots } from './deacon-swarm.js';
 import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
-import { applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, type BootReconciliationApplyResult } from './boot-reconciliation-apply.js';
+import { applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, type BootReconciliationApplyOptions, type BootReconciliationApplyResult } from './boot-reconciliation-apply.js';
 import { listFeatureWorkspaces } from './deacon-workspaces.js';
 import { createInFlightGuard } from './in-flight-guard.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
@@ -1607,8 +1607,8 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
   return autoResumeStoppedWorkAgentsWithDeps(autoResumeNotifierDeps());
 }
 
-export async function applyBootReconciliationDecision(): Promise<BootReconciliationApplyResult> {
-  return applyBootReconciliationDecisionWithDeps(autoResumeNotifierDeps());
+export async function applyBootReconciliationDecision(opts: BootReconciliationApplyOptions = {}): Promise<BootReconciliationApplyResult> {
+  return applyBootReconciliationDecisionWithDeps(autoResumeNotifierDeps(), opts);
 }
 
 export async function reconcileAgentLiveness(): Promise<string[]> {

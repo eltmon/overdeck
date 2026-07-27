@@ -143,7 +143,7 @@ export interface SwarmConfig {
  */
 export interface StartupConfig {
   auto_start: boolean; // Start Cloister when dashboard starts
-  reconciliation_grace_secs: number; // Boot reconciliation grace window before default resume
+  reconciliation_grace_secs: number; // Grace window; clean shutdown resumes, crash boot holds, empty set auto-releases
   reconciliation_max_candidate_age_secs: number; // Max age for stopped agents to appear in boot reconciliation
 }
 

@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
   const agents = [
@@ -80,16 +80,57 @@ const mocks = vi.hoisted(() => {
       stoppedByUser: false,
       sessionId: 'remote-session',
     },
+    {
+      id: 'agent-stopped-by-user',
+      issueId: 'PAN-6',
+      role: 'work',
+      status: 'stopped',
+      model: 'claude',
+      lastActivity: '2026-06-29T14:59:58.000Z',
+      updatedAt: '2026-06-29T14:59:59.000Z',
+      costSoFar: null,
+      hostOverride: null,
+      paused: false,
+      troubled: false,
+      stoppedByUser: true,
+      sessionId: null,
+    },
+    {
+      id: 'agent-strike',
+      issueId: 'PAN-7',
+      role: 'strike',
+      status: 'stopped',
+      model: 'claude',
+      lastActivity: '2026-06-29T14:59:58.000Z',
+      updatedAt: '2026-06-29T14:59:59.000Z',
+      costSoFar: null,
+      hostOverride: null,
+      paused: false,
+      troubled: false,
+      stoppedByUser: false,
+      sessionId: null,
+    },
   ];
 
   return {
     agents,
     candidates: [agents[0]],
+    bootState: {
+      decision: 'pending' as 'pending' | 'resume_all' | 'hold_all' | 'per_agent' | null,
+      perAgent: {} as Record<string, 'resume' | 'hold'>,
+      decidedAt: null as string | null,
+      bootId: 'boot-test',
+      bootStartedAt: '2026-06-29T15:00:00.000Z',
+      graceDeadline: '2026-06-29T15:00:30.000Z',
+    },
   };
 });
 
 vi.mock('../../../../lib/cloister/boot-reconciliation.js', () => ({
-  isBootReconciliationCandidate: vi.fn((agent: { id: string }) => agent.id === 'agent-candidate'),
+  isAutoResumableRole: vi.fn((role: string) => role === 'work' || role === 'strike'),
+  isBootReconciliationCandidate: vi.fn((agent: { id: string }) =>
+    mocks.candidates.some((candidate) => candidate.id === agent.id),
+  ),
   listBootReconciliationCandidates: vi.fn(() => mocks.candidates),
   MAX_BOOT_RECONCILIATION_GRACE_EXTENSIONS: 3,
   extendBootReconciliationGrace: vi.fn(() => ({
@@ -124,14 +165,7 @@ vi.mock('../../../../lib/overdeck/agents.js', () => ({
 }));
 
 vi.mock('../../../../lib/overdeck/control-settings.js', () => ({
-  getBootReconciliationState: vi.fn(() => ({
-    decision: 'pending',
-    perAgent: {},
-    decidedAt: null,
-    bootId: 'boot-test',
-    bootStartedAt: '2026-06-29T15:00:00.000Z',
-    graceDeadline: '2026-06-29T15:00:30.000Z',
-  })),
+  getBootReconciliationState: vi.fn(() => ({ ...mocks.bootState })),
   setBootReconciliationDecision: vi.fn(),
 }));
 
@@ -152,6 +186,12 @@ async function requestRoute(path: string, init?: RequestInit): Promise<{ status:
 }
 
 describe('boot reconciliation route', () => {
+  beforeEach(() => {
+    mocks.candidates = [mocks.agents[0]];
+    mocks.bootState.decision = 'pending';
+    mocks.bootState.perAgent = {};
+  });
+
   it('puts only decision candidates in set, read-only rows in context, and omits stale stopped non-candidates', async () => {
     const response = await requestRoute('/api/boot-reconciliation');
 
@@ -162,10 +202,39 @@ describe('boot reconciliation route', () => {
     expect(contextIds).toEqual(['agent-paused', 'agent-troubled', 'agent-remote']);
     expect([...setIds, ...contextIds]).not.toContain('agent-stale');
     expect(response.body.maxGraceExtensions).toBe(3);
+    expect(response.body.heldCount).toBe(0);
     expect(response.body.set.find((agent: { id: string }) => agent.id === 'agent-candidate').readOnly).toBe(false);
     for (const id of ['agent-paused', 'agent-troubled', 'agent-remote']) {
       expect(response.body.context.find((agent: { id: string }) => agent.id === id).readOnly).toBe(true);
     }
+  });
+
+  it('counts live hold_all candidates and exposes operator-stopped row state', async () => {
+    mocks.bootState.decision = 'hold_all';
+    mocks.candidates = [mocks.agents[0], mocks.agents[5]];
+
+    const response = await requestRoute('/api/boot-reconciliation');
+
+    expect(response.body.heldCount).toBe(2);
+    const operatorStopped = response.body.set.find((agent: { id: string }) => agent.id === 'agent-stopped-by-user');
+    expect(operatorStopped).toMatchObject({
+      stoppedByUser: true,
+      whyStopped: 'stopped by operator',
+    });
+  });
+
+  it('subtracts per-agent resume marks and includes strike candidates', async () => {
+    mocks.bootState.decision = 'per_agent';
+    mocks.bootState.perAgent = { 'PAN-1': 'resume' };
+    mocks.candidates = [mocks.agents[0], mocks.agents[6]];
+
+    const response = await requestRoute('/api/boot-reconciliation');
+
+    expect(response.body.set.map((agent: { id: string }) => agent.id)).toEqual([
+      'agent-candidate',
+      'agent-strike',
+    ]);
+    expect(response.body.heldCount).toBe(1);
   });
 
   it('returns skipped and deferred boot decision breakdowns', async () => {
