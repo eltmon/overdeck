@@ -206,7 +206,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T05:42:57.720Z",
+  "updated": "2026-07-27T05:47:08.634Z",
   "pipeline": {
     "issueId": "PAN-2876",
     "reviewStatus": "pending",
@@ -279,16 +279,8 @@
   "model": "claude-opus-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "agent-task-tool-parity": {
-        "writerId": "agent-pan-2876",
-        "agentId": "agent-pan-2876",
-        "pid": 2503416,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:42:57.720Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2876",
@@ -377,6 +369,17 @@
         "outcome": "completed",
         "reason": "Threaded subagent lookup and open callbacks through the timeline, added a matching-only 'Open subagent transcript' action, and wired it to the shared URL selection used by the rail; full frontend tests and typecheck pass.",
         "releasedAt": "2026-07-27T05:42:42.422Z"
+      },
+      {
+        "writerId": "agent-pan-2876",
+        "agentId": "agent-pan-2876",
+        "pid": 2503416,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:42:57.720Z",
+        "itemId": "agent-task-tool-parity",
+        "outcome": "completed",
+        "reason": "Added Agent fallthrough beside Task in both expanded rendering and work-log summaries, with server and frontend regression tests preserving Task behavior and proving Agent avoids raw JSON.",
+        "releasedAt": "2026-07-27T05:47:08.634Z"
       }
     ],
     "statusReasons": {
@@ -411,6 +414,10 @@
       "frontend-agent-row-link": {
         "reason": "Threaded subagent lookup and open callbacks through the timeline, added a matching-only 'Open subagent transcript' action, and wired it to the shared URL selection used by the rail; full frontend tests and typecheck pass.",
         "updatedAt": "2026-07-27T05:42:42.422Z"
+      },
+      "agent-task-tool-parity": {
+        "reason": "Added Agent fallthrough beside Task in both expanded rendering and work-log summaries, with server and frontend regression tests preserving Task behavior and proving Agent avoids raw JSON.",
+        "updatedAt": "2026-07-27T05:47:08.634Z"
       }
     }
   },
@@ -455,6 +462,9 @@
     "frontend-agent-row-link.frontend-agent-row-link.ac1": "completed",
     "frontend-agent-row-link.frontend-agent-row-link.ac2": "completed",
     "frontend-agent-row-link.frontend-agent-row-link.ac3": "completed",
-    "agent-task-tool-parity": "running"
+    "agent-task-tool-parity": "completed",
+    "agent-task-tool-parity.agent-task-tool-parity.ac1": "completed",
+    "agent-task-tool-parity.agent-task-tool-parity.ac2": "completed",
+    "agent-task-tool-parity.agent-task-tool-parity.ac3": "completed"
   }
 }
