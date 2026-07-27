@@ -62,10 +62,14 @@
   ],
   "scopeDrift": {
     "outsideDeclaredScope": [
+      "drizzle/overdeck/0000_overdeck_init.sql",
       "scripts/file-size-allowlist.txt",
       "src/dashboard/frontend/src/components/CommandDeck/SessionView/IssueHeader.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
+      "src/dashboard/server/routes/workspaces/review-control.ts",
       "src/lib/cloister/__tests__/review-convergence.test.ts",
+      "src/lib/overdeck/infra.ts",
+      "src/lib/review-status.ts",
       "src/lib/xbrief/__tests__/quality-lint.test.ts"
     ],
     "declaredScopeUntouched": [
@@ -109,6 +113,7 @@
       "CLAUDE.md",
       "docs/REVIEW-AGENT-ARCHITECTURE.md",
       "docs/XBRIEF.md",
+      "drizzle/overdeck/0000_overdeck_init.sql",
       "packages/contracts/src/types.ts",
       "scripts/file-size-allowlist.txt",
       "src/cli/commands/show.ts",
@@ -116,6 +121,7 @@
       "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
       "src/dashboard/frontend/src/components/issue-view/derivations.ts",
       "src/dashboard/server/read-model.ts",
+      "src/dashboard/server/routes/workspaces/review-control.ts",
       "src/lib/cloister/__tests__/review-convergence.test.ts",
       "src/lib/cloister/deacon-review-signals.ts",
       "src/lib/cloister/prompts/planning.md",
@@ -123,20 +129,22 @@
       "src/lib/cloister/review-verdict-feedback.ts",
       "src/lib/database/review-status-db.ts",
       "src/lib/database/schema.ts",
+      "src/lib/overdeck/infra.ts",
       "src/lib/overdeck/review-status-record-sync.ts",
       "src/lib/overdeck/review-status-sync.ts",
       "src/lib/pan-dir/record.ts",
       "src/lib/pan-dir/records.ts",
       "src/lib/review-findings.ts",
       "src/lib/review-status-reconcile.ts",
+      "src/lib/review-status.ts",
       "src/lib/xbrief/__tests__/quality-lint.test.ts",
       "src/lib/xbrief/quality-lint.ts",
       "tests/unit/lib/review-findings.test.ts"
     ],
-    "recordedAt": "2026-07-27T11:05:50.125Z"
+    "recordedAt": "2026-07-27T11:53:26.358Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T11:53:25.503Z",
+  "updated": "2026-07-27T11:53:26.361Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
