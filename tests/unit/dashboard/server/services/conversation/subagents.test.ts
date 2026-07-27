@@ -67,7 +67,7 @@ describe('conversation subagent discovery', () => {
     await expect(listSubagentMetas(sessionFile)).resolves.toEqual([]);
   });
 
-  it('warns and skips corrupt metadata while preserving valid entries', async () => {
+  it('warns and retries corrupt metadata while preserving valid entries', async () => {
     await writeMeta('valid', {
       agentType: 'Explore',
       description: 'Inspect valid metadata',
@@ -88,6 +88,29 @@ describe('conversation subagent discovery', () => {
       },
     ]);
     expect(warn).toHaveBeenCalledOnce();
+
+    await writeMeta('corrupt', {
+      agentType: 'general-purpose',
+      description: 'Recover after a partial write',
+      toolUseId: 'toolu_recovered',
+      spawnDepth: 2,
+    });
+    await expect(listSubagentMetas(sessionFile)).resolves.toEqual([
+      {
+        agentId: 'corrupt',
+        agentType: 'general-purpose',
+        description: 'Recover after a partial write',
+        toolUseId: 'toolu_recovered',
+        spawnDepth: 2,
+      },
+      {
+        agentId: 'valid',
+        agentType: 'Explore',
+        description: 'Inspect valid metadata',
+        toolUseId: 'toolu_valid',
+        spawnDepth: 1,
+      },
+    ]);
   });
 
   it('resolves valid transcript ids inside the subagents directory and rejects unsafe ids', () => {

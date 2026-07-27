@@ -133,7 +133,7 @@ describe('useSubagentTranscript', () => {
     fetchMocks.fetchWithTimeout.mockReset();
   });
 
-  it('uses an isolated query key and unsubscribes when the subagent is deselected', () => {
+  it('uses an isolated query key and clears the live cache when the subagent is deselected', () => {
     const queryClient = createQueryClient();
     queryClient.setQueryData(conversationMessagesQueryKey('conv-x'), parentCache);
     const { rerender } = renderHook(
@@ -157,18 +157,41 @@ describe('useSubagentTranscript', () => {
 
     rerender({ agentId: null });
     expect(transportMocks.unsubscribe).toHaveBeenCalledOnce();
+    expect(queryClient.getQueryData(subagentTranscriptQueryKey('conv-x', 'sub-1'))).toBeUndefined();
   });
 
-  it('fetches an ended subagent transcript once over HTTP', async () => {
+  it('clears the live cache when the transcript hook unmounts', () => {
+    const queryClient = createQueryClient();
+    const { unmount } = renderHook(
+      () => useSubagentTranscript(base({}), 'sub-1'),
+      { wrapper: wrapper(queryClient) },
+    );
+
+    act(() => listener?.({
+      kind: 'messages',
+      messages: [{ id: 'sub-message', role: 'assistant', text: 'Subagent', createdAt: '2026-01-01T00:00:02Z' }],
+      workLog: [],
+      streaming: true,
+      snapshot: true,
+    }));
+    expect(queryClient.getQueryData(subagentTranscriptQueryKey('conv-x', 'sub-1'))).toBeDefined();
+
+    unmount();
+    expect(transportMocks.unsubscribe).toHaveBeenCalledOnce();
+    expect(queryClient.getQueryData(subagentTranscriptQueryKey('conv-x', 'sub-1'))).toBeUndefined();
+  });
+
+  it('fetches an ended subagent transcript once over HTTP and clears it on deselect', async () => {
     fetchMocks.fetchWithTimeout.mockResolvedValue(new Response(JSON.stringify({
       messages: [{ id: 'ended', role: 'assistant', text: 'Done', createdAt: '2026-01-01T00:00:00Z' }],
       workLog: [],
       streaming: false,
     }), { status: 200, headers: { 'content-type': 'application/json' } }));
     const queryClient = createQueryClient();
-    const { result } = renderHook(
-      () => useSubagentTranscript(base({ endedAt: '2026-01-01T00:00:00Z' }), 'sub-1'),
-      { wrapper: wrapper(queryClient) },
+    const { result, rerender } = renderHook(
+      ({ agentId }: { agentId: string | null }) =>
+        useSubagentTranscript(base({ endedAt: '2026-01-01T00:00:00Z' }), agentId),
+      { initialProps: { agentId: 'sub-1' }, wrapper: wrapper(queryClient) },
     );
 
     await waitFor(() => expect(result.current.data?.messages[0]?.text).toBe('Done'));
@@ -177,5 +200,8 @@ describe('useSubagentTranscript', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(transportMocks.subscribe).not.toHaveBeenCalled();
+
+    rerender({ agentId: null });
+    expect(queryClient.getQueryData(subagentTranscriptQueryKey('conv-x', 'sub-1'))).toBeUndefined();
   });
 });

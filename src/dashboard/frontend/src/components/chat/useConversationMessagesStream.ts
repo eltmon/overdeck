@@ -205,6 +205,11 @@ export function useSubagentTranscript(
     return () => unsubscribe();
   }, [agentId, conversation.name, queryClient, queryKey, streaming]);
 
+  useEffect(() => {
+    if (!agentId) return;
+    return () => queryClient.removeQueries({ queryKey, exact: true });
+  }, [agentId, queryClient, queryKey]);
+
   return useQuery<ConversationMessagesCache>({
     queryKey,
     queryFn: async ({ signal }) => {

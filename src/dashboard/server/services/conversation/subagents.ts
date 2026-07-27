@@ -8,7 +8,7 @@ import type { ConversationEvent, SubagentSummary } from '@overdeck/contracts';
 
 export type SubagentMeta = Omit<SubagentSummary, 'status'>;
 
-const metaCache = new Map<string, SubagentMeta | null>();
+const metaCache = new Map<string, SubagentMeta>();
 const SAFE_AGENT_ID = /^[A-Za-z0-9_-]+$/;
 
 export function subagentsDirFor(sessionFile: string): string {
@@ -45,7 +45,7 @@ function parseMeta(agentId: string, value: unknown): SubagentMeta {
 
 async function readMeta(metaPath: string, agentId: string): Promise<SubagentMeta | null> {
   const cached = metaCache.get(metaPath);
-  if (cached !== undefined || metaCache.has(metaPath)) return cached ?? null;
+  if (cached !== undefined) return cached;
 
   try {
     const parsed = parseMeta(agentId, JSON.parse(await readFile(metaPath, 'utf8')));
@@ -53,7 +53,6 @@ async function readMeta(metaPath: string, agentId: string): Promise<SubagentMeta
     return parsed;
   } catch (error) {
     console.warn(`[conversation-subagents] Failed to parse ${metaPath}:`, error);
-    metaCache.set(metaPath, null);
     return null;
   }
 }
