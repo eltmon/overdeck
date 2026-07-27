@@ -4,17 +4,17 @@
     "created": "2026-07-26T17:50:03Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3148: Pushed rework commit does not trigger re-review: review stays blocked at a stale SHA while feedback is redelivered, burning agent context",
-    "updated": "2026-07-26T17:57:19.327Z"
+    "updated": "2026-07-27T00:41:15.754Z"
   },
   "plan": {
     "id": "pan-3148",
     "title": "Pushed rework commit does not trigger re-review: review stays blocked at a stale SHA while feedback is redelivered, burning agent context",
-    "status": "running",
+    "status": "completed",
     "uid": "21fab074-007d-4957-9095-804aac68dd96",
     "author": "agent:k3[1m]",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-26T17:50:03Z",
-    "updated": "2026-07-26T17:57:19.327Z",
+    "updated": "2026-07-27T00:41:15.754Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3148",
@@ -481,5 +481,5 @@
       "canonicalFilename": "2026-07-26-PAN-3148-pushed-rework-commit-does-not-trigger-re-review-review-stays-blocked-at-a-stale-sha-while-feedback-is-redelivered-burning-agent-context.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
