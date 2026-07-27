@@ -321,7 +321,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:59:59.805Z",
+  "updated": "2026-07-27T15:00:05.323Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
@@ -331,9 +331,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:59:59.196Z",
+    "updatedAt": "2026-07-27T15:00:05.316Z",
     "reviewNotes": "The new v62→v63 regression test never runs a v63 migration: SCHEMA_VERSION remains 62, the fixture enters the exact-v62 repair, and it asserts user_version stays 62. It gives false coverage for the skipped-release defect; implement and test a real v62→v63 migration.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
+    "reviewedAtCommit": "436787102da30f6e9a845238c6af81b5717948a0",
     "reviewSpawnedAt": "2026-07-27T14:59:16.365Z"
   },
   "closeOut": {
@@ -400,7 +401,7 @@
       },
       "costAtCloseOut": {
         "usd": 263.4836643,
-        "pricingAsOf": "2026-07-27T14:59:59.214Z"
+        "pricingAsOf": "2026-07-27T15:00:05.320Z"
       }
     },
     "merges": [
