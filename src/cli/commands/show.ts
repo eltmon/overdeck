@@ -110,10 +110,21 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   if (pipelineStatus?.stuck) {
     let detail = '';
     try {
-      const parsed = JSON.parse(pipelineStatus.stuckDetails ?? '{}') as { workAgentError?: unknown };
+      const parsed = JSON.parse(pipelineStatus.stuckDetails ?? '{}') as { workAgentError?: unknown; counts?: number[] };
       if (typeof parsed.workAgentError === 'string') detail = `  ${chalk.dim('·')} ${parsed.workAgentError}`;
+      // PAN-3151: show review convergence series if available
+      if (pipelineStatus.stuckReason === 'review-not-converging' && Array.isArray(parsed.counts)) {
+        const series = parsed.counts.join(' → ');
+        detail = `  ${chalk.dim('·')} cycles: ${series}`;
+      }
     } catch { /* malformed legacy details are non-fatal */ }
     console.log(`  ${chalk.dim('pipeline')} ${chalk.red('blocked')}  ${chalk.dim('·')} ${pipelineStatus.stuckReason ?? 'stuck'}${detail}`);
+  }
+
+  // PAN-3151: show review cycle series even if not stuck yet
+  if (pipelineStatus?.reviewCycleHistory && pipelineStatus.reviewCycleHistory.length > 0 && !pipelineStatus.stuck) {
+    const series = pipelineStatus.reviewCycleHistory.map(e => e.blockingCount).join(' → ');
+    console.log(`  ${chalk.dim('pipeline')} ${chalk.dim('review-cycles')}  ${chalk.dim('·')} ${series}`);
   }
 
   // Health line

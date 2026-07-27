@@ -11,7 +11,7 @@ import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 62;
+export const SCHEMA_VERSION = 63;
 
 function tryIdempotentDdl(db: SqliteDatabase, targetVersion: number, statement: string): void {
   try {
@@ -268,7 +268,9 @@ export function initSchema(db: SqliteDatabase): void {
       -- PAN-938: current merge pipeline step
       merge_step              TEXT,
       -- PAN-1691: per-issue merge-train routing key (NULL=project default, 1=auto-merge, 0=hold-for-UAT)
-      auto_merge              INTEGER
+      auto_merge              INTEGER,
+      -- PAN-3151: JSON array of review cycle history entries for convergence detection
+      review_cycle_history    TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -786,17 +788,27 @@ export function initSchema(db: SqliteDatabase): void {
  */
 export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   const currentVersion = db.pragma('user_version', { simple: true }) as number;
-  if (currentVersion === SCHEMA_VERSION) {
-    tryIdempotentDdl(db, SCHEMA_VERSION, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
-    tryIdempotentDdl(db, SCHEMA_VERSION, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
-  }
-  if (currentVersion >= SCHEMA_VERSION) {
-    return; // Already at or ahead of this build's schema version
-  }
 
   if (currentVersion === 0) {
     // Fresh database — just initialize the full schema
     initSchema(db);
+    return;
+  }
+
+  if (currentVersion === SCHEMA_VERSION) {
+    // At this build's schema version.
+    // Run repairs for columns that may be missing on databases at current version.
+    // v60→v61 repairs
+    tryIdempotentDdl(db, 61, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
+    tryIdempotentDdl(db, 61, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
+    // v61→v62 repairs (PAN-3151, PAN-3154)
+    tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN review_cycle_history TEXT');
+    tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN conflicts_since TEXT');
+    return;
+  }
+
+  if (currentVersion > SCHEMA_VERSION) {
+    // Ahead of this build's schema version — just return
     return;
   }
 
@@ -1712,27 +1724,30 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
       tryIdempotentDdl(db, 61, `ALTER TABLE review_status ADD COLUMN ${column}`);
     }
   }
+
   // v59 -> v60: add release status columns to review_status.
   if (currentVersion < 60) {
     tryIdempotentDdl(db, 60, `ALTER TABLE review_status ADD COLUMN release_status TEXT`);
     tryIdempotentDdl(db, 60, `ALTER TABLE review_status ADD COLUMN release_notes TEXT`);
   }
 
-  // v60 -> v61: PAN-1491 store parsed affected v1.0 criteria on substrate bugs.
-  if (currentVersion < 61) {
-    tryIdempotentDdl(db, 61, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
-    tryIdempotentDdl(db, 61, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
-  }
+  // v60 -> v61 repairs: PAN-1491 store parsed affected v1.0 criteria on substrate bugs.
+  // These run unconditionally (idempotent) to repair v61 databases missing the columns.
+  tryIdempotentDdl(db, 61, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
+  tryIdempotentDdl(db, 61, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
 
+  // v61 -> v62: PAN-3151 store review cycle history for convergence detection.
   // v61 -> v62: PAN-3154 record the main-head SHA/paths that first made a branch conflict.
   if (currentVersion < 62) {
+    tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN review_cycle_history TEXT');
     tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN conflicts_since TEXT');
-    // A database already stamped exactly v61 hits neither the `currentVersion < 61`
-    // block above nor the `currentVersion === SCHEMA_VERSION` no-version-bump top-up
-    // (SCHEMA_VERSION is now 62, not 61) — repeat these two idempotent v61 top-ups
-    // here so a v61 -> v62 upgrade never stamps v62 while missing them.
-    tryIdempotentDdl(db, 62, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
-    tryIdempotentDdl(db, 62, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
+  }
+
+  // v62 -> v63: safety repair for review_cycle_history and conflicts_since in case they were missed.
+  // This handles the skip-to-v63 scenario where a v62 database may not have received these columns.
+  if (currentVersion < 63) {
+    tryIdempotentDdl(db, 63, 'ALTER TABLE review_status ADD COLUMN review_cycle_history TEXT');
+    tryIdempotentDdl(db, 63, 'ALTER TABLE review_status ADD COLUMN conflicts_since TEXT');
   }
 
   // After all migrations, set the version

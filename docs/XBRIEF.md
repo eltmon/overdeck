@@ -519,6 +519,35 @@ The infra repo and subpath are declared per project in `projects.yaml` under `pa
 
 ---
 
+## Quality Lint and Constraints (PAN-3151)
+
+Planning applies quality-lint checks during plan finalization to catch oversized or overly fragmented changes before they reach the work agent. These checks are mechanical and fail loudly at finalize time.
+
+### Projected-surface lint
+
+When a plan's items declare `metadata.files_scope` entries, the lint counts distinct files and subsystems and enforces these thresholds:
+
+- **Maximum files:** 25 distinct files across all items' `files_scope`
+- **Maximum subsystems:** 6 distinct subsystems (extracted as the first two segments of each file path, e.g., `src/dashboard` from `src/dashboard/frontend/src/...`)
+
+A change exceeding either threshold is rejected with an error message. To override the thresholds, the plan's `metadata` object must include a non-empty `sizeJustification` string explaining why the scale is necessary.
+
+**Rationale:** Large, fragmented changes tend to create review cycles that don't converge — finding counts drop, then rise again — because there are too many independent areas to coordinate in one PR. Enforcing this limit at plan-finalize time catches oversized changes early and encourages decomposition into sibling issues.
+
+**Example override:**
+```json
+{
+  "plan": {
+    "metadata": {
+      "sizeJustification": "Dashboard redesign requires coordination across 7 subsystems (DX/UX commitment); decomposition would require async coordination and delay ship"
+    },
+    "items": [ /* ... 30 files across 7 subsystems ... */ ]
+  }
+}
+```
+
+---
+
 ## Resilience
 
 The `readPlan()` function in `src/lib/xbrief/io.ts` normalizes flat format plans to the canonical nested format for backwards compatibility. The normalizer handles:

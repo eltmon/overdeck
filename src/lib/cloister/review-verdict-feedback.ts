@@ -117,6 +117,10 @@ async function deliverReviewVerdictFeedbackPromise(
   const workspacePath = opts.workspacePath
     ?? (resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : undefined);
   const existingStatus = getReviewStatusSync(issueId);
+
+  // PAN-3151: check if review loop is stuck in non-converging state
+  const isReviewNotConverging = existingStatus?.stuckReason === 'review-not-converging';
+
   const deliveryIdentity = opts.runId
     ? `run:${opts.runId}`
     : existingStatus?.reviewedAtCommit
@@ -157,89 +161,108 @@ async function deliverReviewVerdictFeedbackPromise(
 
   let agentMessageSent = false;
   if (fileResult.success && fileResult.filePath) {
-    const message = `SPECIALIST FEEDBACK: review-agent reported ${opts.verdict.toUpperCase()} for ${issueId}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix ALL review findings. Do NOT stop at the prompt.`;
-    try {
-      // PAN-2209/PAN-2461: resolveIssueFeedbackTarget's built-in resurrection ladder
-      // (unpause pipeline pauses, clear troubled gates, resume stopped agents) handles
-      // every non-live target; no local reviver override.
-      const target = await resolveIssueFeedbackTarget(issueId, {
-        itemId: opts.slotItemId,
-      });
-      if ('agentId' in target) {
-        try {
-          // PAN-2668: a blocked/failed review verdict owes rework — re-drive a
-          // stopped-by-user agent with a completed handoff instead of queueing.
-          let deliveryOutcome;
+    if (isReviewNotConverging) {
+      // PAN-3151: review loop not converging — suppress agent re-drive, surface needs-you instead
+      const countSeries = existingStatus?.reviewCycleHistory
+        ?.map(e => e.blockingCount)
+        .join(' → ') ?? 'unknown';
+      const needsYouMessage = `Review loop not converging (cycle counts: ${countSeries}). ` +
+        `Consider decomposing the remaining work into sibling issues, or unstick to continue rework.`;
+      try {
+        await surfaceIssueFeedbackNeedsYou(issueId, needsYouMessage, {
+          specialist: 'review-agent',
+          feedbackPath: fileResult.filePath,
+          slotItemId: opts.slotItemId,
+        });
+      } catch (err) {
+        console.warn(`[review-verdict-feedback] Could not surface convergence gate for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      agentMessageSent = false;
+    } else {
+      const message = `SPECIALIST FEEDBACK: review-agent reported ${opts.verdict.toUpperCase()} for ${issueId}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix ALL review findings. Do NOT stop at the prompt.`;
+      try {
+        // PAN-2209/PAN-2461: resolveIssueFeedbackTarget's built-in resurrection ladder
+        // (unpause pipeline pauses, clear troubled gates, resume stopped agents) handles
+        // every non-live target; no local reviver override.
+        const target = await resolveIssueFeedbackTarget(issueId, {
+          itemId: opts.slotItemId,
+        });
+        if ('agentId' in target) {
           try {
-            deliveryOutcome = await messageAgent(target.agentId, message, 'internal', {
-              owesRework: true,
-              ...(dedupKey ? { dedupKey } : {}),
-            });
-          } catch (err) {
-            const reason = err instanceof Error ? err.message : String(err);
-            if (!reason.includes('cannot enforce a dedup key')) throw err;
-            // ACP and explicit Channels targets cannot enforce keyed delivery.
-            // Delivery still wins over deduplication for those transports.
-            console.warn(
-              `[review-verdict-feedback] ${target.agentId} cannot enforce keyed delivery; retrying unkeyed`,
-            );
-            deliveryOutcome = await messageAgent(
-              target.agentId,
-              message,
-              'internal',
-              { owesRework: true },
-            );
-          }
-          agentMessageSent = true;
-          let repeatedDeliveryLoop = false;
-          if (deliveryOutcome.deduplicated && dedupKey) {
-            const suppressedCount = (suppressedReviewFeedbackDeliveries.get(dedupKey) ?? 0) + 1;
-            suppressedReviewFeedbackDeliveries.set(dedupKey, suppressedCount);
-            repeatedDeliveryLoop = suppressedCount >= 2;
-            if (suppressedCount === 2) {
-              try {
-                await surfaceIssueFeedbackNeedsYou(issueId, REPEATED_DELIVERY_LOOP_MESSAGE, {
-                  specialist: 'review-agent',
-                  feedbackPath: fileResult.filePath,
-                });
-              } catch (err) {
-                console.warn(`[review-verdict-feedback] Could not surface repeated delivery loop for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
-              }
+            // PAN-2668: a blocked/failed review verdict owes rework — re-drive a
+            // stopped-by-user agent with a completed handoff instead of queueing.
+            let deliveryOutcome;
+            try {
+              deliveryOutcome = await messageAgent(target.agentId, message, 'internal', {
+                owesRework: true,
+                ...(dedupKey ? { dedupKey } : {}),
+              });
+            } catch (err) {
+              const reason = err instanceof Error ? err.message : String(err);
+              if (!reason.includes('cannot enforce a dedup key')) throw err;
+              // ACP and explicit Channels targets cannot enforce keyed delivery.
+              // Delivery still wins over deduplication for those transports.
+              console.warn(
+                `[review-verdict-feedback] ${target.agentId} cannot enforce keyed delivery; retrying unkeyed`,
+              );
+              deliveryOutcome = await messageAgent(
+                target.agentId,
+                message,
+                'internal',
+                { owesRework: true },
+              );
             }
-          } else if (dedupKey) {
-            suppressedReviewFeedbackDeliveries.delete(dedupKey);
+            agentMessageSent = true;
+            let repeatedDeliveryLoop = false;
+            if (deliveryOutcome.deduplicated && dedupKey) {
+              const suppressedCount = (suppressedReviewFeedbackDeliveries.get(dedupKey) ?? 0) + 1;
+              suppressedReviewFeedbackDeliveries.set(dedupKey, suppressedCount);
+              repeatedDeliveryLoop = suppressedCount >= 2;
+              if (suppressedCount === 2) {
+                try {
+                  await surfaceIssueFeedbackNeedsYou(issueId, REPEATED_DELIVERY_LOOP_MESSAGE, {
+                    specialist: 'review-agent',
+                    feedbackPath: fileResult.filePath,
+                  });
+                } catch (err) {
+                  console.warn(`[review-verdict-feedback] Could not surface repeated delivery loop for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+                }
+              }
+            } else if (dedupKey) {
+              suppressedReviewFeedbackDeliveries.delete(dedupKey);
+            }
+            // PAN-3074: a fresh delivery clears stale feedback-delivery state. Once
+            // repeated suppressions surface a loop, preserve that operator-visible
+            // state until a non-deduplicated delivery proves the loop ended.
+            if (!repeatedDeliveryLoop) clearFeedbackDeliveryStuck(issueId);
+          } catch (err) {
+            // PAN-2228: a resolved-but-unreachable target is a real delivery failure,
+            // not a shrug. Surface it as needs-you so the stall is visible instead of
+            // the issue silently parking with an unread feedback file.
+            const reason = err instanceof Error ? err.message : String(err);
+            console.warn(`[review-verdict-feedback] Could not message ${target.agentId}; feedback file remains available: ${reason}`);
+            try {
+              await surfaceIssueFeedbackNeedsYou(issueId, `Feedback delivery to ${target.agentId} failed: ${reason}`, {
+                specialist: 'review-agent',
+                feedbackPath: fileResult.filePath,
+                slotItemId: opts.slotItemId,
+              });
+            } catch { /* best-effort — the warn above still records the failure */ }
           }
-          // PAN-3074: a fresh delivery clears stale feedback-delivery state. Once
-          // repeated suppressions surface a loop, preserve that operator-visible
-          // state until a non-deduplicated delivery proves the loop ended.
-          if (!repeatedDeliveryLoop) clearFeedbackDeliveryStuck(issueId);
-        } catch (err) {
-          // PAN-2228: a resolved-but-unreachable target is a real delivery failure,
-          // not a shrug. Surface it as needs-you so the stall is visible instead of
-          // the issue silently parking with an unread feedback file.
-          const reason = err instanceof Error ? err.message : String(err);
-          console.warn(`[review-verdict-feedback] Could not message ${target.agentId}; feedback file remains available: ${reason}`);
+        } else {
           try {
-            await surfaceIssueFeedbackNeedsYou(issueId, `Feedback delivery to ${target.agentId} failed: ${reason}`, {
+            await surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
               specialist: 'review-agent',
               feedbackPath: fileResult.filePath,
               slotItemId: opts.slotItemId,
             });
-          } catch { /* best-effort — the warn above still records the failure */ }
+          } catch (err) {
+            console.warn(`[review-verdict-feedback] Could not mark ${issueId} as needing human attention; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
+          }
         }
-      } else {
-        try {
-          await surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
-            specialist: 'review-agent',
-            feedbackPath: fileResult.filePath,
-            slotItemId: opts.slotItemId,
-          });
-        } catch (err) {
-          console.warn(`[review-verdict-feedback] Could not mark ${issueId} as needing human attention; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
-        }
+      } catch (err) {
+        console.warn(`[review-verdict-feedback] Could not resolve a feedback target for ${issueId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
       }
-    } catch (err) {
-      console.warn(`[review-verdict-feedback] Could not resolve a feedback target for ${issueId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
     }
   } else if (!fileResult.success) {
     console.error(`[review-verdict-feedback] Failed to write feedback file for ${issueId}: ${fileResult.error}`);

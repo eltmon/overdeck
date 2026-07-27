@@ -30,7 +30,7 @@ describe('pending auto-merges schema', { timeout: 30_000 }, () => {
   it('uses current schema version and creates pending_auto_merges on fresh init', () => {
     makeTestHome('pan-pending-auto-merges-fresh');
 
-    expect(SCHEMA_VERSION).toBe(62);
+    expect(SCHEMA_VERSION).toBe(63);
     const db = getDatabase();
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
 
@@ -149,6 +149,53 @@ describe('pending auto-merges schema', { timeout: 30_000 }, () => {
       expect(db.prepare("SELECT value FROM app_settings WHERE key = 'sentinel'").get()).toEqual({ value: 'kept' });
       const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'pending_auto_merges'").get();
       expect(table).toEqual({ name: 'pending_auto_merges' });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('repairs v61 databases missing affected_criteria and started_by columns (PAN-3151 regression)', () => {
+    // PAN-3151: v61 databases may exist without affected_criteria and started_by columns
+    // if they were upgraded before these columns were added. The migration repair must run
+    // unconditionally to ensure all v61 databases have a complete schema before advancing to v62.
+    const home = makeTestHome('pan-v61-repair-regression');
+    const db = openDatabase(join(home, 'panopticon.db'));
+    try {
+      // Initialize a v61 database without the affected_criteria and started_by columns.
+      // This simulates a database that was upgraded to v61 before these columns existed.
+      initializeCurrentSchema(db);
+      db.exec('PRAGMA user_version = 61');
+      db.exec(`
+        DELETE FROM flywheel_substrate_bugs;
+        DELETE FROM agents;
+      `);
+      // Manually drop the columns if they exist to simulate the broken state
+      try { db.exec('ALTER TABLE flywheel_substrate_bugs DROP COLUMN affected_criteria'); } catch {}
+      try { db.exec('ALTER TABLE agents DROP COLUMN started_by'); } catch {}
+
+      // Verify precondition: columns are missing
+      const hasAffectedCriteria = db.prepare(
+        "SELECT name FROM pragma_table_info('flywheel_substrate_bugs') WHERE name = 'affected_criteria'"
+      ).get();
+      const hasStartedBy = db.prepare(
+        "SELECT name FROM pragma_table_info('agents') WHERE name = 'started_by'"
+      ).get();
+      expect(hasAffectedCriteria).toBeUndefined();
+      expect(hasStartedBy).toBeUndefined();
+
+      // Run migrations — the unconditional repairs should add these columns
+      runMigrations(db);
+
+      // Verify columns were added by the repair
+      const afterAffectedCriteria = db.prepare(
+        "SELECT name FROM pragma_table_info('flywheel_substrate_bugs') WHERE name = 'affected_criteria'"
+      ).get();
+      const afterStartedBy = db.prepare(
+        "SELECT name FROM pragma_table_info('agents') WHERE name = 'started_by'"
+      ).get();
+      expect(afterAffectedCriteria).toEqual({ name: 'affected_criteria' });
+      expect(afterStartedBy).toEqual({ name: 'started_by' });
+      expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
     } finally {
       db.close();
     }

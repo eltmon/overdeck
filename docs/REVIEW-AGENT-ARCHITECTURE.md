@@ -479,6 +479,34 @@ Restarting the dashboard drops subscriptions and terminal connections, but role 
 
 ---
 
+## Review convergence gate (PAN-3151)
+
+Large or fragmented changes can enter a review loop that never converges: blocking findings decrease for one cycle, then increase in the next, or stall at the same count across multiple cycles. This gate detects and blocks non-converging review loops.
+
+### Convergence rule
+
+Every time review enters the `blocked` state, the system records the blocking-finding count (from the synthesis report's "## Blocking Findings" heading count) into a `reviewCycleHistory` series. When ≥3 cycles are recorded, the series is evaluated:
+
+- **Reversal**: if the latest count > previous count (e.g., counts = [12, 7, 5, 4, **12**]), the series reversed and is flagged not-converging.
+- **Stall**: if both of the last two comparisons are non-decreases (e.g., counts = [12, 7, 5, **5**, **5**]), the series stalled and is flagged not-converging.
+- **Converging**: otherwise (e.g., counts = [12, 7, 5, 4, 2]), the series is strictly decreasing and progress is evident.
+
+When a series is flagged **not-converging**:
+1. The issue is marked `stuck` with `stuckReason: 'review-not-converging'`.
+2. Automatic rework re-drive is suppressed — feedback is written and PR comment posted, but the work agent is not messaged.
+3. A needs-you escalation surfaces with the cycle count series and guidance to either decompose the change into sibling issues or unstick to attempt rework.
+4. The dashboard renders the cycle series (e.g., "Review cycles: 12 → 7 → 5 → 4 → 12 — not converging").
+
+### Unstick escape hatch
+
+`pan unstick <issueId>` clears the stuck flag, resets the `reviewCycleHistory` to empty, and resumes the issue for rework. This is the only manual override; the gate has no TTL or automatic timeout.
+
+### Distinction from prompt-level convergence
+
+This gate is mechanical and operates on the series **across multiple review cycles**. It is distinct from the prompt-level convergence gate described in `roles/review.md:62`, which governs which findings a single reviewer can report within one pass. That gate prevents individual reviewers from overwhelming the change; this gate prevents the entire issue from spinning in a loop across cycles.
+
+---
+
 ## What this replaced
 
 The pre-role architecture used `pan review run`, source prompt templates under `src/lib/cloister/prompts/review/`, and detached reviewer/synthesis tmux sessions coordinated outside the role runner. The Role primitive migration (PAN-1048) replaced that with a single lifecycle entry point: `spawnRun(issueId, 'review')`.

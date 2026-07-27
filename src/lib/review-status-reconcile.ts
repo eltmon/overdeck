@@ -1,9 +1,16 @@
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
-import { upsertReviewStatusSync as dbUpsert } from './overdeck/review-status-sync.js';
+import { upsertReviewStatusSync as dbUpsert, markWorkspaceStuck } from './overdeck/review-status-sync.js';
 import type { readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import type { InspectionStatusFields } from './inspection-status.js';
 import type { StrikeLandingStatus } from './strike-landing.js';
 import type { ScopeDriftRecord } from './xbrief/continue-state.js';
+import type { ReviewCycleEntry } from './cloister/review-convergence.js';
+import {
+  countBlockingFindingsForRun,
+  evaluateReviewConvergence,
+  findLatestReviewRunDir,
+} from './cloister/review-convergence.js';
+import { resolveProjectFromIssueSync } from './projects.js';
 
 export interface StatusHistoryEntry {
   type: 'review' | 'test' | 'merge' | 'inspect' | 'uat' | 'release';
@@ -68,6 +75,7 @@ export interface ReviewStatus extends StrikeLandingStatus, InspectionStatusField
     atCommit?: string;
     findingsPath?: string;
   }>>;
+  reviewCycleHistory?: ReviewCycleEntry[];
 }
 
 type ReviewStatusJournal = NonNullable<ReturnType<typeof readJournalStatusSync>>;
@@ -144,7 +152,95 @@ export function reconcileJournalIntoCacheSync(
   const wasBlocked = dbStatus?.reviewStatus === 'blocked' || dbStatus?.reviewStatus === 'failed';
   const nowBlocked = reconciled.reviewStatus === 'blocked' || reconciled.reviewStatus === 'failed';
   if (nowBlocked && !wasBlocked) {
-    void hooks.deliverReviewVerdictFeedbackHostSide(issueId, reconciled);
+    // PAN-3151: record blocking-finding count and gate on convergence
+    try {
+      const project = resolveProjectFromIssueSync(issueId);
+      if (!project) {
+        console.warn(`[review-status] reconcile: cannot resolve project for ${issueId}, skipping cycle recording`);
+        void hooks.deliverReviewVerdictFeedbackHostSide(issueId, reconciled);
+      } else {
+        const issueLower = issueId.toLowerCase();
+        const workspacePath = `${project.projectPath}/workspaces/feature-${issueLower}`;
+        const reviewRunDir = findLatestReviewRunDir(workspacePath);
+
+        if (!reviewRunDir) {
+          console.warn(`[review-status] reconcile: no review run dir found for ${issueId}, skipping cycle recording`);
+          void hooks.deliverReviewVerdictFeedbackHostSide(issueId, reconciled);
+        } else {
+          const blockingCount = countBlockingFindingsForRun(reviewRunDir);
+          if (blockingCount === null) {
+            console.warn(`[review-status] reconcile: cannot count findings for ${issueId}, skipping cycle recording`);
+            void hooks.deliverReviewVerdictFeedbackHostSide(issueId, reconciled);
+          } else {
+            // Use full directory basename as runId (format: agent-*-review-*)
+            const runDirName = reviewRunDir.split('/').pop() ?? '';
+            const runId = runDirName;
+
+            // Ensure reviewCycleHistory is initialized
+            if (!reconciled.reviewCycleHistory) {
+              reconciled.reviewCycleHistory = [];
+            }
+
+            // Deduplicate by runId: if already recorded, skip appending
+            const cycleNumber = reconciled.reviewCycleHistory.length + 1;
+            const alreadyRecorded = reconciled.reviewCycleHistory.some(e => e.runId === runId);
+
+            if (!alreadyRecorded) {
+              const entry: ReviewCycleEntry = {
+                cycle: cycleNumber,
+                runId,
+                atCommit: reconciled.reviewedAtCommit,
+                blockingCount,
+                recordedAt: new Date().toISOString(),
+              };
+              reconciled.reviewCycleHistory.push(entry);
+
+              // Persist the appended cycle
+              try {
+                dbUpsert(reconciled);
+              } catch {
+                // Non-fatal: read-only DB
+              }
+            }
+
+            // Evaluate convergence
+            const counts = reconciled.reviewCycleHistory.map(e => e.blockingCount);
+            const convergence = evaluateReviewConvergence(counts);
+
+            if (convergence === 'not-converging') {
+              // Gate engaged: mark stuck and emit error activity, skip feedback hook
+              markWorkspaceStuck(issueId, 'review-not-converging', { counts });
+              reconciled.stuck = true;
+              reconciled.stuckReason = 'review-not-converging';
+              reconciled.stuckAt = new Date().toISOString();
+              reconciled.stuckDetails = JSON.stringify({ counts });
+
+              // Persist stuck state
+              try {
+                dbUpsert(reconciled);
+              } catch {
+                // Non-fatal: read-only DB
+              }
+
+              // Emit error-level activity
+              const countSeries = counts.join(' → ');
+              console.error(
+                `[review-status] reconcile: review loop not converging for ${issueId}: ${countSeries}. ` +
+                  `Consider decomposition (split the remaining work), or unstick to continue rework.`,
+              );
+              // TODO: emit activity entry to pipeline when activity recording is ready
+            } else {
+              // Converging: invoke feedback hook as normal
+              void hooks.deliverReviewVerdictFeedbackHostSide(issueId, reconciled);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`[review-status] reconcile: cycle recording error for ${issueId}:`, error);
+      // On any error, still deliver feedback (don't gate on an exception)
+      void hooks.deliverReviewVerdictFeedbackHostSide(issueId, reconciled);
+    }
   }
 
   const wasReviewPassed = dbStatus?.reviewStatus === 'passed';
