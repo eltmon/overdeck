@@ -49,15 +49,7 @@
       "timestamp": "2026-07-27T12:32:20.054Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "test-agent",
-      "outcome": "failed",
-      "timestamp": "2026-07-27T12:32:20Z",
-      "markdownBody": "# Test failure\n\nWorkspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3154, branch feature/pan-3154, HEAD 2fbbaba87b (matches record.reviewedAtCommit). Ran: npm run typecheck (PASSED - root, hooks, evals, dashboard 62 known/0 new, frontend 0 known/0 new), npx vitest run --configLoader runner full suite (PASSED - 1243 files/11558 tests passed, 3 files/50 tests skipped, 0 failed), npx vitest run on the three PAN-3154-specific unit test files (conflict-gate.test.ts, branch-invalidation.test.ts, review-status-sync.test.ts) individually (PASSED - 58/58). npm run lint FAILED at the lint:file-size step: 'src/cli/commands/start.ts is 1277 lines (allowed 1276)'. Verified this is NOT caused by PAN-3154's own changes: `git log $(git merge-base HEAD origin/main)..HEAD -- src/cli/commands/start.ts` is empty (this branch never touched the file); `git diff origin/main HEAD -- src/cli/commands/start.ts` shows the branch is missing a provenance/startedBy feature that landed on main after this branch's base, net +1 line from unrelated formatting drift. This is main-drift staleness on an unrelated file, not a PAN-3154 defect, but the gate genuinely fails as configured today and blocks the pipeline until the branch rebases onto current origin/main (or gets an audited allowlist entry). UAT: not required - PAN-3154 is backend-only (deacon patrol, conflict-gate probe, review-status/DB schema plumbing, docs); its own PRD lists 'No dedicated dashboard badge for conflictsSince' as an explicit NonGoal, and no acceptance criteria reference UI/dashboard behavior. No browser verification performed.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-3154`."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -118,7 +110,7 @@
     "recordedAt": "2026-07-27T12:29:11.863Z"
   },
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T12:36:20.230Z",
+  "updated": "2026-07-27T12:36:20.944Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "passed",
