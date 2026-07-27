@@ -54,7 +54,7 @@
     "recordedAt": "2026-07-27T06:16:25.496Z"
   },
   "created": "2026-07-27T04:42:41.037Z",
-  "updated": "2026-07-27T06:42:36.435Z",
+  "updated": "2026-07-27T06:42:39.107Z",
   "pipeline": {
     "issueId": "PAN-3194",
     "reviewStatus": "passed",
@@ -62,9 +62,9 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T06:17:16.404Z",
-    "updatedAt": "2026-07-27T06:42:36.118Z",
+    "updatedAt": "2026-07-27T06:42:36.155Z",
     "reviewNotes": "No blocking findings; transcript-verified lifecycle probes and fresh-spawn decisions satisfy the acceptance criteria.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3200",
@@ -122,10 +122,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 26,
-            "output": 5039,
-            "cacheRead": 1705186,
-            "cacheWrite": 162808
+            "input": 28,
+            "output": 5831,
+            "cacheRead": 1867994,
+            "cacheWrite": 163712
           }
         },
         "work": {
@@ -145,15 +145,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 26,
-          "output": 5039,
-          "cacheRead": 1705186,
-          "cacheWrite": 162808
+          "input": 28,
+          "output": 5831,
+          "cacheRead": 1867994,
+          "cacheWrite": 163712
         }
       },
       "costAtCloseOut": {
-        "usd": 56.517026,
-        "pricingAsOf": "2026-07-27T06:42:36.297Z"
+        "usd": 56.559772,
+        "pricingAsOf": "2026-07-27T06:42:39.079Z"
       }
     },
     "merges": [
