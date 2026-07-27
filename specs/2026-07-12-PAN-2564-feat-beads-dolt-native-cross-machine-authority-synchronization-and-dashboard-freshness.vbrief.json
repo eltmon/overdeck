@@ -4,17 +4,17 @@
     "created": "2026-07-12T17:58:54.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2564: feat(beads): Dolt-native cross-machine authority, synchronization, and dashboard freshness",
-    "updated": "2026-07-12T18:09:02.771Z"
+    "updated": "2026-07-27T16:39:14.998Z"
   },
   "plan": {
     "id": "pan-2564",
     "title": "feat(beads): Dolt-native cross-machine authority, synchronization, and dashboard freshness",
-    "status": "proposed",
+    "status": "completed",
     "uid": "29d8320f-fb6c-4b0f-835d-cd8c4f2c6502",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-12T17:58:54.000Z",
-    "updated": "2026-07-12T18:09:02.771Z",
+    "updated": "2026-07-27T16:39:14.998Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2564",
@@ -1444,5 +1444,5 @@
       "canonicalFilename": "2026-07-12-PAN-2564-feat-beads-dolt-native-cross-machine-authority-synchronization-and-dashboard-freshness.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
