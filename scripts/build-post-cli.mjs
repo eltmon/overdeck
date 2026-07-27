@@ -71,6 +71,12 @@ process.on('SIGTERM', () => {
 
 try {
   await Promise.all(tasks.map(runTask));
+  // PAN-3209: the last step of the build, once every bundle is on disk. Fails
+  // the build if any emitted dist chunk imports a package that package.json
+  // does not declare as a runtime dependency — the state that shipped a
+  // `dist/` importing an undeclared `posthog-node` and crashed `npx
+  // @overdeck/core` with ERR_MODULE_NOT_FOUND.
+  await runTask('lint:dist-externals');
 } catch (error) {
   stopChildren();
   console.error(error instanceof Error ? error.message : String(error));

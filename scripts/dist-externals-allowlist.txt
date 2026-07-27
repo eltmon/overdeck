@@ -1,0 +1,10 @@
+# Packages that dist/ may import without a package.json "dependencies" entry.
+#
+# Format: <package>  # <ISSUE-REF> <why this is safe>
+#
+# An entry only belongs here when the import is deliberately optional AND its
+# call site degrades gracefully when the package is absent. Anything else is a
+# missing dependency — add it to "dependencies" instead. See PAN-3209 and
+# scripts/lint-dist-externals.mjs.
+
+playwright  # PAN-1645 — externalized on purpose (bundling it drags in playwright-core's coreBundle.js and its unresolvable chromium-bidi require). Loaded only by `await import('playwright')` in src/lib/artifacts/thumbnails.ts, whose caller catches the failure and returns a placeholder thumbnail, so an install without playwright loses artifact thumbnails rather than crashing.
