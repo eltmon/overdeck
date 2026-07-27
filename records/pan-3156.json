@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-26T20:09:18.080Z",
-  "updated": "2026-07-27T00:53:55.691Z",
+  "updated": "2026-07-27T01:03:58.356Z",
   "pipeline": {
     "issueId": "PAN-3156",
     "reviewStatus": "pending",
@@ -43,5 +43,15 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5"
+  "model": "claude-opus-5",
+  "recoveryTrips": [
+    {
+      "issue": "PAN-3156",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-27T00:53:55.668Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-27T01:03:58.354Z"
+    }
+  ]
 }
