@@ -1,0 +1,435 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-27T04:50:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3194: Resume probes trust stored sessionId without verifying the transcript exists — missing JSONL crash-loops agents into troubled",
+    "updated": "2026-07-27T05:03:15.436Z"
+  },
+  "plan": {
+    "id": "pan-3194",
+    "title": "Resume probes trust stored sessionId without verifying the transcript exists — missing JSONL crash-loops agents into troubled",
+    "status": "proposed",
+    "uid": "3eddd972-77e3-41bf-bed5-34197b9f8839",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-27T04:50:00.000Z",
+    "updated": "2026-07-27T05:03:15.436Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3194",
+        "label": "PAN-3194",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "agents",
+      "resume",
+      "deacon",
+      "lifecycle",
+      "regression"
+    ],
+    "narratives": {
+      "Problem": "Resume probes (pan start's fresh-refusal, the /has-session route + stopped-agent listing, and the deacon auto-resume spawn decision) infer resumability from the presence of a stored sessionId and never verify the Claude JSONL transcript exists at sessionFilePath(workspace, sessionId). agent-pan-2876 crash-looped 3x into troubled: transcript resolution logged reason=jsonl-missing at every patrol while pan start refused fresh-less starts and auto-resume attempted --resume against the missing transcript, dying before kickoff delivery each time. PAN-2895 added an in-resumeAgent missing-transcript recovery (fresh-launch + pointer clearing) but it has no test coverage, the probe-level lie is unfixed, and the incident build's live dashboard predated even that recovery.",
+      "Proposal": "Introduce one shared predicate claudeSessionTranscriptExists(cwd, sessionId) in src/lib/paths.ts and use it at every probe point: (1) work-agent-lifecycle.ts sync + async snapshots compute an additive hasResumableTranscript flag (claude-code/unset harness only) so a missing transcript yields recommendedAction 'start', canStartFresh true, canResumeSession false — pan start proceeds fresh without --fresh; (2) buildStoppedAgentLifecycle in the dashboard listing applies the same probe; (3) the spawn-mode decision in resume.ts is extracted behavior-preservingly into a pure decideResumeSpawnPlan module with unit tests locking the missing-transcript → fresh-launch + pointer-clearing path so no launch crash can accrue to the troubled counter; (4) docs/AGENT-STATE-PLANES.md documents transcript-verified resumability. Probes stay read-only; clearAgentSessionPointers in resumeAgent remains the only mutation point. PAN-1980 rotation refusal semantics are preserved (drift + missing transcript still refuses).",
+      "NonGoals": "- Changing PAN-1980 session-rotation refusal semantics: model/harness drift combined with a missing transcript still refuses and leaves the agent stopped for an operator decision.\n- Transcript verification for codex, ohmypi, or acp resume targets (codex/ohmypi already resolve ids from on-disk artifacts; acp is a follow-up).\n- Clearing or mutating session.id / sessions.json / runtime.json from any read path (lifecycle resolvers, listing builders, routes).\n- Deploying the dashboard build — the DoD deploy row owns getting the merged fix onto the live server (see hazard H1).\n- Reworking the async Effect getLatestSessionId resolver (activity.ts:220) to add the codex/acp/ohmypi branches the sync variant has."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Missing transcript routes to fresh-spawn without clearing pointers on read (issue offered 'fresh-spawn OR mark stale and clear')",
+        "rationale": "Read doors must not write; resumeAgent's existing clearAgentSessionPointers is the single mutation point and a fresh spawn overwrites session.id anyway, so read-path clearing adds risk with no benefit."
+      },
+      {
+        "summary": "Transcript probe applies only to claude-code/unset harness",
+        "rationale": "The issue is Claude-JSONL-specific; codex thread ids and ohmypi session ids are already resolved from on-disk artifacts, and checking them against a Claude JSONL path would false-negative every stopped non-Claude agent."
+      },
+      {
+        "summary": "Drift + missing transcript keeps the PAN-1980 rotation refusal",
+        "rationale": "The refusal is a deliberate operator checkpoint protecting against silent session rotation; the incident shape (plain resume, no drift) is fully covered without widening recovery semantics."
+      },
+      {
+        "summary": "FR-3 regression lock uses a new pure decideResumeSpawnPlan module rather than a full resumeAgent mock harness",
+        "rationale": "resumeAgent's ~25-import dependency surface is always wholesale-mocked in existing tests; a behavior-preserving pure extraction gives the same decision coverage without fragility, matching the repo's split-pure-logic pattern."
+      },
+      {
+        "summary": "hasSavedSession semantics unchanged; new additive hasResumableTranscript field on WorkAgentLifecycleState",
+        "rationale": "The no-loss rule: dashboard hasSession, dispatch-gate, unpause, and listing consumers keep their current contract while the probe result is available for future surfaces."
+      }
+    ],
+    "items": [
+      {
+        "id": "transcript-probe-predicate",
+        "title": "Add claudeSessionTranscriptExists predicate to paths.ts and adopt it in resume.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3194",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "lifecycle-probe-verifies-transcript",
+            "stopped-listing-probe",
+            "resume-spawn-plan-decider"
+          ],
+          "files_scope": [
+            "src/lib/paths.ts",
+            "src/lib/agents/resume.ts",
+            "src/lib/__tests__/paths.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/paths.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "paths tests pass including new present/absent transcript cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `claudeSessionTranscriptExists(cwd: string, sessionId: string): boolean` to src/lib/paths.ts next to sessionFilePath (line 286), implemented as `existsSync(sessionFilePath(cwd, sessionId))` with a doc comment naming it the single existence check every resume probe must use (PAN-3194, mirrors jsonl-resolver's jsonl-missing detection). existsSync is already imported in paths.ts — verify and extend the node:fs import if not. In src/lib/agents/resume.ts replace the inline `!existsSync(expectedClaudeJsonl)` at lines 354-358 with `!claudeSessionTranscriptExists(agentState.workspace, sessionId)`, keeping `expectedClaudeJsonl` for the log line at 362 and keeping resume.ts's existsSync import (still used at lines 144, 280, 288). Extend src/lib/__tests__/paths.test.ts with present/absent cases (mock node:fs existsSync per-path, or a real temp file under a mocked os.homedir). Behavior-preserving: no other resume.ts logic changes."
+        },
+        "items": [
+          {
+            "id": "transcript-probe-predicate.ac1",
+            "title": "paths.ts exports claudeSessionTranscriptExists that returns true when sessionFilePath(cwd, sessionId) exists on disk and false when it does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-probe-predicate.ac2",
+            "title": "resume.ts computes claudeJsonlMissingRecovery via the shared predicate and preserves the existing log line and clearAgentSessionPointers call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-probe-predicate.ac3",
+            "title": "npx vitest run src/lib/__tests__/paths.test.ts passes with new cases covering both a present and an absent transcript",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lifecycle-probe-verifies-transcript",
+        "title": "Verify transcript existence in work-agent-lifecycle probes (sync + async snapshot)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3194",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/work-agent-lifecycle.ts",
+            "src/lib/__tests__/work-agent-lifecycle-transcript-probe.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/work-agent-lifecycle-transcript-probe.test.ts",
+            "npx vitest run src/lib/__tests__/work-agent-lifecycle-resume-truth.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new transcript-probe tests pass for missing/present/non-claude cases in both variants",
+            "PAN-806 resume-truth tests still pass unmodified",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In BOTH getWorkAgentLifecycleStateSync (src/lib/work-agent-lifecycle.ts:48) and getWorkAgentLifecycleStateSnapshot (line 131): bind the resolved session id to a variable (the snapshot currently discards it at line 136 — change `!!(await ...getLatestSessionId)` to keep the id), then compute `hasResumableTranscript`: true when there is no saved session, when harness is set and not 'claude-code' (FR-4), or when no workspace is recorded; otherwise `claudeSessionTranscriptExists(agentState.workspace, sessionId)`. Replace `hasSavedSession` with `hasSavedSession && hasResumableTranscript` in requiresSessionResetBeforeFreshStart (lines 72, 152), canResumeSession (lines 122, 204), and canResetSession (lines 124, 206). Add a recommendedAction branch before the `hasAgentState && !hasSavedSession && isStopped` branch: when `hasSavedSession && !hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed)` → recommendedAction 'start' with reason `Agent <id> has a saved Claude session id but its transcript is missing on disk (jsonl-missing). Start Agent will create a fresh session in the existing workspace.` Add `hasResumableTranscript: boolean` to the WorkAgentLifecycleState interface and return it (additive; hasSavedSession keeps its meaning). Do NOT clear session pointers here (NFR-1). Create src/lib/__tests__/work-agent-lifecycle-transcript-probe.test.ts modeled on work-agent-lifecycle-resume-truth.test.ts's mock style (vi.mock ../agents.js, ../tmux.js) but with a path-aware node:fs existsSync mock returning false for .jsonl paths in the missing case. Do NOT modify the PAN-806 test file (hazard H5)."
+        },
+        "items": [
+          {
+            "id": "lifecycle-probe-verifies-transcript.ac1",
+            "title": "Given a stopped claude-code agent whose stored session id has no JSONL at sessionFilePath, getWorkAgentLifecycleStateSync returns recommendedAction 'start', canStartFresh true, canResumeSession false, requiresSessionResetBeforeFreshStart false, hasResumableTranscript false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-probe-verifies-transcript.ac2",
+            "title": "Given the same agent with the JSONL present on disk, the sync probe returns recommendedAction 'resume' and canResumeSession true (prior behavior preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-probe-verifies-transcript.ac3",
+            "title": "assertCanStartFreshSync returns the lifecycle state without throwing for the missing-transcript agent, so pan start proceeds fresh without --fresh",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-probe-verifies-transcript.ac4",
+            "title": "Given a stopped codex-harness agent with a stored id and no Claude JSONL, canResumeSession stays true (harness gate, FR-4)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-probe-verifies-transcript.ac5",
+            "title": "The async getWorkAgentLifecycleState snapshot produces the same flags as the sync variant for the missing and present cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stopped-listing-probe",
+        "title": "Apply the transcript probe in buildStoppedAgentLifecycle (dashboard stopped-agent listing)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3194",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/shared.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/routes"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "dashboard route test suites pass with the new missing-transcript coverage"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/agents/shared.ts, buildStoppedAgentLifecycle (line 247) duplicates the lifecycle math for the stopped-agent listing and has the same gap at line 255 (`hasSavedSession = !!runtimeData.claudeSessionId || !!getLatestSessionIdSync(agentId)`). Resolve the id once (`getLatestSessionIdSync(agentId) ?? runtimeData.claudeSessionId ?? null`), gate on harness (`state.harness` unset or 'claude-code'), compute hasResumableTranscript with claudeSessionTranscriptExists when state.workspace is present, and use `hasSavedSession && hasResumableTranscript` in its requiresSessionResetBeforeFreshStart (line 270), its canResumeSession expression (same shape, further down the builder), and add the same recommendedAction 'start' + jsonl-missing reason branch as work-item lifecycle-probe-verifies-transcript. Add test coverage in the nearest existing suite exercising this builder (search tests/unit/dashboard/server/routes/ for listing/shared tests; create shared.test.ts next to it only if none exists): missing transcript → recommendedAction 'start' and non-resumable flags; present transcript → resume offer preserved."
+        },
+        "items": [
+          {
+            "id": "stopped-listing-probe.ac1",
+            "title": "buildStoppedAgentLifecycle returns recommendedAction 'start', requiresSessionResetBeforeFreshStart false, and canResumeSession false for a stopped claude-code agent whose transcript is missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stopped-listing-probe.ac2",
+            "title": "buildStoppedAgentLifecycle returns recommendedAction 'resume' for a stopped claude-code agent whose transcript exists on disk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stopped-listing-probe.ac3",
+            "title": "The npx vitest run for tests/unit/dashboard/server/routes exits 0 with zero failures in the listing and shared suites after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resume-spawn-plan-decider",
+        "title": "Extract decideResumeSpawnPlan pure module from resume.ts and lock the missing-transcript fresh-launch path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3194",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/resume-spawn-plan.ts",
+            "src/lib/agents/resume.ts",
+            "src/lib/agents/__tests__/resume-spawn-plan.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/resume-spawn-plan.test.ts",
+            "npx vitest run src/lib/agents/__tests__/resume.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pure decider tests pass for all five spawn-plan cases",
+            "existing resume-adjacent suites pass unchanged",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "resumeAgent has no direct unit tests (its ~25-import surface is always mocked wholesale, e.g. message-agent-interventions.test.ts:74). Lock FR-3 by extracting the decision at src/lib/agents/resume.ts:337-395 into a new pure module src/lib/agents/resume-spawn-plan.ts exporting `decideResumeSpawnPlan(input: ResumeSpawnPlanInput): ResumeSpawnPlan` with input { harness, compactSeed: boolean, driftReasons: string[], piProcessWasAlive: boolean, transcriptExists: boolean, allowExplicitRecovery: boolean } and output { mode: 'resume-saved' | 'fresh', freshReason?: 'compact' | 'drift' | 'pi-dead-recovery' | 'claude-jsonl-missing', clearSessionPointers: boolean, rotationRefused: boolean }. Preserve exact current precedence: compact → PAN-1980 rotation refusal (drift) → pi-dead-recovery → claude-jsonl-missing (clearSessionPointers true only here) → resume-saved; keep sessionRotationRefused semantics including allowExplicitRecovery, and keep the drift+missing refusal (decision D3). resume.ts calls the decider and keeps ALL side effects (logging, clearAgentSessionPointers, saveSessionId, launcher build) in place. Write src/lib/agents/__tests__/resume-spawn-plan.test.ts with no mocks covering the five cases."
+        },
+        "items": [
+          {
+            "id": "resume-spawn-plan-decider.ac1",
+            "title": "Given claude-code harness, no compact seed, no drift reasons, and transcriptExists false, decideResumeSpawnPlan returns mode 'fresh', freshReason 'claude-jsonl-missing', clearSessionPointers true, rotationRefused false — so no --resume launch is attempted and no launch-crash failure can accrue to the troubled counter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-spawn-plan-decider.ac2",
+            "title": "Given claude-code harness, no compact seed, no drift reasons, and transcriptExists true, decideResumeSpawnPlan returns mode 'resume-saved'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-spawn-plan-decider.ac3",
+            "title": "Given non-empty driftReasons with transcriptExists true (and with transcriptExists false), decideResumeSpawnPlan returns rotationRefused true (PAN-1980 semantics preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-spawn-plan-decider.ac4",
+            "title": "Given compactSeed true, decideResumeSpawnPlan returns mode 'fresh' with freshReason 'compact'; given ohmypi harness with piProcessWasAlive false and no drift/compact, it returns mode 'fresh' with freshReason 'pi-dead-recovery'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-spawn-plan-decider.ac5",
+            "title": "resume.ts imports and calls decideResumeSpawnPlan from resume-spawn-plan.ts, npm run typecheck completes without errors, and npx vitest run src/lib/agents/__tests__/resume.test.ts exits 0 (behavior-preserving extraction)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-agent-state-planes",
+        "title": "Document transcript-verified resumability in docs/AGENT-STATE-PLANES.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-27T04:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3194",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/AGENT-STATE-PLANES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Transcript-verified resumability' docs/AGENT-STATE-PLANES.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new section heading in docs/AGENT-STATE-PLANES.md"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a 'Transcript-verified resumability (PAN-3194)' section to docs/AGENT-STATE-PLANES.md covering: (a) every resume probe verifies the JSONL at sessionFilePath(workspace, sessionId) via claudeSessionTranscriptExists in src/lib/paths.ts before claiming resumable; (b) the three probe surfaces — pan start fresh-refusal via work-agent-lifecycle.ts, /api/agents/:id/has-session + stopped listing via canResumeSession / buildStoppedAgentLifecycle, and deacon auto-resume via resumeAgent's spawn plan; (c) a missing transcript routes to fresh spawn, and pointer clearing is owned by resumeAgent's recovery path (clearAgentSessionPointers) — never by read paths. No Mintlify page or CLAUDE.md section documents resume probes, so this is the only doc touched."
+        },
+        "items": [
+          {
+            "id": "docs-agent-state-planes.ac1",
+            "title": "docs/AGENT-STATE-PLANES.md contains a 'Transcript-verified resumability (PAN-3194)' section naming claudeSessionTranscriptExists and the three probe surfaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agent-state-planes.ac2",
+            "title": "The section states that a missing transcript routes to fresh spawn and that read paths never clear session pointers (clearing is owned by resumeAgent's recovery)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "transcript-probe-predicate",
+        "to": "lifecycle-probe-verifies-transcript",
+        "type": "blocks"
+      },
+      {
+        "from": "transcript-probe-predicate",
+        "to": "stopped-listing-probe",
+        "type": "blocks"
+      },
+      {
+        "from": "transcript-probe-predicate",
+        "to": "resume-spawn-plan-decider",
+        "type": "blocks"
+      },
+      {
+        "from": "lifecycle-probe-verifies-transcript",
+        "to": "docs-agent-state-planes",
+        "type": "blocks"
+      },
+      {
+        "from": "resume-spawn-plan-decider",
+        "to": "docs-agent-state-planes",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-27-PAN-3194-resume-probes-trust-stored-sessionid-without-verifying-the-transcript-exists-missing-jsonl-crash-loops-agents-into-troubled.xbrief.json"
+    }
+  },
+  "status": "proposed"
+}
