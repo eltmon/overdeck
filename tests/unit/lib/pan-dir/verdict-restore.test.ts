@@ -342,6 +342,7 @@ describe('restoreReviewStatusFromRecords', () => {
       'merge_step',
       'release_status',
       'release_notes',
+      'review_cycle_history',
     ]);
 
     // Columns re-derived live or computed by the write path after restore
