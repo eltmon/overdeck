@@ -241,7 +241,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:26:05.061Z",
+  "updated": "2026-07-27T14:26:10.600Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
@@ -251,9 +251,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:26:04.299Z",
+    "updatedAt": "2026-07-27T14:26:10.589Z",
     "reviewNotes": "main already ships schema version 62, so merged PAN-3151 skips review_cycle_history on existing v62 databases",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
+    "reviewedAtCommit": "d31e1b54458f16a5789b52b8bf26e4d895f9e500",
     "reviewSpawnedAt": "2026-07-27T14:19:37.995Z"
   },
   "closeOut": {
@@ -320,7 +321,7 @@
       },
       "costAtCloseOut": {
         "usd": 204.5146433,
-        "pricingAsOf": "2026-07-27T14:26:04.319Z"
+        "pricingAsOf": "2026-07-27T14:26:10.595Z"
       }
     },
     "merges": [
