@@ -17,7 +17,7 @@ import { fetchWithTimeout } from '../../lib/apiFetch';
 import { useConversationPaneChoice } from '../../lib/useConversationPaneChoice';
 import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
-import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
+import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, SubagentSummary, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import {
   useComposerStore,
   useConversationOptimistic,
@@ -35,6 +35,7 @@ import { useConversationMutations } from '../CommandDeck/useConversationMutation
 import { ForkModal } from '../CommandDeck/ForkModal';
 import { closeConversationPanes } from '../../lib/panesStore';
 import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
+import { SubagentRail } from './SubagentRail';
 import { useComposerDeliveryState } from './useComposerDeliveryState';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -998,14 +999,11 @@ export function ConversationPanel({
         </div>
       )}
 
-      {/* Body — conversation + optional diff panel */}
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <div className={styles.conversationTerminalBody}>
-          {/* Terminal: only mounted when actively viewing (xterm.js crashes with visibility:hidden) */}
           {showTerminal && effectiveViewMode === 'terminal' && (
             <XTerminal sessionName={conversation.tmuxSession} />
           )}
-          {/* Conversation view — shown when in conversation mode, diff mode, or session ended */}
           {(effectiveViewMode === 'conversation' || !showTerminal) && (
             <ConversationView
               conversation={conversation}
@@ -1053,7 +1051,6 @@ export function ConversationPanel({
             />
           )}
         </div>
-        {/* Diff side panel — rendered when ?diff=1 is in the URL */}
         {diffOpen && diffData?.summaries && (
           <DiffWorkerPoolProvider>
             <DiffPanel
@@ -1065,6 +1062,7 @@ export function ConversationPanel({
             />
           </DiffWorkerPoolProvider>
         )}
+        <SubagentRail conversation={conversation} subagents={messagesData?.subagents ?? []} resolvedTheme={resolvedTheme} />
       </div>
 
       {convMutations.forkTarget && (
@@ -1166,6 +1164,7 @@ interface MessagesResponse {
   compactBoundaries?: CompactBoundary[];
   compacting?: boolean;
   contextUsage?: ContextUsage | null;
+  subagents?: SubagentSummary[];
   /** Server-side resolution failure to surface in the panel (e.g. the live
    * session could not be resolved from the launcher). Rendered as a banner. */
   error?: string;
