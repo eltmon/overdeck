@@ -291,17 +291,18 @@
     "recordedAt": "2026-07-27T06:51:31.024Z"
   },
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T07:42:33.367Z",
+  "updated": "2026-07-27T08:07:20.911Z",
   "pipeline": {
     "issueId": "PAN-2876",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T07:42:31.383Z",
+    "updatedAt": "2026-07-27T08:07:20.872Z",
     "reviewNotes": "Approved: AC-4 cache cleanup and transient metadata retry are fixed; no blocking findings remain",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs verified: contracts builds clean (tsdown), rpc.test.ts 3/3 pass covering subagents event decode, subscribeConversationMessages payload with+without agentId, and ConversationResponse with+without subagents (legacy shape still decodes); root npm run typecheck passes with chat-types.ts ConversationEvent extended. Note (non-blocking): ConversationResponse moved from interface to Schema.Struct so arrays are now ReadonlyArray — no consumer broke today, watch it if a caller ever mutates the result in place.",
@@ -403,10 +404,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 2514,
-            "output": 45990,
-            "cacheRead": 22624570,
-            "cacheWrite": 285796
+            "input": 2516,
+            "output": 46171,
+            "cacheRead": 22910366,
+            "cacheWrite": 286936
           }
         },
         "work": {
@@ -438,15 +439,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2514,
-          "output": 45990,
-          "cacheRead": 22624570,
-          "cacheWrite": 285796
+          "input": 2516,
+          "output": 46171,
+          "cacheRead": 22910366,
+          "cacheWrite": 286936
         }
       },
       "costAtCloseOut": {
-        "usd": 137.010879,
-        "pricingAsOf": "2026-07-27T07:42:33.356Z"
+        "usd": 137.072702,
+        "pricingAsOf": "2026-07-27T08:07:20.896Z"
       }
     },
     "merges": [
