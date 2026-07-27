@@ -223,7 +223,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:19:35.495Z",
+  "updated": "2026-07-27T14:19:37.978Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -233,8 +233,15 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:19:33.876Z",
+    "updatedAt": "2026-07-27T14:19:37.004Z",
     "reviewNotes": "Agent re-review request (7/25): Merged with origin/main: resolved conflicts preserving both PAN-3151 (review_cycle_history, unconditional v61 repairs) and PAN-3154 (conflicts_since) features",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-27T14:13:03.586Z"
+      }
+    ],
     "conflictsSince": {
       "sha": "050c54fb3ec155db17aaa23ddcba7a05d3f345a4",
       "detectedAt": "2026-07-27T14:08:42.556Z",
@@ -314,7 +321,7 @@
       },
       "costAtCloseOut": {
         "usd": 184.8690813,
-        "pricingAsOf": "2026-07-27T14:19:35.490Z"
+        "pricingAsOf": "2026-07-27T14:19:37.031Z"
       }
     },
     "merges": [
