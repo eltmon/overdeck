@@ -134,15 +134,7 @@
       "timestamp": "2026-07-27T13:47:24.138Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T13:47:24Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nv61 migration repair now works but lacks the required regression test that fails on the two prior broken implementations\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -231,7 +223,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T13:52:38.631Z",
+  "updated": "2026-07-27T13:52:41.080Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -241,7 +233,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T13:52:37.113Z",
+    "updatedAt": "2026-07-27T13:52:40.441Z",
     "reviewNotes": "Agent re-review request (6/25): Added regression test for v61 repair (affected_criteria and started_by columns)",
     "conflictsSince": {
       "sha": "5ae5d217844e7391d328cfee02c7cc0431b1c18c",
@@ -323,7 +315,7 @@
       },
       "costAtCloseOut": {
         "usd": 169.8325283,
-        "pricingAsOf": "2026-07-27T13:52:38.628Z"
+        "pricingAsOf": "2026-07-27T13:52:40.539Z"
       }
     },
     "merges": [
