@@ -46,6 +46,7 @@ export function agentStateToDbAgent(state: AgentState): DbAgent {
     lastFailureReason: state.lastFailureReason ?? null,
     lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
     flywheelRunId: state.flywheelRunId ?? null,
+    startedBy: state.startedBy ?? null,
     roleRunHead: state.roleRunHead ?? null,
     reviewSubRole: state.reviewSubRole ?? null,
     reviewRunId: state.reviewRunId ?? null,

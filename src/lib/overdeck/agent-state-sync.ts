@@ -36,6 +36,7 @@ type OverdeckAgentRow = {
   phase: string | null;
   role_run_head: string | null;
   flywheel_run_id: string | null;
+  started_by: string | null;
   cost_so_far: number | null;
   review_sub_role: string | null;
   review_run_id: string | null;
@@ -91,6 +92,7 @@ export const AGENT_COLUMNS_FOR_DB = [
   'phase',
   'role_run_head',
   'flywheel_run_id',
+  'started_by',
   'cost_so_far',
   'review_sub_role',
   'review_run_id',
@@ -170,6 +172,7 @@ function overdeckRowToAgentState(row: OverdeckAgentRow): AgentState {
     phase: row.phase == null ? undefined : (row.phase as AgentState['phase']),
     roleRunHead: row.role_run_head ?? undefined,
     flywheelRunId: row.flywheel_run_id ?? undefined,
+    startedBy: row.started_by ?? undefined,
     costSoFar: row.cost_so_far ?? undefined,
     reviewSubRole: row.review_sub_role ?? undefined,
     reviewRunId: row.review_run_id ?? undefined,
@@ -224,6 +227,7 @@ export function stateToOverdeckParamsForDb(state: AgentState, updatedAt: number)
     state.phase ?? null,
     state.roleRunHead ?? null,
     state.flywheelRunId ?? null,
+    state.startedBy ?? null,
     state.costSoFar ?? null,
     state.reviewSubRole ?? null,
     state.reviewRunId ?? null,

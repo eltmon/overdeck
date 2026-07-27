@@ -132,17 +132,13 @@ vi.mock('../../lifecycle/workflows.js', async () => {
   const { Effect } = await import('effect');
   return { closeOut: vi.fn(() => Effect.succeed({ success: true, steps: [] })) };
 });
-vi.mock('../../paths.js', () => ({
+vi.mock('../../paths.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../paths.js')>()),
   getOverdeckHome: () => '/tmp/test-overdeck',
   OVERDECK_HOME: '/tmp/test-overdeck',
   AGENTS_DIR: '/tmp/test-agents',
   COSTS_DIR: '/tmp/test-costs',
   packageRoot: '/tmp/test-package-root',
-  PROJECT_DOCS_SUBDIR: 'docs',
-  PROJECT_PRDS_SUBDIR: 'prds',
-  PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
-  PROJECT_PRDS_PLANNED_SUBDIR: 'planned',
-  PROJECT_PRDS_COMPLETED_SUBDIR: 'completed',
 }));
 vi.mock('../../persistent-logger.js', () => ({ logAgentLifecycle: vi.fn(), logDeaconEvent: vi.fn() }));
 vi.mock('../../projects.js', () => ({

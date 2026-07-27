@@ -280,6 +280,7 @@ describe('PAN-2341 orphan journal reconcile before re-dispatch', () => {
     expect(mocks.spawnRun).toHaveBeenCalledWith('PAN-3004', 'test', {
       workspace: '/repo/workspaces/feature-pan-3004',
       prompt: 'test prompt',
+      startedBy: 'deacon:orphan-test-recovery',
     });
     expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-3004', { testStatus: 'testing' });
   });

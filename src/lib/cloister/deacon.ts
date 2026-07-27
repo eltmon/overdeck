@@ -1310,13 +1310,13 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
         logDeaconEventSync(`checkPendingTestDispatch: deferred test for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
         continue;
       }
-
       const { spawnRun } = await import('../agents.js');
       const { buildTestRolePrompt } = await import('./test-agent-queue.js');
       try {
         const run = await spawnRun(issueId, 'test', {
           workspace,
           prompt: buildTestRolePrompt({ issueId, workspace, branch }),
+          startedBy: 'deacon:test-retry',
         });
         setReviewStatusSync(issueId, { testStatus: 'testing', testRetryCount: retryCount + 1 });
         recordDeaconNudge({

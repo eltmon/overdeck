@@ -71,6 +71,7 @@ const COLUMN_MAP: Record<keyof DbAgent, string> = {
   lastFailureReason: 'last_failure_reason',
   lastFailureNextRetryAt: 'last_failure_next_retry_at',
   flywheelRunId: 'flywheel_run_id',
+  startedBy: 'started_by',
   roleRunHead: 'role_run_head',
   reviewSubRole: 'review_sub_role',
   reviewRunId: 'review_run_id',

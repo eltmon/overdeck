@@ -130,6 +130,7 @@ export async function spawnSequencerAgent(
     model,
     allowHost: true,
     registerConversation: true,
+    startedBy: 'backlog-sequencer',
   });
 }
 

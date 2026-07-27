@@ -4,7 +4,7 @@ import { access, appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { spawnPanCommandDetached } from '../../../dashboard/server/routes/agents/shared.js';
+import { resolveRequestedStartedBy, spawnPanCommandDetached } from '../../../dashboard/server/routes/agents/shared.js';
 import type { EmitActivityOptions } from '../../activity-logger.js';
 import {
   launchPanCommandDetached,
@@ -28,6 +28,12 @@ async function emitSpawnWhenReady(
 }
 
 describe('detached composer command execution', () => {
+  it('derives browser provenance and preserves allowlisted internal callers', () => {
+    expect(resolveRequestedStartedBy(undefined)).toBe('operator:dashboard');
+    expect(resolveRequestedStartedBy(' orphan-proposed-reconciler ')).toBe('operator:dashboard');
+    expect(resolveRequestedStartedBy(' orphan-proposed-reconciler ', true)).toBe('orphan-proposed-reconciler');
+  });
+
   let overdeckHome: string;
 
   beforeEach(async () => {
@@ -185,6 +191,7 @@ describe('detached composer command execution', () => {
       role: 'work',
       workspacePath: '/tmp/pan-42',
       args: ['start', 'PAN-42'],
+      env: { OVERDECK_AGENT_STARTED_BY: 'operator:dashboard' },
     }, {
       now: () => 9999,
       overdeckHome,
@@ -192,6 +199,9 @@ describe('detached composer command execution', () => {
     });
 
     await emitSpawnWhenReady(spawnPanCli, child);
+    expect(spawnPanCli.mock.calls[0][1]).toEqual(expect.objectContaining({
+      env: expect.objectContaining({ OVERDECK_AGENT_STARTED_BY: 'operator:dashboard' }),
+    }));
     let resolved = false;
     void resultPromise.then(() => { resolved = true; });
     await Promise.resolve();

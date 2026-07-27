@@ -93,6 +93,7 @@ Boundaries:
     const run = await spawnRun(issueId, 'test', {
       workspace,
       prompt,
+      startedBy: 'test-agent-queue',
     });
 
     setReviewStatusSync(issueId, { testStatus: 'testing' });
@@ -186,7 +187,7 @@ export const dispatchTestAgentAndNotify = (
     }
 
     const spawnProgram: Effect.Effect<DispatchTestAgentResult, never> = Effect.tryPromise({
-      try: () => spawnRun(issueId, 'test', { workspace, prompt }),
+      try: () => spawnRun(issueId, 'test', { workspace, prompt, startedBy: 'test-agent-queue' }),
       catch: (cause) => {
         const msg = cause instanceof Error ? cause.message : String(cause);
         return new TestDispatchError({ issueId, message: msg, cause });

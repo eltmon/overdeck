@@ -120,7 +120,7 @@ export async function buildCompactRecoverySeed(agentId: string): Promise<{ seed:
   };
 }
 
-export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean; recoverGated?: boolean; resumeCause?: ResumeCause }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
+export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean; recoverGated?: boolean; startedBy?: string; resumeCause?: ResumeCause }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
   const requestedModel = normalizeModelOverrideSync(opts?.model);
   logAgentLifecycleSync(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'}, harness=${opts?.harness || 'unchanged'})`);
@@ -308,6 +308,8 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
 
   try {
     const resumeStartedAt = new Date().toISOString();
+    const startedBy = opts?.startedBy?.trim() || agentState.startedBy?.trim() || 'resume-agent';
+    agentState.startedBy = startedBy;
     // Clear ready signal before resuming (clean slate for PAN-87 fix)
     clearReadySignal(normalizedId);
 
@@ -443,6 +445,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
         OVERDECK_AGENT_ID: normalizedId,
         OVERDECK_ISSUE_ID: agentState.issueId || '',
         OVERDECK_SESSION_TYPE: agentState.role,
+        OVERDECK_AGENT_STARTED_BY: startedBy,
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...providerEnv
       }

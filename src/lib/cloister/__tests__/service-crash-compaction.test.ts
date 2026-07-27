@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   sendMessage: vi.fn().mockResolvedValue(undefined),
+  spawnAgent: vi.fn(),
+  saveAgentStateSync: vi.fn(),
+  getAgentStateSync: vi.fn(() => null as any),
 }));
 
 vi.mock('node:child_process', () => ({
@@ -16,7 +19,8 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('../../../lib/agents.js', () => ({
   getAgentRuntimeStateSync: vi.fn(),
-  getAgentStateSync: vi.fn(() => null),
+  getAgentStateSync: mocks.getAgentStateSync,
+  saveAgentStateSync: mocks.saveAgentStateSync,
 }));
 
 vi.mock('../../../lib/overdeck/control-settings.js', () => ({
@@ -25,7 +29,9 @@ vi.mock('../../../lib/overdeck/control-settings.js', () => ({
 
 vi.mock('../../../lib/runtimes/index.js', () => ({
   getRuntimeForAgent: vi.fn(() => ({
+    name: 'claude-code',
     sendMessage: mocks.sendMessage,
+    spawnAgent: mocks.spawnAgent,
   })),
 }));
 
@@ -33,13 +39,29 @@ vi.mock('../../../lib/tmux.js', () => ({
   exactPaneTarget: vi.fn((agentId: string) => agentId),
 }));
 
-import { pokeAgentWithEscalation } from '../service-crash.js';
+import { pokeAgentWithEscalation, restartAgent } from '../service-crash.js';
 import { orchestratedCompactionContinuations } from '../orchestrated-compaction.js';
 
 describe('idle-alive compaction escalation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     orchestratedCompactionContinuations.clear();
+  });
+
+  it('stamps crash respawn provenance in state and runtime environment', async () => {
+    mocks.getAgentStateSync.mockReturnValue({
+      id: 'agent-pan-2899',
+      issueId: 'PAN-2899',
+      workspace: '/repo/workspaces/feature-pan-2899',
+      sessionId: 'session-1234',
+    });
+
+    await restartAgent({} as any, 'agent-pan-2899');
+
+    expect(mocks.saveAgentStateSync).toHaveBeenCalledWith(expect.objectContaining({ startedBy: 'deacon:crash-respawn' }));
+    expect(mocks.spawnAgent).toHaveBeenCalledWith(expect.objectContaining({
+      env: { OVERDECK_AGENT_STARTED_BY: 'deacon:crash-respawn' },
+    }));
   });
 
   it('registers a continuation before delivering slash compact', async () => {

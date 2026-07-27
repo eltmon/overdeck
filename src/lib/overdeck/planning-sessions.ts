@@ -131,9 +131,10 @@ export function startPlanningForIssue(options: {
   github: any;
   rally: any;
   lifecycle: any;
+  startedBy: string;
 }) {
   return Effect.gen(function* () {
-    const { id, body, eventStore, linear, github, rally, lifecycle } = options;
+    const { id, body, eventStore, linear, github, rally, lifecycle, startedBy } = options;
     const {
       skipWorkspace = false,
       startDocker = false,
@@ -316,6 +317,7 @@ export function startPlanningForIssue(options: {
         role: 'plan',
         model: '',
         auto: auto === true,
+        startedBy,
       });
       return Promise.resolve();
     });
@@ -402,6 +404,7 @@ export function startPlanningForIssue(options: {
             auto: auto === true,
             probe: probe === true,
             autoSpawnOnFinalize: autoStart === true,
+            startedBy,
             onProgress: (event) => {
               console.log(`[start-planning] Progress: step=${event.step} label="${event.label}" status=${event.status} detail="${event.detail}"`);
               sendEvent({ type: 'progress', ...event });

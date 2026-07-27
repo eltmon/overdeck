@@ -102,6 +102,8 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
   }
 
   beforeEach(() => {
+    delete process.env['OVERDECK_AGENT_STARTED_BY'];
+    delete process.env['OVERDECK_FLYWHEEL_RUN_ID'];
     tmpDir = mkdtempSync(join(tmpdir(), 'pan-2407-running-'));
 
     lifecycleMocks.getWorkAgentLifecycleStateSync.mockReset();
@@ -176,10 +178,33 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
     await expect(issueCommand('PAN-X', { model: '' } as any)).resolves.toBeUndefined();
 
     expect(process.exitCode).toBe(0);
+    expect(process.env['OVERDECK_AGENT_STARTED_BY']).toBe('operator:cli:pan-start');
     const written = allConsoleOutput(consoleLogSpy);
     expect(written).toMatch(/already running/);
     expect(written).toMatch(/pan tell PAN-X/);
     expect(written).toMatch(/tmux -L overdeck attach -t agent-pan-x/);
+  });
+
+  it('derives flywheel provenance from an inherited run id', async () => {
+    process.env['OVERDECK_FLYWHEEL_RUN_ID'] = 'RUN-82';
+    agentMocks.getAgentStateSync.mockReturnValue({ id: 'agent-pan-x', issueId: 'PAN-X', paused: false, troubled: false });
+    mockLifecycle({ isRunning: true, isRunningButStuck: false });
+
+    const { issueCommand } = await import('../start.js');
+    await issueCommand('PAN-X', { model: '' } as any);
+
+    expect(process.env['OVERDECK_AGENT_STARTED_BY']).toBe('flywheel:RUN-82');
+  });
+
+  it('preserves inherited route provenance', async () => {
+    process.env['OVERDECK_AGENT_STARTED_BY'] = 'orphan-proposed-reconciler';
+    agentMocks.getAgentStateSync.mockReturnValue({ id: 'agent-pan-x', issueId: 'PAN-X', paused: false, troubled: false });
+    mockLifecycle({ isRunning: true, isRunningButStuck: false });
+
+    const { issueCommand } = await import('../start.js');
+    await issueCommand('PAN-X', { model: '' } as any);
+
+    expect(process.env['OVERDECK_AGENT_STARTED_BY']).toBe('orphan-proposed-reconciler');
   });
 
   it('preserves exit 1 and pause refusal when the agent is paused', async () => {
