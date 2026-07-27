@@ -64,7 +64,7 @@ export interface PanIssueCloseOutRecord {
     evaluatedAt: string;
     rows: DodRowResult[];
     accepted: string[];
-    /** PAN-3211: present when the issue left the pipeline via an abandoned disposition instead of the DoD gate. */
+    /** PAN-3211: set when the issue left via an abandoned disposition, not the gate. */
     disposition?: { reason: string; by: string };
   };
 }

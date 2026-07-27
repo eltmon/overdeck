@@ -42,7 +42,7 @@ import {
   resolvePipelineTelemetryContext,
   type PipelineTelemetryContext,
 } from '../telemetry/pipeline.js';
-import { acceptFlagFor, BRANCH_ABSENT_MERGE_ERROR, DOD_ROWS, type DodGateResult, type DodRowId } from './dod.js';
+import { acceptFlagFor, BRANCH_ABSENT_MERGE_ERROR, buildAbandonedDodGate, DOD_ROWS, type DodGateResult, type DodRowId } from './dod.js';
 
 const execAsync = promisify(exec);
 
@@ -192,22 +192,10 @@ export function closeOut(
     allSteps.push(uatEvidenceStep);
 
     // 1. Evaluate every pre-teardown Definition-of-Done row before any cleanup.
-    // PAN-3211: an abandoned disposition skips the gate — the issue is leaving
-    // the pipeline on the operator's recorded note, not on landing evidence.
-    // Every row is recorded as skipped-with-reason so the durable audit shows
-    // the gate was deliberately not evaluated, never silently green.
+    // PAN-3211: an abandoned disposition skips the gate entirely (PAN-3211).
     const abandon = opts.abandonDisposition;
     const dodGate: DodGateResult = abandon
-      ? {
-          rows: DOD_ROWS.map(row => ({
-            ...row,
-            status: 'skip' as const,
-            observed: `gate not evaluated — abandoned disposition recorded by ${abandon.by}: ${abandon.reason}`,
-          })),
-          misses: [] as DodRowId[],
-          accepted: [] as DodRowId[],
-          passed: true,
-        }
+      ? buildAbandonedDodGate(abandon.reason, abandon.by)
       : yield* Effect.promise(() => evaluateDodGate(ctx, {
           acceptedRows: opts.dodAcceptedRows,
           acceptedBy: opts.dodAcceptedBy,
