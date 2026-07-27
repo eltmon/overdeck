@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:30:47.797Z",
-  "updated": "2026-07-27T06:16:36.977Z",
+  "updated": "2026-07-27T06:16:39.711Z",
   "pipeline": {
     "issueId": "PAN-3183",
     "reviewStatus": "pending",
@@ -25,7 +25,52 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T04:50:32.895Z"
+    "updatedAt": "2026-07-27T06:16:39.709Z",
+    "reviewRequestedAt": "2026-07-27T06:16:39.709Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "src/dashboard/server/services/boot-reconciled-stop-events.ts",
+        "tests/unit/dashboard/server/services/agent-state-service.test.ts",
+        "tests/unit/lib/reconstruct/no-loss-superset.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        ".pan/audits/PAN-3183-agents-table-writers.md",
+        "src/cli/commands/db.ts"
+      ],
+      "declaredScope": [
+        ".pan/audits/PAN-3183-agents-table-writers.md",
+        "docs/AGENT-STATE-PLANES.md",
+        "scripts/lint-state-writes.sh",
+        "src/cli/commands/db.ts",
+        "src/dashboard/server/read-model.ts",
+        "src/dashboard/server/services/agent-state-service.ts",
+        "src/lib/database/agent-backfill.ts",
+        "src/lib/overdeck/agents.ts",
+        "src/lib/reconstruct/reconstruct-cache.ts",
+        "tests/unit/dashboard/server/reconstruct-boot.test.ts",
+        "tests/unit/lib/database/agent-backfill.test.ts",
+        "tests/unit/lib/overdeck/backfill-agents-fk.test.ts",
+        "tests/unit/lib/reconstruct/reconstruct-cache.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/AGENT-STATE-PLANES.md",
+        "scripts/lint-state-writes.sh",
+        "src/dashboard/server/read-model.ts",
+        "src/dashboard/server/services/agent-state-service.ts",
+        "src/dashboard/server/services/boot-reconciled-stop-events.ts",
+        "src/lib/database/agent-backfill.ts",
+        "src/lib/overdeck/agents.ts",
+        "src/lib/reconstruct/reconstruct-cache.ts",
+        "tests/unit/dashboard/server/reconstruct-boot.test.ts",
+        "tests/unit/dashboard/server/services/agent-state-service.test.ts",
+        "tests/unit/lib/database/agent-backfill.test.ts",
+        "tests/unit/lib/overdeck/backfill-agents-fk.test.ts",
+        "tests/unit/lib/reconstruct/no-loss-superset.test.ts",
+        "tests/unit/lib/reconstruct/reconstruct-cache.test.ts"
+      ],
+      "recordedAt": "2026-07-27T06:16:36.976Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3201"
   },
   "closeOut": {
     "usage": {
