@@ -9,6 +9,7 @@ const {
   mockSessionExists,
   mockListSessionNames,
   mockUpdateIssueRecord,
+  mockListOverdeckAgentStatesSync,
 } = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
   mockResolveProjectFromIssueSync: vi.fn(),
@@ -17,6 +18,7 @@ const {
   mockSessionExists: vi.fn(),
   mockListSessionNames: vi.fn(),
   mockUpdateIssueRecord: vi.fn().mockResolvedValue(undefined),
+  mockListOverdeckAgentStatesSync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -30,6 +32,10 @@ vi.mock('../../../../src/lib/pan-dir/record.js', () => ({
 
 vi.mock('../../../../src/lib/pan-dir/record-update.js', () => ({
   updateIssueRecord: mockUpdateIssueRecord,
+}));
+
+vi.mock('../../../../src/lib/overdeck/agent-state-sync.js', () => ({
+  listOverdeckAgentStatesSync: mockListOverdeckAgentStatesSync,
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
@@ -55,6 +61,7 @@ describe('resolveIssueFeedbackTarget', () => {
     mockResolveProjectFromIssueSync.mockReturnValue({ projectKey: 'test', projectPath: '/repo' });
     mockGetProjectSync.mockReturnValue({ name: 'Test', path: '/repo' });
     mockListSessionNames.mockReturnValue([]);
+    mockListOverdeckAgentStatesSync.mockReturnValue([]);
     mockReadIssueRecordSync.mockReturnValue({
       issueId: 'PAN-2214',
       schemaVersion: 2,
@@ -128,6 +135,45 @@ describe('resolveIssueFeedbackTarget', () => {
       'PAN-2214',
       expect.any(Function),
     );
+  });
+
+  it('routes feedback to a live agents-table work session missing from slot assignments', async () => {
+    const registeredAgentId = 'agent-pan-2214-slot-7';
+    const revive = vi.fn().mockResolvedValue(false);
+    mockListOverdeckAgentStatesSync.mockReturnValue([
+      { id: registeredAgentId, issueId: 'PAN-2214' },
+    ]);
+    mockSessionExists.mockImplementation((agentId: string) => agentId === registeredAgentId);
+
+    await expect(resolveIssueFeedbackTarget('PAN-2214', {
+      revivePipelinePausedAgent: revive,
+    })).resolves.toEqual({ agentId: registeredAgentId });
+
+    expect(revive).not.toHaveBeenCalled();
+    expect(mockMarkWorkspaceStuck).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'agent-pan-2214-review',
+    'agent-pan-2214-test',
+    'agent-pan-2214-inspect',
+    'agent-pan-2214-ship',
+    'agent-pan-2214-plan',
+    'conv-pan-2214',
+    'planning-pan-2214',
+  ])('does not route feedback to the non-work session %s', async (registeredAgentId) => {
+    const revive = vi.fn().mockResolvedValue(false);
+    mockListOverdeckAgentStatesSync.mockReturnValue([
+      { id: registeredAgentId, issueId: 'PAN-2214' },
+    ]);
+    mockSessionExists.mockImplementation((agentId: string) => agentId === registeredAgentId);
+
+    const target = await resolveIssueFeedbackTarget('PAN-2214', {
+      revivePipelinePausedAgent: revive,
+    });
+
+    expect(target).toMatchObject({ needsYou: true });
+    expect(target).not.toEqual({ agentId: registeredAgentId });
   });
 
   it('surfaces needs-you feedback as a stuck workspace marker', async () => {

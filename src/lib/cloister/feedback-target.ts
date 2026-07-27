@@ -19,6 +19,12 @@ async function isLiveSession(agentId: string): Promise<boolean> {
   return Effect.runPromise(sessionExists(agentId));
 }
 
+function isWorkFeedbackTarget(agentId: string): boolean {
+  const normalizedId = agentId.toLowerCase();
+  if (normalizedId.startsWith('conv-') || normalizedId.startsWith('planning-')) return false;
+  return !/-(?:review|test|inspect|ship|plan)$/.test(normalizedId);
+}
+
 function slotAgentId(issueId: string, slotIndex: number, assignedAgentId?: string): string {
   return assignedAgentId ?? `agent-${issueId.toLowerCase()}-slot-${slotIndex}`;
 }
@@ -99,6 +105,18 @@ export async function resolveIssueFeedbackTarget(
       await updateIssueRecord(project, normalizedIssue, (current) => selfHealSlotAssignment(current, fallback.agentId, fallback.slotIndex, requestedItemId));
       return { agentId: fallback.agentId };
     }
+  }
+
+  try {
+    const { listOverdeckAgentStatesSync } = await import('../overdeck/agent-state-sync.js');
+    const registeredAgents = listOverdeckAgentStatesSync();
+    for (const agent of registeredAgents) {
+      if (agent.issueId?.toUpperCase() !== normalizedIssue) continue;
+      if (!isWorkFeedbackTarget(agent.id)) continue;
+      if (await isLiveSession(agent.id)) return { agentId: agent.id };
+    }
+  } catch {
+    // The agents table is a recovery tier; preserve the resurrection ladder if unavailable.
   }
 
   // PAN-2209 + PAN-2461 — resurrection-first delivery (operator directive 2026-07-11):
