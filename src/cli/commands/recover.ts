@@ -6,6 +6,7 @@ import {
   recoverAgent,
   autoRecoverAgents,
   normalizeAgentId,
+  resolveAgentTargetSync,
   resumeAgent,
 } from '../../lib/agents.js';
 
@@ -86,8 +87,16 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
       return;
     }
 
-    // Recover specific agent. Preserve known prefixes; bare PAN-NNN gets the work prefix.
-    const agentId = normalizeAgentId(id);
+    // Recover specific agent. Preserve known prefixes; resolve a bare issue ID
+    // against the agents actually registered for it.
+    //
+    // PAN-3150: prefixing blindly with `agent-` made every non-work agent
+    // unreachable — `pan recover PAN-3150` reported "Agent not found:
+    // agent-pan-3150" while the issue's only agent was `strike-pan-3150`, so the
+    // strike namespace had no recovery door at all. resolveAgentTargetSync still
+    // prefers the canonical work agent when one exists, and falls back to the
+    // single registered agent for the issue whatever its prefix.
+    const agentId = resolveAgentTargetSync(id) ?? normalizeAgentId(id);
     spinner.text = options.model
       ? `Recovering ${agentId} on ${options.model}...`
       : `Recovering ${agentId}...`;
