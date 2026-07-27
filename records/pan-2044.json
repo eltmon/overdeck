@@ -76,7 +76,6 @@
     }
   ],
   "resumePoint": null,
-  "beadsMapping": {},
   "sessionHistory": [
     {
       "timestamp": "2026-06-24T16:25:24.065Z",
@@ -91,24 +90,45 @@
     }
   ],
   "feedback": [],
+  "beadsMapping": {},
   "created": "2026-06-24T16:16:16.756Z",
-  "updated": "2026-07-13T03:18:01.574Z",
+  "updated": "2026-07-27T16:32:06.158Z",
   "pipeline": {
     "issueId": "PAN-2044",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "inspectStatus": "passed",
-    "mergeStatus": "merged",
+    "verificationStatus": "passed",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T03:18:01.574Z",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2048",
-    "lastVerifiedCommit": "8438f38c9c4f1b9717243bce0faafe7038191603",
     "closedOut": true,
-    "closedOutAt": "2026-07-13T03:18:01.574Z"
+    "closedOutAt": "2026-07-13T03:18:01.574Z",
+    "updatedAt": "2026-07-27T16:32:06.118Z",
+    "verificationNotes": "uat-promotion: operator UAT of batch uat/pan-quartz-0625 promoted to main (PAN-3114)",
+    "lastVerifiedCommit": "1dfebd971ea0f7a9ff3e005925d1e12737c248ee"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "implementation": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 10,
+            "output": 1366,
+            "cacheRead": 322474,
+            "cacheWrite": 85445
+          },
+          "anthropic/claude-opus-4-8": {
+            "input": 206,
+            "output": 10033,
+            "cacheRead": 574973,
+            "cacheWrite": 16757
+          },
+          "anthropic/claude-sonnet-4-6": {
+            "input": 9,
+            "output": 987,
+            "cacheRead": 446905,
+            "cacheWrite": 78886
+          }
+        },
         "inspect-deep": {
           "anthropic/claude-sonnet-4-6": {
             "input": 55,
@@ -119,8 +139,8 @@
         },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 9699,
-            "output": 674,
+            "input": 10701,
+            "output": 832,
             "cacheRead": 0,
             "cacheWrite": 0
           }
@@ -135,10 +155,10 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 48,
-            "output": 5389,
-            "cacheRead": 1420811,
-            "cacheWrite": 133436
+            "input": 105,
+            "output": 10808,
+            "cacheRead": 3542774,
+            "cacheWrite": 272870
           }
         },
         "work": {
@@ -149,48 +169,48 @@
             "cacheWrite": 773850
           },
           "custom/glm-5.2": {
-            "input": 45305,
-            "output": 8924,
-            "cacheRead": 644480,
+            "input": 221940,
+            "output": 30844,
+            "cacheRead": 2641472,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 115,
+          "output": 12174,
+          "cacheRead": 3865248,
+          "cacheWrite": 358315
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 33709,
+          "output": 85006,
+          "cacheRead": 6748446,
+          "cacheWrite": 320550
+        },
         "anthropic/claude-sonnet-4-6": {
-          "input": 396,
-          "output": 112941,
-          "cacheRead": 45369258,
-          "cacheWrite": 868021
+          "input": 405,
+          "output": 113928,
+          "cacheRead": 45816163,
+          "cacheWrite": 946907
         },
         "cliproxy/gpt-5.4-mini": {
-          "input": 9699,
-          "output": 674,
+          "input": 10701,
+          "output": 832,
           "cacheRead": 0,
           "cacheWrite": 0
         },
-        "anthropic/claude-opus-4-8": {
-          "input": 33503,
-          "output": 74973,
-          "cacheRead": 6173473,
-          "cacheWrite": 303793
-        },
-        "anthropic/claude-haiku-4-5-20251001": {
-          "input": 48,
-          "output": 5389,
-          "cacheRead": 1420811,
-          "cacheWrite": 133436
-        },
         "custom/glm-5.2": {
-          "input": 45305,
-          "output": 8924,
-          "cacheRead": 644480,
+          "input": 221940,
+          "output": 30844,
+          "cacheRead": 2641472,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 26.091463,
-        "pricingAsOf": "2026-06-25T11:37:42.880Z"
+        "usd": 28.283232,
+        "pricingAsOf": "2026-07-27T16:32:06.153Z"
       }
     },
     "merges": [
