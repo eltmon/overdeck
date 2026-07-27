@@ -10,11 +10,11 @@ this table and that module from drifting silently.
 
 | # | Gate ID | Step | Mechanical owner | Visible at |
 | --- | --- | --- | --- | --- |
-| 1 | `review` | Review passed (mode per issue policy; full = convoy + synthesis) | review role → `pan admin specialists done review` → review-status write door | `reviewStatus: passed` |
-| 2 | `tests` | Tests passed (incl. browser UAT when required) | test role → `pan admin specialists done test` | `testStatus: passed` |
+| 1 | `review` | Review passed (mode per issue policy; full = convoy + synthesis); a strike-landed issue records the row skipped-by-strike because no review specialist is dispatched for a strike (PAN-3180) | review role → `pan admin specialists done review` → review-status write door | `reviewStatus: passed`, or `skip` naming `strikeLandingState: landed` |
+| 2 | `tests` | Tests passed (incl. browser UAT when required); a strike-landed issue records the row skipped-by-strike because no test specialist is dispatched for a strike (PAN-3180) | test role → `pan admin specialists done test` | `testStatus: passed`, or `skip` naming `strikeLandingState: landed` |
 | 3 | `verification` | Verification green on the branch (typecheck, lint, suite, build) | supervised verification worker (`verification-runner.ts` / `verification-worker.ts`); uat-promotion (recorded at batch promotion, PAN-3114) | `verificationStatus: passed` (or `skipped` per issue policy) |
 | 4 | `merged` | Merged to main: forge/durable merge evidence resolved through either convention head (`feature/<id>` or `strike/<id>`), including forge squash-merge detection; or a non-PR landing where the shared L2-work lens finds at least one convention-branch ref contained in its repository's default branch with the tip off the first-parent line and zero unmerged refs across all configured repositories | merge door: `triggerMerge` → merge specialist (`merge-agent.ts`); fallback: `gatherIssueBranchContainment()` | PR `MERGED`, `mergeStatus: merged`, or branch-containment evidence |
-| 5 | `post-merge` | Post-merge handoff: work/planning agents paused, workspace Docker stack + networks stopped, `verifying-on-main` label; for a containment-evidenced non-PR landing, passes when no work/planning agents are running because no observed merge event could trigger the lifecycle | `postMergeLifecycle()` (`merge-agent.ts`) — at-most-once per merge (PAN-328 in-flight guard); DoD containment fallback | issue labels, agent states |
+| 5 | `post-merge` | Post-merge handoff: work/planning agents paused, workspace Docker stack + networks stopped, `verifying-on-main` label; for a containment-evidenced non-PR landing, passes when no work/planning agents are running because no observed merge event could trigger the lifecycle; for a strike landing, skips on the same quiescence test because the strike path never runs the work-agent handoff (PAN-3180) | `postMergeLifecycle()` (`merge-agent.ts`) — at-most-once per merge (PAN-328 in-flight guard); DoD containment and strike fallbacks | issue labels, agent states |
 | 6 | `main-verify` | Verified on main (post-merge verification of the merged commit) | deacon verify-on-main flow | `verifying_on_main` → verified |
 | 7 | `deploy` | **Deployed: the live dashboard runs a canonical build that includes the merge.** When the `merged` row misses without resolving a merge commit, this row skips and reports its row-4 dependency instead of recording a second miss. | staleness-gated Step 0 (`merge-agent.ts`) + Deacon deploy patrol (`deploy-patrol.ts`) + deploy intent queue (`pending-deploy.json`), guarded by `getDeployBlockReason()` | `/api/health` `buildCommit`, `buildDirty`, and `buildBranch` + stale-build chip; the row misses when the build is dirty or `buildCommit` is not an ancestor of `origin/main` |
 | 8 | `teardown` | Close-out: worktree removed, branches per `close_out` config, xBRIEF `plan.status: completed`, planning artifacts archived, tracker issue CLOSED + `closed-out` label, review status cleared, Docker `_devnet` teardown verified | `pan close <id>` / dashboard Close Out (`closeOut`); closed-issue reaper (`reapIssueResidue`) as backstop | issue state, `workspaces/` dir |
@@ -49,6 +49,16 @@ this table and that module from drifting silently.
   non-terminal member at promote time, and close-out heals members of batches promoted before
   that write path existed (PAN-3114). The row still reports the anchor's presence or absence,
   so a reader never has to guess which condition a miss came from.
+- **A strike skips rows 1, 2 and 5; it never passes them** (PAN-3180). Bypassing review and
+  test is the entire point of the strike path, so "never ran" and "still outstanding" are
+  different facts and the gate now tells them apart. The waiver keys on
+  `strikeLandingState: landed` — the merge door's own durable statement that the work reached
+  main through `strike/<id>`, mirrored into the per-issue record's `pipeline` block. Every
+  earlier landing state is a strike still in flight and earns nothing; a specialist that ran
+  and returned `failed`/`blocked`/`dispatch_failed` still blocks, because a rejection is not
+  an absence; and a live work or planning agent still misses row 5. The rows land in the
+  close-out record as `skip` with an observed string naming the strike path, so a reader can
+  always tell a strike-landed issue from a fully-reviewed one.
 
 ## Related
 
