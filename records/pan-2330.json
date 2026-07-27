@@ -2,15 +2,15 @@
   "issueId": "PAN-2330",
   "schemaVersion": 2,
   "created": "2026-07-03T21:50:12.975Z",
-  "updated": "2026-07-06T13:57:44.938Z",
+  "updated": "2026-07-27T16:40:15.760Z",
   "pipeline": {
     "issueId": "PAN-2330",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-06T13:57:44.938Z",
+    "updatedAt": "2026-07-27T16:40:15.750Z",
     "closedOut": true,
-    "closedOutAt": "2026-07-06T13:57:44.938Z",
+    "closedOutAt": "2026-07-27T16:40:15.750Z",
     "mergeStatus": "merged"
   },
   "closeOut": {
@@ -19,7 +19,80 @@
       "totals": {}
     },
     "merges": [],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T16:40:15.760Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: missing (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "PR #2340 is squash-merged and strike/pan-2330 matches the merged PR head; PR #2340 is squash-merged and origin/strike/pan-2330 matches the merged PR head; Superseded feature/pan-2330 residual: Feature branch is absent; positive merge evidence is required; PR #2340 MERGED at 2026-07-04T00:41:48Z",
+          "status": "pass",
+          "mergedAt": "2026-07-04T00:41:48Z",
+          "mergeCommit": "88dc5dcae23d95fbe706e1766f83a55ca2c8c888"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "6 check-runs concluded successfully on 88dc5dcae23d95fbe706e1766f83a55ca2c8c888",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit d44fa122 contains merge 88dc5dca",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; Preserved local branch strike/pan-2330 — not merged to main; Preserved remote branch strike/pan-2330 — not merged to main; Pruned 0 checkpoint ref(s) for agent-pan-2330, planning-pan-2330, strike-pan-2330; No specialist registry entries for PAN-2330"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "codex",
   "model": "gpt-5.5"
