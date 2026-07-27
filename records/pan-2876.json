@@ -291,17 +291,17 @@
     "recordedAt": "2026-07-27T06:51:31.024Z"
   },
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T07:17:17.108Z",
+  "updated": "2026-07-27T07:17:24.082Z",
   "pipeline": {
     "issueId": "PAN-2876",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T07:17:15.981Z",
+    "updatedAt": "2026-07-27T07:17:24.071Z",
     "reviewNotes": "Approved: AC-4 cache cleanup and transient metadata retry are fixed; no blocking findings remain",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs verified: contracts builds clean (tsdown), rpc.test.ts 3/3 pass covering subagents event decode, subscribeConversationMessages payload with+without agentId, and ConversationResponse with+without subagents (legacy shape still decodes); root npm run typecheck passes with chat-types.ts ConversationEvent extended. Note (non-blocking): ConversationResponse moved from interface to Schema.Struct so arrays are now ReadonlyArray — no consumer broke today, watch it if a caller ever mutates the result in place.",
@@ -395,9 +395,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2230711,
-            "output": 134195,
-            "cacheRead": 23182336,
+            "input": 2239336,
+            "output": 137875,
+            "cacheRead": 24272384,
             "cacheWrite": 0
           }
         },
@@ -424,15 +424,15 @@
           "cacheWrite": 133023
         },
         "openai/gpt-5.6-sol": {
-          "input": 4784299,
-          "output": 401626,
-          "cacheRead": 179025920,
+          "input": 4792924,
+          "output": 405306,
+          "cacheRead": 180115968,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 130.607997,
-        "pricingAsOf": "2026-07-27T07:17:16.070Z"
+        "usd": 131.306546,
+        "pricingAsOf": "2026-07-27T07:17:24.076Z"
       }
     },
     "merges": [
@@ -441,7 +441,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 20,
