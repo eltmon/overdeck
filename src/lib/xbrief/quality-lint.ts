@@ -35,6 +35,9 @@ export const DOCS_ONLY_AC_PATTERNS = ['docs updated', 'documentation updated', '
 export const VAGUE_AC_PATTERNS = ['displays a message', 'handles errors', 'is implemented', 'is updated', 'passes tests', 'shows a message', 'updates the ui', 'works as expected', 'make it work', 'implement the feature', 'change the code', 'update the code'];
 export const OBSERVABLE_TERMS = ['blocks', 'creates', 'deletes', 'displays', 'emits', 'fails', 'persists', 'records', 'redirects', 'rejects', 'renders', 'returns', 'saves', 'shows', 'stores', 'updates', 'validates', 'exits', 'prints', 'logs', 'throws', 'spawns', 'opens', 'closes', 'sends', 'receives', 'resolves', 'refuses', 'marks', 'syncs', 'commits', 'pushes', 'accepts', 'applies', 'collapses', 'contains', 'covers', 'defaults to', 'falls back', 'preserves', 'produces', 'passes', 'respects', 'routes', 'survives', 'wins', 'when ', 'given ', 'then '];
 
+export const PROJECTED_SURFACE_MAX_FILES = 25;
+export const PROJECTED_SURFACE_MAX_SUBSYSTEMS = 6;
+
 const BANNED_AC_PATTERNS = [
   ...PLACEHOLDER_AC_PATTERNS,
   ...DOCS_ONLY_AC_PATTERNS,
@@ -338,8 +341,54 @@ function hasBlocksCycle(doc: XBriefDocument): boolean {
   return visited < itemIds.size;
 }
 
+function lintProjectedSurface(doc: XBriefDocument): QualityIssue[] {
+  const issues: QualityIssue[] = [];
+
+  // Collect all files_scope entries from non-cancelled items
+  const files = new Set<string>();
+  const subsystems = new Set<string>();
+
+  for (const item of doc.plan.items) {
+    if (item.status === 'cancelled') continue;
+
+    const filesScope = item.metadata?.files_scope;
+    if (Array.isArray(filesScope)) {
+      for (const scope of filesScope) {
+        // Strip wildcard tails from globs (e.g., 'src/**/*' → 'src')
+        const normalized = scope.replace(/\/\*+$/, '');
+        files.add(normalized);
+
+        // Extract subsystem (first two path segments)
+        const parts = normalized.split('/');
+        if (parts.length >= 2) {
+          subsystems.add(`${parts[0]}/${parts[1]}`);
+        } else if (parts.length === 1) {
+          subsystems.add(parts[0]!);
+        }
+      }
+    }
+  }
+
+  const fileCount = files.size;
+  const subsystemCount = subsystems.size;
+  const hasJustification = typeof doc.plan.metadata?.sizeJustification === 'string' && doc.plan.metadata.sizeJustification.trim().length > 0;
+
+  if ((fileCount > PROJECTED_SURFACE_MAX_FILES || subsystemCount > PROJECTED_SURFACE_MAX_SUBSYSTEMS) && !hasJustification) {
+    issues.push(
+      issue(
+        undefined,
+        'projected-surface',
+        `Plan touches ${fileCount} files (limit: ${PROJECTED_SURFACE_MAX_FILES}) and ${subsystemCount} subsystems (limit: ${PROJECTED_SURFACE_MAX_SUBSYSTEMS}). Split into independently-shippable sibling issues per the swarm contract, or set plan.metadata.sizeJustification for genuinely inseparable work.`,
+      ),
+    );
+  }
+
+  return issues;
+}
+
 export function lintPlanQuality(doc: XBriefDocument, options: QualityLintOptions = {}): QualityIssue[] {
   return [
+    ...lintProjectedSurface(doc),
     ...doc.plan.items.flatMap(item => item.status === 'cancelled' ? [] : lintItem(item)),
     ...lintDocumentReferences(doc),
     ...lintDocsCoverage(doc),
