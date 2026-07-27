@@ -80,22 +80,21 @@
     "recordedAt": "2026-07-27T11:46:55.052Z"
   },
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T11:48:27.322Z",
+  "updated": "2026-07-27T11:52:17.042Z",
   "pipeline": {
     "issueId": "PAN-3154",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T11:48:26.258Z",
-    "reviewNotes": "Verification failed at test",
+    "updatedAt": "2026-07-27T11:52:16.996Z",
+    "reviewNotes": "GitHub-only project filtering and null review-status handling leave conflicting branches permanently undetected",
     "inspectNotes": "AC-4 now met; AC-1/2/3/5 re-confirmed unchanged. branch-invalidation.ts:178 gates setSetting on !hadUnknownProbe (flag set at :144), so an unknown probe leaves the stored head at its prior value and the next cycle re-probes at the same SHA; the ls-remote path already returned early at :128. Retry cycle stays correct on the other ACs: an issue marked during the aborted pass hits the conflictsSince.sha === newSha dedup at :146, so no duplicate setReviewStatus, no duplicate per-issue activity entry, and it is absent from newlyMarkedIssueIds so the summary names only new marks — AC-3 holds across the retry path, not just across two clean runs. Test that had asserted the buggy behavior flipped to not.toHaveBeenCalled(), plus a mixed-project regression (one conflicts + one unknown) proving the SHA does not advance even when another issue was newly marked. NON-BLOCKING follow-up: a persistently-unknown workspace (broken remote / corrupted worktree) keeps hadUnknownProbe true indefinitely, so that project re-probes every in-pipeline issue every 120s instead of only on head movement — the direct cost of AC-4 as written, worth bounding later (e.g. advance after N consecutive unknown cycles), not a defect against this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3208",
     "reviewedAtCommit": "c83f308b54c69b0f31edd52f1e4d9eb3d9d08692",
-    "reviewRequestedAt": "2026-07-27T11:46:55.966Z",
     "reviewSpawnedAt": "2026-07-27T11:48:26.257Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -170,9 +169,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 790238,
-            "output": 127897,
-            "cacheRead": 17307136,
+            "input": 2065312,
+            "output": 240545,
+            "cacheRead": 27940864,
             "cacheWrite": 0
           }
         },
@@ -193,9 +192,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 790238,
-          "output": 127897,
-          "cacheRead": 17307136,
+          "input": 2065312,
+          "output": 240545,
+          "cacheRead": 27940864,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -206,8 +205,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 46.209657299999996,
-        "pricingAsOf": "2026-07-27T11:48:26.265Z"
+        "usd": 61.2813313,
+        "pricingAsOf": "2026-07-27T11:52:17.031Z"
       }
     },
     "merges": [
@@ -216,7 +215,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "tasks": {
     "sequence": 10,
     "claims": {},
