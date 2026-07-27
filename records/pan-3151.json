@@ -186,18 +186,18 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:27:21.527Z",
+  "updated": "2026-07-27T12:28:09.727Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T12:27:21.522Z",
-    "reviewNotes": "regression test double-serializes reviewCycleHistory and asserts a string instead of the production array contract",
+    "updatedAt": "2026-07-27T12:28:09.688Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: removed double-serialization from test",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "d41e7959ffcf47379f544d51c4c21851fcb987c3",
@@ -303,18 +303,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 9500546,
-            "output": 308417,
-            "cacheRead": 81474560,
+            "input": 9508730,
+            "output": 315631,
+            "cacheRead": 82429952,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3004,
-            "output": 120861,
-            "cacheRead": 71413229,
-            "cacheWrite": 2802913
+            "input": 3056,
+            "output": 123518,
+            "cacheRead": 72828331,
+            "cacheWrite": 2954112
           }
         }
       },
@@ -326,21 +326,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 9500546,
-          "output": 308417,
-          "cacheRead": 81474560,
+          "input": 9508730,
+          "output": 315631,
+          "cacheRead": 82429952,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3004,
-          "output": 120861,
-          "cacheRead": 71413229,
-          "cacheWrite": 2802913
+          "input": 3056,
+          "output": 123518,
+          "cacheRead": 72828331,
+          "cacheWrite": 2954112
         }
       },
       "costAtCloseOut": {
-        "usd": 108.7605113,
-        "pricingAsOf": "2026-07-27T12:27:21.525Z"
+        "usd": 109.8393943,
+        "pricingAsOf": "2026-07-27T12:28:09.723Z"
       }
     },
     "merges": [
