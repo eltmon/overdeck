@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T05:17:55.352Z",
+  "updated": "2026-07-27T05:18:12.207Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "apply-origin-and-override": {
+        "writerId": "agent-pan-3184",
+        "agentId": "agent-pan-3184",
+        "pid": 631947,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:18:12.207Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3184",
@@ -144,6 +152,7 @@
     "classified-expiry-default": "completed",
     "classified-expiry-default.classified-expiry-default.ac1": "completed",
     "classified-expiry-default.classified-expiry-default.ac2": "completed",
-    "classified-expiry-default.classified-expiry-default.ac3": "completed"
+    "classified-expiry-default.classified-expiry-default.ac3": "completed",
+    "apply-origin-and-override": "running"
   }
 }
