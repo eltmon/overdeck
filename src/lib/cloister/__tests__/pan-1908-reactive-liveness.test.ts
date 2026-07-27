@@ -308,6 +308,16 @@ describe('PAN-1908 reactive liveness handlers', () => {
       expect(mockResumeAgent).not.toHaveBeenCalled();
     });
 
+    it('resumes a deliberately stopped agent with an explicit operator override', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState({ stoppedByUser: true }));
+      mockGetReviewStatusSync.mockReturnValue(undefined);
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908', { overrideStoppedByUser: true });
+
+      expect(result).toBe('agent-pan-1908');
+      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908');
+    });
+
     it('defers when concurrency slots are exhausted', async () => {
       mockGetAgentStateSync.mockReturnValue(makeState());
       mockGetReviewStatusSync.mockReturnValue({ reviewStatus: 'blocked' });

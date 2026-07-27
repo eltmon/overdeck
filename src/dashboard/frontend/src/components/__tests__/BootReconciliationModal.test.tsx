@@ -94,20 +94,18 @@ describe('BootReconciliationModal', () => {
     vi.unstubAllGlobals();
   });
 
-  // PAN-3052: the countdown must name the outcome the server actually commits on
-  // expiry. `armBootReconciliationGraceTimer` sets `hold_all`, so a dialog that
-  // promised "Auto-resuming all" told the operator the exact opposite of what
-  // letting the clock run does.
-  it('formats a 120-second countdown as 2:00 and states that expiry holds, not resumes', async () => {
+  // The countdown must name both classified expiry outcomes: clean boots resume,
+  // while crash or unknown boots hold. It must never promise unconditional resume.
+  it('formats a 120-second countdown as 2:00 and states the classified expiry policy', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-06-29T15:00:00.000Z').getTime());
     renderModal(vi.fn(async () => jsonResponse({
       ...pendingState,
       graceDeadline: '2026-06-29T15:02:00.000Z',
     })));
 
-    expect(await screen.findByText('Keeping all stopped in 2:00')).toBeInTheDocument();
+    expect(await screen.findByText('Applying boot default in 2:00')).toBeInTheDocument();
     expect(screen.queryByText(/Auto-resuming/)).not.toBeInTheDocument();
-    expect(screen.getByText('If the timer runs out, nothing resumes until you say so.')).toBeInTheDocument();
+    expect(screen.getByText('If the timer runs out, clean boots resume and crash boots stay stopped.')).toBeInTheDocument();
   });
 
   it('renders context rows in a separate section that no decision acts on', async () => {
@@ -171,6 +169,43 @@ describe('BootReconciliationModal', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(screen.queryByTestId('boot-reconciliation-modal')).not.toBeInTheDocument();
+  });
+
+  it('defaults operator-stopped rows to hold and plain rows to resume', async () => {
+    const operatorStoppedState: BootReconciliationState = {
+      ...pendingState,
+      set: [
+        { ...pendingState.set[0], stoppedByUser: true, whyStopped: 'stopped by operator' },
+        pendingState.set[1],
+      ],
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === '/api/boot-reconciliation') return jsonResponse(operatorStoppedState);
+      if (url === '/api/boot-reconciliation/decision') {
+        return jsonResponse({ ok: true, count: 0, resumed: [] });
+      }
+      return jsonResponse({ error: 'not found' }, 404);
+    });
+    renderModal(fetchMock);
+
+    expect(await screen.findByTestId('boot-reconciliation-modal')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('boot-reconciliation-review-each'));
+    fireEvent.click(screen.getByTestId('boot-reconciliation-apply-per-agent'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/boot-reconciliation/decision',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          decision: 'per_agent',
+          perAgent: {
+            'PAN-2076': 'hold',
+            'PAN-2077': 'resume',
+          },
+        }),
+      }),
+    ));
   });
 
   it('sends resume all, hold all, per-agent review, and freeze actions', async () => {
@@ -291,6 +326,7 @@ describe('BootReconciliationModal', () => {
       ...pendingState,
       decision: 'hold_all',
       decidedAt: '2026-06-29T15:00:00.253Z',
+      heldCount: 2,
     };
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = input.toString();
@@ -317,11 +353,25 @@ describe('BootReconciliationModal', () => {
     ));
   });
 
+  it('hides a hold_all banner when the live held count is zero', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({
+      ...pendingState,
+      decision: 'hold_all',
+      heldCount: 0,
+    }));
+    renderModal(fetchMock);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/boot-reconciliation'));
+    expect(screen.queryByTestId('boot-reconciliation-held-banner')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('boot-reconciliation-modal')).not.toBeInTheDocument();
+  });
+
   it('counts only agents still held by a per_agent decision, and hides when none are', async () => {
     const perAgentState: BootReconciliationState = {
       ...pendingState,
       decision: 'per_agent',
       perAgent: { 'PAN-2076': 'resume', 'PAN-2077': 'hold', 'PAN-2079': 'resume' },
+      heldCount: 1,
     };
     renderModal(vi.fn(async () => jsonResponse(perAgentState)));
 
@@ -335,6 +385,7 @@ describe('BootReconciliationModal', () => {
       ...pendingState,
       decision: 'per_agent',
       perAgent: { 'PAN-2076': 'resume', 'PAN-2077': 'resume', 'PAN-2079': 'resume' },
+      heldCount: 0,
     };
     renderModal(vi.fn(async () => jsonResponse(allResumedState)));
     await waitFor(() => {

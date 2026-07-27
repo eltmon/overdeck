@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import {
   type BootReconciliationDecision,
   getBootReconciliationState,
+  getLastCleanShutdownAt,
   setBootReconciliationDecision,
   setBootReconciliationGrace,
   stampBootReconciliation,
@@ -18,6 +18,7 @@ import { isExplicitNoResumeRequest } from './no-resume-mode.js';
 import { bootReconciliationSkipReason } from './boot-reconciliation-predicates.js';
 
 export const DEFAULT_BOOT_RECONCILIATION_GRACE_SECS = 120;
+export const CLEAN_SHUTDOWN_FRESHNESS_MS = 30 * 60 * 1000;
 
 /**
  * How many times the grace window may be pushed out because the operator is
@@ -61,12 +62,6 @@ let graceTimer: ReturnType<typeof setTimeout> | null = null;
  */
 let graceExpiryHook: (() => void | Promise<void>) | null = null;
 
-function hasCompletionMarker(workspace: string | null): boolean {
-  if (!workspace) return false;
-  return existsSync(join(workspace, '.pan', 'completed'))
-    || existsSync(join(workspace, '.pan', 'completed.processed'));
-}
-
 function newestAgentTimestampMs(agent: ReconciliationAgent): number | null {
   const timestamps = [agent.lastActivity, agent.stoppedAt, agent.startedAt]
     .map((value) => value == null ? NaN : Date.parse(value))
@@ -81,6 +76,17 @@ function isRecentBootCandidate(agent: ReconciliationAgent): boolean {
   if (!Number.isFinite(bootStartedAtMs) || newestTimestampMs == null) return false;
   const maxAgeMs = getBootReconciliationMaxCandidateAgeSeconds() * 1000;
   return newestTimestampMs >= bootStartedAtMs - maxAgeMs;
+}
+
+export function isCleanShutdownBoot(): boolean {
+  // Classify against boot start so grace extensions cannot age a clean marker into a crash.
+  const state = getBootReconciliationState();
+  const bootStartedAtMs = state.bootStartedAt == null ? NaN : Date.parse(state.bootStartedAt);
+  const marker = getLastCleanShutdownAt();
+  const markerMs = marker == null ? NaN : Date.parse(marker);
+  return Number.isFinite(bootStartedAtMs)
+    && Number.isFinite(markerMs)
+    && bootStartedAtMs - markerMs <= CLEAN_SHUTDOWN_FRESHNESS_MS;
 }
 
 export function getBootReconciliationGraceSeconds(): number {
@@ -98,10 +104,13 @@ export function getBootReconciliationMaxCandidateAgeSeconds(): number {
     : getBootReconciliationGraceSeconds() * 2;
 }
 
+export function isAutoResumableRole(role: ReconciliationAgent['role']): boolean {
+  return role === 'work' || role === 'strike';
+}
+
 export function isBootReconciliationCandidate(agent: ReconciliationAgent): boolean {
-  if (agent.role !== 'work' || agent.status !== 'stopped') return false;
+  if (!isAutoResumableRole(agent.role) || agent.status !== 'stopped') return false;
   if (agent.paused === true || agent.troubled === true) return false;
-  if (agent.stoppedByUser === true && !hasCompletionMarker(agent.workspace)) return false;
   if (!isRecentBootCandidate(agent)) return false;
   if (bootReconciliationSkipReason(agent) !== null) return false;
   if (!agent.workspace || !existsSync(agent.workspace)) return false;
@@ -214,8 +223,20 @@ export function armBootReconciliationGraceTimer(
   graceTimer = setTimeout(() => {
     graceTimer = null;
     if (getBootReconciliationState().decision !== 'pending') return;
-    setBootReconciliationDecision('hold_all');
-    logDeaconEventSync('boot reconciliation grace expired — decision set to hold_all');
+    if (listBootReconciliationCandidateIds().length === 0) {
+      setBootReconciliationDecision('resume_all');
+      logDeaconEventSync('boot reconciliation grace expired — vacuous hold auto-released (0 candidates)');
+      void Promise.resolve(onGraceExpired()).catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        logDeaconEventSync(`boot reconciliation grace expiry apply hook failed: ${message}`);
+      });
+      return;
+    }
+    const decision = isCleanShutdownBoot() ? 'resume_all' : 'hold_all';
+    setBootReconciliationDecision(decision);
+    logDeaconEventSync(decision === 'resume_all'
+      ? 'boot reconciliation grace expired — clean shutdown within 30m, decision set to resume_all'
+      : 'boot reconciliation grace expired — no clean shutdown marker (crash boot), decision set to hold_all');
     void Promise.resolve(onGraceExpired()).catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
       logDeaconEventSync(`boot reconciliation grace expiry apply hook failed: ${message}`);
