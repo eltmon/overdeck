@@ -448,7 +448,7 @@ async function remediateFlywheelOrchestrator(
   }
 
   try {
-    await resumeFlywheel();
+    await resumeFlywheel({ resumeCause: 'system' });
     writeStuckRemediationState(agentId, {
       lastStage: 0,
       lastStageAt: nowIso,
