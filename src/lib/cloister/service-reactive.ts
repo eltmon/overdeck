@@ -333,6 +333,7 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
       return;
     }
 
+    let autoSpawnConsentRequired = false;
     if (role === 'work') {
       const decision = decideAutonomousWorkDispatch(
         await gatherAutonomousWorkDispatchInput(normalizedIssueId),
@@ -349,11 +350,13 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
         );
         return;
       }
+      autoSpawnConsentRequired = decision.releaseSource === 'planning-consent';
     }
 
     const run = await spawnRun(normalizedIssueId, role, {
       prompt: buildReactiveRolePrompt(normalizedIssueId, newState, role),
       startedBy: 'reactive-lifecycle',
+      ...(role === 'work' ? { autoSpawnConsentRequired } : {}),
     });
     const message = `${normalizedIssueId}: ${role} role started from lifecycle state '${newState}' as ${run.id}`;
     console.log(`[cloister] ${message}`);

@@ -109,12 +109,12 @@ describe('decideAutonomousWorkDispatch', () => {
   });
 
   it.each([
-    ['released label', { labels: [READY_LABEL, RELEASED_LABEL] }],
-    ['auto-pickup', { labels: [READY_LABEL], autoPickupBacklog: true }],
-    ['active order-book membership', { labels: [READY_LABEL], activeBookMember: true }],
-    ['auto-start consent', { labels: [READY_LABEL], autoSpawnOnFinalizeConsent: true }],
-  ] as const)('allows a ready issue when released by %s', (_source, overrides) => {
-    expect(decideAutonomousWorkDispatch(input(overrides))).toEqual({ allow: true });
+    ['released label', { labels: [READY_LABEL, RELEASED_LABEL] }, 'released-label'],
+    ['auto-pickup', { labels: [READY_LABEL], autoPickupBacklog: true }, 'auto-pickup'],
+    ['active order-book membership', { labels: [READY_LABEL], activeBookMember: true }, 'active-order-book'],
+    ['auto-start consent', { labels: [READY_LABEL], autoSpawnOnFinalizeConsent: true }, 'planning-consent'],
+  ] as const)('allows a ready issue when released by %s', (_source, overrides, releaseSource) => {
+    expect(decideAutonomousWorkDispatch(input(overrides))).toEqual({ allow: true, releaseSource });
   });
 
   it('applies blocker precedence before readiness and release checks', () => {

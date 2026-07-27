@@ -492,6 +492,7 @@ export interface SpawnRemoteAgentOptions {
   prompt?: string;
   phase?: string;
   startedBy: string;
+  autoSpawnConsentRequired?: boolean;
   tier?: 'ephemeral' | 'durable';
 }
 
@@ -550,7 +551,9 @@ export async function writeRemoteFile(
  * Spawn a Claude agent on a remote VM
  */
 export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promise<RemoteAgentState> {
-  if (isOperatorStartedBy(options.startedBy)) return spawnRemoteAgentWithoutConsentClaim(options);
+  if (isOperatorStartedBy(options.startedBy) || options.autoSpawnConsentRequired !== true) {
+    return spawnRemoteAgentWithoutConsentClaim(options);
+  }
 
   return withAutoSpawnConsentClaim(
     options.issueId,

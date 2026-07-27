@@ -406,6 +406,23 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(createSessionMock).toHaveBeenCalledOnce();
   });
 
+  it('lets non-consent autonomous release sources ignore unreadable consent', async () => {
+    writeSupervisorArtifact();
+    const consentDir = join(tmpHome, 'agents', 'planning-pan-1405');
+    mkdirSync(consentDir, { recursive: true });
+    writeFileSync(join(consentDir, 'auto-spawn-on-finalize.json'), '{invalid-json');
+    const { spawnRun } = await import('../agents.js');
+
+    await expect(spawnRun('PAN-1405', 'work', {
+      workspace,
+      model: 'claude-sonnet-4-6',
+      startedBy: 'reactive-lifecycle',
+      autoSpawnConsentRequired: false,
+    })).resolves.toMatchObject({ status: 'running' });
+
+    expect(createSessionMock).toHaveBeenCalledOnce();
+  });
+
   it('spends autonomous consent when runtime setup fails after tmux accepts the session', async () => {
     writeSupervisorArtifact();
     const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlag } = await import('../planning/auto-spawn-consent.js');
@@ -419,6 +436,7 @@ describe('spawnAgent PTY supervisor wiring', () => {
       role: 'work',
       model: 'claude-sonnet-4-6',
       startedBy: 'reactive-lifecycle',
+      autoSpawnConsentRequired: true,
     })).rejects.toThrow('runtime state persistence failed');
 
     expect(createSessionMock).toHaveBeenCalledOnce();
@@ -612,6 +630,7 @@ describe('spawnAgent PTY supervisor wiring', () => {
       workspace,
       model: 'claude-sonnet-4-6',
       startedBy: 'reactive-lifecycle',
+      autoSpawnConsentRequired: true,
     });
 
     expect(readAutoSpawnOnFinalizeFlag('PAN-1405')).toBe(false);

@@ -153,7 +153,7 @@ function writeRedirectTasks(projectPath: string, issueId: string, taskCount = 2)
   writeFileSync(join(sharedTasksDir, 'issues.jsonl'), lines.join('\n'));
 }
 
-const allowPickupGate = async () => ({ allow: true as const });
+const allowPickupGate = async () => ({ allow: true as const, releaseSource: 'released-label' as const });
 
 describe('orphan proposed spec reconciler', () => {
   beforeEach(() => {
@@ -522,7 +522,7 @@ describe('orphan proposed spec reconciler', () => {
     }
     const evaluatePickupGate = vi.fn()
       .mockRejectedValueOnce(new Error('settings unavailable'))
-      .mockResolvedValue({ allow: true as const });
+      .mockResolvedValue({ allow: true as const, releaseSource: 'released-label' as const });
     const spawnWorkAgent = vi.fn(async (issueId: string) => ({ spawned: true, agentId: `agent-${issueId.toLowerCase()}` }));
 
     await expect(reconcileOrphanProposedSpecs({
@@ -543,25 +543,29 @@ describe('orphan proposed spec reconciler', () => {
       'proposed',
       expect.stringContaining('settings unavailable'),
     );
-    expect(spawnWorkAgent).toHaveBeenCalledWith('PAN-3096');
+    expect(spawnWorkAgent).toHaveBeenCalledWith('PAN-3096', false);
   });
 
   it.each([
-    ['ready and released labels'],
-    ['auto-spawn-on-finalize consent'],
-  ])('preserves orphan work spawning when the pickup gate allows %s', async () => {
+    ['ready and released labels', 'released-label', false],
+    ['auto-spawn-on-finalize consent', 'planning-consent', true],
+  ] as const)('preserves orphan work spawning when the pickup gate allows %s', async (_label, releaseSource, consentRequired) => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-3092', 'proposed');
     writeTasks(projectPath, 'PAN-3092');
     await writeAutoSpawnOnFinalizeFlag('PAN-3092', true);
-    const spawnWorkAgent = vi.fn((issueId: string) => withAutoSpawnConsentClaim(
-      issueId,
-      async () => ({ spawned: true, agentId: 'agent-pan-3092' }),
+    if (!consentRequired) {
+      writeFileSync(join(testDir, 'agents', 'planning-pan-3092', 'auto-spawn-on-finalize.json'), '{invalid-json');
+    }
+    const spawnWorkAgent = vi.fn((issueId: string, requireConsent: boolean) => (
+      requireConsent
+        ? withAutoSpawnConsentClaim(issueId, async () => ({ spawned: true, agentId: 'agent-pan-3092' }))
+        : Promise.resolve({ spawned: true, agentId: 'agent-pan-3092' })
     ));
 
     await expect(reconcileOrphanProposedSpecs({
-      evaluatePickupGate: allowPickupGate,
+      evaluatePickupGate: async () => ({ allow: true, releaseSource }),
       projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
@@ -570,7 +574,7 @@ describe('orphan proposed spec reconciler', () => {
       spawnWorkAgent,
     })).resolves.toEqual(['Spawned work agent for orphan proposed spec PAN-3092']);
 
-    expect(spawnWorkAgent).toHaveBeenCalledWith('PAN-3092');
+    expect(spawnWorkAgent).toHaveBeenCalledWith('PAN-3092', consentRequired);
     expect(readAutoSpawnOnFinalizeFlag('PAN-3092')).toBe(false);
     expect(deadEndTripMocks.recordDeadEndNeedsYou).not.toHaveBeenCalled();
   });
@@ -675,7 +679,7 @@ describe('orphan proposed spec reconciler', () => {
       spawnWorkAgent,
     })).resolves.toEqual(['Spawned work agent for orphan proposed spec PAN-3602']);
 
-    expect(spawnWorkAgent).toHaveBeenCalledWith('PAN-3602');
+    expect(spawnWorkAgent).toHaveBeenCalledWith('PAN-3602', false);
   });
 
   it('checks open PRs with gh from the project directory for the feature branch', async () => {
@@ -734,7 +738,7 @@ describe('orphan proposed spec reconciler', () => {
     })).resolves.toEqual(['Spawned work agent for orphan proposed spec ZZZ-9042']);
 
     expect(childProcessMocks.exec).not.toHaveBeenCalled();
-    expect(spawnWorkAgent).toHaveBeenCalledWith('ZZZ-9042');
+    expect(spawnWorkAgent).toHaveBeenCalledWith('ZZZ-9042', false);
   });
 
   it('checks open PRs with GitHub App REST when configured', async () => {
@@ -898,6 +902,7 @@ describe('orphan proposed spec reconciler', () => {
       issueId: 'PAN-3301',
       role: 'work',
       startedBy: 'orphan-proposed-reconciler',
+      autoSpawnConsentRequired: false,
     });
   });
 

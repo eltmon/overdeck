@@ -27,8 +27,8 @@ vi.mock('../autonomous-plan-dispatch.js', async (importOriginal) => {
 });
 
 const autonomousWorkMock = vi.hoisted(() => ({
-  decision: { allow: true } as
-    | { allow: true }
+  decision: { allow: true, releaseSource: 'released-label' } as
+    | { allow: true; releaseSource: 'released-label' | 'auto-pickup' | 'active-order-book' | 'planning-consent' }
     | { allow: false; code: 'not-ready' | 'not-planned' | 'not-released' | 'labels-unavailable'; reason: string },
 }));
 
@@ -287,7 +287,7 @@ describe('reactive Cloister scheduler', () => {
     autonomousPlanMock.labels = ['released'];
     autonomousPlanMock.recordedModel = undefined;
     autonomousPlanMock.autonomousModel = 'workhorse:cheap';
-    autonomousWorkMock.decision = { allow: true };
+    autonomousWorkMock.decision = { allow: true, releaseSource: 'released-label' };
     mockHeadSha = 'newhead1';
   });
 
@@ -404,15 +404,28 @@ describe('reactive Cloister scheduler', () => {
   it('preserves reactive work spawning when the pickup gate allows dispatch', async () => {
     autonomousPlanMock.labels = [];
     autonomousPlanMock.autonomousModel = undefined;
-    autonomousWorkMock.decision = { allow: true };
+    autonomousWorkMock.decision = { allow: true, releaseSource: 'released-label' };
 
     await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
 
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'work', {
       prompt: expect.stringContaining('WORK TASK for PAN-503'),
       startedBy: 'reactive-lifecycle',
+      autoSpawnConsentRequired: false,
     });
     expect(recordDeadEndNeedsYou).not.toHaveBeenCalled();
+  });
+
+  it('requires a consent claim when planning consent authorized reactive work', async () => {
+    autonomousWorkMock.decision = { allow: true, releaseSource: 'planning-consent' };
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
+
+    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'work', {
+      prompt: expect.stringContaining('WORK TASK for PAN-503'),
+      startedBy: 'reactive-lifecycle',
+      autoSpawnConsentRequired: true,
+    });
   });
 
   it('starts the review role for an issue state transition via the wrapper', async () => {

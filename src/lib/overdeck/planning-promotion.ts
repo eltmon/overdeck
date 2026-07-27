@@ -348,7 +348,12 @@ export async function completePlanningAutoSpawn(options: {
         origin: dashboardOrigin,
         ...internalTokenHeaders,
       },
-      body: JSON.stringify({ issueId: options.issueId, role: 'work', startedBy: 'planning-auto-handoff' }),
+      body: JSON.stringify({
+        issueId: options.issueId,
+        role: 'work',
+        startedBy: 'planning-auto-handoff',
+        autoSpawnConsentRequired: true,
+      }),
     });
 
     const body = await response.json().catch(() => ({})) as Record<string, unknown>;
@@ -380,7 +385,10 @@ export async function completePlanningAutoSpawn(options: {
         {
           method: 'POST',
           headers: { 'content-type': 'application/json', origin: dashboardOrigin, ...internalTokenHeaders },
-          body: JSON.stringify({ startedBy: 'planning-auto-handoff' }),
+          body: JSON.stringify({
+            startedBy: 'planning-auto-handoff',
+            autoSpawnConsentRequired: true,
+          }),
         },
       );
       const recoveryBody = await recovery.json().catch(() => ({})) as Record<string, unknown>;

@@ -236,6 +236,7 @@ export const postAgentsRoute = HttpRouter.add(
     try { startedBy = resolveRequestedStartedBy((body as any).startedBy, internalRequest); }
     catch (error) { return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 }); }
     const autoStart = (body as any).auto === true;
+    const autoSpawnConsentRequired = internalRequest && (body as any).autoSpawnConsentRequired === true;
     const guardrailAcknowledged = (body as any).guardrailAcknowledged === true;
     const offBook = (body as any).offBook === true;
     const requestedHostOverride = (body as any).host === true || (body as any).allowHost === true;
@@ -670,6 +671,7 @@ export const postAgentsRoute = HttpRouter.add(
             workspaceMetadata,
             spawnModel,
             startedBy,
+            autoSpawnConsentRequired,
             projectPath,
             spawnGuardrails,
             lifecycle,
@@ -790,7 +792,18 @@ export const postAgentsRoute = HttpRouter.add(
           agentSessionName,
           gate: gatesCommitted ? null : startGateBlock,
           initialState: initialAgentState,
-          spawn: () => spawnPanCommandDetached({ agentSessionName, issueId, role, workspacePath, args, cwd, env: { OVERDECK_AGENT_STARTED_BY: startedBy } }),
+          spawn: () => spawnPanCommandDetached({
+            agentSessionName,
+            issueId,
+            role,
+            workspacePath,
+            args,
+            cwd,
+            env: {
+              OVERDECK_AGENT_STARTED_BY: startedBy,
+              OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED: autoSpawnConsentRequired ? '1' : '0',
+            },
+          }),
         }),
       );
       if (!admitted.check.decision.eligible || !admitted.result) {

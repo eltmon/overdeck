@@ -980,9 +980,12 @@ const postWorkspaceRebuildAndStartRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const issueId = (yield* HttpRouter.params)['issueId'] ?? '';
+    const body = yield* readJsonBody;
+    const internalRequest = yield* Effect.promise(() => isInternalAgentRequest(request));
     let startedBy: string;
-    try { startedBy = resolveRequestedStartedBy((yield* readJsonBody)?.startedBy, yield* Effect.promise(() => isInternalAgentRequest(request))); }
+    try { startedBy = resolveRequestedStartedBy(body?.startedBy, internalRequest); }
     catch (error) { return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 }); }
+    const autoSpawnConsentRequired = internalRequest && body?.autoSpawnConsentRequired === true;
     if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
     }
@@ -999,7 +1002,10 @@ const postWorkspaceRebuildAndStartRoute = HttpRouter.add(
           args: ['start', issueId],
           phaseLabel: `Stack rebuilt — starting agent for ${issueId.toUpperCase()}`,
         },
-        env: { OVERDECK_AGENT_STARTED_BY: startedBy },
+        env: {
+          OVERDECK_AGENT_STARTED_BY: startedBy,
+          OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED: autoSpawnConsentRequired ? '1' : '0',
+        },
       },
     );
     return jsonResponse({

@@ -35,8 +35,14 @@ export interface AutonomousWorkDispatchDeps {
   now?: () => number;
 }
 
+export type AutonomousWorkReleaseSource =
+  | 'released-label'
+  | 'auto-pickup'
+  | 'active-order-book'
+  | 'planning-consent';
+
 export type AutonomousWorkDispatchDecision =
-  | { allow: true }
+  | { allow: true; releaseSource: AutonomousWorkReleaseSource }
   | {
       allow: false;
       code:
@@ -253,11 +259,16 @@ export function decideAutonomousWorkDispatch(
     };
   }
 
-  const released = hasLabel(RELEASED_LABEL)
-    || input.autoPickupBacklog
-    || input.activeBookMember
-    || input.autoSpawnOnFinalizeConsent;
-  if (!released) {
+  const releaseSource: AutonomousWorkReleaseSource | null = hasLabel(RELEASED_LABEL)
+    ? 'released-label'
+    : input.autoPickupBacklog
+      ? 'auto-pickup'
+      : input.activeBookMember
+        ? 'active-order-book'
+        : input.autoSpawnOnFinalizeConsent
+          ? 'planning-consent'
+          : null;
+  if (!releaseSource) {
     return {
       allow: false,
       code: 'not-released',
@@ -266,5 +277,5 @@ export function decideAutonomousWorkDispatch(
     };
   }
 
-  return { allow: true };
+  return { allow: true, releaseSource };
 }

@@ -98,14 +98,14 @@ export interface SpawnWorkAgentResult {
 export interface ReconcileOrphanProposedOptions extends FindOrphanProposedOptions {
   now?: Date;
   config?: OrphanProposedReconcilerConfig;
-  spawnWorkAgent?: (issueId: string) => Promise<SpawnWorkAgentResult>;
+  spawnWorkAgent?: (issueId: string, autoSpawnConsentRequired: boolean) => Promise<SpawnWorkAgentResult>;
   hasOpenPrForBranch?: (projectPath: string, issueId: string) => Promise<boolean>;
   evaluatePickupGate?: (issueId: string) => Promise<AutonomousWorkDispatchDecision>;
   dashboardOrigin?: string;
 }
 
 export interface HandleOrphanProposedSpecOptions {
-  spawnWorkAgent?: (issueId: string) => Promise<SpawnWorkAgentResult>;
+  spawnWorkAgent?: (issueId: string, autoSpawnConsentRequired: boolean) => Promise<SpawnWorkAgentResult>;
   hasOpenPrForBranch?: (projectPath: string, issueId: string) => Promise<boolean>;
   evaluatePickupGate?: (issueId: string) => Promise<AutonomousWorkDispatchDecision>;
   dashboardOrigin?: string;
@@ -275,7 +275,11 @@ function classifySpawnSkip(status: number, body: Record<string, unknown>): strin
   return 'spawn-failed';
 }
 
-export async function spawnWorkAgentThroughAgentsEndpoint(issueId: string, dashboardOrigin = internalDashboardOrigin()): Promise<SpawnWorkAgentResult> {
+export async function spawnWorkAgentThroughAgentsEndpoint(
+  issueId: string,
+  dashboardOrigin = internalDashboardOrigin(),
+  autoSpawnConsentRequired = false,
+): Promise<SpawnWorkAgentResult> {
   const internalToken = getInternalTokenSync();
   const response = await fetch(new URL('/api/agents', dashboardOrigin), {
     method: 'POST',
@@ -284,7 +288,12 @@ export async function spawnWorkAgentThroughAgentsEndpoint(issueId: string, dashb
       origin: dashboardOrigin,
       ...(internalToken ? { [INTERNAL_TOKEN_HEADER]: internalToken } : {}),
     },
-    body: JSON.stringify({ issueId, role: 'work', startedBy: 'orphan-proposed-reconciler' }),
+    body: JSON.stringify({
+      issueId,
+      role: 'work',
+      startedBy: 'orphan-proposed-reconciler',
+      autoSpawnConsentRequired,
+    }),
   });
   const body = await response.json().catch(() => ({})) as Record<string, unknown>;
   const agentId = typeof body['agentId'] === 'string' ? body['agentId'] : `agent-${issueId.toLowerCase()}`;
@@ -541,7 +550,12 @@ export async function handleOrphanProposedSpec(
   attemptCooldowns.set(upperIssueId, now);
 
   try {
-    const spawn = await (options.spawnWorkAgent ?? ((id) => spawnWorkAgentThroughAgentsEndpoint(id, options.dashboardOrigin)))(upperIssueId);
+    const autoSpawnConsentRequired = pickupGate.releaseSource === 'planning-consent';
+    const spawn = await (options.spawnWorkAgent
+      ?? ((id, required) => spawnWorkAgentThroughAgentsEndpoint(id, options.dashboardOrigin, required)))(
+      upperIssueId,
+      autoSpawnConsentRequired,
+    );
     if (spawn.spawned) {
       emitReconcilerActivity(
         'success',

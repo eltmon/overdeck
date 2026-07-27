@@ -136,6 +136,7 @@ export function handleRemoteAgentSpawn(input: {
   workspaceMetadata: RemoteWorkspaceMetadata;
   spawnModel: string;
   startedBy: string;
+  autoSpawnConsentRequired: boolean;
   projectPath: string;
   spawnGuardrails: SpawnGuardrailDecision;
   lifecycle: LifecycleTransition;
@@ -147,6 +148,7 @@ export function handleRemoteAgentSpawn(input: {
       workspaceMetadata,
       spawnModel,
       startedBy,
+      autoSpawnConsentRequired,
       projectPath,
       spawnGuardrails,
       lifecycle,
@@ -183,6 +185,7 @@ export function handleRemoteAgentSpawn(input: {
       prompt: agentPrompt,
       model: spawnModel,
       startedBy,
+      autoSpawnConsentRequired,
       tier: fly.getResiliencyTier(),
     }));
 

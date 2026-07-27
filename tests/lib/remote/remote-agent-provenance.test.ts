@@ -153,6 +153,7 @@ describe('remote agent provenance', () => {
       },
       model: 'claude-sonnet-4-6',
       startedBy: 'flywheel:RUN-42',
+      autoSpawnConsentRequired: true,
       tier: 'ephemeral',
     })).rejects.toThrow('Failed to start push daemon');
 

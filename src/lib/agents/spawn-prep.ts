@@ -102,6 +102,8 @@ export interface SpawnOptions {
   allowHost?: boolean;
   flywheelRunId?: string;
   startedBy: string;
+  /** True only when planning consent was the release authority for this autonomous work launch. */
+  autoSpawnConsentRequired?: boolean;
   /** Claude Code `--effort` level for the spawned session (work/strike). */
   effort?: RoleEffort;
 }
@@ -134,6 +136,8 @@ export interface SpawnRunOptions {
   resumeSessionId?: string;
   flywheelRunId?: string;
   startedBy: string;
+  /** True only when planning consent was the release authority for this autonomous work launch. */
+  autoSpawnConsentRequired?: boolean;
   /** 1-based registered slot index for per-item work-agent spawning. */
   slotIndex?: number;
   /** xBRIEF item id assigned to this registered slot. Required with slotIndex. */

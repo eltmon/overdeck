@@ -95,7 +95,9 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   const flywheelRunId = resolveFlywheelSpawnEnv(role, options.flywheelRunId).OVERDECK_FLYWHEEL_RUN_ID;
   const startedBy = resolveAgentStartedBy(options.startedBy, flywheelRunId);
   const resolvedOptions = { ...options, startedBy };
-  if (isOperatorStartedBy(startedBy)) return spawnRunWithoutConsentClaim(issueId, role, resolvedOptions);
+  if (isOperatorStartedBy(startedBy) || options.autoSpawnConsentRequired !== true) {
+    return spawnRunWithoutConsentClaim(issueId, role, resolvedOptions);
+  }
 
   return withAutoSpawnConsentClaim(
     issueId,
@@ -147,6 +149,7 @@ async function spawnRunWithoutConsentClaim(
       allowHost: options.allowHost,
       flywheelRunId: options.flywheelRunId,
       startedBy: options.startedBy,
+      autoSpawnConsentRequired: options.autoSpawnConsentRequired,
       effort: options.effort,
       slotIndex: slot?.slotIndex,
       slotItemId: slot?.slotItemId,
@@ -522,7 +525,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const flywheelRunId = resolveFlywheelSpawnEnv(role, options.flywheelRunId).OVERDECK_FLYWHEEL_RUN_ID;
   const startedBy = resolveAgentStartedBy(options.startedBy, flywheelRunId);
   const resolvedOptions = { ...options, startedBy };
-  if (isOperatorStartedBy(startedBy)) return spawnAgentWithoutConsentClaim(resolvedOptions);
+  if (isOperatorStartedBy(startedBy) || options.autoSpawnConsentRequired !== true) {
+    return spawnAgentWithoutConsentClaim(resolvedOptions);
+  }
 
   return withAutoSpawnConsentClaim(
     options.issueId,

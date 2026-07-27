@@ -430,6 +430,7 @@ async function handleRemoteWorkspace(
       model: options.model,
       prompt,
       startedBy: resolveCliStartedBy('operator:cli:pan-start'),
+      autoSpawnConsentRequired: process.env['OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED'] === '1',
       tier: fly.getResiliencyTier(),
     });
     spinner.succeed(`Remote agent spawned: ${remoteAgent.id}`);
@@ -1196,6 +1197,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         prompt,
         allowHost: options.host,
         startedBy: process.env['OVERDECK_AGENT_STARTED_BY']!,
+        autoSpawnConsentRequired: process.env['OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED'] === '1',
         effort: resolvedEffort,
       })),
     );
