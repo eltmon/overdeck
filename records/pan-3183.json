@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:30:47.797Z",
-  "updated": "2026-07-27T05:34:24.166Z",
+  "updated": "2026-07-27T05:34:44.665Z",
   "pipeline": {
     "issueId": "PAN-3183",
     "reviewStatus": "pending",
@@ -43,8 +43,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "lint-guard-agents-status-writes": {
+        "writerId": "agent-pan-3183",
+        "agentId": "agent-pan-3183",
+        "pid": 1842557,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:34:44.665Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3183",
@@ -143,6 +151,7 @@
     "boot-callers-emit-stop-events": "completed",
     "boot-callers-emit-stop-events.boot-callers-emit-stop-events.ac1": "completed",
     "boot-callers-emit-stop-events.boot-callers-emit-stop-events.ac2": "completed",
-    "boot-callers-emit-stop-events.boot-callers-emit-stop-events.ac3": "completed"
+    "boot-callers-emit-stop-events.boot-callers-emit-stop-events.ac3": "completed",
+    "lint-guard-agents-status-writes": "running"
   }
 }
