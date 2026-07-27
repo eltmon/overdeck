@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T10:13:58.031Z",
+  "updated": "2026-07-27T10:14:12.820Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "pending",
@@ -37,8 +37,16 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "conflicts-since-status-field": {
+        "writerId": "agent-pan-3154",
+        "agentId": "agent-pan-3154",
+        "pid": 624650,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T10:14:12.820Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3154",
@@ -64,6 +72,7 @@
     "conflict-path-probe.conflict-path-probe.ac1": "completed",
     "conflict-path-probe.conflict-path-probe.ac2": "completed",
     "conflict-path-probe.conflict-path-probe.ac3": "completed",
-    "conflict-path-probe.conflict-path-probe.ac4": "completed"
+    "conflict-path-probe.conflict-path-probe.ac4": "completed",
+    "conflicts-since-status-field": "running"
   }
 }
