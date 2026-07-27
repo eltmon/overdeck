@@ -54,7 +54,7 @@
     "recordedAt": "2026-07-27T06:16:25.496Z"
   },
   "created": "2026-07-27T04:42:41.037Z",
-  "updated": "2026-07-27T06:16:36.288Z",
+  "updated": "2026-07-27T06:17:19.666Z",
   "pipeline": {
     "issueId": "PAN-3194",
     "reviewStatus": "pending",
@@ -65,7 +65,7 @@
     "readyForMerge": false,
     "updatedAt": "2026-07-27T06:16:36.243Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3200",
-    "reviewRequestedAt": "2026-07-27T06:16:28.279Z",
+    "reviewRequestedAt": "2026-07-27T06:17:16.404Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/codex/__tests__/app-server-host.test.ts",
@@ -103,7 +103,8 @@
         "tests/unit/lib/deploy/deploy-queue.test.ts"
       ],
       "recordedAt": "2026-07-27T06:16:25.496Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-27T06:17:16.404Z"
   },
   "closeOut": {
     "usage": {
