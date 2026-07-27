@@ -183,18 +183,18 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:22:06.075Z",
+  "updated": "2026-07-27T12:22:31.092Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T12:22:05.988Z",
-    "reviewNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-27T12:18:16.725Z by deploy-patrol). It re-runs automatically after the deploy.",
+    "updatedAt": "2026-07-27T12:22:31.027Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: validate JSON storage format in regression test",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "ecb052b11abcc37ce65513e76fb782775e108759",
@@ -309,10 +309,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2978,
-            "output": 118483,
-            "cacheRead": 70578855,
-            "cacheWrite": 2795241
+            "input": 3004,
+            "output": 120861,
+            "cacheRead": 71413229,
+            "cacheWrite": 2802913
           }
         }
       },
@@ -330,15 +330,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2978,
-          "output": 118483,
-          "cacheRead": 70578855,
-          "cacheWrite": 2795241
+          "input": 3004,
+          "output": 120861,
+          "cacheRead": 71413229,
+          "cacheWrite": 2802913
         }
       },
       "costAtCloseOut": {
-        "usd": 103.1666313,
-        "pricingAsOf": "2026-07-27T12:22:06.036Z"
+        "usd": 103.2715753,
+        "pricingAsOf": "2026-07-27T12:22:31.074Z"
       }
     },
     "merges": [
