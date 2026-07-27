@@ -4,7 +4,7 @@
     "created": "2026-07-27T04:43:21Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3183: Boot-path writer batch-stops agents directly in the agents table, bypassing the event door — phantom running agents in the read model",
-    "updated": "2026-07-27T04:50:45.815Z"
+    "updated": "2026-07-27T04:50:48.268Z"
   },
   "plan": {
     "id": "pan-3183",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "23d7627d-b04a-4090-a59c-fa6aebd60617",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-07-27T04:43:21Z",
-    "updated": "2026-07-27T04:50:45.815Z",
+    "updated": "2026-07-27T04:50:48.268Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3183",
