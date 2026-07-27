@@ -343,20 +343,21 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T15:10:10.850Z",
+  "updated": "2026-07-27T15:11:55.325Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T15:10:10.805Z",
-    "reviewNotes": "Agent re-review request (19/25): Fixed review issues",
+    "updatedAt": "2026-07-27T15:11:55.249Z",
+    "reviewNotes": "The real v62→v63 migration remains correct, both stale version assertions are fixed, and all 35 focused migration tests pass. One non-blocking test comment names the v61→v62 block where the v62→v63 block actually performs the repair.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
-    "reviewedAtCommit": "41af9787162a731722d44d99b4a480ec0fd2fb2c",
+    "reviewedAtCommit": "3c8eea55e5a4dc414bc01c9e19488f321e9454e7",
     "reviewSpawnedAt": "2026-07-27T15:10:03.633Z"
   },
   "closeOut": {
@@ -372,9 +373,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 30294982,
-            "output": 666245,
-            "cacheRead": 163512832,
+            "input": 30909851,
+            "output": 675344,
+            "cacheRead": 167093760,
             "cacheWrite": 0
           }
         },
@@ -403,9 +404,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 30294982,
-          "output": 666245,
-          "cacheRead": 163512832,
+          "input": 30909851,
+          "output": 675344,
+          "cacheRead": 167093760,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -422,8 +423,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 279.1455543,
-        "pricingAsOf": "2026-07-27T15:10:10.823Z"
+        "usd": 284.2833333,
+        "pricingAsOf": "2026-07-27T15:11:55.314Z"
       }
     },
     "merges": [
