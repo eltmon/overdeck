@@ -266,6 +266,16 @@ primitive. In automatic mode it tries, in order:
 2. legacy Claude Code Channels MCP socket for already-wired sessions
 3. tmux paste-buffer fallback
 
+The tmux fallback presses Enter after an unverified paste so text never sits
+orphaned in the composer — except when the pane is blocked on a numbered choice
+menu (session-resume gate, permission prompt, plan approval). That menu is why
+the paste was swallowed, and Enter would confirm its highlighted row, so
+`sendKeys` fails the delivery with `MessageDeliveryFailed` instead. Never answer
+a menu Overdeck did not open: at the resume gate the highlighted row is "Resume
+from summary", and a stray Enter there discarded an operator's full session
+(PAN-3212). `paneHasBlockingChoiceMenu()` in `src/lib/pane-choice-menu.ts` is
+the shared detector.
+
 Summary forks add a pane-verified recovery above that transport: when the
 runtime transcript stays silent but the delivered tail remains in the composer,
 the fork pipeline sends at most two standalone Enter keystrokes. If submission

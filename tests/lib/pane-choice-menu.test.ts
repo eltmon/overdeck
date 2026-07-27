@@ -9,6 +9,7 @@ import {
   parsePaneChoiceMenu,
   paneChoiceMenuSignature,
   buildChoiceKeystrokes,
+  paneHasBlockingChoiceMenu,
 } from '../../src/lib/pane-choice-menu.js'
 
 /** Verbatim resume-gate menu as rendered in the operator's pane. */
@@ -177,6 +178,75 @@ describe('parsePaneChoiceMenu — rejections', () => {
 
   it('returns null on empty pane text', () => {
     expect(parsePaneChoiceMenu('')).toBeNull()
+  })
+})
+
+/**
+ * PAN-3212 — the blind-Enter guard. The tmux paste fallback used to press Enter
+ * whenever it could not verify its paste, which at the resume gate confirmed
+ * "Resume from summary" and discarded the operator's full session. The guard
+ * must see every menu that blocks the pane, including the two shapes card
+ * rendering skips.
+ */
+describe('paneHasBlockingChoiceMenu', () => {
+  it('reports the resume gate', () => {
+    expect(paneHasBlockingChoiceMenu(RESUME_GATE_MENU)).toBe(true)
+  })
+
+  it('reports permission menus the card path excludes', () => {
+    const pane = [
+      'Do you want to allow this Bash command?',
+      '',
+      '❯ 1. Yes',
+      "  2. Yes, and don't ask again",
+      '  3. No',
+      '',
+      'Esc to cancel · Tab to amend',
+    ].join('\n')
+    expect(parsePaneChoiceMenu(pane)).toBeNull()
+    expect(paneHasBlockingChoiceMenu(pane)).toBe(true)
+  })
+
+  it('reports multi-select menus the card path excludes', () => {
+    const pane = [
+      'Pick the items to include:',
+      '',
+      '❯ 1. First',
+      '  2. Second',
+      '',
+      'Space to select · Enter to confirm',
+    ].join('\n')
+    expect(parsePaneChoiceMenu(pane)).toBeNull()
+    expect(paneHasBlockingChoiceMenu(pane)).toBe(true)
+  })
+
+  it('stays quiet on an idle composer, so normal delivery still submits', () => {
+    const pane = [
+      '● All done — the full task list is closed out.',
+      '',
+      '✻ Baked for 3m 37s',
+      '',
+      '─────────────────────────────',
+      '❯ ',
+      '─────────────────────────────',
+    ].join('\n')
+    expect(paneHasBlockingChoiceMenu(pane)).toBe(false)
+  })
+
+  it('stays quiet on a numbered prose list', () => {
+    const pane = [
+      'The plan is:',
+      '1. Fix the parser',
+      '2. Add tests',
+      '3. Ship it',
+      'Let me know which step to start with.',
+    ].join('\n')
+    expect(paneHasBlockingChoiceMenu(pane)).toBe(false)
+  })
+
+  it('stays quiet once the menu has been answered and output follows', () => {
+    const pane = [RESUME_GATE_MENU, '', 'Resuming from summary…', '✻ Worked for 12s'].join('\n')
+    expect(paneHasBlockingChoiceMenu(pane)).toBe(false)
   })
 })
 
