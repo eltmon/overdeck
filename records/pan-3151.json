@@ -251,7 +251,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:28:25.519Z",
+  "updated": "2026-07-27T14:28:31.081Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
@@ -261,10 +261,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:28:24.780Z",
+    "updatedAt": "2026-07-27T14:28:31.071Z",
     "reviewNotes": "the new v62 repair runs after the current-version early return, so v62 databases still miss review_cycle_history",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
-    "reviewedAtCommit": "d31e1b54458f16a5789b52b8bf26e4d895f9e500",
+    "reviewedAtCommit": "a2ee827fa70532ffd1d941afc332e13473318e33",
     "reviewSpawnedAt": "2026-07-27T14:27:04.500Z"
   },
   "closeOut": {
@@ -331,7 +331,7 @@
       },
       "costAtCloseOut": {
         "usd": 209.2159623,
-        "pricingAsOf": "2026-07-27T14:28:24.799Z"
+        "pricingAsOf": "2026-07-27T14:28:31.076Z"
       }
     },
     "merges": [
