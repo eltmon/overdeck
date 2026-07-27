@@ -491,6 +491,11 @@ green. A red guard test means you've reopened the loop. Adding new work to the
 post-merge path (e.g. a rolling re-rebase fan-out) is fine as long as it stays
 idempotent and the test stays green.
 
+A merge to `main` doesn't just complete `postMergeLifecycle` for the merged issue —
+it can silently invalidate every *other* open branch touching the same files; the
+branch-invalidation deacon sweep (PAN-3154) detects, marks, and notifies those
+branches within one patrol cycle, see [`docs/MERGE-WORKFLOW.md`](docs/MERGE-WORKFLOW.md#branch-invalidation-sweep).
+
 ## postMergeLifecycle Verify Handoff and Docker Cleanup
 
 `postMergeLifecycle()` in `merge-agent.ts` is a non-destructive merge handoff. After

@@ -11,7 +11,7 @@ import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 61;
+export const SCHEMA_VERSION = 62;
 
 function tryIdempotentDdl(db: SqliteDatabase, targetVersion: number, statement: string): void {
   try {
@@ -249,6 +249,8 @@ export function initSchema(db: SqliteDatabase): void {
       review_spawned_at     TEXT,
       -- PAN-1765: timestamp when conflict resolution was dispatched
       conflict_resolution_dispatched_at TEXT,
+      -- PAN-3154: main-head SHA/paths that first made this branch conflict (JSON)
+      conflicts_since        TEXT,
       -- PAN-699: number of test-agent dispatch retries (circuit breaker)
       test_retry_count      INTEGER DEFAULT 0,
       -- PAN-794: parallel-review re-dispatch retry counter (scoped to current recovery cycle)
@@ -1721,6 +1723,18 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
     tryIdempotentDdl(db, 61, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
     tryIdempotentDdl(db, 61, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
   }
+
+  // v61 -> v62: PAN-3154 record the main-head SHA/paths that first made a branch conflict.
+  if (currentVersion < 62) {
+    tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN conflicts_since TEXT');
+    // A database already stamped exactly v61 hits neither the `currentVersion < 61`
+    // block above nor the `currentVersion === SCHEMA_VERSION` no-version-bump top-up
+    // (SCHEMA_VERSION is now 62, not 61) — repeat these two idempotent v61 top-ups
+    // here so a v61 -> v62 upgrade never stamps v62 while missing them.
+    tryIdempotentDdl(db, 62, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
+    tryIdempotentDdl(db, 62, 'ALTER TABLE agents ADD COLUMN started_by TEXT');
+  }
+
   // After all migrations, set the version
   db.pragma(`user_version = ${SCHEMA_VERSION}`);
 }
