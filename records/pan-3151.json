@@ -137,9 +137,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-27T14:19:39.359Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-27T14:26Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-27T14:26:05.061Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-27T14:26:05Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nmain already ships schema version 62, so merged PAN-3151 skips review_cycle_history on existing v62 databases\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -228,7 +241,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:26:04.325Z",
+  "updated": "2026-07-27T14:26:05.061Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
