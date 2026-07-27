@@ -274,6 +274,7 @@ export function handleContainerOrchestration(input: {
   agentSessionName: string;
   role: Role;
   effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | null;
+  startedBy: string;
   allowHost: boolean;
   spawnModel: string;
   spawnGuardrails: SpawnGuardrailDecision;
@@ -290,6 +291,7 @@ export function handleContainerOrchestration(input: {
       agentSessionName,
       role,
       effectiveHarness,
+      startedBy,
       allowHost,
       spawnModel,
       spawnGuardrails,
@@ -376,18 +378,17 @@ export function handleContainerOrchestration(input: {
           const earlyAgentId = agentSessionName;
           const earlyStateDir = join(homedir(), '.overdeck', 'agents', earlyAgentId);
           yield* Effect.promise(() => mkdir(earlyStateDir, { recursive: true }));
-          // PAN-1048 R2: legacy `runtime` field removed; PAN-1055: persist user-picked harness.
-          saveAgentStateSync({
-            id: earlyAgentId,
+          saveAgentStateSync(buildContainerStartState({
+            agentSessionName: earlyAgentId,
             issueId,
-            ...(effectiveHarness ? { harness: effectiveHarness } : {}),
-            model: 'pending-container-start',
+            workspacePath,
+            role,
+            effectiveHarness,
+            startedBy,
+            allowHost,
             status: 'starting',
             startedAt: new Date().toISOString(),
-            workspace: workspacePath,
-            role,
-            hostOverride: allowHost || undefined,
-          });
+          }));
           updateRegistryForAgentStart(issueId, workspacePath, earlyAgentId);
           yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_waiting_for_containers', {
             issueId,
@@ -445,17 +446,17 @@ export function handleContainerOrchestration(input: {
                   });
 
                   if (!healthy) {
-                    // PAN-1048 R2: legacy `runtime` removed; PAN-1055: persist user-picked harness.
-                    saveAgentStateSync({
-                      id: earlyAgentId,
+                    saveAgentStateSync(buildContainerStartState({
+                      agentSessionName: earlyAgentId,
                       issueId,
-                      ...(effectiveHarness ? { harness: effectiveHarness } : {}),
-                      model: 'pending-container-start',
+                      workspacePath,
+                      role,
+                      effectiveHarness,
+                      startedBy,
+                      allowHost,
                       status: 'error',
                       startedAt: new Date().toISOString(),
-                      workspace: workspacePath,
-                      role,
-                    });
+                    }));
                     return;
                   }
 
@@ -504,16 +505,19 @@ export function handleContainerOrchestration(input: {
                     issueId,
                     error: errorMessage,
                   }).catch(() => undefined);
-                  // PAN-1048 R2: legacy `runtime` removed from state writes.
-                  try { saveAgentStateSync({
-                    id: earlyAgentId,
-                    issueId,
-                    model: 'pending-container-start',
-                    status: 'error',
-                    startedAt: new Date().toISOString(),
-                    workspace: workspacePath,
-                    role,
-                  }); } catch { /* non-fatal */ }
+                  try {
+                    saveAgentStateSync(buildContainerStartState({
+                      agentSessionName: earlyAgentId,
+                      issueId,
+                      workspacePath,
+                      role,
+                      effectiveHarness,
+                      startedBy,
+                      allowHost,
+                      status: 'error',
+                      startedAt: new Date().toISOString(),
+                    }));
+                  } catch { /* non-fatal */ }
                   console.error(`[start-agent] Background container startup failed for ${issueId}:`, err);
                 }
               })();

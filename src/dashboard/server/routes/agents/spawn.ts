@@ -816,6 +816,7 @@ export const postAgentsRoute = HttpRouter.add(
       agentSessionName,
       role,
       effectiveHarness,
+      startedBy,
       allowHost,
       spawnModel,
       spawnGuardrails,
