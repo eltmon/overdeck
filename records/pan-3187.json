@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T05:23:54.667Z",
+  "updated": "2026-07-27T05:24:07.877Z",
   "pipeline": {
     "issueId": "PAN-3187",
     "reviewStatus": "pending",
@@ -61,8 +61,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "reap-closed-issue-review-requests": {
+        "writerId": "agent-pan-3187",
+        "agentId": "agent-pan-3187",
+        "pid": 1138307,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:24:07.877Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3187",
@@ -125,6 +133,7 @@
     "clear-stale-review-request-on-read": "completed",
     "clear-stale-review-request-on-read.clear-stale-review-request-on-read.ac1": "completed",
     "clear-stale-review-request-on-read.clear-stale-review-request-on-read.ac2": "completed",
-    "clear-stale-review-request-on-read.clear-stale-review-request-on-read.ac3": "completed"
+    "clear-stale-review-request-on-read.clear-stale-review-request-on-read.ac3": "completed",
+    "reap-closed-issue-review-requests": "running"
   }
 }
