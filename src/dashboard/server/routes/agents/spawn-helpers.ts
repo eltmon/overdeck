@@ -281,6 +281,7 @@ export function handleContainerOrchestration(input: {
   projectPath: string;
   eventStore: EventStoreAppend;
   spawnPanCommand: SpawnPanCommand;
+  markWorkStartAccepted: () => Promise<void>;
   updateIssueStatus: () => Promise<void>;
 }) {
   return Effect.gen(function* () {
@@ -298,6 +299,7 @@ export function handleContainerOrchestration(input: {
       projectPath,
       eventStore,
       spawnPanCommand,
+      markWorkStartAccepted,
       updateIssueStatus,
     } = input;
 
@@ -484,20 +486,22 @@ export function handleContainerOrchestration(input: {
                     harness: effectiveHarness,
                   });
                   emitStartAgentPhase(issueId, 'spawn', 'start', 'starting local work agent after containers became healthy', { workspacePath });
-                  const activityId = await spawnPanCommand(
-                    buildPanStartArgs({
+                  const activityId = await requestWorkStartAfterContainers({
+                    args: buildPanStartArgs({
                       issueId,
                       model: spawnModel,
                       harness: effectiveHarness,
                       allowHost,
                     }),
                     workspacePath,
-                  );
+                    spawnPanCommand,
+                    markWorkStartAccepted,
+                    updateIssueStatus,
+                  });
                   emitStartAgentPhase(issueId, 'spawn', 'success', 'local work agent spawn requested after container startup', {
                     workspacePath,
                     activityId,
                   });
-                  await updateIssueStatus();
                 } catch (err: any) {
                   const errorMessage = err instanceof Error ? err.message : String(err);
                   emitStartAgentPhase(issueId, 'spawn', 'failure', errorMessage, { workspacePath });

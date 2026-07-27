@@ -396,6 +396,23 @@ describe('completePlanningArtifacts', () => {
     expect(consumeAutoSpawnConsent).toHaveBeenCalledWith('PAN-1146');
   });
 
+  it('reports a successful auto-spawn when consent cleanup fails', async () => {
+    const logWarning = vi.fn();
+
+    await expect(completePlanningAutoSpawn({
+      issueId: 'PAN-1146',
+      autoSpawn: true,
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl: async () => new Response(JSON.stringify({ success: true, agentId: 'agent-pan-1146' }), { status: 200 }),
+      consumeAutoSpawnConsent: async () => { throw new Error('read-only filesystem'); },
+      logWarning,
+    })).resolves.toEqual({
+      workAgentSpawned: true,
+      workAgentSession: 'agent-pan-1146',
+    });
+    expect(logWarning).toHaveBeenCalledWith(expect.stringContaining('consent cleanup failed: read-only filesystem'));
+  });
+
   it('retains current-cycle consent when auto-spawn fails', async () => {
     await writeAutoSpawnOnFinalizeFlag('PAN-1146', true);
     const result = await completePlanningAutoSpawn({

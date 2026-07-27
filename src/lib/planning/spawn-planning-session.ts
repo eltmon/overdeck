@@ -88,8 +88,23 @@ export async function writeAutoSpawnOnFinalizeFlag(issueId: string, enabled: boo
   await writeFile(flagFile, JSON.stringify({ autoSpawnOnFinalize: enabled }));
 }
 
-export async function updateAutoSpawnConsentAfterWorkStart(issueId: string, accepted: boolean): Promise<void> {
-  if (accepted) await writeAutoSpawnOnFinalizeFlag(issueId, false);
+export async function updateAutoSpawnConsentAfterWorkStart(
+  issueId: string,
+  accepted: boolean,
+  dependencies: {
+    writeFlag?: typeof writeAutoSpawnOnFinalizeFlag;
+    logWarning?: (message: string) => void;
+  } = {},
+): Promise<void> {
+  if (!accepted) return;
+  try {
+    await (dependencies.writeFlag ?? writeAutoSpawnOnFinalizeFlag)(issueId, false);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    (dependencies.logWarning ?? console.warn)(
+      `[planning] Work start for ${issueId.toUpperCase()} succeeded, but auto-start consent cleanup failed: ${message}`,
+    );
+  }
 }
 
 /**

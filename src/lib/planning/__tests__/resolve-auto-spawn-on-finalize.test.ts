@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -69,6 +69,17 @@ describe('resolveAutoSpawnOnFinalize', () => {
 
     await updateAutoSpawnConsentAfterWorkStart(ISSUE, true);
     expect(readAutoSpawnOnFinalizeFlag(ISSUE)).toBe(false);
+  });
+
+  it('keeps a successful work start successful when consent cleanup fails', async () => {
+    const logWarning = vi.fn();
+
+    await expect(updateAutoSpawnConsentAfterWorkStart(ISSUE, true, {
+      writeFlag: async () => { throw new Error('read-only filesystem'); },
+      logWarning,
+    })).resolves.toBeUndefined();
+
+    expect(logWarning).toHaveBeenCalledWith(expect.stringContaining('consent cleanup failed: read-only filesystem'));
   });
 
   it('falls back to the current-cycle flag when the request omits autoSpawn', async () => {

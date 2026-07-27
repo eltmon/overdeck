@@ -19,7 +19,7 @@ vi.mock('../../../../lib/agents.js', () => ({
 }));
 
 import { resolveStartAgentGateForRoute, spawnAfterClearingStartGates } from '../agents/spawn.js';
-import { buildAgentStartPlaceholder, buildContainerStartState } from '../agents/spawn-helpers.js';
+import { buildAgentStartPlaceholder, buildContainerStartState, requestWorkStartAfterContainers } from '../agents/spawn-helpers.js';
 import type { AgentState } from '../../../../lib/agents.js';
 
 function makeState(overrides: Partial<AgentState> & { id: string; issueId: string }): AgentState {
@@ -74,6 +74,38 @@ describe('buildContainerStartState', () => {
       startedBy: 'planning-auto-handoff',
       harness: 'claude-code',
     });
+  });
+});
+
+describe('requestWorkStartAfterContainers', () => {
+  it('consumes consent only after the work start command succeeds', async () => {
+    const events: string[] = [];
+
+    await expect(requestWorkStartAfterContainers({
+      args: ['start', 'PAN-3111'],
+      workspacePath: '/tmp/workspace',
+      spawnPanCommand: async () => { events.push('spawn'); return 'activity-1'; },
+      markWorkStartAccepted: async () => { events.push('accepted'); },
+      updateIssueStatus: async () => { events.push('status'); },
+    })).resolves.toBe('activity-1');
+
+    expect(events).toEqual(['spawn', 'accepted', 'status']);
+  });
+
+  it('retains consent when the work start command fails', async () => {
+    const markWorkStartAccepted = vi.fn(async () => undefined);
+    const updateIssueStatus = vi.fn(async () => undefined);
+
+    await expect(requestWorkStartAfterContainers({
+      args: ['start', 'PAN-3111'],
+      workspacePath: '/tmp/workspace',
+      spawnPanCommand: async () => { throw new Error('spawn failed'); },
+      markWorkStartAccepted,
+      updateIssueStatus,
+    })).rejects.toThrow('spawn failed');
+
+    expect(markWorkStartAccepted).not.toHaveBeenCalled();
+    expect(updateIssueStatus).not.toHaveBeenCalled();
   });
 });
 

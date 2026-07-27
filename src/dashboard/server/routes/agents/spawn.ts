@@ -823,14 +823,10 @@ export const postAgentsRoute = HttpRouter.add(
       projectPath,
       eventStore,
       spawnPanCommand,
+      markWorkStartAccepted,
       updateIssueStatus,
     });
-    if (containerResponse) {
-      if (containerResponse.status >= 200 && containerResponse.status < 300) {
-        yield* Effect.promise(markWorkStartAccepted);
-      }
-      return containerResponse;
-    }
+    if (containerResponse) return containerResponse;
 
     // Containers already ready or no containers needed. Claim the spawn before
     // launching `pan start`: two requests can pass the lifecycle read together,
