@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { Data, Effect } from 'effect';
 import { getAgentStateSync, getAgentState, getAgentRuntimeStateSync, getAgentRuntimeState, getLatestSessionIdSync, getLatestSessionId, normalizeAgentId } from './agents.js';
+import { claudeSessionTranscriptExists } from './paths.js';
 import { sessionExistsSync, sessionExists } from './tmux.js';
 
 export type WorkAgentOperation = 'start' | 'resume' | 'restart_with_context' | 'reset_session';
@@ -12,6 +13,7 @@ export interface WorkAgentLifecycleState {
   hasAgentState: boolean;
   hasLiveTmuxSession: boolean;
   hasSavedSession: boolean;
+  hasResumableTranscript: boolean;
   hasWorkspace: boolean;
   isPlaceholder: boolean;
   isOrphaned: boolean;
@@ -50,9 +52,14 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
   const agentState = getAgentStateSync(agentId);
   const runtimeState = getAgentRuntimeStateSync(agentId);
   const hasAgentState = !!agentState;
-  const hasSavedSession = !!getLatestSessionIdSync(agentId);
+  const sessionId = getLatestSessionIdSync(agentId) ?? null;
+  const hasSavedSession = !!sessionId;
   const hasLiveTmuxSession = sessionExistsSync(agentId);
   const hasWorkspace = !!agentState?.workspace && existsSync(agentState.workspace);
+  const hasResumableTranscript = !sessionId
+    || (!!agentState?.harness && agentState.harness !== 'claude-code')
+    || !agentState?.workspace
+    || claudeSessionTranscriptExists(agentState.workspace, sessionId);
   const agentStatus = agentState?.status || 'unknown';
   const runtime = runtimeState?.state || 'uninitialized';
   const isCompleted = runtimeState?.resolution === 'completed';
@@ -69,7 +76,7 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
     (hasSavedSession && !hasResumableBackingState)
     || (hasAgentState && (!hasWorkspace || isPlaceholder))
   );
-  const requiresSessionResetBeforeFreshStart = hasSavedSession && !hasLiveTmuxSession && hasResumableBackingState && (isStopped || isCrashed);
+  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableTranscript && !hasLiveTmuxSession && hasResumableBackingState && (isStopped || isCrashed);
 
   let recommendedAction: WorkAgentRecommendedAction = 'start';
   let reason: string | undefined;
@@ -91,6 +98,9 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
     reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it, or 'pan start ${agentOrIssueId} --fresh' to start a new session (e.g. to switch model).`;
+  } else if (hasSavedSession && !hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed)) {
+    recommendedAction = 'start';
+    reason = `Agent ${agentId} has a saved Claude session id but its transcript is missing on disk (jsonl-missing). Start Agent will create a fresh session in the existing workspace.`;
   } else if (hasAgentState && !hasSavedSession && isStopped) {
     recommendedAction = 'start';
     reason = `Agent ${agentId} is stopped and has no saved Claude session. Start Agent will create a fresh session in the existing workspace.`;
@@ -104,6 +114,7 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
     hasAgentState,
     hasLiveTmuxSession,
     hasSavedSession,
+    hasResumableTranscript,
     hasWorkspace,
     isPlaceholder,
     isOrphaned,
@@ -119,9 +130,9 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
     // session — no resume needed. Stuck agents (isRunning=true, isRunningButStuck=true) must
     // use the dedicated isRunningButStuck flag at call sites; canResumeSession stays false for
     // them so `isRunning` and `canResumeSession` are never simultaneously true.
-    canResumeSession: !isRunning && hasSavedSession && hasResumableBackingState && (isStopped || isCrashed),
+    canResumeSession: !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed),
     canRestartWithContext: hasAgentState && hasWorkspace,
-    canResetSession: hasSavedSession && hasResumableBackingState,
+    canResetSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState,
     requiresSessionResetBeforeFreshStart,
     recommendedAction,
     reason,
@@ -133,9 +144,14 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
   const agentState = await Effect.runPromise(getAgentState(agentId));
   const runtimeState = await Effect.runPromise(getAgentRuntimeState(agentId));
   const hasAgentState = !!agentState;
-  const hasSavedSession = !!(await Effect.runPromise(getLatestSessionId(agentId)));
+  const sessionId = await Effect.runPromise(getLatestSessionId(agentId)) ?? null;
+  const hasSavedSession = !!sessionId;
   const hasLiveTmuxSession = await Effect.runPromise(sessionExists(agentId));
   const hasWorkspace = !!agentState?.workspace && await pathExists(agentState.workspace);
+  const hasResumableTranscript = !sessionId
+    || (!!agentState?.harness && agentState.harness !== 'claude-code')
+    || !agentState?.workspace
+    || claudeSessionTranscriptExists(agentState.workspace, sessionId);
   const agentStatus = agentState?.status || 'unknown';
   const runtime = runtimeState?.state || 'uninitialized';
   const isCompleted = runtimeState?.resolution === 'completed';
@@ -149,7 +165,7 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     (hasSavedSession && !hasResumableBackingState)
     || (hasAgentState && (!hasWorkspace || isPlaceholder))
   );
-  const requiresSessionResetBeforeFreshStart = hasSavedSession && !hasLiveTmuxSession && hasResumableBackingState && (isStopped || isCrashed);
+  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableTranscript && !hasLiveTmuxSession && hasResumableBackingState && (isStopped || isCrashed);
 
   let recommendedAction: WorkAgentRecommendedAction = 'start';
   let reason: string | undefined;
@@ -171,6 +187,9 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
     reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it, or 'pan start ${agentOrIssueId} --fresh' to start a new session (e.g. to switch model).`;
+  } else if (hasSavedSession && !hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed)) {
+    recommendedAction = 'start';
+    reason = `Agent ${agentId} has a saved Claude session id but its transcript is missing on disk (jsonl-missing). Start Agent will create a fresh session in the existing workspace.`;
   } else if (hasAgentState && !hasSavedSession && isStopped) {
     recommendedAction = 'start';
     reason = `Agent ${agentId} is stopped and has no saved Claude session. Start Agent will create a fresh session in the existing workspace.`;
@@ -184,6 +203,7 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     hasAgentState,
     hasLiveTmuxSession,
     hasSavedSession,
+    hasResumableTranscript,
     hasWorkspace,
     isPlaceholder,
     isOrphaned,
@@ -201,9 +221,9 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     // them so `isRunning` and `canResumeSession` are never simultaneously true.
     // PAN-2908: the async snapshot used to omit hasSavedSession here — every stopped agent with
     // a workspace looked resumable, so the CTA offered Resume with nothing to resume (PAN-806).
-    canResumeSession: !isRunning && hasSavedSession && hasResumableBackingState && (isStopped || isCrashed),
+    canResumeSession: !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed),
     canRestartWithContext: hasAgentState && hasWorkspace,
-    canResetSession: hasSavedSession && hasResumableBackingState,
+    canResetSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState,
     requiresSessionResetBeforeFreshStart,
     recommendedAction,
     reason,

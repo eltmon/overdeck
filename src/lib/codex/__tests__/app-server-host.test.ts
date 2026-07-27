@@ -191,7 +191,9 @@ describe('CodexAppServerHost', () => {
       pendingRequests: [{ id: 71, method: 'item/commandExecution/requestApproval', params: { command: 'git status' } }],
     });
     await vi.waitFor(() => {
-      expect(readEventLog()).toContainEqual(expect.objectContaining({ type: 'request' }));
+      expect(readEventLog()).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'request', id: 71, method: 'item/commandExecution/requestApproval' }),
+      ]));
     });
   });
 

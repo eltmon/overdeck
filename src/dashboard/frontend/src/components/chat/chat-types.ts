@@ -49,6 +49,15 @@ export interface WorkLogEntry {
   sequence?: number;
 }
 
+export interface SubagentSummary {
+  agentId: string;
+  agentType: string;
+  description: string;
+  toolUseId: string;
+  spawnDepth: number;
+  status: 'running' | 'done';
+}
+
 export interface ProposedPlan {
   id: string;
   plan: string;
@@ -87,7 +96,8 @@ export interface ContextUsage {
 
 export type ConversationEvent =
   | { kind: 'messages'; messages: ChatMessage[]; workLog: WorkLogEntry[]; streaming: boolean; snapshot?: boolean; proposedPlan?: ProposedPlan; compactBoundaries?: CompactBoundary[]; contextUsage?: ContextUsage | null }
-  | { kind: 'discovering' };
+  | { kind: 'discovering' }
+  | { kind: 'subagents'; subagents: SubagentSummary[] };
 
 // ─── Turn Diff Types ─────────────────────────────────────────────────────────
 // Mirror T3Code's types from apps/web/src/types.ts

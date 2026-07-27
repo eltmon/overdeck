@@ -8,9 +8,11 @@ import { needsReviewDispatch } from '../review-dispatch-decision.js';
  * silently strands the issue at "done but never reviewed" — exactly the failure this fixed.
  */
 describe('needsReviewDispatch (PAN-1988 — auto-heal from durable journal intent)', () => {
+  const now = Date.parse('2026-06-20T12:30:00Z');
+
   describe('DISPATCH owed', () => {
     it('first request, review never spawned', () => {
-      expect(needsReviewDispatch({ reviewRequestedAt: '2026-06-20T10:00:00Z', reviewStatus: 'pending' })).toBe(true);
+      expect(needsReviewDispatch({ reviewRequestedAt: '2026-06-20T10:00:00Z', reviewStatus: 'pending', now })).toBe(true);
     });
 
     it('re-request after a blocked verdict (request newer than last spawn)', () => {
@@ -18,6 +20,7 @@ describe('needsReviewDispatch (PAN-1988 — auto-heal from durable journal inten
         reviewRequestedAt: '2026-06-20T12:00:00Z',
         reviewSpawnedAt: '2026-06-20T10:00:00Z',
         reviewStatus: 'blocked',
+        now,
       })).toBe(true);
     });
 
@@ -26,6 +29,7 @@ describe('needsReviewDispatch (PAN-1988 — auto-heal from durable journal inten
         reviewRequestedAt: '2026-06-20T12:00:00Z',
         reviewSpawnedAt: '2026-06-20T10:00:00Z',
         reviewStatus: 'pending',
+        now,
       })).toBe(true);
     });
   });

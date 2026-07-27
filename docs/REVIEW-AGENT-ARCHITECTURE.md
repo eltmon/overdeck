@@ -71,7 +71,15 @@ The full round trip between the work agent and review:
    **guards** passed, skipped, and `readyForMerge` states from dispatch. Genuine
    re-review paths reset `reviewStatus` to `pending` first. PAN-3083 added the
    consumption and guards after an unconsumed intent repeatedly re-dispatched
-   passed-and-ready issues and invalidated their UAT generations.
+   passed-and-ready issues and invalidated their UAT generations. An unserviced
+   intent dies after `REVIEW_REQUEST_MAX_AGE_MS` (7 days): the next status read
+   clears it from the journal and emits one warning plus an activity entry. The
+   closed-issue reaper also clears unserviced intent when the tracker issue closes;
+   its patrol reads durable journals asynchronously and checks tracker closure in
+   bounded groups of four so pending requests cannot serialize the Deacon loop.
+   Host-side dispatch runs only in the dashboard server process, because only that
+   process registers the durable review pipeline handler; CLI processes emit at
+   most one debug line per process and skip dispatch.
 2. **Review runs** in the resolved mode (above). Sessions are **warm by
    default** (PAN-2579): recording a verdict never kills the session; re-review
    resumes reviewers with their prior-cycle context.

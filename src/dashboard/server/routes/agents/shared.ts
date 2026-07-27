@@ -12,7 +12,7 @@ import type { AgentStatus } from '@overdeck/contracts';
 
 import { jsonResponse } from '../../http-helpers.js';
 import { getHeaderFromMap } from '../origin-validation.js';
-import { getOverdeckHome } from '../../../../lib/paths.js';
+import { claudeSessionTranscriptExists, getOverdeckHome } from '../../../../lib/paths.js';
 import { resolvePrimaryWorkspaceRepoDirSync } from '../../../../lib/project-repos.js';
 import {
   appendAgentLifecycleLog,
@@ -281,8 +281,13 @@ function buildStoppedAgentLifecycle(
   // resumable thread in codex-thread-id, which getLatestSessionIdSync resolves
   // (PAN-1988). Without the fallback the listing reports canResumeSession=false
   // for every stopped codex agent and the UI never offers Resume.
-  const hasSavedSession = !!runtimeData.claudeSessionId || !!getLatestSessionIdSync(agentId);
+  const sessionId = getLatestSessionIdSync(agentId) ?? runtimeData.claudeSessionId ?? null;
+  const hasSavedSession = !!sessionId;
   const hasWorkspace = typeof state.workspace === 'string' && state.workspace.length > 0;
+  const hasResumableTranscript = !sessionId
+    || (!!state.harness && state.harness !== 'claude-code')
+    || !state.workspace
+    || claudeSessionTranscriptExists(state.workspace, sessionId);
   const agentStatus = state.status || 'unknown';
   const runtime = runtimeData.state || 'uninitialized';
   const isCompleted = runtimeData.resolution === 'completed';
@@ -296,7 +301,7 @@ function buildStoppedAgentLifecycle(
     (hasSavedSession && !hasResumableBackingState)
     || (hasAgentState && (!hasWorkspace || isPlaceholder))
   );
-  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableBackingState && (isStopped || isCrashed);
+  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
 
   let recommendedAction: WorkAgentRecommendedAction = 'start';
   let reason: string | undefined;
@@ -309,6 +314,9 @@ function buildStoppedAgentLifecycle(
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
     reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it, or 'pan start ${agentOrIssueId} --fresh' to start a new session (e.g. to switch model).`;
+  } else if (hasSavedSession && !hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed)) {
+    recommendedAction = 'start';
+    reason = `Agent ${agentId} has a saved Claude session id but its transcript is missing on disk (jsonl-missing). Start Agent will create a fresh session in the existing workspace.`;
   } else if (hasAgentState && !hasSavedSession && isStopped) {
     recommendedAction = 'start';
     reason = `Agent ${agentId} is stopped and has no saved Claude session. Start Agent will create a fresh session in the existing workspace.`;
@@ -319,6 +327,7 @@ function buildStoppedAgentLifecycle(
     hasAgentState,
     hasLiveTmuxSession,
     hasSavedSession,
+    hasResumableTranscript,
     hasWorkspace,
     isPlaceholder,
     isOrphaned,
@@ -330,9 +339,9 @@ function buildStoppedAgentLifecycle(
     runtimeState: runtime,
     agentStatus,
     canStartFresh: !requiresSessionResetBeforeFreshStart || isOrphaned,
-    canResumeSession: hasSavedSession && hasResumableBackingState && (isStopped || isCrashed),
+    canResumeSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed),
     canRestartWithContext: hasAgentState && hasWorkspace,
-    canResetSession: hasSavedSession && hasResumableBackingState,
+    canResetSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState,
     requiresSessionResetBeforeFreshStart,
     recommendedAction,
     reason,

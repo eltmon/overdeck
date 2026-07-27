@@ -460,8 +460,8 @@ const getConversationMessagesRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
-      const response = await getConversationMessagesRead(name, conversationReadDependencies);
-      return conversationReadJson(response);
+      const agentId = new URL(request.url, 'http://localhost').searchParams.get('agentId') ?? undefined;
+      return conversationReadJson(await getConversationMessagesRead(name, conversationReadDependencies, agentId));
     });
   }),
 );

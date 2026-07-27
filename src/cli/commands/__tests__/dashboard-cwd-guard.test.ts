@@ -29,6 +29,14 @@ function createFixture(prefix: string): string {
   return root;
 }
 
+function createDashboardBundleFixture(): { serverPath: string; repoRoot: string } {
+  const repoRoot = createFixture('pan-dashboard-bundle-');
+  const serverPath = join(repoRoot, 'dist', 'dashboard', 'server.js');
+  mkdirSync(join(repoRoot, 'dist', 'dashboard'), { recursive: true });
+  writeFileSync(serverPath, 'export {};');
+  return { serverPath, repoRoot };
+}
+
 afterEach(() => {
   process.exitCode = undefined;
   vi.clearAllMocks();
@@ -50,6 +58,7 @@ describe('resolvePrimaryDashboardIdentity', () => {
 
   it('starts the dashboard with the identity root as its working directory', () => {
     const child = { unref: vi.fn() };
+    const bundle = createDashboardBundleFixture();
     processMocks.execFileSync.mockImplementation(() => { throw new Error('systemd unavailable'); });
     processMocks.spawn.mockReturnValue(child);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -59,12 +68,12 @@ describe('resolvePrimaryDashboardIdentity', () => {
       dashboardApiPort: 3011,
       traefikEnabled: false,
       traefikDomain: 'overdeck.localhost',
-    } as Parameters<typeof spawnDashboardDetached>[0]);
+    } as Parameters<typeof spawnDashboardDetached>[0], bundle);
 
     expect(processMocks.spawn).toHaveBeenCalledWith(
       expect.any(String),
-      [resolveBundledServerPath()],
-      expect.objectContaining({ cwd: resolvePrimaryDashboardIdentity().repoRoot }),
+      [bundle.serverPath],
+      expect.objectContaining({ cwd: bundle.repoRoot }),
     );
     expect(child.unref).toHaveBeenCalled();
   });
@@ -95,6 +104,7 @@ describe('resolvePrimaryDashboardIdentity', () => {
   });
 
   it('returns a handle that stops the spawned systemd unit', () => {
+    const bundle = createDashboardBundleFixture();
     processMocks.execFileSync.mockReturnValue(undefined);
     vi.spyOn(Date, 'now').mockReturnValue(123456);
 
@@ -103,7 +113,7 @@ describe('resolvePrimaryDashboardIdentity', () => {
       dashboardApiPort: 3011,
       traefikEnabled: false,
       traefikDomain: 'overdeck.localhost',
-    } as Parameters<typeof spawnDashboardDetached>[0]);
+    } as Parameters<typeof spawnDashboardDetached>[0], bundle);
     handle.stop();
 
     expect(processMocks.execFileSync).toHaveBeenLastCalledWith(
