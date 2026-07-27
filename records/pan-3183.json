@@ -77,7 +77,7 @@
     "recordedAt": "2026-07-27T06:16:36.976Z"
   },
   "created": "2026-07-27T04:30:47.797Z",
-  "updated": "2026-07-27T06:31:03.799Z",
+  "updated": "2026-07-27T06:31:08.688Z",
   "pipeline": {
     "issueId": "PAN-3183",
     "reviewStatus": "blocked",
@@ -87,9 +87,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T06:17:16.404Z",
-    "updatedAt": "2026-07-27T06:31:02.886Z",
+    "updatedAt": "2026-07-27T06:31:08.681Z",
     "reviewNotes": "Boot reconciliation treats failed event/upsert writes as committed transitions, so two-door drift can recur.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3201",
+    "reviewedAtCommit": "ef0ad673749eb895ca4613d028ed4f3c321f27ba",
     "reviewSpawnedAt": "2026-07-27T06:19:56.025Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -165,7 +166,7 @@
       },
       "costAtCloseOut": {
         "usd": 95.04008,
-        "pricingAsOf": "2026-07-27T06:31:02.924Z"
+        "pricingAsOf": "2026-07-27T06:31:08.685Z"
       }
     },
     "merges": [
