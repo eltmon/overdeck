@@ -17,3 +17,7 @@ export function resolveCliStartedBy(
   );
   return runId ? `flywheel:${runId}` : defaultOrigin;
 }
+
+export function isOperatorStartedBy(startedBy: string): boolean {
+  return startedBy.startsWith('operator:') || startedBy === 'dashboard:agent-spawner';
+}

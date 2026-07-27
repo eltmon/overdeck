@@ -388,6 +388,24 @@ describe('spawnAgent PTY supervisor wiring', () => {
     );
   });
 
+  it('lets an explicit operator start proceed when planning consent is unreadable', async () => {
+    writeSupervisorArtifact();
+    const consentDir = join(tmpHome, 'agents', 'planning-pan-1405');
+    mkdirSync(consentDir, { recursive: true });
+    writeFileSync(join(consentDir, 'auto-spawn-on-finalize.json'), '{invalid-json');
+    const { spawnAgent } = await import('../agents.js');
+
+    await expect(spawnAgent({
+      issueId: 'PAN-1405',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      startedBy: 'operator:cli:pan-start',
+    })).resolves.toMatchObject({ status: 'running' });
+
+    expect(createSessionMock).toHaveBeenCalledOnce();
+  });
+
   it('preserves pipeline verdicts and post-merge state when the reviewed anchor is current', async () => {
     writeSupervisorArtifact();
     shouldPreservePipelineVerdictsMock.mockResolvedValue({

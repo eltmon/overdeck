@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -102,6 +102,29 @@ describe('remote agent provenance', () => {
       'utf8',
     ));
     expect(persisted.startedBy).toBe('flywheel:RUN-42');
+  });
+
+  it('lets an explicit operator remote start proceed when planning consent is unreadable', async () => {
+    const consentDir = join(home, '.overdeck', 'agents', 'planning-pan-3112');
+    mkdirSync(consentDir, { recursive: true });
+    writeFileSync(join(consentDir, 'auto-spawn-on-finalize.json'), '{invalid-json');
+    const { spawnRemoteAgent } = await import('../../../src/lib/remote/remote-agents.js');
+
+    await expect(spawnRemoteAgent({
+      issueId: 'PAN-3112',
+      workspace: {
+        id: 'remote-pan-3112',
+        issue: 'PAN-3112',
+        provider: 'fly',
+        vmName: 'pan-3112-vm',
+        urls: {},
+        created: new Date('2026-07-26T00:00:00.000Z'),
+        location: 'remote',
+      },
+      model: 'claude-sonnet-4-6',
+      startedBy: 'operator:dashboard',
+      tier: 'ephemeral',
+    })).resolves.toMatchObject({ status: 'running' });
   });
 
   it('exports provenance in the direct remote command without a prompt', async () => {

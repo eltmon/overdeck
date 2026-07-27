@@ -82,6 +82,7 @@ import { stopAgent } from './termination.js';
 import { createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
 import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
 import { withAutoSpawnConsentClaim } from '../planning/auto-spawn-consent.js';
+import { isOperatorStartedBy } from './provenance.js';
 import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './registered-slot-spawn.js';
 const execAsync = promisify(exec);
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
@@ -493,9 +494,15 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const role: 'work' | 'strike' | 'knowledge' = options.role ?? 'work';
   if (role !== 'work') return spawnAgentWithoutConsentClaim(options);
+
+  const flywheelRunId = resolveFlywheelSpawnEnv(role, options.flywheelRunId).OVERDECK_FLYWHEEL_RUN_ID;
+  const startedBy = resolveAgentStartedBy(options.startedBy, flywheelRunId);
+  const resolvedOptions = { ...options, startedBy };
+  if (isOperatorStartedBy(startedBy)) return spawnAgentWithoutConsentClaim(resolvedOptions);
+
   return withAutoSpawnConsentClaim(
     options.issueId,
-    () => spawnAgentWithoutConsentClaim(options),
+    () => spawnAgentWithoutConsentClaim(resolvedOptions),
     { isAccepted: (state) => state.status === 'running' && state.kickoffDelivered !== false },
   );
 }

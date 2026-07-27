@@ -29,6 +29,7 @@ import { getClaudePermissionFlagsSync, getClaudePermissionFlagsStringSync } from
 import { resolveProjectForIssue } from '../pan-dir/record.js';
 import { isStateMigrated } from '../state-home.js';
 import { withAutoSpawnConsentClaim } from '../planning/auto-spawn-consent.js';
+import { isOperatorStartedBy } from '../agents/provenance.js';
 
 export { sendToRemoteAgentKeyed } from './remote-keyed-delivery.js';
 export type { RemoteKeyedDeliveryOutcome, RemoteKeyedExec } from './remote-keyed-delivery.js';
@@ -546,6 +547,8 @@ export async function writeRemoteFile(
  * Spawn a Claude agent on a remote VM
  */
 export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promise<RemoteAgentState> {
+  if (isOperatorStartedBy(options.startedBy)) return spawnRemoteAgentWithoutConsentClaim(options);
+
   return withAutoSpawnConsentClaim(
     options.issueId,
     () => spawnRemoteAgentWithoutConsentClaim(options),
