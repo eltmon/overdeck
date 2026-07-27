@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T13:35:42.946Z",
-  "updated": "2026-07-27T18:07:00.856Z",
+  "updated": "2026-07-27T18:07:03.958Z",
   "pipeline": {
     "issueId": "PAN-3206",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "docs-and-role-prompt-fixes": {
-        "writerId": "agent-pan-3206",
-        "agentId": "agent-pan-3206",
-        "pid": 3427934,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T14:38:48.146Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3206",
@@ -114,6 +106,17 @@
         "outcome": "completed",
         "reason": "Added an agents-table-backed live work-session fallback and excluded review/test/inspect/ship/plan/conversation/planning sessions with regression coverage",
         "releasedAt": "2026-07-27T18:07:00.856Z"
+      },
+      {
+        "writerId": "agent-pan-3206",
+        "agentId": "agent-pan-3206",
+        "pid": 3427934,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T14:38:48.146Z",
+        "itemId": "docs-and-role-prompt-fixes",
+        "outcome": "completed",
+        "reason": "Documented all verdict application layers and corrected review runtime artifact paths from .overdeck/review to .pan/review",
+        "releasedAt": "2026-07-27T18:07:03.957Z"
       }
     ],
     "statusReasons": {
@@ -128,6 +131,10 @@
       "feedback-target-agents-table-tier": {
         "reason": "Added an agents-table-backed live work-session fallback and excluded review/test/inspect/ship/plan/conversation/planning sessions with regression coverage",
         "updatedAt": "2026-07-27T18:07:00.856Z"
+      },
+      "docs-and-role-prompt-fixes": {
+        "reason": "Documented all verdict application layers and corrected review runtime artifact paths from .overdeck/review to .pan/review",
+        "updatedAt": "2026-07-27T18:07:03.957Z"
       }
     }
   },
@@ -138,7 +145,7 @@
     "verdict-report-helper.verdict-report-helper.ac3": "completed",
     "pending-verdict-sweep": "completed",
     "feedback-target-agents-table-tier": "completed",
-    "docs-and-role-prompt-fixes": "running",
+    "docs-and-role-prompt-fixes": "completed",
     "pending-verdict-sweep.pending-verdict-sweep.ac1": "completed",
     "pending-verdict-sweep.pending-verdict-sweep.ac2": "completed",
     "pending-verdict-sweep.pending-verdict-sweep.ac3": "completed",
@@ -146,6 +153,8 @@
     "pending-verdict-sweep.pending-verdict-sweep.ac5": "completed",
     "feedback-target-agents-table-tier.feedback-target-agents-table-tier.ac1": "completed",
     "feedback-target-agents-table-tier.feedback-target-agents-table-tier.ac2": "completed",
-    "feedback-target-agents-table-tier.feedback-target-agents-table-tier.ac3": "completed"
+    "feedback-target-agents-table-tier.feedback-target-agents-table-tier.ac3": "completed",
+    "docs-and-role-prompt-fixes.docs-and-role-prompt-fixes.ac1": "completed",
+    "docs-and-role-prompt-fixes.docs-and-role-prompt-fixes.ac2": "completed"
   }
 }
