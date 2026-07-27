@@ -612,7 +612,7 @@
     "recordedAt": "2026-07-27T04:09:15.777Z"
   },
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-27T04:59:35.773Z",
+  "updated": "2026-07-27T05:00:06.870Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "blocked",
@@ -1049,5 +1049,15 @@
     "docs-pickup-gate-provenance.docs-pickup-gate-provenance.ac1": "completed",
     "docs-pickup-gate-provenance.docs-pickup-gate-provenance.ac2": "completed",
     "docs-pickup-gate-provenance.docs-pickup-gate-provenance.ac3": "completed"
-  }
+  },
+  "recoveryTrips": [
+    {
+      "issue": "PAN-3111",
+      "recoveryPath": "operator-stopped-rework",
+      "obligationGeneration": "2026-07-27T04:45:56.555Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-27T05:00:06.835Z"
+    }
+  ]
 }
