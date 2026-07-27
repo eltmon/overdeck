@@ -833,13 +833,7 @@ export interface BackfillAgentsSyncResult {
   markedStoppedIds: Array<{ id: string; previousStatus: string }>;
 }
 
-/**
- * Read each agent's state.json from ~/.overdeck/agents/ and upsert rows into
- * the overdeck agents table. Reconciles running/starting agents against live
- * tmux sessions.
- *
- * Replaces database/agent-backfill.ts backfillAgentsAutoSync for the overdeck layer.
- */
+/** Rebuild the agents table from state.json and reconcile statuses against live tmux. */
 /**
  * All agent ids matching a prefix — unions the overdeck.db rows and the on-disk state
  * dirs, so it catches both row-only and dir-only orphans (the two can drift apart).
@@ -939,10 +933,7 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
       // Reconcile: mark stopped if no live tmux session
       if ((state.status === 'running' || state.status === 'starting') && !liveSessions.has(state.id)) {
         const previousStatus = state.status;
-        logAgentLifecycleSync(
-          state.id,
-          `status changed: ${previousStatus} → stopped (boot backfill reconcile: no live tmux session)`,
-        );
+        logAgentLifecycleSync(state.id, `status changed: ${previousStatus} → stopped (boot backfill reconcile: no live tmux session)`);
         markedStoppedIds.push({ id: state.id, previousStatus });
         state.status = 'stopped';
         state.stoppedAt = state.stoppedAt ?? new Date().toISOString();
