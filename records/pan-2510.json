@@ -84,7 +84,7 @@
     "recordedAt": "2026-07-09T00:19:08.915Z"
   },
   "created": "2026-07-08T23:07:44.941Z",
-  "updated": "2026-07-27T05:58:41.439Z",
+  "updated": "2026-07-27T05:58:55.333Z",
   "pipeline": {
     "issueId": "PAN-2510",
     "reviewStatus": "pending",
@@ -92,7 +92,7 @@
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T05:58:41.397Z",
+    "updatedAt": "2026-07-27T05:58:55.297Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -147,7 +147,7 @@
       "recordedAt": "2026-07-09T00:19:08.915Z"
     },
     "closedOut": true,
-    "closedOutAt": "2026-07-27T05:58:41.397Z"
+    "closedOutAt": "2026-07-27T05:58:55.297Z"
   },
   "closeOut": {
     "usage": {
@@ -215,7 +215,7 @@
     ],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-27T05:58:41.430Z",
+      "evaluatedAt": "2026-07-27T05:58:55.330Z",
       "rows": [
         {
           "id": "review",
@@ -238,8 +238,8 @@
           "num": 3,
           "title": "Verification green on the branch",
           "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "verificationStatus: passed at b5bb90edeef819449d5ac7500bede19f0c3cd998 (from pipeline journal)",
-          "status": "pass"
+          "observed": "verificationStatus: missing at b5bb90edeef819449d5ac7500bede19f0c3cd998 (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
         },
         {
           "id": "merged",
