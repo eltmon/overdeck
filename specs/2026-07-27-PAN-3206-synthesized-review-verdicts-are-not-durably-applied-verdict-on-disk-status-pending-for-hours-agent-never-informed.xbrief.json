@@ -4,7 +4,7 @@
     "created": "2026-07-27T14:04:47.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3206: Synthesized review verdicts are not durably applied — verdict on disk, status pending for hours, agent never informed",
-    "updated": "2026-07-27T14:14:22.671Z"
+    "updated": "2026-07-27T14:14:24.609Z"
   },
   "plan": {
     "id": "pan-3206",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "5ae2a7cd-1eb9-4819-967e-65baec32f89e",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-07-27T14:04:47.000Z",
-    "updated": "2026-07-27T14:14:22.671Z",
+    "updated": "2026-07-27T14:14:24.609Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3206",
