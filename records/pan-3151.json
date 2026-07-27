@@ -308,20 +308,20 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:59:17.772Z",
+  "updated": "2026-07-27T14:59:20.561Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:59:15.830Z",
+    "updatedAt": "2026-07-27T14:59:16.365Z",
     "reviewNotes": "Agent re-review request (15/25): Fixed review issues: added v62→v63 regression test for missing review_cycle_history",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
-    "reviewSpawnedAt": "2026-07-27T14:57:22.953Z"
+    "reviewSpawnedAt": "2026-07-27T14:59:16.365Z"
   },
   "closeOut": {
     "usage": {
@@ -387,7 +387,7 @@
       },
       "costAtCloseOut": {
         "usd": 263.4836643,
-        "pricingAsOf": "2026-07-27T14:59:15.847Z"
+        "pricingAsOf": "2026-07-27T14:59:20.558Z"
       }
     },
     "merges": [
@@ -396,7 +396,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "tasks": {
     "sequence": 20,
     "claims": {},
