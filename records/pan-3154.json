@@ -83,7 +83,7 @@
     "recordedAt": "2026-07-27T11:46:55.052Z"
   },
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T11:46:55.968Z",
+  "updated": "2026-07-27T11:46:59.856Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "pending",
@@ -93,12 +93,13 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T11:46:55.966Z",
+    "updatedAt": "2026-07-27T11:46:59.799Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (550613ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3154\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3154/src/dashboard/frontend\n\n\n Test Files  27 passed (27)\n      Tests  457 passed (457)\n   Start at  07:32:41\n   Duration  5.19s (transform 18.45s, setup 5.96s, import 35.67s, tests 9.84s, environment 12.25s)\n\nstdout | src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts > orphan proposed spec reconciler > surfaces only the actioned spawn outcome in the activity feed, with a human-readable message (PAN-1626)\n[orphan-proposed-reconciler] spawn-skipped { issueId: 'PAN-3151', reason: 'issue-scoped-session' }\n\nstdout | src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts > orphan proposed spec reconciler > surfaces only the actioned spawn outcome in the activity feed, with a human-readable message (PAN-1626)\n[orphan-proposed-reconciler] spawn-skipped { issueId: 'PAN-3151', reason: 'issue-scoped-session' }\n\n ❯ |root| src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts (28 tests | 1 failed) 1939ms\n     × surfaces only the actioned spawn outcome in the activity feed, with a human-readable message (PAN-1626) 15ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-iZckwb/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (\n…(1393 chars elided)…\nfeature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-Ifi88Y/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-Ifi88Y/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-conte\n...(truncated)",
     "inspectNotes": "AC-4 now met; AC-1/2/3/5 re-confirmed unchanged. branch-invalidation.ts:178 gates setSetting on !hadUnknownProbe (flag set at :144), so an unknown probe leaves the stored head at its prior value and the next cycle re-probes at the same SHA; the ls-remote path already returned early at :128. Retry cycle stays correct on the other ACs: an issue marked during the aborted pass hits the conflictsSince.sha === newSha dedup at :146, so no duplicate setReviewStatus, no duplicate per-issue activity entry, and it is absent from newlyMarkedIssueIds so the summary names only new marks — AC-3 holds across the retry path, not just across two clean runs. Test that had asserted the buggy behavior flipped to not.toHaveBeenCalled(), plus a mixed-project regression (one conflicts + one unknown) proving the SHA does not advance even when another issue was newly marked. NON-BLOCKING follow-up: a persistently-unknown workspace (broken remote / corrupted worktree) keeps hadUnknownProbe true indefinitely, so that project re-probes every in-pipeline issue every 120s instead of only on head movement — the direct cost of AC-4 as written, worth bounding later (e.g. advance after N consecutive unknown cycles), not a defect against this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3208",
     "reviewedAtCommit": "c83f308b54c69b0f31edd52f1e4d9eb3d9d08692",
+    "reviewRequestedAt": "2026-07-27T11:46:55.966Z",
     "reviewSpawnedAt": "2026-07-27T11:23:30.049Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -158,8 +159,7 @@
         "tests/unit/lib/pan-dir/verdict-restore.test.ts"
       ],
       "recordedAt": "2026-07-27T11:46:55.052Z"
-    },
-    "reviewRequestedAt": "2026-07-27T11:46:55.966Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -182,10 +182,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 696,
-            "output": 145895,
-            "cacheRead": 106400036,
-            "cacheWrite": 1000448
+            "input": 770,
+            "output": 174137,
+            "cacheRead": 125387991,
+            "cacheWrite": 1041825
           }
         }
       },
@@ -203,15 +203,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 696,
-          "output": 145895,
-          "cacheRead": 106400036,
-          "cacheWrite": 1000448
+          "input": 770,
+          "output": 174137,
+          "cacheRead": 125387991,
+          "cacheWrite": 1041825
         }
       },
       "costAtCloseOut": {
-        "usd": 41.6982043,
-        "pricingAsOf": "2026-07-27T11:37:19.901Z"
+        "usd": 45.8818073,
+        "pricingAsOf": "2026-07-27T11:46:59.850Z"
       }
     },
     "merges": [
