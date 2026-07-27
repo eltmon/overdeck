@@ -203,17 +203,17 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T13:40:28.967Z",
+  "updated": "2026-07-27T13:40:31.195Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T13:40:28.909Z",
+    "updatedAt": "2026-07-27T13:40:29.516Z",
     "reviewNotes": "Agent re-review request (4/25): Fixed v61 migration order: combined duplicate if(currentVersion<61) blocks so started_by and affected_criteria migrations run together before v62",
     "conflictsSince": {
       "sha": "f47f84d8b5ac81a247ea22ebca72fe8e3e2193c7",
@@ -294,7 +294,7 @@
       },
       "costAtCloseOut": {
         "usd": 147.3715383,
-        "pricingAsOf": "2026-07-27T13:40:28.962Z"
+        "pricingAsOf": "2026-07-27T13:40:31.187Z"
       }
     },
     "merges": [
