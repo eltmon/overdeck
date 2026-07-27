@@ -612,7 +612,7 @@
     "recordedAt": "2026-07-27T04:09:15.777Z"
   },
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-27T05:00:14.394Z",
+  "updated": "2026-07-27T05:31:16.160Z",
   "pipeline": {
     "issueId": "PAN-3111",
     "reviewStatus": "pending",
@@ -623,7 +623,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T04:09:09.083Z",
-    "updatedAt": "2026-07-27T05:00:14.363Z",
+    "updatedAt": "2026-07-27T05:31:16.131Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "AC1-3 met at this tree state (bead work landed in a4c6729fa9; ec66e8f8 is a behavior-preserving extraction). AC1: agents-state-db.test.ts:92 round-trips 'operator:cli:pan-start' through state.json and the agents-table started_by column with getAgentStateSync returning it; verified both read paths (overdeck agent-state-sync.ts:175 and parseAgentState agent-state.ts:250) and confirmed the insert column list ('flywheel_run_id','started_by','cost_so_far') aligns positionally with the values array (state.flywheelRunId, state.startedBy, state.costSoFar) -- no off-by-one. AC2: resolveAgentStartedBy preserves the exact explicit ?? env ?? flywheel order, and the environmentToken default parameter is evaluated per call so env mutation is still observed; spawn-flywheel-provenance.test.ts covers explicit token, env-over-flywheel precedence, flywheel:<runId>, and undefined. AC3: schema-migrations.test.ts:71 adds started_by to a current-version agents table without throwing; both the currentVersion===SCHEMA_VERSION top-up and the <61 block apply it, and tryIdempotentDdl swallows duplicate-column. Non-blocking observation for the review convoy: this commit is line-count golf for a file ratchet (joining 'flywheel_run_id TEXT, started_by TEXT' onto one CREATE TABLE line, deleting two blank lines in runMigrations, compressing the OVERDECK_AGENT_COLUMNS comment and dropping its 0000_overdeck_init.sql reference) -- semantically inert, but shrinking declarations to fit a ratchet suppresses the growth signal the ratchet exists to surface.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3144",
     "scopeDrift": {
@@ -833,6 +834,14 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 24215,
+            "output": 200,
+            "cacheRead": 3,
+            "cacheWrite": 0
+          }
+        },
         "review": {
           "openai/gpt-5.6-sol": {
             "input": 7573378,
@@ -875,24 +884,30 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 10760426,
-            "output": 697193,
-            "cacheRead": 535766016,
+            "input": 11788680,
+            "output": 757378,
+            "cacheRead": 567407616,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 24215,
+          "output": 200,
+          "cacheRead": 3,
+          "cacheWrite": 0
+        },
         "openai/gpt-5.6-sol": {
-          "input": 35254115,
-          "output": 1356568,
-          "cacheRead": 667021312,
+          "input": 36282369,
+          "output": 1416753,
+          "cacheRead": 698662912,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 550.478271,
-        "pricingAsOf": "2026-07-27T05:00:14.388Z"
+        "usd": 573.2711063,
+        "pricingAsOf": "2026-07-27T05:31:16.154Z"
       }
     },
     "merges": [
