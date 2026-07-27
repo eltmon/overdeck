@@ -2,7 +2,7 @@
   "issueId": "PAN-3192",
   "schemaVersion": 2,
   "created": "2026-07-27T04:32:47.311Z",
-  "updated": "2026-07-27T04:32:47.311Z",
+  "updated": "2026-07-27T04:32:48.694Z",
   "pipeline": {
     "issueId": "PAN-3192",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3192: No mandated quality gate typechecks the dashboard frontend — root tsconfig excludes it and typecheck:dashboard covers only the server",
       "timestamp": "2026-07-27T04:32:47.311Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
