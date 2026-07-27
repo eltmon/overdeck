@@ -196,7 +196,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:29:23.941Z",
+  "updated": "2026-07-27T12:29:29.476Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
@@ -206,11 +206,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T12:29:23.256Z",
+    "updatedAt": "2026-07-27T12:29:29.466Z",
     "reviewNotes": "claimed double-serialization fix still calls JSON.stringify, so the regression fixture remains a string instead of ReviewCycleEntry[]",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
-    "reviewedAtCommit": "d41e7959ffcf47379f544d51c4c21851fcb987c3",
+    "reviewedAtCommit": "3f1954d43cf0bf4512f4135bb7fbed23adab5bd1",
     "reviewSpawnedAt": "2026-07-27T12:28:13.681Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -350,7 +350,7 @@
       },
       "costAtCloseOut": {
         "usd": 115.2131663,
-        "pricingAsOf": "2026-07-27T12:29:23.285Z"
+        "pricingAsOf": "2026-07-27T12:29:29.471Z"
       }
     },
     "merges": [
