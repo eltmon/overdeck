@@ -196,17 +196,17 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:30:12.381Z",
+  "updated": "2026-07-27T12:30:14.218Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T12:30:12.342Z",
+    "updatedAt": "2026-07-27T12:30:12.898Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
@@ -321,10 +321,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3088,
-            "output": 125529,
-            "cacheRead": 73568021,
-            "cacheWrite": 3109235
+            "input": 3098,
+            "output": 125746,
+            "cacheRead": 73931176,
+            "cacheWrite": 3109649
           }
         }
       },
@@ -342,15 +342,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3088,
-          "output": 125529,
-          "cacheRead": 73568021,
-          "cacheWrite": 3109235
+          "input": 3098,
+          "output": 125746,
+          "cacheRead": 73931176,
+          "cacheWrite": 3109649
         }
       },
       "costAtCloseOut": {
-        "usd": 116.1250633,
-        "pricingAsOf": "2026-07-27T12:30:12.376Z"
+        "usd": 116.1629913,
+        "pricingAsOf": "2026-07-27T12:30:14.216Z"
       }
     },
     "merges": [
