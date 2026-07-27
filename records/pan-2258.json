@@ -10,18 +10,18 @@
   ],
   "feedback": [],
   "created": "2026-07-03T02:51:28.037Z",
-  "updated": "2026-07-27T06:00:31.301Z",
+  "updated": "2026-07-27T16:36:59.721Z",
   "pipeline": {
     "issueId": "PAN-2258",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T06:00:31.275Z",
+    "updatedAt": "2026-07-27T16:36:59.701Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2269",
     "reviewRequestedAt": "2026-07-03T03:09:29.582Z",
     "closedOut": true,
-    "closedOutAt": "2026-07-27T06:00:31.275Z"
+    "closedOutAt": "2026-07-27T16:36:59.701Z"
   },
   "closeOut": {
     "usage": {
@@ -53,7 +53,7 @@
     ],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-27T06:00:31.300Z",
+      "evaluatedAt": "2026-07-27T16:36:59.720Z",
       "rows": [
         {
           "id": "review",
@@ -110,7 +110,7 @@
           "num": 7,
           "title": "Deployed",
           "expected": "live server build includes the merged commit",
-          "observed": "build commit 3297fb26 contains merge e5031ed0",
+          "observed": "build commit d44fa122 contains merge e5031ed0",
           "status": "pass"
         },
         {
