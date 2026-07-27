@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-06-29T04:13:04.890Z",
-  "updated": "2026-07-14T16:00:01.847Z",
+  "updated": "2026-07-27T08:24:32.222Z",
   "pipeline": {
     "issueId": "PAN-2152",
     "reviewStatus": "passed",
@@ -30,11 +30,10 @@
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-14T16:00:01.717Z",
+    "updatedAt": "2026-07-27T08:24:32.214Z",
     "reviewNotes": "No blocking findings; workspace command extraction is behavior-preserving",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2161",
-    "reviewRequestedAt": "2026-06-29T05:26:38.971Z"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2161"
   },
   "closeOut": {
     "usage": {
@@ -80,7 +79,7 @@
       },
       "costAtCloseOut": {
         "usd": 10.080641,
-        "pricingAsOf": "2026-07-14T16:00:01.790Z"
+        "pricingAsOf": "2026-07-27T08:24:32.219Z"
       }
     },
     "merges": [
@@ -88,8 +87,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "extract-beads": "completed",
     "extract-beads.extract-beads.ac1": "completed",
