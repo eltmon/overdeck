@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:45.772Z",
-  "updated": "2026-07-27T05:19:34.573Z",
+  "updated": "2026-07-27T05:23:54.667Z",
   "pipeline": {
     "issueId": "PAN-3187",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "clear-stale-review-request-on-read": {
-        "writerId": "agent-pan-3187",
-        "agentId": "agent-pan-3187",
-        "pid": 775319,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:19:34.573Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3187",
@@ -93,6 +85,17 @@
         "outcome": "completed",
         "reason": "Added a handler-registration predicate, skipped CLI-side dispatch before loading the review agent, and covered the one-time debug/no-info-log behavior.",
         "releasedAt": "2026-07-27T05:19:19.407Z"
+      },
+      {
+        "writerId": "agent-pan-3187",
+        "agentId": "agent-pan-3187",
+        "pid": 775319,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:19:34.573Z",
+        "itemId": "clear-stale-review-request-on-read",
+        "outcome": "completed",
+        "reason": "Cleared expired review intent through setReviewStatusSync using the reconciled status as the merge base, deduplicated repairs per process, and covered stale versus fresh read paths.",
+        "releasedAt": "2026-07-27T05:23:54.667Z"
       }
     ],
     "statusReasons": {
@@ -103,6 +106,10 @@
       "skip-host-dispatch-without-handler": {
         "reason": "Added a handler-registration predicate, skipped CLI-side dispatch before loading the review agent, and covered the one-time debug/no-info-log behavior.",
         "updatedAt": "2026-07-27T05:19:19.407Z"
+      },
+      "clear-stale-review-request-on-read": {
+        "reason": "Cleared expired review intent through setReviewStatusSync using the reconciled status as the merge base, deduplicated repairs per process, and covered stale versus fresh read paths.",
+        "updatedAt": "2026-07-27T05:23:54.667Z"
       }
     }
   },
@@ -115,6 +122,9 @@
     "skip-host-dispatch-without-handler.skip-host-dispatch-without-handler.ac1": "completed",
     "skip-host-dispatch-without-handler.skip-host-dispatch-without-handler.ac2": "completed",
     "skip-host-dispatch-without-handler.skip-host-dispatch-without-handler.ac3": "completed",
-    "clear-stale-review-request-on-read": "running"
+    "clear-stale-review-request-on-read": "completed",
+    "clear-stale-review-request-on-read.clear-stale-review-request-on-read.ac1": "completed",
+    "clear-stale-review-request-on-read.clear-stale-review-request-on-read.ac2": "completed",
+    "clear-stale-review-request-on-read.clear-stale-review-request-on-read.ac3": "completed"
   }
 }
