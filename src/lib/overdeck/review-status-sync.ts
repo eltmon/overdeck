@@ -441,14 +441,16 @@ export function markWorkspaceStuck(
   `).run(reason, now, detailsJson, now, issueId.toUpperCase());
 }
 
-export function clearWorkspaceStuck(issueId: string): void {
+export function clearWorkspaceStuck(issueId: string, reason?: string): void {
   const db = getOverdeckDatabaseSync();
   const now = Date.now();
+  // PAN-3151: when unsticking due to review-not-converging, also reset history
+  const isReviewConvergenceGate = reason === 'review-not-converging';
   db.prepare(`
     UPDATE review_status
-    SET stuck = 0, stuck_reason = NULL, stuck_at = NULL, stuck_details = NULL, updated_at = ?
+    SET stuck = 0, stuck_reason = NULL, stuck_at = NULL, stuck_details = NULL, review_cycle_history = ?, updated_at = ?
     WHERE issue_id = ?
-  `).run(now, issueId.toUpperCase());
+  `).run(isReviewConvergenceGate ? null : undefined, now, issueId.toUpperCase());
 }
 
 export function setDeaconIgnored(

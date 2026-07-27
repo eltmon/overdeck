@@ -871,9 +871,9 @@ export function markWorkspaceStuck(
  * Called when the human clicks "Unstick" in the dashboard.
  * Re-enables Deacon patrol for this workspace.
  */
-export function clearWorkspaceStuck(issueId: string): void {
+export function clearWorkspaceStuck(issueId: string, reason?: string): void {
   try {
-    dbClearStuck(issueId);
+    dbClearStuck(issueId, reason);
     console.log(`[review-status] Cleared stuck state for ${issueId}`);
     const updated = getReviewStatusSync(issueId);
     if (updated) notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
