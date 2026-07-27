@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T05:08:59.527Z",
+  "updated": "2026-07-27T05:15:00.513Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "pending",
@@ -61,16 +61,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "clean-shutdown-marker": {
-        "writerId": "agent-pan-3184",
-        "agentId": "agent-pan-3184",
-        "pid": 4091816,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:08:59.527Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3184",
@@ -93,6 +85,17 @@
         "outcome": "completed",
         "reason": "Grace expiry now commits resume_all when no live candidates remain, logs the vacuous auto-release, and invokes the existing apply hook; fake-timer regression passes.",
         "releasedAt": "2026-07-27T05:08:44.161Z"
+      },
+      {
+        "writerId": "agent-pan-3184",
+        "agentId": "agent-pan-3184",
+        "pid": 4091816,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:08:59.527Z",
+        "itemId": "clean-shutdown-marker",
+        "outcome": "completed",
+        "reason": "Added app_settings helpers for dashboard.last_clean_shutdown_at and synchronously records the marker at shutdown-signal entry before notifications or awaits; failures warn without interrupting shutdown.",
+        "releasedAt": "2026-07-27T05:15:00.513Z"
       }
     ],
     "statusReasons": {
@@ -103,6 +106,10 @@
       "vacuous-hold-auto-release": {
         "reason": "Grace expiry now commits resume_all when no live candidates remain, logs the vacuous auto-release, and invokes the existing apply hook; fake-timer regression passes.",
         "updatedAt": "2026-07-27T05:08:44.161Z"
+      },
+      "clean-shutdown-marker": {
+        "reason": "Added app_settings helpers for dashboard.last_clean_shutdown_at and synchronously records the marker at shutdown-signal entry before notifications or awaits; failures warn without interrupting shutdown.",
+        "updatedAt": "2026-07-27T05:15:00.513Z"
       }
     }
   },
@@ -115,6 +122,9 @@
     "vacuous-hold-auto-release": "completed",
     "vacuous-hold-auto-release.vacuous-hold-auto-release.ac1": "completed",
     "vacuous-hold-auto-release.vacuous-hold-auto-release.ac2": "completed",
-    "clean-shutdown-marker": "running"
+    "clean-shutdown-marker": "completed",
+    "clean-shutdown-marker.clean-shutdown-marker.ac1": "completed",
+    "clean-shutdown-marker.clean-shutdown-marker.ac2": "completed",
+    "clean-shutdown-marker.clean-shutdown-marker.ac3": "completed"
   }
 }
