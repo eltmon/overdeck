@@ -92,9 +92,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-27T12:28:14.783Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-27T12:29Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-27T12:29:23.940Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-27T12:29:23Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nclaimed double-serialization fix still calls JSON.stringify, so the regression fixture remains a string instead of ReviewCycleEntry[]\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -183,7 +196,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:29:23.290Z",
+  "updated": "2026-07-27T12:29:23.941Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
