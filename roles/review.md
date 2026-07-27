@@ -47,8 +47,8 @@ hooks:
 > pass, write your findings to `.overdeck/review/<runId>/review.md`, then signal your verdict:
 >
 > ```
-> pan admin specialists done review <issueId> --status passed  --notes "<one-line summary>"
-> pan admin specialists done review <issueId> --status blocked --notes "<one-line top blocker>"
+> pan admin specialists done review <issueId> --status passed  --notes "<one-line summary>" --run-id "<runId>"
+> pan admin specialists done review <issueId> --status blocked --notes "<one-line top blocker>" --run-id "<runId>"
 > ```
 >
 > Use the dimension criteria, severity vocabulary, and verdict rules below as the
@@ -196,10 +196,10 @@ After writing `synthesis.md`, use the local Overdeck CLI to signal the verdict:
 
 ```bash
 # Approved
-pan admin specialists done review <issueId> --status passed --notes "<one-line summary>"
+pan admin specialists done review <issueId> --status passed --notes "<one-line summary>" --run-id "<runId>"
 
 # Changes requested
-pan admin specialists done review <issueId> --status blocked --notes "<one-line top blocker>"
+pan admin specialists done review <issueId> --status blocked --notes "<one-line top blocker>" --run-id "<runId>"
 ```
 
 For Pi sessions, also end your final response with exactly one structured sentinel line:

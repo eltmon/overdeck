@@ -69,6 +69,7 @@ never `execSync`, never shell-string interpolation of branch names).
 | Assembly engine (ordered merges, held-out fallback, cleanup keep-newest-3) | [`src/lib/cloister/uat-generation-engine.ts`](../src/lib/cloister/uat-generation-engine.ts) |
 | Real git wiring (worktree/merge/push, branch + path validation) | [`src/lib/cloister/uat-generation-deps.ts`](../src/lib/cloister/uat-generation-deps.ts) |
 | Assembly-agent conflict resolution (timeboxed headless, allowlist) | [`src/lib/cloister/uat-conflict-agent.ts`](../src/lib/cloister/uat-conflict-agent.ts) |
+| Union lint (Flyway migration version collisions) | [`src/lib/cloister/uat-union-lint.ts`](../src/lib/cloister/uat-union-lint.ts) |
 | Reconciler (auto-assemble on ready-set change, invalidate stale) | [`src/lib/cloister/uat-reconciler.ts`](../src/lib/cloister/uat-reconciler.ts) |
 | Batch promotion (merge tested branch to main, per-member post-merge once) | [`src/lib/cloister/uat-promote.ts`](../src/lib/cloister/uat-promote.ts) |
 | Live UAT stack lifecycle (max 2, mandatory teardown) | [`src/lib/cloister/uat-stack.ts`](../src/lib/cloister/uat-stack.ts) |
@@ -124,6 +125,85 @@ record, so the verification row uses recorded evidence instead of an operator
 override. The promoted generation is reaped; all other live generations
 invalidate (main moved) and the reconciler rebuilds.
 
+A polyrepo generation promotes through a two-phase variant of this — every repo
+is trial-merged before anything is pushed — described under
+[Polyrepo generations](#polyrepo-generations).
+
+### Union lint — collisions git cannot see (PAN-3166)
+
+Git merges by content, so two branches that each add a *differently named* file
+never conflict — even when the union of those files is invalid. The canonical
+case is Flyway: `V256__Kaia_session_task_binding.sql` (MIN-902) and
+`V256__Add_author_type_to_task_comment.sql` (MIN-858) merge silently, each
+branch's own CI is green because each alone has exactly one V256, and the
+assembled api container then dies at startup with
+`FlywayException: Found more than one migration with version 256`.
+
+**Colliding is the normal case, not bad luck.** Sequential `V<n>` naming means
+every branch cut from main takes the next free number, so any two concurrent
+schema branches collide with certainty — MYN sat at V255 with three branches all
+claiming V256. Holding a member out for that would cost throughput on every
+batch carrying two schema changes and buy no safety, because those three
+migrations touched three disjoint tables.
+
+So the lint runs against the **assembled set** — the only place the collision
+exists — and dispositions it by what the migrations actually touch:
+
+| Case | Action |
+| --- | --- |
+| Provably independent | **Renumber.** The earlier member keeps `V256`; the later takes the next version unused anywhere in the union. Recorded as a resolution with `kind: 'migration-renumber'`. |
+| Anything else | **Hold out**, with a reason naming both migration files and both issues. Assembly continues and the generation still reaches `ready` with the remainder. |
+
+Renumbering is legitimate because the UAT branch content is exactly what
+promotes to main — a rename in the union is what lands, the same category of
+assembly-time resolution as a conflict the assembly agent fixes on the branch.
+
+**Independence must be proven, and the proof is strict.** A distinct primary
+table proves nothing: a child table's `REFERENCES` names a parent, a trigger or
+view body reads other tables, and a data migration's `INSERT … SELECT` couples
+two tables that appear in neither one's DDL. `analyzeMigration` therefore
+collects *every* object a migration names — targets, foreign-key parents, and
+DML sources — and **any** overlap holds out. These also hold out:
+
+- **Unrecognized SQL.** A statement shape the extractor does not classify (a
+  `$$ … $$` function body, a `GRANT`) is unknown coupling. Fail closed.
+- **Non-integer versions.** `V1_1`/`V2.3` express deliberate ordering; they are
+  detected and held out, never renumbered.
+- **Any read failure.** Covered below.
+
+**Two invariants that are easy to get wrong:**
+
+- **The allocator reserves the whole union.** Blind `V256 → V257` is a bug: V257
+  may already be on main, or a later member may hold it. The ledger seeds
+  *owners* from the generation branch as cut from its target and *reservations*
+  from every candidate branch, held out or not, then allocates the first
+  integer free in both — and immediately reserves it, so two renames in one
+  assembly can never land on the same number.
+- **One repo is not one Flyway namespace.** A multi-service repo runs several
+  independent histories, each restarting at V1. Every comparison, reservation,
+  and allocation is keyed by the migration's own directory, so two services'
+  `V1__init.sql` are not in conflict.
+
+**The lint fails closed, never open.** A guard that disables itself on error is
+worse than no guard, because it still reports success. Reading the generation
+branch's migrations is unguarded — a failure marks the generation `failed`.
+A failure reading one *candidate* branch holds only that member out, with a
+typed reason, so one broken branch cannot cost the whole batch. Empty-because-
+unread is never allowed to look like empty-because-no-migrations.
+
+Ordering: detection is **pre-merge** (one `git ls-tree` per candidate), so a
+hold-out never needs rollback. The rename is committed **post-merge**, when the
+files exist on the generation branch. In a polyrepo generation the hold-out is
+global like every other, the rename commit sits above the pre-feature snapshot
+so a rollback removes it with everything else, and the ledger attributes a
+member only once it has stuck in *every* repo it contributes to — a partial
+success never leaves a half-recorded rename.
+
+`listMigrationFiles` / `readMigrationFile` / `renameMigrations` on
+`GenerationGitDeps` are all optional. Deps omitting the listing skip the lint
+entirely (the pre-PAN-3166 behaviour); deps that can list but not rename can
+only hold out.
+
 ### Live stacks — the hard cap
 
 `ensureUatStack` renders the devcontainer on the generation worktree — the folder
@@ -136,6 +216,33 @@ oldest first (under a per-project mutation lock so concurrent starts cannot race
 past the cap), and invalidation/promotion always tear a generation's stack down
 (`compose down -v --remove-orphans`).
 
+**`probeUatStack` reports three states, not two (PAN-3166).** Counting running
+containers is not a health signal: a stack whose api died at startup still has
+three healthy containers, so a count says `running` and the panel offers "Open
+UAT frontend" for a gateway timeout. The probe compares what the compose file
+**declares** (`docker compose config --services`, which respects active
+profiles) against what is actually up (`docker compose ps --all`):
+
+| Status | Meaning | Clears the stack record? |
+| --- | --- | --- |
+| `running` | Every declared long-running service is up and healthy. | no |
+| `degraded` | Containers exist but at least one declared service is not serving — exited, never created, or running with an `unhealthy` Compose healthcheck. `downServices` names them and `serviceErrors` carries each one's last error line, pulled from `docker compose logs --tail 200` (a JVM `Caused by:` line wins over the wrapper exception above it). | **no** |
+| `unknown` | The probe itself failed (`docker compose ps`/`config` errored). Not proof of absence. | **no** |
+| `absent` | Zero containers for the project. | yes — the only status that self-heals a stale `stackStartedAt` |
+
+**Only `absent` clears the record, and that split is the fix.** Clearing it
+destroys the evidence: the min-quartz-0726 api died at Flyway startup, the probe
+called the stack `running` because three containers survived, and once they all
+stopped it silently healed to `absent` — which is why the Flyway error was
+unreachable from the UI at all. A degraded or unprobeable stack keeps its record
+so the failing service's logs stay reachable.
+
+Init containers exit by design and are excluded, using the same name convention
+as the workspace stack health check (`src/lib/workspace/stack-health.ts`) — a
+one-shot counts as missing only when it exited non-zero. In the UI a degraded
+generation gets an amber restart control instead of an open link, plus the
+failing service's error line inline.
+
 ## API
 
 | Route | Purpose |
@@ -147,7 +254,7 @@ routes were deleted, not aliased.
 
 | Route | Purpose |
 | --- | --- |
-| `GET /api/merge-train/generations` | One entry per tracked project — `{ projectKey, projectName, enabled, generations }` — where `generations` is that project's chain newest-first: per generation the members (with PR links and **per-member acceptance criteria** from the shared xBRIEF extractor `src/lib/xbrief/acceptance-criteria.ts` — the same source as the AwaitingMerge UAT plan, no second parser), held-out reasons, conflict resolutions, and live-stack `{status, frontendUrl}`. |
+| `GET /api/merge-train/generations` | One entry per tracked project — `{ projectKey, projectName, enabled, generations }` — where `generations` is that project's chain newest-first: per generation the members (with PR links and **per-member acceptance criteria** from the shared xBRIEF extractor `src/lib/xbrief/acceptance-criteria.ts` — the same source as the AwaitingMerge UAT plan, no second parser), held-out reasons, conflict resolutions, and live-stack `{status, frontendUrl, downServices?, serviceErrors?, probeError?}` (`status` is `running` \| `degraded` \| `unknown` \| `absent` — see [Live stacks](#live-stacks--the-hard-cap)). |
 | `GET /api/merge-train/queues` | One entry per tracked project — `{ projectKey, projectName, enabled, queue }` — the ready set as reference data, each row carrying `branchName` and `prUrl`. A project with the merge train off reports `enabled: false` and an empty queue rather than being omitted, so "off" and "nothing ready" stay distinguishable. |
 | `POST /api/merge-train/generations/:name/stack` | Ensure the generation's live stack (idempotent); returns the frontend URL and any evicted stacks. |
 | `POST /api/merge-train/generations/:name/promote` | Promote (merge) the tested generation to main — into the generation's **own** project repo, resolved from its stored `projectRoot`. |
@@ -162,6 +269,11 @@ matching [`design/pan-1737-uat-batch-trains.html`](./design/pan-1737-uat-batch-t
 - **Plain-language intro** — "N features passed review & tests. They're assembled into the test batches below…".
 - **Batches, newest first** — ready (Open UAT frontend + Merge batch (N) to main + rebuild), assembling (live progress while the current batch stays actionable), superseded (still testable/promotable), held-out chips with reasons.
 - **What to UAT** — the current batch's acceptance criteria grouped per member, with explicit "verify the touchpoint" items where the assembly agent resolved a conflict.
+  Each member carries `planResolved` alongside its criteria (PAN-3165). When the
+  server could not resolve or read the issue's xBRIEF at all, the panel says
+  *"Plan not found for PAN-XXXX"* — it must never render a lookup miss as the
+  factual claim *"No UAT steps in plan"*, which silently removes the operator's
+  checklist. That claim is reserved for a plan that resolved and authored none.
 - **Ready features (merge order)** — reference rows with monospace branch + PR link.
 - **Escape hatch** — "Merge one feature to main…", which states it bypasses batch testing.
 
@@ -185,6 +297,96 @@ invalidation runs when its last ready feature merges elsewhere. A project with
 neither skips the tick before doing any git work, which is what keeps the sweep
 from touching every tracked repo every 60 seconds.
 
+### Polyrepo generations
+
+A polyrepo project (`workspace.type: polyrepo`) has no git repo at its own path
+— that path is a wrapper holding one real repo per configured member. A
+generation there is not one branch off one main but an **N-tuple**: one
+`uat/<label>-<codename>-<MMDD>` branch per member repo, each cut from that
+repo's own target head. [PAN-1696](https://github.com/eltmon/overdeck/issues/1696)
+shipped a guard that skipped these projects outright;
+[PAN-3093](https://github.com/eltmon/overdeck/issues/3093) removed it by making
+assembly work per repo.
+
+**Only contributing repos get a branch.** The ready set resolves each
+candidate's member repos through `resolveProjectReposFromResolvedIssueSync` and
+probes each one origin-first for the issue's feature branch. Repos with no
+branch contribute nothing and get no branch and no worktree; a candidate with no
+branch in *any* repo is excluded from the ready set with a logged reason.
+Conflict prediction runs over the union of each candidate's per-repo changed
+files, namespaced `<repoKey>:` so the same path in two repos is not mistaken for
+an overlap — hotspot globs apply per repo, before that prefix is added.
+
+**Per-repo SHAs, one composite anchor.** Each repo's branch, base SHA, worktree,
+and publish stamp live in `uat_generation_repos`; each `(member, repo)`
+contribution lives in `uat_generation_member_repos`. The single-valued
+`uat_generations.base_sha` holds the **composite anchor** `fe@aaa1111 api@bbb2222`
+— the same tuple format the review pipeline already records. Member `headSha`
+is likewise a composite over the repos that member touched. This matters because
+the reconciler decides staleness by *string equality* between the anchor it
+computes now and what assembly stored: both sides build anchors through the same
+helpers, and member anchors order by `repoKey` because that is the only ordering
+both sides can compute. Monorepo generations write no per-repo rows and read
+back as a single synthesized entry, so consumers loop `repos` without branching
+on project type.
+
+**A hold-out is global, and applying a feature is atomic.** A feature that
+cannot be merged and resolved in *any* repo is held out of the whole generation
+— a tester must never see a feature half-applied across repos. Each feature is
+applied to every repo it contributes to or to none: assembly captures each
+target repo's head first, and if a later repo rejects the feature, the repos
+that already took it are re-pointed at that captured head (`checkout -B`, never
+`reset --hard`). Accepted features are never disturbed, so total git work stays
+linear in repos × features rather than the quadratic cost of rebuilding and
+replaying. A repo left carrying nothing after its features are held out gets no
+published branch. The conflict hook runs per repo with `repoKey` in its context,
+naming the repo in its prompt and logs.
+
+**Read-only repos are never targets.** A member repo configured `readonly: true`
+is excluded from the ready set before it is even probed, omitted from the git
+and cleanup deps, and re-checked against current config at promote time — a repo
+flipped read-only after assembly fails the promote closed rather than publishing
+part of the batch.
+
+**Promotion is two-phase and all-or-nothing.** Phase A validates and
+trial-merges every repo *without pushing*: per-repo target head, the same
+disjoint-movement stale-base rule applied per repo, then a no-ff merge committed
+locally in a throwaway worktree. Any failure discards every prepared worktree
+and returns with nothing published and the batch still promotable. Phase B
+publishes in merge order, each repo into its own recorded `target_branch` —
+a repo configured for `develop` is fetched, trial-merged, and published there.
+A failure partway is **resumable, not rolled back** — undoing a landed merge
+would mean force-pushing a member repo's main, a one-way door. Each landed repo
+is stamped with `promoted_at` and its `merge_sha`, the failure names landed vs
+pending repos, and a retry skips whatever already landed. A retry that finds
+every repo already landed *finalizes* rather than erroring, which is what makes
+a crash between the last push and finalization recoverable.
+
+**Finalization requires complete evidence: every repo must carry both
+`promoted_at` and `merge_sha`.** A row stamped without a merge SHA is repaired
+first — the retry looks the merge up on the repo's target and records it — but
+if no merge can be found there, the promote fails *retryably* instead of
+finalizing. This matters because `promoted_at` alone is enough to keep a row out
+of the pending set: finalizing on it would mark the generation `promoted` while
+permanently unable to produce that repo's merge commit, so post-merge
+verification would refuse every member forever and the terminal status would
+block the only retry that could still recover the SHA. `finishPromote()`
+enforces the invariant at the single point a generation turns terminal, so no
+caller can bypass it. Post-merge
+lifecycles fire only after *every* repo publishes, and receive the per-repo
+merge commits as evidence — each verified inside its own repo against its own
+target branch, since a composite anchor is not a git ref and the wrapper is not
+a git repo.
+
+**Teardown covers every repo.** Cleanup removes each member repo's worktree and
+branch (local and remote), then the wrapper folder, and sweeps the generation
+branch from every configured member repo — a hold-out can drop a repo after its
+branch was created locally, and that branch is never pushed but would otherwise
+linger. Every repo is attempted even after one fails, and `cleanedAt` stays
+unset so the next patrol retries. The live stack is unchanged: the generation's
+`worktreePath` is the wrapper folder, so the folder-name → Traefik host contract
+and the 2-stack cap work exactly as for a monorepo.
+
 ### Multi-project shape
 
 Batches are always **per project** — a generation contains one project's work and
@@ -192,8 +394,10 @@ nothing else; cross-project batches do not exist. Generation labels use the
 project's issue prefix (`uat/pan-…`, `uat/min-…`), which is what keeps names
 distinct in the globally-keyed `uat_generations` table. What spans projects is the
 **view and control surface**: the merge-train view on the Awaiting Merge page
-renders one section per project with a persisted project filter, and the Flywheel
-rail card is a second viewer of that same component. Per-project enablement lives
+renders one section per project that has ready work or a switched-off train, with
+a persisted project filter. Idle enabled projects are hidden instead of repeating
+empty boilerplate, and a footer counts the hidden projects. The Flywheel rail card
+is a second viewer of that same component. Per-project enablement lives
 in the project cockpit's settings; the global default lives on Awaiting Merge and
 in Settings → Roles → Flywheel.
 

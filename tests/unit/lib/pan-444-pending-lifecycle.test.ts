@@ -7,16 +7,30 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── fs/promises mock ──────────────────────────────────────────────────────────
 const mockReadFile = vi.hoisted(() => vi.fn<(path: string, enc: string) => Promise<string>>());
+const mockReaddir = vi.hoisted(() => vi.fn<(path: string) => Promise<string[]>>());
+const mockRename = vi.hoisted(() => vi.fn<(from: string, to: string) => Promise<void>>());
 const mockUnlink = vi.hoisted(() => vi.fn<(path: string) => Promise<void>>());
 const mockExistsSync = vi.hoisted(() => vi.fn<(path: string) => boolean>());
 const mockEmitDashboardLifecycleSync = vi.hoisted(() => vi.fn());
+const mockResolveCanonicalReviewStatus = vi.hoisted(() => vi.fn<(
+  issueId: string,
+) => {
+  available: boolean;
+  status: { mergeStatus?: string; mergeStep?: string } | null;
+}>(() => ({ available: true, status: null })));
 
 vi.mock('../../../src/lib/activity-logger.js', () => ({
   emitDashboardLifecycleSync: mockEmitDashboardLifecycleSync,
 }));
 
+vi.mock('../../../src/lib/cloister/review-status-source.js', () => ({
+  resolveCanonicalReviewStatus: mockResolveCanonicalReviewStatus,
+}));
+
 vi.mock('fs/promises', () => ({
+  readdir: mockReaddir,
   readFile: mockReadFile,
+  rename: mockRename,
   unlink: mockUnlink,
 }));
 
@@ -61,6 +75,13 @@ describe('processPendingLifecycle', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     mockExistsSync.mockReturnValue(false);
+    mockReaddir.mockResolvedValue([]);
+    mockRename.mockImplementation(async (from) => {
+      if (mockExistsSync(from) || from.includes('.claimed-')) return;
+      throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+    });
+    mockUnlink.mockResolvedValue(undefined);
+    mockResolveCanonicalReviewStatus.mockReturnValue({ available: true, status: null });
   });
 
   afterEach(() => {
@@ -100,11 +121,10 @@ describe('processPendingLifecycle', () => {
     });
   });
 
-  it('reads and deletes the pending file', async () => {
+  it('atomically claims and discards the pending artifact after success', async () => {
     const data = makePendingData();
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
-    mockUnlink.mockResolvedValue(undefined);
 
     await processPendingLifecycle({
       pendingFile: PENDING_FILE,
@@ -112,26 +132,38 @@ describe('processPendingLifecycle', () => {
       now: data.timestamp + 1000,
       _runner: vi.fn().mockResolvedValue(undefined),
     });
+    await vi.runAllTimersAsync();
 
-    expect(mockReadFile).toHaveBeenCalledWith(PENDING_FILE, 'utf-8');
-    expect(mockUnlink).toHaveBeenCalledWith(PENDING_FILE);
+    expect(mockRename).toHaveBeenCalledWith(
+      PENDING_FILE,
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+    );
+    expect(mockReadFile).toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+      'utf-8',
+    );
+    expect(mockUnlink).toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+    );
   });
 
-  it('deletes the file before checking staleness', async () => {
+  it('discards a claimed stale artifact', async () => {
     const data = makePendingData({ timestamp: Date.now() - (STALE_THRESHOLD_MS + 1000) });
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
     mockUnlink.mockResolvedValue(undefined);
 
     await processPendingLifecycle({ pendingFile: PENDING_FILE, now: Date.now() });
 
-    expect(mockUnlink).toHaveBeenCalledWith(PENDING_FILE);
+    expect(mockUnlink).toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+    );
   });
 
   it('ignores stale files (> 1h old) without running lifecycle', async () => {
     const staleTimestamp = Date.now() - (STALE_THRESHOLD_MS + 60_000);
     const data = makePendingData({ timestamp: staleTimestamp });
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
     mockUnlink.mockResolvedValue(undefined);
     const runner = vi.fn().mockResolvedValue(undefined);
@@ -144,27 +176,57 @@ describe('processPendingLifecycle', () => {
 
   it('schedules lifecycle runner after delay for fresh files', async () => {
     const data = makePendingData();
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
     mockUnlink.mockResolvedValue(undefined);
     const runner = vi.fn().mockResolvedValue(undefined);
 
-    await processPendingLifecycle({
+    const processing = processPendingLifecycle({
       pendingFile: PENDING_FILE,
       lifecycleDelayMs: 100,
       now: data.timestamp + 1000,
       _runner: runner,
     });
 
+    await vi.advanceTimersByTimeAsync(99);
     expect(runner).not.toHaveBeenCalled();
-    await vi.runAllTimersAsync();
+    await vi.advanceTimersByTimeAsync(1);
+    await processing;
     expect(runner).toHaveBeenCalledOnce();
     expect(runner).toHaveBeenCalledWith(data);
   });
 
+  it('returns after scheduling while the claimed lifecycle remains in flight', async () => {
+    const data = makePendingData();
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
+    mockReadFile.mockResolvedValue(JSON.stringify(data));
+    let resolveRunner!: () => void;
+    const runner = vi.fn(() => new Promise<void>((resolve) => {
+      resolveRunner = resolve;
+    }));
+
+    await expect(processPendingLifecycle({
+      pendingFile: PENDING_FILE,
+      lifecycleDelayMs: 0,
+      now: data.timestamp + 1000,
+      _runner: runner,
+    })).resolves.toBeUndefined();
+
+    expect(runner).toHaveBeenCalledOnce();
+    expect(mockUnlink).not.toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+    );
+
+    resolveRunner();
+    await vi.runAllTimersAsync();
+    expect(mockUnlink).toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+    );
+  });
+
   it('passes full pending data to the runner', async () => {
     const data = makePendingData({ issueId: 'PAN-42', projectPath: '/my/proj', sourceBranch: 'feature/x' });
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
     mockUnlink.mockResolvedValue(undefined);
     const runner = vi.fn().mockResolvedValue(undefined);
@@ -185,7 +247,7 @@ describe('processPendingLifecycle', () => {
   });
 
   it('handles malformed JSON gracefully without throwing', async () => {
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue('not-valid-json');
     mockUnlink.mockResolvedValue(undefined);
 
@@ -195,7 +257,7 @@ describe('processPendingLifecycle', () => {
   it('accepts files exactly at the stale boundary (1h - 1s is fresh)', async () => {
     const data = makePendingData({ timestamp: 0 });
     const now = STALE_THRESHOLD_MS - 1000; // 59m59s old → not stale
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
     mockUnlink.mockResolvedValue(undefined);
     const runner = vi.fn().mockResolvedValue(undefined);
@@ -209,7 +271,7 @@ describe('processPendingLifecycle', () => {
   it('rejects files exactly at the stale boundary (1h + 1s is stale)', async () => {
     const data = makePendingData({ timestamp: 0 });
     const now = STALE_THRESHOLD_MS + 1000;
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
     mockUnlink.mockResolvedValue(undefined);
     const runner = vi.fn().mockResolvedValue(undefined);
@@ -220,12 +282,13 @@ describe('processPendingLifecycle', () => {
     expect(runner).not.toHaveBeenCalled();
   });
 
-  it('does not throw when runner throws', async () => {
+  it('restores a failed claim without durable retry ownership so a later call can retry', async () => {
     const data = makePendingData();
-    mockExistsSync.mockReturnValue(true);
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
     mockReadFile.mockResolvedValue(JSON.stringify(data));
-    mockUnlink.mockResolvedValue(undefined);
-    const runner = vi.fn().mockRejectedValue(new Error('lifecycle failed'));
+    const runner = vi.fn()
+      .mockRejectedValueOnce(new Error('lifecycle failed'))
+      .mockResolvedValueOnce(undefined);
 
     await processPendingLifecycle({
       pendingFile: PENDING_FILE,
@@ -233,6 +296,88 @@ describe('processPendingLifecycle', () => {
       now: data.timestamp + 1000,
       _runner: runner,
     });
-    await expect(vi.runAllTimersAsync()).resolves.not.toThrow();
+    await vi.runAllTimersAsync();
+
+    expect(mockEmitDashboardLifecycleSync).toHaveBeenCalledTimes(1);
+    expect(mockEmitDashboardLifecycleSync).toHaveBeenCalledWith('failed', expect.objectContaining({
+      issueId: data.issueId,
+      error: 'lifecycle failed',
+    }));
+    expect(mockRename).toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+      expect.stringContaining(`${PENDING_FILE}.queued-`),
+    );
+
+    await processPendingLifecycle({
+      pendingFile: PENDING_FILE,
+      lifecycleDelayMs: 0,
+      now: data.timestamp + 1000,
+      _runner: runner,
+    });
+    await vi.runAllTimersAsync();
+
+    expect(runner).toHaveBeenCalledTimes(2);
+    expect(mockEmitDashboardLifecycleSync).toHaveBeenCalledTimes(2);
+    expect(mockEmitDashboardLifecycleSync).toHaveBeenLastCalledWith('completed', expect.objectContaining({
+      issueId: data.issueId,
+    }));
+  });
+
+  it('discards a failed claim when canonical status positively owns the retry', async () => {
+    const data = makePendingData();
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
+    mockReadFile.mockResolvedValue(JSON.stringify(data));
+    mockResolveCanonicalReviewStatus.mockReturnValue({
+      available: true,
+      status: { mergeStatus: 'merged', mergeStep: 'post-merge-cleanup' },
+    });
+
+    await processPendingLifecycle({
+      pendingFile: PENDING_FILE,
+      lifecycleDelayMs: 0,
+      now: data.timestamp + 1000,
+      _runner: vi.fn().mockRejectedValue(new Error('lifecycle failed')),
+    });
+    await vi.runAllTimersAsync();
+
+    expect(mockRename).not.toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+      expect.stringContaining(`${PENDING_FILE}.queued-`),
+    );
+    expect(mockUnlink).toHaveBeenCalledWith(
+      expect.stringContaining(`${PENDING_FILE}.claimed-`),
+    );
+  });
+
+  it('runs one lifecycle and emits one terminal event when two processes see one artifact', async () => {
+    const data = makePendingData();
+    mockExistsSync.mockImplementation((path) => path === PENDING_FILE);
+    mockReadFile.mockResolvedValue(JSON.stringify(data));
+    mockRename
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    const runner = vi.fn().mockResolvedValue(undefined);
+
+    const owner = processPendingLifecycle({
+      pendingFile: PENDING_FILE,
+      lifecycleDelayMs: 100,
+      now: data.timestamp + 1000,
+      _runner: runner,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    await processPendingLifecycle({
+      pendingFile: PENDING_FILE,
+      lifecycleDelayMs: 0,
+      now: data.timestamp + 1000,
+      _runner: runner,
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    await owner;
+
+    expect(runner).toHaveBeenCalledTimes(1);
+    expect(mockEmitDashboardLifecycleSync).toHaveBeenCalledTimes(1);
+    expect(mockEmitDashboardLifecycleSync).toHaveBeenCalledWith('completed', expect.objectContaining({
+      issueId: data.issueId,
+    }));
   });
 });

@@ -1,25 +1,32 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SCRIPT_SOURCE = new URL('../../../scripts/lint-file-size.sh', import.meta.url);
+const ALLOWLIST_SOURCE = new URL('../../../scripts/file-size-allowlist.txt', import.meta.url);
 
-function makeTempRepo(): string {
+function makeTempRepo(setupBase?: (root: string) => void): string {
   const root = mkdtempSync(join(tmpdir(), 'lint-file-size-'));
   execFileSync('git', ['init', '--quiet'], { cwd: root });
   execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: root });
   execFileSync('git', ['config', 'user.name', 'Test'], { cwd: root });
+  installScript(root);
+  setupBase?.(root);
+  execFileSync('git', ['add', '-A'], { cwd: root });
+  execFileSync('git', ['commit', '--quiet', '-m', 'base'], { cwd: root });
+  execFileSync('git', ['update-ref', 'refs/heads/base', 'HEAD'], { cwd: root });
   return root;
 }
 
 function installScript(root: string): string {
   const scriptDest = join(root, 'scripts', 'lint-file-size.sh');
   const src = readFileSync(SCRIPT_SOURCE, 'utf-8');
+  const allowlist = readFileSync(ALLOWLIST_SOURCE, 'utf-8');
   mkdirSync(join(root, 'scripts'), { recursive: true });
   writeFileSync(scriptDest, src, { mode: 0o755 });
-  writeFileSync(join(root, 'scripts', 'file-size-baseline.txt'), '');
+  writeFileSync(join(root, 'scripts', 'file-size-allowlist.txt'), allowlist);
   return scriptDest;
 }
 
@@ -29,21 +36,21 @@ function writeLines(root: string, path: string, count: number): void {
   writeFileSync(filePath, Array.from({ length: count }, (_, i) => `line ${i}`).join('\n') + '\n');
 }
 
-function writeBaseline(root: string, entries: Array<[number, string]>): void {
+function writeAllowlist(root: string, rows: string[]): void {
   writeFileSync(
-    join(root, 'scripts', 'file-size-baseline.txt'),
-    entries.map(([lines, path]) => `${lines} ${path}`).join('\n') + '\n',
+    join(root, 'scripts', 'file-size-allowlist.txt'),
+    `# Audited growth exceptions: <lines> <path> # <ISSUE-REF>\n${rows.join('\n')}\n`,
   );
 }
 
-function readBaseline(root: string): string {
-  return readFileSync(join(root, 'scripts', 'file-size-baseline.txt'), 'utf-8');
-}
-
-function runLint(root: string, args: string[] = []): { ok: boolean; output: string } {
+function runLint(root: string, baseRef = 'base'): { ok: boolean; output: string } {
   const script = join(root, 'scripts', 'lint-file-size.sh');
   try {
-    const output = execFileSync('bash', [script, ...args], { cwd: root, encoding: 'utf-8' });
+    const output = execFileSync('bash', [script], {
+      cwd: root,
+      encoding: 'utf-8',
+      env: { ...process.env, FILE_SIZE_BASE_REF: baseRef },
+    });
     return { ok: true, output };
   } catch (err: any) {
     return {
@@ -54,91 +61,80 @@ function runLint(root: string, args: string[] = []): { ok: boolean; output: stri
 }
 
 describe('lint-file-size.sh', () => {
-  it('fails when a new src file exceeds the ceiling without a baseline entry', () => {
+  it('rejects a new god file with the allowlist remedy', () => {
     const root = makeTempRepo();
-    installScript(root);
     writeLines(root, 'src/new-god-file.ts', 1001);
 
     const { ok, output } = runLint(root);
 
     expect(ok).toBe(false);
-    expect(output).toContain('src/new-god-file.ts is 1001 lines (> 1000)');
+    expect(output).toContain('src/new-god-file.ts is 1001 lines (allowed 1000)');
+    expect(output).toContain('1001 src/new-god-file.ts # <ISSUE-REF>');
   });
 
-  it('fails when a baselined file grows above its entry', () => {
+  it('accepts the base count and rejects growth past it', () => {
+    const root = makeTempRepo((repo) => writeLines(repo, 'src/existing-god-file.ts', 1200));
+
+    const unchanged = runLint(root);
+    writeLines(root, 'src/existing-god-file.ts', 1201);
+    const grown = runLint(root);
+
+    expect(unchanged.ok).toBe(true);
+    expect(unchanged.output).toContain('file-size guard passed');
+    expect(grown.ok).toBe(false);
+    expect(grown.output).toContain('src/existing-god-file.ts is 1201 lines (allowed 1200)');
+  });
+
+  it('permits audited growth only through the declared allowlist count', () => {
+    const root = makeTempRepo((repo) => writeLines(repo, 'src/audited-growth.ts', 1200));
+    writeAllowlist(root, ['1300 src/audited-growth.ts # PAN-3116']);
+    writeLines(root, 'src/audited-growth.ts', 1300);
+
+    const allowed = runLint(root);
+    writeLines(root, 'src/audited-growth.ts', 1301);
+    const exceeded = runLint(root);
+
+    expect(allowed.ok).toBe(true);
+    expect(exceeded.ok).toBe(false);
+    expect(exceeded.output).toContain('src/audited-growth.ts is 1301 lines (allowed 1300)');
+  });
+
+  it('rejects malformed allowlist rows and names the line', () => {
     const root = makeTempRepo();
-    installScript(root);
-    writeLines(root, 'src/grown.ts', 1201);
-    writeBaseline(root, [[1200, 'src/grown.ts']]);
+    writeAllowlist(root, ['1300 src/missing-issue-ref.ts']);
 
     const { ok, output } = runLint(root);
 
     expect(ok).toBe(false);
-    expect(output).toContain('src/grown.ts grew to 1201 lines (baseline 1200)');
-    expect(output).toContain('god files must shrink, not grow');
+    expect(output).toContain('malformed scripts/file-size-allowlist.txt line 2');
+    expect(output).toContain('expected: <lines> <path> # <ISSUE-REF>');
   });
 
-  it('fails with an update hint when a baselined file shrinks but stays over the ceiling', () => {
+  it('fails with an actionable message when the base ref is missing', () => {
     const root = makeTempRepo();
-    installScript(root);
-    writeLines(root, 'src/shrunk.ts', 1200);
-    writeBaseline(root, [[1500, 'src/shrunk.ts']]);
+
+    const { ok, output } = runLint(root, 'missing-base');
+
+    expect(ok).toBe(false);
+    expect(output).toContain("cannot resolve base ref 'missing-base'");
+    expect(output).toContain('Fetch the merge target');
+    expect(output).toContain('FILE_SIZE_BASE_REF');
+  });
+
+  it('accepts a shrunk god file without baseline metadata', () => {
+    const root = makeTempRepo((repo) => writeLines(repo, 'src/shrunk.ts', 1200));
+    writeLines(root, 'src/shrunk.ts', 1100);
 
     const { ok, output } = runLint(root);
 
-    expect(ok).toBe(false);
-    expect(output).toContain('stale baseline: src/shrunk.ts is 1200 lines but baselined at 1500');
-    expect(output).toContain('bash scripts/lint-file-size.sh --update');
-  });
-
-  it('lowers a stale entry with --update and then passes check mode', () => {
-    const root = makeTempRepo();
-    installScript(root);
-    writeLines(root, 'src/shrunk.ts', 1200);
-    writeBaseline(root, [[1500, 'src/shrunk.ts']]);
-
-    const update = runLint(root, ['--update']);
-    const check = runLint(root);
-
-    expect(update.ok).toBe(true);
-    expect(update.output).toContain('baseline updated: 1 lowered, 0 dropped, 0 unchanged');
-    expect(readBaseline(root)).toBe('1200 src/shrunk.ts\n');
-    expect(check.ok).toBe(true);
-    expect(check.output).toContain('file-size guard passed');
-  });
-
-  it('drops deleted and sub-ceiling entries with --update and then passes check mode', () => {
-    const root = makeTempRepo();
-    installScript(root);
-    writeLines(root, 'src/small.ts', 999);
-    writeBaseline(root, [
-      [1400, 'src/deleted.ts'],
-      [1200, 'src/small.ts'],
-    ]);
-
-    const update = runLint(root, ['--update']);
-    const check = runLint(root);
-
-    expect(update.ok).toBe(true);
-    expect(update.output).toContain('baseline updated: 0 lowered, 2 dropped, 0 unchanged');
-    expect(readBaseline(root)).toBe('');
-    expect(check.ok).toBe(true);
-    expect(check.output).toContain('file-size guard passed');
-  });
-
-  it('never raises a violation entry during --update and check mode still fails', () => {
-    const root = makeTempRepo();
-    installScript(root);
-    writeLines(root, 'src/grown.ts', 1200);
-    writeBaseline(root, [[1100, 'src/grown.ts']]);
-
-    const update = runLint(root, ['--update']);
-    const check = runLint(root);
-
-    expect(update.ok).toBe(true);
-    expect(update.output).toContain('baseline updated: 0 lowered, 0 dropped, 1 unchanged');
-    expect(readBaseline(root)).toBe('1100 src/grown.ts\n');
-    expect(check.ok).toBe(false);
-    expect(check.output).toContain('src/grown.ts grew to 1200 lines (baseline 1100)');
+    expect(ok).toBe(true);
+    expect(output).toContain('file-size guard passed');
+    expect(existsSync(join(root, 'scripts', 'file-size-baseline.txt'))).toBe(false);
+    // The guard must not REWRITE the allowlist — asserting a literal header
+    // instead would fail the moment anyone lands an audited exception, which
+    // is the very remedy the guard's own failure message prescribes.
+    expect(readFileSync(join(root, 'scripts', 'file-size-allowlist.txt'), 'utf-8')).toBe(
+      readFileSync(ALLOWLIST_SOURCE, 'utf-8'),
+    );
   });
 });

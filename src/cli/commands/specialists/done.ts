@@ -7,8 +7,8 @@ import { Effect } from 'effect';
  * No output parsing needed - just run this command.
  *
  * Usage:
- *   pan specialists done review MIN-665 --status passed --notes "Code looks good"
- *   pan specialists done review MIN-665 --status blocked --notes "Changes requested"
+ *   pan specialists done review MIN-665 --status passed --notes "Code looks good" --run-id "agent-min-665-review-abc12345"
+ *   pan specialists done review MIN-665 --status blocked --notes "Changes requested" --run-id "agent-min-665-review-abc12345"
  *   pan specialists done test PAN-97 --status failed --notes "3 tests failing"
  *   pan specialists done merge PAN-83 --status passed
  */
@@ -26,6 +26,8 @@ interface DoneOptions {
   status: 'passed' | 'failed' | 'blocked';
   /** xBRIEF item receiving an inspect verdict. Required for inspect. */
   item?: string;
+  /** Review cycle identity used to deduplicate blocked feedback delivery. */
+  runId?: string;
   /** PAN-1862 (FR-6): "security=passed,correctness=blocked" per-reviewer verdicts. */
   reviewers?: string;
   notes?: string;
@@ -123,12 +125,14 @@ export async function doneCommand(
       // route does. The synthesis agent signals via this CLI path, so without this
       // the snapshot never happens: canSkipTests can't fire and the deacon's
       // post-review-commit drift detection goes blind, jamming the issue at
-      // passed-but-no-anchor. Runs for passed verdicts (reviewedAtCommit) AND for
-      // any verdict carrying --reviewers: per-reviewer verdicts need their atCommit
-      // anchor on a BLOCKED aggregate too — that is exactly the cycle whose clean
-      // reviewers selective re-review wants to skip next time (PAN-1862 FR-6/NFR-1).
-      // A bare blocked verdict (no --reviewers) skips the git probe so the durable
-      // write stays synchronous ahead of feedback delivery (PAN-2524).
+      // passed-but-no-anchor. This pre-delivery probe runs for passed verdicts
+      // (reviewedAtCommit) AND for any verdict carrying --reviewers: per-reviewer
+      // verdicts need their atCommit anchor on a BLOCKED aggregate too — that is
+      // exactly the cycle whose clean reviewers selective re-review wants to skip
+      // next time (PAN-1862 FR-6/NFR-1). A bare blocked verdict skips this probe so
+      // the durable verdict write stays synchronous ahead of feedback delivery;
+      // its reviewedAtCommit anchor is recorded by a second best-effort write after
+      // feedback delivery below (PAN-2524, PAN-3148).
       if (options.status === 'passed' || update.reviewerVerdicts) {
         let workspaceHead: HeadAnchor | undefined;
         try {
@@ -246,6 +250,7 @@ export async function doneCommand(
         verdict: options.status,
         notes: options.notes,
         prUrl: status.prUrl,
+        ...(options.runId ? { runId: options.runId } : {}),
       }));
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timeout = new Promise<never>((_, reject) => {
@@ -262,6 +267,34 @@ export async function doneCommand(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.warn(chalk.yellow(`Could not deliver review feedback: ${message}`));
+    }
+  }
+
+  // PAN-3148: a blocked verdict needs the reviewed HEAD as the baseline for
+  // detecting the rework commit that should trigger a fresh review. Keep this as
+  // a second, best-effort write after the durable verdict and feedback delivery;
+  // folding the git probe into the first write would reopen PAN-2524's stall.
+  if (specialist === 'review' && options.status === 'blocked') {
+    try {
+      const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
+      const { existsSync } = await import('node:fs');
+      const { join } = await import('node:path');
+      const project = resolveProjectFromIssueSync(normalizedIssueId);
+      if (project) {
+        const workspacePath = join(
+          project.projectPath,
+          'workspaces',
+          `feature-${normalizedIssueId.toLowerCase()}`,
+        );
+        if (existsSync(workspacePath)) {
+          const { snapshotWorkspaceHeadsPromise } = await import('../../../lib/git-utils.js');
+          const reviewedAtCommit = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
+          if (reviewedAtCommit) setReviewStatusSync(normalizedIssueId, { reviewedAtCommit });
+        }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(chalk.yellow(`  ⚠ Could not snapshot blocked review HEAD: ${message}`));
     }
   }
 

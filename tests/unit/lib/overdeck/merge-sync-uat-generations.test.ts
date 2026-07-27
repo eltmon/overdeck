@@ -82,7 +82,11 @@ describe('insert + get round-trip', () => {
     expect(loaded!.members).toHaveLength(2);
     expect(loaded!.members[1]).toMatchObject({ issueId: 'PAN-2', pr: 42, mergeOrder: 2 });
     expect(loaded!.heldOut).toEqual([{ issueId: 'PAN-3', reason: 'conflict with PAN-1 could not be resolved' }]);
-    expect(loaded!.resolutions).toEqual([{ issueIds: ['PAN-2', 'PAN-1'], files: ['src/a.ts'], commitSha: 'ccc333' }]);
+    // PAN-3166: a resolution written without a kind reads back as 'conflict',
+    // the only kind that existed before the union lint.
+    expect(loaded!.resolutions).toEqual([
+      { issueIds: ['PAN-2', 'PAN-1'], files: ['src/a.ts'], commitSha: 'ccc333', kind: 'conflict' },
+    ]);
     expect(loaded!.baseSha).toBe('abc123');
     expect(loaded!.status).toBe('assembling');
     expect(loaded!.stackStartedAt).toBeNull();

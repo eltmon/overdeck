@@ -50,6 +50,31 @@ On the Flywheel page, the **UAT batches** card shows, newest first:
 Merging a single feature on its own is still available as an escape hatch; doing
 so simply restales the live batches and a fresh one reassembles automatically.
 
+## Projects that span several repos
+
+A polyrepo project — one where a single issue's work lands across several member
+repositories — gets batch trains too, on the same terms as a single-repo
+project. There is no separate setting: the merge-train flag is the only gate.
+
+A batch there spans **one `uat/…` branch per member repo that a ready feature
+actually touches**. Repos no feature touches are left alone entirely. The batch
+still behaves as one unit:
+
+- **A feature that conflicts anywhere is held out everywhere.** You never test a
+  feature that landed in the API repo but not the frontend one — if it can't be
+  merged cleanly in every repo it contributes to, it waits for the next batch.
+- **Merging is all-or-nothing.** Overdeck first merges every repo locally,
+  without publishing anything. Only once all of them succeed does it push. If
+  any repo would fail, nothing is published at all and the batch stays exactly
+  as it was.
+- **An interrupted merge resumes instead of unwinding.** If a push fails after
+  some repos already landed, Overdeck tells you which landed and which are still
+  pending, and never rewrites a repo's `main` to undo one. Clicking merge again
+  skips what already landed and finishes the rest.
+
+The live UAT stack works the same way as for a single-repo project — one stack
+per batch, serving all of its repos together.
+
 ## Live UAT stacks
 
 Each generation can serve a live dashboard at

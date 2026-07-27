@@ -12,6 +12,7 @@ vi.mock('../merge-verification.js', () => ({
 }));
 
 const mockDeliverReviewVerdictFeedback = vi.hoisted(() => vi.fn());
+const mockSnapshotWorkspaceHeads = vi.hoisted(() => vi.fn());
 vi.mock('../review-verdict-feedback.js', async () => {
   const { Effect } = await import('effect');
   mockDeliverReviewVerdictFeedback.mockImplementation(() => Effect.succeed({
@@ -52,6 +53,10 @@ vi.mock('../../overdeck/review-status-sync.js', () => ({ markWorkspaceStuck: vi.
 vi.mock('../../overdeck/control-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
 vi.mock('../../overdeck/agents.js', () => ({ listAllAgentsSync: vi.fn(() => []) }));
 vi.mock('../../shadow-state.js', () => ({ getShadowState: vi.fn(async () => null) }));
+vi.mock('../../git-utils.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../git-utils.js')>()),
+  snapshotWorkspaceHeadsPromise: mockSnapshotWorkspaceHeads,
+}));
 vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn(), resolveProjectFromIssueSync: vi.fn(), listProjects: vi.fn(() => [{ config: { path: '/repo' } }]), listProjectsSync: vi.fn(() => [{ config: { path: '/repo' } }]), getProject: vi.fn(() => null), getProjectSync: vi.fn(() => null) }));
 vi.mock('../../lifecycle/archive-planning.js', () => ({ findWorkspacePath: vi.fn() }));
 vi.mock('../../persistent-logger.js', () => ({ logDeaconEvent: vi.fn(), logDeaconEventSync: vi.fn(), logAgentLifecycle: vi.fn() }));
@@ -234,6 +239,7 @@ describe('cleanupOrphanedReviewSessions', () => {
 describe('monitorReviewConvoySignals', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSnapshotWorkspaceHeads.mockResolvedValue(undefined);
     mockSessionExistsAsync.mockImplementation((name: string) => Effect.succeed(name === 'agent-pan-879-review') as any);
     mockSpawnReviewSubRole.mockReturnValue(Effect.succeed({ success: true, message: 'respawned', sessionId: 'agent-pan-879-review-security' }) as any);
   });
@@ -439,6 +445,7 @@ describe('monitorReviewConvoySignals', () => {
       reviewRunId: runId,
     } as any);
     mockGetReviewStatus.mockReturnValue({ issueId: 'PAN-880', reviewStatus: 'reviewing', prUrl: 'https://github.com/eltmon/overdeck/pull/880' } as any);
+    mockSnapshotWorkspaceHeads.mockResolvedValue('fallback-head');
     mockSessionExistsAsync.mockReturnValue(Effect.succeed(false) as any);
 
     const actions = await monitorReviewConvoySignals();
@@ -454,16 +461,15 @@ describe('monitorReviewConvoySignals', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-880', {
       reviewStatus: 'blocked',
       reviewNotes: '[correctness] Missing null check — `src/example.ts:42`',
-      // PAN-1862 (FR-6): the fallback synthesis persists per-reviewer verdicts so
-      // the next cycle's selective re-review can skip provably-clean reviewers.
-      // No atCommit here — the mocked execFile fails the HEAD probe, and an
-      // unanchored verdict simply re-runs next cycle (fail toward quality).
+      // PAN-1862/PAN-3148: the fallback synthesis anchors both the per-reviewer
+      // verdicts and the blocked aggregate verdict to the same reviewed HEAD.
       reviewerVerdicts: {
-        security: { status: 'passed', findingsPath: `${reviewDir}/security.md` },
-        correctness: { status: 'blocked', findingsPath: `${reviewDir}/correctness.md` },
-        performance: { status: 'passed', findingsPath: `${reviewDir}/performance.md` },
-        requirements: { status: 'passed', findingsPath: `${reviewDir}/requirements.md` },
+        security: { status: 'passed', findingsPath: `${reviewDir}/security.md`, atCommit: 'fallback-head' },
+        correctness: { status: 'blocked', findingsPath: `${reviewDir}/correctness.md`, atCommit: 'fallback-head' },
+        performance: { status: 'passed', findingsPath: `${reviewDir}/performance.md`, atCommit: 'fallback-head' },
+        requirements: { status: 'passed', findingsPath: `${reviewDir}/requirements.md`, atCommit: 'fallback-head' },
       },
+      reviewedAtCommit: 'fallback-head',
     });
     expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith({
       issueId: 'PAN-880',
@@ -471,6 +477,7 @@ describe('monitorReviewConvoySignals', () => {
       notes: '[correctness] Missing null check — `src/example.ts:42`',
       workspacePath: '/workspace',
       prUrl: 'https://github.com/eltmon/overdeck/pull/880',
+      runId,
     });
     expect(actions).toEqual([
       'Synthesized review for PAN-880 from 4 reviewer reports: blocked',

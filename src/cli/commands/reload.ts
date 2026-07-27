@@ -1,18 +1,36 @@
 import { Effect } from 'effect';
 import chalk from 'chalk';
-import { exec, spawn } from 'child_process';
-import { constants, promises as fs, statSync } from 'fs';
-import { homedir } from 'os';
-import { delimiter, dirname, isAbsolute, join, resolve } from 'path';
-import { promisify } from 'util';
+import { statSync } from 'fs';
+import { resolve } from 'path';
+import {
+  activateDashboardDeployment,
+  buildDashboardFromOriginMain,
+  dashboardDeploymentRoots,
+  removeDashboardDeployment,
+  runGitAsync,
+  selectDashboardDeploymentRoot,
+  sweepDashboardDeployments,
+  type DashboardDeployment,
+  type DashboardDeploymentActivation,
+} from '../../lib/deploy/build-from-origin.js';
+import {
+  readActiveDashboardBundleSync,
+  writeActiveDashboardBundle,
+} from '../../lib/deploy/active-dashboard-bundle.js';
+import { supervisorDeploymentFailure } from '../../lib/channels/pty-supervisor-locate.js';
 import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-lock.js';
-import { readPlatformConfigSync, restartDashboard, StageError, parseHealthTimeoutMs } from '../../lib/platform-lifecycle.js';
+import {
+  leavesDashboardRunning,
+  parseHealthTimeoutMs,
+  readPlatformConfigSync,
+  restartDashboard,
+  StageError,
+} from '../../lib/platform-lifecycle.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
 import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
 import {
   refuseNonPrimaryDashboardCwd,
   resolveBundledServerPath,
-  resolvePrimaryDashboardIdentity,
   spawnDashboardDetached,
 } from './restart.js';
 
@@ -25,8 +43,6 @@ export interface ReloadOptions {
 
 class UsageError extends Error {}
 
-const execAsync = promisify(exec);
-
 function parseHealthTimeout(value: string | undefined): number {
   try {
     return parseHealthTimeoutMs(value, 30_000);
@@ -35,33 +51,11 @@ function parseHealthTimeout(value: string | undefined): number {
   }
 }
 
-function dashboardBundleMtimeMs(): number {
+function dashboardBundleMtimeMs(bundlePath = resolveBundledServerPath()): number {
   try {
-    return statSync(resolveBundledServerPath()).mtimeMs;
+    return statSync(bundlePath).mtimeMs;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0;
-    throw error;
-  }
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-async function runGitAsync(args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
-  return execAsync(`git ${args.map(shellQuote).join(' ')}`, {
-    cwd,
-    encoding: 'utf8',
-  });
-}
-
-async function runGitExit(args: string[], cwd: string): Promise<number> {
-  try {
-    await runGitAsync(args, cwd);
-    return 0;
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException & { code?: unknown }).code;
-    if (typeof code === 'number') return code;
     throw error;
   }
 }
@@ -73,129 +67,6 @@ async function resolvePrimaryRepoRoot(cwd: string): Promise<string> {
   }
   const workspaceMatch = repoRoot.match(/^(.+)\/workspaces\/feature-[^/]+$/);
   return workspaceMatch?.[1] ?? repoRoot;
-}
-
-function runCommand(command: string, args: string[], cwd: string): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      stdio: 'inherit',
-      env: process.env,
-      cwd,
-    });
-    child.once('error', reject);
-    child.once('close', (code) => resolve(code ?? 1));
-  });
-}
-
-/**
- * Install dependencies before building. A merge/rebase that adds a runtime dep
- * (e.g. chokidar from PAN-1395) leaves node_modules behind package.json: the
- * build still succeeds (the bundler externalizes the dep) but the freshly built
- * server boot-crashes with ERR_MODULE_NOT_FOUND, taking the dashboard down.
- * `bun install` is idempotent and ~instant on a warm cache, so running it
- * unconditionally before every reload makes "apply my merged changes" safe.
- */
-async function resolveBunBinary(cwd: string): Promise<string> {
-  const pathDirectories = (process.env.PATH ?? '')
-    .split(delimiter)
-    .filter(Boolean)
-    .map((directory) => isAbsolute(directory) ? directory : resolve(cwd, directory));
-
-  for (const directory of pathDirectories) {
-    const candidate = join(directory, 'bun');
-    try {
-      await fs.access(candidate, constants.X_OK);
-      return candidate;
-    } catch {
-      // Keep searching the inherited PATH.
-    }
-  }
-
-  const fallback = join(process.env.HOME || homedir(), '.bun', 'bin', 'bun');
-  try {
-    await fs.access(fallback, constants.X_OK);
-    return fallback;
-  } catch {
-    throw new Error(`bun executable not found in PATH or at ${fallback}`);
-  }
-}
-
-async function runBunInstall(cwd: string): Promise<number> {
-  const bunBinary = await resolveBunBinary(cwd);
-  return runCommand(bunBinary, ['install'], cwd);
-}
-
-function runBuild(cwd: string): Promise<number> {
-  return runCommand('npm', ['run', 'build'], cwd);
-}
-
-async function runInstallAndBuild(cwd: string): Promise<void> {
-  const installExit = await runBunInstall(cwd);
-  if (installExit !== 0) {
-    throw new Error(`bun install failed in ${cwd} — old dashboard left running`);
-  }
-
-  const exitCode = await runBuild(cwd);
-  if (exitCode !== 0) {
-    throw new Error(`Build failed in ${cwd} — old dashboard left running`);
-  }
-}
-
-async function swapBuiltDist(repoRoot: string, buildWorktree: string): Promise<void> {
-  const incomingDist = join(repoRoot, 'dist.incoming');
-  const currentDist = join(repoRoot, 'dist');
-  const oldDist = join(repoRoot, `dist.old.${process.pid}`);
-
-  await fs.rm(incomingDist, { recursive: true, force: true });
-  await fs.cp(join(buildWorktree, 'dist'), incomingDist, { recursive: true });
-  await fs.rm(oldDist, { recursive: true, force: true });
-
-  let movedOldDist = false;
-  try {
-    await fs.rename(currentDist, oldDist);
-    movedOldDist = true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-  }
-
-  try {
-    await fs.rename(incomingDist, currentDist);
-  } catch (error) {
-    if (movedOldDist) {
-      await fs.rename(oldDist, currentDist).catch(() => undefined);
-    }
-    throw error;
-  }
-
-  await fs.rm(oldDist, { recursive: true, force: true });
-}
-
-async function buildFromOriginMain(repoRoot: string): Promise<void> {
-  await runGitAsync(['fetch', 'origin', 'main'], repoRoot);
-
-  const ancestorExit = await runGitExit(['merge-base', '--is-ancestor', 'origin/main', 'HEAD'], repoRoot);
-  if (ancestorExit === 0) {
-    await runInstallAndBuild(repoRoot);
-    return;
-  }
-  if (ancestorExit !== 1) {
-    throw new Error(`git merge-base --is-ancestor origin/main HEAD exited ${ancestorExit}`);
-  }
-
-  const originMainSha = (await runGitAsync(['rev-parse', '--short', 'origin/main'], repoRoot)).stdout.trim();
-  const buildWorktree = join(dirname(repoRoot), `.pan-reload-build-${process.pid}`);
-
-  console.warn(chalk.yellow(`origin/main (${originMainSha}) is not contained in this worktree HEAD; building from a detached origin/main worktree.`));
-  try {
-    await runGitAsync(['worktree', 'add', '--detach', buildWorktree, 'origin/main'], repoRoot);
-    await runInstallAndBuild(buildWorktree);
-    await swapBuiltDist(repoRoot, buildWorktree);
-    console.log(chalk.green(`✓ Built dashboard from origin/main ${originMainSha}`));
-  } finally {
-    await runGitAsync(['worktree', 'remove', '--force', buildWorktree], repoRoot).catch(() => undefined);
-    await fs.rm(buildWorktree, { recursive: true, force: true }).catch(() => undefined);
-    await fs.rm(join(repoRoot, 'dist.incoming'), { recursive: true, force: true }).catch(() => undefined);
-  }
 }
 
 async function recordReloadStatus(startedAt: number, success: boolean, error?: string): Promise<void> {
@@ -288,12 +159,42 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
 
     const config = readPlatformConfigSync();
     let repoRoot = process.cwd();
+    let deployment: DashboardDeployment | null = null;
+    let activation: DashboardDeploymentActivation | null = null;
+    const previousBundle = readActiveDashboardBundleSync();
     if (!options.skipBuild) {
-      const beforeMtime = dashboardBundleMtimeMs();
       try {
         repoRoot = await resolvePrimaryRepoRoot(process.cwd());
-        await buildFromOriginMain(repoRoot);
+        const generationRoots = dashboardDeploymentRoots();
+        await sweepDashboardDeployments(repoRoot, [
+          ...generationRoots,
+          ...(previousBundle ? [previousBundle.deployRoot] : []),
+        ]);
+        const nextDeployRoot = selectDashboardDeploymentRoot(previousBundle?.deployRoot);
+        deployment = await buildDashboardFromOriginMain(repoRoot, {
+          deploymentRoot: () => nextDeployRoot,
+        });
+        const deployedMtime = dashboardBundleMtimeMs(deployment.serverPath);
+        if (deployedMtime <= 0) {
+          throw new Error(`Build did not create ${deployment.serverPath}`);
+        }
+        // A deployment that cannot run the PTY supervisor cannot spawn a
+        // conversation or a Claude Code agent, yet it serves HTTP happily — so
+        // the ordinary health check stays green while a core operator surface
+        // is dead (PAN-3172). Fail before any traffic moves onto it.
+        const supervisorFailure = supervisorDeploymentFailure(deployment.deployRoot);
+        if (supervisorFailure) throw new Error(supervisorFailure);
+        await writeActiveDashboardBundle({ repoRoot, ...deployment });
+        try {
+          activation = await activateDashboardDeployment(repoRoot, deployment);
+        } catch (error) {
+          await writeActiveDashboardBundle(previousBundle).catch(() => undefined);
+          throw error;
+        }
       } catch (error) {
+        if (deployment) {
+          await removeDashboardDeployment(repoRoot, deployment.deployRoot);
+        }
         const message = (error as Error)?.message || String(error);
         const reloadError = message.includes('old dashboard left running')
           ? message
@@ -303,21 +204,39 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
         process.exitCode = 1;
         return;
       }
-
-      const afterMtime = dashboardBundleMtimeMs();
-      if (afterMtime <= beforeMtime) {
-        const error = `Build did not refresh ${resolveBundledServerPath()} — old dashboard left running`;
-        console.error(chalk.red(error));
-        await recordReloadStatus(startedAt, false, error);
-        process.exitCode = 1;
-        return;
-      }
     }
 
-    await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, { deacon: options.deacon }), {
-      healthTimeoutMs,
-      expectedIdentity: resolvePrimaryDashboardIdentity(),
-    }));
+    try {
+      await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, {
+        deacon: options.deacon,
+        serverPath: deployment?.serverPath,
+        repoRoot,
+      }), {
+        healthTimeoutMs,
+        expectedIdentity: { repoRoot, mode: 'primary' },
+      }));
+    } catch (error) {
+      if (deployment) {
+        if (leavesDashboardRunning(error)) {
+          await activation?.commit();
+          await sweepDashboardDeployments(repoRoot, dashboardDeploymentRoots()).catch(() => undefined);
+        } else {
+          await writeActiveDashboardBundle(previousBundle).catch(() => undefined);
+          await activation?.rollback();
+          await removeDashboardDeployment(repoRoot, deployment.deployRoot);
+          await sweepDashboardDeployments(repoRoot, [
+            ...dashboardDeploymentRoots(),
+            ...(previousBundle ? [previousBundle.deployRoot] : []),
+          ]).catch(() => undefined);
+        }
+      }
+      throw error;
+    }
+
+    await activation?.commit();
+    if (deployment) {
+      await sweepDashboardDeployments(repoRoot, dashboardDeploymentRoots()).catch(() => undefined);
+    }
     await recordReloadStatus(startedAt, true);
     console.log(chalk.green('✓ Dashboard reloaded and healthy'));
   } catch (error) {

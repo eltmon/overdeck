@@ -12,16 +12,19 @@ import {
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
 } from './overdeck/review-status-sync.js';
-import { registerReviewStatusMapReader } from './cloister/review-status-source.js';
-import { normalizeReviewStatusSync } from './review-status-normalize.js';
-import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import {
-  reconcileJournalIntoCacheSync,
+  registerCanonicalReviewStatusResolver,
+  registerReviewStatusMapReader,
+} from './cloister/review-status-source.js';
+import { normalizeReviewStatusSync } from './review-status-normalize.js';
+import { updateIssueRecordForReviewStatusSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
+import {
   reviewGatesPassedSync,
   verificationSatisfied,
   type BlockerReason, type ReviewStatus, type StatusHistoryEntry,
 } from './review-status-reconcile.js';
 import { needsReviewDispatch } from './review-dispatch-decision.js';
+import { resolveJournalReconciledReviewStatusSync } from './review-status-read.js';
 import { capturePipelineStageForIssue } from './telemetry/pipeline.js';
 import type { ReviewStatusUpdate } from './workspace-anchor-drift.js';
 
@@ -60,6 +63,7 @@ export function mergeGateEligibility(
 // PAN-2579: register the cycle-free status-map reader used by concurrency.ts for
 // warm-idle advancing classification (see cloister/review-status-source.ts).
 registerReviewStatusMapReader(() => getAllReviewStatusesFromDb());
+registerCanonicalReviewStatusResolver((issueId) => getReviewStatusSync(issueId));
 
 const DEFAULT_STATUS_FILE = join(homedir(), '.overdeck', 'review-status.json');
 
@@ -498,11 +502,14 @@ async function deliverReviewVerdictFeedbackHostSide(
 ): Promise<void> {
   try {
     const { deliverReviewVerdictFeedback } = await import('./cloister/review-verdict-feedback.js');
+    const { getAgentStateSync } = await import('./agents.js');
+    const runId = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`)?.reviewRunId;
     const result = await Effect.runPromise(deliverReviewVerdictFeedback({
       issueId,
       verdict: status.reviewStatus === 'failed' ? 'failed' : 'blocked',
       notes: status.reviewNotes,
       prUrl: status.prUrl,
+      ...(runId ? { runId } : {}),
     }));
     if (result.agentMessageSent) {
       console.log(`[review-status] delivered review feedback to the work agent for ${issueId} (host-side)`);
@@ -660,52 +667,28 @@ async function deliverTestFailureToWorkAgentHostSide(issueId: string, status: Re
   }
 }
 
+function resolveReviewStatusSync(issueId: string, dbStatus: ReviewStatus | null | undefined): ReviewStatus | null {
+  return resolveJournalReconciledReviewStatusSync(issueId, dbStatus, {
+    deleteStatus: dbDelete,
+    notifyStatusChanged: (id, status) => notifyPipelineSync({ type: 'status_changed', issueId: id, status }),
+    deliverReviewVerdictFeedbackHostSide,
+    emitReactiveLifecycleEvent,
+    maybeAutoDispatchReviewHostSide,
+    maybeRecoverTestVerdictHostSide,
+  });
+}
+
 export function getReviewStatusSync(issueId: string): ReviewStatus | null {
-  const dbStatus = getReviewStatusFromDbSync(issueId);
-  const journal = readJournalStatusSync(issueId);
+  return resolveReviewStatusSync(issueId, getReviewStatusFromDbSync(issueId));
+}
 
-  // No journal record → the DB is all we have. (Pre-PAN-1908 issues, or issues whose
-  // workspace/record hasn't been created yet.)
-  if (!journal) return dbStatus ?? null;
-
-  if ((journal.durable as { closedOut?: boolean }).closedOut === true) {
-    // PAN-2054: closed-out journal records are terminal; stale active DB rows are cache residue.
-    try {
-      dbDelete(issueId);
-    } catch {
-      // Read-only DB (a sandboxed reader) — the host clears residue when it reads. Non-fatal.
-    }
-    return null;
-  }
-
-  // PAN-1988 — journal is the source of truth; DB is a rebuildable cache. If the journal is
-  // NEWER than the DB row, an agent recorded its verdict to the journal but the DB write
-  // lagged or was blocked (a sandboxed agent that can't write ~/.overdeck). Reconcile the
-  // cache from the journal. Whatever process reads next performs this; the host (non-sandboxed)
-  // write succeeds, a sandboxed reader's reconcile is a best-effort no-op.
-  const journalNewer = !dbStatus || (dbStatus.updatedAt ?? '') < journal.updatedAt;
-  if (journalNewer) {
-    return reconcileJournalIntoCacheSync(issueId, dbStatus, journal, {
-      notifyStatusChanged: (reconciledIssueId, status) => {
-        notifyPipelineSync({
-          type: 'status_changed',
-          issueId: reconciledIssueId,
-          status,
-        });
-      },
-      deliverReviewVerdictFeedbackHostSide,
-      emitReactiveLifecycleEvent,
-      maybeAutoDispatchReviewHostSide,
-      maybeRecoverTestVerdictHostSide,
-    });
-  }
-
-  // DB is current → overlay the feedback TEXT from the journal (it is no longer stored in the
-  // DB; the row holds only the queryable status flags).
-  const enriched = enrichReviewNotesFromRecordSync(issueId, dbStatus!);
-  maybeAutoDispatchReviewHostSide(issueId, enriched);
-  maybeRecoverTestVerdictHostSide(issueId, enriched);
-  return enriched;
+export function getReviewStatusesSync(issueIds: string[]): Record<string, ReviewStatus> {
+  const ids = [...new Set(issueIds.map((issueId) => issueId.trim().toUpperCase()).filter(Boolean))];
+  const dbStatuses = getReviewStatusesFromDb(ids);
+  return Object.fromEntries(ids.flatMap((id) => {
+    const status = resolveReviewStatusSync(id, dbStatuses[id]);
+    return status ? [[id, status]] : [];
+  }));
 }
 
 /**

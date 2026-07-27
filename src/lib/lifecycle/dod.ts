@@ -28,7 +28,7 @@ export const DOD_ROWS: readonly DodRowDef[] = [
     expected: 'verificationStatus: passed',
     overridable: true,
   },
-  { id: 'merged', num: 4, title: 'Merged to main', expected: 'PR merged on the forge, or branch work contained in main (non-PR landing)', overridable: true },
+  { id: 'merged', num: 4, title: 'Merged to main', expected: 'PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)', overridable: true },
   {
     id: 'post-merge',
     num: 5,

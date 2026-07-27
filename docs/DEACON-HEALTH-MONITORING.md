@@ -11,6 +11,7 @@ The Deacon is Overdeck's health monitor, running as part of the dashboard server
 | **First-Completion** | Agent idle with commits but never called `pan done` | 10 min idle | Nudge to call done | Every 15 min |
 | **Resolution Patrol** | Agent evidence shows done/stuck (from enrichment) | 2+ nudges (done) or 3+ (stuck) | Auto-complete or poke | Per resolution |
 | **Parallel Review Re-dispatch** | Review got stuck in `reviewing`/`testing` after dispatch | `recoveryStartedAt` cutoff | Re-dispatch parallel-review specialists | 3 before breaker trips (PAN-794) |
+| **Blocked Review Rework Drift** | Work agent pushed a new tree after a `blocked` verdict | Same new HEAD for 2 patrol ticks | Reset to pending + re-dispatch review | One dispatch per stable HEAD |
 | **Orphaned Agents** | status=running but no tmux session | Immediate | Reset to stopped | N/A |
 | **Dead Planning Sessions** | Planning tmux with remain-on-exit, process dead | Immediate | Kill session + reset | N/A |
 | **Context-Window Wedged** | Recent terminal tail shows `input exceeds the context window` 400 | Immediate | Mark `wedged`, Overdeck-side compaction → `/clear` + reseed → stuck | 1 clear tier |
@@ -53,6 +54,12 @@ The Deacon is Overdeck's health monitor, running as part of the dashboard server
   - `done` with count ≥ 2 → auto-complete via `pan done`
   - `stuck` with count ≥ 3 → send poke message
   - `working`, `completed`, `needs_input`, `unclear` → skip
+
+### Blocked Review Rework Drift (`checkPostReviewCommits`)
+- **File:** `src/lib/cloister/deacon-post-review-commits.ts`
+- **Criteria:** `reviewStatus='blocked'` and the workspace tree moved past the reviewed anchor. Legacy rows may use `reviewerVerdicts[*].atCommit` only when every reviewer agrees on one anchor.
+- **Debounce:** The same new HEAD must appear on two consecutive patrol ticks, so per-item pushes do not start review before the rework batch is complete.
+- **Action:** Reset review to `pending` without clearing test verdicts or feedback notes, then emit `Re-dispatched review for <issue>: rework commit after BLOCKED verdict (<old> → <new>)` after the fresh convoy starts.
 
 ### Context-Window Wedged Recovery (`checkApiErrorAgents`)
 - **File:** `src/lib/cloister/deacon.ts`

@@ -47,6 +47,12 @@ export interface UatGenerationMember {
   prUrl?: string;
   mergeOrder: number;
   acceptanceCriteria: Array<{ title: string; status: string }>;
+  /**
+   * PAN-3165: false when the server could not resolve the issue's xBRIEF at
+   * all. Optional so an older cached payload degrades to the unresolved
+   * message rather than asserting the plan listed nothing.
+   */
+  planResolved?: boolean;
 }
 
 export interface UatGenerationPayload {
@@ -58,7 +64,16 @@ export interface UatGenerationPayload {
   members: UatGenerationMember[];
   heldOut: Array<{ issueId: string; reason: string }>;
   resolutions: Array<{ issueIds: string[]; files: string[]; commitSha: string }>;
-  stack: { status: 'running' | 'absent'; frontendUrl: string };
+  stack: {
+    status: 'running' | 'degraded' | 'unknown' | 'absent';
+    frontendUrl: string;
+    /** Declared services that are not serving — `degraded` only (PAN-3166). */
+    downServices?: string[];
+    /** service → last error line from its logs. */
+    serviceErrors?: Record<string, string>;
+    /** Why the probe could not tell — `unknown` only. */
+    probeError?: string;
+  };
 }
 
 interface QueuesEntry {
@@ -153,6 +168,10 @@ function visibleGenerationsOf(section: MergeTrainProjectSection): UatGenerationP
   return section.generations.filter(
     (g) => g.status === 'assembling' || g.status === 'ready' || g.status === 'superseded',
   );
+}
+
+function isIdleSection(section: MergeTrainProjectSection): boolean {
+  return section.queue.length === 0 && visibleGenerationsOf(section).length === 0;
 }
 
 function readStoredFilter(): string[] | null {
@@ -265,6 +284,10 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
 
   const isSelected = (projectKey: string) => selectedProjects === null || selectedProjects.includes(projectKey);
   const visibleSections = sections.filter((s) => isSelected(s.projectKey));
+  // Idle enabled sections repeat boilerplate without adding information. Disabled
+  // sections are never hidden because "merge train off" is meaningful state.
+  const renderedSections = visibleSections.filter((section) => !section.enabled || !isIdleSection(section));
+  const idleHiddenCount = visibleSections.length - renderedSections.length;
 
   const toggleProject = (projectKey: string) => {
     const current = selectedProjects ?? sections.map((s) => s.projectKey);
@@ -399,6 +422,36 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
 
   const StackButton = ({ gen, compact }: { gen: UatGenerationPayload; compact?: boolean }) => {
     const starting = stackMutation.isPending && stackMutation.variables === gen.name;
+    // PAN-3166: a stack whose api died still has healthy containers. Offering
+    // "Open UAT frontend" there sends the operator into a gateway timeout, so a
+    // degraded stack gets a restart control instead of a link.
+    if (gen.stack.status === 'degraded' || gen.stack.status === 'unknown') {
+      const unknown = gen.stack.status === 'unknown';
+      const down = gen.stack.downServices ?? [];
+      const detail = Object.entries(gen.stack.serviceErrors ?? {})
+        .map(([service, line]) => `${service}: ${line}`)
+        .join('\n');
+      return (
+        <button
+          type="button"
+          disabled={starting}
+          onClick={() => void onStack(gen)}
+          data-testid={`uat-stack-degraded-${gen.name}`}
+          title={
+            unknown
+              ? `Could not probe the stack: ${gen.stack.probeError ?? 'unknown error'} — the stack record is preserved`
+              : detail || `Not serving: ${down.join(', ') || 'a declared service'} — restart the stack`
+          }
+          className="inline-flex items-center gap-1 rounded border border-amber-500/50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-400 hover:bg-amber-500/10 disabled:opacity-60"
+        >
+          {starting
+            ? (<><Loader2 className="h-3 w-3 animate-spin" /> Restarting…</>)
+            : unknown
+              ? (<>⚠ {compact ? 'Unknown' : 'Stack state unknown'}</>)
+              : (<>⚠ {compact ? 'Degraded' : `Stack degraded — ${down.join(', ') || 'service down'}`}</>)}
+        </button>
+      );
+    }
     if (gen.stack.status === 'running') {
       return (
         <a
@@ -423,19 +476,6 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
       </button>
     );
   };
-
-  // "Nothing ready anywhere" may only replace the sections when there is nothing
-  // a section would have told the operator. A disabled project's row carries real
-  // information — the train is OFF here, which is a different answer from "nothing
-  // is ready" — so ANY disabled row suppresses the collapse, not just the
-  // all-disabled case. Otherwise a mix of idle-enabled and disabled projects hides
-  // the off rows and sends the operator hunting for work that was never coming.
-  const anyDisabled = sections.some((s) => !s.enabled);
-  const nothingAnywhere =
-    !loading &&
-    !anyDisabled &&
-    sections.length > 0 &&
-    sections.every((s) => s.queue.length === 0 && visibleGenerationsOf(s).length === 0);
 
   return (
     <div data-testid="merge-train-view">
@@ -482,17 +522,22 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
             ? 'Loading the merge train…'
             : 'No projects are registered, so there is no merge train to show.'}
         </p>
-      ) : nothingAnywhere ? (
-        <p className="px-1 py-1.5 text-xs text-muted-foreground">
-          No features are ready to merge in any project. When work passes review and tests, it lines up here and a test batch assembles automatically.
-        </p>
       ) : visibleSections.length === 0 ? (
         <p className="px-1 py-1.5 text-xs text-muted-foreground">
           Every project is filtered out. Select a project above to see its merge train.
         </p>
+      ) : renderedSections.length === 0 ? (
+        <p className="px-1 py-1.5 text-xs text-muted-foreground">
+          {loading
+            ? 'Loading the merge train…'
+            : visibleSections.length === sections.length
+              ? 'No features are ready to merge in any project. When work passes review and tests, it lines up here and a test batch assembles automatically.'
+              : 'No features are ready to merge in the selected projects. Other projects may still have ready work.'}
+        </p>
       ) : (
-        <div className="space-y-3">
-          {visibleSections.map((section) => {
+        <>
+          <div className="space-y-3">
+            {renderedSections.map((section) => {
             const visibleGenerations = visibleGenerationsOf(section);
             const currentBatch =
               visibleGenerations.find((g) => g.status === 'ready') ??
@@ -519,10 +564,6 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                 {!section.enabled ? (
                   <p className="px-1 py-1.5 text-[11px] text-muted-foreground">
                     The merge train is turned off for {section.projectName}, so no batches assemble here. Turn it on in the project cockpit to start batching this project's ready work.
-                  </p>
-                ) : featureCount === 0 && visibleGenerations.length === 0 ? (
-                  <p className="px-1 py-1.5 text-[11px] text-muted-foreground">
-                    No features are ready to merge. When work passes review and tests, it lines up here and a test batch assembles automatically.
                   </p>
                 ) : (
                   <div className="space-y-1">
@@ -582,6 +623,16 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                                   held out: {gen.heldOut.map((h) => `${h.issueId} (${h.reason})`).join('; ')}
                                 </div>
                               )}
+                              {gen.stack.status === 'degraded' && (
+                                <div className="mt-0.5 pl-4 text-[10px] text-amber-400" data-testid={`uat-stack-degraded-detail-${gen.name}`}>
+                                  stack degraded — {(gen.stack.downServices ?? []).join(', ') || 'a declared service'} not serving
+                                  {Object.entries(gen.stack.serviceErrors ?? {}).map(([service, line]) => (
+                                    <div key={service} className="truncate font-mono text-[9.5px] text-muted-foreground" title={line}>
+                                      {service}: {line}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                               <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-4">
                                 <StackButton gen={gen} compact={isSuperseded} />
                                 <button
@@ -638,7 +689,13 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                                     <span className="truncate text-foreground">{member.title}</span>
                                   </div>
                                   <ul className="mt-0.5 space-y-0.5 pl-1">
-                                    {member.acceptanceCriteria.length === 0 ? (
+                                    {member.planResolved === false ? (
+                                      // PAN-3165: a lookup miss must never render as a claim about
+                                      // the plan's contents — say the plan is unresolved and name it.
+                                      <li className="text-[10.5px] italic text-muted-foreground">
+                                        Plan not found for {member.issueId} — its UAT checklist could not be read; exercise the feature described above.
+                                      </li>
+                                    ) : member.acceptanceCriteria.length === 0 ? (
                                       <li className="text-[10.5px] italic text-muted-foreground">No UAT steps in plan — exercise the feature described above.</li>
                                     ) : (
                                       member.acceptanceCriteria.map((ac, i) => (
@@ -723,9 +780,19 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                   </div>
                 )}
               </section>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+          {idleHiddenCount > 0 && (
+            <p
+              className="px-1 pt-1 text-[10.5px] text-muted-foreground"
+              data-testid="merge-train-idle-hidden-note"
+            >
+              {idleHiddenCount} project{idleHiddenCount === 1 ? '' : 's'} with nothing ready{' '}
+              {idleHiddenCount === 1 ? 'is' : 'are'} hidden
+            </p>
+          )}
+        </>
       )}
     </div>
   );

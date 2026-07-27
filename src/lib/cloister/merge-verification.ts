@@ -6,16 +6,39 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
 import { getMergeSetSync } from '../merge-set.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { assessMergeCompleteness } from './merge-completeness.js';
+import { assessMergeCompleteness, hasPositiveMergedEvidence } from './merge-completeness.js';
 import type { VerificationRunnerOutcome } from './verification-types.js';
 
 const execAsync = promisify(exec);
+
+/**
+ * One repo's positive merge evidence from a polyrepo batch promotion
+ * (PAN-3093): a real merge commit, in a real git repo, against the branch that
+ * repo actually targets.
+ */
+export interface VerifiedMergedRepo {
+  repoKey: string;
+  /** Absolute path to that member repo's git root — NOT the wrapper. */
+  repoPath: string;
+  /** The merge commit published to `targetBranch`. */
+  mergeSha: string;
+  /** The branch it was published to; often but not always `main`. */
+  targetBranch: string;
+}
 
 export interface PostMergeLifecycleOptions {
   skipDeploy?: boolean;
   allowVerifiedNoPrMerge?: boolean;
   markReviewPassed?: boolean;
   verifiedMergedRef?: string;
+  /**
+   * Per-repo merge evidence for a batch promotion that spans several repos.
+   * The single-ref `verifiedMergedRef` cannot express this: its ancestry check
+   * runs one `git merge-base` against `origin/main` in the PROJECT path, which
+   * for a polyrepo project is a wrapper with no git repo, and the repos may
+   * target branches other than main.
+   */
+  verifiedMergedRepos?: readonly VerifiedMergedRepo[];
 }
 
 type MergeStatus = 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
@@ -70,6 +93,61 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
+/**
+ * Positive ancestry results for a (repo, merge, target) tuple.
+ *
+ * A batch promotion fans the SAME generation-wide evidence out to every member,
+ * so an N-member batch across R repos ran N x R identical `git merge-base`
+ * processes, N of them concurrently. Only positives are cached: once a commit is
+ * an ancestor of a branch it stays one, whereas a negative can become positive
+ * as soon as the merge lands, so caching that would be wrong.
+ */
+const provenAncestry = new Set<string>();
+/** Bound the set so a long-lived server cannot accumulate entries forever. */
+const PROVEN_ANCESTRY_LIMIT = 512;
+
+/**
+ * Checks currently running, so concurrent callers share one process.
+ *
+ * The cache alone is not enough: every member's lifecycle consults it BEFORE
+ * any first check has settled, so all of them miss and each spawns the same
+ * `git merge-base`. A 100-member, 3-repo generation still meant ~300 duplicate
+ * checks and ~100 concurrent processes per repo. Coalescing on the in-flight
+ * promise collapses that to one process per distinct tuple.
+ */
+const inFlightAncestry = new Map<string, Promise<boolean>>();
+
+async function mergeIsAncestorOfTarget(evidence: VerifiedMergedRepo): Promise<boolean> {
+  const key = `${evidence.repoPath}|${evidence.mergeSha}|${evidence.targetBranch}`;
+  if (provenAncestry.has(key)) return true;
+
+  const running = inFlightAncestry.get(key);
+  if (running) return running;
+
+  const check = (async () => {
+    try {
+      await execAsync(
+        `git merge-base --is-ancestor ${shellQuote(evidence.mergeSha)} ${shellQuote(`origin/${evidence.targetBranch}`)}`,
+        { cwd: evidence.repoPath },
+      );
+    } catch {
+      return false;
+    }
+    // Only successes are retained: an ancestor stays an ancestor, whereas a
+    // negative becomes positive the moment the merge lands.
+    if (provenAncestry.size >= PROVEN_ANCESTRY_LIMIT) provenAncestry.clear();
+    provenAncestry.add(key);
+    return true;
+  })();
+
+  inFlightAncestry.set(key, check);
+  try {
+    return await check;
+  } finally {
+    inFlightAncestry.delete(key);
+  }
+}
+
 async function requireCompletePolyrepoMerge(
   issueId: string,
   mergedResult: { merged: true; reason: string },
@@ -96,16 +174,55 @@ export async function verifyMergedBeforeLifecycle(
   issueId: string,
   projectPath: string,
   sourceBranch?: string,
-  options?: Pick<PostMergeLifecycleOptions, 'allowVerifiedNoPrMerge' | 'verifiedMergedRef'>,
+  options?: Pick<PostMergeLifecycleOptions, 'allowVerifiedNoPrMerge' | 'verifiedMergedRef' | 'verifiedMergedRepos'>,
 ): Promise<{ merged: boolean; reason: string }> {
   // PAN-1531: GitHub PR state remains the authoritative merge oracle. A caller-
   // supplied merged ref is only accepted when git proves it is reachable from main.
   const branchName = sourceBranch?.trim() || `feature/${issueId.toLowerCase()}`;
   const quotedBranch = shellQuote(branchName);
 
+  // Batch promotion across several repos proves itself directly: each repo's
+  // merge commit must be an ancestor of the branch it was published to, checked
+  // inside that repo. This runs before the GitHub PR oracle because the
+  // per-feature PRs of a polyrepo batch are not what landed — the uat branch
+  // was — and because non-GitHub members are rejected outright below.
+  const verifiedRepos = options?.verifiedMergedRepos ?? [];
+  if (verifiedRepos.length > 0) {
+    const unproven: string[] = [];
+    for (const evidence of verifiedRepos) {
+      if (!/^[0-9a-f]{7,40}$/i.test(evidence.mergeSha)) {
+        unproven.push(`${evidence.repoKey} (no merge sha recorded)`);
+        continue;
+      }
+      if (!(await mergeIsAncestorOfTarget(evidence))) {
+        unproven.push(`${evidence.repoKey}@${evidence.mergeSha.slice(0, 9)} not on origin/${evidence.targetBranch}`);
+      }
+    }
+    if (unproven.length === 0) {
+      return {
+        merged: true,
+        reason: `batch promotion verified in ${verifiedRepos.length} repo(s): ${verifiedRepos.map((r: VerifiedMergedRepo) => r.repoKey).join(', ')}`,
+      };
+    }
+    return { merged: false, reason: `batch promotion unverified: ${unproven.join('; ')}` };
+  }
+
   const ghResolved = resolveGitHubIssueSync(issueId);
   if (!ghResolved.isGitHub) {
-    return { merged: false, reason: `Non-GitHub project for ${issueId}; merge state cannot be auto-verified` };
+    try {
+      const completeness = await assessMergeCompleteness(issueId);
+      const mergedRepos = completeness.repos.filter((repo) => repo.state === 'merged');
+      if (completeness.complete && hasPositiveMergedEvidence(completeness.repos)) {
+        return {
+          merged: true,
+          reason: `Forge confirms merge complete for ${mergedRepos.map((repo) => repo.repoKey).join(', ')}`,
+        };
+      }
+      return { merged: false, reason: completeness.summary };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { merged: false, reason: `Non-GitHub merge state is unverifiable: ${message}` };
+    }
   }
 
   const { owner, repo } = ghResolved;

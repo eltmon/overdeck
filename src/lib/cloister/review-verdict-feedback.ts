@@ -1,4 +1,15 @@
+/**
+ * Delivers durable review-verdict feedback to the work agent. Agent messages
+ * use a key derived from the issue and review run so one review cycle is
+ * model-visible at most once; callers without a run ID fall back to the
+ * reviewed anchor, or deliver unkeyed if neither identity exists. ACP and
+ * Channels targets fall back to unkeyed delivery because those transports
+ * cannot enforce the key.
+ * Repeated keyed suppressions surface a needs-you escalation before duplicate
+ * delivery attempts consume the work agent's context window.
+ */
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -24,6 +35,7 @@ export interface DeliverReviewVerdictFeedbackOptions {
   workspacePath?: string;
   prUrl?: string;
   slotItemId?: string;
+  runId?: string;
 }
 
 export interface DeliverReviewVerdictFeedbackResult {
@@ -81,6 +93,9 @@ function buildReviewFeedbackBody(opts: {
 // command and the issue stalls in-review. A bounded timeout turns a stall into
 // a rejection the caller already swallows.
 const PR_COMMENT_TIMEOUT_MS = 15_000;
+const suppressedReviewFeedbackDeliveries = new Map<string, number>();
+const REPEATED_DELIVERY_LOOP_MESSAGE =
+  'Review feedback for this verdict was already delivered to the agent; the pipeline re-triggered delivery 3+ times — possible stuck loop. Investigate before the agent context burns.';
 
 export async function postPrComment(prUrl: string | undefined, body: string): Promise<boolean> {
   const parsed = parseGitHubPrUrl(prUrl);
@@ -102,6 +117,17 @@ async function deliverReviewVerdictFeedbackPromise(
   const workspacePath = opts.workspacePath
     ?? (resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : undefined);
   const existingStatus = getReviewStatusSync(issueId);
+  const deliveryIdentity = opts.runId
+    ? `run:${opts.runId}`
+    : existingStatus?.reviewedAtCommit
+      ? `anchor:${existingStatus.reviewedAtCommit}`
+      : undefined;
+  const dedupKey = deliveryIdentity
+    ? `review-feedback:${issueId.toLowerCase()}:${createHash('sha256')
+      .update(deliveryIdentity)
+      .digest('hex')
+      .slice(0, 16)}`
+    : undefined;
   const synthesis = workspacePath && existsSync(workspacePath)
     ? await findLatestSynthesis(workspacePath)
     : null;
@@ -143,11 +169,50 @@ async function deliverReviewVerdictFeedbackPromise(
         try {
           // PAN-2668: a blocked/failed review verdict owes rework — re-drive a
           // stopped-by-user agent with a completed handoff instead of queueing.
-          await messageAgent(target.agentId, message, 'internal', { owesRework: true });
+          let deliveryOutcome;
+          try {
+            deliveryOutcome = await messageAgent(target.agentId, message, 'internal', {
+              owesRework: true,
+              ...(dedupKey ? { dedupKey } : {}),
+            });
+          } catch (err) {
+            const reason = err instanceof Error ? err.message : String(err);
+            if (!reason.includes('cannot enforce a dedup key')) throw err;
+            // ACP and explicit Channels targets cannot enforce keyed delivery.
+            // Delivery still wins over deduplication for those transports.
+            console.warn(
+              `[review-verdict-feedback] ${target.agentId} cannot enforce keyed delivery; retrying unkeyed`,
+            );
+            deliveryOutcome = await messageAgent(
+              target.agentId,
+              message,
+              'internal',
+              { owesRework: true },
+            );
+          }
           agentMessageSent = true;
-          // PAN-3074: delivery succeeded — a prior feedback_delivery_needs_you
-          // flag no longer describes reality.
-          clearFeedbackDeliveryStuck(issueId);
+          let repeatedDeliveryLoop = false;
+          if (deliveryOutcome.deduplicated && dedupKey) {
+            const suppressedCount = (suppressedReviewFeedbackDeliveries.get(dedupKey) ?? 0) + 1;
+            suppressedReviewFeedbackDeliveries.set(dedupKey, suppressedCount);
+            repeatedDeliveryLoop = suppressedCount >= 2;
+            if (suppressedCount === 2) {
+              try {
+                await surfaceIssueFeedbackNeedsYou(issueId, REPEATED_DELIVERY_LOOP_MESSAGE, {
+                  specialist: 'review-agent',
+                  feedbackPath: fileResult.filePath,
+                });
+              } catch (err) {
+                console.warn(`[review-verdict-feedback] Could not surface repeated delivery loop for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+              }
+            }
+          } else if (dedupKey) {
+            suppressedReviewFeedbackDeliveries.delete(dedupKey);
+          }
+          // PAN-3074: a fresh delivery clears stale feedback-delivery state. Once
+          // repeated suppressions surface a loop, preserve that operator-visible
+          // state until a non-deduplicated delivery proves the loop ended.
+          if (!repeatedDeliveryLoop) clearFeedbackDeliveryStuck(issueId);
         } catch (err) {
           // PAN-2228: a resolved-but-unreachable target is a real delivery failure,
           // not a shrug. Surface it as needs-you so the stall is visible instead of

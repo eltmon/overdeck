@@ -422,6 +422,8 @@ CREATE TABLE `uat_generation_resolutions` (
 	`issue_ids` text NOT NULL,
 	`files` text NOT NULL,
 	`commit_sha` text NOT NULL,
+	`kind` text,
+	`note` text,
 	FOREIGN KEY (`uat_name`) REFERENCES `uat_generations`(`name`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
@@ -439,6 +441,36 @@ CREATE TABLE `uat_generations` (
 );
 --> statement-breakpoint
 CREATE INDEX `uat_status_idx` ON `uat_generations` (`status`);--> statement-breakpoint
+CREATE INDEX `uat_generations_uncleaned_terminal_idx` ON `uat_generations` (`project_root`,`status`) WHERE `cleaned_at` IS NULL;--> statement-breakpoint
+CREATE TABLE `uat_generation_repos` (
+	`uat_name` text NOT NULL,
+	`repo_key` text NOT NULL,
+	`repo_path` text NOT NULL,
+	`branch` text NOT NULL,
+	`base_sha` text NOT NULL,
+	`target_branch` text DEFAULT 'main' NOT NULL,
+	`worktree_path` text NOT NULL,
+	`merge_order` integer DEFAULT 0 NOT NULL,
+	`promoted_at` integer,
+	`merge_sha` text,
+	PRIMARY KEY(`uat_name`, `repo_key`),
+	FOREIGN KEY (`uat_name`) REFERENCES `uat_generations`(`name`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE INDEX `uat_generation_repos_uat_order_idx` ON `uat_generation_repos` (`uat_name`,`merge_order`);--> statement-breakpoint
+CREATE TABLE `uat_generation_member_repos` (
+	`uat_name` text NOT NULL,
+	`issue_id` text NOT NULL,
+	`repo_key` text NOT NULL,
+	`branch` text NOT NULL,
+	`head_sha` text NOT NULL,
+	`merge_order_in_repo` integer DEFAULT 0 NOT NULL,
+	PRIMARY KEY(`uat_name`, `issue_id`, `repo_key`),
+	FOREIGN KEY (`uat_name`) REFERENCES `uat_generations`(`name`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`issue_id`) REFERENCES `issues`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE INDEX `uat_generation_member_repos_uat_idx` ON `uat_generation_member_repos` (`uat_name`,`issue_id`);--> statement-breakpoint
 CREATE TABLE `discovered_sessions` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`jsonl_path` text NOT NULL UNIQUE,

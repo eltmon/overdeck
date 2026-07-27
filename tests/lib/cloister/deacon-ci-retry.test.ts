@@ -37,6 +37,7 @@ const mockClearAgentTroubledSync = vi.fn();
 const mockSpawnWorkAgentThroughAgentsEndpoint = vi.fn();
 const mockRecordDeadEndNeedsYou = vi.fn();
 const mockEvaluateWorkspaceAnchorDrift = vi.fn();
+const mockReleaseAdvancingSlot = vi.fn();
 
 vi.mock('../../../src/lib/workspace-anchor-drift.js', () => ({
   evaluateWorkspaceAnchorDrift: (...args: unknown[]) => mockEvaluateWorkspaceAnchorDrift(...args),
@@ -125,7 +126,7 @@ vi.mock('../../../src/lib/cloister/concurrency.js', () => ({
   resetPatrolDispatchBudget: () => {},
   tryReserveAdvancingSlot: () => true,
   canDispatchAdvancing: () => true,
-  releaseAdvancingSlot: () => {},
+  releaseAdvancingSlot: () => mockReleaseAdvancingSlot(),
   tryReserveSwarmSlot: () => true,
   releaseSwarmSlot: () => {},
   getConcurrencyLimits: () => ({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 }),
@@ -186,6 +187,7 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
       kind: 'drifted',
       currentAnchor: 'feedface00000000000000000000000000000000',
     });
+    mockReleaseAdvancingSlot.mockReset();
     // Default: read the real review-status.json so tests that write to it work
     mockLoadReviewStatuses.mockReset().mockImplementation(() => {
       try {
@@ -454,6 +456,7 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
       expect(mockSpawnReviewRoleForIssue).toHaveBeenCalledWith(
         expect.objectContaining({ issueId: ISSUE_ID, workspace: workspacePath, force: true }),
       );
+      expect(mockReleaseAdvancingSlot).toHaveBeenCalledOnce();
     } finally {
       rmSync(projectPath, { recursive: true, force: true });
     }

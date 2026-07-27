@@ -18,6 +18,25 @@ The recovery net also reconciles durable verdicts, terminal agent rows, and
 pipeline labels on deterministic patrol cadence. Signal commands write durable
 state before bounded advisory network calls and exit explicitly.
 
+## Merge-state patrols
+
+Two merge recovery checks run on every Deacon patrol tick:
+
+- The forge-merge reconciler polls only merge-relevant issues: those ready to
+  merge, in `merging`, `verifying`, `queued`, or `failed`, or backed by a merge
+  set in `merging` or `failed`. It records per-repository GitHub PR or GitLab MR
+  merge evidence. It terminalizes the issue only when all required repositories
+  are complete and at least one has positive merged-artifact evidence.
+- The stuck-merge patrol examines `merging` and `verifying` rows whose latest
+  merge transition is at least 30 minutes old. It reconciles against the forge,
+  advances confirmed merges, and resets unmerged work to `pending` while
+  preserving `readyForMerge` only when every quality gate still passes.
+
+Both checks fail open on git, forge, or authentication errors: they log an
+`unverifiable` warning and leave issue-level merge state unchanged for the next
+patrol tick. Completed or cancelled specs are terminal, and active re-planning
+defers post-merge terminalization.
+
 Failed swarm slots are archived under timestamped `slot-N-failed-*` branch and
 worktree names and redispatched on a higher monotonic index. Patrol reconcile and
 GC ignore those names for occupancy and never delete them. They remain available

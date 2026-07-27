@@ -23,31 +23,112 @@
  *      (content-hash keyed over the whole staged tree, so an app upgrade
  *      refreshes it even when only non-entry files changed) and the vendored
  *      packages land under node_modules/ there for normal Node resolution.
+ *   3. <activeBundle.repoRoot>/dist/pty-supervisor.js — the primary checkout a
+ *      `pan reload` deployment was built from (PAN-3172).
  *
- * Missing everywhere is a build/packaging defect and throws — never silently
- * degrade a spawn that the caller expects to be supervised.
+ * A candidate is only accepted when its own bare imports actually resolve from
+ * where it sits. Existence alone is not enough: `pan reload` runs the dashboard
+ * out of ~/.overdeck/deployments/dashboard/.pan-reload-generation-{a,b}, and a
+ * generation whose node_modules cannot resolve @lydell/node-pty produces a
+ * supervisor that dies on ERR_MODULE_NOT_FOUND before it ever binds its socket
+ * — every conversation spawned afterwards then died on a socket timeout with no
+ * hint of the real cause (PAN-3172). Falling through to the primary checkout,
+ * whose node_modules is complete, keeps spawns alive; that copy is the same
+ * build, since activateDashboardDeployment() copies the generation's dist/ into
+ * the primary checkout.
+ *
+ * Missing (or unresolvable) everywhere is a build/packaging defect and throws —
+ * never silently degrade a spawn that the caller expects to be supervised.
  */
 
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { readActiveDashboardBundleSync } from '../deploy/active-dashboard-bundle.js';
 import { getOverdeckHome, packageRoot } from '../paths.js';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
-export function resolvePtySupervisorScriptPath(): string {
-  const built = join(packageRoot, 'dist', 'pty-supervisor.js');
-  if (existsSync(built)) return built;
+/** `from "x"`, `import "x"`, and `import("x")` in the bundled ESM output. */
+const IMPORT_SOURCE_PATTERN = /\b(?:from|import)\s*\(?\s*(["'])([^"'\n]+)\1/g;
+/** Bare package specifiers — relative, absolute, and `node:` are always fine. */
+const PACKAGE_SPECIFIER_PATTERN = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*(?:\/[^\s]*)?$/;
 
-  // Desktop layouts: all server chunks (this module included) sit in one
-  // bundle directory with the staged supervisor tree beside them.
-  const staged = join(moduleDir, 'supervisor');
-  if (existsSync(join(staged, 'pty-supervisor.js'))) {
-    return materializePtySupervisorRuntime(staged);
+/**
+ * Bare package specifiers the built supervisor imports but cannot resolve from
+ * its own location. Empty means the artifact can start where it sits.
+ *
+ * Only a genuine module-not-found counts. A package that is present but whose
+ * exports refuse the `require` condition still resolves under `import`, so it
+ * must not be reported as missing.
+ */
+export function unresolvedSupervisorImports(scriptPath: string): string[] {
+  const source = readFileSync(scriptPath, 'utf8');
+  const requireFrom = createRequire(scriptPath);
+  const missing = new Set<string>();
+
+  for (const match of source.matchAll(IMPORT_SOURCE_PATTERN)) {
+    const specifier = match[2];
+    if (!specifier || !PACKAGE_SPECIFIER_PATTERN.test(specifier)) continue;
+    try {
+      requireFrom.resolve(specifier);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'MODULE_NOT_FOUND' || code === 'ERR_MODULE_NOT_FOUND') missing.add(specifier);
+    }
   }
 
+  return [...missing];
+}
+
+/**
+ * Why a freshly built deployment cannot run the supervisor, or null if it can.
+ *
+ * `pan reload`'s health check only exercises the dashboard's HTTP surface, which
+ * stays green even when the generation's node_modules is incomplete — so the
+ * reload reported "healthy" while every new conversation died on a supervisor
+ * socket timeout (PAN-3172). Callers use this to fail the deploy instead.
+ */
+export function supervisorDeploymentFailure(deployRoot: string): string | null {
+  const supervisorPath = join(deployRoot, 'dist', 'pty-supervisor.js');
+  if (!existsSync(supervisorPath)) return `Build did not create ${supervisorPath}`;
+
+  const missing = unresolvedSupervisorImports(supervisorPath);
+  if (missing.length === 0) return null;
+  return `Deployment cannot resolve ${missing.join(', ')} from ${supervisorPath} — `
+    + 'the PTY supervisor would die on startup and every new conversation would time out. '
+    + 'Run `bun install` in the deployment root, then reload again';
+}
+
+export function resolvePtySupervisorScriptPath(): string {
+  const activeBundle = readActiveDashboardBundleSync();
+  const candidates = [
+    join(packageRoot, 'dist', 'pty-supervisor.js'),
+    // Desktop layouts: all server chunks (this module included) sit in one
+    // bundle directory with the staged supervisor tree beside them.
+    join(moduleDir, 'supervisor', 'pty-supervisor.js'),
+    ...(activeBundle ? [join(activeBundle.repoRoot, 'dist', 'pty-supervisor.js')] : []),
+  ];
+
+  const rejected: string[] = [];
+  for (const candidate of candidates) {
+    if (!existsSync(candidate)) continue;
+    const staged = dirname(candidate) === join(moduleDir, 'supervisor');
+    const entry = staged ? materializePtySupervisorRuntime(dirname(candidate)) : candidate;
+    const missing = unresolvedSupervisorImports(entry);
+    if (missing.length === 0) return entry;
+    rejected.push(`${entry} cannot resolve ${missing.join(', ')}`);
+  }
+
+  if (rejected.length > 0) {
+    throw new Error(
+      `pty-supervisor cannot start — its dependencies are missing from every built copy: ${rejected.join('; ')}. `
+      + 'Reinstall dependencies where the dashboard is running from (`bun install`), then rebuild.',
+    );
+  }
   throw new Error('pty-supervisor build artifact missing — run `npm run build`.');
 }
 

@@ -9,6 +9,7 @@ import { Effect } from 'effect';
 import { listRunningAgents, type AgentState } from '../agents.js';
 import { getDashboardApiUrlSync } from '../config.js';
 import { getReviewStatus, type ReviewStatus } from '../review-status.js';
+import type { StrikeLandingStatus } from '../strike-landing.js';
 import {
   getProjectConfigFromWorkspacePath,
   readIssueRecord,
@@ -92,9 +93,11 @@ interface PostMergeRowDeps {
   readCanonicalState: (ctx: LifecycleContext) => Promise<CanonicalState | null>;
   readMergeStatus: (issueId: string) => Awaitable<string | undefined>;
   listAgents: () => Awaitable<Array<Pick<AgentState, 'id' | 'issueId' | 'role' | 'status'>>>;
+  readStrikeLanded?: (issueId: string) => Awaitable<boolean>;
 }
 
 const defaultPostMergeRowDeps: PostMergeRowDeps = {
+  readStrikeLanded: async issueId => strikeLanded((await loadStatus(issueId, defaultDeps))?.status),
   readCanonicalState: async ctx => {
     return getAutoCloseOutCanonicalState(ctx.issueId) as Promise<CanonicalState | null>;
   },
@@ -130,7 +133,11 @@ export interface EvaluateDodGateDeps {
   merged: (ctx: LifecycleContext) => MergedDodRowResult | Promise<MergedDodRowResult>;
   postMerge: (ctx: LifecycleContext, merged?: MergedDodRowResult) => DodRowResult | Promise<DodRowResult>;
   mainVerify: (ctx: LifecycleContext, mergeCommit?: string) => DodRowResult | Promise<DodRowResult>;
-  deploy: (ctx: LifecycleContext, merge: { mergedAt?: string; mergeCommit?: string }) => DodRowResult | Promise<DodRowResult>;
+  deploy: (ctx: LifecycleContext, merge: {
+    mergedAt?: string;
+    mergeCommit?: string;
+    mergedRowStatus?: DodRowResult['status'];
+  }) => DodRowResult | Promise<DodRowResult>;
   now: () => string;
 }
 
@@ -196,6 +203,37 @@ async function loadStatus(issueId: string, deps: DodStatusRowDeps): Promise<Stat
   }
 }
 
+/**
+ * PAN-3180: `landed` is the strike path's own durable statement that this issue's
+ * work reached main through `strike/<id>`. It is written by the server merge door
+ * (`mergeCompletionStatus` in `merge-strike.ts`) and mirrored into the per-issue
+ * record's `pipeline` block, so it outlives review-status clearing. Every earlier
+ * landing state (`ready`/`landing`/`recovering`/`needs_you`) is a strike still in
+ * flight and earns no waiver.
+ */
+function strikeLanded(status: StrikeLandingStatus | null | undefined): boolean {
+  return status?.strikeLandingState === 'landed';
+}
+
+/**
+ * PAN-3180: a strike dispatches neither a review nor a test specialist — that
+ * bypass is the whole point of the path. So for a strike-landed issue these rows
+ * are `skip` (deliberately not run), never `pass` (ran and succeeded) and never
+ * `miss` (outstanding). A reader of the close-out record still sees the real
+ * verdict and the reason it was never produced.
+ */
+const STRIKE_BYPASS_NOTE: Record<'review' | 'tests', string> = {
+  review: 'no review specialist is dispatched for a strike',
+  tests: 'no test specialist is dispatched for a strike',
+};
+
+/**
+ * A specialist that ran and returned a negative verdict is a different fact from
+ * one that was never dispatched, so the strike waiver never covers it — those
+ * still block until an operator records an explicit `--accept-<row>` override.
+ */
+const NEGATIVE_VERDICTS = new Set(['failed', 'blocked', 'dispatch_failed']);
+
 async function checkVerdict(
   issueId: string,
   id: 'review' | 'tests',
@@ -209,7 +247,15 @@ async function checkVerdict(
   const source = loaded.source === 'journal' ? ' from pipeline journal' : '';
   const policy = value === 'skipped' ? ' (skipped per issue policy)' : '';
   const observed = `${field}: ${value ?? 'missing'}${source}${policy}`;
-  return result(id, value === 'passed' || value === 'skipped' ? 'pass' : 'miss', observed);
+  if (value === 'passed' || value === 'skipped') return result(id, 'pass', observed);
+  if (strikeLanded(loaded.status) && !NEGATIVE_VERDICTS.has(value ?? '')) {
+    return result(
+      id,
+      'skip',
+      `${observed}; skipped by the strike path (strikeLandingState: landed) — ${STRIKE_BYPASS_NOTE[id]}`,
+    );
+  }
+  return result(id, 'miss', observed);
 }
 
 export function checkReviewRow(issueId: string, deps: DodStatusRowDeps = defaultDeps): Promise<DodRowResult> {
@@ -339,6 +385,19 @@ export async function checkPostMergeRow(
       ? `running agents: ${runningAgents.map(agent => agent.id).join(', ')}`
       : 'no running work/planning agents';
     const lifecycleObserved = canonicalState === 'verifying_on_main' || mergeStatus === 'merged';
+    // PAN-3180: `postMergeLifecycle()` is the work-agent handoff — it pauses the
+    // work/planning agents, stops the workspace stack, and applies
+    // `verifying-on-main`. A strike has no work agent to pause and its landing is
+    // owned by the Deacon's merge door, so the marker this row looks for is never
+    // written and its absence proves nothing. What a strike does still owe is
+    // quiescence, so a live work/planning agent remains a real miss.
+    if (!lifecycleObserved && await (deps.readStrikeLanded ?? defaultPostMergeRowDeps.readStrikeLanded!)(ctx.issueId)) {
+      return result(
+        'post-merge',
+        runningAgents.length === 0 ? 'skip' : 'miss',
+        `strike landing (strikeLandingState: landed) — the work-agent post-merge handoff is not the strike path's lifecycle; ${stateObserved}; ${agentsObserved}`,
+      );
+    }
     if (!lifecycleObserved && merged?.evidence === 'branch-containment') {
       return result(
         'post-merge',
@@ -391,9 +450,24 @@ export async function checkMainVerifyRow(
 
 export async function checkDeployRow(
   ctx: LifecycleContext,
-  merge: { mergedAt?: string; mergeCommit?: string },
+  merge: {
+    mergedAt?: string;
+    mergeCommit?: string;
+    mergedRowStatus?: DodRowResult['status'];
+  },
   deps: DeployRowDeps = defaultDeployRowDeps,
 ): Promise<DodRowResult> {
+  if (!merge.mergeCommit) {
+    if (merge.mergedRowStatus === 'miss') {
+      return result(
+        'deploy',
+        'skip',
+        'no merge commit resolved because the merged row missed — deploy ancestry depends on row 4; build ancestry unchecked',
+      );
+    }
+    return result('deploy', 'miss', 'merged row passed without a resolvable merge commit; build ancestry cannot be checked');
+  }
+
   const baseUrl = deps.dashboardUrl().replace(/\/$/, '');
   let health: Record<string, unknown>;
   try {
@@ -415,11 +489,24 @@ export async function checkDeployRow(
   if (!buildCommit) {
     return result('deploy', 'miss', `dashboard at ${baseUrl} did not report buildCommit; live deployment cannot be proven`);
   }
-  if (!merge.mergeCommit) {
-    return result('deploy', 'miss', 'cannot resolve merge commit; live deployment cannot be proven');
-  }
-
   try {
+    if (health.buildDirty === true) {
+      return result(
+        'deploy',
+        'miss',
+        `live build ${buildCommit.slice(0, 8)} was built from a dirty working tree — uncommitted changes may be serving; redeploy canonically with \`pan reload\``,
+      );
+    }
+
+    const canonical = await deps.commitContains(repoRoot, buildCommit, 'origin/main');
+    if (!canonical) {
+      return result(
+        'deploy',
+        'miss',
+        `live build commit ${buildCommit.slice(0, 8)} is not an ancestor of origin/main — the server is running a build of local-only commits; redeploy with \`pan reload\``,
+      );
+    }
+
     const contains = await deps.commitContains(repoRoot, merge.mergeCommit, buildCommit);
     const observed = `build commit ${buildCommit.slice(0, 8)} ${contains ? 'contains' : 'does not contain'} merge ${merge.mergeCommit.slice(0, 8)}`;
     return result('deploy', contains ? 'pass' : 'miss', observed);
@@ -458,7 +545,11 @@ export async function evaluateDodGate(
     Promise.resolve(merged),
     deps.postMerge(ctx, merged),
     deps.mainVerify(ctx, merged.mergeCommit),
-    deps.deploy(ctx, { mergedAt: merged.mergedAt, mergeCommit: merged.mergeCommit }),
+    deps.deploy(ctx, {
+      mergedAt: merged.mergedAt,
+      mergeCommit: merged.mergeCommit,
+      mergedRowStatus: merged.status,
+    }),
   ]);
   for (const row of rows) {
     if (row.status === 'miss' && acceptedRows.has(row.id)) {

@@ -108,6 +108,7 @@ function durableSubset(p: PanIssuePipelineRecord): DurableStatusFields {
     reviewStatus: p.reviewStatus as ReviewStatus['reviewStatus'],
     testStatus: p.testStatus as ReviewStatus['testStatus'],
     mergeStatus: (p.mergeStatus as ReviewStatus['mergeStatus']) ?? undefined,
+    mergeStep: p.mergeStep,
     inspectStatus: (p.inspectStatus as ReviewStatus['inspectStatus']) ?? undefined,
     verificationStatus: (p.verificationStatus as ReviewStatus['verificationStatus']) ?? undefined,
     reviewNotes: p.reviewNotes,

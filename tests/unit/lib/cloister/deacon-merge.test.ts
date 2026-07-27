@@ -5,7 +5,7 @@ const mockLoadReviewStatuses = vi.fn();
 const mockSetReviewStatusSync = vi.fn();
 const mockResolveProjectFromIssueSync = vi.fn();
 const mockGetAgentStateSync = vi.fn();
-const mockPostMergeLifecycle = vi.fn();
+const mockEnqueuePostMergeLifecycle = vi.fn();
 const mockFindSpecByIssue = vi.fn();
 const { mockExecFile } = vi.hoisted(() => ({
   mockExecFile: vi.fn(),
@@ -53,10 +53,11 @@ vi.mock('../../../../src/lib/pan-dir/specs.js', () => ({
   findSpecByIssue: (...args: Parameters<typeof mockFindSpecByIssue>) => mockFindSpecByIssue(...args),
 }));
 
-vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({
-  postMergeLifecycle: (...args: Parameters<typeof mockPostMergeLifecycle>) => mockPostMergeLifecycle(...args),
-  syncMainIntoWorkspace: vi.fn(),
+vi.mock('../../../../src/lib/cloister/post-merge-lifecycle-worker.js', () => ({
+  enqueuePostMergeLifecycle: (...args: Parameters<typeof mockEnqueuePostMergeLifecycle>) => mockEnqueuePostMergeLifecycle(...args),
 }));
+
+vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({ syncMainIntoWorkspace: vi.fn() }));
 
 vi.mock('../../../../src/lib/concurrency.js', () => ({
   withConcurrencyLimit: vi.fn((fn: () => unknown) => fn()),
@@ -64,8 +65,8 @@ vi.mock('../../../../src/lib/concurrency.js', () => ({
 
 import { reconcileStaleMergeStatus } from '../../../../src/lib/cloister/deacon-merge.js';
 
-function makeStatus(mergeStatus = 'failed') {
-  return { mergeStatus, readyForMerge: false };
+function makeStatus(mergeStatus = 'failed', mergeStep?: string) {
+  return { mergeStatus, mergeStep, readyForMerge: false };
 }
 
 describe('reconcileStaleMergeStatus (PAN-2420)', () => {
@@ -73,7 +74,9 @@ describe('reconcileStaleMergeStatus (PAN-2420)', () => {
     vi.clearAllMocks();
     mockResolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/project' });
     mockFindSpecByIssue.mockReturnValue(Effect.succeed({ status: 'active' }));
-    mockPostMergeLifecycle.mockReturnValue(Promise.resolve(undefined));
+    mockEnqueuePostMergeLifecycle.mockImplementation(
+      (issueId: string) => `Queued pending post-merge lifecycle for ${issueId}`,
+    );
     mockExecFile.mockImplementation((cmd: string, args: string[]) => {
       const joined = `${cmd} ${args.join(' ')}`;
       if (joined.includes('gh pr list')) {
@@ -96,8 +99,27 @@ describe('reconcileStaleMergeStatus (PAN-2420)', () => {
     const actions = await reconcileStaleMergeStatus();
 
     expect(actions.some(a => a.includes('Reconciled stale mergeStatus'))).toBe(true);
-    expect(mockSetReviewStatusSync).toHaveBeenCalledWith('PAN-2420', { mergeStatus: 'merged', readyForMerge: false });
-    expect(mockPostMergeLifecycle).toHaveBeenCalledWith('PAN-2420', '/tmp/project', 'feature/pan-2420', { skipDeploy: true });
+    expect(mockSetReviewStatusSync).toHaveBeenCalledWith('PAN-2420', {
+      mergeStatus: 'merged',
+      mergeStep: 'post-merge-cleanup',
+      readyForMerge: false,
+    });
+    expect(mockEnqueuePostMergeLifecycle).toHaveBeenCalledWith(
+      'PAN-2420', '/tmp/project', 'feature/pan-2420',
+    );
+  });
+
+  it('queues an incomplete post-merge lifecycle without running it in patrol', async () => {
+    mockLoadReviewStatuses.mockReturnValue({
+      'PAN-2421': makeStatus('merged', 'post-merge-cleanup'),
+    });
+
+    const actions = await reconcileStaleMergeStatus();
+
+    expect(actions).toContain('Queued pending post-merge lifecycle for PAN-2421');
+    expect(mockEnqueuePostMergeLifecycle).toHaveBeenCalledWith(
+      'PAN-2421', '/tmp/project', 'feature/pan-2421',
+    );
   });
 
   it('defers terminalization when a planning agent is actively running', async () => {
@@ -111,7 +133,7 @@ describe('reconcileStaleMergeStatus (PAN-2420)', () => {
 
     expect(actions).toHaveLength(0);
     expect(mockSetReviewStatusSync).not.toHaveBeenCalled();
-    expect(mockPostMergeLifecycle).not.toHaveBeenCalled();
+    expect(mockEnqueuePostMergeLifecycle).not.toHaveBeenCalled();
   });
 
   it('defers terminalization when the spec is back at draft/proposed', async () => {
@@ -123,7 +145,7 @@ describe('reconcileStaleMergeStatus (PAN-2420)', () => {
 
     expect(actions).toHaveLength(0);
     expect(mockSetReviewStatusSync).not.toHaveBeenCalled();
-    expect(mockPostMergeLifecycle).not.toHaveBeenCalled();
+    expect(mockEnqueuePostMergeLifecycle).not.toHaveBeenCalled();
   });
 
   it('skips issues whose PR is not merged', async () => {

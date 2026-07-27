@@ -99,6 +99,24 @@ Git or forge errors produce `unverifiable`, which fails closed and blocks the me
 This prevents a repeat of MIN-857, where the frontend merge marked the issue done
 while two UAT-critical API commits remained on an artifact-less sibling branch.
 
+Forge-observed merges propagate through existing train state rather than a second
+train-side poller. Once the forge reconciler marks an issue `mergeStatus: merged`,
+`mergeGateEligibility()` excludes it from `listEligibleCandidatesByProject()`.
+The UAT generation reconciler's `isStale()` check then invalidates any live
+generation that still contains the issue because the member left the ready set.
+The next generation assembles from the corrected set, so the train never needs to
+query GitHub or GitLab itself.
+
+### Polyrepo UAT eligibility
+
+Polyrepo projects are eligible for UAT batch trains on the same terms as
+monorepo ones: the per-project merge-train flag is the only gate, and there is
+no project-shape exclusion. A generation spans one `uat/*` branch per member
+repo that has a contributing feature branch, and promotes to every one of those
+repos or to none of them. See
+[`UAT-BATCH-TRAINS.md` → Polyrepo generations](./UAT-BATCH-TRAINS.md#polyrepo-generations)
+for the assembly, hold-out, promote, and teardown semantics.
+
 ## 5. REMAINING WORK (the plan)
 
 > **Status (2026-06-09):** 5a, 5b, 5c are **DONE, committed, pushed, built, reloaded, and visually verified**. Only **5d** remains, and it is blocked on a *live* merge an operator must trigger — it cannot be synthesized.

@@ -1,6 +1,6 @@
 {
   "name": "@overdeck/contracts",
-  "version": "0.45.24",
+  "version": "0.46.0",
   "type": "module",
   "publishConfig": {
     "access": "public"

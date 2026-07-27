@@ -9,14 +9,26 @@ export function githubPrLookupSource(): string {
   return isGitHubAppConfigured() ? 'GitHub App PR lookup' : 'gh pr list';
 }
 
-export async function lookupPullRequestNumberForBranch(
+export interface BranchPullRequest {
+  number: number;
+  state: string;
+  mergedAt: string | null;
+}
+
+export async function lookupPullRequestForBranch(
   owner: string,
   repo: string,
   branchName: string,
-): Promise<number | null> {
+): Promise<BranchPullRequest | null> {
   if (isGitHubAppConfigured()) {
     const prs = await Effect.runPromise(listPullRequestsForHead(owner, repo, branchName, 'all'));
-    return prs[0]?.number ?? null;
+    const pr = prs[0];
+    if (!pr) return null;
+    return {
+      number: pr.number,
+      state: pr.merged ? 'MERGED' : pr.state.toUpperCase(),
+      mergedAt: pr.mergedAt,
+    };
   }
 
   const { stdout } = await execFileAsync(
@@ -26,15 +38,31 @@ export async function lookupPullRequestNumberForBranch(
       '--repo', `${owner}/${repo}`,
       '--head', branchName,
       '--state', 'all',
-      '--json', 'number',
+      '--json', 'number,state,mergedAt',
       '--limit', '1',
-      '--jq', '.[0].number',
     ],
     { encoding: 'utf-8', timeout: 15000 },
   );
   const trimmed = stdout.trim();
   if (!trimmed) return null;
 
-  const parsed = Number.parseInt(trimmed, 10);
-  return Number.isFinite(parsed) ? parsed : null;
+  const [pr] = JSON.parse(trimmed) as Array<{
+    number?: number;
+    state?: string;
+    mergedAt?: string | null;
+  }>;
+  if (!pr || !Number.isFinite(pr.number)) return null;
+  return {
+    number: pr.number as number,
+    state: typeof pr.state === 'string' ? pr.state.toUpperCase() : 'CLOSED',
+    mergedAt: typeof pr.mergedAt === 'string' ? pr.mergedAt : null,
+  };
+}
+
+export async function lookupPullRequestNumberForBranch(
+  owner: string,
+  repo: string,
+  branchName: string,
+): Promise<number | null> {
+  return (await lookupPullRequestForBranch(owner, repo, branchName))?.number ?? null;
 }

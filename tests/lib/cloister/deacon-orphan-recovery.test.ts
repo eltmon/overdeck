@@ -50,6 +50,7 @@ const mockGetTmuxSessionName = vi.fn();
 const mockSpawnRun = vi.fn();
 const mockSpawnReviewRoleForIssue = vi.fn();
 const mockIsIssueClosed = vi.fn();
+const mockReleaseAdvancingSlot = vi.fn();
 
 vi.mock('../../../src/lib/cloister/issue-closed.js', () => ({
   isIssueClosed: (...args: unknown[]) => mockIsIssueClosed(...args),
@@ -70,7 +71,7 @@ vi.mock('../../../src/lib/cloister/concurrency.js', () => ({
   resetPatrolDispatchBudget: () => {},
   tryReserveAdvancingSlot: () => true,
   canDispatchAdvancing: () => true,
-  releaseAdvancingSlot: () => {},
+  releaseAdvancingSlot: () => mockReleaseAdvancingSlot(),
   tryReserveSwarmSlot: () => true,
   releaseSwarmSlot: () => {},
   getConcurrencyLimits: () => ({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 }),
@@ -728,7 +729,9 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     );
     expect(stuckCalls).toHaveLength(0);
 
-    // Dispatch was attempted on every tick
+    // Dispatch was attempted on every tick, and each gated attempt released
+    // the advancing-role reservation immediately.
     expect(mockSpawnReviewRoleForIssue).toHaveBeenCalledTimes(TICKS);
+    expect(mockReleaseAdvancingSlot).toHaveBeenCalledTimes(TICKS);
   });
 });

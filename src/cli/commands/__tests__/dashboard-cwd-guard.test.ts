@@ -69,6 +69,31 @@ describe('resolvePrimaryDashboardIdentity', () => {
     expect(child.unref).toHaveBeenCalled();
   });
 
+  it('launches a deployment-root bundle while keeping the primary repo as cwd', () => {
+    const fixtureRoot = createFixture('pan-dashboard-deployment-root-');
+    const repoRoot = join(fixtureRoot, 'primary');
+    const serverPath = join(fixtureRoot, 'deploy', 'dist', 'dashboard', 'server.js');
+    mkdirSync(join(fixtureRoot, 'deploy', 'dist', 'dashboard'), { recursive: true });
+    writeFileSync(serverPath, 'export {};');
+    const child = { unref: vi.fn() };
+    processMocks.execFileSync.mockImplementation(() => { throw new Error('systemd unavailable'); });
+    processMocks.spawn.mockReturnValue(child);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    spawnDashboardDetached({
+      dashboardPort: 3010,
+      dashboardApiPort: 3011,
+      traefikEnabled: false,
+      traefikDomain: 'overdeck.localhost',
+    } as Parameters<typeof spawnDashboardDetached>[0], { serverPath, repoRoot });
+
+    expect(processMocks.spawn).toHaveBeenCalledWith(
+      expect.any(String),
+      [serverPath],
+      expect.objectContaining({ cwd: repoRoot }),
+    );
+  });
+
   it('returns a handle that stops the spawned systemd unit', () => {
     processMocks.execFileSync.mockReturnValue(undefined);
     vi.spyOn(Date, 'now').mockReturnValue(123456);

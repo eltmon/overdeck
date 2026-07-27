@@ -18,12 +18,18 @@ const mocks = vi.hoisted(() => ({
   spawn: vi.fn(),
   statSync: vi.fn(),
   fsAccess: vi.fn(),
+  fsReaddir: vi.fn(),
   fsRm: vi.fn(),
   fsCp: vi.fn(),
   fsRename: vi.fn(),
+  fsSymlink: vi.fn(),
   readDevSupervisorMarker: vi.fn(),
   devSupervisorRefusalLines: vi.fn(),
   agentRestartBlockReason: vi.fn(),
+  readActiveDashboardBundle: vi.fn(),
+  writeActiveDashboardBundle: vi.fn(),
+  fsMkdir: vi.fn(),
+  supervisorDeploymentFailure: vi.fn(),
 }));
 
 // reloadCommand refuses to run when a `pan dev` supervisor marker is present.
@@ -44,6 +50,15 @@ vi.mock('../../../lib/deploy/agent-restart-gate.js', () => ({
   agentRestartBlockReason: mocks.agentRestartBlockReason,
 }));
 
+vi.mock('../../../lib/channels/pty-supervisor-locate.js', () => ({
+  supervisorDeploymentFailure: mocks.supervisorDeploymentFailure,
+}));
+
+vi.mock('../../../lib/deploy/active-dashboard-bundle.js', () => ({
+  readActiveDashboardBundleSync: mocks.readActiveDashboardBundle,
+  writeActiveDashboardBundle: mocks.writeActiveDashboardBundle,
+}));
+
 vi.mock('../../../lib/platform-lifecycle.js', () => ({
   readPlatformConfig: mocks.readPlatformConfig,
   readPlatformConfigSync: mocks.readPlatformConfig,
@@ -56,12 +71,15 @@ vi.mock('../../../lib/platform-lifecycle.js', () => ({
     return n;
   },
   StageError: class StageError extends Error {
-    failure: { stage: string; reason: string };
-    constructor(failure: { stage: string; reason: string }) {
+    failure: { stage: string; reason: string; recovery?: 'dashboard-left-running' };
+    constructor(failure: { stage: string; reason: string; recovery?: 'dashboard-left-running' }) {
       super(`[${failure.stage}] ${failure.reason}`);
       this.failure = failure;
     }
   },
+  leavesDashboardRunning: (error: unknown) => (
+    (error as { failure?: { recovery?: string } })?.failure?.recovery === 'dashboard-left-running'
+  ),
 }));
 
 vi.mock('../../../lib/restart-status.js', () => ({
@@ -89,9 +107,12 @@ vi.mock('fs', async (importActual) => ({
   promises: {
     ...(await importActual<typeof import('fs')>()).promises,
     access: mocks.fsAccess,
+    readdir: mocks.fsReaddir,
+    mkdir: mocks.fsMkdir,
     rm: mocks.fsRm,
     cp: mocks.fsCp,
     rename: mocks.fsRename,
+    symlink: mocks.fsSymlink,
   },
   statSync: mocks.statSync,
 }));
@@ -128,9 +149,16 @@ function mockExecByCommand(handlers: Record<string, Array<{ stdout?: string; cod
   });
 }
 
+const DEFAULT_REPO_ROOT = '/repo';
+const TEST_OVERDECK_HOME = '/overdeck-home';
+const DEFAULT_BUILD_WORKTREE = `${TEST_OVERDECK_HOME}/deployments/dashboard/.pan-reload-generation-a`;
+const ALTERNATE_BUILD_WORKTREE = `${TEST_OVERDECK_HOME}/deployments/dashboard/.pan-reload-generation-b`;
+const DEFAULT_ORIGIN_MAIN_SHA = '1111111111111111111111111111111111111111';
+
 const originalAgentId = process.env.OVERDECK_AGENT_ID;
 const originalHome = process.env.HOME;
 const originalPath = process.env.PATH;
+const originalOverdeckHome = process.env.OVERDECK_HOME;
 
 function restoreEnv(): void {
   if (originalAgentId === undefined) delete process.env.OVERDECK_AGENT_ID;
@@ -139,6 +167,8 @@ function restoreEnv(): void {
   else process.env.HOME = originalHome;
   if (originalPath === undefined) delete process.env.PATH;
   else process.env.PATH = originalPath;
+  if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = originalOverdeckHome;
 }
 
 describe('reloadCommand', () => {
@@ -148,6 +178,7 @@ describe('reloadCommand', () => {
     delete process.env.OVERDECK_AGENT_ID;
     process.env.HOME = '/home/test';
     process.env.PATH = '/usr/bin:/bin';
+    process.env.OVERDECK_HOME = TEST_OVERDECK_HOME;
     vi.spyOn(process, 'cwd').mockReturnValue('/repo');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -169,17 +200,28 @@ describe('reloadCommand', () => {
     mocks.readDevSupervisorMarker.mockReturnValue(null);
     mocks.devSupervisorRefusalLines.mockReturnValue([]);
     mocks.agentRestartBlockReason.mockResolvedValue(null);
+    mocks.readActiveDashboardBundle.mockReturnValue(null);
+    mocks.writeActiveDashboardBundle.mockResolvedValue(undefined);
+    mocks.supervisorDeploymentFailure.mockReturnValue(null);
     mocks.fsAccess.mockImplementation(async (path: string) => {
       if (path === '/usr/bin/bun') return;
       throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' });
     });
+    mocks.fsReaddir.mockResolvedValue([]);
+    mocks.fsMkdir.mockResolvedValue(undefined);
     mocks.fsRm.mockResolvedValue(undefined);
     mocks.fsCp.mockResolvedValue(undefined);
     mocks.fsRename.mockResolvedValue(undefined);
+    mocks.fsSymlink.mockResolvedValue(undefined);
     mockExecByCommand({
-      "git 'rev-parse' '--show-toplevel'": [{ stdout: '/repo\n' }],
+      "git 'rev-parse' '--show-toplevel'": [{ stdout: `${DEFAULT_REPO_ROOT}\n` }],
       "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
-      "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ stdout: '' }],
+      "git 'status' '--porcelain'": [{ stdout: '' }],
+      "git 'rev-parse' 'HEAD'": [{ stdout: `${DEFAULT_ORIGIN_MAIN_SHA}\n` }],
+      "git 'rev-parse' 'origin/main'": [{ stdout: `${DEFAULT_ORIGIN_MAIN_SHA}\n` }],
+      "git 'worktree' 'prune'": [{ stdout: '' }],
+      [`git 'worktree' 'add' '--detach' '${DEFAULT_BUILD_WORKTREE}' 'origin/main'`]: [{ stdout: '' }],
+      [`git 'worktree' 'remove' '--force' '${DEFAULT_BUILD_WORKTREE}'`]: [{ stdout: '' }],
     });
   });
 
@@ -310,16 +352,168 @@ describe('reloadCommand', () => {
 
     // Deps are installed before the build so a rebase-added runtime dep can't
     // produce a server bundle that boot-crashes (ERR_MODULE_NOT_FOUND).
-    expect(mocks.exec).toHaveBeenCalledWith("git 'rev-parse' '--show-toplevel'", expect.objectContaining({ cwd: '/repo' }));
-    expect(mocks.exec).toHaveBeenCalledWith("git 'fetch' 'origin' 'main'", expect.objectContaining({ cwd: '/repo' }));
-    expect(mocks.exec).toHaveBeenCalledWith("git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'", expect.objectContaining({ cwd: '/repo' }));
-    expect(mocks.exec).not.toHaveBeenCalledWith(expect.stringContaining("'worktree' 'add'"), expect.anything());
-    expect(mocks.spawn).toHaveBeenCalledWith('/usr/bin/bun', ['install'], expect.objectContaining({ cwd: '/repo', stdio: 'inherit' }));
-    expect(mocks.spawn).toHaveBeenCalledWith('npm', ['run', 'build'], expect.objectContaining({ cwd: '/repo', stdio: 'inherit' }));
+    expect(mocks.exec).toHaveBeenCalledWith("git 'rev-parse' '--show-toplevel'", expect.objectContaining({ cwd: DEFAULT_REPO_ROOT }));
+    expect(mocks.exec).toHaveBeenCalledWith("git 'fetch' 'origin' 'main'", expect.objectContaining({ cwd: DEFAULT_REPO_ROOT }));
+    expect(mocks.exec).toHaveBeenCalledWith("git 'worktree' 'prune'", expect.objectContaining({ cwd: DEFAULT_REPO_ROOT }));
+    expect(mocks.exec).toHaveBeenCalledWith(
+      `git 'worktree' 'add' '--detach' '${DEFAULT_BUILD_WORKTREE}' 'origin/main'`,
+      expect.objectContaining({ cwd: DEFAULT_REPO_ROOT }),
+    );
+    expect(mocks.spawn).toHaveBeenCalledWith('/usr/bin/bun', ['install'], expect.objectContaining({ cwd: DEFAULT_BUILD_WORKTREE, stdio: 'inherit' }));
+    expect(mocks.spawn).toHaveBeenCalledWith('npm', ['run', 'build'], expect.objectContaining({ cwd: DEFAULT_BUILD_WORKTREE, stdio: 'inherit' }));
     const installOrder = mocks.spawn.mock.calls.findIndex(([c]) => c === '/usr/bin/bun');
     const buildOrder = mocks.spawn.mock.calls.findIndex(([c, a]) => c === 'npm' && a[1] === 'build');
     expect(installOrder).toBeLessThan(buildOrder);
     expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  // PAN-3172: the HTTP health check stays green when a generation's
+  // node_modules cannot resolve @lydell/node-pty, so the reload printed
+  // "healthy" while every new conversation died on a supervisor socket timeout.
+  it('fails the reload when the built deployment cannot run the PTY supervisor', async () => {
+    mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+    mocks.supervisorDeploymentFailure.mockReturnValue(
+      'Deployment cannot resolve @lydell/node-pty from /dist/pty-supervisor.js',
+    );
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    expect(mocks.supervisorDeploymentFailure).toHaveBeenCalledWith(DEFAULT_BUILD_WORKTREE);
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.exec).toHaveBeenCalledWith(
+      `git 'worktree' 'remove' '--force' '${DEFAULT_BUILD_WORKTREE}'`,
+      expect.objectContaining({ cwd: DEFAULT_REPO_ROOT }),
+    );
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false, error: expect.stringContaining('@lydell/node-pty') }),
+    );
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('keeps a successful restart green when previous deployment cleanup fails', async () => {
+    const previousRoot = `${TEST_OVERDECK_HOME}/deployments/dashboard/.pan-reload-build-previous`;
+    mocks.readActiveDashboardBundle.mockReturnValue({
+      repoRoot: DEFAULT_REPO_ROOT,
+      deployRoot: previousRoot,
+      serverPath: `${previousRoot}/dist/dashboard/server.js`,
+    });
+    mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+    mocks.fsReaddir.mockResolvedValue(['.pan-reload-build-previous']);
+    mocks.fsRm.mockImplementation(async (path: string) => {
+      if (path === previousRoot) throw Object.assign(new Error('busy'), { code: 'EBUSY' });
+    });
+    mockExecByCommand({
+      "git 'rev-parse' '--show-toplevel'": [{ stdout: `${DEFAULT_REPO_ROOT}\n` }],
+      "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
+      "git 'status' '--porcelain'": [{ stdout: '' }],
+      "git 'rev-parse' 'HEAD'": [{ stdout: `${DEFAULT_ORIGIN_MAIN_SHA}\n` }],
+      "git 'rev-parse' 'origin/main'": [{ stdout: `${DEFAULT_ORIGIN_MAIN_SHA}\n` }],
+      "git 'worktree' 'prune'": [{ stdout: '' }, { stdout: '' }],
+      [`git 'worktree' 'add' '--detach' '${DEFAULT_BUILD_WORKTREE}' 'origin/main'`]: [{ stdout: '' }],
+      [`git 'worktree' 'remove' '--force' '${previousRoot}'`]: [{ code: 128 }],
+    });
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('reuses the inactive generation and restores the active generation across repeated restart failures', async () => {
+    const activeBundle = {
+      repoRoot: DEFAULT_REPO_ROOT,
+      deployRoot: DEFAULT_BUILD_WORKTREE,
+      serverPath: `${DEFAULT_BUILD_WORKTREE}/dist/dashboard/server.js`,
+    };
+    let marker = activeBundle;
+    mocks.readActiveDashboardBundle.mockImplementation(() => marker);
+    mocks.writeActiveDashboardBundle.mockImplementation(async (next: typeof activeBundle | null) => {
+      marker = next ?? activeBundle;
+    });
+    mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+    mocks.exec.mockImplementation(async (command: string) => {
+      if (command === "git 'rev-parse' '--show-toplevel'") return { stdout: `${DEFAULT_REPO_ROOT}\n`, stderr: '' };
+      if (command === "git 'rev-parse' 'HEAD'" || command === "git 'rev-parse' 'origin/main'") {
+        return { stdout: `${DEFAULT_ORIGIN_MAIN_SHA}\n`, stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
+    mocks.restartDashboard.mockReturnValue(Effect.fail(new Error('health failed')));
+    mockSpawnExits();
+
+    await reloadCommand({});
+    expect(process.exitCode).toBe(1);
+    process.exitCode = undefined;
+    await reloadCommand({});
+
+    const addedRoots = mocks.exec.mock.calls
+      .map(([command]) => command as string)
+      .filter((command) => command.includes("git 'worktree' 'add'"));
+    expect(addedRoots).toEqual([
+      `git 'worktree' 'add' '--detach' '${ALTERNATE_BUILD_WORKTREE}' 'origin/main'`,
+      `git 'worktree' 'add' '--detach' '${ALTERNATE_BUILD_WORKTREE}' 'origin/main'`,
+    ]);
+    expect(marker).toEqual(activeBundle);
+    expect(mocks.fsRm).toHaveBeenCalledWith(ALTERNATE_BUILD_WORKTREE, { recursive: true, force: true });
+    expect(mocks.fsRename).toHaveBeenCalledWith(
+      `/repo/dist.rollback.${process.pid}`,
+      '/repo/dist',
+    );
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('preserves a deployment when the lifecycle leaves its dashboard running after health timeout', async () => {
+    mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+    mocks.restartDashboard.mockReturnValue(Effect.fail(Object.assign(new Error('health timed out'), {
+      failure: {
+        stage: 'dashboard',
+        reason: 'health timed out; dashboard left running',
+        recovery: 'dashboard-left-running',
+      },
+    })));
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    expect(mocks.writeActiveDashboardBundle).toHaveBeenCalledTimes(1);
+    expect(mocks.writeActiveDashboardBundle).toHaveBeenCalledWith({
+      repoRoot: DEFAULT_REPO_ROOT,
+      deployRoot: DEFAULT_BUILD_WORKTREE,
+      serverPath: `${DEFAULT_BUILD_WORKTREE}/dist/dashboard/server.js`,
+    });
+    expect(mocks.exec).not.toHaveBeenCalledWith(
+      `git 'worktree' 'remove' '--force' '${DEFAULT_BUILD_WORKTREE}'`,
+      expect.anything(),
+    );
+    expect(mocks.fsRename).not.toHaveBeenCalledWith(
+      `/repo/dist.rollback.${process.pid}`,
+      '/repo/dist',
+    );
+    expect(mocks.fsRm).toHaveBeenCalledWith(
+      `/repo/dist.rollback.${process.pid}`,
+      { recursive: true, force: true },
+    );
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('restarts when obsolete primary dist cleanup fails after the new dist is installed', async () => {
+    mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+    let oldDistRemovals = 0;
+    mocks.fsRm.mockImplementation(async (path: string) => {
+      if (path === `/repo/dist.rollback.${process.pid}` && ++oldDistRemovals === 2) {
+        throw Object.assign(new Error('busy'), { code: 'EBUSY' });
+      }
+    });
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
     expect(process.exitCode).toBeUndefined();
   });
 
@@ -342,7 +536,7 @@ describe('reloadCommand', () => {
     expect(mocks.spawn).toHaveBeenCalledWith(
       '/home/service/.bun/bin/bun',
       ['install'],
-      expect.objectContaining({ cwd: '/repo', stdio: 'inherit' }),
+      expect.objectContaining({ cwd: DEFAULT_BUILD_WORKTREE, stdio: 'inherit' }),
     );
     expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
     expect(process.exitCode).toBeUndefined();
@@ -389,19 +583,19 @@ describe('reloadCommand', () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it('builds from a detached origin/main worktree and swaps dist when primary HEAD is stale', async () => {
+  it('launches the canonical bundle from its persistent deployment worktree', async () => {
     const repoRoot = '/repo';
-    const buildWorktree = `${repoRoot.replace(/\/[^/]+$/, '')}/.pan-reload-build-${process.pid}`;
-    mocks.statSync
-      .mockReturnValueOnce({ mtimeMs: 1000 })
-      .mockReturnValueOnce({ mtimeMs: 2000 });
+    const buildWorktree = DEFAULT_BUILD_WORKTREE;
+    const serverPath = `${buildWorktree}/dist/dashboard/server.js`;
+    mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
     mockExecByCommand({
       "git 'rev-parse' '--show-toplevel'": [{ stdout: `${repoRoot}\n` }],
       "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
-      "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ code: 1 }],
-      "git 'rev-parse' '--short' 'origin/main'": [{ stdout: '0973c8c\n' }],
+      "git 'status' '--porcelain'": [{ stdout: '' }],
+      "git 'rev-parse' 'HEAD'": [{ stdout: '2222222222222222222222222222222222222222\n' }],
+      "git 'rev-parse' 'origin/main'": [{ stdout: '0973c8c0973c8c0973c8c0973c8c0973c8c097\n' }],
+      "git 'worktree' 'prune'": [{ stdout: '' }],
       [`git 'worktree' 'add' '--detach' '${buildWorktree}' 'origin/main'`]: [{ stdout: '' }],
-      [`git 'worktree' 'remove' '--force' '${buildWorktree}'`]: [{ stdout: '' }],
     });
     mockSpawnExits();
 
@@ -410,26 +604,47 @@ describe('reloadCommand', () => {
     expect(mocks.spawn).toHaveBeenCalledWith('/usr/bin/bun', ['install'], expect.objectContaining({ cwd: buildWorktree }));
     expect(mocks.spawn).toHaveBeenCalledWith('npm', ['run', 'build'], expect.objectContaining({ cwd: buildWorktree }));
     expect(mocks.fsCp).toHaveBeenCalledWith(`${buildWorktree}/dist`, `${repoRoot}/dist.incoming`, { recursive: true });
-    expect(mocks.fsRename).toHaveBeenCalledWith(`${repoRoot}/dist`, `${repoRoot}/dist.old.${process.pid}`);
-    expect(mocks.fsRename).toHaveBeenCalledWith(`${repoRoot}/dist.incoming`, `${repoRoot}/dist`);
-    expect(mocks.exec).toHaveBeenCalledWith(
+    expect(mocks.fsSymlink).toHaveBeenCalledWith(
+      `${buildWorktree}/node_modules`,
+      `${repoRoot}/dist.incoming/node_modules`,
+      'dir',
+    );
+    expect(mocks.fsRename).not.toHaveBeenCalledWith(
+      `${repoRoot}/node_modules`,
+      expect.stringContaining('node_modules.old'),
+    );
+    expect(mocks.writeActiveDashboardBundle).toHaveBeenCalledWith({
+      repoRoot,
+      deployRoot: buildWorktree,
+      serverPath,
+    });
+    expect(mocks.exec).not.toHaveBeenCalledWith(
       `git 'worktree' 'remove' '--force' '${buildWorktree}'`,
-      expect.objectContaining({ cwd: repoRoot }),
+      expect.anything(),
     );
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining('0973c8c'));
     expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
+    const spawnFactory = mocks.restartDashboard.mock.calls[0][1] as () => unknown;
+    spawnFactory();
+    expect(mocks.spawnDashboardDetached).toHaveBeenCalledWith(expect.anything(), {
+      deacon: undefined,
+      serverPath,
+      repoRoot,
+    });
     expect(process.exitCode).toBeUndefined();
   });
 
   it('cleans up the detached worktree and preserves the running server when worktree build fails', async () => {
     const repoRoot = '/repo';
-    const buildWorktree = `${repoRoot.replace(/\/[^/]+$/, '')}/.pan-reload-build-${process.pid}`;
+    const buildWorktree = DEFAULT_BUILD_WORKTREE;
     mocks.statSync.mockReturnValue({ mtimeMs: 1000 });
     mockExecByCommand({
       "git 'rev-parse' '--show-toplevel'": [{ stdout: `${repoRoot}\n` }],
       "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
-      "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ code: 1 }],
-      "git 'rev-parse' '--short' 'origin/main'": [{ stdout: '0973c8c\n' }],
+      "git 'status' '--porcelain'": [{ stdout: '' }],
+      "git 'rev-parse' 'HEAD'": [{ stdout: '2222222222222222222222222222222222222222\n' }],
+      "git 'rev-parse' 'origin/main'": [{ stdout: '0973c8c0973c8c0973c8c0973c8c0973c8c097\n' }],
+      "git 'worktree' 'prune'": [{ stdout: '' }],
       [`git 'worktree' 'add' '--detach' '${buildWorktree}' 'origin/main'`]: [{ stdout: '' }],
       [`git 'worktree' 'remove' '--force' '${buildWorktree}'`]: [{ stdout: '' }],
     });
@@ -474,7 +689,12 @@ describe('reloadCommand', () => {
     mockExecByCommand({
       "git 'rev-parse' '--show-toplevel'": [{ stdout: '/repo/workspaces/feature-pan-2095\n' }],
       "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
-      "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ stdout: '' }],
+      "git 'status' '--porcelain'": [{ stdout: '' }],
+      "git 'rev-parse' 'HEAD'": [{ stdout: `${DEFAULT_ORIGIN_MAIN_SHA}\n` }],
+      "git 'rev-parse' 'origin/main'": [{ stdout: `${DEFAULT_ORIGIN_MAIN_SHA}\n` }],
+      "git 'worktree' 'prune'": [{ stdout: '' }],
+      [`git 'worktree' 'add' '--detach' '${DEFAULT_BUILD_WORKTREE}' 'origin/main'`]: [{ stdout: '' }],
+      [`git 'worktree' 'remove' '--force' '${DEFAULT_BUILD_WORKTREE}'`]: [{ stdout: '' }],
     });
     mockSpawnExits();
 
@@ -485,7 +705,7 @@ describe('reloadCommand', () => {
       expect.objectContaining({ cwd: '/repo/workspaces/feature-pan-2095/subdir' }),
     );
     expect(mocks.exec).toHaveBeenCalledWith("git 'fetch' 'origin' 'main'", expect.objectContaining({ cwd: '/repo' }));
-    expect(mocks.spawn).toHaveBeenCalledWith('/usr/bin/bun', ['install'], expect.objectContaining({ cwd: '/repo' }));
+    expect(mocks.spawn).toHaveBeenCalledWith('/usr/bin/bun', ['install'], expect.objectContaining({ cwd: DEFAULT_BUILD_WORKTREE }));
     expect(mocks.restartDashboard).toHaveBeenCalledWith(
       expect.anything(),
       expect.any(Function),
