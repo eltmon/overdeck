@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T10:59:59.202Z",
+  "updated": "2026-07-27T11:01:35.462Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "failed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T10:59:59.102Z",
-    "inspectNotes": "AC-4 not met (AC-1/2/3/5 all pass). VIOLATION: src/lib/cloister/branch-invalidation.ts:172 calls deps.setSetting(settingKey, newSha) unconditionally, so an 'unknown' probe still advances the stored main head. AC-4 (and PRD AC-6, drafts/PAN-3154.md:417-418) require an 'unknown' probe to preserve the stored SHA. FAILURE SCENARIO: main moves to X; issue A's probe returns 'unknown' because 'git fetch origin main' failed transiently (conflict-gate.ts:98 — concurrent fetch lock, network blip, worktree mid-operation, all routine while the deacon patrols active worktrees); sweep writes main_head=X anyway; every later sweep early-returns at the unchanged-head check (branch-invalidation.ts:135), so A is never probed again at head X — no blocker, no conflictsSince, readyForMerge stays true — until main moves again. That is the silent-invalidation bug PAN-3154 exists to fix, reintroduced via the failure path. REQUIRED FIX: in sweepProject, track whether any probe returned 'unknown' (branch-invalidation.ts:143 currently treats it as a bare continue) and skip the setSetting at :172 when at least one did, so the next cycle re-probes at the same head. Safe and idempotent: the existing conflictsSince.sha === newSha dedup (AC-3) skips issues already marked in the aborted sweep, and the summary entry only counts newly-marked issues. Then flip tests/unit/lib/cloister/branch-invalidation.test.ts 'produces zero writes and preserves the stored SHA when the probe is unknown' to assert setSetting was NOT called — it currently asserts toHaveBeenCalled() with a comment conceding it is not preserving the SHA, i.e. written to the implementation rather than the criterion. The ls-remote-failure path is already correct (early return before setSetting) and needs no change."
+    "updatedAt": "2026-07-27T11:01:35.447Z",
+    "inspectNotes": "Inspecting item branch-invalidation-sweep"
   },
   "closeOut": {
     "usage": {
@@ -37,10 +37,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 484,
-            "output": 89150,
-            "cacheRead": 62671049,
-            "cacheWrite": 883459
+            "input": 508,
+            "output": 92814,
+            "cacheRead": 67163368,
+            "cacheWrite": 893287
           }
         }
       },
@@ -52,15 +52,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 484,
-          "output": 89150,
-          "cacheRead": 62671049,
-          "cacheWrite": 883459
+          "input": 508,
+          "output": 92814,
+          "cacheRead": 67163368,
+          "cacheWrite": 893287
         }
       },
       "costAtCloseOut": {
-        "usd": 15.6503893,
-        "pricingAsOf": "2026-07-27T10:59:59.182Z"
+        "usd": 16.6101093,
+        "pricingAsOf": "2026-07-27T11:01:35.455Z"
       }
     },
     "merges": [],
