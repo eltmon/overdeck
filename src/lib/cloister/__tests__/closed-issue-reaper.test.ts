@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   getReviewStatusesSync: vi.fn(),
   isIssueClosed: vi.fn(),
   isTrackerIssueClosed: vi.fn(),
-  readJournalStatusSync: vi.fn(),
+  readJournalStatus: vi.fn(),
   listRunningAgents: vi.fn(),
   listProjectsSync: vi.fn(),
   listSessionNames: vi.fn(),
@@ -73,7 +73,7 @@ vi.mock('../../review-status.js', () => ({
 }));
 
 vi.mock('../../overdeck/review-status-record-sync.js', () => ({
-  readJournalStatusSync: mocks.readJournalStatusSync,
+  readJournalStatus: mocks.readJournalStatus,
 }));
 
 vi.mock('../merged-docker-cleanup-worker.js', () => ({
@@ -83,6 +83,7 @@ vi.mock('../merged-docker-cleanup-worker.js', () => ({
 import {
   reapClosedIssueReviewRequests,
   reconcileClosedIssueAgents,
+  REVIEW_REQUEST_CLOSURE_CHECK_CONCURRENCY,
 } from '../closed-issue-reaper.js';
 
 describe('reconcileClosedIssueAgents', () => {
@@ -98,7 +99,7 @@ describe('reconcileClosedIssueAgents', () => {
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.loadReviewStatuses.mockReturnValue({});
     mocks.getReviewStatusesSync.mockReturnValue({});
-    mocks.readJournalStatusSync.mockReturnValue(null);
+    mocks.readJournalStatus.mockResolvedValue(null);
     mocks.reapIssueResidue.mockResolvedValue([]);
     mocks.resolveProjectForIssue.mockReturnValue(null);
     mocks.stopAgent.mockReturnValue(Effect.succeed(undefined));
@@ -400,7 +401,7 @@ describe('reconcileClosedIssueAgents', () => {
       readyForMerge: false,
     };
     mocks.loadReviewStatuses.mockReturnValue({ 'PAN-7001': dbStatus });
-    mocks.readJournalStatusSync.mockReturnValue({
+    mocks.readJournalStatus.mockResolvedValue({
       updatedAt: '2026-07-02T00:00:00.000Z',
       durable: { reviewRequestedAt: '2026-07-02T00:00:00.000Z' },
     });
@@ -420,6 +421,32 @@ describe('reconcileClosedIssueAgents', () => {
       level: 'info',
       issueId: 'PAN-7001',
     }));
+  });
+
+  it('reaps review intent that exists only in the durable journal', async () => {
+    const dbStatus = {
+      issueId: 'PAN-7005',
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+      readyForMerge: false,
+    };
+    mocks.loadReviewStatuses.mockReturnValue({ 'PAN-7005': dbStatus });
+    mocks.readJournalStatus.mockResolvedValue({
+      updatedAt: '2026-07-02T00:00:00.000Z',
+      durable: { reviewRequestedAt: '2026-07-02T00:00:00.000Z' },
+    });
+    mocks.isTrackerIssueClosed.mockResolvedValue(true);
+
+    await expect(reapClosedIssueReviewRequests(new Map())).resolves.toEqual([
+      'Cleared unserviced review request for PAN-7005 — parent issue is closed',
+    ]);
+
+    expect(mocks.setReviewStatusSync).toHaveBeenCalledWith(
+      'PAN-7005',
+      { reviewRequestedAt: undefined, reviewSpawnedAt: undefined },
+      expect.objectContaining({ reviewRequestedAt: '2026-07-02T00:00:00.000Z' }),
+    );
   });
 
   it('preserves unserviced review intent for a tracker-open issue', async () => {
@@ -442,7 +469,52 @@ describe('reconcileClosedIssueAgents', () => {
 
     expect(mocks.isTrackerIssueClosed).toHaveBeenCalledWith('PAN-7002');
     expect(mocks.isIssueClosed).not.toHaveBeenCalled();
+    expect(mocks.readJournalStatus).toHaveBeenCalledWith('PAN-7002');
     expect(mocks.setReviewStatusSync).not.toHaveBeenCalled();
+  });
+
+  it('checks tracker closure concurrently with a bounded batch', async () => {
+    const statuses = Object.fromEntries(Array.from(
+      { length: REVIEW_REQUEST_CLOSURE_CHECK_CONCURRENCY + 1 },
+      (_, index) => {
+        const issueId = `PAN-${7100 + index}`;
+        return [issueId, {
+          issueId,
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          reviewRequestedAt: '2026-07-01T00:00:00.000Z',
+          updatedAt: '2026-07-01T00:00:00.000Z',
+          readyForMerge: false,
+        }];
+      },
+    ));
+    mocks.loadReviewStatuses.mockReturnValue(statuses);
+
+    let active = 0;
+    let maxActive = 0;
+    const firstBatchResolvers: Array<(closed: boolean) => void> = [];
+    mocks.isTrackerIssueClosed.mockImplementation(() => new Promise<boolean>((resolve) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      firstBatchResolvers.push((closed) => {
+        active -= 1;
+        resolve(closed);
+      });
+    }));
+
+    const sweep = reapClosedIssueReviewRequests(new Map());
+    await vi.waitFor(() => {
+      expect(mocks.isTrackerIssueClosed).toHaveBeenCalledTimes(REVIEW_REQUEST_CLOSURE_CHECK_CONCURRENCY);
+    });
+    expect(maxActive).toBe(REVIEW_REQUEST_CLOSURE_CHECK_CONCURRENCY);
+    for (const resolve of firstBatchResolvers.splice(0)) resolve(false);
+
+    await vi.waitFor(() => {
+      expect(mocks.isTrackerIssueClosed).toHaveBeenCalledTimes(REVIEW_REQUEST_CLOSURE_CHECK_CONCURRENCY + 1);
+    });
+    for (const resolve of firstBatchResolvers.splice(0)) resolve(false);
+    await expect(sweep).resolves.toEqual([]);
+    expect(mocks.readJournalStatus).toHaveBeenCalledTimes(REVIEW_REQUEST_CLOSURE_CHECK_CONCURRENCY + 1);
   });
 
   it('preserves serviced requests and terminal review verdicts', async () => {

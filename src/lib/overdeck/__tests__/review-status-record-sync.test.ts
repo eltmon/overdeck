@@ -4,6 +4,7 @@ import type { ReviewStatus } from '../../review-status.js';
 const mocks = vi.hoisted(() => ({
   resolveProjectFromIssueSync: vi.fn(),
   getProjectSync: vi.fn(),
+  readIssueRecord: vi.fn(),
   readIssueRecordSync: vi.fn(),
   updateIssueRecordForIssue: vi.fn(),
 }));
@@ -13,13 +14,14 @@ vi.mock('../../projects.js', () => ({
   getProjectSync: mocks.getProjectSync,
 }));
 vi.mock('../../pan-dir/record.js', () => ({
+  readIssueRecord: mocks.readIssueRecord,
   readIssueRecordSync: mocks.readIssueRecordSync,
 }));
 vi.mock('../../pan-dir/records.js', () => ({
   updateIssueRecordForIssue: mocks.updateIssueRecordForIssue,
 }));
 
-import { enrichReviewNotesFromRecordSync, readJournalStatusSync } from '../review-status-record-sync.js';
+import { enrichReviewNotesFromRecordSync, readJournalStatus, readJournalStatusSync } from '../review-status-record-sync.js';
 
 const baseStatus: ReviewStatus = {
   issueId: 'PAN-1866',
@@ -113,5 +115,27 @@ describe('readJournalStatusSync terminal markers (PAN-2054)', () => {
       strikeReadyHead: 'head', strikeLandingState: 'recovering', strikeRecoveryCount: 1,
       strikeLandingAttempts: attempts,
     });
+  });
+
+  it('reads the journal record asynchronously for patrol callers', async () => {
+    mocks.readIssueRecord.mockResolvedValue({
+      pipeline: {
+        issueId: 'PAN-3187',
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        reviewRequestedAt: '2026-07-27T00:00:00.000Z',
+        updatedAt: '2026-07-27T00:00:00.000Z',
+      },
+    });
+
+    await expect(readJournalStatus('PAN-3187')).resolves.toMatchObject({
+      updatedAt: '2026-07-27T00:00:00.000Z',
+      durable: { reviewRequestedAt: '2026-07-27T00:00:00.000Z' },
+    });
+    expect(mocks.readIssueRecord).toHaveBeenCalledWith(
+      { key: 'overdeck', path: '/repo' },
+      'PAN-3187',
+    );
+    expect(mocks.readIssueRecordSync).not.toHaveBeenCalled();
   });
 });

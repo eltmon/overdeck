@@ -8,7 +8,7 @@ import { listRunningAgents, stopAgent } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { AGENTS_DIR } from '../paths.js';
 import { listProjectsSync } from '../projects.js';
-import { readJournalStatusSync } from '../overdeck/review-status-record-sync.js';
+import { readJournalStatus } from '../overdeck/review-status-record-sync.js';
 import { resolveProjectForIssue } from '../pan-dir/record.js';
 import { loadReviewStatuses, setReviewStatusSync } from '../review-status.js';
 import type { ReviewStatus } from '../review-status-reconcile.js';
@@ -36,6 +36,7 @@ function issueIdFromAgentDir(entryName: string): string | null {
 
 const execAsync = promisify(exec);
 const DEVNET_CLOSURE_CHECK_CONCURRENCY = 4;
+export const REVIEW_REQUEST_CLOSURE_CHECK_CONCURRENCY = 4;
 
 // Leaked `_devnet` networks are a residue source of their own: a closed issue
 // whose sessions, workspace, and agent dirs are already gone can still hold a
@@ -81,43 +82,53 @@ async function isTrackerClosedIssue(
   return promise;
 }
 
+function hasUnservicedReviewRequest(status: ReviewStatus): boolean {
+  if (status.reviewStatus !== 'pending' || !status.reviewRequestedAt) return false;
+  return !status.reviewSpawnedAt ||
+    new Date(status.reviewRequestedAt).getTime() > new Date(status.reviewSpawnedAt).getTime();
+}
+
 export async function reapClosedIssueReviewRequests(
   trackerClosedChecks: Map<string, Promise<boolean>>,
 ): Promise<string[]> {
   const actions: string[] = [];
-  const statuses = loadReviewStatuses();
+  const pendingStatuses = Object.entries(loadReviewStatuses())
+    .filter(([, status]) => status.reviewStatus === 'pending');
 
-  for (const [issueId, dbStatus] of Object.entries(statuses)) {
-    if (dbStatus.reviewStatus !== 'pending') continue;
+  for (let offset = 0; offset < pendingStatuses.length; offset += REVIEW_REQUEST_CLOSURE_CHECK_CONCURRENCY) {
+    const batch = pendingStatuses.slice(offset, offset + REVIEW_REQUEST_CLOSURE_CHECK_CONCURRENCY);
+    const candidates = (await Promise.all(batch.map(async ([issueId, dbStatus]) => {
+      const journal = await readJournalStatus(issueId);
+      const existing = {
+        ...dbStatus,
+        ...(journal?.durable ?? {}),
+        issueId,
+      } as ReviewStatus;
+      for (const field of journal?.clearedFields ?? []) {
+        delete (existing as unknown as Record<string, unknown>)[field];
+      }
+      return hasUnservicedReviewRequest(existing) ? [issueId, existing] as const : null;
+    }))).filter((candidate): candidate is readonly [string, ReviewStatus] => candidate !== null);
 
-    const journal = readJournalStatusSync(issueId);
-    const existing = {
-      ...dbStatus,
-      ...(journal?.durable ?? {}),
-      issueId,
-    } as ReviewStatus;
-    for (const field of journal?.clearedFields ?? []) {
-      delete (existing as unknown as Record<string, unknown>)[field];
+    const trackerClosedCandidates = (await Promise.all(candidates.map(async ([issueId, existing]) => (
+      await isTrackerClosedIssue(issueId, trackerClosedChecks) ? [issueId, existing] as const : null
+    )))).filter((candidate): candidate is readonly [string, ReviewStatus] => candidate !== null);
+
+    for (const [issueId, existing] of trackerClosedCandidates) {
+      setReviewStatusSync(issueId, {
+        reviewRequestedAt: undefined,
+        reviewSpawnedAt: undefined,
+      }, existing);
+      const action = `Cleared unserviced review request for ${issueId} — parent issue is closed`;
+      actions.push(action);
+      console.log(`[deacon] ${action}`);
+      emitActivityEntrySync({
+        source: 'cloister',
+        level: 'info',
+        issueId,
+        message: `[deacon] cleared unserviced review request for ${issueId} — parent issue is closed`,
+      });
     }
-
-    if (existing.reviewStatus !== 'pending' || !existing.reviewRequestedAt) continue;
-    if (existing.reviewSpawnedAt &&
-        Date.parse(existing.reviewRequestedAt) <= new Date(existing.reviewSpawnedAt).getTime()) continue;
-    if (!await isTrackerClosedIssue(issueId, trackerClosedChecks)) continue;
-
-    setReviewStatusSync(issueId, {
-      reviewRequestedAt: undefined,
-      reviewSpawnedAt: undefined,
-    }, existing);
-    const action = `Cleared unserviced review request for ${issueId} — parent issue is closed`;
-    actions.push(action);
-    console.log(`[deacon] ${action}`);
-    emitActivityEntrySync({
-      source: 'cloister',
-      level: 'info',
-      issueId,
-      message: `[deacon] cleared unserviced review request for ${issueId} — parent issue is closed`,
-    });
   }
 
   return actions;
