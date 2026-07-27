@@ -3,23 +3,32 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-26T22:38:10.006Z",
-  "updated": "2026-07-26T23:35:59.157Z",
+  "updated": "2026-07-27T03:29:09.703Z",
   "pipeline": {
     "issueId": "PAN-3172",
     "reviewStatus": "pending",
-    "testStatus": "pending",
+    "testStatus": "skipped",
     "verificationStatus": "passed",
     "mergeStatus": "failed",
     "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-26T23:35:53.135Z",
+    "updatedAt": "2026-07-27T03:29:09.670Z",
+    "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
     "verificationNotes": "merge-verify: CI green on the merged tip (PAN-2487 local-gate skip)",
     "mergeNotes": "Merge pipeline error: Cannot find package 'effect' imported from /home/eltmon/.overdeck/deployments/dashboard/.pan-reload-generation-b/dist/dashboard/deploy-window-Dchy3FNh.js",
     "lastVerifiedCommit": "5b32fbc6097b2eab08bf03e5320a5365c3531b39",
-    "strikeLandingState": "landed",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-26T23:35:53.144Z",
+        "strikeHead": "5b32fbc6097b2eab08bf03e5320a5365c3531b39",
+        "mainHead": "876a5aa8a1be3a96af97cbc4144ba1f90a96af8b",
+        "outcome": "failed",
+        "detail": "Cannot find package 'effect' imported from /home/eltmon/.overdeck/deployments/dashboard/.pan-reload-generation-b/dist/dashboard/deploy-window-Dchy3FNh.js"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -27,7 +36,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-26T23:35:59.151Z"
+        "pricingAsOf": "2026-07-27T03:29:09.681Z"
       }
     },
     "merges": [],
