@@ -28,16 +28,23 @@ const DEFAULT_CONFIG: LauncherConfig = {
   workingDir: '/workspace/project',
 };
 
-function materializeGitGuard(): { script: string; wrapperPath: string } {
+function materializeGitGuard(): { script: string; wrapperPath: string; worktree: string; outside: string } {
   const realGitDir = join(tempHome, 'real-git');
   const realGitPath = join(realGitDir, 'git');
   const launcherPath = join(tempHome, 'launcher.sh');
+  // PAN-3189: the guard scopes to the agent's worktree, so both it and an
+  // unrelated directory (standing in for a fixture's temp repo) must exist.
+  const worktree = join(tempHome, 'workspace');
+  const outside = join(tempHome, 'elsewhere');
   mkdirSync(realGitDir, { recursive: true });
+  mkdirSync(worktree, { recursive: true });
+  mkdirSync(outside, { recursive: true });
   writeFileSync(realGitPath, '#!/bin/sh\nexit 23\n');
   chmodSync(realGitPath, 0o755);
 
   const script = generateLauncherScriptSync({
     ...DEFAULT_CONFIG,
+    workingDir: worktree,
     changeDir: false,
     overdeckEnv: { agentId: 'agent-pan-806', issueId: 'PAN-806', sessionType: 'work' },
     baseCommand: 'true',
@@ -55,6 +62,8 @@ function materializeGitGuard(): { script: string; wrapperPath: string } {
   return {
     script,
     wrapperPath: join(tempHome, 'agents', 'agent-pan-806', 'git-guard', 'git'),
+    worktree,
+    outside,
   };
 }
 
@@ -138,8 +147,9 @@ describe('generateLauncherScript', () => {
   });
 
   it('blocks history operations and passes permitted git commands to real git', () => {
-    const { wrapperPath } = materializeGitGuard();
+    const { wrapperPath, worktree } = materializeGitGuard();
     const run = (args: string[]) => spawnSync(wrapperPath, args, {
+      cwd: worktree,
       encoding: 'utf-8',
       env: { ...process.env, OVERDECK_PAN_GIT_OP: '' },
     });
@@ -148,8 +158,8 @@ describe('generateLauncherScript', () => {
       ['rebase', 'main'],
       ['reset', '--hard', 'HEAD'],
       ['stash', 'push'],
-      ['-C', '/workspace', 'rebase', 'main'],
-      ['-C/workspace', 'reset', '--hard', 'HEAD'],
+      ['-C', worktree, 'rebase', 'main'],
+      [`-C${worktree}`, 'reset', '--hard', 'HEAD'],
       ['-c', 'core.hooksPath=/tmp/hooks', 'stash', 'push'],
       ['-ccore.hooksPath=/tmp/hooks', 'rebase', 'main'],
     ]) {
@@ -162,9 +172,52 @@ describe('generateLauncherScript', () => {
     }
   });
 
-  it('passes every git command through when the pan git-op sentinel is set', () => {
-    const { wrapperPath } = materializeGitGuard();
+  it('leaves history operations outside the agent worktree alone (PAN-3189)', () => {
+    const { wrapperPath, outside } = materializeGitGuard();
     const run = (args: string[]) => spawnSync(wrapperPath, args, {
+      cwd: outside,
+      encoding: 'utf-8',
+      env: { ...process.env, OVERDECK_PAN_GIT_OP: '' },
+    });
+
+    for (const args of [['rebase', 'main'], ['reset', '--hard', 'HEAD'], ['stash', 'push']]) {
+      const result = run(args);
+      expect(result.stderr).not.toContain('Overdeck agents must not run git');
+      expect(result.status).toBe(23);
+    }
+  });
+
+  it('strips an inherited guard dir from PATH before installing its own (PAN-3189)', () => {
+    const foreignGuardDir = join(tempHome, 'agents', 'flywheel-orchestrator', 'git-guard');
+    mkdirSync(foreignGuardDir, { recursive: true });
+    writeFileSync(join(foreignGuardDir, 'git'), '#!/bin/sh\nexit 77\n');
+    chmodSync(join(foreignGuardDir, 'git'), 0o755);
+
+    const worktree = join(tempHome, 'workspace');
+    mkdirSync(worktree, { recursive: true });
+    const launcherPath = join(tempHome, 'inherited-guard-launcher.sh');
+    writeFileSync(launcherPath, generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      workingDir: worktree,
+      changeDir: false,
+      overdeckEnv: { agentId: 'agent-pan-3189', issueId: 'PAN-3189', sessionType: 'work' },
+      baseCommand: 'printenv PATH',
+    }));
+
+    const result = spawnSync('bash', [launcherPath], {
+      encoding: 'utf-8',
+      env: { ...process.env, PATH: `${foreignGuardDir}:${process.env.PATH ?? ''}` },
+    });
+
+    expect(result.status).toBe(0);
+    const guardSegments = result.stdout.trim().split(':').filter(segment => segment.endsWith('/git-guard'));
+    expect(guardSegments).toEqual([join(tempHome, 'agents', 'agent-pan-3189', 'git-guard')]);
+  });
+
+  it('passes every git command through when the pan git-op sentinel is set', () => {
+    const { wrapperPath, worktree } = materializeGitGuard();
+    const run = (args: string[]) => spawnSync(wrapperPath, args, {
+      cwd: worktree,
       encoding: 'utf-8',
       env: { ...process.env, OVERDECK_PAN_GIT_OP: '1' },
     });
@@ -203,11 +256,21 @@ describe('generateLauncherScript', () => {
       export OVERDECK_AGENT_ID='plan-abc'
       export OVERDECK_ISSUE_ID='PAN-824'
       export OVERDECK_SESSION_TYPE='planning'
+      IFS=':' read -r -a _overdeck_path_segments <<< "$PATH"
+      _overdeck_kept_path=()
+      for _overdeck_path_segment in "\${_overdeck_path_segments[@]}"; do
+        [[ "$_overdeck_path_segment" == */git-guard ]] || _overdeck_kept_path+=("$_overdeck_path_segment")
+      done
+      PATH="$(IFS=':'; echo "\${_overdeck_kept_path[*]}")"
+      unset _overdeck_path_segments _overdeck_kept_path _overdeck_path_segment
       _OVERDECK_REAL_GIT="$(command -v git)"
+      _OVERDECK_GUARD_ROOT="$(cd '/workspace/project' 2>/dev/null && pwd -P)"
+      [ -n "$_OVERDECK_GUARD_ROOT" ] || _OVERDECK_GUARD_ROOT='/workspace/project'
       mkdir -p '<OVERDECK_HOME>/agents/plan-abc/git-guard'
       cat > '<OVERDECK_HOME>/agents/plan-abc/git-guard/git' <<EOF
       #!/bin/sh
       _OVERDECK_REAL_GIT="$_OVERDECK_REAL_GIT"
+      _OVERDECK_GUARD_ROOT="$_OVERDECK_GUARD_ROOT"
       if [ "\\$OVERDECK_PAN_GIT_OP" = "1" ]; then
         exec "\\$_OVERDECK_REAL_GIT" "\\$@"
       fi
@@ -236,7 +299,61 @@ describe('generateLauncherScript', () => {
         done
         [ "\\$#" -gt 0 ] && printf "%s\\n" "\\$1"
       }
+      _overdeck_git_target_dir() {
+        _overdeck_dir="\\$(pwd -P 2>/dev/null || pwd)"
+        while [ "\\$#" -gt 0 ]; do
+          case "\\$1" in
+            -C)
+              shift
+              [ "\\$#" -gt 0 ] || break
+              case "\\$1" in
+                /*) _overdeck_dir="\\$1" ;;
+                *) _overdeck_dir="\\$_overdeck_dir/\\$1" ;;
+              esac
+              shift
+              ;;
+            -C?*)
+              _overdeck_c_value="\\\${1#-C}"
+              case "\\$_overdeck_c_value" in
+                /*) _overdeck_dir="\\$_overdeck_c_value" ;;
+                *) _overdeck_dir="\\$_overdeck_dir/\\$_overdeck_c_value" ;;
+              esac
+              shift
+              ;;
+            -c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix|--attr-source)
+              shift
+              [ "\\$#" -gt 0 ] && shift
+              ;;
+            -c?*|--git-dir=*|--work-tree=*|--namespace=*|--config-env=*|--super-prefix=*|--attr-source=*)
+              shift
+              ;;
+            --)
+              break
+              ;;
+            -*)
+              shift
+              ;;
+            *)
+              break
+              ;;
+          esac
+        done
+        if [ -d "\\$_overdeck_dir" ]; then
+          (cd "\\$_overdeck_dir" 2>/dev/null && pwd -P) || printf "%s\\n" "\\$_overdeck_dir"
+        else
+          printf "%s\\n" "\\$_overdeck_dir"
+        fi
+      }
       _overdeck_git_command="\\$(_overdeck_git_find_command "\\$@")"
+      case "\\$_overdeck_git_command" in
+        rebase|stash|reset) ;;
+        *) exec "\\$_OVERDECK_REAL_GIT" "\\$@" ;;
+      esac
+      _overdeck_git_target="\\$(_overdeck_git_target_dir "\\$@")"
+      case "\\$_overdeck_git_target" in
+        "\\$_OVERDECK_GUARD_ROOT"|"\\$_OVERDECK_GUARD_ROOT"/*) ;;
+        *) exec "\\$_OVERDECK_REAL_GIT" "\\$@" ;;
+      esac
       case "\\$_overdeck_git_command" in
         rebase)
           echo "Overdeck agents must not run git rebase directly. Use pan sync-main to sync main or pan done to submit." >&2
@@ -322,11 +439,21 @@ describe('generateLauncherScript', () => {
       export OVERDECK_AGENT_ID='spec-123'
       export OVERDECK_ISSUE_ID='PAN-824'
       export OVERDECK_SESSION_TYPE='correctness-review'
+      IFS=':' read -r -a _overdeck_path_segments <<< "$PATH"
+      _overdeck_kept_path=()
+      for _overdeck_path_segment in "\${_overdeck_path_segments[@]}"; do
+        [[ "$_overdeck_path_segment" == */git-guard ]] || _overdeck_kept_path+=("$_overdeck_path_segment")
+      done
+      PATH="$(IFS=':'; echo "\${_overdeck_kept_path[*]}")"
+      unset _overdeck_path_segments _overdeck_kept_path _overdeck_path_segment
       _OVERDECK_REAL_GIT="$(command -v git)"
+      _OVERDECK_GUARD_ROOT="$(cd '/workspace/project' 2>/dev/null && pwd -P)"
+      [ -n "$_OVERDECK_GUARD_ROOT" ] || _OVERDECK_GUARD_ROOT='/workspace/project'
       mkdir -p '<OVERDECK_HOME>/agents/spec-123/git-guard'
       cat > '<OVERDECK_HOME>/agents/spec-123/git-guard/git' <<EOF
       #!/bin/sh
       _OVERDECK_REAL_GIT="$_OVERDECK_REAL_GIT"
+      _OVERDECK_GUARD_ROOT="$_OVERDECK_GUARD_ROOT"
       if [ "\\$OVERDECK_PAN_GIT_OP" = "1" ]; then
         exec "\\$_OVERDECK_REAL_GIT" "\\$@"
       fi
@@ -355,7 +482,61 @@ describe('generateLauncherScript', () => {
         done
         [ "\\$#" -gt 0 ] && printf "%s\\n" "\\$1"
       }
+      _overdeck_git_target_dir() {
+        _overdeck_dir="\\$(pwd -P 2>/dev/null || pwd)"
+        while [ "\\$#" -gt 0 ]; do
+          case "\\$1" in
+            -C)
+              shift
+              [ "\\$#" -gt 0 ] || break
+              case "\\$1" in
+                /*) _overdeck_dir="\\$1" ;;
+                *) _overdeck_dir="\\$_overdeck_dir/\\$1" ;;
+              esac
+              shift
+              ;;
+            -C?*)
+              _overdeck_c_value="\\\${1#-C}"
+              case "\\$_overdeck_c_value" in
+                /*) _overdeck_dir="\\$_overdeck_c_value" ;;
+                *) _overdeck_dir="\\$_overdeck_dir/\\$_overdeck_c_value" ;;
+              esac
+              shift
+              ;;
+            -c|--git-dir|--work-tree|--namespace|--config-env|--super-prefix|--attr-source)
+              shift
+              [ "\\$#" -gt 0 ] && shift
+              ;;
+            -c?*|--git-dir=*|--work-tree=*|--namespace=*|--config-env=*|--super-prefix=*|--attr-source=*)
+              shift
+              ;;
+            --)
+              break
+              ;;
+            -*)
+              shift
+              ;;
+            *)
+              break
+              ;;
+          esac
+        done
+        if [ -d "\\$_overdeck_dir" ]; then
+          (cd "\\$_overdeck_dir" 2>/dev/null && pwd -P) || printf "%s\\n" "\\$_overdeck_dir"
+        else
+          printf "%s\\n" "\\$_overdeck_dir"
+        fi
+      }
       _overdeck_git_command="\\$(_overdeck_git_find_command "\\$@")"
+      case "\\$_overdeck_git_command" in
+        rebase|stash|reset) ;;
+        *) exec "\\$_OVERDECK_REAL_GIT" "\\$@" ;;
+      esac
+      _overdeck_git_target="\\$(_overdeck_git_target_dir "\\$@")"
+      case "\\$_overdeck_git_target" in
+        "\\$_OVERDECK_GUARD_ROOT"|"\\$_OVERDECK_GUARD_ROOT"/*) ;;
+        *) exec "\\$_OVERDECK_REAL_GIT" "\\$@" ;;
+      esac
       case "\\$_overdeck_git_command" in
         rebase)
           echo "Overdeck agents must not run git rebase directly. Use pan sync-main to sync main or pan done to submit." >&2

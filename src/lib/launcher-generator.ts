@@ -298,7 +298,7 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
   }
 
   if (config.overdeckEnv?.agentId && config.spawnMode !== 'conversation') {
-    lines.push(...buildGitGuardLines(config.overdeckEnv.agentId));
+    lines.push(...buildGitGuardLines(config.overdeckEnv.agentId, config.workingDir));
   }
 
   // Extra env exports
