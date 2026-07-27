@@ -4,17 +4,17 @@
     "created": "2026-07-27T04:52:30.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3187: Review-status auto-dispatch floods on 11 wedged closed issues — stale reviewRequestedAt never ages out, CLI processes attempt handler-less dispatch; expanded per operator direction to the DoD rows 1/2/3 terminal-settling rule for the 22-issue close-out backlog",
-    "updated": "2026-07-27T05:09:42.140Z"
+    "updated": "2026-07-27T08:24:47.098Z"
   },
   "plan": {
     "id": "pan-3187",
     "title": "Review-status auto-dispatch floods on wedged closed issues — age-out, handler gate, reaper sweep, DoD terminal settling, backlog repair",
-    "status": "running",
+    "status": "completed",
     "uid": "251778ca-fd7a-4cbf-8adb-8081f818f2d0",
     "author": "agent:k3[1m]",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-27T04:52:30.000Z",
-    "updated": "2026-07-27T05:09:42.140Z",
+    "updated": "2026-07-27T08:24:47.098Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3187",
@@ -560,5 +560,5 @@
       "canonicalFilename": "2026-07-27-PAN-3187-review-status-auto-dispatch-floods-on-wedged-closed-issues-age-out-handler-gate-reaper-sweep-dod-terminal-settling-backlog-repair.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
