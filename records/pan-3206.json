@@ -80,7 +80,7 @@
     "recordedAt": "2026-07-27T18:36:56.906Z"
   },
   "created": "2026-07-27T13:35:42.946Z",
-  "updated": "2026-07-27T18:53:39.271Z",
+  "updated": "2026-07-27T18:53:44.810Z",
   "pipeline": {
     "issueId": "PAN-3206",
     "reviewStatus": "blocked",
@@ -90,10 +90,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T18:53:38.629Z",
+    "updatedAt": "2026-07-27T18:53:44.801Z",
     "reviewNotes": "Recovered verdicts omit passed anchors, fail polyrepo HEAD matching, and can misroute or inject feedback commands",
     "inspectNotes": "All 3 ACs verified: parse maps APPROVED/PASSED->passed, FAILED->failed, CHANGES REQUESTED suffix (em/en dash, colon, hyphen) -> blocked with blocker, bare form -> first ### under ## Blocking Findings, null otherwise; findVerdictReport prefers synthesis.md then review.md then null; vitest review-verdict-report.test.ts 9/9 passed and npm run typecheck clean (dashboard/frontend ratchets none-new).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3213",
+    "reviewedAtCommit": "3d6be59b2013e40cfb35460e797d832a8d03abbd",
     "reviewSpawnedAt": "2026-07-27T18:46:26.441Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -177,7 +178,7 @@
       },
       "costAtCloseOut": {
         "usd": 87.40798,
-        "pricingAsOf": "2026-07-27T18:53:38.650Z"
+        "pricingAsOf": "2026-07-27T18:53:44.806Z"
       }
     },
     "merges": [
