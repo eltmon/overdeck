@@ -7723,3 +7723,10 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
   * **Worth watching rather than assuming:** PAN-3187's row-1 fix added the alternative *"or tracker-closed with landed work and no negative review verdict"*. Once the issue reaches a closed state that clause may satisfy row 1 without any override. **If it does not, row 1 is a genuine `--accept-review` operator call — not a transient — and I will say so plainly rather than waiting on it indefinitely.**
 - Post-merge sweep: ready queue empty.
 - **RUN TOTALS: 43 close-outs, 12 merges, 9 substrate bugs filed of which 6 fixed, merged and closed out.**
+
+## RUN-72 tick 32 (2026-07-27 14:08Z) — PAN-3191 CLOSED 8/8, and row 1 resolved itself
+- CI green on `145ec8e3dc`, no verifications running, deployed `17f83f3761` → `5ae5d217844e` (clean, pid 2734191, systemd-parented, deacon `False`→`True`), then **PAN-3191 CLOSED OUT WITH ALL 8 ROWS PASS**.
+- **Row 1 passed reading `reviewStatus: passed` — NOT the tracker-closed fallback.** So the verdict genuinely got written somewhere in the merge/post-merge path, and **no `--accept-review` was needed.** I had flagged it as a likely operator decision; **it resolved on its own and the honest report is that my prediction was wrong in the good direction.** Recording that rather than quietly claiming the outcome I forecast.
+- **The whole PAN-3191 episode ended without a single override**: the on-disk verdict justified the merge, the merge and deploy satisfied rows 5–7, and row 1 healed itself. **The only thing that would have made this worse was acting early** — writing a speculative verdict at tick 29, or `--accept-review`-ing at tick 31.
+- Post-close sweep: ready queue empty, merge-blockers `[]`, both trains idle, MIN-879 cache still present.
+- **RUN TOTALS: 44 close-outs, 12 merges, merge queue 15 → 0, 9 substrate bugs filed of which 7 fixed, merged and closed out.**
