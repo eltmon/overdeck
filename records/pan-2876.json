@@ -206,7 +206,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T12:10:41.589Z",
-  "updated": "2026-07-27T05:14:10.420Z",
+  "updated": "2026-07-27T05:20:49.467Z",
   "pipeline": {
     "issueId": "PAN-2876",
     "reviewStatus": "pending",
@@ -279,16 +279,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "frontend-cache-hooks": {
-        "writerId": "agent-pan-2876",
-        "agentId": "agent-pan-2876",
-        "pid": 339432,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:14:10.420Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2876",
@@ -344,6 +336,17 @@
         "outcome": "completed",
         "reason": "Extended the canonical conversation read door and REST query route to resolve safe subagent transcripts, reject unsafe ids with 400, and include ended subagents as done in parent responses; tests and typecheck pass.",
         "releasedAt": "2026-07-27T05:13:57.922Z"
+      },
+      {
+        "writerId": "agent-pan-2876",
+        "agentId": "agent-pan-2876",
+        "pid": 339432,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:14:10.420Z",
+        "itemId": "frontend-cache-hooks",
+        "outcome": "completed",
+        "reason": "Added subagent list cache replacement, preserved lists across message events, and introduced isolated live/ended subagent transcript queries with unsubscribe and HTTP fallback tests.",
+        "releasedAt": "2026-07-27T05:20:49.467Z"
       }
     ],
     "statusReasons": {
@@ -366,6 +369,10 @@
       "rest-subagent-messages": {
         "reason": "Extended the canonical conversation read door and REST query route to resolve safe subagent transcripts, reject unsafe ids with 400, and include ended subagents as done in parent responses; tests and typecheck pass.",
         "updatedAt": "2026-07-27T05:13:57.922Z"
+      },
+      "frontend-cache-hooks": {
+        "reason": "Added subagent list cache replacement, preserved lists across message events, and introduced isolated live/ended subagent transcript queries with unsubscribe and HTTP fallback tests.",
+        "updatedAt": "2026-07-27T05:20:49.467Z"
       }
     }
   },
@@ -395,6 +402,10 @@
     "rest-subagent-messages.rest-subagent-messages.ac1": "completed",
     "rest-subagent-messages.rest-subagent-messages.ac2": "completed",
     "rest-subagent-messages.rest-subagent-messages.ac3": "completed",
-    "frontend-cache-hooks": "running"
+    "frontend-cache-hooks": "completed",
+    "frontend-cache-hooks.frontend-cache-hooks.ac1": "completed",
+    "frontend-cache-hooks.frontend-cache-hooks.ac2": "completed",
+    "frontend-cache-hooks.frontend-cache-hooks.ac3": "completed",
+    "frontend-cache-hooks.frontend-cache-hooks.ac4": "completed"
   }
 }
