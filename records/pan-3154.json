@@ -115,19 +115,18 @@
     "recordedAt": "2026-07-27T12:29:11.863Z"
   },
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T13:14:44.261Z",
+  "updated": "2026-07-27T13:14:46.796Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "mergeStep": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:29:58.912Z",
-    "updatedAt": "2026-07-27T12:57:39.216Z",
+    "updatedAt": "2026-07-27T13:14:46.773Z",
     "reviewNotes": "Unchanged approved HEAD; no correctness, security, requirements, or performance findings",
     "testNotes": "Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3154, branch feature/pan-3154, HEAD 2fbbaba87b (matches record.reviewedAtCommit). Ran: npm run typecheck (PASSED - root, hooks, evals, dashboard 62 known/0 new, frontend 0 known/0 new), npx vitest run --configLoader runner full suite (PASSED - 1243 files/11558 tests passed, 3 files/50 tests skipped, 0 failed), npx vitest run on the three PAN-3154-specific unit test files (conflict-gate.test.ts, branch-invalidation.test.ts, review-status-sync.test.ts) individually (PASSED - 58/58). npm run lint FAILED at the lint:file-size step: 'src/cli/commands/start.ts is 1277 lines (allowed 1276)'. Verified this is NOT caused by PAN-3154's own changes: `git log $(git merge-base HEAD origin/main)..HEAD -- src/cli/commands/start.ts` is empty (this branch never touched the file); `git diff origin/main HEAD -- src/cli/commands/start.ts` shows the branch is missing a provenance/startedBy feature that landed on main after this branch's base, net +1 line from unrelated formatting drift. This is main-drift staleness on an unrelated file, not a PAN-3154 defect, but the gate genuinely fails as configured today and blocks the pipeline until the branch rebases onto current origin/main (or gets an audited allowlist entry). UAT: not required - PAN-3154 is backend-only (deacon patrol, conflict-gate probe, review-status/DB schema plumbing, docs); its own PRD lists 'No dedicated dashboard badge for conflictsSince' as an explicit NonGoal, and no acceptance criteria reference UI/dashboard behavior. No browser verification performed.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -195,7 +194,9 @@
         "tests/unit/lib/pan-dir/verdict-restore.test.ts"
       ],
       "recordedAt": "2026-07-27T12:29:11.863Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T13:14:46.773Z"
   },
   "closeOut": {
     "usage": {
@@ -261,7 +262,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3208"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T13:14:46.793Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at ceed3768cf1d0f14056a373f71e912aa7d22a91f",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3208 MERGED at 2026-07-27T12:56:46Z",
+          "status": "pass",
+          "mergedAt": "2026-07-27T12:56:46Z",
+          "mergeCommit": "127b037f1372eb24cd6ade0a2a68f740c5d77bfc"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 127b037f1372eb24cd6ade0a2a68f740c5d77bfc",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 17f83f37 contains merge 127b037f",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 5 agent state directories; No strike branch strike/pan-3154 found; Pruned 320 checkpoint ref(s) for agent-pan-3154, planning-pan-3154, strike-pan-3154; No specialist registry entries for PAN-3154"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "claude-sonnet-5",
