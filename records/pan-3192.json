@@ -12,9 +12,22 @@
       "timestamp": "2026-07-27T04:58:31.235Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-27T05:35Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-27T05:35:49.113Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-27T05:35:49Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3192\n\nFrontend typecheck guard suppresses compiler failures and can report success without a completed tsc run\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3192 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -37,20 +50,19 @@
     "recordedAt": "2026-07-27T05:24:46.200Z"
   },
   "created": "2026-07-27T04:32:47.311Z",
-  "updated": "2026-07-27T05:27:07.406Z",
+  "updated": "2026-07-27T05:35:49.114Z",
   "pipeline": {
     "issueId": "PAN-3192",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:25:06.787Z",
-    "updatedAt": "2026-07-27T05:27:06.325Z",
-    "reviewNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-27T04:22:17.553Z by deploy-patrol, merge-step0). It re-runs automatically after the deploy.",
+    "updatedAt": "2026-07-27T05:35:48.522Z",
+    "reviewNotes": "Frontend typecheck guard suppresses compiler failures and can report success without a completed tsc run",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3198",
-    "reviewRequestedAt": "2026-07-27T05:25:06.787Z",
     "reviewSpawnedAt": "2026-07-27T05:27:06.324Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -77,6 +89,14 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 720446,
+            "output": 100995,
+            "cacheRead": 9089024,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 311717,
@@ -88,15 +108,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 311717,
-          "output": 41906,
-          "cacheRead": 17572864,
+          "input": 1032163,
+          "output": 142901,
+          "cacheRead": 26661888,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 11.602197,
-        "pricingAsOf": "2026-07-27T05:27:06.351Z"
+        "usd": 22.778789,
+        "pricingAsOf": "2026-07-27T05:35:48.545Z"
       }
     },
     "merges": [
