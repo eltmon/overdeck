@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T10:10:36.510Z",
+  "updated": "2026-07-27T10:13:58.031Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "pending",
@@ -37,18 +37,33 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "conflict-path-probe": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3154",
         "agentId": "agent-pan-3154",
         "pid": 548062,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T10:10:36.510Z"
+        "claimedAt": "2026-07-27T10:10:36.510Z",
+        "itemId": "conflict-path-probe",
+        "outcome": "completed",
+        "reason": "Added probeBranchConflictPaths + parseMergeTreeNameOnly in conflict-gate.ts; checkBranchMergeability reimplemented as a thin wrapper. Extended conflict-gate.test.ts with fixtures matching the PRD's verified git merge-tree output (1-path, 3-path, clean, fatal, fetch-failure cases) — all 28 tests pass. Noted (not fixed, out of scope): npm run typecheck has a pre-existing dashboard-server ratchet regression (baseline 62 -> 67 errors) in files unrelated to conflict-gate.ts (costs.ts, hooks.ts, command-deck.ts, etc.), present on main prior to this item's change.",
+        "releasedAt": "2026-07-27T10:13:58.030Z"
+      }
+    ],
+    "statusReasons": {
+      "conflict-path-probe": {
+        "reason": "Added probeBranchConflictPaths + parseMergeTreeNameOnly in conflict-gate.ts; checkBranchMergeability reimplemented as a thin wrapper. Extended conflict-gate.test.ts with fixtures matching the PRD's verified git merge-tree output (1-path, 3-path, clean, fatal, fetch-failure cases) — all 28 tests pass. Noted (not fixed, out of scope): npm run typecheck has a pre-existing dashboard-server ratchet regression (baseline 62 -> 67 errors) in files unrelated to conflict-gate.ts (costs.ts, hooks.ts, command-deck.ts, etc.), present on main prior to this item's change.",
+        "updatedAt": "2026-07-27T10:13:58.030Z"
       }
     }
   },
   "statusOverrides": {
-    "conflict-path-probe": "running"
+    "conflict-path-probe": "completed",
+    "conflict-path-probe.conflict-path-probe.ac1": "completed",
+    "conflict-path-probe.conflict-path-probe.ac2": "completed",
+    "conflict-path-probe.conflict-path-probe.ac3": "completed",
+    "conflict-path-probe.conflict-path-probe.ac4": "completed"
   }
 }
