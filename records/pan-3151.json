@@ -237,9 +237,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-27T15:05:52.597Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-27T15:07Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-27T15:07:58.038Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-27T15:07:58Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nThe real v62→v63 migration is now correct, but the focused migration suite is red: two existing assertions still require version 62 after SCHEMA_VERSION was bumped to 63. Update those expectations/comments and return all 35 targeted tests green.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -328,7 +341,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T15:07:57.332Z",
+  "updated": "2026-07-27T15:07:58.038Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
