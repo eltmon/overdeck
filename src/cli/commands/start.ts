@@ -10,6 +10,8 @@ import { exec, execFile, execSync } from 'child_process';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { clearAgentPausedSync, getAgentStateSync, spawnAgent } from '../../lib/agents.js';
+import { resolveCliStartedBy } from '../../lib/agents/provenance.js';
+import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { describeConflictingWorkAgents } from '../../lib/work-agent-conflicts.js';
 import { ROLE_EFFORTS, resolveModel as resolveRoleModel, loadConfigSync as loadYamlConfig, type RoleEffort } from '../../lib/config-yaml.js';
 import { getModelEffortLevelsSync } from '../../lib/model-capabilities.js';
@@ -33,7 +35,6 @@ import {
   streamPlanningSession,
 } from './planning-stream.js';
 import { createPlanningProgress, createPrepProgress, runStartPrepStep, runStateReconcile, warnSyncMainFailure } from './start-prep-progress.js';
-
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
  */
@@ -414,7 +415,6 @@ async function handleRemoteWorkspace(
 
   // Spawn remote agent
   spinner.text = 'Spawning remote agent...';
-
   try {
     if (clearPauseBeforeSpawn) {
       clearAgentPausedSync(agentId);
@@ -429,9 +429,10 @@ async function handleRemoteWorkspace(
       // until the Fly worker image bundles the pi binary — tracked separately).
       model: options.model,
       prompt,
+      startedBy: resolveCliStartedBy('operator:cli:pan-start'),
+      autoSpawnConsentRequired: process.env['OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED'] === '1',
       tier: fly.getResiliencyTier(),
     });
-
     spinner.succeed(`Remote agent spawned: ${remoteAgent.id}`);
 
     // Handle shadow mode
@@ -705,8 +706,8 @@ export function resolveSpawnModel(
 ): string | undefined {
   return explicitModel || (fresh ? undefined : recordedModel);
 }
-
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
+  process.env['OVERDECK_AGENT_STARTED_BY'] = resolveCliStartedBy('operator:cli:pan-start');
   try {
     const model = normalizeModelOverrideSync(options.model);
     if (model) options.model = model;
@@ -716,7 +717,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
     return exitCli(1);
   }
-
   if (!(await confirmHostOverride(options))) {
     return exitCli(1);
   }
@@ -879,9 +879,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
         spinner.text = `Starting ${resolvedPlanningMode} planning session for ${id}...`;
         if (options.model) {
-          // --model is the WORK model (already persisted to the issue record by
-          // applyStartPolicyOptions above) — the planning agent keeps the
-          // configured planning default unless --plan-model names one. Say so,
+          // --model is the persisted WORK model; planning keeps its configured
+          // default unless --plan-model names one. Say so,
           // because the pre-fix behavior silently handed the model to planning
           // instead.
           spinner.info(
@@ -894,7 +893,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
             `${getDashboardApiUrlSync()}/api/issues/${encodeURIComponent(id)}/start-planning`,
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: ensureInternalTokenSync() },
               body: buildStartPlanningBody({
                 auto: resolvedPlanningMode === 'auto',
                 autoStart: true,
@@ -904,6 +903,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
                 harness: options.harness,
                 effort: options.effort,
                 workspaceLocation: effectiveRemote ? 'remote' : 'local',
+                startedBy: process.env['OVERDECK_AGENT_STARTED_BY'],
               }),
             },
           );
@@ -1184,7 +1184,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     if (shouldClearPauseBeforeSpawn) {
       clearAgentPausedSync(agentId);
     }
-
     const admitted = await withActiveOrderDispatchReservation(
       projectRoot,
       id,
@@ -1197,6 +1196,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         role: 'work',
         prompt,
         allowHost: options.host,
+        startedBy: process.env['OVERDECK_AGENT_STARTED_BY']!,
+        autoSpawnConsentRequired: process.env['OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED'] === '1',
         effort: resolvedEffort,
       })),
     );
@@ -1204,13 +1205,11 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       throw new Error(admitted.check.decision.message ?? `Order-book dispatch blocked for ${id}`);
     }
     const agent = admitted.result;
-
     if (agent.role === 'work' && agent.kickoffDelivered === false) {
       spinner.fail(`Agent spawned but kickoff delivery was not confirmed: ${agent.id}`);
       for (const line of ['', chalk.red(`Kickoff delivery did not land for ${agent.id}.`), chalk.dim('The live session is preserved and the agent may be idle until the kickoff lands.'), chalk.dim('Deacon will retry delivery after the stuck threshold, or you can send a manual message now:'), `  pan tell ${id} "continue from your kickoff brief"`]) console.log(line);
       process.exitCode = 1; return;
     }
-
     spinner.succeed(`Agent spawned: ${agent.id}`);
 
     try {

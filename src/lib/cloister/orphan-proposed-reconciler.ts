@@ -1,3 +1,8 @@
+/**
+ * Reconciles proposed specs only after the shared autonomous-work pickup gate
+ * passes; explicit planning auto-start consent is a release source, not a bypass
+ * for readiness, tracker-label availability, or blocker labels.
+ */
 import { exec } from 'child_process';
 import { existsSync } from 'fs';
 import { readdir, readFile } from 'fs/promises';
@@ -17,12 +22,20 @@ import { isXBriefFilename } from '../xbrief/lifecycle.js';
 import type { XBriefDocument } from '../xbrief/types.js';
 import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import {
+  decideAutonomousWorkDispatch,
+  gatherAutonomousWorkDispatchInput,
+  type AutonomousWorkDispatchDecision,
+} from './autonomous-work-dispatch.js';
 import { loadCloisterConfig } from './config.js';
+import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { clearIssueClosedCache, isIssueClosed } from './issue-closed.js';
 
 const DEFAULT_ATTEMPT_INTERVAL_MS = 5 * 60 * 1000;
+const MAX_PICKUP_REFUSAL_REASONS = 512;
 const execAsync = promisify(exec);
 const attemptCooldowns = new Map<string, number>();
+const pickupRefusalReasons = new Map<string, string>();
 const terminalClosedIssueIds = new Set<string>();
 let scanInFlight = false;
 
@@ -76,6 +89,7 @@ export interface FindOrphanProposedOptions {
 
 export interface SpawnWorkAgentResult {
   spawned: boolean;
+  queued?: boolean;
   agentId?: string;
   skippedReason?: string;
   error?: string;
@@ -84,22 +98,25 @@ export interface SpawnWorkAgentResult {
 export interface ReconcileOrphanProposedOptions extends FindOrphanProposedOptions {
   now?: Date;
   config?: OrphanProposedReconcilerConfig;
-  spawnWorkAgent?: (issueId: string) => Promise<SpawnWorkAgentResult>;
+  spawnWorkAgent?: (issueId: string, autoSpawnConsentRequired: boolean) => Promise<SpawnWorkAgentResult>;
   hasOpenPrForBranch?: (projectPath: string, issueId: string) => Promise<boolean>;
+  evaluatePickupGate?: (issueId: string) => Promise<AutonomousWorkDispatchDecision>;
   dashboardOrigin?: string;
 }
 
 export interface HandleOrphanProposedSpecOptions {
-  spawnWorkAgent?: (issueId: string) => Promise<SpawnWorkAgentResult>;
+  spawnWorkAgent?: (issueId: string, autoSpawnConsentRequired: boolean) => Promise<SpawnWorkAgentResult>;
   hasOpenPrForBranch?: (projectPath: string, issueId: string) => Promise<boolean>;
+  evaluatePickupGate?: (issueId: string) => Promise<AutonomousWorkDispatchDecision>;
   dashboardOrigin?: string;
   config?: OrphanProposedReconcilerConfig;
   /** Project override for tests / callers that already resolved the issue. */
   project?: { projectKey: string; projectPath: string };
   /** Spec override so the safety net does not re-read the file. */
   spec?: { path: string; doc: XBriefDocument };
-  /** Tmux session-list override for tests / callers that already resolved it. */
+  /** Liveness overrides for deterministic scans that already captured a snapshot. */
   tmuxSessionNames?: readonly string[];
+  getAgentStateForIssue?: (agentId: string) => Promise<Pick<AgentState, 'status' | 'paused' | 'troubled'> | null>;
 }
 
 async function findSpecPathForIssue(projectPath: string, issueId: string): Promise<string | null> {
@@ -258,7 +275,11 @@ function classifySpawnSkip(status: number, body: Record<string, unknown>): strin
   return 'spawn-failed';
 }
 
-export async function spawnWorkAgentThroughAgentsEndpoint(issueId: string, dashboardOrigin = internalDashboardOrigin()): Promise<SpawnWorkAgentResult> {
+export async function spawnWorkAgentThroughAgentsEndpoint(
+  issueId: string,
+  dashboardOrigin = internalDashboardOrigin(),
+  autoSpawnConsentRequired = false,
+): Promise<SpawnWorkAgentResult> {
   const internalToken = getInternalTokenSync();
   const response = await fetch(new URL('/api/agents', dashboardOrigin), {
     method: 'POST',
@@ -267,13 +288,18 @@ export async function spawnWorkAgentThroughAgentsEndpoint(issueId: string, dashb
       origin: dashboardOrigin,
       ...(internalToken ? { [INTERNAL_TOKEN_HEADER]: internalToken } : {}),
     },
-    body: JSON.stringify({ issueId, role: 'work' }),
+    body: JSON.stringify({
+      issueId,
+      role: 'work',
+      startedBy: 'orphan-proposed-reconciler',
+      autoSpawnConsentRequired,
+    }),
   });
   const body = await response.json().catch(() => ({})) as Record<string, unknown>;
   const agentId = typeof body['agentId'] === 'string' ? body['agentId'] : `agent-${issueId.toLowerCase()}`;
 
   if (response.ok && body['success'] !== false) {
-    return { spawned: true, agentId };
+    return { spawned: true, ...(body['startingContainers'] === true ? { queued: true } : {}), agentId };
   }
 
   return {
@@ -314,6 +340,7 @@ export async function triggerRebuildAndStart(
         origin: dashboardOrigin,
         ...(internalToken ? { [INTERNAL_TOKEN_HEADER]: internalToken } : {}),
       },
+      body: JSON.stringify({ startedBy: 'workspace-rebuild-recovery' }),
     },
   );
   const body = await response.json().catch(() => ({})) as Record<string, unknown>;
@@ -364,10 +391,33 @@ function logReconcilerDiagnostic(kind: string, info: Record<string, unknown> = {
   console.debug(`[orphan-proposed-reconciler] ${kind}`, info);
 }
 
+async function recordPickupRefusal(
+  issueId: string,
+  now: number,
+  decision: Extract<AutonomousWorkDispatchDecision, { allow: false }>,
+): Promise<string[]> {
+  const reason = `pickup-gate:${decision.code}`;
+  logReconcilerDiagnostic('spawn-skipped', { issueId, reason });
+  attemptCooldowns.set(issueId, now);
+  if (pickupRefusalReasons.get(issueId) !== decision.reason) {
+    if (!pickupRefusalReasons.has(issueId) && pickupRefusalReasons.size >= MAX_PICKUP_REFUSAL_REASONS) {
+      const oldestIssueId = pickupRefusalReasons.keys().next().value;
+      if (oldestIssueId) pickupRefusalReasons.delete(oldestIssueId);
+    }
+    pickupRefusalReasons.set(issueId, decision.reason);
+    await recordDeadEndNeedsYou(issueId, 'orphan-proposed-pickup-gate', 'proposed', decision.reason);
+  }
+  return [`Skipped orphan proposed spec ${issueId}: ${reason}`];
+}
+
+async function defaultEvaluatePickupGate(issueId: string): Promise<AutonomousWorkDispatchDecision> {
+  return decideAutonomousWorkDispatch(await gatherAutonomousWorkDispatchInput(issueId, { knownPlanned: true }));
+}
+
 /**
- * PAN-1908: reactive orphan-proposed handler. When a spec reaches `proposed`
- * and no work agent is running/starting, spawn a work agent for that issue
- * without scanning all project specs.
+ * PAN-1908: reactive orphan-proposed handler. When a spec reaches `proposed`,
+ * the autonomous-work pickup gate allows it, and no work agent is
+ * running/starting, spawn a work agent without scanning all project specs.
  */
 export async function handleOrphanProposedSpec(
   issueId: string,
@@ -428,12 +478,26 @@ export async function handleOrphanProposedSpec(
     return [];
   }
 
+  let pickupGate: AutonomousWorkDispatchDecision;
+  try {
+    pickupGate = await (options.evaluatePickupGate ?? defaultEvaluatePickupGate)(upperIssueId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    pickupGate = {
+      allow: false,
+      code: 'labels-unavailable',
+      reason: `Autonomous work dispatch was refused because pickup evaluation failed: ${message}`,
+    };
+  }
+  if (!pickupGate.allow) return recordPickupRefusal(upperIssueId, now, pickupGate);
+  pickupRefusalReasons.delete(upperIssueId);
+
   const agentId = `agent-${issueLower}`;
 
   // PAN-1908: prefer agents-table state (fast) but fall back to state.json.
-  const agentState = await Effect.runPromise(
-    getAgentState(agentId).pipe(Effect.catch(() => Effect.succeed(null))),
-  );
+  const agentState = options.getAgentStateForIssue
+    ? await options.getAgentStateForIssue(agentId)
+    : await Effect.runPromise(getAgentState(agentId).pipe(Effect.catch(() => Effect.succeed(null))));
   if (agentState?.status === 'starting' || agentState?.status === 'running') {
     logReconcilerDiagnostic('spawn-skipped', { issueId: upperIssueId, reason: 'agent-active' });
     return [];
@@ -444,7 +508,8 @@ export async function handleOrphanProposedSpec(
   }
 
   // Any tmux session for the issue means the pipeline is active here.
-  const sessions = await loadTmuxSessionNames(options.tmuxSessionNames);
+  const sessions = options.tmuxSessionNames
+    ?? await Effect.runPromise(listSessionNames().pipe(Effect.catch(() => Effect.succeed([]))));
   if (hasIssueScopedSession(sessions, agentId)) {
     logReconcilerDiagnostic('spawn-skipped', { issueId: upperIssueId, reason: 'issue-scoped-session' });
     return [];
@@ -485,15 +550,24 @@ export async function handleOrphanProposedSpec(
   attemptCooldowns.set(upperIssueId, now);
 
   try {
-    const spawn = await (options.spawnWorkAgent ?? ((id) => spawnWorkAgentThroughAgentsEndpoint(id, options.dashboardOrigin)))(upperIssueId);
+    const autoSpawnConsentRequired = pickupGate.releaseSource === 'planning-consent';
+    const spawn = await (options.spawnWorkAgent
+      ?? ((id, required) => spawnWorkAgentThroughAgentsEndpoint(id, options.dashboardOrigin, required)))(
+      upperIssueId,
+      autoSpawnConsentRequired,
+    );
     if (spawn.spawned) {
       emitReconcilerActivity(
         'success',
-        `Started work agent for ${upperIssueId} — proposed spec had tasks but no running agent`,
-        { issueId: upperIssueId, agentId: spawn.agentId, projectKey, projectPath },
+        spawn.queued
+          ? `Queued container startup for ${upperIssueId} before work-agent spawn`
+          : `Started work agent for ${upperIssueId} — proposed spec had tasks but no running agent`,
+        { issueId: upperIssueId, agentId: spawn.agentId, queued: spawn.queued === true, projectKey, projectPath },
         upperIssueId,
       );
-      return [`Spawned work agent for orphan proposed spec ${upperIssueId}`];
+      return [spawn.queued
+        ? `Queued container startup for orphan proposed spec ${upperIssueId}`
+        : `Spawned work agent for orphan proposed spec ${upperIssueId}`];
     }
 
     const reason = spawn.skippedReason ?? 'spawn-failed';
@@ -544,6 +618,10 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
   try {
     const actions: string[] = [];
     const candidates = await findOrphanProposedSpecsForReconciler(options);
+    const liveCandidateIds = new Set(candidates.map(candidate => candidate.issueId));
+    for (const issueId of pickupRefusalReasons.keys()) {
+      if (!liveCandidateIds.has(issueId)) pickupRefusalReasons.delete(issueId);
+    }
 
     for (const candidate of candidates) {
       let planDoc: XBriefDocument;
@@ -557,11 +635,13 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
       const result = await handleOrphanProposedSpec(candidate.issueId, {
         spawnWorkAgent: options.spawnWorkAgent,
         hasOpenPrForBranch: options.hasOpenPrForBranch,
+        evaluatePickupGate: options.evaluatePickupGate,
         dashboardOrigin: options.dashboardOrigin,
         config: { enabled: true, minAttemptIntervalMs: loadedConfig.minAttemptIntervalMs },
         project: { projectKey: candidate.projectKey, projectPath: candidate.projectPath },
         spec: { path: candidate.specPath, doc: planDoc },
         tmuxSessionNames: options.tmuxSessionNames,
+        getAgentStateForIssue: options.getAgentStateForIssue,
       });
       actions.push(...result);
     }
@@ -574,6 +654,7 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
 
 export function clearOrphanProposedAttemptCooldowns(): void {
   attemptCooldowns.clear();
+  pickupRefusalReasons.clear();
   terminalClosedIssueIds.clear();
   clearIssueClosedCache();
   scanInFlight = false;

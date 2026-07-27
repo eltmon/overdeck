@@ -547,7 +547,7 @@ describe('auto-resume gates', () => {
     const resumed = await settleWithStagger(autoResumeStoppedWorkAgents());
 
     expect(resumed).toEqual([agentId]);
-    expect(resumeAgentMock).toHaveBeenCalledWith(agentId);
+    expect(resumeAgentMock).toHaveBeenCalledWith(agentId, undefined, { startedBy: 'deacon:auto-resume' });
   }, 20_000);
 
   it('recovers orphaned strike agents whose registered session is missing', async () => {
@@ -723,7 +723,7 @@ describe('auto-resume gates', () => {
     const resumed = await autoResumeStoppedWorkAgents();
 
     expect(resumed).toEqual([agentId]);
-    expect(resumeAgentMock).toHaveBeenCalledWith(agentId);
+    expect(resumeAgentMock).toHaveBeenCalledWith(agentId, undefined, { startedBy: 'deacon:auto-resume' });
     const state = agents.getAgentStateSync(agentId);
     expect(state?.paused).toBeUndefined();
     expect(state?.stoppedByPause).toBeUndefined();

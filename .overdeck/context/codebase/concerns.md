@@ -1,6 +1,6 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-06-13.
+Live landmines a change in this repo can step on. Verified 2026-07-26.
 
 - **ToS policy gate** — `canUseHarnessSync()` (`src/lib/harness-policy.ts:69`) blocks
   Pi + Anthropic + subscription auth. Every harness resolution path must end by
@@ -20,6 +20,7 @@ Live landmines a change in this repo can step on. Verified 2026-06-13.
   deprecated alias at role-tier precedence (PAN-1787). Its only consumer,
   `specialists.ts buildSpecialistBaseCommand`, is dead code (no callers) — not a
   live spawn path.
+- **Every agent launch path must stamp `startedBy`** — the token identifies the immediate operator or autonomous path and must survive `state.json`, the agents-table `started_by` column, detached `pan start` environment propagation, and planning-agent state. `flywheelRunId` exposed both failure modes: launch code resolved it without persisting it, and state cleanup later dropped it. Treat any new provenance field as a no-loss audit across both state stores and every spawn/resume entry point.
 - **JSONL resume across model/harness change** — `spawnMode: 'resume'`
   (`agents.ts:2647`, `resumeAgent` ~:4537) emits `--resume <sessionId>`
   (`launcher-generator.ts:427,529`). Resuming a session created under a different
@@ -95,4 +96,4 @@ Live landmines a change in this repo can step on. Verified 2026-06-13.
   `/workspace`. Never run durable work without verifying the volume mount
   (PAN-1845).
 
-<!-- last-verified: 2026-06-13 -->
+<!-- last-verified: 2026-07-26 -->

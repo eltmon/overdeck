@@ -786,7 +786,7 @@ export async function handleAgentStoppedEvent(
   const runtimeStateForLog = getAgentRuntimeStateSync(agentId);
   logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} candidate — calling resumeAgent (issueId=${state.issueId}, runtime.state=${runtimeStateForLog?.state || 'null'})`);
   try {
-    const result = await resumeAgent(agentId);
+    const result = await resumeAgent(agentId, undefined, { startedBy: 'deacon:auto-resume' });
     if (result.success) {
       const resumedState = await Effect.runPromise(getAgentState(agentId));
       if (resumedState) {

@@ -227,6 +227,7 @@ async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
       model: options.model,
       role: 'strike',
       prompt,
+      startedBy: 'operator:cli:pan-strike',
       effort: options.effort,
     });
 

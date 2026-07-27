@@ -234,6 +234,7 @@ beforeEach(() => {
   createOverdeckDatabase({ dbPath: join(tmpHome, 'overdeck.db') });
   closeOverdeckDatabaseSync();
   process.env.OVERDECK_HOME = tmpHome;
+  process.env.OVERDECK_AGENT_STARTED_BY = 'test:agents-spawn-supervisor';
   capturePaneText = 'Claude Code';
   channelsMcpEnabled = false;
   activeFlywheelRunId = null;
@@ -272,6 +273,7 @@ afterEach(() => {
   vi.doUnmock('../projects.js');
   closeOverdeckDatabaseSync();
   delete process.env.OVERDECK_HOME;
+  delete process.env.OVERDECK_AGENT_STARTED_BY;
   delete process.env.PAN_DOCKER;
   delete process.env.OVERDECK_DOCKER_WORKSPACE;
   rmSync(tmpHome, { recursive: true, force: true });
@@ -380,8 +382,65 @@ describe('spawnAgent PTY supervisor wiring', () => {
       'agent-pan-1405',
       workspace,
       `bash ${join(agentDir, 'launcher.sh')}`,
-      expect.any(Object),
+      expect.objectContaining({
+        env: expect.objectContaining({ OVERDECK_AGENT_STARTED_BY: 'test:agents-spawn-supervisor' }),
+      }),
     );
+  });
+
+  it('lets an explicit operator start proceed when planning consent is unreadable', async () => {
+    writeSupervisorArtifact();
+    const consentDir = join(tmpHome, 'agents', 'planning-pan-1405');
+    mkdirSync(consentDir, { recursive: true });
+    writeFileSync(join(consentDir, 'auto-spawn-on-finalize.json'), '{invalid-json');
+    const { spawnAgent } = await import('../agents.js');
+
+    await expect(spawnAgent({
+      issueId: 'PAN-1405',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      startedBy: 'operator:cli:pan-start',
+    })).resolves.toMatchObject({ status: 'running' });
+
+    expect(createSessionMock).toHaveBeenCalledOnce();
+  });
+
+  it('lets non-consent autonomous release sources ignore unreadable consent', async () => {
+    writeSupervisorArtifact();
+    const consentDir = join(tmpHome, 'agents', 'planning-pan-1405');
+    mkdirSync(consentDir, { recursive: true });
+    writeFileSync(join(consentDir, 'auto-spawn-on-finalize.json'), '{invalid-json');
+    const { spawnRun } = await import('../agents.js');
+
+    await expect(spawnRun('PAN-1405', 'work', {
+      workspace,
+      model: 'claude-sonnet-4-6',
+      startedBy: 'reactive-lifecycle',
+      autoSpawnConsentRequired: false,
+    })).resolves.toMatchObject({ status: 'running' });
+
+    expect(createSessionMock).toHaveBeenCalledOnce();
+  });
+
+  it('spends autonomous consent when runtime setup fails after tmux accepts the session', async () => {
+    writeSupervisorArtifact();
+    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlag } = await import('../planning/auto-spawn-consent.js');
+    const { spawnAgent } = await import('../agents.js');
+    await writeAutoSpawnOnFinalizeFlag('PAN-1405', true);
+    emitAgentEventMock.mockReturnValue(Effect.fail(new Error('runtime state persistence failed')));
+
+    await expect(spawnAgent({
+      issueId: 'PAN-1405',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      startedBy: 'reactive-lifecycle',
+      autoSpawnConsentRequired: true,
+    })).rejects.toThrow('runtime state persistence failed');
+
+    expect(createSessionMock).toHaveBeenCalledOnce();
+    expect(readAutoSpawnOnFinalizeFlag('PAN-1405')).toBe(false);
   });
 
   it('preserves pipeline verdicts and post-merge state when the reviewed anchor is current', async () => {
@@ -561,6 +620,35 @@ describe('spawnAgent PTY supervisor wiring', () => {
     );
   });
 
+  it('claims planning consent for fresh autonomous spawnRun work launches', async () => {
+    writeSupervisorArtifact();
+    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlag } = await import('../planning/auto-spawn-consent.js');
+    const { spawnRun } = await import('../agents.js');
+    await writeAutoSpawnOnFinalizeFlag('PAN-1405', true);
+
+    await spawnRun('PAN-1405', 'work', {
+      workspace,
+      model: 'claude-sonnet-4-6',
+      startedBy: 'reactive-lifecycle',
+      autoSpawnConsentRequired: true,
+    });
+
+    expect(readAutoSpawnOnFinalizeFlag('PAN-1405')).toBe(false);
+  });
+
+  it('does not inspect planning consent for specialist spawnRun launches', async () => {
+    const consentDir = join(tmpHome, 'agents', 'planning-pan-1405');
+    mkdirSync(consentDir, { recursive: true });
+    writeFileSync(join(consentDir, 'auto-spawn-on-finalize.json'), '{invalid-json');
+    const { spawnRun } = await import('../agents.js');
+
+    await expect(spawnRun('PAN-1405', 'review', {
+      workspace,
+      model: 'gpt-5.5',
+      startedBy: 'reactive-lifecycle',
+    })).resolves.toMatchObject({ role: 'review' });
+  });
+
   it('threads active flywheel provenance env into spawnRun work agents', async () => {
     const supervisorScriptPath = writeSupervisorArtifact();
     activeFlywheelRunId = 'RUN-777';
@@ -605,6 +693,14 @@ describe('spawnAgent PTY supervisor wiring', () => {
         claudeSessionId: expect.any(String),
         sessionModel: 'gpt-5.5',
         sessionHarness: 'codex',
+      }),
+    );
+    expect(createSessionMock).toHaveBeenCalledWith(
+      'agent-pan-1405-review',
+      workspace,
+      expect.any(String),
+      expect.objectContaining({
+        env: expect.objectContaining({ OVERDECK_AGENT_STARTED_BY: 'test:agents-spawn-supervisor' }),
       }),
     );
   });

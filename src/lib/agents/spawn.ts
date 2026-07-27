@@ -4,7 +4,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { homedir } from 'os';
-import { dirname, join, resolve } from 'path';
+import { join, resolve } from 'path';
 import { Effect } from 'effect';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
@@ -24,7 +24,6 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { writeBridgeTokenSync } from '../bridge-token.js';
 import { createSession, exactPaneTarget, sessionExists, setOption } from '../tmux.js';
-import { createActiveSlice } from '../xbrief/dag.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import {
   getAgentDir,
@@ -55,6 +54,7 @@ import {
   buildAgentLaunchConfig,
   defaultRunWorkspace,
   flywheelEnvExports,
+  resolveAgentStartedBy,
   resolveRegisteredSlotSpawn,
   resolveSlotTierSpawnParams,
   resolveSingleWorkTierSpawnParams,
@@ -63,7 +63,6 @@ import {
   transitionIssueToInProgress,
   withSpawnTimeMemoryContext,
   assertWorkspaceStackHealthyForSpawn,
-  type RegisteredSlotSpawn,
   type SpawnOptions,
   type SpawnRunOptions,
 } from './spawn-prep.js';
@@ -82,8 +81,37 @@ import {
 import { stopAgent } from './termination.js';
 import { createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
 import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
+import {
+  withAutoSpawnConsentClaim,
+  type AcceptAutoSpawnConsent,
+} from '../planning/auto-spawn-consent.js';
+import { isOperatorStartedBy } from './provenance.js';
+import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './registered-slot-spawn.js';
 const execAsync = promisify(exec);
-export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
+
+export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
+  if (role !== 'work') return spawnRunWithoutConsentClaim(issueId, role, options);
+
+  const flywheelRunId = resolveFlywheelSpawnEnv(role, options.flywheelRunId).OVERDECK_FLYWHEEL_RUN_ID;
+  const startedBy = resolveAgentStartedBy(options.startedBy, flywheelRunId);
+  const resolvedOptions = { ...options, startedBy };
+  if (isOperatorStartedBy(startedBy) || options.autoSpawnConsentRequired !== true) {
+    return spawnRunWithoutConsentClaim(issueId, role, resolvedOptions);
+  }
+
+  return withAutoSpawnConsentClaim(
+    issueId,
+    (acceptConsent) => spawnRunWithoutConsentClaim(issueId, role, resolvedOptions, acceptConsent),
+    { isAccepted: (state) => state.status === 'running' && state.kickoffDelivered !== false },
+  );
+}
+
+async function spawnRunWithoutConsentClaim(
+  issueId: string,
+  role: Role,
+  options: SpawnRunOptions,
+  acceptConsent?: AcceptAutoSpawnConsent,
+): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
   const modelSpawnKey = `${role}:${issueId}`;
   const selectedModel = determineModel({ model: options.model, role, spawnKey: modelSpawnKey });
@@ -110,7 +138,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     const prompt = slot
       ? buildRegisteredSlotPrompt(issueId, workspace, slot, options.prompt)
       : options.prompt;
-    return spawnAgent({
+    return spawnAgentWithoutConsentClaim({
       issueId,
       workspace: slot?.workspace ?? workspace,
       agentId: slot?.agentId,
@@ -120,13 +148,16 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       role: 'work',
       allowHost: options.allowHost,
       flywheelRunId: options.flywheelRunId,
+      startedBy: options.startedBy,
+      autoSpawnConsentRequired: options.autoSpawnConsentRequired,
       effort: options.effort,
       slotIndex: slot?.slotIndex,
       slotItemId: slot?.slotItemId,
-    });
+    }, acceptConsent);
   }
 
   const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
+  const startedBy = resolveAgentStartedBy(options.startedBy, flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID);
   const agentId = options.agentId ?? runAgentId(issueId, role, options.subRole);
   if (await Effect.runPromise(sessionExists(agentId))) {
     // PAN-2579 (warm-by-default lifecycle): advancing-role sessions are no longer
@@ -158,7 +189,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     const { killSession } = await import('../tmux.js');
     await Effect.runPromise(killSession(agentId)).catch(() => {});
   }
-
   await assertWorkspaceStackHealthyForSpawn(issueId, role, options.allowHost, workspace);
   initHookSync(agentId);
 
@@ -170,11 +200,9 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   const harnessBehavior = getHarnessBehavior(resolvedHarness);
   const isAcp = harnessBehavior.launchCommandKind === 'acp-host';
   const harnessLaunch = await prepareHarnessLaunch(resolvedHarness);
-  // PAN-2285: never launch a fresh Codex agent when native Codex auth is
-  // missing/expired/burned — it would wedge silently in a 401 loop.
+  // PAN-2285: reject fresh Codex launches when native auth would wedge in a 401 loop.
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
-
   if (
     getProviderForModelSync(selectedModel).name === 'openai'
     && (await getProviderAuthMode(selectedModel)) === 'subscription'
@@ -203,12 +231,13 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     hostOverride: options.allowHost || undefined,
     slotIndex: options.slotIndex,
     slotItemId: options.slotItemId,
+    flywheelRunId: flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID,
+    startedBy,
   };
   // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,
   // reactive Cloister scheduler). All disk I/O here uses async fs/promises
   // so we never block the Node event loop.
   await Effect.runPromise(saveAgentState(state));
-
   const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship' || role === 'knowledge';
   const shouldRegisterConversation = isSpecialistRole || options.registerConversation === true;
   // PAN-1557: convoy sub-reviewers are now interactive specialists — deliver
@@ -251,7 +280,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   const providerExports = isAcp ? undefined : await getProviderExportsForModel(selectedModel);
   const providerEnv = isAcp ? {} : await getProviderEnvForModel(selectedModel);
-
   // PAN-1048 review feedback 005 (S1): when the resolved harness is ohmypi, thread
   // the per-agent ohmypi launcher fields (--session-dir, --extension, FIFO
   // redirect) through generateLauncherScript so the role launcher emits the
@@ -385,6 +413,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       OVERDECK_AGENT_ID: agentId,
       OVERDECK_ISSUE_ID: issueId,
       OVERDECK_SESSION_TYPE: role,
+      OVERDECK_AGENT_STARTED_BY: startedBy,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
       GIT_SEQUENCE_EDITOR: 'false',
       ...flywheelEnv,
@@ -491,6 +520,27 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const role: 'work' | 'strike' | 'knowledge' = options.role ?? 'work';
+  if (role !== 'work') return spawnAgentWithoutConsentClaim(options);
+
+  const flywheelRunId = resolveFlywheelSpawnEnv(role, options.flywheelRunId).OVERDECK_FLYWHEEL_RUN_ID;
+  const startedBy = resolveAgentStartedBy(options.startedBy, flywheelRunId);
+  const resolvedOptions = { ...options, startedBy };
+  if (isOperatorStartedBy(startedBy) || options.autoSpawnConsentRequired !== true) {
+    return spawnAgentWithoutConsentClaim(resolvedOptions);
+  }
+
+  return withAutoSpawnConsentClaim(
+    options.issueId,
+    (acceptConsent) => spawnAgentWithoutConsentClaim(resolvedOptions, acceptConsent),
+    { isAccepted: (state) => state.status === 'running' && state.kickoffDelivered !== false },
+  );
+}
+
+async function spawnAgentWithoutConsentClaim(
+  options: SpawnOptions,
+  acceptConsent?: AcceptAutoSpawnConsent,
+): Promise<AgentState> {
+  const role: 'work' | 'strike' | 'knowledge' = options.role ?? 'work';
   const sessionPrefix = role === 'strike' ? 'strike' : 'agent';
   const agentId = options.agentId ?? `${sessionPrefix}-${options.issueId.toLowerCase()}`;
 
@@ -542,11 +592,11 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   });
   const isAcp = getHarnessBehavior(resolvedHarness).launchCommandKind === 'acp-host';
   const harnessLaunch = await prepareHarnessLaunch(resolvedHarness);
-  // PAN-2285: never launch a fresh Codex agent when native Codex auth is
-  // missing/expired/burned — it would wedge silently in a 401 loop.
+  // PAN-2285: reject fresh Codex launches when native auth would wedge in a 401 loop.
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
-  // Create state
+  const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
+  const startedBy = resolveAgentStartedBy(options.startedBy, flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID);
   const state: AgentState = {
     id: agentId,
     issueId: options.issueId,
@@ -560,8 +610,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     ...(resolvedHarness === 'codex' ? {} : { costSoFar: 0 }),
     hostOverride: options.allowHost || undefined,
     sessionId: createFreshSessionIdentity(agentId, resolvedHarness),
+    flywheelRunId: flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID,
+    startedBy,
   };
-
   const supervisorLaunch = await prepareSupervisorForFreshLaunch(agentId, options, state);
 
   saveAgentStateSync(state);
@@ -711,7 +762,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     saveAgentStateSync(state);
   }
 
-  const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
   const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
     agentId,
     model: selectedModel,
@@ -768,12 +818,14 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       OVERDECK_AGENT_ID: agentId,
       OVERDECK_ISSUE_ID: options.issueId,
       OVERDECK_SESSION_TYPE: role,
+      OVERDECK_AGENT_STARTED_BY: startedBy,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
       GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
       ...flywheelEnv,
       ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
     }
   }));
+  await acceptConsent?.();
   await saveAgentRuntimeState(agentId, {
     claudeSessionId: state.sessionId,
     sessionModel: selectedModel,
@@ -909,69 +961,6 @@ function assertRegisteredSlotCap(issueId: string, configuredCap?: number): void 
     throw new Error(
       `Registered slot cap reached for ${issueId}: ${activeSlots.length}/${cap} active slot agents.`
     );
-  }
-}
-
-function buildRegisteredSlotPrompt(
-  issueId: string,
-  baseWorkspace: string,
-  slot: RegisteredSlotSpawn,
-  extraPrompt?: string,
-): string {
-  const doc = readWorkspacePlanSync(baseWorkspace);
-  if (!doc) {
-    throw new Error(
-      `Registered slot spawn for ${issueId} requires a readable xBRIEF plan in ${baseWorkspace}.`
-    );
-  }
-
-  const slice = createActiveSlice(doc, {
-    issueId: issueId.toUpperCase(),
-    itemId: slot.slotItemId,
-    currentItemIds: [slot.slotItemId],
-  });
-
-  const lines = [
-    `# Registered Slot Assignment: ${slot.slotItemId}`,
-    '',
-    `Issue: ${issueId}`,
-    `Slot: ${slot.slotIndex}`,
-    `Agent: ${slot.agentId}`,
-    `Branch: ${slot.branch}`,
-    `Workspace: ${slot.workspace}`,
-    '',
-    'You are a registered slot work agent. Implement only the target xBRIEF item below, keep changes scoped to that item, and do not merge this slot branch yourself.',
-    '',
-    slice.prompt,
-  ];
-
-  const trimmedExtra = extraPrompt?.trim();
-  if (trimmedExtra) {
-    lines.push('', '## Additional Foreman Instructions', trimmedExtra);
-  }
-
-  return lines.join('\n');
-}
-
-async function ensureRegisteredSlotWorktree(baseWorkspace: string, slot: RegisteredSlotSpawn): Promise<void> {
-  if (existsSync(slot.workspace)) return;
-
-  await mkdir(dirname(slot.workspace), { recursive: true });
-  const branchExists = await gitBranchExists(baseWorkspace, slot.branch);
-  const target = JSON.stringify(slot.workspace);
-  const branch = JSON.stringify(slot.branch);
-  const command = branchExists
-    ? `git worktree add ${target} ${branch}`
-    : `git worktree add -b ${branch} ${target} HEAD`;
-  await execAsync(command, { cwd: baseWorkspace });
-}
-
-async function gitBranchExists(workspace: string, branch: string): Promise<boolean> {
-  try {
-    await execAsync(`git show-ref --verify --quiet ${JSON.stringify(`refs/heads/${branch}`)}`, { cwd: workspace });
-    return true;
-  } catch {
-    return false;
   }
 }
 

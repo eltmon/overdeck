@@ -135,6 +135,7 @@ export async function spawnTierSupervisor(
     harness: supervisor.harness,
     workspace: options.workspace,
     prompt: options.prompt ?? buildSupervisorPrompt(issueId, supervisor.subscribe),
+    startedBy: 'tier-supervisor',
   });
 }
 

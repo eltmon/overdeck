@@ -113,6 +113,7 @@ import { IssueNotFound } from '../../services/typed-errors.js';
 let projectPath: string;
 let originalHome: string | undefined;
 let originalOverdeckHome: string | undefined;
+let originalInternalToken: string | undefined;
 
 function eventStoreLayer(appendedEvents: Record<string, unknown>[]) {
   return Layer.succeed(EventStoreService, {
@@ -171,12 +172,16 @@ function routeServicesLayer(appendedEvents: Record<string, unknown>[]) {
   );
 }
 
-async function postStartPlanning(issueId: string) {
+async function postStartPlanning(
+  issueId: string,
+  body: Record<string, unknown> = {},
+  headers: Record<string, string> = {},
+) {
   const appendedEvents: Record<string, unknown>[] = [];
   const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/issues/${issueId}/start-planning`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ auto: true, autoStart: true }),
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ auto: true, autoStart: true, ...body }),
   }));
 
   const response = await Effect.runPromise(
@@ -198,8 +203,10 @@ describe('POST /api/issues/:id/start-planning GitHub hydration', () => {
     projectPath = await mkdtemp(join(tmpdir(), 'pan-start-planning-'));
     originalHome = process.env.HOME;
     originalOverdeckHome = process.env.OVERDECK_HOME;
+    originalInternalToken = process.env.OVERDECK_INTERNAL_TOKEN;
     process.env.HOME = projectPath;
     process.env.OVERDECK_HOME = join(projectPath, '.overdeck');
+    process.env.OVERDECK_INTERNAL_TOKEN = 'test-internal-token';
     mockResolveProjectFromIssue.mockReturnValue({
       projectKey: 'overdeck',
       projectName: 'Overdeck',
@@ -232,6 +239,8 @@ describe('POST /api/issues/:id/start-planning GitHub hydration', () => {
     } else {
       process.env.OVERDECK_HOME = originalOverdeckHome;
     }
+    if (originalInternalToken === undefined) delete process.env.OVERDECK_INTERNAL_TOKEN;
+    else process.env.OVERDECK_INTERNAL_TOKEN = originalInternalToken;
     if (projectPath) await rm(projectPath, { recursive: true, force: true });
   });
 
@@ -261,6 +270,48 @@ describe('POST /api/issues/:id/start-planning GitHub hydration', () => {
       id: 'planning-pan-1993',
       issueId: 'PAN-1993',
       role: 'plan',
+      startedBy: 'operator:dashboard',
+    }));
+    expect(mockSpawnPlanningSession).toHaveBeenCalledWith(expect.objectContaining({
+      startedBy: 'operator:dashboard',
+    }));
+  });
+
+  it('ignores browser-supplied planning provenance', async () => {
+    mockGitHubGetIssue.mockReturnValue(Effect.succeed({
+      number: 1993,
+      title: 'Planning provenance',
+      body: 'Browser callers cannot select internal origins.',
+      state: 'open',
+      labels: [],
+      htmlUrl: 'https://github.com/eltmon/overdeck/issues/1993',
+    }));
+
+    await postStartPlanning('PAN-1993', { startedBy: 'flywheel:forged' });
+
+    expect(mockSpawnPlanningSession).toHaveBeenCalledWith(expect.objectContaining({
+      startedBy: 'operator:dashboard',
+    }));
+  });
+
+  it('preserves allowlisted planning provenance for internal callers', async () => {
+    mockGitHubGetIssue.mockReturnValue(Effect.succeed({
+      number: 1993,
+      title: 'Planning provenance',
+      body: 'CLI caller is authenticated by the internal token.',
+      state: 'open',
+      labels: [],
+      htmlUrl: 'https://github.com/eltmon/overdeck/issues/1993',
+    }));
+
+    await postStartPlanning(
+      'PAN-1993',
+      { startedBy: 'operator:cli:pan-start' },
+      { 'x-overdeck-internal-token': 'test-internal-token' },
+    );
+
+    expect(mockSpawnPlanningSession).toHaveBeenCalledWith(expect.objectContaining({
+      startedBy: 'operator:cli:pan-start',
     }));
   });
 

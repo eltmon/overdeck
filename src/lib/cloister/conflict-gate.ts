@@ -163,7 +163,7 @@ export function buildRealConflictGateDeps(overrides: RealConflictGateDepsOverrid
       const prompt = buildConflictResolverPrompt(input);
       let dispatchState: ResolverDispatchState = 'dispatched';
       try {
-        await runSpawn(input.issueId, 'work', { prompt });
+        await runSpawn(input.issueId, 'work', { prompt, startedBy: 'conflict-gate' });
       } catch (err) {
         if (isAlreadyRunningError(err)) {
           await deliverMessage(`agent-${input.issueId.toLowerCase()}`, prompt, 'conflict-gate');
