@@ -54,19 +54,21 @@
     "recordedAt": "2026-07-27T06:16:25.496Z"
   },
   "created": "2026-07-27T04:42:41.037Z",
-  "updated": "2026-07-27T06:19:47.202Z",
+  "updated": "2026-07-27T06:29:26.845Z",
   "pipeline": {
     "issueId": "PAN-3194",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T06:17:16.404Z",
-    "updatedAt": "2026-07-27T06:19:47.150Z",
+    "updatedAt": "2026-07-27T06:29:26.763Z",
+    "reviewNotes": "No blocking findings; transcript-verified lifecycle probes and fresh-spawn decisions satisfy the acceptance criteria.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3200",
-    "reviewRequestedAt": "2026-07-27T06:17:16.404Z",
+    "reviewedAtCommit": "5564e76b17961c26952edd964fabfdf0d8fee8a9",
     "reviewSpawnedAt": "2026-07-27T06:19:47.148Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -110,6 +112,14 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 1424260,
+            "output": 76266,
+            "cacheRead": 15043584,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 1942260,
@@ -121,15 +131,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1942260,
-          "output": 155440,
-          "cacheRead": 47976448,
+          "input": 3366520,
+          "output": 231706,
+          "cacheRead": 63020032,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 38.362724,
-        "pricingAsOf": "2026-07-27T06:19:47.180Z"
+        "usd": 55.293796,
+        "pricingAsOf": "2026-07-27T06:29:26.835Z"
       }
     },
     "merges": [
