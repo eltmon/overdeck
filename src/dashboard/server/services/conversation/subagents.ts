@@ -1,3 +1,7 @@
+/**
+ * Read-only discovery and streaming support for Claude Code conversation subagents.
+ * See docs/CONVERSATION-SUBAGENTS.md for the file layout and transport contract.
+ */
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import type { ConversationEvent, SubagentSummary } from '@overdeck/contracts';
