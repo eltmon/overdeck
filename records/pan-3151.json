@@ -136,7 +136,7 @@
     "recordedAt": "2026-07-27T11:05:50.125Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T11:45:21.139Z",
+  "updated": "2026-07-27T11:45:30.275Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
@@ -146,8 +146,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T11:09:21.628Z",
-    "updatedAt": "2026-07-27T11:45:20.371Z",
-    "reviewNotes": "history-reset unstick helper is orphaned, so convergence history is never cleared",
+    "updatedAt": "2026-07-27T11:45:30.043Z",
+    "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (764772ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3151\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3151/src/dashboard/frontend\n\n\n Test Files  138 passed (138)\n      Tests  1524 passed (1524)\n   Start at  07:41:16\n   Duration  15.08s (transform 32.79s, setup 30.26s, import 127.83s, tests 54.76s, environment 69.57s)\n\n ❯ |root| tests/unit/lib/database/review-status-db.test.ts (34 tests | 30 failed) 167ms\n     × inserts a new status record 15ms (retry x1)\n     × updates an existing record on conflict 8ms (retry x1)\n     × round-trips autoMerge: undefined → NULL → undefined 5ms (retry x1)\n     × round-trips autoMerge: true → 1 → true 4ms (retry x1)\n     × round-trips autoMerge: false → 0 → false 5ms (retry x1)\n     × flips autoMerge on conflict update 4ms (retry x1)\n     × round-trips conflictResolutionDispatchedAt 4ms (retry x1)\n     × stores history entries 4ms (retry x1)\n     × deduplicates history entries via INSERT OR IGNORE 4ms (retry x1)\n     × stores optional fields (mergeStatus, prUrl, verificationNotes) 5ms (retry x1)\n     × removes the review status row 4ms (retry x1)\n     × cascades delete to status_history 4ms (retry x1)\n     × returns a fully mapped ReviewStatus 4ms (retry x1)\n     × includes history when present 4ms (retry x1)\n     × returns undefined history when no history exists 4ms (retry x1)\n     × normalizes stale merge notes away for merged records 4ms (retry x1)\n     × preserves readyForMerge=true when verificationStatus=failed (no longer normalized) 4ms (retry x1)\n     × persists reviewedAtCommit through upsert→get 4ms (retry x1)\n     × overwrites reviewedAtCommit on update 5ms (retry x1)\n     × returns undefined reviewedAtCommit when not set 10ms (retry x1)\n     × clears reviewedAtCommit when explicitly set to undefined 8ms (retry x1)\n     × persists stuckAt through upsert→get 7ms (retry x1)\n     × persists stuckDetails through upsert→get 5ms (retry x1)\n     × preserves all three fields together through \n…(7126 chars elided)…\noo 7ms (retry x1)\n ❯ |root| tests/unit/lib/review-status.test.ts (8 tests | 7 failed) 43ms\n     × resolves canonical merged status even when the raw status map is stale 12ms (retry x1)\n     × persists scope drift through the review status journal update 6ms (retry x1)\n     × finalizes verification when no-code-drift skips the post-review test role 4ms (retry x1)\n     × consumes a serviced review request when review passes 4ms (retry x1)\n     × preserves a review request newer than the current spawn 4ms (retry x1)\n     × consumes a review request without a spawn timestamp when review blocks 4ms (retry x1)\n     × preserves a pending review request during non-verdict updates 4ms (retry x1)\n ❯ |root| tests/unit/dashboard/routes/resources-teardown.test.ts (5 tests | 5 failed) 19ms\n     × returns a short-lived typed-confirm estimate for the stack 13ms (retry x1)\n     × rejects wrong typed confirmation without executing docker commands 2ms (retry x1)\n     × rejects expi\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "fcd59501d8a1e325be9872f32e4c1f9833f757f5",
@@ -278,7 +278,7 @@
       },
       "costAtCloseOut": {
         "usd": 58.2887783,
-        "pricingAsOf": "2026-07-27T11:45:20.378Z"
+        "pricingAsOf": "2026-07-27T11:45:30.114Z"
       }
     },
     "merges": [
