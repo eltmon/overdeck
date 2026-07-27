@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T05:19:04.228Z",
+  "updated": "2026-07-27T05:19:11.341Z",
   "pipeline": {
     "issueId": "PAN-3191",
     "reviewStatus": "pending",
@@ -124,5 +124,38 @@
     "docs-flywheel-reconciliation": "completed",
     "docs-flywheel-reconciliation.docs-flywheel-reconciliation.ac1": "completed",
     "docs-flywheel-reconciliation.docs-flywheel-reconciliation.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/FLYWHEEL.md",
+      "src/cli/commands/__tests__/merge.test.ts",
+      "src/cli/commands/merge.ts",
+      "src/dashboard/server/routes/__tests__/flywheel.test.ts",
+      "src/dashboard/server/routes/flywheel.ts",
+      "src/lib/cloister/deacon-auto-merge-reconcile.ts",
+      "src/lib/cloister/deacon-merge.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/overdeck/merge-sync.ts",
+      "sync-sources/skills/pan-merge/SKILL.md",
+      "tests/unit/lib/cloister/deacon-auto-merge-reconcile.test.ts",
+      "tests/unit/lib/overdeck/merge-sync-pending-auto-merges.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/FLYWHEEL.md",
+      "src/cli/commands/__tests__/merge.test.ts",
+      "src/cli/commands/merge.ts",
+      "src/dashboard/server/routes/__tests__/flywheel.test.ts",
+      "src/dashboard/server/routes/flywheel.ts",
+      "src/lib/cloister/deacon-auto-merge-reconcile.ts",
+      "src/lib/cloister/deacon-merge.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/overdeck/merge-sync.ts",
+      "sync-sources/skills/pan-merge/SKILL.md",
+      "tests/unit/lib/cloister/deacon-auto-merge-reconcile.test.ts",
+      "tests/unit/lib/overdeck/merge-sync-pending-auto-merges.test.ts"
+    ],
+    "recordedAt": "2026-07-27T05:19:11.339Z"
   }
 }
