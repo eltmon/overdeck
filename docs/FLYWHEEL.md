@@ -175,6 +175,16 @@ then records one of three outcomes:
   underlying cause, then schedule auto-merge again; restarting a work agent is
   unnecessary when the reviewed HEAD has not changed.
 
+### Reconciliation
+
+Failed and blocked rows aren't permanent residue. On each Deacon patrol, the
+reconciler marks them `merged` when the forge confirms that their PR or MR
+merged by another path, and cancels all actionable rows for an issue whose
+durable record says close-out completed. Forge checks are throttled per issue
+for ten minutes after an unmerged result or lookup failure. `pan merge cancel
+<id>` clears one actionable row per invocation; when duplicates remain, its
+success message reports their count and tells the operator to run it again.
+
 The requeue path uses the same merge executor described in
 [`MERGE-WORKFLOW.md`](./MERGE-WORKFLOW.md): GitHub-clean PRs merge directly,
 branches that are behind use the server-side rebase first, and only conflicts
