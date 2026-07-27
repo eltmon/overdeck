@@ -121,7 +121,7 @@
   ],
   "feedback": [],
   "created": "2026-07-06T14:55:36.922Z",
-  "updated": "2026-07-27T05:59:55.456Z",
+  "updated": "2026-07-27T06:00:08.095Z",
   "pipeline": {
     "issueId": "PAN-2407",
     "reviewStatus": "pending",
@@ -129,12 +129,12 @@
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T05:59:55.428Z",
+    "updatedAt": "2026-07-27T06:00:08.056Z",
     "inspectNotes": "Bead route-unplanned-to-planning ack: fix 599f26fa12 corrects workspaceLocation in the start-planning POST body to use the already-resolved isRemote flag from findWorkspaceWithLocation() instead of raw options.remote, so an existing remote workspace is reported correctly even without --remote; regression test added and verified against findWorkspaceWithLocation/determineWorkspaceLocation source. No regression to the prior 5 ACs.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2415",
     "reviewRequestedAt": "2026-07-06T18:36:20.415Z",
     "closedOut": true,
-    "closedOutAt": "2026-07-27T05:59:55.428Z"
+    "closedOutAt": "2026-07-27T06:00:08.056Z"
   },
   "closeOut": {
     "usage": {
@@ -242,14 +242,14 @@
     ],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-27T05:59:55.456Z",
+      "evaluatedAt": "2026-07-27T06:00:08.091Z",
       "rows": [
         {
           "id": "review",
           "num": 1,
           "title": "Review passed",
           "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
-          "observed": "reviewStatus: pending; settled because the tracker issue is closed and merged work is landed",
+          "observed": "reviewStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
           "status": "skip"
         },
         {
@@ -257,7 +257,7 @@
           "num": 2,
           "title": "Tests passed",
           "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "testStatus: pending; settled because the tracker issue is closed and merged work is landed",
+          "observed": "testStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
           "status": "skip"
         },
         {
@@ -265,7 +265,7 @@
           "num": 3,
           "title": "Verification green on the branch",
           "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "verificationStatus: pending; settled because the tracker issue is closed and merged work is landed",
+          "observed": "verificationStatus: missing (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
           "status": "skip"
         },
         {
@@ -308,7 +308,7 @@
           "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
           "overridable": false,
           "status": "pass",
-          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; Removed 4 agent state directories; No strike branch strike/pan-2407 found; Pruned 0 checkpoint ref(s) for agent-pan-2407, planning-pan-2407, strike-pan-2407; No specialist registry entries for PAN-2407"
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; No strike branch strike/pan-2407 found; Pruned 0 checkpoint ref(s) for agent-pan-2407, planning-pan-2407, strike-pan-2407; No specialist registry entries for PAN-2407"
         }
       ],
       "accepted": []
