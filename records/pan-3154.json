@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T10:40:55.909Z",
+  "updated": "2026-07-27T10:57:20.216Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "branch-invalidation-sweep": {
-        "writerId": "agent-pan-3154",
-        "agentId": "agent-pan-3154",
-        "pid": 1981269,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T10:40:55.909Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3154",
@@ -101,6 +93,17 @@
         "outcome": "completed",
         "reason": "Plumbed conflictsSince {sha, detectedAt, paths} through ReviewStatus type, the overdeck.db schema (both infra.ts top-up + drizzle init SQL -- the live write door, which the PRD's file list omitted), review-status-sync.ts read/write, the durable per-issue record (pan-dir/record.ts, records.ts durableSubset, verdict-restore.ts restore path incl. no-loss audit), and the frontend DTO. Also bumped legacy panopticon.db schema.ts to SCHEMA_VERSION 62 since verdict-restore.test.ts's no-loss audit runs against it. Deviation: extended files_scope beyond the PRD (src/lib/overdeck/infra.ts, drizzle/overdeck/0000_overdeck_init.sql, src/lib/pan-dir/verdict-restore.ts + its test) because the PRD's plumbing target (schema.ts/panopticon.db) is not the live write door for review_status -- overdeck.db (infra.ts) is -- so the round-trip test could not have passed without it. Fixed one stale hardcoded SCHEMA_VERSION==61 assertion. Added 2 audited file-size-allowlist.txt entries (schema.ts, record.ts -- both already at ceiling on origin/main). All scoped tests pass (8 new/updated), full npm test: 11531 passed, 2 pre-existing failures unrelated to this item (one is a live-tmux-session collision with real dev-machine state in orphan-proposed-reconciler.test.ts, not caused by this change). npm run typecheck and npm run lint both pass clean.",
         "releasedAt": "2026-07-27T10:38:53.941Z"
+      },
+      {
+        "writerId": "agent-pan-3154",
+        "agentId": "agent-pan-3154",
+        "pid": 1981269,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T10:40:55.909Z",
+        "itemId": "branch-invalidation-sweep",
+        "outcome": "completed",
+        "reason": "Added src/lib/cloister/branch-invalidation.ts (reconcileBranchInvalidation) with injectable deps: watches each project's origin/main head SHA on a 120s cooldown via git ls-remote (async, 30s timeout); on change, probes every in-pipeline branch with WI-1's probeBranchConflictPaths, marks newly-conflicting issues with conflictsSince + a replacing merge_conflict blocker (non-merge blockers preserved), emits per-issue + summary activity entries, dedups per SHA. Workspace resolution: agents-table workspace column first, then feature-<issue>* prefix scan covering -strike/-slot-N. Wired into deacon.ts runPatrol after reconcileStaleMergeBlockers. Extended conflict-gate.ts's clean-recovery path to clear conflictsSince alongside the blocker (FR-6) with a new regression test. 12 new branch-invalidation tests + 1 new conflict-gate test, all pass; full deacon/cloister suite (814+870 tests) green; full npm test: 11545 passed, only the pre-existing unrelated orphan-proposed-reconciler live-tmux-collision flake failed (same as before this item, a real dev-machine tmux session for PAN-3151 colliding with an unmocked listSessionNames() call). Deviation from PRD: used src/lib/overdeck/control-settings.ts getSetting/setSetting instead of the PRD-cited database/app-settings.js, because the overdeck-boundaries lint gate forbids cloister/* from importing the legacy panopticon.db surface directly -- control-settings.ts exposes the identical signature over the live app_settings table. Bumped scripts/file-size-allowlist.txt for deacon.ts (already at ceiling on origin/main), audited under PAN-3154. typecheck and lint both pass clean.",
+        "releasedAt": "2026-07-27T10:57:20.216Z"
       }
     ],
     "statusReasons": {
@@ -111,6 +114,10 @@
       "conflicts-since-status-field": {
         "reason": "Plumbed conflictsSince {sha, detectedAt, paths} through ReviewStatus type, the overdeck.db schema (both infra.ts top-up + drizzle init SQL -- the live write door, which the PRD's file list omitted), review-status-sync.ts read/write, the durable per-issue record (pan-dir/record.ts, records.ts durableSubset, verdict-restore.ts restore path incl. no-loss audit), and the frontend DTO. Also bumped legacy panopticon.db schema.ts to SCHEMA_VERSION 62 since verdict-restore.test.ts's no-loss audit runs against it. Deviation: extended files_scope beyond the PRD (src/lib/overdeck/infra.ts, drizzle/overdeck/0000_overdeck_init.sql, src/lib/pan-dir/verdict-restore.ts + its test) because the PRD's plumbing target (schema.ts/panopticon.db) is not the live write door for review_status -- overdeck.db (infra.ts) is -- so the round-trip test could not have passed without it. Fixed one stale hardcoded SCHEMA_VERSION==61 assertion. Added 2 audited file-size-allowlist.txt entries (schema.ts, record.ts -- both already at ceiling on origin/main). All scoped tests pass (8 new/updated), full npm test: 11531 passed, 2 pre-existing failures unrelated to this item (one is a live-tmux-session collision with real dev-machine state in orphan-proposed-reconciler.test.ts, not caused by this change). npm run typecheck and npm run lint both pass clean.",
         "updatedAt": "2026-07-27T10:38:53.941Z"
+      },
+      "branch-invalidation-sweep": {
+        "reason": "Added src/lib/cloister/branch-invalidation.ts (reconcileBranchInvalidation) with injectable deps: watches each project's origin/main head SHA on a 120s cooldown via git ls-remote (async, 30s timeout); on change, probes every in-pipeline branch with WI-1's probeBranchConflictPaths, marks newly-conflicting issues with conflictsSince + a replacing merge_conflict blocker (non-merge blockers preserved), emits per-issue + summary activity entries, dedups per SHA. Workspace resolution: agents-table workspace column first, then feature-<issue>* prefix scan covering -strike/-slot-N. Wired into deacon.ts runPatrol after reconcileStaleMergeBlockers. Extended conflict-gate.ts's clean-recovery path to clear conflictsSince alongside the blocker (FR-6) with a new regression test. 12 new branch-invalidation tests + 1 new conflict-gate test, all pass; full deacon/cloister suite (814+870 tests) green; full npm test: 11545 passed, only the pre-existing unrelated orphan-proposed-reconciler live-tmux-collision flake failed (same as before this item, a real dev-machine tmux session for PAN-3151 colliding with an unmocked listSessionNames() call). Deviation from PRD: used src/lib/overdeck/control-settings.ts getSetting/setSetting instead of the PRD-cited database/app-settings.js, because the overdeck-boundaries lint gate forbids cloister/* from importing the legacy panopticon.db surface directly -- control-settings.ts exposes the identical signature over the live app_settings table. Bumped scripts/file-size-allowlist.txt for deacon.ts (already at ceiling on origin/main), audited under PAN-3154. typecheck and lint both pass clean.",
+        "updatedAt": "2026-07-27T10:57:20.216Z"
       }
     }
   },
@@ -125,6 +132,11 @@
     "conflicts-since-status-field.conflicts-since-status-field.ac2": "completed",
     "conflicts-since-status-field.conflicts-since-status-field.ac3": "completed",
     "conflicts-since-status-field.conflicts-since-status-field.ac4": "completed",
-    "branch-invalidation-sweep": "running"
+    "branch-invalidation-sweep": "completed",
+    "branch-invalidation-sweep.branch-invalidation-sweep.ac1": "completed",
+    "branch-invalidation-sweep.branch-invalidation-sweep.ac2": "completed",
+    "branch-invalidation-sweep.branch-invalidation-sweep.ac3": "completed",
+    "branch-invalidation-sweep.branch-invalidation-sweep.ac4": "completed",
+    "branch-invalidation-sweep.branch-invalidation-sweep.ac5": "completed"
   }
 }
