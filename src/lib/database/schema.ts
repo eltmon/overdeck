@@ -266,7 +266,9 @@ export function initSchema(db: SqliteDatabase): void {
       -- PAN-938: current merge pipeline step
       merge_step              TEXT,
       -- PAN-1691: per-issue merge-train routing key (NULL=project default, 1=auto-merge, 0=hold-for-UAT)
-      auto_merge              INTEGER
+      auto_merge              INTEGER,
+      -- PAN-3151: JSON array of review cycle history entries for convergence detection
+      review_cycle_history    TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
