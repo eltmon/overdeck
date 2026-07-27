@@ -283,7 +283,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:42:44.272Z",
+  "updated": "2026-07-27T14:42:49.815Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "reviewing",
@@ -293,7 +293,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:42:42.857Z",
+    "updatedAt": "2026-07-27T14:42:49.768Z",
     "reviewNotes": "Agent re-review request (13/25): Fixed: repairs only run for databases exactly at SCHEMA_VERSION",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "aa784f5d2e07626caf7a535f562b61cb6b2e667a",
@@ -363,7 +363,7 @@
       },
       "costAtCloseOut": {
         "usd": 238.06189030000002,
-        "pricingAsOf": "2026-07-27T14:42:42.938Z"
+        "pricingAsOf": "2026-07-27T14:42:49.789Z"
       }
     },
     "merges": [
@@ -372,7 +372,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "tasks": {
     "sequence": 20,
     "claims": {},
