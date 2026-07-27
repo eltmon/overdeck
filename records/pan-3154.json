@@ -47,6 +47,11 @@
       "reason": "feedback",
       "note": "[2026-07-27T12:32Z] test-agent → FAILED — seq 1",
       "timestamp": "2026-07-27T12:32:20.054Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-27T12:36:21.777Z"
     }
   ],
   "feedback": [],
@@ -110,7 +115,7 @@
     "recordedAt": "2026-07-27T12:29:11.863Z"
   },
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T12:36:20.944Z",
+  "updated": "2026-07-27T12:36:21.799Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "passed",
@@ -257,7 +262,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 10,
     "claims": {},
