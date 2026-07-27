@@ -1,20 +1,20 @@
 {
-  "vBRIEFInfo": {
+  "xBRIEFInfo": {
     "version": "0.6",
     "created": "2026-06-19T18:05:59.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1970: New-user: minimal New Project flow (add existing / new folder + git init -> register)",
-    "updated": "2026-06-19T18:33:26.765Z"
+    "updated": "2026-07-27T16:52:09.805Z"
   },
   "plan": {
     "id": "pan-1970",
     "title": "New-user: minimal New Project flow (add existing / new folder + git init -> register)",
-    "status": "running",
+    "status": "completed",
     "uid": "1a606b90-d9e9-4f1c-87f6-21f6c32b696a",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-06-19T18:05:59.000Z",
-    "updated": "2026-06-19T18:33:26.765Z",
+    "updated": "2026-07-27T16:52:09.805Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1970",
@@ -543,5 +543,5 @@
       "canonicalFilename": "2026-06-19-PAN-1970-new-user-minimal-new-project-flow-add-existing-new-folder-git-init-register.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
