@@ -27,17 +27,14 @@
       "reason": "feedback",
       "note": "[2026-07-27T05:59Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-27T05:59:49.449Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T05:59:49Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3191\n\nGitLab/polyrepo rows still cannot resolve repository identity, so merged MRs remain stranded\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3191 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-27T06:33:12.056Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -72,20 +69,20 @@
     "recordedAt": "2026-07-27T05:19:11.339Z"
   },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T06:33:09.927Z",
+  "updated": "2026-07-27T06:33:12.057Z",
   "pipeline": {
     "issueId": "PAN-3191",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:20:05.037Z",
-    "updatedAt": "2026-07-27T06:33:09.882Z",
+    "updatedAt": "2026-07-27T06:33:10.563Z",
     "reviewNotes": "GitLab/polyrepo rows still cannot resolve repository identity, so merged MRs remain stranded",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
-    "reviewSpawnedAt": "2026-07-27T05:58:11.918Z",
+    "reviewSpawnedAt": "2026-07-27T06:33:10.562Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -150,7 +147,7 @@
       },
       "costAtCloseOut": {
         "usd": 69.401775,
-        "pricingAsOf": "2026-07-27T06:33:09.920Z"
+        "pricingAsOf": "2026-07-27T06:33:11.962Z"
       }
     },
     "merges": [
