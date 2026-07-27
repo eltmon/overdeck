@@ -406,6 +406,25 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(createSessionMock).toHaveBeenCalledOnce();
   });
 
+  it('spends autonomous consent when runtime setup fails after tmux accepts the session', async () => {
+    writeSupervisorArtifact();
+    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlag } = await import('../planning/auto-spawn-consent.js');
+    const { spawnAgent } = await import('../agents.js');
+    await writeAutoSpawnOnFinalizeFlag('PAN-1405', true);
+    emitAgentEventMock.mockReturnValue(Effect.fail(new Error('runtime state persistence failed')));
+
+    await expect(spawnAgent({
+      issueId: 'PAN-1405',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      startedBy: 'reactive-lifecycle',
+    })).rejects.toThrow('runtime state persistence failed');
+
+    expect(createSessionMock).toHaveBeenCalledOnce();
+    expect(readAutoSpawnOnFinalizeFlag('PAN-1405')).toBe(false);
+  });
+
   it('preserves pipeline verdicts and post-merge state when the reviewed anchor is current', async () => {
     writeSupervisorArtifact();
     shouldPreservePipelineVerdictsMock.mockResolvedValue({

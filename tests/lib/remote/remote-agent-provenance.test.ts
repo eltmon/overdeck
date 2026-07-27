@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 const mocks = vi.hoisted(() => ({
   commands: [] as string[],
+  failPushDaemon: false,
   launcherOptions: undefined as Record<string, unknown> | undefined,
   remoteFiles: new Map<string, string>(),
 }));
@@ -39,6 +40,9 @@ vi.mock('../../../src/lib/remote/remote-tmux.js', async (importOriginal) => {
       if (command.includes('has-session')) {
         return { stdout: 'not-found\n', stderr: '', exitCode: 0 };
       }
+      if (mocks.failPushDaemon && command.includes('new-session') && command.includes('push-daemon-')) {
+        return { stdout: '', stderr: 'push daemon failed', exitCode: 1 };
+      }
       const append = command.match(/printf %s '([^']*)' >> (\S+)/);
       if (append) {
         chunks.set(append[2], `${chunks.get(append[2]) ?? ''}${append[1]}`);
@@ -61,6 +65,7 @@ describe('remote agent provenance', () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.commands.length = 0;
+    mocks.failPushDaemon = false;
     mocks.launcherOptions = undefined;
     mocks.remoteFiles.clear();
     home = mkdtempSync(join(tmpdir(), 'remote-agent-provenance-'));
@@ -125,6 +130,33 @@ describe('remote agent provenance', () => {
       startedBy: 'operator:dashboard',
       tier: 'ephemeral',
     })).resolves.toMatchObject({ status: 'running' });
+  });
+
+  it('spends autonomous consent when remote setup fails after tmux accepts the session', async () => {
+    const { writeAutoSpawnOnFinalizeFlag, readAutoSpawnOnFinalizeFlag } = await import(
+      '../../../src/lib/planning/auto-spawn-consent.js'
+    );
+    const { spawnRemoteAgent } = await import('../../../src/lib/remote/remote-agents.js');
+    await writeAutoSpawnOnFinalizeFlag('PAN-3113', true);
+    mocks.failPushDaemon = true;
+
+    await expect(spawnRemoteAgent({
+      issueId: 'PAN-3113',
+      workspace: {
+        id: 'remote-pan-3113',
+        issue: 'PAN-3113',
+        provider: 'fly',
+        vmName: 'pan-3113-vm',
+        urls: {},
+        created: new Date('2026-07-26T00:00:00.000Z'),
+        location: 'remote',
+      },
+      model: 'claude-sonnet-4-6',
+      startedBy: 'flywheel:RUN-42',
+      tier: 'ephemeral',
+    })).rejects.toThrow('Failed to start push daemon');
+
+    expect(readAutoSpawnOnFinalizeFlag('PAN-3113')).toBe(false);
   });
 
   it('exports provenance in the direct remote command without a prompt', async () => {

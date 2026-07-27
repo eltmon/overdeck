@@ -47,6 +47,17 @@ describe('auto-spawn consent claims', () => {
     expect(readAutoSpawnOnFinalizeFlag(issueId)).toBe(true);
   });
 
+  it('keeps consent spent when setup fails after session acceptance', async () => {
+    await writeAutoSpawnOnFinalizeFlag(issueId, true);
+
+    await expect(withAutoSpawnConsentClaim(issueId, async (accept) => {
+      await accept();
+      throw new Error('runtime state persistence failed');
+    })).rejects.toThrow('runtime state persistence failed');
+
+    expect(readAutoSpawnOnFinalizeFlag(issueId)).toBe(false);
+  });
+
   it('does not let an old completion consume a newer planning generation', async () => {
     await writeAutoSpawnOnFinalizeFlag(issueId, true);
     let finishLaunch!: () => void;

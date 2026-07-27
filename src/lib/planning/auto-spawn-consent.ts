@@ -20,6 +20,8 @@ export interface AutoSpawnConsentClaim {
   claimId: string;
 }
 
+export type AcceptAutoSpawnConsent = () => Promise<void>;
+
 function getOverdeckHome(): string {
   return process.env['OVERDECK_HOME'] ?? join(homedir(), '.overdeck');
 }
@@ -166,38 +168,46 @@ export async function releaseAutoSpawnConsentClaim(claim: AutoSpawnConsentClaim)
 
 export async function withAutoSpawnConsentClaim<T>(
   issueId: string,
-  operation: () => Promise<T>,
+  operation: (accept: AcceptAutoSpawnConsent) => Promise<T>,
   options: {
     isAccepted?: (result: T) => boolean;
     logWarning?: (message: string) => void;
   } = {},
 ): Promise<T> {
   const claim = await claimAutoSpawnConsentForWorkStart(issueId);
-  if (!claim) return operation();
+  if (!claim) return operation(async () => undefined);
+
+  let accepted = false;
+  const accept = async (): Promise<void> => {
+    if (accepted) return;
+    accepted = true;
+    try {
+      await completeAutoSpawnConsentClaim(claim);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      (options.logWarning ?? console.warn)(
+        `[planning] Work start for ${issueId.toUpperCase()} succeeded; consent remains durably claimed because completion persistence failed: ${message}`,
+      );
+    }
+  };
 
   try {
-    const result = await operation();
-    if ((options.isAccepted ?? (() => true))(result)) {
-      try {
-        await completeAutoSpawnConsentClaim(claim);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        (options.logWarning ?? console.warn)(
-          `[planning] Work start for ${issueId.toUpperCase()} succeeded; consent remains durably claimed because completion persistence failed: ${message}`,
-        );
-      }
-    } else {
-      await releaseAutoSpawnConsentClaim(claim);
+    const result = await operation(accept);
+    if (!accepted) {
+      if ((options.isAccepted ?? (() => true))(result)) await accept();
+      else await releaseAutoSpawnConsentClaim(claim);
     }
     return result;
   } catch (error) {
-    try {
-      await releaseAutoSpawnConsentClaim(claim);
-    } catch (releaseError) {
-      const message = releaseError instanceof Error ? releaseError.message : String(releaseError);
-      (options.logWarning ?? console.warn)(
-        `[planning] Work start for ${issueId.toUpperCase()} failed; consent remains fail-closed because claim release failed: ${message}`,
-      );
+    if (!accepted) {
+      try {
+        await releaseAutoSpawnConsentClaim(claim);
+      } catch (releaseError) {
+        const message = releaseError instanceof Error ? releaseError.message : String(releaseError);
+        (options.logWarning ?? console.warn)(
+          `[planning] Work start for ${issueId.toUpperCase()} failed; consent remains fail-closed because claim release failed: ${message}`,
+        );
+      }
     }
     throw error;
   }

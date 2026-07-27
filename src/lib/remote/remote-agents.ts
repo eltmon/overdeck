@@ -28,7 +28,10 @@ import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync, getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 import { resolveProjectForIssue } from '../pan-dir/record.js';
 import { isStateMigrated } from '../state-home.js';
-import { withAutoSpawnConsentClaim } from '../planning/auto-spawn-consent.js';
+import {
+  withAutoSpawnConsentClaim,
+  type AcceptAutoSpawnConsent,
+} from '../planning/auto-spawn-consent.js';
 import { isOperatorStartedBy } from '../agents/provenance.js';
 
 export { sendToRemoteAgentKeyed } from './remote-keyed-delivery.js';
@@ -551,12 +554,15 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
 
   return withAutoSpawnConsentClaim(
     options.issueId,
-    () => spawnRemoteAgentWithoutConsentClaim(options),
+    (acceptConsent) => spawnRemoteAgentWithoutConsentClaim(options, acceptConsent),
     { isAccepted: (state) => state.status === 'running' },
   );
 }
 
-async function spawnRemoteAgentWithoutConsentClaim(options: SpawnRemoteAgentOptions): Promise<RemoteAgentState> {
+async function spawnRemoteAgentWithoutConsentClaim(
+  options: SpawnRemoteAgentOptions,
+  acceptConsent?: AcceptAutoSpawnConsent,
+): Promise<RemoteAgentState> {
   const { issueId, workspace, startedBy, model = 'claude-sonnet-4-6', prompt } = options;
   const project = resolveProjectForIssue(issueId);
   if (project) assertFlyRemoteStateSupported(issueId, await isStateMigrated(project));
@@ -646,6 +652,7 @@ async function spawnRemoteAgentWithoutConsentClaim(options: SpawnRemoteAgentOpti
     saveRemoteAgentState(state);
     throw new Error(`Failed to start agent: ${result.stderr}`);
   }
+  await acceptConsent?.();
 
   // Install a continuous commit+push heartbeat daemon in its own tmux session.
   // This runs independently of the agent session and survives agent crashes.

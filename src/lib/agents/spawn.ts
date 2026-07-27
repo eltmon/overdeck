@@ -81,7 +81,10 @@ import {
 import { stopAgent } from './termination.js';
 import { createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
 import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
-import { withAutoSpawnConsentClaim } from '../planning/auto-spawn-consent.js';
+import {
+  withAutoSpawnConsentClaim,
+  type AcceptAutoSpawnConsent,
+} from '../planning/auto-spawn-consent.js';
 import { isOperatorStartedBy } from './provenance.js';
 import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './registered-slot-spawn.js';
 const execAsync = promisify(exec);
@@ -96,12 +99,17 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   return withAutoSpawnConsentClaim(
     issueId,
-    () => spawnRunWithoutConsentClaim(issueId, role, resolvedOptions),
+    (acceptConsent) => spawnRunWithoutConsentClaim(issueId, role, resolvedOptions, acceptConsent),
     { isAccepted: (state) => state.status === 'running' && state.kickoffDelivered !== false },
   );
 }
 
-async function spawnRunWithoutConsentClaim(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
+async function spawnRunWithoutConsentClaim(
+  issueId: string,
+  role: Role,
+  options: SpawnRunOptions,
+  acceptConsent?: AcceptAutoSpawnConsent,
+): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
   const modelSpawnKey = `${role}:${issueId}`;
   const selectedModel = determineModel({ model: options.model, role, spawnKey: modelSpawnKey });
@@ -142,7 +150,7 @@ async function spawnRunWithoutConsentClaim(issueId: string, role: Role, options:
       effort: options.effort,
       slotIndex: slot?.slotIndex,
       slotItemId: slot?.slotItemId,
-    });
+    }, acceptConsent);
   }
 
   const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
@@ -518,12 +526,15 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   return withAutoSpawnConsentClaim(
     options.issueId,
-    () => spawnAgentWithoutConsentClaim(resolvedOptions),
+    (acceptConsent) => spawnAgentWithoutConsentClaim(resolvedOptions, acceptConsent),
     { isAccepted: (state) => state.status === 'running' && state.kickoffDelivered !== false },
   );
 }
 
-async function spawnAgentWithoutConsentClaim(options: SpawnOptions): Promise<AgentState> {
+async function spawnAgentWithoutConsentClaim(
+  options: SpawnOptions,
+  acceptConsent?: AcceptAutoSpawnConsent,
+): Promise<AgentState> {
   const role: 'work' | 'strike' | 'knowledge' = options.role ?? 'work';
   const sessionPrefix = role === 'strike' ? 'strike' : 'agent';
   const agentId = options.agentId ?? `${sessionPrefix}-${options.issueId.toLowerCase()}`;
@@ -809,6 +820,7 @@ async function spawnAgentWithoutConsentClaim(options: SpawnOptions): Promise<Age
       ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
     }
   }));
+  await acceptConsent?.();
   await saveAgentRuntimeState(agentId, {
     claudeSessionId: state.sessionId,
     sessionModel: selectedModel,
