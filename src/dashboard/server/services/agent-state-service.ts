@@ -35,6 +35,7 @@ import { initEventStore } from '../event-store.js';
 import type { StoredEvent } from '../event-store.js';
 import { setAgentRuntimeMirror, getRuntimeSnapshot as getMirrorSnapshot, markAgentStateServiceInProcess } from '../../../lib/agent-runtime-mirror.js';
 import { appendSessionIdToHistory } from '../../../lib/session-history.js';
+import { emitBootReconciledStopEvents } from './boot-reconciled-stop-events.js';
 
 // ─── Event filtering ──────────────────────────────────────────────────────────
 
@@ -113,6 +114,7 @@ export const AgentStateServiceLive = Layer.effect(
       );
       const result = yield* Effect.promise(() => reconstructCacheAuto());
       const seeded = result.agentRuntimeById;
+      yield* Effect.promise(() => emitBootReconciledStopEvents(store, result.markedStoppedIds, seeded, '[AgentStateService] Failed to emit boot-reconciled stop event:'));
       if (Object.keys(seeded).length > 0) {
         yield* SubscriptionRef.update(ref, (current) =>
           mergeRuntimeBySequence(current, seeded, result.agentsById),
