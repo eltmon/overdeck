@@ -609,21 +609,20 @@
     "recordedAt": "2026-07-27T05:54:26.480Z"
   },
   "created": "2026-07-26T12:26:09.908Z",
-  "updated": "2026-07-27T05:55:10.446Z",
+  "updated": "2026-07-27T06:00:32.590Z",
   "pipeline": {
     "issueId": "PAN-3111",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T05:55:09.213Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-27T06:00:32.514Z",
+    "reviewNotes": "Blocked: container-queue callers still consume current-cycle consent before the delayed work launch, and consent cleanup failures leave the release-equivalent flag reusable without durable retry. Report: .pan/review/agent-pan-3111-review-6f9d6c13/review.md",
     "inspectNotes": "AC1-3 met at this tree state (bead work landed in a4c6729fa9; ec66e8f8 is a behavior-preserving extraction). AC1: agents-state-db.test.ts:92 round-trips 'operator:cli:pan-start' through state.json and the agents-table started_by column with getAgentStateSync returning it; verified both read paths (overdeck agent-state-sync.ts:175 and parseAgentState agent-state.ts:250) and confirmed the insert column list ('flywheel_run_id','started_by','cost_so_far') aligns positionally with the values array (state.flywheelRunId, state.startedBy, state.costSoFar) -- no off-by-one. AC2: resolveAgentStartedBy preserves the exact explicit ?? env ?? flywheel order, and the environmentToken default parameter is evaluated per call so env mutation is still observed; spawn-flywheel-provenance.test.ts covers explicit token, env-over-flywheel precedence, flywheel:<runId>, and undefined. AC3: schema-migrations.test.ts:71 adds started_by to a current-version agents table without throwing; both the currentVersion===SCHEMA_VERSION top-up and the <61 block apply it, and tryIdempotentDdl swallows duplicate-column. Non-blocking observation for the review convoy: this commit is line-count golf for a file ratchet (joining 'flywheel_run_id TEXT, started_by TEXT' onto one CREATE TABLE line, deleting two blank lines in runMigrations, compressing the OVERDECK_AGENT_COLUMNS comment and dropping its 0000_overdeck_init.sql reference) -- semantically inert, but shrinking declarations to fit a ratchet suppresses the growth signal the ratchet exists to surface.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3144",
-    "reviewRequestedAt": "2026-07-27T05:54:27.422Z",
     "reviewSpawnedAt": "2026-07-27T05:55:09.210Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -842,9 +841,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 7573378,
-            "output": 284853,
-            "cacheRead": 62509568,
+            "input": 9308073,
+            "output": 334929,
+            "cacheRead": 73078784,
             "cacheWrite": 0
           }
         },
@@ -897,15 +896,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 36682096,
-          "output": 1421064,
-          "cacheRead": 702924800,
+          "input": 38416791,
+          "output": 1471140,
+          "cacheRead": 713494016,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 577.5300153,
-        "pricingAsOf": "2026-07-27T05:55:09.248Z"
+        "usd": 592.9903783,
+        "pricingAsOf": "2026-07-27T06:00:32.554Z"
       }
     },
     "merges": [
