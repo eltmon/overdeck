@@ -4,10 +4,14 @@
  * `git stash`, and `git rebase` stay blocked. Regression cover for the
  * 2026-07-26 workspaces-route GitError storm, where a dashboard behind the
  * shim had its read-only stash enumeration rejected.
+ *
+ * PAN-3189 adds the two scoping rules: the guard fires only inside the agent's
+ * own worktree, and the launcher strips any inherited guard dir from PATH
+ * before resolving real git or installing its own.
  */
 
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -16,6 +20,7 @@ import { buildGitGuardLines } from '../launcher-git-guard.js';
 
 let home: string;
 let repo: string;
+let fixtureRepo: string;
 let guardGit: string;
 let previousHome: string | undefined;
 
@@ -44,14 +49,19 @@ beforeAll(() => {
   previousHome = process.env.OVERDECK_HOME;
   process.env.OVERDECK_HOME = home;
 
-  execFileSync('bash', ['-ec', buildGitGuardLines('guard-behavior-test').join('\n')], {
+  // The agent's worktree — the only place the guard is allowed to fire.
+  repo = join(home, 'scratch-repo');
+  execFileSync('git', ['init', '--quiet', repo], { stdio: 'ignore' });
+
+  // An unrelated repository standing in for a test fixture's temp repo.
+  fixtureRepo = join(home, 'fixture-repo');
+  execFileSync('git', ['init', '--quiet', fixtureRepo], { stdio: 'ignore' });
+
+  execFileSync('bash', ['-ec', buildGitGuardLines('guard-behavior-test', repo).join('\n')], {
     cwd: home,
     stdio: 'ignore',
   });
   guardGit = join(home, 'agents', 'guard-behavior-test', 'git-guard', 'git');
-
-  repo = join(home, 'scratch-repo');
-  execFileSync('git', ['init', '--quiet', repo], { stdio: 'ignore' });
 });
 
 afterAll(() => {
@@ -95,5 +105,56 @@ describe('git-guard shim behavior', () => {
     const result = runGuardedGit(['reset', '--hard'], repo);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('must not run git reset --hard');
+  });
+});
+
+describe('git-guard worktree scoping (PAN-3189)', () => {
+  it('lets a test fixture rebase, stash and reset --hard its own temp repo', () => {
+    for (const args of [['rebase', 'main'], ['stash', 'push'], ['reset', '--hard']]) {
+      const result = runGuardedGit(args, fixtureRepo);
+      expect(result.stderr).not.toContain('Overdeck agents must not run git');
+    }
+  });
+
+  it('still blocks a guarded command aimed at the worktree with -C from outside', () => {
+    const result = runGuardedGit(['-C', repo, 'reset', '--hard'], fixtureRepo);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('must not run git reset --hard');
+  });
+
+  it('allows a guarded command aimed elsewhere with -C from inside the worktree', () => {
+    const result = runGuardedGit(['-C', fixtureRepo, 'reset', '--hard'], repo);
+    expect(result.stderr).not.toContain('Overdeck agents must not run git');
+  });
+});
+
+describe('git-guard PATH hygiene (PAN-3189)', () => {
+  it('drops an inherited guard dir and resolves real git behind it', () => {
+    const foreignGuardDir = join(home, 'agents', 'flywheel-orchestrator', 'git-guard');
+    mkdirSync(foreignGuardDir, { recursive: true });
+    writeFileSync(join(foreignGuardDir, 'git'), '#!/bin/sh\nexit 77\n');
+    execFileSync('chmod', ['0755', join(foreignGuardDir, 'git')]);
+
+    const ownGuardDir = join(home, 'agents', 'path-hygiene-test', 'git-guard');
+    const script = [
+      ...buildGitGuardLines('path-hygiene-test', repo),
+      'echo "$PATH"',
+    ].join('\n');
+
+    const result = spawnSync('bash', ['-ec', script], {
+      cwd: home,
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${foreignGuardDir}:${process.env.PATH ?? ''}` },
+    });
+
+    expect(result.status).toBe(0);
+    const segments = result.stdout.trim().split(':');
+    expect(segments).toContain(ownGuardDir);
+    expect(segments).not.toContain(foreignGuardDir);
+    expect(segments.filter(segment => segment.endsWith('/git-guard'))).toEqual([ownGuardDir]);
+
+    // Real git must resolve past the foreign shim, not into it.
+    const shim = execFileSync('cat', [join(ownGuardDir, 'git')], { encoding: 'utf8' });
+    expect(shim).not.toContain(foreignGuardDir);
   });
 });

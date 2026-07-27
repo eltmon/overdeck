@@ -541,6 +541,11 @@ export async function buildAgentLaunchConfig(opts: {
         ? await getAgentRuntimeBaseCommand(model, opts.agentId, launchRole, opts.harness)
         : `claude ${getClaudePermissionFlagsStringSync()}${roleSystemPromptInjectionSync(roleAgentDefinitionPath(launchRole))}`,
       resumeSessionId: opts.resumeSessionId,
+      // PAN-3189: the git guard is emitted for launchers that carry an agent
+      // id. Work/strike/review agents — the ones the stash/rebase rules exist
+      // for — were the only launchers omitting it, so they ran unguarded and
+      // inherited whichever guard their spawner happened to have on PATH.
+      overdeckEnv: { agentId: opts.agentId },
       model: behavior.launchCommandKind !== 'claude-code' || providerExports?.includes('ANTHROPIC_BASE_URL') ? model : undefined,
       extraArgs: behavior.launchCommandKind !== 'claude-code' ? undefined : `--name ${opts.agentId}`,
       appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
@@ -578,6 +583,8 @@ export async function buildAgentLaunchConfig(opts: {
     providerExports,
     cavemanExports,
     baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code', opts.effort),
+    // PAN-3189: see the resume branch above — same reason, fresh-spawn path.
+    overdeckEnv: { agentId: opts.agentId },
     sessionId: behavior.sessionIdSource === 'launcher-session-id' ? opts.sessionId : undefined,
     appendSystemPromptFiles: await claudeSystemPromptFiles(opts.workspace, opts.harness),
     extraEnvExports: opts.extraEnvExports,

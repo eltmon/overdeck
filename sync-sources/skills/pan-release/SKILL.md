@@ -115,25 +115,30 @@ OVERDECK_OPERATOR_PUSH=1 git push origin main
 OVERDECK_OPERATOR_PUSH=1 git push origin vX.Y.Z
 ```
 
-**3. Preflight tests fail for the wrong reason (PAN-3081).** An agent session
-carries `~/.overdeck/agents/<id>/git-guard` on `PATH`. That shim intercepts
+**3. Preflight tests failing for the wrong reason (PAN-3081 / PAN-3189).** The
+per-agent `~/.overdeck/agents/<id>/git-guard` shim used to intercept
 `git reset --hard` and `git rebase` *inside test fixtures that legitimately run
-them against their own temp repos*, so preflight reports failures that do not
-exist. Observed repeatedly: **10 failures with the shim on `PATH`, 0 without.**
+them against their own temp repos*, so preflight reported failures that did not
+exist — **10 failures with the shim on `PATH`, 0 without.**
 
-Verify the suite yourself with the shim dropped, and only then skip the
-preflight re-run:
+PAN-3189 fixed both halves at the source: the guard now fires only for git
+commands targeting the agent's own worktree, and each launcher strips any
+inherited guard directory from `PATH` before installing its own. A session
+spawned since that landed needs no workaround.
+
+A session started *before* it — or any shell that inherited an old shim — can
+still see the artifact. Check first, and only reach for the workaround if the
+shim is actually there:
 
 ```bash
+echo $PATH | tr ':' '\n' | grep git-guard    # expect: your own agent's dir, or nothing
 CLEAN=$(echo $PATH | tr ':' '\n' | grep -v git-guard | paste -sd:)
 PATH="$CLEAN" npm test          # must be genuinely green
 pan release stable --version X.Y.Z --skip-tests
 ```
 
 `--skip-tests` is legitimate **only** when you have run the suite clean and seen
-it pass. It skips a corrupted measurement, not the verification itself. Note the
-precedent in `src/cli/commands/restart.ts:194-198`, which already strips the
-guard from `PATH` for agent-launched restarts — release preflight does not, yet.
+it pass. It skips a corrupted measurement, not the verification itself.
 
 **Ordering note.** If `git push origin main` is rejected because the remote moved
 ahead, merge rather than rebase (`git rebase` is blocked by the agent git guard)

@@ -373,6 +373,36 @@ describe('Definition-of-Done post-merge row', () => {
     expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('canonical state: in_review') });
   });
 
+  // PAN-3188 (row 5): terminal canonical states settle the row — 'done' proves
+  // the lifecycle already ran; 'canceled' makes it moot. Without this, every
+  // re-evaluated terminal issue wedges on the transient verifying_on_main marker.
+  it('passes on terminal canonical state done with no running agents', async () => {
+    const row = await checkPostMergeRow(ctx, undefined, {
+      readCanonicalState: async () => 'done',
+      readMergeStatus: () => null,
+      listAgents: clearAgents,
+    });
+    expect(row).toMatchObject({ status: 'pass', observed: expect.stringContaining('terminal canonical state: done') });
+  });
+
+  it('skips on terminal canonical state canceled', async () => {
+    const row = await checkPostMergeRow(ctx, undefined, {
+      readCanonicalState: async () => 'canceled',
+      readMergeStatus: () => null,
+      listAgents: clearAgents,
+    });
+    expect(row).toMatchObject({ status: 'skip', observed: expect.stringContaining('terminal canonical state: canceled') });
+  });
+
+  it('still misses on terminal state done while a work agent runs', async () => {
+    const row = await checkPostMergeRow(ctx, undefined, {
+      readCanonicalState: async () => 'done',
+      readMergeStatus: () => null,
+      listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
+    });
+    expect(row).toMatchObject({ status: 'miss' });
+  });
+
   it('turns canonical-state probe failures into an observed miss', async () => {
     const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => { throw new Error('gh timed out'); },
@@ -612,11 +642,30 @@ describe('Definition-of-Done deploy row', () => {
     expect(commitContains).not.toHaveBeenCalled();
   });
 
-  it('misses before reading dashboard health when the merged row passed without a resolvable merge commit', async () => {
+  it('skips before reading dashboard health when the merged row passed without a merge commit and main-verify skipped (PAN-3188)', async () => {
     const dashboardUrl = vi.fn(baseDeps.dashboardUrl);
     const readJson = vi.fn(baseDeps.readJson);
     const commitContains = vi.fn(baseDeps.commitContains);
-    const row = await checkDeployRow(ctx, { mergedRowStatus: 'pass' }, {
+    const row = await checkDeployRow(ctx, { mergedRowStatus: 'pass', mainVerifyRowStatus: 'skip' }, {
+      dashboardUrl,
+      readJson,
+      commitContains,
+    });
+
+    expect(row).toMatchObject({
+      status: 'skip',
+      observed: expect.stringContaining('no merge commit resolvable'),
+    });
+    expect(dashboardUrl).not.toHaveBeenCalled();
+    expect(readJson).not.toHaveBeenCalled();
+    expect(commitContains).not.toHaveBeenCalled();
+  });
+
+  it('still misses when the merged row passed without a merge commit but main-verify did not skip', async () => {
+    const dashboardUrl = vi.fn(baseDeps.dashboardUrl);
+    const readJson = vi.fn(baseDeps.readJson);
+    const commitContains = vi.fn(baseDeps.commitContains);
+    const row = await checkDeployRow(ctx, { mergedRowStatus: 'pass', mainVerifyRowStatus: 'pass' }, {
       dashboardUrl,
       readJson,
       commitContains,
@@ -665,11 +714,13 @@ describe('assembled Definition-of-Done gate', () => {
       mergedAt?: string;
       mergeCommit?: string;
       mergedRowStatus?: DodRowResult['status'];
+      mainVerifyRowStatus?: DodRowResult['status'];
     }) => {
       expect(merge).toEqual({
         mergedAt: '2026-07-15T12:00:00Z',
         mergeCommit: 'abc123',
         mergedRowStatus: 'pass',
+        mainVerifyRowStatus: 'pass',
       });
       return makeRow('deploy', deployStatus);
     },
@@ -680,6 +731,32 @@ describe('assembled Definition-of-Done gate', () => {
     const gate = await evaluateDodGate(ctx, {}, deps());
     expect(gate.passed).toBe(true);
     expect(gate.rows.map(row => row.id)).toEqual(DOD_ROWS.slice(0, 7).map(row => row.id));
+  });
+
+  // PAN-3188: a landing with no resolvable merge commit must skip row 7 when
+  // row 6 skips — the GitLab-backed landing class that wedged six MYN close-outs.
+  it('passes main-verify status into deploy so a no-commit landing skips both rows', async () => {
+    const deploySpy = vi.fn(async () => makeRow('deploy', 'skip'));
+    const gate = await evaluateDodGate(ctx, {}, {
+      review: async () => makeRow('review'),
+      tests: async () => makeRow('tests'),
+      verification: async () => makeRow('verification'),
+      merged: async () => ({ ...makeRow('merged'), mergedAt: '2026-07-15T12:00:00Z' }),
+      postMerge: async () => makeRow('post-merge'),
+      mainVerify: async () => makeRow('main-verify', 'skip'),
+      deploy: deploySpy,
+      now: () => '2026-07-15T13:00:00Z',
+    });
+    expect(deploySpy).toHaveBeenCalledWith(ctx, expect.objectContaining({
+      mergedRowStatus: 'pass',
+      mainVerifyRowStatus: 'skip',
+      mergeCommit: undefined,
+    }));
+    expect(gate.rows.map(row => [row.id, row.status])).toEqual([
+      ['review', 'pass'], ['tests', 'pass'], ['verification', 'pass'], ['merged', 'pass'],
+      ['post-merge', 'pass'], ['main-verify', 'skip'], ['deploy', 'skip'],
+    ]);
+    expect(gate.passed).toBe(true);
   });
 
   it('blocks an unaccepted miss and records an accepted miss with who and when', async () => {

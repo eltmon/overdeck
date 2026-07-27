@@ -11,7 +11,7 @@ import { Effect } from 'effect';
 
 import { getAgentRuntimeState, spawnAgent, stopAgent } from '../../lib/agents.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
-import { sessionExists } from '../../lib/tmux.js';
+import { isHarnessProcessAlive, sessionExists } from '../../lib/tmux.js';
 import type { RoleEffort } from '../../lib/config-yaml.js';
 
 const execAsync = promisify(exec);
@@ -162,6 +162,22 @@ function buildStrikePrompt(plan: StrikePlan): string {
   ].join('\n');
 }
 
+/**
+ * Replace a prior strike session so the issue can be struck again.
+ *
+ * PAN-3150: "a session exists" is NOT "an agent is running". A strike that
+ * finished normally leaves its tmux session behind on purpose, so operators can
+ * read the transcript — but its last recorded activity is still `active`, so a
+ * state-only check reads the corpse as live and refuses to re-dispatch. That
+ * closed the loop for the flywheel, which is forbidden `pan kill`: the only verb
+ * addressing a `strike-<id>` session was the one that would not reuse it.
+ *
+ * The harness process tree is the honest liveness oracle (`isHarnessProcessAlive`
+ * walks the pane tree rather than trusting recorded state), so a session with no
+ * harness under it is replaceable no matter what the runtime state claims.
+ * Cycling a session is not the one-way door `pan kill` is treated as: the strike
+ * worktree, branch, and commits all survive.
+ */
 async function clearIdlePriorStrike(plan: StrikePlan): Promise<boolean> {
   const hasExistingSession = await Effect.runPromise(sessionExists(plan.sessionName));
   if (!hasExistingSession) return false;
@@ -169,7 +185,10 @@ async function clearIdlePriorStrike(plan: StrikePlan): Promise<boolean> {
   const runtimeState = await Effect.runPromise(getAgentRuntimeState(plan.sessionName));
   const replaceableStates = new Set(['idle', 'suspended', 'stopped']);
   if (runtimeState && !replaceableStates.has(runtimeState.state)) {
-    throw new Error(`Agent ${plan.sessionName} already running. Use 'pan tell' to message it.`);
+    // The recorded state says busy — only a live harness process may veto reuse.
+    if (await isHarnessProcessAlive(plan.sessionName)) {
+      throw new Error(`Agent ${plan.sessionName} already running. Use 'pan tell' to message it.`);
+    }
   }
 
   await Effect.runPromise(stopAgent(plan.sessionName));
