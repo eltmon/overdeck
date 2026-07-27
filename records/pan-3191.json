@@ -79,19 +79,21 @@
     "recordedAt": "2026-07-27T05:19:11.339Z"
   },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T06:59:18.252Z",
+  "updated": "2026-07-27T07:01:16.326Z",
   "pipeline": {
     "issueId": "PAN-3191",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:20:05.037Z",
-    "updatedAt": "2026-07-27T06:59:16.717Z",
-    "reviewNotes": "Unbounded serial forge checks still monopolize the Deacon patrol; GitHub App repository identity also remains omitted",
+    "updatedAt": "2026-07-27T07:01:16.235Z",
+    "reviewNotes": "Approved: bounded fair forge batching and GitHub/GitLab repository identity resolve all remaining blockers",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
+    "reviewedAtCommit": "6d25e80471fae973a5aa9b3fe6e7caeb898f3330",
     "reviewSpawnedAt": "2026-07-27T06:59:16.716Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -132,9 +134,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4375451,
-            "output": 226193,
-            "cacheRead": 30934528,
+            "input": 6378141,
+            "output": 266556,
+            "cacheRead": 36045824,
             "cacheWrite": 0
           }
         },
@@ -149,15 +151,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 6695262,
-          "output": 431660,
-          "cacheRead": 101443584,
+          "input": 8697952,
+          "output": 472023,
+          "cacheRead": 106554880,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 97.147902,
-        "pricingAsOf": "2026-07-27T06:59:18.248Z"
+        "usd": 110.92789,
+        "pricingAsOf": "2026-07-27T07:01:16.300Z"
       }
     },
     "merges": [
