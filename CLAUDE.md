@@ -221,7 +221,7 @@ nearly instant (~2s). It correctly resolves `@overdeck/contracts` to the worktre
 `packages/contracts/` via Bun workspace resolution.
 
 **Quality gates** (must pass before `pan done`):
-- `npm run typecheck` — TypeScript strict mode
+- `npm run typecheck` — TypeScript strict mode (root, hooks, evals, and both dashboard halves — server and frontend each guarded by a shrink-only ratchet: `scripts/lint-dashboard-types.sh`, `scripts/lint-frontend-types.sh`)
 - `npm run lint` — ESLint
 - `npm test` — Vitest (root + frontend)
 
