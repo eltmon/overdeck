@@ -201,17 +201,17 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:31:43.730Z",
+  "updated": "2026-07-27T12:31:49.662Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T12:31:43.014Z",
+    "updatedAt": "2026-07-27T12:31:49.653Z",
     "reviewNotes": "cycle 9 correctly passes ReviewCycleEntry[] to the canonical writer with no new blocking findings",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
@@ -318,9 +318,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 11414085,
-            "output": 334794,
-            "cacheRead": 86713856,
+            "input": 11437557,
+            "output": 344956,
+            "cacheRead": 88223232,
             "cacheWrite": 0
           }
         },
@@ -341,9 +341,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 11414085,
-          "output": 334794,
-          "cacheRead": 86713856,
+          "input": 11437557,
+          "output": 344956,
+          "cacheRead": 88223232,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -354,8 +354,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 122.3988993,
-        "pricingAsOf": "2026-07-27T12:31:43.063Z"
+        "usd": 123.5758073,
+        "pricingAsOf": "2026-07-27T12:31:49.657Z"
       }
     },
     "merges": [
@@ -364,7 +364,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-haiku-4-5",
   "tasks": {
     "sequence": 20,
     "claims": {},
