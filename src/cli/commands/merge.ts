@@ -53,5 +53,8 @@ export function registerMergeCommands(program: Command): void {
   merge
     .command('cancel <id>')
     .description('Cancel a pending Flywheel auto-merge during its cooldown window')
-    .action(mergeCancelCommand);
+    // Commander passes (arg, options, command) to the action handler; without
+    // this wrapper the options object lands in mergeCancelCommand's fetchImpl
+    // slot and every invocation dies with "fetchImpl is not a function" (PAN-3190).
+    .action((id: string) => mergeCancelCommand(id));
 }

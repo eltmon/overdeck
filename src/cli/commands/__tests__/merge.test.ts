@@ -28,6 +28,7 @@ describe('merge CLI', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
     process.exitCode = undefined;
   });
@@ -80,5 +81,26 @@ describe('merge CLI', () => {
     const cancel = merge?.commands.find(command => command.name() === 'cancel');
 
     expect(cancel?.registeredArguments.map(argument => argument.name())).toEqual(['id']);
+  });
+
+  // PAN-3190: the action handler must not leak Commander's options object into
+  // mergeCancelCommand's fetchImpl slot. Invoke through a real Commander parse
+  // so a regression here fails this test, not the user.
+  it('invokes cancel through the Commander registration', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ issueId: 'PAN-123' }) });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const program = new Command();
+    program.exitOverride();
+    registerMergeCommands(program);
+
+    await program.parseAsync(['node', 'pan', 'merge', 'cancel', 'pan-123']);
+
+    expect(fetchSpy).toHaveBeenCalledWith('http://dashboard.test/api/flywheel/auto-merge/PAN-123', {
+      method: 'DELETE',
+      headers: { 'x-pan-test-token': 'secret-token' },
+    });
+    expect(logSpy).toHaveBeenCalledWith('Cancelled auto-merge for PAN-123');
+    expect(process.exitCode).toBeUndefined();
   });
 });
