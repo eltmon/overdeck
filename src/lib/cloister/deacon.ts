@@ -31,22 +31,17 @@ import { isStartingWithinGrace } from './agent-grace.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { checkInspectAgentTimeouts } from './deacon-inspect.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
+import { checkPostReviewCommits } from './deacon-post-review-commits.js';
 import { patrolStrikeLandings } from './deacon-strike-landing.js';
 import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, monitorReviewConvoySignals, cleanupOrphanedReviewSessions, checkStalledReviewDiscovery, checkStalledReviewParents, checkReviewForkCacheMisses } from './deacon-review.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
-import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
+import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileStuckMergingStates, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 import { reconcileTraefikNetworks } from '../workspace/traefik-connect.js';
 import { coordinateSwarmSlots } from './deacon-swarm.js';
 import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
 import { applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, type BootReconciliationApplyResult } from './boot-reconciliation-apply.js';
 import { listFeatureWorkspaces } from './deacon-workspaces.js';
 import { createInFlightGuard } from './in-flight-guard.js';
-// Review gated-dispatch behavior moved to deacon-review-status.ts:
-// keep the source guard anchors here: releaseAdvancingSlot, if (dispatchResult.gated),
-// Deferred review re-dispatch for, Deferred post-review re-dispatch for.
-// if (dispatchResult.gated) {
-//   releaseAdvancingSlot();
-// }
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
@@ -144,15 +139,15 @@ const unlinkPath = (path: string): Effect.Effect<void, FsError> =>
 /** Re-exported for symmetry with the additive pattern in the rest of src/lib. */
 export { GitError, ProcessTimeoutError };
 export { checkInspectAgentTimeouts, INSPECT_TIMEOUT_MS } from './deacon-inspect.js';
-export { reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
+export { reconcileStaleMergeStatus, reconcileStuckMergingStates, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 export { coordinateSwarmSlots } from './deacon-swarm.js';
 export { nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, isRapidPostResumeDeath, isPreKickoffLaunchDeath } from './deacon-auto-resume.js';
 
 import { OVERDECK_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
-import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, releaseAdvancingSlot, describeRunningAgents } from './concurrency.js';
+import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, describeRunningAgents } from './concurrency.js';
 import { tryYieldForAdvancingDispatch } from './preemption.js';
-import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync } from '../review-status.js';
 import { needsReviewDispatch } from '../review-dispatch-decision.js';
 import { readIssueRecordSync } from '../pan-dir/record.js';
 import { updateIssueRecord } from '../pan-dir/record-update.js';
@@ -1553,130 +1548,7 @@ export async function checkVerificationReviewContradiction(): Promise<string[]> 
 // Post-review commit detection
 // ============================================================================
 
-/**
- * Detect issues where the agent pushed new commits AFTER review passed.
- *
- * When review passes, specialists.ts snapshots the HEAD commit SHA into
- * `reviewedAtCommit`. On each patrol, we check all passed/readyForMerge
- * issues: if the workspace HEAD has moved past that snapshot, the review
- * is stale and must be re-run.
- *
- * Guards:
- *   - Only fires when reviewedAtCommit is populated (set since the review passed)
- *   - Skips issues already merged (mergeStatus === 'merged')
- *   - Skips issues whose workspace directory doesn't exist
- */
-export async function checkPostReviewCommits(): Promise<string[]> {
-  const actions: string[] = [];
-
-  try {
-    const statuses = loadReviewStatuses();
-    const { resolveProjectFromIssueSync } = await import('../projects.js');
-
-    for (const [issueId, status] of Object.entries(statuses)) {
-      // Only check passed reviews not yet merged
-      if (status.mergeStatus === 'merged') continue;
-      if (!status.reviewedAtCommit) continue;
-      if (status.reviewStatus !== 'passed' && !status.readyForMerge) continue;
-      if (await isIssueClosed(issueId)) {
-        console.log(`[deacon] ${issueId}: skipping review re-dispatch — issue is closed`);
-        continue;
-      }
-
-      // Resolve workspace path
-      const project = resolveProjectFromIssueSync(issueId);
-      if (!project) continue;
-      const workspacePath = join(
-        project.projectPath,
-        'workspaces',
-        `feature-${issueId.toLowerCase()}`,
-      );
-      if (!existsSync(workspacePath)) continue;
-
-      const { formatAnchorShort, rehydrateHeadAnchor } = await import('../git-utils.js');
-      const { evaluateWorkspaceAnchorDrift } = await import('../workspace-anchor-drift.js');
-      const verdict = await evaluateWorkspaceAnchorDrift(
-        issueId,
-        workspacePath,
-        rehydrateHeadAnchor(status.reviewedAtCommit), // Stored anchors re-brand at the evaluator boundary.
-      );
-      if (verdict.kind === 'unreadable' || verdict.kind === 'current') continue;
-
-      if (verdict.kind === 'benign') {
-        setReviewStatusSync(issueId, { reviewedAtCommit: verdict.currentAnchor });
-        console.log(`[deacon] Benign post-review HEAD move for ${issueId}: ${formatAnchorShort(status.reviewedAtCommit)} → ${formatAnchorShort(verdict.currentAnchor)} — review/test preserved`);
-        continue;
-      }
-
-      const currentHead = verdict.currentAnchor;
-
-      // HEAD moved with a real tree change — new commits since review. Reset review pipeline.
-      console.log(
-        `[deacon] Post-review commit detected for ${issueId}: ` +
-        `was ${formatAnchorShort(status.reviewedAtCommit)}, now ${formatAnchorShort(currentHead)} — resetting review`,
-      );
-      setReviewStatusSync(issueId, {
-        reviewStatus: 'pending',
-        testStatus: 'pending',
-        readyForMerge: false,
-        reviewedAtCommit: undefined,
-        reviewNotes: undefined,
-        testNotes: undefined,
-        // Reset merge retry counter so checkFailedMergeRetry can retry again after
-        // the work agent pushes a fix (e.g. to address a CI check failure).
-        mergeRetryCount: 0,
-        // PAN-794: new commits open a fresh recovery cycle — stale infra
-        // failures from the previous cycle must not poison the breaker budget.
-        reviewRetryCount: 0,
-        recoveryStartedAt: undefined,
-      });
-      // Also clear the CI transient retry counter so the next merge attempt
-      // starts fresh. Without this, ciRetryMap retains count=6 from the previous
-      // CI failure cycle, permanently blocking transient retries for this issue.
-      ciRetryMap.delete(issueId);
-      actions.push(`Reset review for ${issueId}: new commits after review passed (${formatAnchorShort(status.reviewedAtCommit)} → ${formatAnchorShort(currentHead)})`);
-
-      // Redispatch a fresh review convoy. Re-read status to guard against races
-      // with other dispatch paths (HTTP request-review, manual CLI) that may have
-      // already picked up the work between the reset above and now.
-      const freshStatus = getReviewStatusSync(issueId);
-      // PAN-2507: also a blocked advancing (review) dispatch — try to yield an
-      // idle work agent before deferring. (This 7th site was not in the PRD's
-      // six-site enumeration but is the same `!tryReserveAdvancingSlot()` shape.)
-      if (freshStatus?.reviewStatus === 'pending' && !tryReserveAdvancingSlot() && !(await tryYieldForAdvancingDispatch('review', issueId))) {
-        // PAN-1665: at the ceiling — status is already reset to pending above, so
-        // the orphan-review path will re-dispatch on a later patrol once a slot frees.
-        actions.push(`Deferred post-review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
-        logDeaconEventSync(`checkPostReviewCommits: deferred review for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
-      } else if (freshStatus?.reviewStatus === 'pending') {
-        const { spawnReviewRoleForIssue } = await import('./review-agent.js');
-        const branch = `feature/${issueId.toLowerCase()}`;
-        const dispatchResult = await Effect.runPromise(spawnReviewRoleForIssue({
-          issueId,
-          workspace: workspacePath,
-          branch,
-          force: true,
-        }));
-        if (dispatchResult.gated) {
-          releaseAdvancingSlot();
-          actions.push(`Deferred post-review re-dispatch for ${issueId} — ${dispatchResult.message}`);
-          console.log(`[deacon] Deferred post-review re-dispatch for ${issueId}: ${dispatchResult.message}`);
-        } else if (dispatchResult.success) {
-          actions.push(`Re-dispatched review for ${issueId}`);
-          console.log(`[deacon] Re-dispatched review convoy for ${issueId} after post-review commit reset`);
-        } else {
-          actions.push(`Failed to re-dispatch review for ${issueId}: ${dispatchResult.error || dispatchResult.message}`);
-          console.error(`[deacon] Failed to re-dispatch review for ${issueId}:`, dispatchResult.error || dispatchResult.message);
-        }
-      }
-    }
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('[deacon] Error in checkPostReviewCommits:', msg);
-  }
-
-  return actions;
-}
+export { checkPostReviewCommits };
 
 // Callback set by the server layer to emit domain events when agents are stopped.
 // Deacon is a library module and does not own the event store directly.
@@ -2739,26 +2611,9 @@ export async function runPatrol(): Promise<PatrolResult> {
   // In dev mode, the deploy script may fail to restart cleanly, leaving the pending file.
   try {
     const pendingFile = join(OVERDECK_HOME, 'pending-post-merge.json');
-    if (existsSync(pendingFile)) {
-      const content = readFileSync(pendingFile, 'utf-8');
-      const pending = JSON.parse(content);
-      const age = Date.now() - (pending.timestamp ?? 0);
-      if (age < 60 * 60 * 1000) { // Less than 1 hour old
-        console.log(`[deacon] Processing pending post-merge lifecycle for ${pending.issueId} (age: ${Math.round(age / 1000)}s)`);
-        // Import and run lifecycle with skipDeploy to avoid infinite restart loop
-        const { postMergeLifecycle } = await import('./merge-agent.js');
-        // Delete file first to prevent re-processing
-        const { unlinkSync } = await import('fs');
-        unlinkSync(pendingFile);
-        await postMergeLifecycle(pending.issueId, pending.projectPath, pending.sourceBranch, { skipDeploy: true });
-        actions.push(`Processed pending post-merge lifecycle for ${pending.issueId}`);
-      } else {
-        // Stale — delete it
-        const { unlinkSync } = await import('fs');
-        unlinkSync(pendingFile);
-        console.log(`[deacon] Deleted stale pending-post-merge.json (age: ${Math.round(age / 60000)}m)`);
-      }
-    }
+    const { processPendingLifecycleForPatrol } = await import('./deacon-pending-lifecycle.js');
+    const action = await processPendingLifecycleForPatrol(pendingFile);
+    if (action) actions.push(action);
   } catch (err: any) {
     console.warn(`[deacon] Failed to process pending lifecycle: ${err.message}`);
   }
@@ -3067,10 +2922,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...swarmActions);
   for (const a of swarmActions) addLog('action', a, state.patrolCycle);
 
-  // Reconcile stale merge status: detect branches merged to main outside the dashboard
+  // Reconcile stale merges and bound merging/verifying states that never completed.
   const staleMergeActions = await reconcileStaleMergeStatus();
-  actions.push(...staleMergeActions);
-  for (const a of staleMergeActions) addLog('action', a, state.patrolCycle);
+  staleMergeActions.push(...await reconcileStuckMergingStates());
+  actions.push(...staleMergeActions); for (const a of staleMergeActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1027 reverse: detect mergeStatus=merged issues whose GitHub PR is not merged
   // (closed-without-merge, reopened after revert, or false positive from squash detection).

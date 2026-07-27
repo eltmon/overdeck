@@ -11,7 +11,8 @@ import {
   type AgentState,
 } from '../../../../lib/agents.js';
 import { createInFlightGuard } from '../../../../lib/cloister/in-flight-guard.js';
-import { extractPrefixSync } from '../../../../lib/issue-id.js';
+import type { VerifiedMergedRepo } from '../../../../lib/cloister/merge-verification.js';
+import { parseIssueIdSync } from '../../../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 
 export const execAsync = promisify(exec);
@@ -129,40 +130,58 @@ export const _serverManagedMerges = new Set<string>();
 export interface FirePostMergeLifecycleOptions {
   sourceBranch?: string;
   verifiedMergedRef?: string;
+  /**
+   * Per-repo merge evidence from a polyrepo batch promotion (PAN-3093). It must
+   * be forwarded: a polyrepo member's single-ref evidence is a composite anchor
+   * checked against origin/main in the WRAPPER path, which is not a git repo,
+   * so dropping this silently refuses every member's post-merge transition even
+   * though all repos landed.
+   */
+  verifiedMergedRepos?: readonly VerifiedMergedRepo[];
 }
 
 export function firePostMergeLifecycle(issueId: string, options?: FirePostMergeLifecycleOptions): boolean {
+  const parsedIssueId = parseIssueIdSync(issueId.trim());
+  if (!parsedIssueId) {
+    console.error(`[merge] Refusing post-merge lifecycle for invalid issue ID: ${issueId}`);
+    return false;
+  }
+  const normalizedIssueId = parsedIssueId.normalized.toUpperCase();
+
   const started = postMergeGuard.run(
-    issueId,
+    normalizedIssueId,
     async () => {
-      const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-      const projectPath = getProjectPathForIssue(issuePrefix);
+      const projectPath = getProjectPathForIssue(parsedIssueId.prefix);
       const { postMergeLifecycle } = await import('../../../../lib/cloister/merge-agent.js');
+      const lifecycleOptions = {
+        ...(options?.verifiedMergedRef ? { verifiedMergedRef: options.verifiedMergedRef } : {}),
+        ...(options?.verifiedMergedRepos?.length ? { verifiedMergedRepos: options.verifiedMergedRepos } : {}),
+      };
       await postMergeLifecycle(
-        issueId,
+        normalizedIssueId,
         projectPath,
         options?.sourceBranch,
-        options?.verifiedMergedRef ? { verifiedMergedRef: options.verifiedMergedRef } : undefined,
+        Object.keys(lifecycleOptions).length > 0 ? lifecycleOptions : undefined,
       );
-      console.log(`[merge] post-merge lifecycle completed for ${issueId}`);
+      console.log(`[merge] post-merge lifecycle completed for ${normalizedIssueId}`);
 
       // PAN-1691: roll the merge train — rebase ready siblings onto the new main,
       // re-verify the clean ones, agent-resolve conflicts. No-op unless the
       // flywheel.merge_train_enabled flag is on. Runs inside the in-flight guard,
       // so it cannot re-enter postMergeLifecycle for this issue.
       const { runMergeTrainReconcile } = await import('../../../../lib/cloister/merge-train.js');
-      const outcomes = await runMergeTrainReconcile(issueId);
+      const outcomes = await runMergeTrainReconcile(normalizedIssueId);
       if (outcomes.length > 0) {
         console.log(
-          `[merge-train] reconciled ${outcomes.length} sibling(s) after ${issueId}: ` +
+          `[merge-train] reconciled ${outcomes.length} sibling(s) after ${normalizedIssueId}: ` +
             outcomes.map((o) => `${o.issueId}=${o.result}`).join(', '),
         );
       }
     },
-    (err) => console.error(`[merge] post-merge lifecycle failed for ${issueId}:`, err),
+    (err) => console.error(`[merge] post-merge lifecycle failed for ${normalizedIssueId}:`, err),
   );
   if (!started) {
-    console.log(`[merge] firePostMergeLifecycle: skipping ${issueId} — already in flight`);
+    console.log(`[merge] firePostMergeLifecycle: skipping ${normalizedIssueId} — already in flight`);
   }
   return started;
 }

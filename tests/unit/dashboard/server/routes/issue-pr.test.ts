@@ -127,7 +127,7 @@ describe('fetchIssuePullRequest — GET /api/issues/:id/pr', () => {
     expect(strikeCmd).toContain('--head strike/pan-830');
   });
 
-  it('returns parsed pr metadata on the happy path', async () => {
+  it('returns the single feature PR after probing both convention heads', async () => {
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
@@ -157,17 +157,76 @@ describe('fetchIssuePullRequest — GET /api/issues/:id/pr', () => {
       body: '',
     };
     mockExec
-      .mockResolvedValueOnce({ stdout: '642\n', stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 642, state: 'OPEN', mergedAt: null }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       .mockResolvedValueOnce({ stdout: JSON.stringify(prJson), stderr: '' });
 
     const result = await fetchIssuePullRequest('PAN-830');
 
     expect(result.pr?.number).toBe(642);
     expect(result.pr?.title).toBe('feat: command deck');
-    expect(mockExec).toHaveBeenCalledTimes(2);
-    const [, viewCmdCall] = mockExec.mock.calls;
+    expect(mockExec).toHaveBeenCalledTimes(3);
+    const [featureCmdCall, strikeCmdCall, viewCmdCall] = mockExec.mock.calls;
+    expect(featureCmdCall![0]).toContain('--head feature/pan-830');
+    expect(strikeCmdCall![0]).toContain('--head strike/pan-830');
     expect(viewCmdCall![0]).toContain('gh pr view 642');
     expect(viewCmdCall![0]).toContain('eltmon/overdeck');
+  });
+
+  it('prefers a merged strike PR over a closed feature PR', async () => {
+    mockResolveGitHubIssue.mockReturnValue({
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'overdeck',
+      number: 830,
+    });
+    const strikePr = {
+      number: 3152,
+      title: 'fix: strike landing',
+      url: 'https://github.com/eltmon/overdeck/pull/3152',
+      state: 'MERGED',
+      mergedAt: '2026-07-26T12:00:00Z',
+      mergeCommit: { oid: '6ac4a3dc11' },
+    };
+    mockExec
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 3127, state: 'CLOSED', mergedAt: null }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 3152, state: 'MERGED', mergedAt: '2026-07-26T12:00:00Z' }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify(strikePr), stderr: '' });
+
+    const result = await fetchIssuePullRequest('PAN-830');
+
+    expect(result.pr).toMatchObject({
+      number: 3152,
+      state: 'MERGED',
+      mergedAt: '2026-07-26T12:00:00Z',
+      mergeCommit: { oid: '6ac4a3dc11' },
+    });
+    expect(mockExec.mock.calls[2]![0]).toContain('gh pr view 3152');
+  });
+
+  it('prefers an open feature PR over a merged strike PR', async () => {
+    mockResolveGitHubIssue.mockReturnValue({
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'overdeck',
+      number: 830,
+    });
+    const featurePr = {
+      number: 3127,
+      title: 'fix: active feature',
+      url: 'https://github.com/eltmon/overdeck/pull/3127',
+      state: 'OPEN',
+    };
+    mockExec
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 3127, state: 'OPEN', mergedAt: null }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 3152, state: 'MERGED', mergedAt: '2026-07-26T12:00:00Z' }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify(featurePr), stderr: '' });
+
+    const result = await fetchIssuePullRequest('PAN-830');
+
+    expect(result.pr?.number).toBe(3127);
+    expect(result.pr?.state).toBe('OPEN');
+    expect(mockExec.mock.calls[2]![0]).toContain('gh pr view 3127');
   });
 
   it('returns error when gh pr view fails', async () => {
@@ -178,7 +237,8 @@ describe('fetchIssuePullRequest — GET /api/issues/:id/pr', () => {
       number: 830,
     });
     mockExec
-      .mockResolvedValueOnce({ stdout: '642\n', stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 642, state: 'OPEN', mergedAt: null }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       .mockRejectedValueOnce(new Error('gh: not authenticated'));
 
     const result = await fetchIssuePullRequest('PAN-830');
@@ -206,15 +266,16 @@ describe('fetchIssuePullRequestDiff — GET /api/issues/:id/pr/diff', () => {
       number: 830,
     });
     mockExec
-      .mockResolvedValueOnce({ stdout: '642\n', stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 642, state: 'OPEN', mergedAt: null }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       .mockResolvedValueOnce({ stdout: 'diff --git a/foo b/foo\n+added\n', stderr: '' });
 
     const result = await fetchIssuePullRequestDiff('PAN-830');
 
     expect(result.diff).toContain('diff --git');
     expect(result.diff).toContain('+added');
-    expect(mockExec).toHaveBeenCalledTimes(2);
-    const [, diffCmdCall] = mockExec.mock.calls;
+    expect(mockExec).toHaveBeenCalledTimes(3);
+    const [, , diffCmdCall] = mockExec.mock.calls;
     expect(diffCmdCall![0]).toContain('gh pr diff 642');
     expect(diffCmdCall![0]).toContain('eltmon/overdeck');
   });
@@ -227,7 +288,8 @@ describe('fetchIssuePullRequestDiff — GET /api/issues/:id/pr/diff', () => {
       number: 830,
     });
     mockExec
-      .mockResolvedValueOnce({ stdout: '642\n', stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 642, state: 'OPEN', mergedAt: null }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       .mockRejectedValueOnce(new Error('diff too large'));
 
     const result = await fetchIssuePullRequestDiff('PAN-830');
@@ -293,7 +355,8 @@ describe('fetchIssueCheckRuns — GET /api/issues/:id/check-runs', () => {
       ],
     };
     mockExec
-      .mockResolvedValueOnce({ stdout: '642\n', stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 642, state: 'OPEN', mergedAt: null }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       .mockResolvedValueOnce({ stdout: JSON.stringify(prJson), stderr: '' })
       .mockResolvedValueOnce({ stdout: JSON.stringify(checksJson), stderr: '' });
 
@@ -303,7 +366,7 @@ describe('fetchIssueCheckRuns — GET /api/issues/:id/check-runs', () => {
     expect(result.checkRuns).toHaveLength(5);
     expect(result.checkRuns[0]).toMatchObject({ name: 'build', status: 'completed', conclusion: 'success', app: 'GitHub Actions' });
     expect(result.summary).toMatchObject({ total: 5, passed: 1, failed: 1, skipped: 1, running: 1, pending: 1 });
-    const [, , apiCmdCall] = mockExec.mock.calls;
+    const [, , , apiCmdCall] = mockExec.mock.calls;
     expect(apiCmdCall![0]).toContain('gh api');
     expect(apiCmdCall![0]).toContain('repos/eltmon/overdeck/commits/abc123def456/check-runs');
   });
@@ -316,7 +379,8 @@ describe('fetchIssueCheckRuns — GET /api/issues/:id/check-runs', () => {
       number: 830,
     });
     mockExec
-      .mockResolvedValueOnce({ stdout: '642\n', stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 642, state: 'OPEN', mergedAt: null }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       .mockResolvedValueOnce({ stdout: JSON.stringify({ number: 642, url: 'https://github/pull/642', headRefName: 'feature/pan-830', mergeable: 'UNKNOWN', statusCheckRollup: [] }), stderr: '' })
       .mockRejectedValueOnce(new Error('gh: not authenticated'));
 

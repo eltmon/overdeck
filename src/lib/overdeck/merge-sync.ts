@@ -23,25 +23,15 @@ import type { MergeSet, MergeSetRepoState } from '../merge-set.js';
 import type { ForgeType } from '../forge.js';
 
 // ── Timestamp helpers ─────────────────────────────────────────────────────────
-// overdeck stores INTEGER milliseconds; old types want ISO strings.
+// overdeck stores INTEGER milliseconds; old types want ISO strings. Shared with
+// merge-sync-uat.ts, so they live in their own module to avoid an import cycle.
 
-function isoFromMillis(value: number | null | undefined): string | undefined {
-  return value == null ? undefined : new Date(value).toISOString();
-}
-
-function isoFromMillisRequired(value: number): string {
-  return new Date(value).toISOString();
-}
-
-function millisFromIso(value: string | null | undefined): number | null {
-  if (!value) return null;
-  const ms = Date.parse(value);
-  return Number.isFinite(ms) ? ms : null;
-}
-
-function nowMillis(): number {
-  return Date.now();
-}
+import {
+  isoFromMillis,
+  isoFromMillisRequired,
+  millisFromIso,
+  nowMillis,
+} from './merge-sync-time.js';
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
@@ -340,328 +330,11 @@ export function resetProcessingToQueued(): number {
 }
 
 // ── UAT Generations ───────────────────────────────────────────────────────────
+// Split into merge-sync-uat.ts (PAN-3093) when per-repo generation state pushed
+// this file over the size ceiling. Re-exported so callers keep importing from
+// merge-sync.js.
 
-export type {
-  UatGeneration,
-  UatGenerationMember,
-  UatGenerationHeldOut,
-  UatGenerationResolution,
-  UatGenerationStatus,
-} from './merge-types.js';
-
-import type {
-  UatGeneration,
-  UatGenerationMember,
-  UatGenerationHeldOut,
-  UatGenerationResolution,
-  UatGenerationStatus,
-} from './merge-types.js';
-
-// overdeck row shapes
-interface OverdeckUatGenerationRow {
-  name: string;
-  worktree_path: string;
-  project_root: string;
-  base_sha: string;
-  status: string;
-  stack_started_at: number | null;
-  cleaned_at: number | null;
-  created_at: number;
-  updated_at: number;
-}
-
-interface OverdeckUatMemberRow {
-  uat_name: string;
-  issue_id: string;
-  role: string;
-  title: string | null;
-  branch: string | null;
-  head_sha: string | null;
-  merge_order: number | null;
-  pr: number | null;
-  pr_url: string | null;
-  reason: string | null;
-}
-
-interface OverdeckUatResolutionRow {
-  id: number;
-  uat_name: string;
-  issue_ids: string; // JSON-encoded string[]
-  files: string;     // JSON-encoded string[]
-  commit_sha: string;
-}
-
-function rowToUatGeneration(
-  row: OverdeckUatGenerationRow,
-  memberRows: OverdeckUatMemberRow[],
-  resolutionRows: OverdeckUatResolutionRow[],
-): UatGeneration {
-  const members: UatGenerationMember[] = memberRows
-    .filter((m) => m.role === 'member')
-    .map((m) => ({
-      issueId: m.issue_id,
-      title: m.title ?? '',
-      branch: m.branch ?? '',
-      headSha: m.head_sha ?? '',
-      mergeOrder: m.merge_order ?? 0,
-      pr: m.pr ?? undefined,
-      prUrl: m.pr_url ?? undefined,
-    }));
-
-  const heldOut: UatGenerationHeldOut[] = memberRows
-    .filter((m) => m.role === 'held_out')
-    .map((m) => ({
-      issueId: m.issue_id,
-      branch: m.branch ?? undefined,
-      headSha: m.head_sha ?? undefined,
-      reason: m.reason ?? '',
-    }));
-
-  const resolutions: UatGenerationResolution[] = resolutionRows.map((r) => ({
-    issueIds: JSON.parse(r.issue_ids) as string[],
-    files: JSON.parse(r.files) as string[],
-    commitSha: r.commit_sha,
-  }));
-
-  return {
-    name: row.name,
-    worktreePath: row.worktree_path,
-    projectRoot: row.project_root,
-    baseSha: row.base_sha,
-    status: row.status as UatGenerationStatus,
-    members,
-    heldOut,
-    resolutions,
-    stackStartedAt: isoFromMillis(row.stack_started_at) ?? null,
-    cleanedAt: isoFromMillis(row.cleaned_at) ?? null,
-    createdAt: isoFromMillisRequired(row.created_at),
-    updatedAt: isoFromMillisRequired(row.updated_at),
-  };
-}
-
-function loadMembersForUat(db: ReturnType<typeof getOverdeckDatabaseSync>, uatName: string): OverdeckUatMemberRow[] {
-  return db.prepare('SELECT * FROM uat_generation_members WHERE uat_name = ?').all(uatName) as OverdeckUatMemberRow[];
-}
-
-function loadResolutionsForUat(db: ReturnType<typeof getOverdeckDatabaseSync>, uatName: string): OverdeckUatResolutionRow[] {
-  return db.prepare('SELECT * FROM uat_generation_resolutions WHERE uat_name = ?').all(uatName) as OverdeckUatResolutionRow[];
-}
-
-/** Drop-in for insertUatGenerationSync() from uat-generations-db.ts. */
-export function insertUatGenerationSync(
-  gen: Omit<UatGeneration, 'createdAt' | 'updatedAt'> & { createdAt?: string },
-): UatGeneration {
-  const db = getOverdeckDatabaseSync();
-  const nowMs = nowMillis();
-  const createdAt = gen.createdAt ?? new Date(nowMs).toISOString();
-  const createdAtMs = millisFromIso(createdAt) ?? nowMs;
-
-  const tx = db.transaction(() => {
-    db.prepare('DELETE FROM uat_generation_members WHERE uat_name = ?').run(gen.name);
-    db.prepare('DELETE FROM uat_generation_resolutions WHERE uat_name = ?').run(gen.name);
-    db.prepare(`
-      INSERT OR REPLACE INTO uat_generations (
-        name, worktree_path, project_root, base_sha, status,
-        stack_started_at, cleaned_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      gen.name,
-      gen.worktreePath,
-      gen.projectRoot,
-      gen.baseSha,
-      gen.status,
-      gen.stackStartedAt ? millisFromIso(gen.stackStartedAt) : null,
-      gen.cleanedAt ? millisFromIso(gen.cleanedAt) : null,
-      createdAtMs,
-      nowMs,
-    );
-
-    const insertMember = db.prepare(`
-      INSERT INTO uat_generation_members (uat_name, issue_id, role, title, branch, head_sha, merge_order, pr, pr_url, reason)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    for (const m of gen.members) {
-      insertMember.run(gen.name, m.issueId, 'member', m.title, m.branch, m.headSha, m.mergeOrder, m.pr ?? null, m.prUrl ?? null, null);
-    }
-    for (const h of gen.heldOut) {
-      insertMember.run(gen.name, h.issueId, 'held_out', null, h.branch ?? null, h.headSha ?? null, null, null, null, h.reason);
-    }
-
-    const insertResolution = db.prepare(`
-      INSERT INTO uat_generation_resolutions (uat_name, issue_ids, files, commit_sha)
-      VALUES (?, ?, ?, ?)
-    `);
-    for (const r of gen.resolutions) {
-      insertResolution.run(gen.name, JSON.stringify(r.issueIds), JSON.stringify(r.files), r.commitSha);
-    }
-  });
-
-  tx();
-  return { ...gen, createdAt, updatedAt: new Date(nowMs).toISOString() };
-}
-
-/** Drop-in for getUatGenerationSync() from uat-generations-db.ts. */
-export function getUatGenerationSync(name: string): UatGeneration | null {
-  const db = getOverdeckDatabaseSync();
-  const row = db.prepare('SELECT * FROM uat_generations WHERE name = ?').get(name) as
-    | OverdeckUatGenerationRow
-    | undefined;
-  if (!row) return null;
-  return rowToUatGeneration(row, loadMembersForUat(db, name), loadResolutionsForUat(db, name));
-}
-
-/** Drop-in for listUatGenerationsSync() from uat-generations-db.ts. */
-export function listUatGenerationsSync(options: {
-  projectRoot?: string;
-  statuses?: readonly UatGenerationStatus[];
-  limit?: number;
-} = {}): UatGeneration[] {
-  const db = getOverdeckDatabaseSync();
-  const where: string[] = [];
-  const params: unknown[] = [];
-  if (options.projectRoot) {
-    where.push('project_root = ?');
-    params.push(options.projectRoot);
-  }
-  if (options.statuses && options.statuses.length > 0) {
-    where.push(`status IN (${options.statuses.map(() => '?').join(', ')})`);
-    params.push(...options.statuses);
-  }
-  const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
-  const limitSql = options.limit ? `LIMIT ${Math.max(1, Math.floor(options.limit))}` : '';
-  const rows = db.prepare(
-    `SELECT * FROM uat_generations ${whereSql} ORDER BY created_at DESC, name DESC ${limitSql}`,
-  ).all(...params) as OverdeckUatGenerationRow[];
-
-  return rows.map((row) =>
-    rowToUatGeneration(row, loadMembersForUat(db, row.name), loadResolutionsForUat(db, row.name)),
-  );
-}
-
-/** Drop-in for listUatGenerationNamesSync() from uat-generations-db.ts. */
-export function listUatGenerationNamesSync(): string[] {
-  const db = getOverdeckDatabaseSync();
-  const rows = db.prepare('SELECT name FROM uat_generations').all() as Array<{ name: string }>;
-  return rows.map((r) => r.name);
-}
-
-/** Drop-in for updateUatGenerationStatusSync() from uat-generations-db.ts. */
-export function updateUatGenerationStatusSync(name: string, status: UatGenerationStatus): void {
-  const db = getOverdeckDatabaseSync();
-  const result = db.prepare(
-    'UPDATE uat_generations SET status = ?, updated_at = ? WHERE name = ?',
-  ).run(status, nowMillis(), name);
-  if (result.changes === 0) {
-    throw new Error(`[merge-sync] uat generation not found: ${name}`);
-  }
-}
-
-/** Drop-in for updateUatGenerationSync() from uat-generations-db.ts. */
-export function updateUatGenerationSync(
-  name: string,
-  patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt'>>,
-): void {
-  const db = getOverdeckDatabaseSync();
-
-  const tx = db.transaction(() => {
-    // Update scalar fields on the generation row
-    const sets: string[] = [];
-    const params: unknown[] = [];
-    if (patch.status !== undefined) { sets.push('status = ?'); params.push(patch.status); }
-    if (patch.baseSha !== undefined) { sets.push('base_sha = ?'); params.push(patch.baseSha); }
-    if (patch.cleanedAt !== undefined) { sets.push('cleaned_at = ?'); params.push(millisFromIso(patch.cleanedAt)); }
-
-    if (sets.length > 0) {
-      sets.push('updated_at = ?');
-      params.push(nowMillis(), name);
-      const result = db.prepare(`UPDATE uat_generations SET ${sets.join(', ')} WHERE name = ?`).run(...params);
-      if (result.changes === 0) {
-        throw new Error(`[merge-sync] uat generation not found: ${name}`);
-      }
-    } else {
-      // At least stamp updated_at if we're touching members/resolutions
-      db.prepare('UPDATE uat_generations SET updated_at = ? WHERE name = ?').run(nowMillis(), name);
-    }
-
-    // Rebuild members table if members or heldOut changed
-    if (patch.members !== undefined || patch.heldOut !== undefined) {
-      // Load existing rows BEFORE deleting them (needed when only one side is patched)
-      const existing = (patch.members === undefined || patch.heldOut === undefined)
-        ? (db.prepare('SELECT * FROM uat_generation_members WHERE uat_name = ?').all(name) as OverdeckUatMemberRow[])
-        : [];
-
-      db.prepare('DELETE FROM uat_generation_members WHERE uat_name = ?').run(name);
-      const insertMember = db.prepare(`
-        INSERT INTO uat_generation_members (uat_name, issue_id, role, title, branch, head_sha, merge_order, pr, pr_url, reason)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      const members: UatGenerationMember[] = patch.members !== undefined
-        ? patch.members
-        : existing.filter((r) => r.role === 'member').map((r) => ({
-            issueId: r.issue_id,
-            title: r.title ?? '',
-            branch: r.branch ?? '',
-            headSha: r.head_sha ?? '',
-            mergeOrder: r.merge_order ?? 0,
-            pr: r.pr ?? undefined,
-            prUrl: r.pr_url ?? undefined,
-          }));
-
-      const heldOut: UatGenerationHeldOut[] = patch.heldOut !== undefined
-        ? patch.heldOut
-        : existing.filter((r) => r.role === 'held_out').map((r) => ({
-            issueId: r.issue_id,
-            branch: r.branch ?? undefined,
-            headSha: r.head_sha ?? undefined,
-            reason: r.reason ?? '',
-          }));
-
-      for (const m of members) {
-        insertMember.run(name, m.issueId, 'member', m.title, m.branch, m.headSha, m.mergeOrder, m.pr ?? null, m.prUrl ?? null, null);
-      }
-      for (const h of heldOut) {
-        insertMember.run(name, h.issueId, 'held_out', null, h.branch ?? null, h.headSha ?? null, null, null, null, h.reason);
-      }
-    }
-
-    // Rebuild resolutions if changed
-    if (patch.resolutions !== undefined) {
-      db.prepare('DELETE FROM uat_generation_resolutions WHERE uat_name = ?').run(name);
-      const insertRes = db.prepare(`
-        INSERT INTO uat_generation_resolutions (uat_name, issue_ids, files, commit_sha)
-        VALUES (?, ?, ?, ?)
-      `);
-      for (const r of patch.resolutions) {
-        insertRes.run(name, JSON.stringify(r.issueIds), JSON.stringify(r.files), r.commitSha);
-      }
-    }
-  });
-
-  tx();
-}
-
-/** Drop-in for setUatGenerationStackStartedAtSync() from uat-generations-db.ts. */
-export function setUatGenerationStackStartedAtSync(name: string, startedAt: string | null): void {
-  const db = getOverdeckDatabaseSync();
-  const result = db.prepare(
-    'UPDATE uat_generations SET stack_started_at = ?, updated_at = ? WHERE name = ?',
-  ).run(startedAt ? millisFromIso(startedAt) : null, nowMillis(), name);
-  if (result.changes === 0) {
-    throw new Error(`[merge-sync] uat generation not found: ${name}`);
-  }
-}
-
-/** Drop-in for listUatGenerationsWithStacksSync() from uat-generations-db.ts. */
-export function listUatGenerationsWithStacksSync(): UatGeneration[] {
-  const db = getOverdeckDatabaseSync();
-  const rows = db.prepare(
-    'SELECT * FROM uat_generations WHERE stack_started_at IS NOT NULL ORDER BY stack_started_at ASC',
-  ).all() as OverdeckUatGenerationRow[];
-  return rows.map((row) =>
-    rowToUatGeneration(row, loadMembersForUat(db, row.name), loadResolutionsForUat(db, row.name)),
-  );
-}
+export * from './merge-sync-uat.js';
 
 // ── Merge Sets ────────────────────────────────────────────────────────────────
 
@@ -794,6 +467,60 @@ export function upsertMergeSet(mergeSet: MergeSet): void {
   });
 
   tx(mergeSet);
+}
+
+export interface MergeSetRepoPatch {
+  repoKey: string;
+  expected: Pick<MergeSetRepoState, 'sourceBranch' | 'targetBranch' | 'artifactUrl' | 'artifactId'>;
+  patch: Partial<Pick<MergeSetRepoState, 'artifactUrl' | 'artifactId' | 'mergeStatus'>>;
+}
+
+const MERGE_SET_REPO_CAS_FAILED = new Error('merge-set-repo-cas-failed');
+
+export function patchMergeSetRepos(issueId: string, patches: MergeSetRepoPatch[]): boolean {
+  const db = getOverdeckDatabaseSync();
+  const effective = patches.filter(({ patch }) => Object.values(patch).some((value) => value !== undefined));
+  if (effective.length === 0) return true;
+
+  try {
+    db.transaction(() => {
+      for (const { repoKey, expected, patch } of effective) {
+        const assignments: string[] = [];
+        const values: unknown[] = [];
+        if (patch.artifactUrl !== undefined) { assignments.push('artifact_url = ?'); values.push(patch.artifactUrl); }
+        if (patch.artifactId !== undefined) { assignments.push('artifact_id = ?'); values.push(patch.artifactId); }
+        if (patch.mergeStatus !== undefined) { assignments.push('merge_status = ?'); values.push(patch.mergeStatus); }
+        const result = db.prepare(`
+          UPDATE merge_set_repos SET ${assignments.join(', ')}
+          WHERE issue_id = ? AND repo_key = ? AND source_branch = ? AND target_branch = ?
+            AND artifact_url IS ? AND artifact_id IS ?
+        `).run(
+          ...values,
+          issueId,
+          repoKey,
+          expected.sourceBranch,
+          expected.targetBranch,
+          expected.artifactUrl ?? null,
+          expected.artifactId ?? null,
+        );
+        if (result.changes !== 1) throw MERGE_SET_REPO_CAS_FAILED;
+      }
+      db.prepare('UPDATE merge_sets SET updated_at = ? WHERE issue_id = ?').run(nowMillis(), issueId);
+    })();
+    return true;
+  } catch (error) {
+    if (error === MERGE_SET_REPO_CAS_FAILED) return false;
+    throw error;
+  }
+}
+
+export function patchMergeSetRepo(
+  issueId: string,
+  repoKey: string,
+  expected: MergeSetRepoPatch['expected'],
+  patch: MergeSetRepoPatch['patch'],
+): boolean {
+  return patchMergeSetRepos(issueId, [{ repoKey, expected, patch }]);
 }
 
 /** Drop-in for getMergeSetFromDb() from merge-set-db.ts. */

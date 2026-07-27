@@ -531,7 +531,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       }
 
       const activeRepos = mergeSet.repos
-        .filter(repo => repo.mergeStatus !== 'skipped' && !!repo.artifactUrl)
+        .filter(repo => repo.mergeStatus !== 'skipped' && repo.mergeStatus !== 'merged' && !!repo.artifactUrl)
         .sort((a, b) => a.mergeOrder - b.mergeOrder);
 
       if (activeRepos.length === 0) {

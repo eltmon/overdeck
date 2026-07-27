@@ -124,6 +124,7 @@ describe('swarm verdict feedback routing', () => {
       notes: 'fix wi-b',
       workspacePath,
       slotItemId: 'wi-b',
+      runId: 'agent-pan-2203-review-abcdef12',
     }));
 
     expect(result.agentMessageSent).toBe(true);
@@ -132,7 +133,10 @@ describe('swarm verdict feedback routing', () => {
       'agent-pan-2203-slot-2',
       expect.stringContaining('MUST READ: /tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md'),
       'internal',
-      { owesRework: true },
+      {
+        owesRework: true,
+        dedupKey: expect.stringMatching(/^review-feedback:pan-2203:[a-f0-9]{16}$/),
+      },
     );
   });
 
@@ -153,6 +157,7 @@ describe('swarm verdict feedback routing', () => {
       notes: 'fix wi-b',
       workspacePath,
       slotItemId: 'wi-b',
+      runId: 'agent-pan-2203-review-abcdef12',
     }));
 
     expect(result.agentMessageSent).toBe(true);
@@ -161,7 +166,10 @@ describe('swarm verdict feedback routing', () => {
       'agent-pan-2203-slot-2',
       expect.any(String),
       'internal',
-      { owesRework: true },
+      {
+        owesRework: true,
+        dedupKey: expect.stringMatching(/^review-feedback:pan-2203:[a-f0-9]{16}$/),
+      },
     );
     expect(mockMessageAgent).not.toHaveBeenCalledWith(
       'agent-pan-2203',
@@ -184,6 +192,7 @@ describe('swarm verdict feedback routing', () => {
       notes: 'fix wi-c',
       workspacePath,
       slotItemId: 'wi-c',
+      runId: 'agent-pan-2203-review-abcdef12',
     }));
 
     expect(result.agentMessageSent).toBe(true);
@@ -192,7 +201,10 @@ describe('swarm verdict feedback routing', () => {
       'agent-pan-2203-slot-1',
       expect.stringContaining('MUST READ: /tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md'),
       'internal',
-      { owesRework: true },
+      {
+        owesRework: true,
+        dedupKey: expect.stringMatching(/^review-feedback:pan-2203:[a-f0-9]{16}$/),
+      },
     );
     expect(mockMessageAgent).not.toHaveBeenCalledWith(
       'agent-pan-2203-slot-3',

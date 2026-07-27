@@ -495,8 +495,8 @@ idempotent and the test stays green.
 
 `postMergeLifecycle()` in `merge-agent.ts` is a non-destructive merge handoff. After
 merge it marks the issue `verifying_on_main`, applies the `verifying-on-main` label,
-pauses the work/planning agents, preserves workspace/state/xBRIEF/branches, and stops
-Docker containers and networks.
+pauses the work/planning agents, preserves workspace/state/xBRIEF/branches, and removes
+the workspace Docker containers and `overdeck-feature-<issue>_devnet` network.
 
 Docker cleanup still happens at merge time because orphaned networks from merged
 workspaces accumulate and eventually block new workspace creation with "all predefined
@@ -506,9 +506,22 @@ networks. NEVER remove this cleanup step.
 The durable, verified teardown owner is **close-out**: `pan close <id>` / dashboard
 Close Out stops and removes the workspace Docker stack (including the
 `overdeck-feature-<issue>_devnet` network) and verifies the network is gone. The deacon's
-closed-issue reaper (`reapIssueResidue`) is the backstop that tears down any terminal
-issue's leaked stack by name. The single `rebuildWorkspaceStack` chokepoint no-ops for
-closed/merged issues, so patrols never recreate a terminal stack.
+reaper is the backstop: it runs full `reapIssueResidue` cleanup for tracker-closed issues
+and queues Docker-only teardown for merged-but-not-closed issues on a deduplicated serial
+worker with retry backoff. Tracker-backed devnet closure checks run in batches of four. The worker revalidates canonical merged status before each
+attempt, while a fresh merge-agent enqueue may use its just-verified merge for the first
+retry if status persistence lags. Durable `mergeStep: post-merge-cleanup` marks an incomplete
+handoff. Startup atomically claims the pending file and runs it in a supervised background
+promise, so dashboard boot continues while the claim remains owned. Failure moves the claim to
+a discoverable queued generation unless canonical status positively owns the retry; a newer
+pending generation is never overwritten or discarded. Startup and patrol reclaim queued files
+and claims whose owner PID is dead. Issue IDs are validated at the route and lock boundaries,
+and the resolved lock path must remain inside the lifecycle lock directory. Completion records
+`mergeStep: merged`. Patrol reconciliation prunes Docker retries that are
+no longer eligible. The worker removes Compose
+volumes, project-owned containers, and the leaked devnet while preserving workspace files,
+branches, agents, sessions, state, and xBRIEF. The single `rebuildWorkspaceStack`
+chokepoint no-ops for closed and merged issues, so patrols never recreate a terminal stack.
 
 The destructive/non-reversible completion steps are owned by close-out, not merge:
 `pan close <id>` / dashboard Close Out completes the xBRIEF, archives planning artifacts,

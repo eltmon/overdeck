@@ -84,6 +84,7 @@ describe('readJournalStatusSync terminal markers (PAN-2054)', () => {
         testStatus: 'passed',
         verificationStatus: 'running',
         mergeStatus: 'pending',
+        mergeStep: 'post-merge-cleanup',
         readyForMerge: false,
         closedOut: true,
         closedOutAt: '2026-06-27T00:00:00.000Z',
@@ -95,6 +96,7 @@ describe('readJournalStatusSync terminal markers (PAN-2054)', () => {
 
     expect(journal?.durable.closedOut).toBe(true);
     expect(journal?.durable.closedOutAt).toBe('2026-06-27T00:00:00.000Z');
+    expect(journal?.durable.mergeStep).toBe('post-merge-cleanup');
   });
 
   it('projects durable strike landing state from the pipeline block', () => {

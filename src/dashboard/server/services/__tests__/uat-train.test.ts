@@ -9,7 +9,9 @@ import {
   getUatGenerationsPayload,
   postUatGenerationPromotePayload,
   resolveUatProjectRoot,
+  runUatTrainReconcile,
 } from '../uat-train.js';
+import type { UatReconcilerDeps } from '../../../../lib/cloister/uat-reconciler.js';
 import type { UatGeneration } from '../../../../lib/overdeck/merge-types.js';
 import type { PromoteResult, UatPromoteDeps } from '../../../../lib/cloister/uat-promote.js';
 
@@ -29,6 +31,14 @@ const mocks = vi.hoisted(() => ({
   findXBriefByIssue: vi.fn(),
   readXBriefDocument: vi.fn(),
   reviewRecordEligibility: vi.fn(),
+  isMergeTrainEnabledForProject: vi.fn(),
+  listEligibleCandidatesByProject: vi.fn(),
+  reconcileUatGenerations: vi.fn(),
+  assemblePolyrepoUatGeneration: vi.fn(),
+  buildPolyrepoGitDeps: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
+  resolveProjectReposFromResolvedIssueSync: vi.fn(),
+  hasUncleanedTerminalUatGenerationSync: vi.fn(),
 }));
 
 vi.mock('../../../../lib/projects.js', async (importOriginal) => {
@@ -36,6 +46,31 @@ vi.mock('../../../../lib/projects.js', async (importOriginal) => {
   return {
     ...original,
     findProjectByPathSync: mocks.findProjectByPathSync,
+    resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync,
+  };
+});
+
+vi.mock('../../../../lib/project-repos.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../lib/project-repos.js')>();
+  return {
+    ...original,
+    resolveProjectReposFromResolvedIssueSync: mocks.resolveProjectReposFromResolvedIssueSync,
+  };
+});
+
+vi.mock('../../../../lib/cloister/uat-reconciler.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../lib/cloister/uat-reconciler.js')>();
+  return {
+    ...original,
+    reconcileUatGenerations: mocks.reconcileUatGenerations,
+  };
+});
+
+vi.mock('../../../../lib/cloister/uat-polyrepo-engine.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../lib/cloister/uat-polyrepo-engine.js')>();
+  return {
+    ...original,
+    assemblePolyrepoUatGeneration: mocks.assemblePolyrepoUatGeneration,
   };
 });
 
@@ -58,14 +93,8 @@ vi.mock('../../../../lib/overdeck/merge-sync.js', async (importOriginal) => {
     ...original,
     getUatGenerationSync: mocks.getUatGenerationSync,
     listUatGenerationsSync: mocks.listUatGenerationsSync,
-  };
-});
-
-vi.mock('../../../../lib/cloister/uat-generation-deps.js', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../../../../lib/cloister/uat-generation-deps.js')>();
-  return {
-    ...original,
-    buildUatGenerationStore: mocks.buildUatGenerationStore,
+    isMergeTrainEnabledForProject: mocks.isMergeTrainEnabledForProject,
+    hasUncleanedTerminalUatGenerationSync: mocks.hasUncleanedTerminalUatGenerationSync,
   };
 });
 
@@ -100,6 +129,16 @@ vi.mock('../../../../lib/flywheel-merge-order.js', async (importOriginal) => {
   return {
     ...original,
     reviewRecordEligibility: mocks.reviewRecordEligibility,
+    listEligibleCandidatesByProject: mocks.listEligibleCandidatesByProject,
+  };
+});
+
+vi.mock('../../../../lib/cloister/uat-generation-deps.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../lib/cloister/uat-generation-deps.js')>();
+  return {
+    ...original,
+    buildUatGenerationStore: mocks.buildUatGenerationStore,
+    buildPolyrepoGitDeps: mocks.buildPolyrepoGitDeps,
   };
 });
 
@@ -162,6 +201,59 @@ describe('getUatGenerationsPayload', () => {
     tmp = undefined;
   });
 
+  // PAN-3093: the payload gains per-repo detail additively so the follow-up
+  // presentation work has data to render.
+  it('projects per-repo generation detail onto the payload', async () => {
+    const polyGen = {
+      ...gen([]),
+      repos: [
+        {
+          repoKey: 'fe', repoPath: '/repos/myn/fe', branch: 'uat/min-otter-0727',
+          baseSha: 'aaa1111', targetBranch: 'main',
+          worktreePath: '/repos/myn/workspaces/uat-min-otter-0727/fe',
+          mergeOrder: 0, promotedAt: null, mergeSha: null,
+        },
+      ],
+    } as UatGeneration;
+    mocks.listUatGenerationsSync.mockReturnValue([polyGen]);
+    mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
+
+    const payload = await getUatGenerationsPayload('/repos/myn');
+
+    expect(payload[0]!.repos).toEqual([{
+      repoKey: 'fe',
+      branch: 'uat/min-otter-0727',
+      baseSha: 'aaa1111',
+      targetBranch: 'main',
+      mergeOrder: 0,
+      promotedAt: null,
+      mergeSha: null,
+    }]);
+    // Absolute server paths must not leave the process.
+    expect(JSON.stringify(payload[0]!.repos)).not.toContain('/repos/myn');
+  });
+
+  it('projects the synthesized single repo for a monorepo generation', async () => {
+    // The store always yields at least one entry, so the payload shape is the
+    // same whether or not the project is polyrepo.
+    const monoGen = {
+      ...gen([]),
+      repos: [{
+        repoKey: 'overdeck', repoPath: '/proj', branch: 'uat/pan-otter-0610',
+        baseSha: 'main-sha', targetBranch: 'main',
+        worktreePath: '/proj/workspaces/uat-pan-otter-0610',
+        mergeOrder: 0, promotedAt: null, mergeSha: null,
+      }],
+    } as UatGeneration;
+    mocks.listUatGenerationsSync.mockReturnValue([monoGen]);
+    mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
+
+    const payload = await getUatGenerationsPayload('/repos/myn');
+
+    expect(payload[0]!.repos).toHaveLength(1);
+    expect(payload[0]!.repos[0]!.repoKey).toBe('overdeck');
+  });
+
   // PAN-1696 review finding: once this payload started serving every tracked
   // project, resolving each member's xBRIEF against the DASHBOARD's repo left
   // every non-PAN batch with an empty "What to UAT" checklist.
@@ -178,6 +270,46 @@ describe('getUatGenerationsPayload', () => {
     expect(mocks.listUatGenerationsSync).toHaveBeenCalledWith(
       expect.objectContaining({ projectRoot: '/repos/myn' }),
     );
+  });
+
+  // PAN-3165: an unresolvable spec must not be reported as a plan that listed
+  // no criteria — the UAT panel renders that as a factual claim and deletes the
+  // operator's checklist.
+  it('marks a member whose spec cannot be resolved as planResolved: false', async () => {
+    mocks.listUatGenerationsSync.mockReturnValue([
+      gen([{ issueId: 'PAN-3158', title: 'Cedar', branch: 'feature/pan-3158', headSha: 'h1', mergeOrder: 1 }]),
+    ]);
+    mocks.findXBriefByIssue.mockReturnValue(Effect.succeed(null));
+
+    const payload = await getUatGenerationsPayload('/repos/myn');
+
+    expect(payload[0]!.members[0]!.planResolved).toBe(false);
+    expect(payload[0]!.members[0]!.acceptanceCriteria).toEqual([]);
+  });
+
+  it('marks a member whose spec resolves as planResolved: true', async () => {
+    tmp = await mkdtemp(join(tmpdir(), 'pan-uat-train-'));
+    const specPath = join(tmp, 'PAN-3158.xbrief.json');
+    await writeFile(specPath, '{}');
+    mocks.listUatGenerationsSync.mockReturnValue([
+      gen([{ issueId: 'PAN-3158', title: 'Cedar', branch: 'feature/pan-3158', headSha: 'h1', mergeOrder: 1 }]),
+    ]);
+    mocks.findXBriefByIssue.mockReturnValue(Effect.succeed({
+      path: specPath,
+      lifecycleDir: 'proposed',
+      issueId: 'PAN-3158',
+      slug: 'cedar',
+      date: '2026-07-26',
+      filename: 'PAN-3158.xbrief.json',
+    }));
+    mocks.readXBriefDocument.mockReturnValue(Effect.succeed(doc('Given a member, when read, then 14 criteria') as never));
+
+    const payload = await getUatGenerationsPayload('/repos/myn');
+
+    expect(payload[0]!.members[0]!.planResolved).toBe(true);
+    expect(payload[0]!.members[0]!.acceptanceCriteria).toEqual([
+      { title: 'Given a member, when read, then 14 criteria', status: 'pending' },
+    ]);
   });
 
   it('returns generations without flywheel run active (PAN-1696: reconciler-decouple.ac4)', async () => {
@@ -382,5 +514,204 @@ describe('postUatGenerationPromotePayload', () => {
     mocks.notifyFlywheelOfUatPromote.mockRejectedValue(new Error('delivery failed'));
 
     await expect(postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn())).resolves.toBe(result);
+  });
+});
+
+// PAN-3093: polyrepo projects used to be skipped outright by a guard in
+// runUatTrainReconcileForProject. Now they route to the polyrepo ready set,
+// polyrepo assembly, and composite staleness anchors.
+describe('runUatTrainReconcile — polyrepo routing', () => {
+  const POLY_ROOT = '/repos/myn';
+  const MONO_ROOT = '/repos/overdeck';
+
+  /** Deps handed to the (mocked) reconciler by the last call. */
+  function capturedDeps(): UatReconcilerDeps {
+    return mocks.reconcileUatGenerations.mock.calls.at(-1)![1] as UatReconcilerDeps;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.isMergeTrainEnabledForProject.mockReturnValue(true);
+    mocks.listEligibleCandidatesByProject.mockReturnValue([
+      { issueId: 'MIN-901', title: 'MIN-901' },
+    ]);
+    mocks.listUatGenerationsSync.mockReturnValue([]);
+    mocks.buildUatGenerationStore.mockReturnValue({});
+    mocks.buildPolyrepoGitDeps.mockReturnValue(new Map());
+    mocks.reconcileUatGenerations.mockResolvedValue({ action: 'idle', invalidated: [] });
+    mocks.resolveProjectFromIssueSync.mockReturnValue({
+      projectKey: 'mind-your-now', projectName: 'MYN', projectPath: POLY_ROOT,
+    });
+    mocks.resolveProjectReposFromResolvedIssueSync.mockReturnValue([
+      {
+        projectKey: 'mind-your-now', projectPath: POLY_ROOT, repoKey: 'fe',
+        repoPath: `${POLY_ROOT}/fe`, forge: 'github', sourceBranch: 'feature/min-901',
+        targetBranch: 'main', mergeOrder: 0, required: true,
+      },
+    ]);
+  });
+
+  // The removed guard returned no-queue before any git work; reaching the
+  // reconciler at all is the runtime proof that it is gone.
+  it('reconciles a polyrepo project instead of skipping it', async () => {
+    mocks.findProjectByPathSync.mockReturnValue({
+      name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
+    });
+
+    const result = await runUatTrainReconcile({ projectRoot: POLY_ROOT });
+
+    expect(mocks.reconcileUatGenerations).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ action: 'idle', invalidated: [] });
+  });
+
+  it('gives the polyrepo path composite anchor deps', async () => {
+    mocks.findProjectByPathSync.mockReturnValue({
+      name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
+    });
+
+    await runUatTrainReconcile({ projectRoot: POLY_ROOT });
+
+    const deps = capturedDeps();
+    expect(deps.getBaseAnchor).toBeTypeOf('function');
+    expect(deps.getFeatureAnchor).toBeTypeOf('function');
+  });
+
+  it('invokes polyrepo assembly, not the monorepo engine, for a polyrepo project', async () => {
+    mocks.findProjectByPathSync.mockReturnValue({
+      name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
+    });
+    mocks.assemblePolyrepoUatGeneration.mockResolvedValue({ name: 'uat/min-otter-0727' });
+
+    await runUatTrainReconcile({ projectRoot: POLY_ROOT });
+
+    // Drive the assemble hook the reconciler was handed.
+    await capturedDeps().assemble([
+      {
+        issueId: 'MIN-901',
+        title: 'One',
+        branch: 'feature/min-901',
+        repoContributions: [{
+          repoKey: 'fe', repoPath: `${POLY_ROOT}/fe`, branch: 'feature/min-901',
+          targetBranch: 'main', mergeOrder: 0,
+        }],
+      },
+    ]);
+
+    expect(mocks.assemblePolyrepoUatGeneration).toHaveBeenCalledTimes(1);
+    const [assembleInput] = mocks.assemblePolyrepoUatGeneration.mock.calls[0]!;
+    expect(assembleInput.projectRoot).toBe(POLY_ROOT);
+    expect(assembleInput.repos.map((r: { repoKey: string }) => r.repoKey)).toEqual(['fe']);
+  });
+
+  it('leaves the monorepo path on single-SHA staleness with no anchor deps', async () => {
+    mocks.findProjectByPathSync.mockReturnValue({ name: 'overdeck', path: MONO_ROOT });
+
+    await runUatTrainReconcile({ projectRoot: MONO_ROOT });
+
+    const deps = capturedDeps();
+    expect(deps.getBaseAnchor).toBeUndefined();
+    expect(deps.getFeatureAnchor).toBeUndefined();
+    expect(mocks.assemblePolyrepoUatGeneration).not.toHaveBeenCalled();
+  });
+});
+
+// PAN-3093 review: terminal generations still own branches, worktrees, and a
+// wrapper folder. Promoting the last ready batch leaves zero candidates and
+// zero live rows, which used to return early and leak every artifact.
+describe('runUatTrainReconcile — terminal generation cleanup', () => {
+  const POLY_ROOT = '/repos/myn';
+
+  function terminalGen(overrides: Partial<UatGeneration> = {}): UatGeneration {
+    return {
+      name: 'uat/min-otter-0727',
+      worktreePath: `${POLY_ROOT}/workspaces/uat-min-otter-0727`,
+      projectRoot: POLY_ROOT,
+      baseSha: 'fe@aaa1111',
+      status: 'promoted',
+      members: [],
+      heldOut: [],
+      resolutions: [],
+      stackStartedAt: null,
+      cleanedAt: null,
+      createdAt: '2026-07-27T00:00:00.000Z',
+      updatedAt: '2026-07-27T00:00:00.000Z',
+      ...overrides,
+    } as UatGeneration;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.isMergeTrainEnabledForProject.mockReturnValue(true);
+    mocks.listEligibleCandidatesByProject.mockReturnValue([]);
+    mocks.buildUatGenerationStore.mockReturnValue({
+      insert: vi.fn(), update: vi.fn(), listNames: () => [], listChain: () => [],
+    });
+    mocks.findProjectByPathSync.mockReturnValue({
+      name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
+    });
+  });
+
+  it('cleans an uncleaned promoted generation even with no candidates and no live rows', async () => {
+    mocks.listUatGenerationsSync.mockReturnValue([]);
+    mocks.hasUncleanedTerminalUatGenerationSync.mockReturnValue(true);
+
+    await runUatTrainReconcile({ projectRoot: POLY_ROOT });
+
+    // Reaching the cleanup path at all is the proof; it builds its store here.
+    expect(mocks.buildUatGenerationStore).toHaveBeenCalled();
+    expect(mocks.reconcileUatGenerations).not.toHaveBeenCalled();
+  });
+
+  it('does no cleanup work when every terminal generation is already cleaned', async () => {
+    mocks.listUatGenerationsSync.mockReturnValue([]);
+    // The idle tick must answer this with a single existence query, never by
+    // hydrating the retained terminal history.
+    mocks.hasUncleanedTerminalUatGenerationSync.mockReturnValue(false);
+
+    const result = await runUatTrainReconcile({ projectRoot: POLY_ROOT });
+
+    expect(mocks.buildUatGenerationStore).not.toHaveBeenCalled();
+    expect(result).toEqual({ action: 'idle', invalidated: [] });
+  });
+});
+
+// PAN-3093 cycle 4: an outage refreshing member-repo refs must not read as a
+// verified-empty ready set. The reconciler treats [] as authoritative — it
+// marks every live member departed, invalidates the generation, and tears down
+// its stack — so a transient blip would destroy the current testable batch.
+describe('runUatTrainReconcile — ref-refresh outage preserves the live generation', () => {
+  const POLY_ROOT = '/repos/myn';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.isMergeTrainEnabledForProject.mockReturnValue(true);
+    mocks.listEligibleCandidatesByProject.mockReturnValue([{ issueId: 'MIN-901', title: 'MIN-901' }]);
+    mocks.listUatGenerationsSync.mockReturnValue([{ name: 'uat/min-otter-0727', status: 'ready' }]);
+    mocks.buildUatGenerationStore.mockReturnValue({});
+    mocks.buildPolyrepoGitDeps.mockReturnValue(new Map());
+    mocks.reconcileUatGenerations.mockResolvedValue({ action: 'no-queue', invalidated: [] });
+    mocks.findProjectByPathSync.mockReturnValue({
+      name: 'myn', path: POLY_ROOT, workspace: { type: 'polyrepo' },
+    });
+    mocks.resolveProjectFromIssueSync.mockReturnValue({
+      projectKey: 'mind-your-now', projectName: 'MYN', projectPath: POLY_ROOT,
+    });
+    mocks.resolveProjectReposFromResolvedIssueSync.mockReturnValue([
+      {
+        projectKey: 'mind-your-now', projectPath: POLY_ROOT, repoKey: 'api',
+        repoPath: `${POLY_ROOT}/api`, forge: 'github', sourceBranch: 'feature/min-901',
+        targetBranch: 'main', mergeOrder: 0, required: true,
+      },
+    ]);
+  });
+
+  it('hands the reconciler null, not an empty ready set, when a repo refresh fails', async () => {
+    // computePolyrepoMergeQueueFromCandidates is the real implementation here;
+    // no ChildProcessSpawner is provided, so every git call fails — exactly the
+    // shape of a transport/auth outage.
+    await runUatTrainReconcile({ projectRoot: POLY_ROOT });
+
+    const deps = mocks.reconcileUatGenerations.mock.calls.at(-1)![1] as UatReconcilerDeps;
+    await expect(deps.getReadySet()).resolves.toBeNull();
   });
 });

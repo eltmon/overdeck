@@ -2,8 +2,6 @@ import { join } from 'path'
 import { Effect, FileSystem } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
-import { findProjectByPathSync, type ProjectConfig } from '../projects.js'
-import { resolveStateReadHomeSync } from '../state-read-home.js'
 
 import { normalizeXBriefEnvelope, serializeXBriefDocument, XBriefMergeConflictError } from '../xbrief/io.js'
 import {
@@ -15,11 +13,8 @@ import {
 import { invalidateXBriefIndex } from '../xbrief/xbrief-index.js'
 import type { XBriefDocument } from '../xbrief/types.js'
 import { deriveProjectRoot, flushAutoCommits, queueAutoCommit } from './auto-commit.js'
+import { getProjectPanPaths } from './paths.js'
 import {
-  PAN_DIRNAME,
-  PAN_CONTINUES_DIRNAME,
-  PAN_DRAFTS_DIRNAME,
-  PAN_SPECS_DIRNAME,
   type PanSpecDocument,
   type PanSpecEntry,
   type PanSpecListOptions,
@@ -29,24 +24,9 @@ import {
   type ProjectPanPaths,
 } from './types.js'
 
-function projectPanPaths(projectRoot: string): ProjectPanPaths {
-  const project: ProjectConfig = findProjectByPathSync(projectRoot) ?? {
-    name: projectRoot,
-    path: projectRoot,
-  }
-  const stateHome = resolveStateReadHomeSync(project)
-  const panDir = stateHome.migrated ? stateHome.root : join(stateHome.root, PAN_DIRNAME)
-  return {
-    panDir,
-    specsDir: join(panDir, PAN_SPECS_DIRNAME),
-    draftsDir: join(panDir, PAN_DRAFTS_DIRNAME),
-    continuesDir: join(panDir, PAN_CONTINUES_DIRNAME),
-  }
-}
+const projectPanPaths = getProjectPanPaths
 
-export function getProjectPanPaths(projectRoot: string): ProjectPanPaths {
-  return projectPanPaths(projectRoot)
-}
+export { getProjectPanPaths }
 
 export function ensurePanDirs(
   projectRoot: string,

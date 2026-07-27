@@ -204,9 +204,8 @@ describe('one section per project (ac1)', () => {
   });
 
   it('keeps a disabled row visible when it is MIXED with idle enabled projects', async () => {
-    // The dangerous case: one enabled project with nothing ready plus one disabled
-    // project. Every queue is empty, so the collapse shortcut would fire and hide
-    // the fact that the second project's train is switched off.
+    // The idle enabled project is hidden, but the disabled project remains because
+    // its off state carries information the page-level empty copy cannot replace.
     mockFetch({
       '/api/merge-train/queues': [
         { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: [] },
@@ -218,8 +217,60 @@ describe('one section per project (ac1)', () => {
 
     await waitFor(() => expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy());
     expect(screen.getByTestId('merge-train-project-myn').textContent).toContain('turned off for Mind Your Now');
-    expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy();
+    expect(screen.queryByTestId('merge-train-project-overdeck')).toBeNull();
     expect(screen.queryByText(/No features are ready to merge in any project/)).toBeNull();
+  });
+
+  it('hides an idle enabled project when another project has ready work', async () => {
+    mockFetch({
+      '/api/merge-train/queues': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: PAN_QUEUE },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, queue: [] },
+      ],
+      '/api/merge-train/generations': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [PAN_READY_GEN] },
+      ],
+    });
+    renderView();
+
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    expect(screen.queryByTestId('merge-train-project-myn')).toBeNull();
+    expect(screen.getByTestId('merge-train-idle-hidden-note').textContent).toContain(
+      '1 project with nothing ready is hidden',
+    );
+  });
+
+  it('pluralizes the hidden-project footer when multiple idle projects are omitted', async () => {
+    mockFetch({
+      '/api/merge-train/queues': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: PAN_QUEUE },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, queue: [] },
+        { projectKey: 'krux', projectName: 'Krux', enabled: true, queue: [] },
+      ],
+      '/api/merge-train/generations': [],
+    });
+    renderView();
+
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    expect(screen.getByTestId('merge-train-idle-hidden-note').textContent).toContain(
+      '2 projects with nothing ready are hidden',
+    );
+  });
+
+  it('collapses to the page-level empty state when every project is idle and enabled', async () => {
+    mockFetch({
+      '/api/merge-train/queues': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: [] },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, queue: [] },
+      ],
+      '/api/merge-train/generations': [],
+    });
+    renderView();
+
+    await screen.findByText(/No features are ready to merge in any project/);
+    expect(screen.queryByTestId('merge-train-project-overdeck')).toBeNull();
+    expect(screen.queryByTestId('merge-train-project-myn')).toBeNull();
+    expect(screen.queryByTestId('merge-train-idle-hidden-note')).toBeNull();
   });
 
   it('keeps the off rows visible when EVERY project has the train disabled', async () => {
@@ -255,6 +306,55 @@ describe('one section per project (ac1)', () => {
     renderView();
     expect(await screen.findByText('Merge backend unavailable')).toBeTruthy();
   });
+
+  // PAN-3165: a spec the server could not resolve must not be reported as a
+  // plan that listed nothing to check — that sentence silently removed the
+  // operator's UAT checklist for every issue planned after the state cutover.
+  it('says the plan is unresolved instead of claiming it has no UAT steps', async () => {
+    mockFetch(twoProjectResponses({
+      '/api/merge-train/generations': [{
+        projectKey: 'overdeck',
+        projectName: 'Overdeck',
+        enabled: true,
+        generations: [{
+          ...PAN_READY_GEN,
+          members: [
+            { issueId: 'PAN-3158', title: 'Cedar', branch: 'feature/pan-3158', mergeOrder: 1, acceptanceCriteria: [], planResolved: false },
+          ],
+          resolutions: [],
+        }],
+      }],
+    }));
+    renderView();
+
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    const pan = screen.getByTestId('merge-train-project-overdeck');
+    expect(pan.textContent).toContain('Plan not found for PAN-3158');
+    expect(pan.textContent).not.toContain('No UAT steps in plan');
+  });
+
+  it('keeps the no-steps message for a resolved plan that authored none', async () => {
+    mockFetch(twoProjectResponses({
+      '/api/merge-train/generations': [{
+        projectKey: 'overdeck',
+        projectName: 'Overdeck',
+        enabled: true,
+        generations: [{
+          ...PAN_READY_GEN,
+          members: [
+            { issueId: 'PAN-3158', title: 'Cedar', branch: 'feature/pan-3158', mergeOrder: 1, acceptanceCriteria: [], planResolved: true },
+          ],
+          resolutions: [],
+        }],
+      }],
+    }));
+    renderView();
+
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+    const pan = screen.getByTestId('merge-train-project-overdeck');
+    expect(pan.textContent).toContain('No UAT steps in plan');
+    expect(pan.textContent).not.toContain('Plan not found');
+  });
 });
 
 // ── AC2 ───────────────────────────────────────────────────────────────────────
@@ -278,6 +378,25 @@ describe('project filter chips (ac2)', () => {
 
     await waitFor(() => expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy());
     expect(screen.queryByTestId('merge-train-project-overdeck')).toBeNull();
+  });
+
+  it('scopes the empty message to selected projects when filtered-out work is ready', async () => {
+    window.localStorage.setItem(MERGE_TRAIN_PROJECT_FILTER_KEY, JSON.stringify(['myn']));
+    mockFetch({
+      '/api/merge-train/queues': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: PAN_QUEUE },
+        { projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, queue: [] },
+      ],
+      '/api/merge-train/generations': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [PAN_READY_GEN] },
+      ],
+    });
+    renderView();
+
+    await screen.findByText(/No features are ready to merge in the selected projects/);
+    expect(screen.queryByText(/No features are ready to merge in any project/)).toBeNull();
+    expect(screen.queryByTestId('merge-train-project-overdeck')).toBeNull();
+    expect(screen.queryByTestId('merge-train-project-myn')).toBeNull();
   });
 
   it('shows every project by default when nothing is stored', async () => {
@@ -462,6 +581,46 @@ describe('actions post to the new endpoints behind confirms (ac3)', () => {
     const link = screen.getByTestId('merge-train-project-myn').querySelector('a[href*="uat-min-badger-0726"]');
     expect(link).toBeTruthy();
     expect(link!.textContent).toContain('Open');
+  });
+
+  // PAN-3166: the min-quartz-0726 failure — the api container had exited at
+  // Flyway startup, yet the panel still offered "Open UAT frontend" in success
+  // green, which is a link straight into a gateway timeout.
+  it('a degraded stack offers a restart control, not an open link, and shows why', async () => {
+    mockFetch(
+      twoProjectResponses({
+        '/api/merge-train/generations': [
+          { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [PAN_READY_GEN] },
+          {
+            projectKey: 'myn',
+            projectName: 'Mind Your Now',
+            enabled: true,
+            generations: [{
+              ...MIN_READY_GEN,
+              stack: {
+                status: 'degraded',
+                frontendUrl: 'https://uat-min-badger-0726.overdeck.localhost',
+                downServices: ['api'],
+                serviceErrors: {
+                  api: 'Caused by: org.flywaydb.core.api.FlywayException: Found more than one migration with version 256',
+                },
+              },
+            }],
+          },
+        ],
+      }),
+    );
+    renderView();
+    const panel = await screen.findByTestId('merge-train-project-myn');
+
+    expect(panel.querySelector('a[href*="uat-min-badger-0726"]')).toBeNull();
+    const control = screen.getByTestId('uat-stack-degraded-uat/min-badger-0726');
+    expect(control.tagName).toBe('BUTTON');
+    expect(control.textContent).toContain('Stack degraded');
+    expect(control.textContent).toContain('api');
+    expect(screen.getByTestId('uat-stack-degraded-detail-uat/min-badger-0726').textContent).toContain(
+      'Found more than one migration with version 256',
+    );
   });
 
   it('stack POSTs the aggregate stack route for a batch with no live stack', async () => {

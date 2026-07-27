@@ -227,8 +227,8 @@ function buildReviewRolePrompt(opts: {
     'including a per-reviewer verdict for each sub-role that RAN this cycle',
     '(PAN-1862 — this is what lets the next re-review skip provably-clean reviewers;',
     'do NOT list carried-forward sub-roles, their verdicts are already recorded):',
-    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --reviewers "${inScope.map(r => `${r}=passed`).join(',')}"`,
-    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --reviewers "<subRole>=passed|blocked for each of: ${inScope.join(', ')}>"`,
+    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --run-id "${opts.runId}" --reviewers "${inScope.map(r => `${r}=passed`).join(',')}"`,
+    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --run-id "${opts.runId}" --reviewers "<subRole>=passed|blocked for each of: ${inScope.join(', ')}>"`,
     '',
     // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
     // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next
@@ -300,8 +300,8 @@ function buildSelfReviewPrompt(opts: {
     `3. Write your findings to ${reviewReportPath}.`,
     '',
     'Then signal the verdict with the Overdeck CLI (exactly one):',
-    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>"`,
-    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>"`,
+    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --run-id "${opts.runId}"`,
+    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --run-id "${opts.runId}"`,
     '',
     // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
     // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next

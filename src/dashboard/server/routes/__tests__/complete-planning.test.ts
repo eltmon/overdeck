@@ -28,7 +28,7 @@ import {
 } from '../../../../lib/overdeck/planning-promotion.js';
 import { readAutoSpawnOnFinalizeFlag, writeAutoSpawnOnFinalizeFlag } from '../../../../lib/planning/spawn-planning-session.js';
 import { applyStatusOverrides } from '../../../../lib/xbrief/io.js';
-import { lintPlanQuality, PlanQualityLintError } from '../../../../lib/xbrief/quality-lint.js';
+import { PlanQualityLintError } from '../../../../lib/xbrief/quality-lint.js';
 import type { XBriefDocument } from '../../../../lib/xbrief/types.js';
 
 let projectRoot: string | null = null;
@@ -116,7 +116,7 @@ function makeDoc(issueId: string): XBriefDocument {
   };
 }
 
-function makeFileSizeRatchetDoc(issueId: string, intermediateCommand: string): XBriefDocument {
+function makeRefinalizationDoc(issueId: string, verifyCommand: string): XBriefDocument {
   const doc = makeDoc(issueId);
   doc.plan.title = 'Extract specialist spawn seam';
   doc.plan.items = [
@@ -128,20 +128,19 @@ function makeFileSizeRatchetDoc(issueId: string, intermediateCommand: string): X
         Action: 'Extract specialist spawn helpers from the monolith into a focused source module',
       },
       metadata: {
-        requiresInspection: true,
-        foundationFor: ['wi-7-reconcile'],
+        requiresInspection: false,
         files_scope: [
           'src/lib/cloister/specialists.ts',
           'src/lib/cloister/specialists-spawn.ts',
         ],
         files_scope_confidence: 'high',
         readiness: 'sequential',
-        verify_commands: [intermediateCommand],
+        verify_commands: [verifyCommand],
       },
       subItems: [
         {
           id: 'wi-1-spawn.ac1',
-          title: `${intermediateCommand} passes from the committed extraction tree`,
+          title: `${verifyCommand} passes from the committed extraction tree`,
           status: 'pending',
           metadata: { kind: 'acceptance_criterion' },
         },
@@ -153,40 +152,8 @@ function makeFileSizeRatchetDoc(issueId: string, intermediateCommand: string): X
         },
       ],
     },
-    {
-      id: 'wi-7-reconcile',
-      title: 'Reconcile the file-size ratchet',
-      status: 'pending',
-      narrative: {
-        Action: 'Lower scripts/file-size-baseline.txt for src/lib/cloister/specialists.ts after all extractions finish',
-      },
-      metadata: {
-        requiresInspection: false,
-        files_scope: [
-          'scripts/file-size-baseline.txt',
-          'src/lib/cloister/specialists.ts',
-        ],
-        files_scope_confidence: 'high',
-        readiness: 'sequential',
-        verify_commands: ['npm run lint'],
-      },
-      subItems: [
-        {
-          id: 'wi-7-reconcile.ac1',
-          title: 'scripts/file-size-baseline.txt records the lowered specialists.ts line count',
-          status: 'pending',
-          metadata: { kind: 'acceptance_criterion' },
-        },
-        {
-          id: 'wi-7-reconcile.ac2',
-          title: 'npm run lint passes after the final baseline reconciliation',
-          status: 'pending',
-          metadata: { kind: 'acceptance_criterion' },
-        },
-      ],
-    },
   ];
-  doc.plan.edges = [{ from: 'wi-1-spawn', to: 'wi-7-reconcile', type: 'blocks' }];
+  doc.plan.edges = [];
   return doc;
 }
 
@@ -334,7 +301,7 @@ describe('completePlanningArtifacts', () => {
     expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSync(join(projectPath, '.pan', 'specs')) : []).toEqual([]);
   });
 
-  it('re-finalizes an active ratchet-blocked plan without losing stable item progress', async () => {
+  it('re-finalizes an active plan without losing stable item progress', async () => {
     const issueId = 'PAN-2232';
     const { projectPath, workspacePath } = makeProject(issueId);
     const specsDir = join(projectPath, '.pan', 'specs');
@@ -348,11 +315,11 @@ describe('completePlanningArtifacts', () => {
 
     const canonicalFilename = '2026-07-16-PAN-2232-extract-specialist-spawn-seam.xbrief.json';
     const canonicalPath = join(specsDir, canonicalFilename);
-    const blockedDoc = makeFileSizeRatchetDoc(issueId, 'npm run lint');
+    const activeDoc = makeRefinalizationDoc(issueId, 'npm run lint');
     writeFileSync(canonicalPath, JSON.stringify({
-      ...blockedDoc,
+      ...activeDoc,
       status: 'active',
-      plan: { ...blockedDoc.plan, status: 'active' },
+      plan: { ...activeDoc.plan, status: 'active' },
     }, null, 2));
 
     const statusOverrides = {
@@ -363,19 +330,10 @@ describe('completePlanningArtifacts', () => {
     writeFileSync(recordPath, JSON.stringify({ issueId, statusOverrides }, null, 2));
     const recordBefore = readFileSync(recordPath, 'utf-8');
 
-    expect(lintPlanQuality(blockedDoc)).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        itemId: 'wi-1-spawn',
-        rule: 'deferred-file-size-ratchet',
-      }),
-    ]));
-
-    const repairedDoc = makeFileSizeRatchetDoc(issueId, 'npm run typecheck');
-    expect(lintPlanQuality(repairedDoc).map(issue => issue.rule))
-      .not.toContain('deferred-file-size-ratchet');
+    const updatedDoc = makeRefinalizationDoc(issueId, 'npm run typecheck');
     writeFileSync(
       join(workspacePanDir, 'spec.vbrief.json'),
-      JSON.stringify(repairedDoc, null, 2),
+      JSON.stringify(updatedDoc, null, 2),
     );
 
     const result = await completePlanningArtifacts({

@@ -17,9 +17,17 @@
  * conflict-resolved, held-out, failed — is unit-testable with fake deps.
  */
 import { makeUatCandidateName } from './uat-candidate-name.js';
+import {
+  applyUnionLintPlan,
+  planUnionLint,
+  plannedFiles,
+  seedUnionLedger,
+} from './uat-union-lint.js';
+import type { PolyrepoRepoContribution } from '../flywheel-merge-order.js';
 import type {
   UatGeneration,
   UatGenerationMember,
+  UatGenerationRepo,
   UatGenerationStatus,
 } from '../overdeck/merge-sync.js';
 
@@ -33,6 +41,13 @@ export interface ReadyFeature {
   prUrl?: string;
   /** Issue ids this feature's changed files overlap with (from computeMergeQueue). */
   conflictsWith?: readonly string[];
+  /**
+   * Member repos this feature actually has a branch in (polyrepo only; the
+   * monorepo ready set omits it). Populated by
+   * computePolyrepoMergeQueueFromCandidates — the polyrepo engine merges only
+   * these repos and skips the rest.
+   */
+  repoContributions?: readonly PolyrepoRepoContribution[];
 }
 
 /** Context handed to the conflict-resolution hook while the merge is mid-conflict. */
@@ -44,6 +59,13 @@ export interface ConflictContext {
   conflictingIssueIds: readonly string[];
   branchName: string;
   worktreePath: string;
+  /**
+   * Member repo this conflict occurred in (polyrepo assembly only). Absent for
+   * monorepo assembly. The hook already works purely on `worktreePath`, so
+   * per-repo worktrees scope it automatically — this only names the repo in the
+   * prompt and logs so an operator can tell which one blocked.
+   */
+  repoKey?: string;
 }
 
 /** Successful resolution: the hook committed the merge on the branch. */
@@ -71,6 +93,20 @@ export interface GenerationGitDeps {
   abortMerge(): Promise<void>;
   /** Push the generation branch to origin. */
   push(branchName: string): Promise<void>;
+  /**
+   * Files tracked at a git ref that the union lint cares about — today, Flyway
+   * migrations (PAN-3166). Optional: deps that omit it skip the union lint
+   * entirely, which is exactly the pre-PAN-3166 behaviour.
+   */
+  listMigrationFiles?(ref: string): Promise<string[]>;
+  /** One migration's SQL at a ref, for deciding which objects it touches. */
+  readMigrationFile?(ref: string, path: string): Promise<string>;
+  /**
+   * Rename migrations on the generation branch and commit, breaking a version
+   * collision between migrations that touch disjoint objects. Returns the
+   * commit SHA so the renumbering is auditable as a resolution.
+   */
+  renameMigrations?(renames: ReadonlyArray<{ from: string; to: string }>, message: string): Promise<string>;
 }
 
 export interface GenerationStorePort {
@@ -78,7 +114,9 @@ export interface GenerationStorePort {
   insert(gen: Omit<UatGeneration, 'createdAt' | 'updatedAt'>): void;
   update(
     name: string,
-    patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt'>>,
+    // 'repos' is written only by the polyrepo engine; the monorepo path never
+    // sets it, so its generations keep reading back as a synthesized N=1 entry.
+    patch: Partial<Pick<UatGeneration, 'status' | 'baseSha' | 'members' | 'heldOut' | 'resolutions' | 'cleanedAt' | 'repos'>>,
   ): void;
   /** Existing generation names. */
   listNames(): string[];
@@ -164,6 +202,20 @@ export async function assembleUatGeneration(
     return finish('failed');
   }
 
+  // Union lint (PAN-3166): owners come from the branch as just cut from the
+  // target, so a member colliding with a migration already on main is caught
+  // too; reservations cover every candidate branch, so an allocated version
+  // cannot collide with one a later member already holds. A read failure here
+  // fails the generation — a lint that quietly disables itself is worse than
+  // none, because assembly would still report ready.
+  let ledger: Awaited<ReturnType<typeof seedUnionLedger>>;
+  try {
+    ledger = await seedUnionLedger(deps.git, name, input.features.map((f) => f.branch));
+  } catch (err) {
+    log(`[uat-generation] ${name}: union lint could not read migrations: ${err instanceof Error ? err.message : String(err)} — marking failed`);
+    return finish('failed');
+  }
+
   for (const feature of input.features) {
     const mergedIssueIds = members.map((m) => m.issueId);
     const attemptedHeadSha = async () => deps.git.branchHeadSha(feature.branch).catch(() => 'unknown');
@@ -180,6 +232,57 @@ export async function assembleUatGeneration(
       heldOut.push({ issueId: feature.issueId, branch: feature.branch, headSha: await attemptedHeadSha(), reason });
     };
 
+    // Union lint runs BEFORE the merge: git would take this branch cleanly
+    // (the colliding migrations are different filenames), and the batch would
+    // only fail at Flyway startup, long after assembly reported ready. A
+    // collision between migrations touching disjoint objects is renumbered
+    // after the merge lands; only a same-object collision holds the member out.
+    const plan = await planUnionLint({
+      git: deps.git,
+      ledger,
+      generationBranch: name,
+      featureBranch: feature.branch,
+      issueId: feature.issueId,
+    });
+    if (plan.disposition.kind === 'hold-out') {
+      log(`[uat-generation] ${name}: holding ${feature.issueId} out — ${plan.disposition.reason}`);
+      await holdOut(plan.disposition.reason);
+      deps.store.update(name, { members, heldOut, resolutions });
+      continue;
+    }
+
+    /**
+     * Land any renumbering and record the member's (possibly renamed) files.
+     * Returns false when a planned rename did not land: the branch would then
+     * carry the very collision the lint exists to prevent, and this engine has
+     * no post-merge rollback, so the caller abandons the generation rather than
+     * publish a union known not to boot.
+     */
+    const settleUnionLint = async (): Promise<boolean> => {
+      let applied: Awaited<ReturnType<typeof applyUnionLintPlan>>;
+      try {
+        applied = await applyUnionLintPlan(deps.git, plan, feature.issueId);
+      } catch (err) {
+        log(`[uat-generation] ${name}: renumbering ${feature.issueId} failed: ${err instanceof Error ? err.message : String(err)}`);
+        return false;
+      }
+      if (applied) {
+        log(`[uat-generation] ${name}: renumbered ${feature.issueId} migrations — ${applied.note}`);
+        resolutions.push({
+          issueIds: [feature.issueId],
+          files: applied.files,
+          commitSha: applied.commitSha,
+          kind: 'migration-renumber',
+          note: applied.note,
+        });
+      } else if (plan.disposition.kind === 'renumber') {
+        log(`[uat-generation] ${name}: ${feature.issueId} needed renumbering but no rename primitive is wired`);
+        return false;
+      }
+      ledger?.record(plannedFiles(plan), feature.issueId);
+      return true;
+    };
+
     let result: Awaited<ReturnType<GenerationGitDeps['mergeBranch']>>;
     try {
       result = await deps.git.mergeBranch(feature.branch);
@@ -191,6 +294,7 @@ export async function assembleUatGeneration(
     }
 
     if (result.ok) {
+      if (!(await settleUnionLint())) return finish('failed');
       members.push(await recordMember());
       deps.store.update(name, { members, heldOut, resolutions });
       continue;
@@ -222,11 +326,13 @@ export async function assembleUatGeneration(
     }
 
     if (resolution) {
+      if (!(await settleUnionLint())) return finish('failed');
       members.push(await recordMember());
       resolutions.push({
         issueIds: [feature.issueId, ...conflictingIssueIds],
         files: resolution.files,
         commitSha: resolution.commitSha,
+        kind: 'conflict',
       });
     } else {
       await deps.git.abortMerge().catch(() => {});
@@ -270,6 +376,26 @@ export interface GenerationCleanupDeps {
   deleteBranch(branchName: string): Promise<void>;
   /** Tear down the generation's live stack if one is running. */
   teardownStack?: (generation: UatGeneration) => Promise<void>;
+  /**
+   * Remove ONE member repo's worktree and branch (local + remote), for a
+   * polyrepo generation (PAN-3093). Its PRESENCE selects per-repo teardown:
+   * every generation reads back with at least one `repos` entry (monorepo rows
+   * synthesize one), so a repo count cannot distinguish the two, and a polyrepo
+   * generation with a single contributing repo still needs per-repo handling.
+   * Omit it and cleanup behaves exactly as it did before.
+   */
+  removeRepoArtifacts?: (repo: UatGenerationRepo) => Promise<void>;
+  /**
+   * Everything left once the recorded repos are clean: the wrapper folder that
+   * held the per-repo worktrees, plus the generation branch in any member repo
+   * the generation stopped using (a hold-out can drop a repo after its branch
+   * was already created locally — that branch is never pushed, but it lingers).
+   */
+  removeGenerationResidue?: (
+    generation: UatGeneration,
+    /** Repos the generation recorded — already cleaned by removeRepoArtifacts. */
+    recordedRepoKeys?: readonly string[],
+  ) => Promise<void>;
   log?: (msg: string) => void;
 }
 
@@ -301,14 +427,30 @@ export async function cleanupUatGenerations(
         log(`[uat-generation] cleanup ${gen.name}: stack teardown failed: ${err instanceof Error ? err.message : String(err)}`);
       });
     }
-    await deps.removeWorktree(gen.worktreePath).catch((err) => {
-      cleaned = false;
-      log(`[uat-generation] cleanup ${gen.name}: worktree removal failed: ${err instanceof Error ? err.message : String(err)}`);
-    });
-    await deps.deleteBranch(gen.name).catch((err) => {
-      cleaned = false;
-      log(`[uat-generation] cleanup ${gen.name}: branch deletion failed: ${err instanceof Error ? err.message : String(err)}`);
-    });
+    if (deps.removeRepoArtifacts) {
+      // Polyrepo: one worktree and one branch per member repo, then the wrapper
+      // folder. Every repo is attempted even after one fails, so a single bad
+      // repo cannot strand the others' artifacts; cleanedAt still stays unset.
+      for (const repo of gen.repos ?? []) {
+        await deps.removeRepoArtifacts(repo).catch((err) => {
+          cleaned = false;
+          log(`[uat-generation] cleanup ${gen.name}: ${repo.repoKey} artifact removal failed: ${err instanceof Error ? err.message : String(err)}`);
+        });
+      }
+      await deps.removeGenerationResidue?.(gen, (gen.repos ?? []).map((r) => r.repoKey)).catch((err) => {
+        cleaned = false;
+        log(`[uat-generation] cleanup ${gen.name}: generation folder removal failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    } else {
+      await deps.removeWorktree(gen.worktreePath).catch((err) => {
+        cleaned = false;
+        log(`[uat-generation] cleanup ${gen.name}: worktree removal failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
+      await deps.deleteBranch(gen.name).catch((err) => {
+        cleaned = false;
+        log(`[uat-generation] cleanup ${gen.name}: branch deletion failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }
     if (!cleaned) continue;
     const cleanedAt = new Date().toISOString();
     if (gen.status === 'ready' || gen.status === 'superseded') {

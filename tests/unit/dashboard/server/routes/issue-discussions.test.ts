@@ -150,7 +150,7 @@ describe('fetchIssueDiscussions — GET /api/issues/:id/discussions', () => {
       { id: 1, user: { login: 'alice' }, body: 'on the issue', created_at: '2026-04-20T00:00:00Z', html_url: 'u1' },
     ]);
     // gh pr list → 642
-    const prListStdout = '642\n';
+    const prListStdout = JSON.stringify([{ number: 642, state: 'OPEN', mergedAt: null }]);
     // gh api repos/.../issues/642/comments → PR conversation
     const prConvJson = JSON.stringify([
       { id: 2, user: { login: 'bob' }, body: 'pr conv', created_at: '2026-04-22T00:00:00Z', html_url: 'u2' },
@@ -223,7 +223,7 @@ describe('fetchIssueDiscussions — GET /api/issues/:id/discussions', () => {
 
     mockExec
       .mockRejectedValueOnce(new Error('gh: not authenticated')) // issue comments
-      .mockResolvedValueOnce({ stdout: '642\n', stderr: '' })    // gh pr list ok
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 642, state: 'OPEN', mergedAt: null }]), stderr: '' }) // gh pr list ok
       .mockRejectedValueOnce(new Error('rate limit'))            // pr conversation
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })       // pr reviews ok
       .mockRejectedValueOnce(new Error('boom'));                 // pr review comments
@@ -251,7 +251,7 @@ describe('fetchIssueDiscussions — GET /api/issues/:id/discussions', () => {
     ]);
 
     mockExec
-      .mockResolvedValueOnce({ stdout: '642\n', stderr: '' })   // gh pr list found
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 642, state: 'OPEN', mergedAt: null }]), stderr: '' }) // gh pr list found
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })       // pr conversation empty
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })       // pr reviews empty
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' });      // pr review comments empty

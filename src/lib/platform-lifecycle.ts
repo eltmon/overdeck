@@ -107,6 +107,7 @@ export interface PlatformConfig {
 export interface StageFailure {
   stage: 'traefik' | 'cliproxy' | 'dashboard' | 'tldr';
   reason: string;
+  recovery?: 'dashboard-left-running';
 }
 
 export class StageError extends Error {
@@ -373,6 +374,7 @@ async function restartDashboardPromise(
       reason:
         `${healthFailure}; the newly spawned dashboard was LEFT RUNNING for inspection ` +
         `(it may still be booting — re-check ${config.dashboardApiPort ? `http://127.0.0.1:${config.dashboardApiPort}/api/health` : 'the health endpoint'} shortly)`,
+      recovery: 'dashboard-left-running',
     });
   }
 }async function restartCliproxyPromise(
@@ -431,6 +433,10 @@ async function restartDashboardPromise(
 export function describeStageFailure(err: unknown): StageFailure | null {
   if (err instanceof StageError) return err.failure;
   return null;
+}
+
+export function leavesDashboardRunning(err: unknown): boolean {
+  return err instanceof StageError && err.failure.recovery === 'dashboard-left-running';
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────

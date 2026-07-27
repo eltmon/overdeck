@@ -81,12 +81,19 @@ The full round trip between the work agent and review:
    stale dispatch-side 'reviewing' write can never clobber a terminal verdict,
    PAN-2578); then `deliverReviewVerdictFeedback` posts the PR comment, writes
    the feedback file (`.overdeck/feedback/NNN-review-agent-*.md`), and messages
-   the work agent directly. If the work agent is not running, the delivery door
-   RESURRECTS it (unpause pipeline pauses, clear troubled gates, resume stopped
-   agents — PAN-2209/PAN-2461) before ever escalating to the operator.
-5. **work again:** the work agent fixes the findings, commits, and re-runs
-   `pan done` → a NEW review cycle starts (re-request newer than the last
-   dispatch), which in `full` mode is a **selective** re-review.
+   the work agent directly. The delivery key is stable for `(issueId, runId)`, so
+   writing `reviewedAtCommit` after delivery cannot create a duplicate, while a
+   later run gets a fresh key even after drift reset clears the anchor. Legacy
+   callers without a run ID fall back to the reviewed anchor; if neither identity
+   exists, delivery is unkeyed rather than risking suppression of a later run. If
+   the work agent is not running, the delivery door RESURRECTS it (unpause pipeline pauses,
+   clear troubled gates, resume stopped agents — PAN-2209/PAN-2461) before ever
+   escalating to the operator.
+5. **work again:** the work agent fixes the findings, commits, and pushes. The
+   blocked-review drift patrol observes the stable new HEAD over two patrol
+   ticks, resets review to `pending`, and starts a NEW review cycle, which in
+   `full` mode is a **selective** re-review. `pan review request <id>` remains the
+   manual fallback when automatic re-dispatch does not begin.
 
 ---
 
@@ -141,8 +148,14 @@ comment naming that storage boundary. The pairing rule is: **a compare site may 
 
 The five converted stamp/compare sites are:
 
-1. `checkPostReviewCommits()` in `cloister/deacon.ts` compares
-   `reviewedAtCommit` through the composite-aware drift evaluator.
+1. `checkPostReviewCommits()` in `cloister/deacon-post-review-commits.ts`
+   compares `reviewedAtCommit` through the composite-aware drift evaluator.
+   Passed reviews reset immediately on real drift. Blocked reviews also detect
+   pushed rework: legacy rows without `reviewedAtCommit` may derive an anchor
+   only when every `reviewerVerdicts[*].atCommit` agrees, and a real new HEAD
+   must remain unchanged for two consecutive patrol ticks before review is
+   reset and re-dispatched. The debounce prevents per-item pushes from starting
+   review while the work agent is still committing the rest of the rework.
 2. Role-run liveness stamps in `agents/spawn.ts` and compares in
    `cloister/service-reactive.ts` using the same full `roleRunHead` anchor.
 3. `POST /api/review/:issueId/status` in `routes/workspaces.ts` stamps

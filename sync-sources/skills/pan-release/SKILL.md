@@ -88,6 +88,58 @@ First-time setup for a brand-new package (npm org creation, the one-time
 bootstrap publish, configuring the Trusted Publisher) and full publish
 troubleshooting live in `docs/RELEASING.md`.
 
+## Releasing as an agent (guards you will hit)
+
+An agent cutting a release trips guards a human operator never sees. All three
+have sanctioned levers — **never reach for `--no-verify`**, which is a one-way
+door.
+
+**1. The commit path guard.** `scripts/guard-flywheel-orchestrator-commit.sh`
+(via `.husky/pre-commit`) refuses a `flywheel-orchestrator` commit that touches
+anything outside `docs/FLYWHEEL-STATE.md` and the state paths — and a release
+commit necessarily touches three `package.json` files. The guard's own
+operator-directed escape hatch is:
+
+```bash
+OVERDECK_OPERATOR_COMMIT=1 pan release stable --version X.Y.Z
+```
+
+It mirrors `OVERDECK_OPERATOR_PUSH=1` for the push guard. Use it only when the
+operator has actually directed the release.
+
+**2. The push guard.** `scripts/guard-agent-main-push.sh` exempts `conv-`
+prefixed agent ids but not pipeline roles, so pushing `main` and the tag needs:
+
+```bash
+OVERDECK_OPERATOR_PUSH=1 git push origin main
+OVERDECK_OPERATOR_PUSH=1 git push origin vX.Y.Z
+```
+
+**3. Preflight tests fail for the wrong reason (PAN-3081).** An agent session
+carries `~/.overdeck/agents/<id>/git-guard` on `PATH`. That shim intercepts
+`git reset --hard` and `git rebase` *inside test fixtures that legitimately run
+them against their own temp repos*, so preflight reports failures that do not
+exist. Observed repeatedly: **10 failures with the shim on `PATH`, 0 without.**
+
+Verify the suite yourself with the shim dropped, and only then skip the
+preflight re-run:
+
+```bash
+CLEAN=$(echo $PATH | tr ':' '\n' | grep -v git-guard | paste -sd:)
+PATH="$CLEAN" npm test          # must be genuinely green
+pan release stable --version X.Y.Z --skip-tests
+```
+
+`--skip-tests` is legitimate **only** when you have run the suite clean and seen
+it pass. It skips a corrupted measurement, not the verification itself. Note the
+precedent in `src/cli/commands/restart.ts:194-198`, which already strips the
+guard from `PATH` for agent-launched restarts — release preflight does not, yet.
+
+**Ordering note.** If `git push origin main` is rejected because the remote moved
+ahead, merge rather than rebase (`git rebase` is blocked by the agent git guard)
+and push again. Push the tag even if `main` is momentarily behind — the tag is
+its own ref and triggers the publish workflow independently.
+
 ## Notes
 
 - Stable is for “ship this to normal users now.”

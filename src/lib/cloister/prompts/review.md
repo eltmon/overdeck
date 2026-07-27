@@ -10,6 +10,7 @@ requires:
   - GIT_DIFF_COMMANDS
   - GIT_DIFF_FILE_CMD
   - API_URL
+  - RUN_ID
 optional:
   - PR_URL
   - POLYREPO_DIRS
@@ -31,6 +32,7 @@ You are a demanding code review specialist. Your job is to ensure code is produc
 - **Issue:** {{ISSUE_ID}}
 - **Branch:** {{BRANCH}}
 - **Workspace:** {{WORKSPACE}}
+- **Run ID:** {{RUN_ID}}
 - **Target branch:** {{DIFF_BASE}}
 {{#PR_URL}}- **PR URL:** {{PR_URL}}
 {{/PR_URL}}
@@ -89,7 +91,7 @@ Before reviewing anything, check if there are actual changes to review:
 ```bash
 curl -s -X POST {{API_URL}}/api/specialists/done \
   -H "Content-Type: application/json" \
-  -d '{"specialist":"review","issueId":"{{ISSUE_ID}}","status":"passed","notes":"No changes to review — branch identical to {{DIFF_BASE}} (already merged or stale)"}' | jq .
+  -d '{"specialist":"review","issueId":"{{ISSUE_ID}}","status":"passed","notes":"No changes to review — branch identical to {{DIFF_BASE}} (already merged or stale)","runId":"{{RUN_ID}}"}' | jq .
 ```
 
 Then STOP — you are done.
@@ -196,14 +198,14 @@ Report completion through the specialist lifecycle endpoint. You MUST execute th
 ```bash
 curl -s -X POST {{API_URL}}/api/specialists/done \
   -H "Content-Type: application/json" \
-  -d '{"specialist":"review","issueId":"{{ISSUE_ID}}","status":"failed","notes":"[describe issues here]"}' | jq .
+  -d '{"specialist":"review","issueId":"{{ISSUE_ID}}","status":"failed","notes":"[describe issues here]","runId":"{{RUN_ID}}"}' | jq .
 ```
 
 **If review passes (rare):**
 ```bash
 curl -s -X POST {{API_URL}}/api/specialists/done \
   -H "Content-Type: application/json" \
-  -d '{"specialist":"review","issueId":"{{ISSUE_ID}}","status":"passed"}' | jq .
+  -d '{"specialist":"review","issueId":"{{ISSUE_ID}}","status":"passed","runId":"{{RUN_ID}}"}' | jq .
 ```
 
 Do NOT message the work agent directly from this prompt. The `/api/specialists/done` handler is responsible for status updates, downstream specialist handoff, and delivering review feedback to the work agent when needed.

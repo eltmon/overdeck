@@ -79,11 +79,23 @@ function strikeLandingDeaconChunkAssertion() {
 }
 
 export default defineConfig(async () => {
+  const repoRoot = resolve(import.meta.dirname, '../../..');
   const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
-    cwd: resolve(import.meta.dirname, '../../..'),
+    cwd: repoRoot,
     encoding: 'utf8',
   });
   const buildCommit = stdout.trim();
+  const { stdout: statusOutput } = await execFileAsync('git', ['status', '--porcelain'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  const buildDirty = statusOutput.trim().length > 0;
+  const { stdout: branchOutput } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  const branch = branchOutput.trim();
+  const buildBranch = branch === 'HEAD' ? null : branch;
   const builtAt = new Date().toISOString();
 
   return {
@@ -101,6 +113,8 @@ export default defineConfig(async () => {
     define: {
       __OVERDECK_BUILD_COMMIT__: JSON.stringify(buildCommit),
       __OVERDECK_BUILD_TIME__: JSON.stringify(builtAt),
+      __OVERDECK_BUILD_DIRTY__: JSON.stringify(buildDirty),
+      __OVERDECK_BUILD_BRANCH__: JSON.stringify(buildBranch),
     },
     clean: false,
     sourcemap: true,

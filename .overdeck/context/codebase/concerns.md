@@ -30,6 +30,48 @@ Live landmines a change in this repo can step on. Verified 2026-07-26.
 - **`postMergeLifecycle` idempotency** — guarded by
   `src/lib/cloister/in-flight-guard.ts` + its test. Weakening it reopens the
   PAN-328 infinite-loop (24k tracker calls). Keep the test green.
+- **Polyrepo UAT: never gate on `repos.length`** (PAN-3093) — every generation
+  reads back with at least one `repos` entry because monorepo rows synthesize
+  one, and a polyrepo project with a single contributing repo still needs the
+  per-repo path. Gate on the injected per-repo deps instead (`polyrepoGit` in
+  `uat-promote.ts`, `removeRepoArtifacts` in `uat-generation-engine.ts`).
+- **UAT anchors are compared by string equality** (PAN-3093) — the reconciler
+  decides staleness by comparing an anchor it computes now against what
+  assembly stored, so both sides must build anchors with the shared helpers in
+  `src/lib/cloister/uat-polyrepo-engine.ts`. Member anchors order by `repoKey`
+  because `mergeOrderInRepo` is knowable only to assembly; ordering on it makes
+  every generation read stale and reassemble forever.
+- **Polyrepo promote is resumable, not transactional** — phase A trial-merges
+  every repo before anything is pushed, but a phase-B failure leaves earlier
+  repos landed on purpose. Recovery is retry-with-skip via `promoted_at`; never
+  force-push or rewind a member repo's main (one-way door). A retry that finds
+  every repo landed must FINALIZE, not error — that is the crash window between
+  the last push and finalization.
+- **Read-only member repos are never UAT targets** (PAN-3093) — `required ===
+  false` (from `readonly: true`) is enforced in the ready set, in
+  `buildPolyrepoGitDeps`/`buildPolyrepoCleanupGit`, and re-checked against
+  current config at promote time. Assembly pushes branches, promote pushes
+  merges, and cleanup deletes remote branches, so every one of those is a write
+  boundary.
+- **Feature contributions carry the LOGICAL branch** (`feature/<issue>`), never
+  `origin/…` — `GenerationGitDeps` validates with `safeBranchName(…, 'feature')`
+  and resolves origin-first itself. Passing a remote-qualified ref makes every
+  merge throw and every feature get held out.
+- **A ready-set branch probe must FETCH first** — `git rev-parse origin/<b>`
+  reads a local tracking ref and never contacts the remote, so a branch pushed
+  from another machine reads as absent and its project never assembles.
+- **`promoted_at` is not proof of "not landed"** — publish and stamp are two
+  writes to two systems. Promote must ask git (`findLandedMerge`) whether a
+  nominally pending repo is already contained in its target before classifying
+  it, or a crash between the two wedges the batch as stale-base forever.
+- **Stale `node_modules/.experimental-vitest-cache`** (vitest `fsModuleCache:
+  true`) serves PRE-FIX transforms: a fix appears not to work, and an inert
+  comment "fixes" it. If a change seems to have no effect, purge that directory
+  before debugging the code. It also masks unrelated failures.
+- **Polyrepo assembly is feature-atomic** — a feature applies to all its repos
+  or none, rolled back with `checkout -B` to a captured head. Do NOT reintroduce
+  rebuild-and-replay: it is O(repos x features²) heavyweight git and can hold the
+  project's single-flight reconcile slot for hours.
 - **Single Deacon invariant** — never mount `~/.overdeck` into workspace
   containers; `OVERDECK_DISABLE_DEACON=1` belt-and-suspenders.
 - **Dashboard runtime** — Node 22 + built `dist/` only (node-pty native addon
