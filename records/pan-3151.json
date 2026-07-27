@@ -308,7 +308,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:59:20.561Z",
+  "updated": "2026-07-27T14:59:23.509Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "reviewing",
@@ -318,7 +318,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:59:16.365Z",
+    "updatedAt": "2026-07-27T14:59:23.455Z",
     "reviewNotes": "Agent re-review request (15/25): Fixed review issues: added v62→v63 regression test for missing review_cycle_history",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewSpawnedAt": "2026-07-27T14:59:16.365Z"
@@ -387,7 +387,7 @@
       },
       "costAtCloseOut": {
         "usd": 263.4836643,
-        "pricingAsOf": "2026-07-27T14:59:20.558Z"
+        "pricingAsOf": "2026-07-27T14:59:23.495Z"
       }
     },
     "merges": [
