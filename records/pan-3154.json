@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-26T19:12:34.052Z",
-  "updated": "2026-07-27T10:39:06.847Z",
+  "updated": "2026-07-27T10:40:39.696Z",
   "pipeline": {
     "issueId": "PAN-3154",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T10:39:06.835Z",
-    "inspectNotes": "Inspecting item conflicts-since-status-field"
+    "updatedAt": "2026-07-27T10:40:39.613Z",
+    "inspectNotes": "All 4 ACs met. AC1: INSERT cols/placeholders both 50, conflicts_since in ON CONFLICT DO UPDATE, round-trip + clear-to-undefined tests. AC2: SELECT * read with truthy guard (review-status-sync.ts:143) yields undefined for absent/NULL column; survival via non-destructive ADD COLUMN on both surfaces, top-up entry gated by schema-audit.test.ts. AC3: schema.ts:253 column, :1728 currentVersion<62 block, SCHEMA_VERSION 62, stale 61 assertion updated. AC4: projectPipeline (records.ts:122) + durableSubset (review-status-record-sync.ts:153) + restore path (verdict-restore.ts:76) + no-loss audit durable set. Scope extension to infra.ts/drizzle init SQL is correct — overdeck.db is the live write door for review_status."
   },
   "closeOut": {
     "usage": {
@@ -37,10 +37,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 338,
-            "output": 54526,
-            "cacheRead": 38162420,
-            "cacheWrite": 550478
+            "input": 342,
+            "output": 55257,
+            "cacheRead": 38770992,
+            "cacheWrite": 551466
           }
         }
       },
@@ -52,15 +52,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 338,
-          "output": 54526,
-          "cacheRead": 38162420,
-          "cacheWrite": 550478
+          "input": 342,
+          "output": 55257,
+          "cacheRead": 38770992,
+          "cacheWrite": 551466
         }
       },
       "costAtCloseOut": {
-        "usd": 9.5696743,
-        "pricingAsOf": "2026-07-27T10:39:06.841Z"
+        "usd": 9.7011763,
+        "pricingAsOf": "2026-07-27T10:40:39.658Z"
       }
     },
     "merges": [],
