@@ -7828,3 +7828,10 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - **Deployed `9b82f937504e` → `d2844501e5d0`**, clearing **13 drifted code files** (clean, pid 2535355, systemd-parented, deacon `False`→`True`). **Verified the specific feature by ancestry rather than the build number: `PAN-3211 --abandon IS LIVE`.** PAN-3209's dist-externals guard passed again in this build (21 packages, all declared).
 - All three queues empty post-deploy. **Nothing is outstanding in the queue lane** — MIN-879 closed last tick was the final blocked item.
 - **RUN TOTALS: 146 close-outs, 13 merges, 10 substrate bugs filed of which 7 fixed, merged and closed out.**
+
+## RUN-72 tick 47 (2026-07-27 20:02Z) — PAN-3206 merged; a post-release hotfix awaits deploy
+- **PAN-3206 went review+test green during the watch and is MERGED** (`d4d143ff32`, confirmed in `origin/main`). PR #3213 was `MERGEABLE/CLEAN`, 0 failing, 0 in flight. **Fifth watch tick to catch newly-green work** — the pattern of long quiet stretches punctuated by a merge continues to justify sweeping properly every tick.
+- **`package.json` appeared in the drift, so I checked for a version delta before assuming.** None — HEAD `f3bb306bc2` is *"unbreak npm install — bundle the private effect-acp workspace package (PAN-3209)"*, a post-release hotfix, not a new release. **A plain deploy is correct; `pan release stable` would have been wrong.** That check exists precisely because the two look identical in a file list.
+- **Notable: PAN-3209 shipped a guard this run and has now needed its own follow-up** — bundling a private workspace package that the dist-externals check surfaced. The guard found a real packaging break in npm install that no test caught.
+- Close-out for PAN-3206 blocks on the established transient trio; CI `in_progress` on the merge commit, so no deploy this tick.
+- **RUN TOTALS: 146 close-outs, 14 merges, 10 substrate bugs filed of which 7 fixed, merged and closed out.**
