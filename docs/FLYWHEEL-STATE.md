@@ -7779,3 +7779,10 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - Queues otherwise empty; MIN-879 cache still present. The 18 row-4-blocked sweep residue is with the operator and **is not mine to accept**.
 - **RUN TOTALS: 145 close-outs, 13 merges, 10 substrate bugs filed of which 7 fixed, merged and closed out.**
 - **LESSON: the drift check earns its place on quiet ticks.** Three queue surfaces all said "nothing", and the only signal that anything had happened was one changed file outside `docs/`. **A watch tick that checks only the queues would have left a close-out fix undeployed indefinitely** — the same inert-fix failure the deploy row exists to catch.
+
+## RUN-72 tick 40 (2026-07-27 18:01Z) — build drift found three commits; deploy held on CI
+- Queues all empty again, but **drift found 17 non-docs files and three real commits** past the live build: `114f073401` (dashboard subagent rail), `ba25151e12` (**PAN-3209** — fail the build when dist imports an undeclared dependency), `fac085ef4e` (**PAN-3212** — never press Enter into a blocking tmux choice menu). **Second tick running where the queues said nothing and drift said otherwise.**
+- **Checked `package.json` for a version change before treating it as ordinary code.** A changed `package.json` in the drift set is exactly what a release looks like, and a release would need `pan release stable` rather than a plain deploy. **No version delta — dependency/build config only**, so this is a normal deploy.
+- **Deploy HELD: CI is `in_progress` on both new heads.** Deploying now would ship an unreported head, which is the tick-16 lapse I have already recorded once. Checked CI as its own command and read it before deciding.
+- MIN-879 cache still present; the 18 row-4 sweep residue remains the operator's.
+- **RUN TOTALS: 145 close-outs, 13 merges, 10 substrate bugs filed of which 7 fixed, merged and closed out.**
