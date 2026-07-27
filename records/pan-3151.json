@@ -306,7 +306,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:54:25.915Z",
+  "updated": "2026-07-27T14:54:31.446Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
@@ -316,10 +316,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:54:25.281Z",
+    "updatedAt": "2026-07-27T14:54:31.439Z",
     "reviewNotes": "The targeted migration suite is green, but the changed fixtures only accommodate the exact-SCHEMA_VERSION repair and do not add the required v62→later-version regression. A user skipping this build can still advance from the shipped v62 schema without review_cycle_history; bump to v63 and test the real v62 state.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
-    "reviewedAtCommit": "3986d07bdd7a1a9d417581e7b3deec7773921746",
+    "reviewedAtCommit": "c868260f59517b74913b42a1c3c29fcff77203b9",
     "reviewSpawnedAt": "2026-07-27T14:49:44.260Z"
   },
   "closeOut": {
@@ -386,7 +386,7 @@
       },
       "costAtCloseOut": {
         "usd": 259.8885043,
-        "pricingAsOf": "2026-07-27T14:54:25.299Z"
+        "pricingAsOf": "2026-07-27T14:54:31.443Z"
       }
     },
     "merges": [
