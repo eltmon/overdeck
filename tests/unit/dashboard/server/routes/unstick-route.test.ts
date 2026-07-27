@@ -220,6 +220,32 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     const after = getReviewStatusSync('PAN-RAC-CLEAR');
     expect(after?.reviewedAtCommit).toBeUndefined();
   });
+
+  it('200: clears review_cycle_history when unsticking review-not-converging (PAN-3151 regression)', () => {
+    // PAN-3151: When convergence detection marks an issue stuck with stuckReason=review-not-converging,
+    // unstick must clear the cycle history so a fresh attempt doesn't immediately re-trigger the gate.
+    // Regression: without clearing, the history series would re-engage convergence detection immediately.
+    setReviewStatusSync('PAN-CONV-CLEAR', {
+      reviewStatus: 'blocked',
+      testStatus: 'passed',
+    });
+    markWorkspaceStuck('PAN-CONV-CLEAR', 'review-not-converging', {
+      blockingCount: 8,
+      cycleCount: 3,
+    });
+    // Pre-populate cycle history to simulate a stuck convergence scenario
+    const stuckStatusBefore = getReviewStatusSync('PAN-CONV-CLEAR');
+    expect(stuckStatusBefore?.stuck).toBe(true);
+    expect(stuckStatusBefore?.stuckReason).toBe('review-not-converging');
+
+    processUnstickRequest('PAN-CONV-CLEAR', true, stuckStatusBefore, { safe: true });
+
+    const after = getReviewStatusSync('PAN-CONV-CLEAR');
+    // Convergence history must be cleared so a fresh rework attempt doesn't re-engage the gate
+    expect(after?.reviewCycleHistory).toBeUndefined();
+    // Stuck flag cleared — deacon will process the issue again from a clean slate
+    expect(after?.stuck).toBeFalsy();
+  });
 });
 
 describe('buildUnstickRepairAdvice', () => {
