@@ -221,17 +221,17 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T13:44:04.523Z",
+  "updated": "2026-07-27T13:44:07.458Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T13:44:04.488Z",
+    "updatedAt": "2026-07-27T13:44:04.962Z",
     "reviewNotes": "Agent re-review request (5/25): Fixed v60→v61 repairs to run unconditionally for databases already at v61",
     "conflictsSince": {
       "sha": "f47f84d8b5ac81a247ea22ebca72fe8e3e2193c7",
@@ -278,10 +278,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3399,
-            "output": 135288,
-            "cacheRead": 80703204,
-            "cacheWrite": 3356397
+            "input": 3409,
+            "output": 135652,
+            "cacheRead": 80938722,
+            "cacheWrite": 3357916
           }
         }
       },
@@ -305,15 +305,15 @@
           "cacheWrite": 255526
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3399,
-          "output": 135288,
-          "cacheRead": 80703204,
-          "cacheWrite": 3356397
+          "input": 3409,
+          "output": 135652,
+          "cacheRead": 80938722,
+          "cacheWrite": 3357916
         }
       },
       "costAtCloseOut": {
-        "usd": 157.6684583,
-        "pricingAsOf": "2026-07-27T13:44:04.520Z"
+        "usd": 157.6957383,
+        "pricingAsOf": "2026-07-27T13:44:07.454Z"
       }
     },
     "merges": [
