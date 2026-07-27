@@ -189,15 +189,7 @@
       "timestamp": "2026-07-27T14:38:33.559Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T14:38:33Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nthe >= current-version repair mutates newer schemas and leaves 3 migration tests failing\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -286,21 +278,21 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T14:42:40.957Z",
+  "updated": "2026-07-27T14:42:43.089Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T14:42:39.384Z",
+    "updatedAt": "2026-07-27T14:42:42.857Z",
     "reviewNotes": "Agent re-review request (13/25): Fixed: repairs only run for databases exactly at SCHEMA_VERSION",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "aa784f5d2e07626caf7a535f562b61cb6b2e667a",
-    "reviewSpawnedAt": "2026-07-27T14:37:11.594Z"
+    "reviewSpawnedAt": "2026-07-27T14:42:42.855Z"
   },
   "closeOut": {
     "usage": {
@@ -366,7 +358,7 @@
       },
       "costAtCloseOut": {
         "usd": 238.06189030000002,
-        "pricingAsOf": "2026-07-27T14:42:40.952Z"
+        "pricingAsOf": "2026-07-27T14:42:42.938Z"
       }
     },
     "merges": [
