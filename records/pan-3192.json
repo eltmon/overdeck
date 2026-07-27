@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:32:47.311Z",
-  "updated": "2026-07-27T05:24:02.840Z",
+  "updated": "2026-07-27T05:24:09.510Z",
   "pipeline": {
     "issueId": "PAN-3192",
     "reviewStatus": "pending",
@@ -128,5 +128,26 @@
     "docs-quality-gates-frontend": "completed",
     "docs-quality-gates-frontend.docs-quality-gates-frontend.ac1": "completed",
     "docs-quality-gates-frontend.docs-quality-gates-frontend.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "CLAUDE.md",
+      "package.json",
+      "scripts/frontend-types-baseline.txt",
+      "scripts/lint-frontend-types.sh",
+      "src/dashboard/frontend/package.json",
+      "tests/unit/scripts/lint-frontend-types.test.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "package.json",
+      "scripts/frontend-types-baseline.txt",
+      "scripts/lint-frontend-types.sh",
+      "src/dashboard/frontend/package.json",
+      "tests/unit/scripts/lint-frontend-types.test.ts"
+    ],
+    "recordedAt": "2026-07-27T05:24:09.509Z"
   }
 }
