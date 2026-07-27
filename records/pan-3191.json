@@ -84,17 +84,17 @@
     "recordedAt": "2026-07-27T05:19:11.339Z"
   },
   "created": "2026-07-27T04:32:15.417Z",
-  "updated": "2026-07-27T07:02:43.959Z",
+  "updated": "2026-07-27T07:14:09.847Z",
   "pipeline": {
     "issueId": "PAN-3191",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T05:20:05.037Z",
-    "updatedAt": "2026-07-27T07:02:43.856Z",
+    "updatedAt": "2026-07-27T07:14:09.510Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3197",
     "reviewedAtCommit": "6d25e80471fae973a5aa9b3fe6e7caeb898f3330",
@@ -147,10 +147,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 12,
-            "output": 1620,
-            "cacheRead": 632971,
-            "cacheWrite": 158442
+            "input": 60,
+            "output": 10545,
+            "cacheRead": 4799718,
+            "cacheWrite": 186934
           }
         },
         "work": {
@@ -170,15 +170,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 12,
-          "output": 1620,
-          "cacheRead": 632971,
-          "cacheWrite": 158442
+          "input": 60,
+          "output": 10545,
+          "cacheRead": 4799718,
+          "cacheWrite": 186934
         }
       },
       "costAtCloseOut": {
-        "usd": 112.488942,
-        "pricingAsOf": "2026-07-27T07:02:43.893Z"
+        "usd": 113.482869,
+        "pricingAsOf": "2026-07-27T07:14:09.721Z"
       }
     },
     "merges": [
