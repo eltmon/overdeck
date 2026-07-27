@@ -1,19 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import type { SubagentSummary } from './chat-types';
-
-const hookMocks = vi.hoisted(() => ({ useSubagentTranscript: vi.fn() }));
-
-vi.mock('./useConversationMessagesStream', () => ({
-  useSubagentTranscript: hookMocks.useSubagentTranscript,
-}));
-vi.mock('./MessagesTimeline', () => ({
-  MessagesTimeline: ({ messages }: { messages: Array<{ text: string }> }) => (
-    <div data-testid="subagent-timeline">{messages.map((message) => message.text).join(' ')}</div>
-  ),
-}));
 
 import { SubagentRail } from './SubagentRail';
 
@@ -29,6 +18,7 @@ const conversation: Conversation = {
   lastAttachedAt: null,
   sessionAlive: true,
   harness: 'claude-code',
+  title: 'xBrief context costs',
 };
 
 const subagents: SubagentSummary[] = [
@@ -53,59 +43,52 @@ const subagents: SubagentSummary[] = [
 describe('SubagentRail', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/conv/42');
-    hookMocks.useSubagentTranscript.mockReset().mockReturnValue({
-      data: {
-        messages: [{ id: 'sub-msg', role: 'assistant', text: 'Subagent transcript', createdAt: '2026-07-18T00:01:00Z' }],
-        workLog: [],
-        streaming: false,
-      },
-      isLoading: false,
-      isError: false,
-    });
   });
 
   it('renders nothing when no subagents exist', () => {
-    const { container } = render(<SubagentRail conversation={conversation} subagents={[]} />);
+    const { container } = render(
+      <SubagentRail conversation={conversation} subagents={[]} selectedAgentId={null} />,
+    );
 
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders flat rows with status and nested-depth markers', () => {
-    render(<SubagentRail conversation={conversation} subagents={subagents} />);
+  it('lists the main agent above flat subagent rows with status and depth markers', () => {
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
 
+    expect(screen.getByText('Main agent')).toBeInTheDocument();
+    expect(screen.getByText('xBrief context costs')).toBeInTheDocument();
     expect(screen.getByText('Explore')).toBeInTheDocument();
     expect(screen.getByText('Trace the conversation parser')).toBeInTheDocument();
     expect(screen.getByText('general-purpose')).toBeInTheDocument();
     expect(screen.getByText('depth 2')).toBeInTheDocument();
-    expect(screen.getByLabelText('running')).toHaveClass('bg-primary');
+    expect(screen.getAllByLabelText('running')).toHaveLength(2); // main agent + Explore
     expect(screen.getByLabelText('done')).toHaveClass('bg-muted-foreground/40');
-    expect(screen.getByRole('complementary', { name: 'Conversation subagents' })).toHaveClass('min-w-0');
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toHaveClass('min-w-0');
   });
 
-  it('selects a subagent in the URL and renders its transcript without a composer', async () => {
+  it('marks the main agent row current while no subagent is selected', () => {
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
+
+    expect(screen.getByRole('button', { name: /Main agent/ })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('button', { name: /Explore/ })).not.toHaveAttribute('aria-current');
+  });
+
+  it('marks the selected subagent row current', () => {
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId="deep" />);
+
+    expect(screen.getByRole('button', { name: /general-purpose/ })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('button', { name: /Main agent/ })).not.toHaveAttribute('aria-current');
+  });
+
+  it('writes the clicked subagent into the URL and clears it from the main agent row', async () => {
     const user = userEvent.setup();
-    render(<SubagentRail conversation={conversation} subagents={subagents} />);
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
 
-    await user.click(screen.getByRole('button', { name: /Explore/i }));
-
+    await user.click(screen.getByRole('button', { name: /Explore/ }));
     expect(new URLSearchParams(window.location.search).get('subagent')).toBe('alpha');
-    expect(screen.getByText(/Explore/)).toHaveTextContent('Explore · Trace the conversation parser');
-    expect(screen.getByTestId('subagent-timeline')).toHaveTextContent('Subagent transcript');
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-    expect(hookMocks.useSubagentTranscript).toHaveBeenLastCalledWith(conversation, 'alpha');
 
-    await user.click(screen.getByRole('button', { name: 'Close subagent transcript' }));
+    await user.click(screen.getByRole('button', { name: /Main agent/ }));
     expect(new URLSearchParams(window.location.search).has('subagent')).toBe(false);
-    expect(screen.getByText('Subagents')).toBeInTheDocument();
-  });
-
-  it('opens a matching subagent directly from the URL', () => {
-    window.history.replaceState({}, '', '/conv/42?subagent=deep');
-
-    render(<SubagentRail conversation={conversation} subagents={subagents} />);
-
-    expect(screen.getByText(/general-purpose/)).toHaveTextContent('general-purpose · Inspect nested behavior');
-    expect(screen.getByTestId('subagent-timeline')).toBeInTheDocument();
-    expect(hookMocks.useSubagentTranscript).toHaveBeenLastCalledWith(conversation, 'deep');
   });
 });

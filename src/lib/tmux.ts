@@ -12,6 +12,7 @@ import { buildChildEnvSync } from './child-env.js';
 import { TmuxError } from './errors.js';
 import { getUiTheme, TERMINAL_BG } from './ui-theme.js';
 import { paneTreeHasHarnessProcess } from './tmux-process-tree.js';
+import { paneHasBlockingChoiceMenu } from './pane-choice-menu.js';
 
 export { paneTreeHasHarnessProcess } from './tmux-process-tree.js';
 
@@ -1228,7 +1229,18 @@ export const sendKeys = (
         await tmuxExecAsync(['delete-buffer', '-b', bufferName], { encoding: 'utf-8' }).catch(() => {});
 
         if (!pasteVerified) {
-          const snapshot = await capturePaneText(sessionName, 30);
+          const snapshot = await capturePaneText(sessionName, 90);
+          // A blocking menu swallowed the paste, and Enter would confirm ITS
+          // highlighted row — at the resume gate, "Resume from summary" over
+          // the operator's "as-is" (PAN-3212). Never answer a menu we did not
+          // open; see the delivery-cascade section in CLAUDE.md.
+          if (paneHasBlockingChoiceMenu(snapshot)) {
+            throw new MessageDeliveryFailed(
+              `Delivery to ${sessionName} aborted: the pane is blocked on a choice menu, so the paste never reached the composer and Enter would answer that menu`,
+              sessionName,
+              snapshot,
+            );
+          }
           console.warn(`[tmux] Paste verification failed for ${sessionName} after ${PASTE_MAX_ATTEMPTS} attempts × ${VERIFY_TIMEOUT_MS}ms. Sending Enter anyway to avoid orphaned input. Snapshot:\n${snapshot.slice(0, 500)}`);
         }
 

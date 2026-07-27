@@ -131,8 +131,16 @@ function parseOptionLine(line: string): ParsedOptionLine | null {
  * Parse the last numbered-choice menu in the pane, or null when the pane is
  * not currently blocked on one. See the module header for the conservative
  * acceptance rules.
+ *
+ * `mode: 'guard'` keeps the menus card rendering excludes — permission prompts
+ * and multi-selects. A caller that only wants to know "is this pane blocked on
+ * a menu?" must see those too; see `paneHasBlockingChoiceMenu`.
  */
-export function parsePaneChoiceMenu(paneText: string): PaneChoiceMenu | null {
+export function parsePaneChoiceMenu(
+  paneText: string,
+  opts: { mode?: 'card' | 'guard' } = {},
+): PaneChoiceMenu | null {
+  const mode = opts.mode ?? 'card'
   if (!paneText) return null
   const lines = paneText.split('\n').map(cleanLine)
 
@@ -200,8 +208,12 @@ export function parsePaneChoiceMenu(paneText: string): PaneChoiceMenu | null {
   })
 
   // Exclusions — menus another pipeline owns, or shapes the card cannot model.
-  if (looksLikePermissionOptions(options)) return null
-  if (footerHint && /space\s+to\s+(?:select|toggle)/i.test(footerHint)) return null
+  // Guard mode keeps them: they still block the pane, so a caller about to
+  // press Enter blind must be told they are there.
+  if (mode === 'card') {
+    if (looksLikePermissionOptions(options)) return null
+    if (footerHint && /space\s+to\s+(?:select|toggle)/i.test(footerHint)) return null
+  }
 
   // Context block: lines above the first option, skipping the blank gap, then
   // collecting upward. Menus keep their context tight (headline + one
@@ -243,6 +255,20 @@ export function parsePaneChoiceMenu(paneText: string): PaneChoiceMenu | null {
     footerHint,
     confidence,
   }
+}
+
+/**
+ * True when the pane is blocked on ANY numbered menu, including the permission
+ * and multi-select shapes card rendering skips.
+ *
+ * Callers that would otherwise press Enter with nothing verified in the
+ * composer MUST consult this first: a bare Enter confirms the menu's
+ * highlighted row, which answers a question nobody asked. The session-resume
+ * gate defaults to "Resume from summary", so a stray Enter there discards the
+ * operator's full session (PAN-3212).
+ */
+export function paneHasBlockingChoiceMenu(paneText: string): boolean {
+  return parsePaneChoiceMenu(paneText, { mode: 'guard' }) !== null
 }
 
 /** Stable identity for patrol dedupe — same menu re-parsed must not re-surface. */

@@ -164,7 +164,10 @@ async function movePrdImpl(
         try { await cp(resolvedSidecarSource, sidecarDest); } catch { /* non-fatal */ }
       }
     }
-    await execAsync(`git commit -m "Move ${ctx.issueId} PRD to completed"`, { cwd: ctx.projectPath });
+    // The commit subject must be commitlint-compliant (type prefix required) —
+    // a bare "Move X PRD to completed" is rejected by commit-msg, and before the
+    // guard below that left the rename staged with the close-out wedged (PAN-3211).
+    await execAsync(`git commit -m "chore: move ${ctx.issueId} PRD to completed"`, { cwd: ctx.projectPath });
     if (pushToRemote) {
       await execAsync('git push', { cwd: ctx.projectPath });
     }
@@ -172,6 +175,15 @@ async function movePrdImpl(
     return stepOk(step, [`Moved ${formatLabel} from active/ to completed/ via git mv${sidecarNote}`]);
   } catch {
     // git mv failed — fall back to plain copy. cp handles both file and directory.
+    // Guard: if git mv already moved the source and a LATER step (commit/push)
+    // failed, the destination holds the PRD and the rename sits staged. cp would
+    // then ENOENT on the vanished source and bury the real failure (PAN-3211).
+    if (!existsSync(source.path)) {
+      if (existsSync(dest)) {
+        return stepFailed(step, 'PRD moved to completed/ but the follow-up git commit failed; the rename is staged — commit it and re-run close-out');
+      }
+      return stepFailed(step, `PRD source ${source.path} is missing — nothing to preserve`);
+    }
     try {
       await cp(source.path, dest, { recursive: true });
       if (!existsSync(dest)) {

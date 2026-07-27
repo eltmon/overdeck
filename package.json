@@ -118,6 +118,7 @@
     "lint:file-size": "bash scripts/lint-file-size.sh",
     "lint:source-introspection": "bash scripts/lint-source-introspection.sh",
     "lint:no-coderabbit-merge-gate": "bash scripts/lint-no-coderabbit-merge-gate.sh",
+    "lint:dist-externals": "node scripts/lint-dist-externals.mjs",
     "lint:ratchet-audit": "bash scripts/lint-ratchet-audit.sh",
     "pretest": "npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli",
     "test": "vitest run --configLoader runner && npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx",

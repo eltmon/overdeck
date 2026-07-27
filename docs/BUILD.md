@@ -14,6 +14,49 @@ How Overdeck's TypeScript source is built into distributable artifacts.
 | `npm run build:dashboard:frontend` | React frontend → `dist/dashboard/public/` |
 | `npm run build:dashboard:server` | Effect server → `dist/dashboard/server.js` + copies prompt templates |
 | `npm run dev` | Development mode via tsx watch (runs from source, no build needed) |
+| `npm run lint:dist-externals` | Verify every bare import left external in `dist/` is a declared runtime dependency |
+
+## Build Gates
+
+### Externalized imports must be declared dependencies (PAN-3209)
+
+The bundlers leave some packages **external** — the emitted chunk keeps a bare
+`import { PostHog } from "posthog-node"` and Node resolves it from
+`node_modules` at import time. If that package is missing from `dependencies`,
+the build still succeeds and the failure only appears when someone installs or
+`npm link`s the result:
+
+```
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'posthog-node'
+    imported from .../dist/review-status-8rqOvGJV.js
+```
+
+That shipped once (PAN-3209): the `posthog-node` import landed before the
+`dependencies` entry, and `npx @overdeck/core` crashed at startup off a linked
+checkout. `scripts/lint-dist-externals.mjs` closes it. It runs as the **last
+step of `npm run build`** (from `scripts/build-post-cli.mjs`, after every bundle
+is on disk) and is also available standalone as `npm run lint:dist-externals`.
+CI runs `npm run build`, so a `dist/` importing an undeclared external cannot be
+published or linked.
+
+What it checks:
+
+- Every `dist/**/*.js` except `dist/dashboard/public/**` — that is Vite's browser
+  output, resolved by the browser from the bundle rather than by Node.
+- ES module syntax only (static `import` / `export … from`, and dynamic
+  `import()`) — exactly what Node resolves in this ESM package. AMD/UMD
+  `define([…])` arrays and the bundler's `__require` shim inside inlined
+  third-party code are ignored; Node never resolves those.
+- A specifier's package must appear in `dependencies`, `optionalDependencies`,
+  or `peerDependencies`. A **devDependency does not count** — a published
+  install has none, which is how both PAN-3209 and PAN-1562 shipped broken.
+
+When it fails, the usual fix is adding the package to `dependencies` and running
+`bun install`. If the import is genuinely optional and its call site degrades
+gracefully without the package, add it to
+`scripts/dist-externals-allowlist.txt` as `<package>  # <ISSUE-REF> <why it is
+safe>` — the issue reference is mandatory, and an allowlist entry that no bundle
+imports anymore is itself a failure, so the list cannot rot.
 
 ## Build Tools
 
