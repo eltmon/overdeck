@@ -86,10 +86,6 @@ export function buildRealBranchInvalidationDeps(): ReconcileBranchInvalidationDe
   return {
     listProjects: () =>
       Object.entries(loadProjectsConfigSync().projects)
-        // Canonical membership needs forge signals (open PRs/issues); a project
-        // without github_repo can't be resolved, so it's skipped rather than
-        // falling back to a permissive "everything is in pipeline" guess.
-        .filter(([, projectConfig]) => Boolean(projectConfig.github_repo))
         .map(([projectKey, projectConfig]) => ({
           projectKey,
           projectPath: resolveProjectPath(projectConfig),
@@ -224,14 +220,18 @@ async function sweepProject(
     // route) may have updated this issue's status meanwhile. Passing a
     // snapshot taken before the probes as `existing` would tell
     // setReviewStatusSync to skip its fresh canonical read and silently
-    // overwrite that newer state.
+    // overwrite that newer state. A canonically in-pipeline issue can have NO
+    // review-status row at all (cache loss/rebuild, or work never touched by
+    // the runtime review pipeline) — that is not "nothing to mark", it is a
+    // proven conflict on real, in-pipeline work, so it must still be written
+    // through setReviewStatus's supported create-default-row path rather than
+    // silently dropped.
     const freshStatus = deps.getReviewStatus(issueId);
-    if (!freshStatus) continue; // no canonical row (yet) — nothing to mark
-    if (freshStatus.mergeStatus === 'merged') continue; // merged while we were probing
-    if (freshStatus.conflictsSince?.sha === newSha) continue; // dedup per main head (AC-3)
+    if (freshStatus?.mergeStatus === 'merged') continue; // merged while we were probing
+    if (freshStatus?.conflictsSince?.sha === newSha) continue; // dedup per main head (AC-3)
 
     const detectedAt = new Date(nowMs).toISOString();
-    const nonMergeBlockers = (freshStatus.blockerReasons ?? []).filter(
+    const nonMergeBlockers = (freshStatus?.blockerReasons ?? []).filter(
       (b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable',
     );
     const mergeConflictBlocker: BlockerReason = {
@@ -243,7 +243,7 @@ async function sweepProject(
     deps.setReviewStatus(issueId, {
       conflictsSince: { sha: newSha, detectedAt, paths: probe.paths },
       blockerReasons: [...nonMergeBlockers, mergeConflictBlocker],
-    }, freshStatus);
+    }, freshStatus ?? undefined);
 
     deps.emitActivityEntry({
       source: 'cloister',

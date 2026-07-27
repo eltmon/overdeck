@@ -1,13 +1,31 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { ProjectConfig } from '../../../../src/lib/projects.js';
+
+vi.mock('../../../../src/lib/projects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/projects.js')>();
+  return {
+    ...actual,
+    loadProjectsConfigSync: () => ({
+      projects: {
+        pan: { name: 'Overdeck', path: '/projects/pan', issue_prefix: 'PAN', github_repo: 'eltmon/overdeck' } as ProjectConfig,
+        // PAN-3154 cycle-2 finding: a GitLab-only project (no github_repo) must
+        // still reach the sweep — canonical membership handles the tracker/forge
+        // path, listProjects must not gate on github_repo.
+        myn: { name: 'Mind Your Now', path: '/projects/myn', issue_prefix: 'MYN', gitlab_repo: 'group/myn' } as ProjectConfig,
+      },
+    }),
+  };
+});
+
 import {
   __resetBranchInvalidationCooldownsForTests,
+  buildRealBranchInvalidationDeps,
   reconcileBranchInvalidation,
   type ProjectDescriptor,
   type ReconcileBranchInvalidationDeps,
 } from '../../../../src/lib/cloister/branch-invalidation.js';
 import type { BlockerReason, ReviewStatus } from '../../../../src/lib/review-status.js';
 import type { PipelineMembership } from '../../../../src/lib/pipeline-membership.js';
-import type { ProjectConfig } from '../../../../src/lib/projects.js';
 
 function makeStatus(overrides: Partial<ReviewStatus> = {}): ReviewStatus {
   return {
@@ -171,7 +189,7 @@ describe('reconcileBranchInvalidation', () => {
     expect(actions).toEqual([]);
   });
 
-  it('only probes projects with github_repo configured (listProjects filters unresolvable projects)', async () => {
+  it('sweeps every project listProjects returns', async () => {
     const deps = makeDeps({
       listProjects: vi.fn(() => [makeProject('pan'), makeProject('other', '/projects/other')]),
     });
@@ -180,6 +198,16 @@ describe('reconcileBranchInvalidation', () => {
 
     expect(deps.lsRemoteMainSha).toHaveBeenCalledWith('/projects/pan');
     expect(deps.lsRemoteMainSha).toHaveBeenCalledWith('/projects/other');
+  });
+
+  it('the production listProjects does not gate on github_repo — a GitLab-only project is still enumerated', () => {
+    const projects = buildRealBranchInvalidationDeps().listProjects();
+
+    expect(projects.map((p) => p.projectKey).sort()).toEqual(['myn', 'pan']);
+    const myn = projects.find((p) => p.projectKey === 'myn');
+    expect(myn).toBeDefined();
+    expect(myn?.projectConfig.github_repo).toBeUndefined();
+    expect((myn?.projectConfig as { gitlab_repo?: string }).gitlab_repo).toBe('group/myn');
   });
 
   it('marks a newly-conflicting issue with conflictsSince and a replaced merge_conflict blocker, preserving non-merge blockers', async () => {
@@ -241,6 +269,24 @@ describe('reconcileBranchInvalidation', () => {
 
     expect(deps.setReviewStatus).toHaveBeenCalledWith('PAN-1111', expect.anything(), freshStatus);
     expect(deps.setReviewStatus).not.toHaveBeenCalledWith('PAN-1111', expect.anything(), staleStatus);
+  });
+
+  it('marks a canonically in-pipeline conflict even when no review-status row exists (cache loss/rebuild), and advances the checkpoint since it was handled', async () => {
+    const deps = makeDeps({
+      listAgentWorkspaces: () => [{ issueId: 'PAN-1111', workspace: '/projects/pan/workspaces/feature-pan-1111' }],
+      existsSync: () => true,
+      probeConflictPaths: vi.fn(async () => ({ mergeability: 'conflicts' as const, paths: ['a.txt'] })),
+      getReviewStatus: vi.fn(() => null),
+    });
+
+    await reconcileBranchInvalidation(deps);
+
+    expect(deps.setReviewStatus).toHaveBeenCalledWith(
+      'PAN-1111',
+      expect.objectContaining({ conflictsSince: expect.objectContaining({ sha: NEW_SHA }) }),
+      undefined,
+    );
+    expect(deps.setSetting).toHaveBeenCalledWith('branch_invalidation.main_head.pan', NEW_SHA);
   });
 
   it('skips an issue that was merged concurrently while its workspace was being probed', async () => {
