@@ -192,6 +192,46 @@ describe('lint-dist-externals', () => {
     expect(output).toContain('npm run build');
   });
 
+  it('rejects a consumer-installed dependency that uses a workspace protocol', () => {
+    // @overdeck/core 0.46.0/0.47.0 declared "effect-acp": "workspace:*" in
+    // dependencies. npm cannot resolve that from a registry tarball, so
+    // `npm install @overdeck/core` failed with EUNSUPPORTEDPROTOCOL for
+    // everyone — whether or not dist imported the package.
+    const root = makeRoot({ dependencies: { 'effect-acp': 'workspace:*' } });
+    writeDistFile(root, 'dist/index.js', 'export const noop = () => {};\n');
+
+    const { ok, output } = run(root);
+
+    expect(ok).toBe(false);
+    expect(output).toContain('dependencies.effect-acp is "workspace:*"');
+    expect(output).toContain('EUNSUPPORTEDPROTOCOL');
+  });
+
+  it('allows workspace and catalog protocols in devDependencies', () => {
+    // A consumer never installs devDependencies, so build-time workspace
+    // inputs may use those protocols freely.
+    const root = makeRoot({
+      devDependencies: { 'effect-acp': 'workspace:*', '@effect/vitest': 'catalog:' },
+    });
+    writeDistFile(root, 'dist/index.js', 'export const noop = () => {};\n');
+
+    expect(run(root).ok).toBe(true);
+  });
+
+  it('rejects catalog and file protocols in dependencies too', () => {
+    const root = makeRoot({
+      dependencies: { '@effect/vitest': 'catalog:' },
+      optionalDependencies: { 'local-thing': 'file:../local-thing' },
+    });
+    writeDistFile(root, 'dist/index.js', 'export const noop = () => {};\n');
+
+    const { ok, output } = run(root);
+
+    expect(ok).toBe(false);
+    expect(output).toContain('dependencies.@effect/vitest is "catalog:"');
+    expect(output).toContain('optionalDependencies.local-thing is "file:../local-thing"');
+  });
+
   it('stays wired into npm run build', () => {
     // The guard only protects a publish/link if it actually runs during the
     // build. build-post-cli.mjs is the final step of `npm run build`, invoked

@@ -19,6 +19,14 @@
 // `optionalDependencies`, or `peerDependencies`. A devDependency does NOT
 // satisfy it — a published install has no devDependencies.
 //
+// The second rule covers the other half of the same contract: a declaration
+// only helps if a consumer can actually resolve it. `@overdeck/core@0.46.0`
+// and `0.47.0` declared `"effect-acp": "workspace:*"` in `dependencies` —
+// a Bun/pnpm workspace protocol that npm cannot resolve from a registry
+// tarball — so `npm install @overdeck/core` failed outright with
+// `EUNSUPPORTEDPROTOCOL` for every user, whether or not dist imported it.
+// So every consumer-installed dependency spec must be a real registry range.
+//
 // Wired into `npm run build` (via scripts/build-post-cli.mjs, after every
 // bundle is emitted) and exposed as `npm run lint:dist-externals`. CI runs
 // `npm run build`, so a dist importing an undeclared external cannot be
@@ -111,11 +119,18 @@ if (!existsSync(distDir)) {
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 // devDependencies deliberately excluded: they are absent from a published
 // install, which is exactly how PAN-3209 and PAN-1562 shipped broken.
-const declared = new Set([
-  ...Object.keys(pkg.dependencies ?? {}),
-  ...Object.keys(pkg.optionalDependencies ?? {}),
-  ...Object.keys(pkg.peerDependencies ?? {}),
-]);
+const CONSUMER_INSTALLED_FIELDS = ['dependencies', 'optionalDependencies', 'peerDependencies'];
+const declared = new Set(CONSUMER_INSTALLED_FIELDS.flatMap((field) => Object.keys(pkg[field] ?? {})));
+
+// Protocols a workspace-aware package manager understands locally but that no
+// consumer can resolve from a published tarball. devDependencies may use them
+// freely — a consumer never installs those.
+const UNPUBLISHABLE_PROTOCOL = /^(workspace|catalog|link|file|portal):/;
+const unresolvableSpecs = CONSUMER_INSTALLED_FIELDS.flatMap((field) =>
+  Object.entries(pkg[field] ?? {})
+    .filter(([, spec]) => UNPUBLISHABLE_PROTOCOL.test(spec))
+    .map(([name, spec]) => ({ field, name, spec })),
+);
 
 const { allowed, malformed } = readAllowlist();
 
@@ -148,6 +163,10 @@ const staleAllowlist = [...allowed.keys()].filter((name) => !externals.has(name)
 
 const errors = [
   ...malformed,
+  ...unresolvableSpecs.map(
+    ({ field, name, spec }) =>
+      `${field}.${name} is "${spec}" — a consumer installing from the registry cannot resolve that protocol, so \`npm install\` fails outright with EUNSUPPORTEDPROTOCOL. Move it to devDependencies if it is a build-time workspace input, or give it a published version range.`,
+  ),
   ...missing.map((name) => {
     const importers = [...externals.get(name)].sort().slice(0, 3).join(', ');
     const classification = pkg.devDependencies?.[name]

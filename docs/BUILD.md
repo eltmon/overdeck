@@ -39,6 +39,18 @@ is on disk) and is also available standalone as `npm run lint:dist-externals`.
 CI runs `npm run build`, so a `dist/` importing an undeclared external cannot be
 published or linked.
 
+The same script enforces the other half of the contract: a declaration only
+helps if a consumer can resolve it. `@overdeck/core` 0.46.0 and 0.47.0 declared
+`"effect-acp": "workspace:*"` in `dependencies` — a Bun/pnpm workspace protocol
+npm cannot resolve from a registry tarball — so `npm install @overdeck/core`
+failed outright with `EUNSUPPORTEDPROTOCOL` for every user, and
+`dist/acp-host.js` externally imported that same unpublished package. The guard
+now rejects `workspace:`, `catalog:`, `link:`, `file:`, and `portal:` specs in
+`dependencies`, `optionalDependencies`, and `peerDependencies`. devDependencies
+may use them freely, since a consumer never installs those — an unpublished
+workspace package belongs there, bundled into `dist` via `deps.alwaysBundle` in
+`tsdown.config.ts` rather than left external.
+
 What it checks:
 
 - Every `dist/**/*.js` except `dist/dashboard/public/**` — that is Vite's browser

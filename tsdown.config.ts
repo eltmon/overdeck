@@ -34,7 +34,12 @@ export default defineConfig({
     '@overdeck/contracts': resolve(import.meta.dirname, 'packages/contracts/src/index.ts'),
   },
   deps: {
-    alwaysBundle: (id) => id.startsWith('@overdeck/'),
+    // PAN-3209 follow-up: effect-acp is a private, unpublished workspace package
+    // (packages/effect-acp, "private": true). Left external, dist/acp-host.js
+    // imported a package no consumer can install, and its `workspace:*` entry in
+    // `dependencies` made `npm install @overdeck/core` fail outright. Bundle it
+    // like @overdeck/*; it stays a devDependency build input.
+    alwaysBundle: (id) => id.startsWith('@overdeck/') || id === 'effect-acp' || id.startsWith('effect-acp/'),
     neverBundle: ['@lydell/node-pty'],
   },
   outDir: 'dist',
