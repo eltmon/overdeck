@@ -75,18 +75,18 @@
     "recordedAt": "2026-07-27T06:36:31.990Z"
   },
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T06:56:55.292Z",
+  "updated": "2026-07-27T07:41:20.671Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T06:36:49.685Z",
-    "updatedAt": "2026-07-27T06:56:52.968Z",
+    "updatedAt": "2026-07-27T07:41:20.550Z",
     "reviewNotes": "Cycle-1 blockers are fixed; all requirements are covered and no blocking correctness, security, or performance findings remain",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs met: isAutoResumableRole(work|strike) admits strikes (boot-reconciliation.ts:94-99); the hasCompletionMarker/stoppedByUser gate is gone so in-window stoppedByUser agents qualify while isRecentBootCandidate still rejects out-of-window ones; handleAgentStoppedEvent now gates on isAutoResumableRole and logs 'not auto-resumable' (deacon-auto-resume.ts:640-643). Verified end-to-end: applyBootReconciliationDecision resumes via handleAgentStoppedEvent, so admitted strikes are not dead-ended, and the removed workspace-path completion check is still covered by bootReconciliationSkipReason's agent-dir marker check. vitest boot-reconciliation.test.ts 22/22 pass, npm run typecheck clean. Non-blocking note for follow-up beads: deacon-auto-resume.ts:868 and :935 still filter role==='work', so strikes stay invisible to the batch patrol and reconcile safety net outside the boot window.",
@@ -153,10 +153,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 66,
-            "output": 9413,
-            "cacheRead": 4504754,
-            "cacheWrite": 156747
+            "input": 68,
+            "output": 9550,
+            "cacheRead": 4661501,
+            "cacheWrite": 157367
           }
         },
         "work": {
@@ -176,15 +176,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 66,
-          "output": 9413,
-          "cacheRead": 4504754,
-          "cacheWrite": 156747
+          "input": 68,
+          "output": 9550,
+          "cacheRead": 4661501,
+          "cacheWrite": 157367
         }
       },
       "costAtCloseOut": {
-        "usd": 112.893945,
-        "pricingAsOf": "2026-07-27T06:56:55.258Z"
+        "usd": 112.928218,
+        "pricingAsOf": "2026-07-27T07:41:20.640Z"
       }
     },
     "merges": [
