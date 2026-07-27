@@ -43,6 +43,7 @@ import { readWorkspaceFileEffect } from './services/read-workspace-file.js';
 import { resolveFilePathExistsEffect } from './services/resolve-file-path-exists.js';
 import { getHarnessBehavior } from '../../lib/runtimes/behavior.js';
 import { normalizeSessionsFeedFilter, toDiscoveredSessionSnapshot, toSessionsFeedRowSnapshot } from './services/sessions-feed-rpc.js';
+import { subagentTranscriptPath } from './services/conversation/subagents.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -902,7 +903,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               ? yield* Effect.promise(() => readLauncherPinnedSessionId(launcherTmuxSession))
               : null;
             const resolvedSessionId = pinnedSessionId ?? conv.claudeSessionId;
-            const sessionFile = resolvedSessionId
+            let sessionFile = resolvedSessionId
               ? sessionFilePath(conv.cwd, resolvedSessionId)
               : null;
             const model = conv.model ?? null;
@@ -911,6 +912,11 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               // Session file not yet discovered — keep the subscription alive
               // without causing the client to reconnect in a tight loop.
               return conversationDiscoveringStream();
+            }
+
+            if (input.agentId) {
+              sessionFile = subagentTranscriptPath(sessionFile, input.agentId);
+              if (!sessionFile) return conversationDiscoveringStream();
             }
 
             if (isPiSessionFile(sessionFile)) {
