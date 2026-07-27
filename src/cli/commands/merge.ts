@@ -33,7 +33,15 @@ export async function mergeCancelCommand(issueId: string, fetchImpl: typeof fetc
     });
 
     if (res.ok) {
-      console.log(`Cancelled auto-merge for ${normalizedIssueId}`);
+      const payload = await res.json() as { remainingActionable?: unknown };
+      const remainingActionable = typeof payload.remainingActionable === 'number'
+        ? payload.remainingActionable
+        : 0;
+      if (remainingActionable > 0) {
+        console.log(`Cancelled auto-merge for ${normalizedIssueId} (${remainingActionable} actionable row(s) remain — re-run 'pan merge cancel ${normalizedIssueId}' to clear the next one)`);
+      } else {
+        console.log(`Cancelled auto-merge for ${normalizedIssueId}`);
+      }
       return;
     }
 

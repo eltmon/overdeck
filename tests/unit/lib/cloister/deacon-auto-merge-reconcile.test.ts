@@ -1,0 +1,360 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ForgeAdapter } from '../../../../src/lib/forge.js';
+import type { MergeSet } from '../../../../src/lib/merge-set.js';
+import {
+  cancelPending,
+  listActiveAutoMerges,
+  listProblemAutoMerges,
+  markMerged,
+  type PendingAutoMergeStatus,
+} from '../../../../src/lib/overdeck/merge-sync.js';
+import {
+  AUTO_MERGE_RECONCILE_FORGE_LIMIT,
+  reconcileAutoMergeRowsWithDeps,
+  type AutoMergeReconcileDeps,
+} from '../../../../src/lib/cloister/deacon-auto-merge-reconcile.js';
+import {
+  setupOverdeckTestDb,
+  teardownOverdeckTestDb,
+  type OverdeckTestDb,
+} from '../../../helpers/overdeck-test-db.js';
+
+const NOW = Date.parse('2026-07-27T00:00:00.000Z');
+let odb: OverdeckTestDb;
+
+beforeEach(() => { odb = setupOverdeckTestDb(); });
+afterEach(() => { teardownOverdeckTestDb(odb); });
+
+function seedIssue(issueId: string): void {
+  odb.raw().prepare(
+    "INSERT INTO issues (id, stage, updated_at) VALUES (?, 'open', ?)",
+  ).run(issueId, NOW);
+}
+
+function seedAutoMerge(
+  issueId: string,
+  status: PendingAutoMergeStatus,
+  overrides: { prUrl?: string; projectKey?: string; forge?: 'github' | 'gitlab' } = {},
+): number {
+  const result = odb.raw().prepare(`
+    INSERT INTO pending_auto_merges
+      (issue_id, pr_url, project_key, forge, status, scheduled_merge_at, scheduled_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    issueId,
+    overrides.prUrl ?? `https://github.com/eltmon/overdeck/pull/${issueId.slice(4)}`,
+    overrides.projectKey ?? 'overdeck',
+    overrides.forge ?? 'github',
+    status,
+    NOW,
+    NOW,
+  );
+  return Number(result.lastInsertRowid);
+}
+
+function row(id: number): { status: string; cancelled_by: string | null; merged_at: number | null } {
+  return odb.raw().prepare(
+    'SELECT status, cancelled_by, merged_at FROM pending_auto_merges WHERE id = ?',
+  ).get(id) as { status: string; cancelled_by: string | null; merged_at: number | null };
+}
+
+function forgeAdapter(findMergedArtifact: ForgeAdapter['findMergedArtifact']): ForgeAdapter {
+  return { findMergedArtifact } as ForgeAdapter;
+}
+
+function makeDeps(overrides: Partial<AutoMergeReconcileDeps> = {}): AutoMergeReconcileDeps {
+  return {
+    now: vi.fn(() => NOW),
+    listProblemAutoMerges,
+    listActiveAutoMerges,
+    cancelPending,
+    markMerged,
+    readJournalStatus: vi.fn(() => null),
+    getMergeSet: vi.fn(() => null),
+    resolveProject: vi.fn(() => ({
+      projectKey: 'overdeck',
+      projectName: 'Overdeck',
+      projectPath: '/tmp/overdeck',
+    })),
+    getForgeAdapter: vi.fn(() => forgeAdapter(vi.fn(async () => null))),
+    log: vi.fn(),
+    warn: vi.fn(),
+    ...overrides,
+  };
+}
+
+function mergedArtifact() {
+  return {
+    forge: 'github' as const,
+    created: false,
+    url: 'https://github.com/eltmon/overdeck/pull/1',
+    id: '1',
+  };
+}
+
+describe('reconcileAutoMergeRowsWithDeps', () => {
+  it('marks a failed row merged when the forge confirms its PR merged', async () => {
+    seedIssue('PAN-101');
+    const id = seedAutoMerge('PAN-101', 'failed');
+    const findMergedArtifact = vi.fn(async () => mergedArtifact());
+    const deps = makeDeps({
+      getForgeAdapter: vi.fn(() => forgeAdapter(findMergedArtifact)),
+    });
+
+    await reconcileAutoMergeRowsWithDeps(deps);
+
+    expect(findMergedArtifact).toHaveBeenCalledWith({
+      sourceBranch: 'feature/pan-101',
+      artifactUrl: 'https://github.com/eltmon/overdeck/pull/101',
+      repository: 'eltmon/overdeck',
+      cwd: '/tmp/overdeck',
+    });
+    expect(row(id).status).toBe('merged');
+    expect(row(id).merged_at).toBeGreaterThan(0);
+    expect(listProblemAutoMerges()).toEqual([]);
+  });
+
+  it('uses the matching polyrepo repository for a GitLab merge lookup', async () => {
+    const issueId = 'MIN-201';
+    const artifactUrl = 'https://gitlab.com/eltmon/mind-your-now/-/merge_requests/62';
+    seedIssue(issueId);
+    const id = seedAutoMerge(issueId, 'failed', {
+      prUrl: artifactUrl,
+      projectKey: 'mind-your-now',
+      forge: 'gitlab',
+    });
+    const mergeSet: MergeSet = {
+      issueId,
+      projectKey: 'mind-your-now',
+      projectPath: '/tmp/myn',
+      workspaceType: 'polyrepo',
+      status: 'failed',
+      createdAt: new Date(NOW).toISOString(),
+      updatedAt: new Date(NOW).toISOString(),
+      repos: [
+        {
+          repoKey: 'fe', repoPath: '/tmp/myn/fe', forge: 'github',
+          sourceBranch: 'feature/min-201', targetBranch: 'main',
+          reviewStatus: 'passed', testStatus: 'passed', rebaseStatus: 'passed',
+          verificationStatus: 'passed', mergeStatus: 'merged', mergeOrder: 0, required: true,
+        },
+        {
+          repoKey: 'api', repoPath: '/tmp/myn/api', forge: 'gitlab',
+          sourceBranch: 'feature/min-201', targetBranch: 'main', artifactUrl, artifactId: '62',
+          reviewStatus: 'passed', testStatus: 'passed', rebaseStatus: 'passed',
+          verificationStatus: 'passed', mergeStatus: 'failed', mergeOrder: 1, required: true,
+        },
+      ],
+    };
+    const findMergedArtifact = vi.fn(async () => ({
+      forge: 'gitlab' as const,
+      created: false,
+      url: artifactUrl,
+      id: '62',
+    }));
+    const getForgeAdapter = vi.fn(() => forgeAdapter(findMergedArtifact));
+    const deps = makeDeps({
+      resolveProject: vi.fn(() => ({
+        projectKey: 'mind-your-now',
+        projectName: 'Mind Your Now',
+        projectPath: '/tmp/myn',
+      })),
+      getMergeSet: vi.fn(() => mergeSet),
+      getForgeAdapter,
+    });
+
+    await reconcileAutoMergeRowsWithDeps(deps);
+
+    expect(getForgeAdapter).toHaveBeenCalledWith('gitlab');
+    expect(findMergedArtifact).toHaveBeenCalledWith({
+      sourceBranch: 'feature/min-201',
+      targetBranch: 'main',
+      artifactUrl,
+      artifactId: '62',
+      repository: 'eltmon/mind-your-now',
+      cwd: '/tmp/myn/api',
+    });
+    expect(row(id).status).toBe('merged');
+  });
+
+  it('cancels every failed and blocked row for a closed-out issue without querying the forge', async () => {
+    seedIssue('PAN-102');
+    const failedId = seedAutoMerge('PAN-102', 'failed');
+    const blockedId = seedAutoMerge('PAN-102', 'blocked');
+    const findMergedArtifact = vi.fn(async () => mergedArtifact());
+    const deps = makeDeps({
+      readJournalStatus: vi.fn(() => ({
+        updatedAt: new Date(NOW).toISOString(),
+        durable: { closedOut: true },
+      })),
+      getForgeAdapter: vi.fn(() => forgeAdapter(findMergedArtifact)),
+    });
+
+    await reconcileAutoMergeRowsWithDeps(deps);
+
+    expect(row(failedId)).toMatchObject({ status: 'cancelled', cancelled_by: 'auto-merge-reconciler' });
+    expect(row(blockedId)).toMatchObject({ status: 'cancelled', cancelled_by: 'auto-merge-reconciler' });
+    expect(findMergedArtifact).not.toHaveBeenCalled();
+  });
+
+  it('cancels a pending row when its issue is closed out', async () => {
+    seedIssue('PAN-103');
+    const id = seedAutoMerge('PAN-103', 'pending');
+    const deps = makeDeps({
+      readJournalStatus: vi.fn(() => ({
+        updatedAt: new Date(NOW).toISOString(),
+        durable: { closedOut: true },
+      })),
+    });
+
+    await reconcileAutoMergeRowsWithDeps(deps);
+
+    expect(row(id)).toMatchObject({ status: 'cancelled', cancelled_by: 'auto-merge-reconciler' });
+  });
+
+  it('marks every duplicate failed row for one issue merged in a single run', async () => {
+    seedIssue('PAN-104');
+    const firstId = seedAutoMerge('PAN-104', 'failed');
+    const secondId = seedAutoMerge('PAN-104', 'failed');
+    const findMergedArtifact = vi.fn(async () => mergedArtifact());
+    const deps = makeDeps({
+      getForgeAdapter: vi.fn(() => forgeAdapter(findMergedArtifact)),
+    });
+
+    await reconcileAutoMergeRowsWithDeps(deps);
+
+    expect(row(firstId).status).toBe('merged');
+    expect(row(secondId).status).toBe('merged');
+    expect(findMergedArtifact).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves an unmerged failed row actionable and suppresses an immediate forge re-check', async () => {
+    seedIssue('PAN-105');
+    const id = seedAutoMerge('PAN-105', 'failed');
+    const findMergedArtifact = vi.fn(async () => null);
+    const deps = makeDeps({
+      getForgeAdapter: vi.fn(() => forgeAdapter(findMergedArtifact)),
+    });
+
+    await reconcileAutoMergeRowsWithDeps(deps);
+    await reconcileAutoMergeRowsWithDeps(deps);
+
+    expect(row(id).status).toBe('failed');
+    expect(listProblemAutoMerges().map((entry) => entry.id)).toEqual([id]);
+    expect(findMergedArtifact).toHaveBeenCalledTimes(1);
+  });
+
+  it('contains forge errors, preserves the row, and applies the cooldown', async () => {
+    seedIssue('PAN-106');
+    const id = seedAutoMerge('PAN-106', 'failed');
+    const findMergedArtifact = vi.fn(async () => {
+      throw new Error('forge unavailable');
+    });
+    const deps = makeDeps({
+      getForgeAdapter: vi.fn(() => forgeAdapter(findMergedArtifact)),
+    });
+
+    await expect(reconcileAutoMergeRowsWithDeps(deps)).resolves.toEqual([]);
+    await reconcileAutoMergeRowsWithDeps(deps);
+
+    expect(row(id).status).toBe('failed');
+    expect(findMergedArtifact).toHaveBeenCalledTimes(1);
+    expect(deps.warn).toHaveBeenCalledWith(expect.stringContaining('forge unavailable'));
+  });
+
+  it('bounds forge checks per patrol and starts the batch concurrently', async () => {
+    const ids = Array.from(
+      { length: AUTO_MERGE_RECONCILE_FORGE_LIMIT + 1 },
+      (_, index) => `PAN-${4000 + index}`,
+    );
+    for (const issueId of ids) {
+      seedIssue(issueId);
+      seedAutoMerge(issueId, 'failed');
+    }
+    let active = 0;
+    let maxActive = 0;
+    const releases: Array<() => void> = [];
+    const findMergedArtifact = vi.fn(() => new Promise<null>((resolve) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      releases.push(() => {
+        active -= 1;
+        resolve(null);
+      });
+    }));
+    const deps = makeDeps({
+      getForgeAdapter: vi.fn(() => forgeAdapter(findMergedArtifact)),
+    });
+
+    const reconciliation = reconcileAutoMergeRowsWithDeps(deps);
+    await vi.waitFor(() => {
+      expect(findMergedArtifact).toHaveBeenCalledTimes(AUTO_MERGE_RECONCILE_FORGE_LIMIT);
+    });
+
+    expect(maxActive).toBe(AUTO_MERGE_RECONCILE_FORGE_LIMIT);
+    for (const release of releases) release();
+    await reconciliation;
+    expect(findMergedArtifact).toHaveBeenCalledTimes(AUTO_MERGE_RECONCILE_FORGE_LIMIT);
+  });
+
+  it('reconciles problem rows beyond the default 100-row route page', async () => {
+    const ids = Array.from({ length: 101 }, (_, index) => `PAN-${2000 + index}`);
+    for (const issueId of ids) {
+      seedIssue(issueId);
+      seedAutoMerge(issueId, 'failed');
+    }
+    const targetIssue = ids.at(-1)!;
+    const findMergedArtifact = vi.fn(async (input: { artifactUrl?: string }) => (
+      input.artifactUrl?.endsWith(`/${targetIssue.slice(4)}`) ? mergedArtifact() : null
+    ));
+    let now = NOW;
+    const deps = makeDeps({
+      now: vi.fn(() => now),
+      getForgeAdapter: vi.fn(() => forgeAdapter(findMergedArtifact)),
+    });
+
+    const patrols = Math.ceil(ids.length / AUTO_MERGE_RECONCILE_FORGE_LIMIT);
+    for (let run = 0; run < patrols; run += 1) {
+      const callsBefore = findMergedArtifact.mock.calls.length;
+      await reconcileAutoMergeRowsWithDeps(deps);
+      expect(findMergedArtifact.mock.calls.length - callsBefore)
+        .toBeLessThanOrEqual(AUTO_MERGE_RECONCILE_FORGE_LIMIT);
+      now += 10 * 60 * 1000 + 1;
+    }
+
+    expect(listProblemAutoMerges(200).find((entry) => entry.issueId === targetIssue)).toBeUndefined();
+  });
+
+  it('cancels closed-out pending rows beyond the default 100-row route page', async () => {
+    const ids = Array.from({ length: 101 }, (_, index) => `PAN-${3000 + index}`);
+    let targetId = 0;
+    for (const issueId of ids) {
+      seedIssue(issueId);
+      targetId = seedAutoMerge(issueId, 'pending');
+    }
+    const deps = makeDeps({
+      readJournalStatus: vi.fn(() => ({
+        updatedAt: new Date(NOW).toISOString(),
+        durable: { closedOut: true },
+      })),
+    });
+
+    await reconcileAutoMergeRowsWithDeps(deps);
+
+    expect(row(targetId)).toMatchObject({ status: 'cancelled', cancelled_by: 'auto-merge-reconciler' });
+  });
+
+  it('leaves merging rows untouched', async () => {
+    seedIssue('PAN-107');
+    const id = seedAutoMerge('PAN-107', 'merging');
+    const findMergedArtifact = vi.fn(async () => mergedArtifact());
+    const deps = makeDeps({
+      getForgeAdapter: vi.fn(() => forgeAdapter(findMergedArtifact)),
+    });
+
+    await reconcileAutoMergeRowsWithDeps(deps);
+
+    expect(row(id).status).toBe('merging');
+    expect(findMergedArtifact).not.toHaveBeenCalled();
+  });
+});

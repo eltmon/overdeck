@@ -47,6 +47,22 @@ describe('merge CLI', () => {
     expect(process.exitCode).toBeUndefined();
   });
 
+  it('reports when duplicate actionable rows remain after a successful cancel', async () => {
+    fetchImpl.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ issueId: 'PAN-123', remainingActionable: 2 }),
+    });
+
+    await mergeCancelCommand('PAN-123', fetchImpl as never);
+
+    expect(logSpy).toHaveBeenCalledWith(
+      "Cancelled auto-merge for PAN-123 (2 actionable row(s) remain — re-run 'pan merge cancel PAN-123' to clear the next one)",
+    );
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(process.exitCode).toBeUndefined();
+  });
+
   it('prints a non-zero cooldown-expired error when merge is already in progress', async () => {
     fetchImpl.mockResolvedValue({
       ok: false,

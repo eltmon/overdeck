@@ -193,7 +193,7 @@ export function markMergingBlocked(id: number, reason: string): boolean {
 export function markMerged(id: number): boolean {
   const db = getOverdeckDatabaseSync();
   const result = db.prepare(
-    "UPDATE pending_auto_merges SET status = 'merged', merged_at = ? WHERE id = ? AND status = 'merging'",
+    "UPDATE pending_auto_merges SET status = 'merged', merged_at = ? WHERE id = ? AND status IN ('pending','blocked','failed','merging')",
   ).run(nowMillis(), id);
   return result.changes === 1;
 }
@@ -214,6 +214,14 @@ export function getActionableAutoMerge(issueId: string): PendingAutoMerge | null
     "SELECT * FROM pending_auto_merges WHERE issue_id = ? AND status IN ('pending','merging','blocked','failed') ORDER BY id DESC LIMIT 1",
   ).get(issueId) as OverdeckPendingAutoMergeRow | undefined;
   return row ? rowToPendingAutoMerge(row) : null;
+}
+
+export function countActionableAutoMerges(issueId: string): number {
+  const db = getOverdeckDatabaseSync();
+  const row = db.prepare(
+    "SELECT COUNT(*) AS n FROM pending_auto_merges WHERE issue_id = ? AND status IN ('pending','merging','blocked','failed')",
+  ).get(issueId) as { n: number } | undefined;
+  return row?.n ?? 0;
 }
 
 /** Drop-in for listActiveAutoMerges() from pending-auto-merges-db.ts. */
