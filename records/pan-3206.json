@@ -2,7 +2,7 @@
   "issueId": "PAN-3206",
   "schemaVersion": 2,
   "created": "2026-07-27T13:35:42.946Z",
-  "updated": "2026-07-27T13:35:42.946Z",
+  "updated": "2026-07-27T13:35:44.460Z",
   "pipeline": {
     "issueId": "PAN-3206",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3206: Synthesized review verdicts are not durably applied — verdict on disk, status pending for hours, agent never informed",
       "timestamp": "2026-07-27T13:35:42.946Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
