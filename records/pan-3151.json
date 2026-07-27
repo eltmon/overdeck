@@ -234,15 +234,7 @@
       "timestamp": "2026-07-27T15:03:52.119Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-27T15:03:52Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3151\n\nThe expanded regression tests still never execute a v62→v63 migration: the v62 fixture runs the exact-v62 repair and remains at 62, while the v61 fixture only tests v61→v62. They pass without covering the skipped-release defect; implement SCHEMA_VERSION 63 and test a real v62→v63 transition.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3151 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -331,21 +323,21 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T15:05:49.212Z",
+  "updated": "2026-07-27T15:05:51.283Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T15:05:47.724Z",
+    "updatedAt": "2026-07-27T15:05:51.110Z",
     "reviewNotes": "Agent re-review request (17/25): Fixed review issues: bumped to SCHEMA_VERSION 63 with v62→v63 migration and comprehensive regression tests",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "fc19e669a59088966a8149057824ab6a8db87946",
-    "reviewSpawnedAt": "2026-07-27T15:02:26.073Z"
+    "reviewSpawnedAt": "2026-07-27T15:05:51.110Z"
   },
   "closeOut": {
     "usage": {
@@ -411,7 +403,7 @@
       },
       "costAtCloseOut": {
         "usd": 270.0470683,
-        "pricingAsOf": "2026-07-27T15:05:49.209Z"
+        "pricingAsOf": "2026-07-27T15:05:51.220Z"
       }
     },
     "merges": [
