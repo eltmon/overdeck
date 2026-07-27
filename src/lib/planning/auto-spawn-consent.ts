@@ -128,7 +128,12 @@ export async function writeAutoSpawnOnFinalizeFlag(issueId: string, enabled: boo
 export async function claimAutoSpawnConsentForWorkStart(issueId: string): Promise<AutoSpawnConsentClaim | null> {
   return withConsentLock(issueId, 'planning-consent:claim', async () => {
     const current = await readConsentRecordForTransition(issueId);
-    if (!current || current.status !== 'granted') return null;
+    if (!current) return null;
+    if (current.status !== 'granted') {
+      throw new Error(
+        `Auto-start consent for ${issueId.toUpperCase()} is unavailable because the current generation is ${current.status}`,
+      );
+    }
     const claimId = randomUUID();
     await writeConsentRecord(issueId, {
       ...current,
@@ -175,7 +180,9 @@ export async function withAutoSpawnConsentClaim<T>(
   } = {},
 ): Promise<T> {
   const claim = await claimAutoSpawnConsentForWorkStart(issueId);
-  if (!claim) return operation(async () => undefined);
+  if (!claim) {
+    throw new Error(`Auto-start consent for ${issueId.toUpperCase()} is required but no current generation exists`);
+  }
 
   let accepted = false;
   const accept = async (): Promise<void> => {

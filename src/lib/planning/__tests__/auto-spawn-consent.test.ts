@@ -47,6 +47,32 @@ describe('auto-spawn consent claims', () => {
     expect(readAutoSpawnOnFinalizeFlag(issueId)).toBe(true);
   });
 
+  it('allows only one launch to own a granted consent generation', async () => {
+    await writeAutoSpawnOnFinalizeFlag(issueId, true);
+    let firstEntered!: () => void;
+    const entered = new Promise<void>((resolve) => { firstEntered = resolve; });
+    let failFirst!: () => void;
+    const mayFail = new Promise<void>((resolve) => { failFirst = resolve; });
+    const firstOperation = vi.fn(async () => {
+      firstEntered();
+      await mayFail;
+      throw new Error('pre-session setup failed');
+    });
+    const secondOperation = vi.fn(async () => 'running');
+
+    const firstLaunch = withAutoSpawnConsentClaim(issueId, firstOperation);
+    await entered;
+    await expect(withAutoSpawnConsentClaim(issueId, secondOperation)).rejects.toThrow(
+      'current generation is claimed',
+    );
+    expect(secondOperation).not.toHaveBeenCalled();
+
+    failFirst();
+    await expect(firstLaunch).rejects.toThrow('pre-session setup failed');
+    expect(firstOperation).toHaveBeenCalledOnce();
+    expect(readAutoSpawnOnFinalizeFlag(issueId)).toBe(true);
+  });
+
   it('keeps consent spent when setup fails after session acceptance', async () => {
     await writeAutoSpawnOnFinalizeFlag(issueId, true);
 
