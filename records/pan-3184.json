@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:31:12.812Z",
-  "updated": "2026-07-27T05:50:10.218Z",
+  "updated": "2026-07-27T05:50:18.082Z",
   "pipeline": {
     "issueId": "PAN-3184",
     "reviewStatus": "pending",
@@ -221,5 +221,45 @@
     "docs-failsafe-amendment": "completed",
     "docs-failsafe-amendment.docs-failsafe-amendment.ac1": "completed",
     "docs-failsafe-amendment.docs-failsafe-amendment.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/lib/cloister/__tests__/pan-1908-reactive-liveness.test.ts",
+      "src/lib/cloister/deacon.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/FAILSAFE-CONTROL-ARCHITECTURE.md",
+      "src/dashboard/frontend/src/components/BootReconciliationModal.tsx",
+      "src/dashboard/frontend/src/components/__tests__/BootReconciliationModal.test.tsx",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/routes/__tests__/boot-reconciliation.test.ts",
+      "src/dashboard/server/routes/boot-reconciliation.ts",
+      "src/lib/cloister/__tests__/boot-reconciliation-apply.test.ts",
+      "src/lib/cloister/__tests__/boot-reconciliation.test.ts",
+      "src/lib/cloister/boot-reconciliation-apply.ts",
+      "src/lib/cloister/boot-reconciliation.ts",
+      "src/lib/cloister/config.ts",
+      "src/lib/cloister/deacon-auto-resume.ts",
+      "src/lib/overdeck/control-settings.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/FAILSAFE-CONTROL-ARCHITECTURE.md",
+      "src/dashboard/frontend/src/components/BootReconciliationModal.tsx",
+      "src/dashboard/frontend/src/components/__tests__/BootReconciliationModal.test.tsx",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/routes/__tests__/boot-reconciliation.test.ts",
+      "src/dashboard/server/routes/boot-reconciliation.ts",
+      "src/lib/cloister/__tests__/boot-reconciliation-apply.test.ts",
+      "src/lib/cloister/__tests__/boot-reconciliation.test.ts",
+      "src/lib/cloister/__tests__/pan-1908-reactive-liveness.test.ts",
+      "src/lib/cloister/boot-reconciliation-apply.ts",
+      "src/lib/cloister/boot-reconciliation.ts",
+      "src/lib/cloister/config.ts",
+      "src/lib/cloister/deacon-auto-resume.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/overdeck/control-settings.ts"
+    ],
+    "recordedAt": "2026-07-27T05:50:18.081Z"
   }
 }
