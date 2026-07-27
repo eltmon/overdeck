@@ -225,18 +225,28 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     // PAN-3151: When convergence detection marks an issue stuck with stuckReason=review-not-converging,
     // unstick must clear the cycle history so a fresh attempt doesn't immediately re-trigger the gate.
     // Regression: without clearing, the history series would re-engage convergence detection immediately.
+
+    // Seed cycle history: [12 blocks → 8 blocks → 7 blocks] = not converging due to first-cycle reversal
+    const cycleHistory = JSON.stringify([
+      { cycle: 1, runId: 'agent-run-1', atCommit: 'abc123', blockingCount: 12, recordedAt: '2026-07-27T10:00:00Z' },
+      { cycle: 2, runId: 'agent-run-2', atCommit: 'abc123', blockingCount: 8, recordedAt: '2026-07-27T10:30:00Z' },
+      { cycle: 3, runId: 'agent-run-3', atCommit: 'abc123', blockingCount: 7, recordedAt: '2026-07-27T11:00:00Z' },
+    ]);
+
     setReviewStatusSync('PAN-CONV-CLEAR', {
       reviewStatus: 'blocked',
       testStatus: 'passed',
+      reviewCycleHistory: cycleHistory,
     });
     markWorkspaceStuck('PAN-CONV-CLEAR', 'review-not-converging', {
-      blockingCount: 8,
+      blockingCount: 7,
       cycleCount: 3,
     });
-    // Pre-populate cycle history to simulate a stuck convergence scenario
+
     const stuckStatusBefore = getReviewStatusSync('PAN-CONV-CLEAR');
     expect(stuckStatusBefore?.stuck).toBe(true);
     expect(stuckStatusBefore?.stuckReason).toBe('review-not-converging');
+    expect(stuckStatusBefore?.reviewCycleHistory).toBeDefined(); // Precondition: history exists before unstick
 
     processUnstickRequest('PAN-CONV-CLEAR', true, stuckStatusBefore, { safe: true });
 
