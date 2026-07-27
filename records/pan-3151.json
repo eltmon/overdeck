@@ -183,18 +183,18 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:28:19.593Z",
+  "updated": "2026-07-27T12:29:23.290Z",
   "pipeline": {
     "issueId": "PAN-3151",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T12:16:28.373Z",
-    "updatedAt": "2026-07-27T12:28:19.579Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: removed double-serialization from test",
+    "updatedAt": "2026-07-27T12:29:23.256Z",
+    "reviewNotes": "claimed double-serialization fix still calls JSON.stringify, so the regression fixture remains a string instead of ReviewCycleEntry[]",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
     "reviewedAtCommit": "d41e7959ffcf47379f544d51c4c21851fcb987c3",
@@ -300,9 +300,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 9508730,
-            "output": 315631,
-            "cacheRead": 82429952,
+            "input": 10401082,
+            "output": 321609,
+            "cacheRead": 83895296,
             "cacheWrite": 0
           }
         },
@@ -323,9 +323,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 9508730,
-          "output": 315631,
-          "cacheRead": 82429952,
+          "input": 10401082,
+          "output": 321609,
+          "cacheRead": 83895296,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -336,8 +336,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 109.8393943,
-        "pricingAsOf": "2026-07-27T12:28:19.590Z"
+        "usd": 115.2131663,
+        "pricingAsOf": "2026-07-27T12:29:23.285Z"
       }
     },
     "merges": [
