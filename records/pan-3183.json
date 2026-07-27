@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-27T04:30:47.797Z",
-  "updated": "2026-07-27T05:21:04.884Z",
+  "updated": "2026-07-27T05:34:24.166Z",
   "pipeline": {
     "issueId": "PAN-3183",
     "reviewStatus": "pending",
@@ -43,16 +43,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "boot-callers-emit-stop-events": {
-        "writerId": "agent-pan-3183",
-        "agentId": "agent-pan-3183",
-        "pid": 898554,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-27T05:21:04.884Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3183",
@@ -97,6 +89,17 @@
         "outcome": "completed",
         "reason": "mergeRuntimeBySequence now lets a source-reconstructed stopped snapshot win over stale higher-sequence runtime events only when the existing AgentSnapshot liveness field says tmux is absent. Added tests for no-tmux stop precedence, live-tmux preservation, and unchanged sequence precedence; targeted tests and typecheck pass.",
         "releasedAt": "2026-07-27T05:20:47.433Z"
+      },
+      {
+        "writerId": "agent-pan-3183",
+        "agentId": "agent-pan-3183",
+        "pid": 898554,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-27T05:21:04.884Z",
+        "itemId": "boot-callers-emit-stop-events",
+        "outcome": "completed",
+        "reason": "ReadModel and AgentStateService boot paths now durably append agent.status_changed events for every backfill-reconciled stop before continuing bootstrap. A shared helper filters absent agents and logs append failures without aborting boot. Targeted tests and typecheck pass.",
+        "releasedAt": "2026-07-27T05:34:24.166Z"
       }
     ],
     "statusReasons": {
@@ -115,6 +118,10 @@
       "runtime-merge-table-wins": {
         "reason": "mergeRuntimeBySequence now lets a source-reconstructed stopped snapshot win over stale higher-sequence runtime events only when the existing AgentSnapshot liveness field says tmux is absent. Added tests for no-tmux stop precedence, live-tmux preservation, and unchanged sequence precedence; targeted tests and typecheck pass.",
         "updatedAt": "2026-07-27T05:20:47.433Z"
+      },
+      "boot-callers-emit-stop-events": {
+        "reason": "ReadModel and AgentStateService boot paths now durably append agent.status_changed events for every backfill-reconciled stop before continuing bootstrap. A shared helper filters absent agents and logs append failures without aborting boot. Targeted tests and typecheck pass.",
+        "updatedAt": "2026-07-27T05:34:24.166Z"
       }
     }
   },
@@ -133,6 +140,9 @@
     "runtime-merge-table-wins.runtime-merge-table-wins.ac1": "completed",
     "runtime-merge-table-wins.runtime-merge-table-wins.ac2": "completed",
     "runtime-merge-table-wins.runtime-merge-table-wins.ac3": "completed",
-    "boot-callers-emit-stop-events": "running"
+    "boot-callers-emit-stop-events": "completed",
+    "boot-callers-emit-stop-events.boot-callers-emit-stop-events.ac1": "completed",
+    "boot-callers-emit-stop-events.boot-callers-emit-stop-events.ac2": "completed",
+    "boot-callers-emit-stop-events.boot-callers-emit-stop-events.ac3": "completed"
   }
 }
