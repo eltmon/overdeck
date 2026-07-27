@@ -69,16 +69,21 @@ const PROBE_CACHE_MAX_ENTRIES = 256;
 const probeCache = new Map<string, { checkedAtMs: number; result: BranchMergeability }>();
 const probeInFlight = new Map<string, Promise<BranchMergeability>>();
 
+export interface BranchConflictProbeResult {
+  mergeability: BranchMergeability;
+  paths: string[];
+}
+
 /**
- * Non-destructively checks whether HEAD can merge with origin/<targetBranch>.
- * Uses git merge-tree only — never git merge — so HEAD, the index, and the
- * working tree are left untouched.
+ * Non-destructively checks whether HEAD can merge with origin/<targetBranch>,
+ * returning the conflicting paths (if any). Uses git merge-tree only — never
+ * git merge — so HEAD, the index, and the working tree are left untouched.
  */
-export async function checkBranchMergeability(
+export async function probeBranchConflictPaths(
   workspacePath: string,
   targetBranch: string,
   deps: CheckBranchMergeabilityDeps = {},
-): Promise<BranchMergeability> {
+): Promise<BranchConflictProbeResult> {
   const run = deps.exec ?? execAsync;
   const options: ExecOptions = {
     cwd: workspacePath,
@@ -90,7 +95,7 @@ export async function checkBranchMergeability(
   try {
     await run(`git fetch origin ${shellQuote(targetBranch)}`, options);
   } catch {
-    return 'unknown';
+    return { mergeability: 'unknown', paths: [] };
   }
 
   try {
@@ -98,10 +103,46 @@ export async function checkBranchMergeability(
       `git merge-tree --write-tree --name-only HEAD ${shellQuote(`origin/${targetBranch}`)}`,
       options,
     );
-    return outputHasConflictMarker(result.stdout, result.stderr) ? 'conflicts' : 'clean';
+    if (outputHasConflictMarker(result.stdout, result.stderr)) {
+      return { mergeability: 'conflicts', paths: parseMergeTreeNameOnly(toText(result.stdout)) };
+    }
+    return { mergeability: 'clean', paths: [] };
   } catch (err) {
-    return mergeTreeFailureIndicatesConflict(err) ? 'conflicts' : 'unknown';
+    if (mergeTreeFailureIndicatesConflict(err)) {
+      const maybe = err as { stdout?: unknown };
+      return { mergeability: 'conflicts', paths: parseMergeTreeNameOnly(toText(maybe.stdout)) };
+    }
+    return { mergeability: 'unknown', paths: [] };
   }
+}
+
+/**
+ * Non-destructively checks whether HEAD can merge with origin/<targetBranch>.
+ * Thin wrapper over probeBranchConflictPaths — kept for callers that only
+ * need the tri-state result.
+ */
+export async function checkBranchMergeability(
+  workspacePath: string,
+  targetBranch: string,
+  deps: CheckBranchMergeabilityDeps = {},
+): Promise<BranchMergeability> {
+  return (await probeBranchConflictPaths(workspacePath, targetBranch, deps)).mergeability;
+}
+
+/**
+ * Parses `git merge-tree --write-tree --name-only` stdout. Line 1 is the
+ * tree OID; subsequent lines up to (not including) the first blank line are
+ * the conflicting paths.
+ */
+export function parseMergeTreeNameOnly(stdout: string): string[] {
+  const lines = stdout.split('\n');
+  const paths: string[] = [];
+  for (let i = 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (line === '') break;
+    paths.push(line);
+  }
+  return paths;
 }
 
 export function buildRealConflictGateDeps(overrides: RealConflictGateDepsOverrides = {}): ResolveConflictGateDeps {
