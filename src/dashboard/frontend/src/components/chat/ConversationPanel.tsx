@@ -5,7 +5,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { markTerminalClick, useNeedsTerminalAutoSwitch, type ViewMode } from './useNeedsTerminalAutoSwitch';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, Folder, GitBranchPlus, GitFork, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw, FileText, FileX, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square } from 'lucide-react';
+import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, Folder, GitBranchPlus, GitFork, Archive, Sparkles, Info, RefreshCw, FileText, FileX, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -35,7 +35,9 @@ import { useConversationMutations } from '../CommandDeck/useConversationMutation
 import { ForkModal } from '../CommandDeck/ForkModal';
 import { closeConversationPanes } from '../../lib/panesStore';
 import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
-import { SubagentRail, updateSelectedSubagent } from './SubagentRail';
+import { SubagentRail, updateSelectedSubagent, useSubagentSelection } from './SubagentRail';
+import { SubagentTranscript } from './SubagentTranscript';
+import { ForkProgressView } from './ForkProgressView';
 import { useComposerDeliveryState } from './useComposerDeliveryState';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -248,6 +250,9 @@ export function ConversationPanel({
     enabled: !streamMessagesEnabled,
     refetchInterval: streamMessagesEnabled ? false : (conversation.sessionAlive ? 2000 : false),
   });
+  // PAN-2876 — the rail lists the main agent plus every subagent; picking a subagent swaps the body to its transcript.
+  const subagents = messagesData?.subagents ?? [];
+  const { selectedAgentId: selectedSubagentId, selectedSubagent, clearSelection: clearSubagent } = useSubagentSelection(subagents);
   const headerMessages = messagesData?.messages ?? [];
   const headerWorkLog = messagesData?.workLog ?? [];
   const headerLastMsg = headerMessages[headerMessages.length - 1];
@@ -1004,7 +1009,9 @@ export function ConversationPanel({
           {showTerminal && effectiveViewMode === 'terminal' && (
             <XTerminal sessionName={conversation.tmuxSession} />
           )}
-          {(effectiveViewMode === 'conversation' || !showTerminal) && (
+          {(effectiveViewMode === 'conversation' || !showTerminal) && (selectedSubagent ? (
+            <SubagentTranscript conversation={conversation} subagent={selectedSubagent} resolvedTheme={resolvedTheme} onBack={clearSubagent} />
+          ) : (
             <ConversationView
               conversation={conversation}
               onResume={onEmbeddedResume ?? (!embedded && !showTerminal && !isSpawningHeader ? handleResume : undefined)}
@@ -1049,7 +1056,7 @@ export function ConversationPanel({
                 />
               ) : undefined}
             />
-          )}
+          ))}
         </div>
         {diffOpen && diffData?.summaries && (
           <DiffWorkerPoolProvider>
@@ -1062,7 +1069,7 @@ export function ConversationPanel({
             />
           </DiffWorkerPoolProvider>
         )}
-        <SubagentRail conversation={conversation} subagents={messagesData?.subagents ?? []} resolvedTheme={resolvedTheme} />
+        <SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={selectedSubagentId} />
       </div>
 
       {convMutations.forkTarget && (
@@ -1077,77 +1084,6 @@ export function ConversationPanel({
           }}
         />
       )}
-    </div>
-  );
-}
-
-// ─── ForkProgressView ─────────────────────────────────────────────────────────
-
-const FORK_STEPS = [
-  { key: 'summarizing', label: 'Summarizing', description: 'Generating a concise summary of the parent conversation' },
-  { key: 'spawning',    label: 'Spawning',    description: 'Starting a new Claude Code session' },
-  { key: 'injecting',   label: 'Injecting',   description: 'Seeding the new session with conversation context' },
-] as const;
-
-function ForkProgressView({ forkStatus, forkError, parentTitle }: {
-  forkStatus: string;
-  forkError?: string | null;
-  parentTitle?: string;
-}) {
-  const isFailed = forkStatus === 'failed';
-  const activeIdx = FORK_STEPS.findIndex((s) => s.key === forkStatus);
-
-  return (
-    <div className={styles.forkProgressView}>
-      <div className={styles.forkProgressCard}>
-        <div className={styles.forkProgressHeader}>
-          <GitBranchPlus size={20} className={styles.forkProgressIcon} />
-          <div>
-            <h3 className={styles.forkProgressTitle}>
-              {isFailed ? 'Fork Failed' : 'Setting up fork…'}
-            </h3>
-            {parentTitle && (
-              <p className={styles.forkProgressSubtitle}>
-                Forking from <strong>{parentTitle}</strong>
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className={styles.forkProgressTimeline}>
-          {FORK_STEPS.map((step, i) => {
-            let state: 'done' | 'active' | 'pending' | 'failed';
-            if (isFailed) {
-              state = i < activeIdx ? 'done' : i === activeIdx || (activeIdx === -1 && i === 0) ? 'failed' : 'pending';
-            } else {
-              state = i < activeIdx ? 'done' : i === activeIdx ? 'active' : 'pending';
-            }
-
-            return (
-              <div key={step.key} className={`${styles.forkProgressStep} ${styles[`forkProgressStep--${state}`]}`}>
-                <div className={styles.forkProgressStepIndicator}>
-                  {state === 'done' && <CheckCircle2 size={18} />}
-                  {state === 'active' && <Loader2 size={18} className={styles.forkProgressSpinner} />}
-                  {state === 'pending' && <Circle size={18} />}
-                  {state === 'failed' && <AlertCircle size={18} />}
-                  {i < FORK_STEPS.length - 1 && <div className={styles.forkProgressStepLine} />}
-                </div>
-                <div className={styles.forkProgressStepContent}>
-                  <span className={styles.forkProgressStepLabel}>{step.label}</span>
-                  <span className={styles.forkProgressStepDesc}>{step.description}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {isFailed && forkError && (
-          <div className={styles.forkProgressError}>
-            <AlertCircle size={14} />
-            <span>{forkError}</span>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
