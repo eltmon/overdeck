@@ -373,6 +373,36 @@ describe('Definition-of-Done post-merge row', () => {
     expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('canonical state: in_review') });
   });
 
+  // PAN-3188 (row 5): terminal canonical states settle the row — 'done' proves
+  // the lifecycle already ran; 'canceled' makes it moot. Without this, every
+  // re-evaluated terminal issue wedges on the transient verifying_on_main marker.
+  it('passes on terminal canonical state done with no running agents', async () => {
+    const row = await checkPostMergeRow(ctx, undefined, {
+      readCanonicalState: async () => 'done',
+      readMergeStatus: () => null,
+      listAgents: clearAgents,
+    });
+    expect(row).toMatchObject({ status: 'pass', observed: expect.stringContaining('terminal canonical state: done') });
+  });
+
+  it('skips on terminal canonical state canceled', async () => {
+    const row = await checkPostMergeRow(ctx, undefined, {
+      readCanonicalState: async () => 'canceled',
+      readMergeStatus: () => null,
+      listAgents: clearAgents,
+    });
+    expect(row).toMatchObject({ status: 'skip', observed: expect.stringContaining('terminal canonical state: canceled') });
+  });
+
+  it('still misses on terminal state done while a work agent runs', async () => {
+    const row = await checkPostMergeRow(ctx, undefined, {
+      readCanonicalState: async () => 'done',
+      readMergeStatus: () => null,
+      listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
+    });
+    expect(row).toMatchObject({ status: 'miss' });
+  });
+
   it('turns canonical-state probe failures into an observed miss', async () => {
     const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => { throw new Error('gh timed out'); },

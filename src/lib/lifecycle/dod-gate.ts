@@ -385,6 +385,25 @@ export async function checkPostMergeRow(
     const agentsObserved = runningAgents.length > 0
       ? `running agents: ${runningAgents.map(agent => agent.id).join(', ')}`
       : 'no running work/planning agents';
+    // PAN-3188 (row 5): terminal canonical states settle this row. 'done'
+    // proves the post-merge lifecycle already ran to close-out; 'canceled'
+    // makes it moot. Requiring the transient verifying_on_main marker here
+    // wedges every re-evaluated terminal issue (the 11 closed issues that
+    // blocked close-out sweeps on 'canonical state: done').
+    if (canonicalState === 'done') {
+      return result(
+        'post-merge',
+        runningAgents.length === 0 ? 'pass' : 'miss',
+        `terminal canonical state: done — the post-merge lifecycle already ran to close-out; ${agentsObserved}`,
+      );
+    }
+    if (canonicalState === 'canceled') {
+      return result(
+        'post-merge',
+        runningAgents.length === 0 ? 'skip' : 'miss',
+        `terminal canonical state: canceled — post-merge lifecycle not applicable; ${agentsObserved}`,
+      );
+    }
     const lifecycleObserved = canonicalState === 'verifying_on_main' || mergeStatus === 'merged';
     // PAN-3180: `postMergeLifecycle()` is the work-agent handoff — it pauses the
     // work/planning agents, stops the workspace stack, and applies
