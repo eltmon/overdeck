@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ForgeAdapter } from '../../../../src/lib/forge.js';
+import type { MergeSet } from '../../../../src/lib/merge-set.js';
 import {
   cancelPending,
   listActiveAutoMerges,
@@ -29,14 +30,20 @@ function seedIssue(issueId: string): void {
   ).run(issueId, NOW);
 }
 
-function seedAutoMerge(issueId: string, status: PendingAutoMergeStatus): number {
+function seedAutoMerge(
+  issueId: string,
+  status: PendingAutoMergeStatus,
+  overrides: { prUrl?: string; projectKey?: string; forge?: 'github' | 'gitlab' } = {},
+): number {
   const result = odb.raw().prepare(`
     INSERT INTO pending_auto_merges
       (issue_id, pr_url, project_key, forge, status, scheduled_merge_at, scheduled_at)
-    VALUES (?, ?, 'overdeck', 'github', ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(
     issueId,
-    `https://github.com/eltmon/overdeck/pull/${issueId.slice(4)}`,
+    overrides.prUrl ?? `https://github.com/eltmon/overdeck/pull/${issueId.slice(4)}`,
+    overrides.projectKey ?? 'overdeck',
+    overrides.forge ?? 'github',
     status,
     NOW,
     NOW,
@@ -62,6 +69,7 @@ function makeDeps(overrides: Partial<AutoMergeReconcileDeps> = {}): AutoMergeRec
     cancelPending,
     markMerged,
     readJournalStatus: vi.fn(() => null),
+    getMergeSet: vi.fn(() => null),
     resolveProject: vi.fn(() => ({
       projectKey: 'overdeck',
       projectName: 'Overdeck',
@@ -102,6 +110,69 @@ describe('reconcileAutoMergeRowsWithDeps', () => {
     expect(row(id).status).toBe('merged');
     expect(row(id).merged_at).toBeGreaterThan(0);
     expect(listProblemAutoMerges()).toEqual([]);
+  });
+
+  it('uses the matching polyrepo repository for a GitLab merge lookup', async () => {
+    const issueId = 'MIN-201';
+    const artifactUrl = 'https://gitlab.com/eltmon/mind-your-now/-/merge_requests/62';
+    seedIssue(issueId);
+    const id = seedAutoMerge(issueId, 'failed', {
+      prUrl: artifactUrl,
+      projectKey: 'mind-your-now',
+      forge: 'gitlab',
+    });
+    const mergeSet: MergeSet = {
+      issueId,
+      projectKey: 'mind-your-now',
+      projectPath: '/tmp/myn',
+      workspaceType: 'polyrepo',
+      status: 'failed',
+      createdAt: new Date(NOW).toISOString(),
+      updatedAt: new Date(NOW).toISOString(),
+      repos: [
+        {
+          repoKey: 'fe', repoPath: '/tmp/myn/fe', forge: 'github',
+          sourceBranch: 'feature/min-201', targetBranch: 'main',
+          reviewStatus: 'passed', testStatus: 'passed', rebaseStatus: 'passed',
+          verificationStatus: 'passed', mergeStatus: 'merged', mergeOrder: 0, required: true,
+        },
+        {
+          repoKey: 'api', repoPath: '/tmp/myn/api', forge: 'gitlab',
+          sourceBranch: 'feature/min-201', targetBranch: 'main', artifactUrl, artifactId: '62',
+          reviewStatus: 'passed', testStatus: 'passed', rebaseStatus: 'passed',
+          verificationStatus: 'passed', mergeStatus: 'failed', mergeOrder: 1, required: true,
+        },
+      ],
+    };
+    const findMergedArtifact = vi.fn(async () => ({
+      forge: 'gitlab' as const,
+      created: false,
+      url: artifactUrl,
+      id: '62',
+    }));
+    const getForgeAdapter = vi.fn(() => forgeAdapter(findMergedArtifact));
+    const deps = makeDeps({
+      resolveProject: vi.fn(() => ({
+        projectKey: 'mind-your-now',
+        projectName: 'Mind Your Now',
+        projectPath: '/tmp/myn',
+      })),
+      getMergeSet: vi.fn(() => mergeSet),
+      getForgeAdapter,
+    });
+
+    await reconcileAutoMergeRowsWithDeps(deps);
+
+    expect(getForgeAdapter).toHaveBeenCalledWith('gitlab');
+    expect(findMergedArtifact).toHaveBeenCalledWith({
+      sourceBranch: 'feature/min-201',
+      targetBranch: 'main',
+      artifactUrl,
+      artifactId: '62',
+      repository: 'eltmon/mind-your-now',
+      cwd: '/tmp/myn/api',
+    });
+    expect(row(id).status).toBe('merged');
   });
 
   it('cancels every failed and blocked row for a closed-out issue without querying the forge', async () => {

@@ -1,4 +1,5 @@
 import { getForgeAdapter } from '../forge.js';
+import { getMergeSetSync } from '../merge-set.js';
 import {
   cancelPending,
   listActiveAutoMerges,
@@ -22,6 +23,7 @@ export interface AutoMergeReconcileDeps {
   cancelPending: typeof cancelPending;
   markMerged: typeof markMerged;
   readJournalStatus: typeof readJournalStatusSync;
+  getMergeSet: typeof getMergeSetSync;
   resolveProject: typeof resolveProjectFromIssueSync;
   getForgeAdapter: typeof getForgeAdapter;
   log(message: string): void;
@@ -36,6 +38,22 @@ function groupByIssue(rows: PendingAutoMerge[]): Map<string, PendingAutoMerge[]>
     grouped.set(row.issueId, issueRows);
   }
   return grouped;
+}
+
+function normalizeArtifactUrl(url: string): string {
+  return url.replace(/[?#].*$/, '').replace(/\/+$/, '');
+}
+
+function gitLabRepositoryFromArtifactUrl(url: string): string | undefined {
+  try {
+    const pathname = new URL(url).pathname;
+    const marker = '/-/merge_requests/';
+    const markerIndex = pathname.indexOf(marker);
+    if (markerIndex <= 1) return undefined;
+    return pathname.slice(1, markerIndex);
+  } catch {
+    return undefined;
+  }
 }
 
 export async function reconcileAutoMergeRowsWithDeps(
@@ -82,11 +100,23 @@ export async function reconcileAutoMergeRowsWithDeps(
       );
       const project = deps.resolveProject(issueId);
       if (!project) throw new Error(`project resolution failed for ${issueId}`);
+      const artifactUrl = normalizeArtifactUrl(representative.prUrl);
+      const artifactRepo = deps.getMergeSet(issueId)?.repos.find(
+        (repo) => repo.forge === representative.forge
+          && repo.artifactUrl !== undefined
+          && normalizeArtifactUrl(repo.artifactUrl) === artifactUrl,
+      );
 
+      const repository = representative.forge === 'gitlab'
+        ? gitLabRepositoryFromArtifactUrl(representative.prUrl)
+        : undefined;
       const artifact = await deps.getForgeAdapter(representative.forge).findMergedArtifact({
-        sourceBranch: `feature/${issueId.toLowerCase()}`,
+        sourceBranch: artifactRepo?.sourceBranch ?? `feature/${issueId.toLowerCase()}`,
+        ...(artifactRepo?.targetBranch ? { targetBranch: artifactRepo.targetBranch } : {}),
         artifactUrl: representative.prUrl,
-        cwd: project.projectPath,
+        ...(artifactRepo?.artifactId ? { artifactId: artifactRepo.artifactId } : {}),
+        ...(repository ? { repository } : {}),
+        cwd: artifactRepo?.repoPath ?? project.projectPath,
       });
 
       if (!artifact) {
@@ -118,6 +148,7 @@ export async function reconcileAutoMergeRows(): Promise<string[]> {
     cancelPending,
     markMerged,
     readJournalStatus: readJournalStatusSync,
+    getMergeSet: getMergeSetSync,
     resolveProject: resolveProjectFromIssueSync,
     getForgeAdapter,
     log: (message) => console.log(message),
