@@ -158,7 +158,7 @@
     "recordedAt": "2026-07-27T11:58:39.123Z"
   },
   "created": "2026-07-26T18:14:55.384Z",
-  "updated": "2026-07-27T12:00:35.960Z",
+  "updated": "2026-07-27T12:00:41.505Z",
   "pipeline": {
     "issueId": "PAN-3151",
     "reviewStatus": "blocked",
@@ -168,10 +168,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-27T11:59:30.892Z",
-    "updatedAt": "2026-07-27T12:00:35.258Z",
+    "updatedAt": "2026-07-27T12:00:41.495Z",
     "reviewNotes": "convergence unstick branch lacks the required history-clear regression test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3207",
-    "reviewedAtCommit": "fcd59501d8a1e325be9872f32e4c1f9833f757f5",
+    "reviewedAtCommit": "718409fa3a78ebb8ba13f87743047716380fb7d8",
     "reviewRequestedAt": "2026-07-27T11:59:30.892Z",
     "reviewSpawnedAt": "2026-07-27T11:53:32.566Z",
     "scopeDrift": {
@@ -312,7 +312,7 @@
       },
       "costAtCloseOut": {
         "usd": 78.2230663,
-        "pricingAsOf": "2026-07-27T12:00:35.277Z"
+        "pricingAsOf": "2026-07-27T12:00:41.500Z"
       }
     },
     "merges": [
