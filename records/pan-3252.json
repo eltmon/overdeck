@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-28T22:25:43.254Z",
+  "updated": "2026-07-28T22:31:39.155Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "pending",
@@ -66,16 +66,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "ql-models-core": {
-        "writerId": "agent-pan-3252",
-        "agentId": "agent-pan-3252",
-        "pid": 581529,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T22:25:43.254Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3252",
@@ -109,6 +101,17 @@
         "outcome": "completed",
         "reason": "Added ql- prefix branch to normalizeModelName returning {provider:'custom'}; tests in tests/lib/cost-parsers/jsonl-parser.test.ts (planned test path did not exist); 71 passed",
         "releasedAt": "2026-07-28T22:25:16.525Z"
+      },
+      {
+        "writerId": "agent-pan-3252",
+        "agentId": "agent-pan-3252",
+        "pid": 581529,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T22:25:43.254Z",
+        "itemId": "ql-models-core",
+        "outcome": "completed",
+        "reason": "QuantumLlamaModel union on ModelId, MODEL_PROVIDERS rows, ql- prefix heuristic, FALLBACK_MAP (reason→sonnet-5, swift/nano→haiku-4-5), detectEnabledProviders quantumllama slot, three capability entries with new maxOutputTokens field; 93 tests passed, typecheck clean; file-size growth audited in allowlist",
+        "releasedAt": "2026-07-28T22:31:39.155Z"
       }
     ],
     "statusReasons": {
@@ -123,6 +126,10 @@
       "ql-cost-parser": {
         "reason": "Added ql- prefix branch to normalizeModelName returning {provider:'custom'}; tests in tests/lib/cost-parsers/jsonl-parser.test.ts (planned test path did not exist); 71 passed",
         "updatedAt": "2026-07-28T22:25:16.525Z"
+      },
+      "ql-models-core": {
+        "reason": "QuantumLlamaModel union on ModelId, MODEL_PROVIDERS rows, ql- prefix heuristic, FALLBACK_MAP (reason→sonnet-5, swift/nano→haiku-4-5), detectEnabledProviders quantumllama slot, three capability entries with new maxOutputTokens field; 93 tests passed, typecheck clean; file-size growth audited in allowlist",
+        "updatedAt": "2026-07-28T22:31:39.155Z"
       }
     }
   },
@@ -138,6 +145,10 @@
     "ql-cost-parser": "completed",
     "ql-cost-parser.ql-cost-parser.ac1": "completed",
     "ql-cost-parser.ql-cost-parser.ac2": "completed",
-    "ql-models-core": "running"
+    "ql-models-core": "completed",
+    "ql-models-core.ql-models-core.ac1": "completed",
+    "ql-models-core.ql-models-core.ac2": "completed",
+    "ql-models-core.ql-models-core.ac3": "completed",
+    "ql-models-core.ql-models-core.ac4": "completed"
   }
 }
