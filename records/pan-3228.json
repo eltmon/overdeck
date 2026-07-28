@@ -200,18 +200,18 @@
     "recordedAt": "2026-07-28T19:16:09.927Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T22:08:43.983Z",
+  "updated": "2026-07-28T22:14:55.010Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:17:21.407Z",
-    "updatedAt": "2026-07-28T22:08:42.550Z",
+    "updatedAt": "2026-07-28T22:14:54.972Z",
     "reviewNotes": "Agent re-review request (1/25): Addressed feedback: graceful restart restores the running projection on a late pending-decision refusal; added route-level fake-timer coverage proving stop is not called.",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -222,7 +222,8 @@
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ]
     },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3241"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3241",
+    "lastVerifiedCommit": "91c637dfa6d4fe02c4c207ac6aa8c0d1f85ff2cb"
   },
   "closeOut": {
     "usage": {
@@ -245,9 +246,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4348655,
-            "output": 302978,
-            "cacheRead": 186097152,
+            "input": 4358217,
+            "output": 304248,
+            "cacheRead": 187971072,
             "cacheWrite": 0
           }
         }
@@ -260,15 +261,15 @@
           "cacheWrite": 121982
         },
         "openai/gpt-5.6-sol": {
-          "input": 11688068,
-          "output": 573213,
-          "cacheRead": 244019200,
+          "input": 11697630,
+          "output": 574483,
+          "cacheRead": 245893120,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 208.635952,
-        "pricingAsOf": "2026-07-28T22:08:43.980Z"
+        "usd": 209.65882200000001,
+        "pricingAsOf": "2026-07-28T22:14:55.000Z"
       }
     },
     "merges": [
