@@ -1,0 +1,539 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T20:12:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3242: Rebuild order-book RunSettingsPanel to the approved UX proposal: atomic posture+reason, visible attribution, per-field save state, inline validation",
+    "updated": "2026-07-28T20:05:28.818Z"
+  },
+  "plan": {
+    "id": "pan-3242",
+    "title": "Rebuild order-book RunSettingsPanel to the approved UX proposal: atomic posture+reason, visible attribution, per-field save state, inline validation",
+    "status": "proposed",
+    "uid": "bb403cec-076e-47bb-b8be-b1df33a0cb90",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-28T20:12:00.000Z",
+    "updated": "2026-07-28T20:05:28.818Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3242",
+        "label": "PAN-3242",
+        "type": "issue"
+      },
+      {
+        "uri": "https://claude.ai/code/artifact/f3c272e4-f5e2-4799-a60b-83c18d713cad",
+        "label": "Approved interactive mockup — build to this",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "dashboard",
+      "order-books",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "The order-book RunSettingsPanel has five verified defects: a posture-reason input with no save path (typed text silently discarded), no visible active state when posture is open, a single dangling 'Saving settings…' line with no success state or field ownership, persisted posture attribution (postureSetAt/postureSetBy/postureReason) rendered nowhere, and undefined terms (open/drain, lanes, brief overlay, off-book). The live book already stores the contradiction this causes: posture open with reason 'Operator paused new pickup.' and no surface exposes it.",
+      "Proposal": "Frontend-only rebuild of src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx to the operator-approved interactive mockup: posture as a segmented control with an inline confirm that saves { posture, postureReason } atomically; an always-visible attribution line with a stale-reason tag; a keyed per-field save-state map (idle|saving|saved|error+retry) replacing the single boolean, with a 'Changes save automatically · last saved' footer; a bounded Lane A stepper with debounced save; brief-overlay shape validation with inline error; and an off-book policy row with an explanatory expander. The onChange(patch) prop contract and the /api/orders/:id PATCH door are untouched. Full spec with exact copy, timings, and before/after code is in the PRD (.pan/drafts/PAN-3242.md).",
+      "NonGoals": "- No backend, route, writer, or packages/contracts changes (no reasonSetAt field added)\n- No change to OrderBookPage.tsx, including its drain-only posture banner, or any component other than RunSettingsPanel\n- No server-side brief-path resolution or file-size display in the client; the mockup's simulated 'resolves · 4.1 KB' copy is not shipped\n- No new endpoints; no change to the RunSettingsPanel props signature\n- No screenshot regeneration for configuration/order-books.mdx"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Lane A stepper bounds are 1..8 with buttons disabled at the bounds",
+        "rationale": "The issue text only states min 1; the approved mockup (the named build-to reference) disables increment at 8, and the mockup wins on demonstrated behavior."
+      },
+      {
+        "summary": "Stale-reason detection uses the known-default mismatch rule (posture 'open' + reason 'Operator paused new pickup.', or posture 'drain' + reason 'Operator reopened pickup.')",
+        "rationale": "The contract has no reasonSetAt timestamp and schema changes are out of scope; this rule mechanically catches the verified live contradiction and the bug class the old UI created."
+      },
+      {
+        "summary": "Valid brief-overlay path shows 'Appended to every item's kickoff brief.' instead of the mockup's '✓ resolves · 4.1 KB'",
+        "rationale": "The issue scopes validation to client-side shape only; claiming server resolution or a file size in the UI would be fabricated."
+      },
+      {
+        "summary": "Clearing the brief overlay persists briefOverlay: '' (the mockup demo skipped saving on empty)",
+        "rationale": "A real clear must reach the store or the empty state would lie; the empty-state copy 'None — items run with their PRDs alone.' still renders."
+      },
+      {
+        "summary": "postureSetAt renders as short-UTC 'MMM D, HH:MMZ' via a local formatter",
+        "rationale": "Matches the mockup's 'Jul 19, 07:21Z' format; UTC avoids ambiguity for a multi-machine operator surface."
+      },
+      {
+        "summary": "The existing single test is rewritten in the posture item to drive the confirm flow",
+        "rationale": "It targets the removed standalone reason field; the rewrite preserves the same behavioral guarantee (one atomic { posture, postureReason } patch)."
+      }
+    ],
+    "items": [
+      {
+        "id": "save-state-map",
+        "title": "Per-field save-state machinery, SaveChip, and autosave footer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T20:12:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3242",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "posture-control",
+            "lane-stepper",
+            "brief-overlay"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/RunSettingsPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/orders/__tests__/RunSettingsPanel.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "RunSettingsPanel.test.tsx passes including new chip-transition, retry, and footer tests",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the single `saving` boolean and dangling foot lines (RunSettingsPanel.tsx:13-14, :99-100) with the keyed save-state map from the PRD design section: FieldId 'posture'|'lane'|'brief', SaveState idle|saving|saved|error{retry}, runSave(field, patch) capturing the patch in the retry closure, saved fading to idle after 1600ms, lastSaved updated on success. Add a SaveChip renderer (spinner + 'Saving…' muted; 'Saved ✓' success; 'Couldn't save' + underlined Retry button, destructive) and the footer: left 'Changes save automatically', right mono 'last saved HH:MM:SSZ' UTC or 'last saved —'. Wire the three existing save sites (concurrency blur, brief blur, posture click) through runSave so the panel keeps working before later items land. Tests use vi.useFakeTimers() + advanceTimersByTimeAsync per the repo fake-timers rule."
+        },
+        "items": [
+          {
+            "id": "save-state-map.ac1",
+            "title": "Given an in-flight save, the owning field's chip renders a spinner with 'Saving…'; on resolve it renders 'Saved ✓' and reverts to idle after 1600ms of fake-timer advance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "save-state-map.ac2",
+            "title": "Given a rejected save, the chip renders 'Couldn't save' with a Retry button, and clicking Retry re-sends a patch deep-equal to the original failed patch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "save-state-map.ac3",
+            "title": "A successful save updates the footer to render 'last saved HH:MM:SSZ' in monospace; before any save it renders 'last saved —'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "save-state-map.ac4",
+            "title": "The panel no longer renders the global 'Saving settings…' line; each of the three fields' saves surfaces state only on its own chip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "posture-control",
+        "title": "Posture segmented control with atomic inline confirm",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T20:12:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/RunSettingsPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/orders/__tests__/RunSettingsPanel.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "RunSettingsPanel.test.tsx passes including the atomic-reason regression and open-active-styling tests",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the posture buttons (RunSettingsPanel.tsx:74-93) with the segmented control and remove the standalone 'Posture reason' input (:64-73). Both segments styled active via the 8%/32% formula: open = info tint (text-info-foreground bg-info/[0.08] border-info/[0.32]), drain = warning tint; inactive segment neutral muted-foreground, enabled, aria-pressed=false. Under the control render the current-posture hint (open: 'Dispatch is live: eligible items start when a slot frees, Lane B strictly in order.'; drain: 'Draining: in-flight items finish, nothing new starts until reopened.'). Clicking the inactive segment expands the inline confirm (consequence sentence, label 'Why? Recorded on the run and shown to anyone reading this book.', reason input prefilled per target — drain: 'Operator paused new pickup.', open: 'Operator reopened pickup.' — focused and selected, confirm button 'Switch to drain'/'Reopen pickup' tinted per target, Cancel). Confirm calls runSave('posture', { posture: target, postureReason: trimmed reason or the target default }) and collapses; Cancel collapses with no onChange call. pendingTo and the confirm reason are local-only state, never synced from props. Rewrite the existing defect-1 test to drive this flow; exact copy in PRD FR-1/FR-2 and the design section."
+        },
+        "items": [
+          {
+            "id": "posture-control.ac1",
+            "title": "Given the confirm open with an edited reason, clicking the confirm button emits exactly one onChange patch containing both posture and postureReason (the edited text)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "posture-control.ac2",
+            "title": "Rendering with posture 'open' applies the info-tint active classes and aria-pressed=true to Open while Drain renders neutral, enabled, aria-pressed=false; the inverse holds for posture 'drain'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "posture-control.ac3",
+            "title": "Cancel collapses the confirm and produces zero onChange calls; the panel renders no standalone reason input outside the confirm",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "posture-control.ac4",
+            "title": "Opening the confirm renders the target-specific consequence sentence and prefills the reason input with the target default ('Switch to drain' renders 'Operator paused new pickup.'; 'Reopen pickup' renders 'Operator reopened pickup.')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "posture-attribution",
+        "title": "Attribution line with stale-reason tag",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T20:12:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/RunSettingsPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/orders/__tests__/RunSettingsPanel.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "RunSettingsPanel.test.tsx passes including attribution-rendering and stale-tag presence/absence tests",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Under the posture control render the attribution row: posture label ('Open'/'Drain') + ' · set by ' + postureSetBy in monospace (fallback 'operator') + ' · ' + postureSetAt formatted as short-UTC 'MMM D, HH:MMZ' (segment omitted when absent) + ' — ' + quoted postureReason (fallback 'No reason recorded.'). Append the stale tag (uppercase 10px, rounded-sm, warning 8%/32% tint, text 'stale reason', title tooltip 'This reason was recorded before the current posture was set — it describes a previous state.') exactly when the known-default mismatch rule fires: posture 'open' with reason 'Operator paused new pickup.' or posture 'drain' with reason 'Operator reopened pickup.'."
+        },
+        "items": [
+          {
+            "id": "posture-attribution.ac1",
+            "title": "With postureSetBy/postureSetAt/postureReason present, the panel renders who (monospace), the short-UTC timestamp, and the quoted reason whenever it renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "posture-attribution.ac2",
+            "title": "Given posture 'open' and reason 'Operator paused new pickup.', the amber 'stale reason' tag renders with the specified tooltip title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "posture-attribution.ac3",
+            "title": "Given a posture whose reason is not the opposite posture's default, no stale tag renders; absent attribution fields fall back to 'operator' and 'No reason recorded.' without crashing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-stepper",
+        "title": "Lane A concurrency stepper with debounced save",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T20:12:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/RunSettingsPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/orders/__tests__/RunSettingsPanel.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "RunSettingsPanel.test.tsx passes including debounced single-patch and bounds-disable tests",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the number input (RunSettingsPanel.tsx:36-50) with a − / value / + stepper: min 1, max 8, buttons disabled at the bounds, value in monospace with tabular numerals. Hint under the label: 'How many parallel-safe Lane A items may run at once. Lane B ignores this — it is always one item at a time, in order.' Clicks update the shown value immediately and debounce 500ms before runSave('lane', { laneAConcurrency: value }), so a burst of clicks emits one patch. Debounce tests use fake timers."
+        },
+        "items": [
+          {
+            "id": "lane-stepper.ac1",
+            "title": "Two rapid increments from 1 followed by a 500ms fake-timer advance emits exactly one onChange patch { laneAConcurrency: 3 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-stepper.ac2",
+            "title": "The stepper renders the decrement button disabled at value 1 and renders the increment button disabled at value 8",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-stepper.ac3",
+            "title": "The hint copy stating Lane B is always one item at a time renders under the Lane A concurrency label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "brief-overlay",
+        "title": "Brief overlay path input with inline validation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T20:12:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/RunSettingsPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/orders/__tests__/RunSettingsPanel.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "RunSettingsPanel.test.tsx passes including invalid-path-no-save, valid-path-save, and clear-persists tests",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "NFR-2",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Rebuild the brief overlay field (RunSettingsPanel.tsx:51-63): monospace path input, placeholder 'docs/briefs/refactor-p3.md', hint 'Markdown appended to every item's kickoff brief for this run.' Input debounces 550ms, then on the trimmed value: empty → muted status 'None — items run with their PRDs alone.' and, when the persisted value was non-empty, runSave('brief', { briefOverlay: '' }); non-.md (fails /\\.md$/i) → destructive inline status 'Not a markdown file — expected a repo-relative .md path.' and no onChange call; valid .md differing from the persisted value → runSave('brief', { briefOverlay: value }) with success status 'Appended to every item's kickoff brief.'. The status must never claim server-side resolution or a file size."
+        },
+        "items": [
+          {
+            "id": "brief-overlay.ac1",
+            "title": "Typing 'notes.txt' and advancing 550ms renders the not-a-markdown-file error inline and produces zero onChange calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brief-overlay.ac2",
+            "title": "Typing 'docs/briefs/x.md' and advancing 550ms emits one patch { briefOverlay: 'docs/briefs/x.md' } and renders the success status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "brief-overlay.ac3",
+            "title": "Clearing a previously persisted overlay emits { briefOverlay: '' } and renders 'None — items run with their PRDs alone.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "offbook-policy-row",
+        "title": "Off-book pickup policy row with explanatory expander",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T20:12:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/RunSettingsPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/orders/__tests__/RunSettingsPanel.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "RunSettingsPanel.test.tsx passes including policy-line and expander-toggle tests",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the off-book text row (RunSettingsPanel.tsx:94-97) with the policy row: label 'Off-book pickup', toggle button 'how the override works' carrying aria-expanded, policy line with lock glyph 🔒 and 'Blocked while this book runs — fixed policy, not a preference.' The expander body reads: 'While a run is active the flywheel only starts issues that are in this book. Starting anything else requires pan start <id> --off-book, which succeeds but is written to the run record with who ran it and when — an audited exception, not a setting.' with the command in monospace. This row has no save chip — it is policy, not a setting."
+        },
+        "items": [
+          {
+            "id": "offbook-policy-row.ac1",
+            "title": "The panel renders the lock-glyph policy line 'Blocked while this book runs — fixed policy, not a preference.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "offbook-policy-row.ac2",
+            "title": "Clicking 'how the override works' applies the flipped aria-expanded value and renders the expander body containing the monospace 'pan start <id> --off-book' command and the audited-exception sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-order-books",
+        "title": "Update order-books docs for the rebuilt run-settings surface",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T20:12:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3242",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/order-books.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without new errors; configuration/order-books.mdx contains the updated posture and run-settings descriptions"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit configuration/order-books.mdx. In the 'Pickup posture' section (currently lines 63-67, which say OPEN 'is neutral because an open gate is the normal rest state'): state that OPEN renders blue-tinted (dispatch is live — machine working) and DRAIN amber (a human paused pickup), and that run settings always show posture attribution — who set it, when, and why — with an amber stale-reason flag when the recorded reason predates the current posture. In 'Setup and Progress' (currently line 95): note that run settings save automatically per field, with saved/error state shown beside the field and a retry on failure. Keep the page's existing voice and structure; do not regenerate screenshots."
+        },
+        "items": [
+          {
+            "id": "docs-order-books.ac1",
+            "title": "configuration/order-books.mdx renders a 'Pickup posture' section whose copy covers the blue OPEN treatment, amber DRAIN, always-visible attribution, and the stale-reason flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-order-books.ac2",
+            "title": "configuration/order-books.mdx renders a 'Setup and Progress' section whose copy covers per-field autosave with visible saved and error-with-retry state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "save-state-map",
+        "to": "posture-control",
+        "type": "blocks"
+      },
+      {
+        "from": "posture-control",
+        "to": "posture-attribution",
+        "type": "blocks"
+      },
+      {
+        "from": "posture-attribution",
+        "to": "lane-stepper",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-stepper",
+        "to": "brief-overlay",
+        "type": "blocks"
+      },
+      {
+        "from": "brief-overlay",
+        "to": "offbook-policy-row",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-28-PAN-3242-rebuild-order-book-runsettingspanel-to-the-approved-ux-proposal-atomic-posture-reason-visible-attribution-per-field-save-state-inline-validation.xbrief.json"
+    }
+  },
+  "status": "proposed"
+}
