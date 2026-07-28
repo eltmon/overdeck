@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-28T22:52:19.632Z",
+  "updated": "2026-07-28T23:01:58.764Z",
   "pipeline": {
     "issueId": "PAN-3231",
     "reviewStatus": "pending",
@@ -88,16 +88,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "prd-resource-signal": {
-        "writerId": "agent-pan-3231",
-        "agentId": "agent-pan-3231",
-        "pid": 1818424,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T22:52:19.632Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3231",
@@ -131,6 +123,17 @@
         "outcome": "completed",
         "reason": "Added GET /api/issues/:id/prd through the canonical PRD location/content read door, preserved command-deck fallback behavior, locked the additive route in the no-loss audit, and added draft/404/content-selection tests; typecheck and 21 focused tests pass.",
         "releasedAt": "2026-07-28T22:52:07.227Z"
+      },
+      {
+        "writerId": "agent-pan-3231",
+        "agentId": "agent-pan-3231",
+        "pid": 1818424,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T22:52:19.632Z",
+        "itemId": "prd-resource-signal",
+        "outcome": "completed",
+        "reason": "Added canonical draft discovery to resource allocation, exposed the prd source and hasPrd DTO flag without removing existing sources, updated frontend DTO fallbacks, and added presence/absence tests; typecheck and 25 resource-discovery tests pass.",
+        "releasedAt": "2026-07-28T23:01:58.764Z"
       }
     ],
     "statusReasons": {
@@ -145,6 +148,10 @@
       "prd-endpoint": {
         "reason": "Added GET /api/issues/:id/prd through the canonical PRD location/content read door, preserved command-deck fallback behavior, locked the additive route in the no-loss audit, and added draft/404/content-selection tests; typecheck and 21 focused tests pass.",
         "updatedAt": "2026-07-28T22:52:07.227Z"
+      },
+      "prd-resource-signal": {
+        "reason": "Added canonical draft discovery to resource allocation, exposed the prd source and hasPrd DTO flag without removing existing sources, updated frontend DTO fallbacks, and added presence/absence tests; typecheck and 25 resource-discovery tests pass.",
+        "updatedAt": "2026-07-28T23:01:58.764Z"
       }
     }
   },
@@ -160,6 +167,9 @@
     "prd-endpoint.prd-endpoint.ac2": "completed",
     "prd-endpoint.prd-endpoint.ac3": "completed",
     "prd-endpoint.prd-endpoint.ac4": "completed",
-    "prd-resource-signal": "running"
+    "prd-resource-signal": "completed",
+    "prd-resource-signal.prd-resource-signal.ac1": "completed",
+    "prd-resource-signal.prd-resource-signal.ac2": "completed",
+    "prd-resource-signal.prd-resource-signal.ac3": "completed"
   }
 }
