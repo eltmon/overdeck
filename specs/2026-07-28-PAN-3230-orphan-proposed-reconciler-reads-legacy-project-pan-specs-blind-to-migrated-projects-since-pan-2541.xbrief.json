@@ -4,17 +4,17 @@
     "created": "2026-07-28T17:12:34Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3230: orphan-proposed-reconciler reads legacy <project>/.pan/specs — blind to migrated projects since PAN-2541 (79 proposed specs invisible in the state worktree)",
-    "updated": "2026-07-28T17:18:06.566Z"
+    "updated": "2026-07-28T21:04:29.038Z"
   },
   "plan": {
     "id": "pan-3230",
     "title": "orphan-proposed-reconciler reads legacy <project>/.pan/specs — blind to migrated projects since PAN-2541",
-    "status": "running",
+    "status": "completed",
     "uid": "9661a837-07ec-4d10-9016-5c4c8d83c088",
     "author": "agent:claude-fable-5",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-28T17:12:34Z",
-    "updated": "2026-07-28T17:18:06.566Z",
+    "updated": "2026-07-28T21:04:29.038Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3230",
@@ -514,5 +514,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }
