@@ -12,6 +12,7 @@ import {
   listOpenIssuesWithLabelsPromise,
 } from './github-app.js';
 import { createSettledTtlPromiseCache, withConcurrencyLimitPromise } from './concurrency.js';
+import { listOpenGitLabMergeRequests, type GitLabMergeRequestRow } from './gitlab-merge-requests.js';
 import { STALE_PIPELINE_LABELS } from './cloister/label-reconciler.js';
 import { loadConfigSync } from './config.js';
 import { listSpecs } from './pan-dir/specs.js';
@@ -274,6 +275,7 @@ export interface PipelineMembershipGatherDeps {
   listOpenIssues(owner: string, repo: string): Promise<Array<{ number: number; labels: string[] }>>;
   listPhaseLabeledIssues(owner: string, repo: string): Promise<Array<{ number: number; state: 'open' | 'closed'; labels: string[] }>>;
   listOpenPullRequests(owner: string, repo: string): Promise<PullRequestRow[]>;
+  listOpenMergeRequests(repoPath: string): Promise<GitLabMergeRequestRow[]>;
   listMergedPullRequestHeads(owner: string, repo: string, heads: string[]): Promise<string[]>;
   listIssueStates(owner: string, repo: string, numbers: number[]): Promise<Array<{ number: number; state: 'open' | 'closed' }>>;
   listTrackerIssues(project: ProjectConfig): Promise<ProjectTrackerIssueRow[]>;
@@ -285,6 +287,7 @@ const defaultDeps: PipelineMembershipGatherDeps = {
   listOpenIssues: listOpenIssuesWithLabelsPromise,
   listPhaseLabeledIssues: (owner, repo) => listIssuesWithAnyLabelPromise(owner, repo, STALE_PIPELINE_LABELS),
   listOpenPullRequests: listOpenPullRequestsSnapshot,
+  listOpenMergeRequests: listOpenGitLabMergeRequests,
   listMergedPullRequestHeads: listMergedPullRequestHeadsBatched,
   listIssueStates: listIssueStatesBatched,
   listTrackerIssues: listProjectTrackerIssues,
@@ -523,6 +526,7 @@ export async function gatherProjectLensSignals(
   }
 
   const repositories = projectRepositories(project);
+  const gitlabRepos = repositories.filter((r) => r.forge === 'gitlab');
   const branchRefPatterns = [
     'refs/heads/feature/*', 'refs/remotes/origin/feature/*',
     'refs/heads/strike/*', 'refs/remotes/origin/strike/*',
@@ -530,7 +534,7 @@ export async function gatherProjectLensSignals(
   const branchSnapshots = repositories.map((repository) =>
     snapshotBranchRefs(repository.path, repository.defaultBranch, branchRefPatterns, deps.run));
 
-  const [trackerIssues, openIssues, phaseLabeledIssues, openPrs, branches, specIssueIds] = await Promise.all([
+  const [trackerIssues, openIssues, phaseLabeledIssues, openPrs, openMrs, branches, specIssueIds] = await Promise.all([
     project.github_repo
       ? Promise.resolve([])
       : withUnavailableReason('forge_unavailable', () => deps.listTrackerIssues(project)),
@@ -542,6 +546,10 @@ export async function gatherProjectLensSignals(
       : Promise.resolve([]),
     owner && repo
       ? withUnavailableReason('forge_unavailable', () => deps.listOpenPullRequests(owner, repo))
+      : Promise.resolve([]),
+    !(owner && repo) && gitlabRepos.length > 0
+      ? withUnavailableReason('forge_unavailable', () =>
+          Promise.all(gitlabRepos.map((r) => deps.listOpenMergeRequests(r.path))))
       : Promise.resolve([]),
     Promise.all(branchSnapshots),
     withUnavailableReason('gather_failed', () => deps.listSpecIssueIds(project.path)),
@@ -582,12 +590,23 @@ export async function gatherProjectLensSignals(
     knownStateByIssue.set(id, issue.state);
   }
   for (const pr of openPrs) {
-    if (!owner || !repo || pr.headRepoFullName.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) continue;
+    // GitHub fork filter: only count PRs from the configured owner/repo
+    if (owner && repo && pr.headRepoFullName.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) continue;
     const id = issueIdFromRef(pr.headRefName, issuePrefix);
     if (id) {
       candidates.add(id);
       openPrIssues.add(id);
       headRefsByIssue.set(id, new Set([...(headRefsByIssue.get(id) ?? []), pr.headRefName]));
+    }
+  }
+  // Process GitLab open MRs (flatten from multi-repo array)
+  const gitlabMrs = openMrs.flat();
+  for (const mr of gitlabMrs) {
+    const id = issueIdFromRef(mr.source_branch, issuePrefix);
+    if (id) {
+      candidates.add(id);
+      openPrIssues.add(id);
+      headRefsByIssue.set(id, new Set([...(headRefsByIssue.get(id) ?? []), mr.source_branch]));
     }
   }
   for (const snapshot of branches) {

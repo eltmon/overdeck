@@ -54,6 +54,7 @@ function deps(): PipelineMembershipGatherDeps {
     listOpenPullRequests: vi.fn().mockResolvedValue([{
       headRefName: 'feature/pan-2', headRepoFullName: 'eltmon/overdeck',
     }]),
+    listOpenMergeRequests: vi.fn().mockResolvedValue([]),
     listMergedPullRequestHeads: vi.fn().mockResolvedValue(['feature/pan-1']),
     listIssueStates: vi.fn().mockImplementation(async (_owner, _repo, numbers: number[]) =>
       numbers.map((number) => ({ number, state: number === 4 ? 'open' as const : 'closed' as const }))),
@@ -685,6 +686,92 @@ describe('gatherProjectLensSignals', () => {
       args[0] === 'rev-parse' ? cwd : 'feature/krux-5\nstrike/krux-9\n');
 
     await expect(gatherProjectLensSignals(project, mocked)).resolves.toEqual([]);
+  });
+
+  it('gathers GitLab open MRs for non-GitHub polyrepo and sets hasOpenPr', async () => {
+    const mocked = deps();
+    mocked.listTrackerIssues = vi.fn().mockResolvedValue([
+      { issueId: 'MIN-864', state: 'open', labels: [] },
+    ]);
+    mocked.listOpenMergeRequests = vi.fn().mockResolvedValue([
+      { source_branch: 'feature/min-864', web_url: 'https://gitlab.com/test/mr/1' } as any,
+    ]);
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
+    const gitlabPolyrepo: ProjectConfig = {
+      name: 'mind-your-now',
+      path: '/myn',
+      issue_prefix: 'MIN',
+      gitlab_repo: 'test/test',
+      workspace: {
+        type: 'polyrepo',
+        repos: [
+          { name: 'fe', path: 'frontend' },
+          { name: 'api', path: 'api' },
+        ],
+      },
+    };
+
+    const result = await gatherProjectLensSignals(gitlabPolyrepo, mocked);
+
+    expect(result).toContainEqual(expect.objectContaining({
+      issueId: 'MIN-864',
+      issueOpen: true,
+      hasOpenPr: true,
+    }));
+    // Verify the GitLab query was called for each repo
+    expect(mocked.listOpenMergeRequests).toHaveBeenCalledTimes(2);
+  });
+
+  it('classifies closed issue with open GitLab MR as zombie_pr', async () => {
+    const mocked = deps();
+    mocked.listTrackerIssues = vi.fn().mockResolvedValue([
+      { issueId: 'MIN-999', state: 'closed', labels: [] },
+    ]);
+    mocked.listOpenMergeRequests = vi.fn().mockResolvedValue([
+      { source_branch: 'feature/min-999', web_url: 'https://gitlab.com/test/mr/99' } as any,
+    ]);
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
+    const gitlabPolyrepo: ProjectConfig = {
+      name: 'test',
+      path: '/test',
+      issue_prefix: 'MIN',
+      gitlab_repo: 'test/test',
+      workspace: {
+        type: 'polyrepo',
+        repos: [{ name: 'api', path: 'api' }],
+      },
+    };
+
+    const result = await gatherProjectLensSignals(gitlabPolyrepo, mocked);
+
+    const issue = result.find((r) => r.issueId === 'MIN-999');
+    expect(issue).toMatchObject({
+      issueOpen: false,
+      hasOpenPr: true,
+    });
+    // Verify zombie_pr through resolvePipelineMembership (hasOpenPr + closed)
+    const membership = resolvePipelineMembership(issue!);
+    expect(membership).toEqual(expect.objectContaining({
+      bucket: 'zombie_pr',
+    }));
+  });
+
+  it('rejects when GitLab MR dep fails with forge_unavailable', async () => {
+    const mocked = deps();
+    mocked.listOpenMergeRequests = vi.fn().mockRejectedValue(new Error('glab unavailable'));
+    const gitlabProject: ProjectConfig = {
+      name: 'test',
+      path: '/test',
+      issue_prefix: 'TEST',
+      gitlab_repo: 'test/test',
+    };
+
+    await expect(gatherProjectLensSignals(gitlabProject, mocked)).rejects.toMatchObject({
+      reason: 'forge_unavailable',
+      message: expect.stringContaining('glab unavailable'),
+    });
   });
 
   it('does not query issue states or merged history for closed spec-only candidates', async () => {
