@@ -170,7 +170,7 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T11:20:44.816Z",
+  "updated": "2026-07-28T11:20:50.366Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "blocked",
@@ -181,11 +181,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T11:20:44.127Z",
+    "updatedAt": "2026-07-28T11:20:50.358Z",
     "reviewNotes": "The new settled append fetch has no deadline; a hung loopback request wedges the serial Deacon patrol while its heartbeat keeps reporting healthy, so later recovery work never runs.",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
-    "reviewedAtCommit": "4db74b5910033b9d19d1f4b3f99dea7fbf1a2225",
+    "reviewedAtCommit": "f110307644701e83f5413011b79bea06fb74cd73",
     "lastVerifiedCommit": "51f15f597ae7b2b54c2e21b4f81ce496648728c9",
     "reviewSpawnedAt": "2026-07-28T11:14:41.328Z",
     "scopeDrift": {
@@ -281,7 +281,7 @@
       },
       "costAtCloseOut": {
         "usd": 84.3798503,
-        "pricingAsOf": "2026-07-28T11:20:44.143Z"
+        "pricingAsOf": "2026-07-28T11:20:50.362Z"
       }
     },
     "merges": [
