@@ -722,6 +722,53 @@ describe('workflows', () => {
       );
     });
 
+    it('reuses one GitLab MR lookup when the merged branch exists locally and remotely', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor feature/pan-100 main') {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command === 'git rev-parse feature/pan-100 2>/dev/null') {
+          return { stdout: 'gitlab-head\n', stderr: '' };
+        }
+        if (command === 'glab mr list --source-branch feature/pan-100 --all --output json') {
+          return {
+            stdout: '[{"iid":75,"web_url":"https://gitlab.com/acme/app/-/merge_requests/75","state":"merged","source_branch":"feature/pan-100","target_branch":"main","sha":"gitlab-head"}]',
+            stderr: '',
+          };
+        }
+        if (command === 'git ls-remote --heads origin "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: 'gitlab-head\trefs/heads/feature/pan-100\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor origin/feature/pan-100 main') {
+          throw new Error('remote is squash-merged');
+        }
+        if (command.startsWith('git diff main...origin/feature/pan-100')) {
+          return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
+        }
+        if (command === 'git rev-parse origin/feature/pan-100 2>/dev/null') {
+          return { stdout: 'gitlab-head\n', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const verifyStep = await verifyConventionBranchMerged(
+        { issueId: 'PAN-100', projectPath: testDir },
+        { repoKey: 'fe', dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
+      );
+
+      expect(verifyStep?.success).toBe(true);
+      expect(verifyStep?.details).toEqual([
+        'MR !75 is merged and feature/pan-100 matches the merged MR head (https://gitlab.com/acme/app/-/merge_requests/75)',
+        'Remote origin/feature/pan-100 matches the merged MR head',
+      ]);
+      const commands = mockExecAsync.mock.calls.map(([command]) => command);
+      expect(commands.filter(command => command === 'glab mr list --source-branch feature/pan-100 --all --output json')).toHaveLength(1);
+      expect(verifyStep?.details?.filter(detail => detail.includes('MR !75'))).toHaveLength(1);
+    });
+
     it('falls through when a merged GitLab MR head does not match the branch tip', async () => {
       mockExecAsync.mockImplementation(async (command: string) => {
         if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
@@ -948,6 +995,96 @@ describe('workflows', () => {
       expect(verifyStep.details).toEqual([
         'PR #2182 is squash-merged; all 2 post-PR non-merge commit(s) on feature/pan-100 are already on origin/main',
       ]);
+    });
+
+    it('checks post-PR commits against a configured non-main target branch', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor feature/pan-100 master') {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command.startsWith('git diff master...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
+        }
+        if (command.startsWith('gh pr list')) {
+          return {
+            stdout: '[{"number":2182,"mergedAt":"2026-07-02T12:00:00Z","headRefOid":"merged-head","url":"https://github.com/eltmon/overdeck/pull/2182"}]',
+            stderr: '',
+          };
+        }
+        if (command === 'git rev-parse feature/pan-100 2>/dev/null') {
+          return { stdout: 'tip-after-target-merge\n', stderr: '' };
+        }
+        if (command.startsWith('git log --no-merges')) {
+          return { stdout: 'target-commit\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor target-commit origin/master') {
+          return { stdout: '', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const verifyStep = await verifyConventionBranchMerged(
+        { issueId: 'PAN-100', projectPath: testDir, github: { owner: 'eltmon', repo: 'overdeck', number: 100 } },
+        { repoKey: 'legacy', dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'master', forge: 'github' },
+      );
+
+      expect(verifyStep?.success).toBe(true);
+      expect(verifyStep?.details).toEqual([
+        'PR #2182 is squash-merged; all 1 post-PR non-merge commit(s) on feature/pan-100 are already on origin/master',
+      ]);
+    });
+
+    it('checks state-plane-only branch work against a configured non-main target branch', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor feature/pan-100 master') {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command.startsWith('git diff master...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
+        }
+        if (command.startsWith('gh pr list')) {
+          return {
+            stdout: '[{"number":2182,"mergedAt":"2026-07-02T12:00:00Z","headRefOid":"merged-head","url":"https://github.com/eltmon/overdeck/pull/2182"}]',
+            stderr: '',
+          };
+        }
+        if (command === 'git rev-parse feature/pan-100 2>/dev/null') {
+          return { stdout: 'tip-with-state\n', stderr: '' };
+        }
+        if (command.startsWith('git log --no-merges')) {
+          return { stdout: 'state-commit\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor state-commit origin/master') {
+          throw new Error('state commit is not on the target');
+        }
+        if (command === 'git diff --name-only merged-head..tip-with-state') {
+          return { stdout: 'src/from-target.ts\n', stderr: '' };
+        }
+        if (command === 'git diff --name-only origin/master...tip-with-state') {
+          return { stdout: '.pan/records/pan-100.json\n', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const verifyStep = await verifyConventionBranchMerged(
+        { issueId: 'PAN-100', projectPath: testDir, github: { owner: 'eltmon', repo: 'overdeck', number: 100 } },
+        { repoKey: 'legacy', dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'master', forge: 'github' },
+      );
+
+      expect(verifyStep?.success).toBe(true);
+      expect(verifyStep?.details).toEqual([
+        'PR #2182 is squash-merged; feature/pan-100 is ahead only by state-plane commits (1 file(s): .pan) — accepted per state-plane policy',
+      ]);
+      expect(mockExecAsync).toHaveBeenCalledWith(
+        'git diff --name-only origin/master...tip-with-state',
+        { cwd: testDir, encoding: 'utf-8' },
+      );
     });
 
     it('rejects local squash-merge success when the remote branch has advanced past the merged PR head', async () => {
