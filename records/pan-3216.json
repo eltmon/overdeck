@@ -10,8 +10,21 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/lib/briefing-assembler.ts",
+      "tests/unit/lib/briefing-assembler.test.ts"
+    ],
+    "actualChangedFiles": [
+      "src/lib/briefing-assembler.ts",
+      "tests/unit/lib/briefing-assembler.test.ts"
+    ],
+    "recordedAt": "2026-07-28T06:40:20.292Z"
+  },
   "created": "2026-07-28T04:43:34.296Z",
-  "updated": "2026-07-28T06:40:23.241Z",
+  "updated": "2026-07-28T06:40:25.125Z",
   "pipeline": {
     "issueId": "PAN-3216",
     "reviewStatus": "pending",
@@ -20,7 +33,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T06:40:23.239Z",
+    "updatedAt": "2026-07-28T06:40:24.434Z",
+    "reviewNotes": "Verification infrastructure error: Verification worker 1861366 exited before writing a result",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3219",
     "reviewRequestedAt": "2026-07-28T06:40:23.239Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -34,19 +49,36 @@
         "tests/unit/lib/briefing-assembler.test.ts"
       ],
       "recordedAt": "2026-07-28T06:40:20.292Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3219"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 220,
+            "output": 6620,
+            "cacheRead": 4286956,
+            "cacheWrite": 186572
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 220,
+          "output": 6620,
+          "cacheRead": 4286956,
+          "cacheWrite": 186572
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-28T06:34:37.306Z"
+        "usd": 0.695228,
+        "pricingAsOf": "2026-07-28T06:40:24.459Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3219"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -90,18 +122,5 @@
     "narrow-troubled-filter.narrow-troubled-filter.ac2": "completed",
     "narrow-troubled-filter.narrow-troubled-filter.ac3": "completed",
     "narrow-troubled-filter.narrow-troubled-filter.ac4": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "src/lib/briefing-assembler.ts",
-      "tests/unit/lib/briefing-assembler.test.ts"
-    ],
-    "actualChangedFiles": [
-      "src/lib/briefing-assembler.ts",
-      "tests/unit/lib/briefing-assembler.test.ts"
-    ],
-    "recordedAt": "2026-07-28T06:40:20.292Z"
   }
 }
