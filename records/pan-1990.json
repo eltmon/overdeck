@@ -16,18 +16,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T22:30:19.368Z",
+  "updated": "2026-07-28T22:30:25.243Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "passed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T21:04:47.322Z",
-    "inspectNotes": "All five ACs met; both new suites green 19/19. AC-1: getWorkspaceById/getWorkspaceByName covered incl. null misses (tests/unit/lib/workspaces/resolver.test.ts:39-47), getWorkspaceForIssue covered incl. the archived-row exclusion (:49-64), and resolveWorkspaceForCwd covered for longest-prefix, sibling-boundary, project-primary-path fallback to main, and no-match (:100-131). MUTATION-VERIFIED the cwd matcher rather than trusting green: I copied src outside the repo and degraded isPathPrefixMatch at src/lib/workspaces/resolver.ts:207 from the boundary-aware form to a naive cwd.startsWith(candidate), then replicated both cwd assertions. Mutated run: longest-prefix=true but sibling-boundary=false (correctly caught - /repo/overdeck-other-project wrongly resolves to the /repo/overdeck workspace). Unmutated control: both true. AC-2: deleteWorkspace UPDATEs conversations SET workspace_id = NULL before the DELETE inside one transaction (src/lib/workspaces/writer.ts:130-134); the test asserts the surviving row's full shape via toEqual({name,workspace_id:null}), so a DELETE-instead-of-SET-NULL regression fails loudly. AC-3: kind='main' delete throws before any mutation (writer.ts:126-128) and the test also asserts the row still exists; workspace-scoped pin cleanup and project-scoped pin survival both asserted. AC-4: main-singleton enforced in createWorkspace (writer.ts:76-78) with the test asserting both the throw message and that exactly one main row remains. AC-5: addProjectTarget demotes inside a transaction before the upsert (writer.ts:44-46); the test asserts exactly one primary remains AND that it is the new path. NON-BLOCKING OBSERVATIONS for the review convoy, none of which violate an AC: (1) deleteWorkspace nulls conversations.workspace_id but leaves agents.workspace_id dangling at the deleted id - schema-v64 added the column to both tables and there is no FK, so the agents reference silently outlives the row; worth deciding deliberately rather than by omission. (2) The pin test at tests/unit/lib/workspaces/writer.test.ts is named 'leaves project-scoped pins for the same id untouched' but actually pins ('project', projectId) while deleting workspace id, which are different id spaces (yaml key vs UUID); the scope='workspace' predicate in the DELETE is therefore never exercised - pinning ('project', id) with the SAME id would make the test match its name and its claim. (3) The main-singleton is enforced in application code only, with no partial unique index on workspaces(project_id) WHERE kind='main', unlike the analogous project_targets guard in schema-v64; single-process SQLite makes this safe today but a CLI/dashboard cross-process race could insert two mains.",
+    "updatedAt": "2026-07-28T22:30:25.230Z",
+    "inspectNotes": "Inspecting item workspace-doors",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -51,10 +51,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 410,
-            "output": 108293,
-            "cacheRead": 51188036,
-            "cacheWrite": 607216
+            "input": 680,
+            "output": 210862,
+            "cacheRead": 114909157,
+            "cacheWrite": 1233987
           }
         }
       },
@@ -66,22 +66,22 @@
           "cacheWrite": 194048
         },
         "anthropic/claude-sonnet-5": {
-          "input": 410,
-          "output": 108293,
-          "cacheRead": 51188036,
-          "cacheWrite": 607216
+          "input": 680,
+          "output": 210862,
+          "cacheRead": 114909157,
+          "cacheWrite": 1233987
         }
       },
       "costAtCloseOut": {
-        "usd": 21.296027,
-        "pricingAsOf": "2026-07-28T21:04:47.385Z"
+        "usd": 36.633412,
+        "pricingAsOf": "2026-07-28T22:30:25.236Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-1990",
