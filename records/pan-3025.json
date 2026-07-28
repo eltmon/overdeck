@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T06:47:16.270Z",
+  "updated": "2026-07-28T06:47:24.921Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "pending",
@@ -47,8 +47,16 @@
     }
   ],
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "reclose-idempotent-short-circuit": {
+        "writerId": "agent-pan-3025",
+        "agentId": "agent-pan-3025",
+        "pid": 2671890,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:47:24.921Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3025",
@@ -112,6 +120,7 @@
     "post-merge-row-journal-fallback.post-merge-row-journal-fallback.ac1": "completed",
     "post-merge-row-journal-fallback.post-merge-row-journal-fallback.ac2": "completed",
     "post-merge-row-journal-fallback.post-merge-row-journal-fallback.ac3": "completed",
-    "post-merge-row-journal-fallback.post-merge-row-journal-fallback.ac4": "completed"
+    "post-merge-row-journal-fallback.post-merge-row-journal-fallback.ac4": "completed",
+    "reclose-idempotent-short-circuit": "running"
   }
 }
