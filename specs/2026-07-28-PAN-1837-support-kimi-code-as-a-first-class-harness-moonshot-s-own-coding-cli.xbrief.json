@@ -1,0 +1,1250 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T15:57:26Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1837: Support Kimi Code as a first-class harness (Moonshot's own coding CLI)",
+    "updated": "2026-07-28T16:03:59.553Z"
+  },
+  "plan": {
+    "id": "pan-1837",
+    "title": "Support Kimi Code as a first-class harness (Moonshot's own coding CLI)",
+    "status": "proposed",
+    "uid": "61643a96-a494-45d9-b2cd-a6a11b1d5d32",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-28T15:57:26Z",
+    "updated": "2026-07-28T16:03:59.553Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1837",
+        "label": "PAN-1837",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/PAN-1837.md",
+        "label": "PRD (canonical, overdeck-state)",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2858",
+        "label": "PAN-2858 (ACP harness — coexists, untouched)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "harness",
+      "kimi",
+      "runtime",
+      "adapter",
+      "moonshot"
+    ],
+    "metadata": {
+      "sizeJustification": "Adding a harness is a single inseparable deliverable: getHarness() silently coerces any partially-registered harness string to claude-code, so a partial ship either runs Kimi agents as Claude or crashes at runtime dispatch. The issue explicitly mandates 'single deliverable — no partial ship'. Items are decomposed for reviewability (16 tracer slices with per-item tests) but cannot ship as sibling issues.",
+      "canonicalFilename": "2026-07-28-PAN-1837-support-kimi-code-as-a-first-class-harness-moonshot-s-own-coding-cli.xbrief.json"
+    },
+    "narratives": {
+      "Problem": "Overdeck can run Kimi models only through claude-code pointed at Kimi's Anthropic-compatibility endpoint (which forfeits Moonshot's server-side context caching discipline) or through the generic acp harness (a portability layer that cannot reach Kimi-specific capabilities). Neither drives Kimi Code's native agent loop. Moonshot's own CLI (`kimi`) is a Claude-Code-class terminal agent; without a native harness, Kimi models are second-class in Overdeck.",
+      "Proposal": "Add 'kimi-code' as a fifth harness that drives the native `kimi` TUI: launch `cd <workspace> && kimi -m <model> --yolo` under the PTY supervisor in the agent's tmux session (async tmux-paste fallback), readiness via the native session dir appearing (kimi-session-signal), session id captured post-launch (newest dir under the workspace's workDirKey bucket, persisted per-agent like codex's thread-id), transcript and cost parsed from Kimi's own wire.jsonl. Kimi-provider-only policy gate mirrors acp. The existing acp harness coexists untouched. Shipped provider default flips to kimi-code only as the final item, gated on a proven end-to-end work-agent run (two-phase default, PRD WI-7.1).",
+      "NonGoals": "- Kimi Code through ACP: the existing acp harness is its own shipped path and must remain byte-for-byte unchanged (no merge, delete, or re-point)\n- Kimi headless -p/--print roles: v1 work agents run interactively; a one-shot headless role type is a follow-up\n- Kimi sub-agent transcripts (agents/agent-0/…/wire.jsonl): v1 renders only the main agent's wire\n- Setting the operator override providerHarnesses.kimi: 'acp': that is Settings/config, not code in this diff\n- Silent harness fallback or coercion: {kimi-code, non-Kimi model} must block with a reason, never coerce (NFR-2)\n- A second `kimi` prerequisite row (would double-report in pan doctor)\n- Sync tmux primitives (sendKeys) or execSync anywhere in new code (NFR-3)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Reused the canonical PRD at drafts/PAN-1837.md on overdeck-state instead of authoring a new one.",
+        "rationale": "All of its verified file/line anchors were re-checked against the workspace tree at d266109a1d and held; only a planning-errata section was appended."
+      },
+      {
+        "summary": "Launcher acceptance criteria encode `cd <workspace> && kimi -m <model> --yolo` with no --session, no --work-dir, no --print — superseding the PRD's stale WI-6 test line and acceptance criterion 5.",
+        "rationale": "The PRD's own [RESOLVED — verified 0.29.2] checkpoint establishes -S cannot create arbitrary session ids and --work-dir does not exist; the resolved sections are authoritative over the stale lines (erratum E1 in the PRD draft)."
+      },
+      {
+        "summary": "Delivery is pty-supervisor primary with async tmux-paste fallback; a spike item pins the wire.jsonl fixture and resolves the live delivery checkpoint before adapter hardening.",
+        "rationale": "The PRD states this default and fallback explicitly and orders checkpoint resolution early ('spawn one throwaway kimi-code agent by hand … pin both as fixtures')."
+      },
+      {
+        "summary": "Context layers reuse the shared AGENTS.md layer and ~/.agents/skills; no new kimi-code-global.md render file.",
+        "rationale": "PRD WI-9 names this the default ('reuse the shared AGENTS.md layer, no new file'); Kimi Code reads AGENTS.md natively."
+      },
+      {
+        "summary": "The shipped PROVIDERS.kimi.defaultHarness flip to 'kimi-code' is the final item, blocked by the end-to-end verification item.",
+        "rationale": "PRD WI-7.1 two-phase decision: flipping forces the kimi binary on every Kimi user, so it lands proven, not before; the interim caching default is the operator config override, not code."
+      },
+      {
+        "summary": "Prerequisites: broaden the existing `kimi` entry's purpose string; no duplicate probe.",
+        "rationale": "PRD WI-10's stated decision — both harnesses share one binary and a second row would double-report in pan doctor."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-union-validators",
+        "title": "Add 'kimi-code' to the Harness union and every hand-maintained validator",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/types.ts",
+            "src/lib/runtimes/types.ts",
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "packages/contracts/src/types.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run packages/contracts/src/types.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "types.test.ts passes including new getHarness('kimi-code') assertions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add 'kimi-code' to the canonical Harness union and KNOWN_HARNESSES set (packages/contracts/src/types.ts:87,89), the RuntimeName literal (src/lib/runtimes/types.ts:44), the frontend Harness copy (Settings/types.ts:7), the config-yaml harness literals (schema.ts:370 and the providerHarnesses value type ~760), the conversation-runtime membership chains (conversation-runtime.ts:197,340), and the ConversationList harness prop literal (:46). Do NOT touch the jsonl-resolver trust list here — that is wi8a's precise change. Extend the getHarness unit test."
+        },
+        "items": [
+          {
+            "id": "wi1-union-validators.ac1",
+            "title": "getHarness({runtime:'kimi-code'}) returns 'kimi-code' — never coerced to 'claude-code'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-union-validators.ac2",
+            "title": "getHarness returns the existing target for every legacy harness string (regression assertions unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-union-validators.ac3",
+            "title": "The conversation-runtime explicit-harness chains accept kimi-code and the code routes it as an explicit harness rather than falling through to the default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-union-validators.ac4",
+            "title": "npm run typecheck exits 0 across root, server, and frontend after the union change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-behavior-matrix",
+        "title": "Behavior matrix: KIMI_CODE_BEHAVIOR entry plus new *Kind discriminants",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1837",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wi5-runtime-adapter",
+            "wi6-launcher-command",
+            "wi8a-wire-resolver",
+            "wi8b-wire-parser-cost"
+          ],
+          "files_scope": [
+            "packages/contracts/src/harness-behavior.ts",
+            "src/lib/runtimes/__tests__/behavior.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/runtimes/__tests__/behavior.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "behavior.test.ts passes including new kimi-code matrix assertions"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/harness-behavior.ts: extend the *Kind unions (lines 6-23) with 'kimi-code-tui' (launch), 'kimi-session-signal' (readiness), 'kimi-wire-jsonl' (transcript), 'kimi-session-newest' (sessionIdSource — post-launch newest-dir capture), 'kimi-code' (contextLayerKind), 'kimi_code' (feedKind); reuse 'pty-supervisor' for deliveryKind (no new literal); extend the workAgentMode union (line 50) with 'kimi-code-tui'. Add the KIMI_CODE_BEHAVIOR constant exactly as specified in PRD WI-2 (executableName 'kimi', processNames ['kimi'], supportsPtySupervisor true, readyTimeoutSeconds 60). Register in BEHAVIORS (line 155, Record<RuntimeName,…> — compiler-forced) and add the getHarnessBehavior branch (line 162). These discriminants are the dispatch backbone every later item switches on."
+        },
+        "items": [
+          {
+            "id": "wi2-behavior-matrix.ac1",
+            "title": "getRuntimeBehavior('kimi-code') returns KIMI_CODE_BEHAVIOR and getHarnessBehavior('kimi-code') returns the same object",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-behavior-matrix.ac2",
+            "title": "KIMI_CODE_BEHAVIOR contains transcriptKind kimi-wire-jsonl, deliveryKind pty-supervisor, readinessKind kimi-session-signal, and sessionIdSource kimi-session-newest",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-behavior-matrix.ac3",
+            "title": "BEHAVIORS compiles as Record<RuntimeName, HarnessBehavior> with the 'kimi-code' key present (missing key fails typecheck)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-binary-map",
+        "title": "Binary map: kimi-code → kimi, failure name, configured binaryPath",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/harness-binary.ts",
+            "src/lib/config-yaml/schema.ts",
+            "tests/unit/lib/harness-binary.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/harness-binary.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "harness-binary tests pass (create the test file if none exists) asserting the kimi mapping and failure name"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/harness-binary.ts: add 'kimi-code': 'kimi' to HARNESS_BINARY_BY_RUNTIME (line 14, compiler-forced; both acp and kimi-code intentionally map to 'kimi'). Add an explicit 'Kimi Code CLI' arm in the requireHarnessBinary name ladder (~line 174) leaving acp's existing fallthrough label intact. Extend configuredHarnessBinaryPath (~line 144) so kimi-code reads a new config.kimiCode?.binaryPath, added to config-yaml/schema.ts alongside acp.kimi.binaryPath (~611, ~924). The binary installs to ~/.kimi-code/bin and is NOT on PATH — the configured path matters."
+        },
+        "items": [
+          {
+            "id": "wi3-binary-map.ac1",
+            "title": "harnessBinaryName('kimi-code') returns 'kimi'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-binary-map.ac2",
+            "title": "A missing binary throws an error whose message names 'Kimi Code CLI' (not a generic or acp label)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-binary-map.ac3",
+            "title": "configuredHarnessBinaryPath('kimi-code') returns kimiCode.binaryPath when set in config and undefined otherwise; acp still resolves acp.kimi.binaryPath",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-policy-gate",
+        "title": "Policy gate: kimi-code is Kimi-provider-only; policy-decisions map gains the key",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/harness-policy.ts",
+            "src/lib/harness-policy-decisions.ts",
+            "src/lib/__tests__/harness-policy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/harness-policy.test.ts"
+          ],
+          "expected_outputs": [
+            "harness-policy suite passes including new kimi-code allowed/blocked assertions and the per-model decisions-map key assertion"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/harness-policy.ts: add KIMI_CODE_KIMI_ONLY_BLOCK next to ACP_KIMI_ONLY_BLOCK (line 47) with reason 'The Kimi Code harness runs Kimi (Moonshot) models only. Pick a Kimi model, or use the model's supported harness.', export the reason constant, and add the canUseHarnessSync branch after the acp branch (~line 97): kimi provider → ALLOWED, else the block. In src/lib/harness-policy-decisions.ts (~77-82): add the 'kimi-code' key to the per-model decisions record (the PAN-2528 class of bug the file warns about)."
+        },
+        "items": [
+          {
+            "id": "wi4-policy-gate.ac1",
+            "title": "canUseHarnessSync('kimi-code', <kimi model>, …) returns allowed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-policy-gate.ac2",
+            "title": "canUseHarnessSync('kimi-code', <non-Kimi model>, …) returns blocked carrying the Kimi-only reason string — never coerces the harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-policy-gate.ac3",
+            "title": "buildHarnessPolicyDecisions emits a 'kimi-code' key for every model in the map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-policy-gate.ac4",
+            "title": "Every existing acp policy assertion still passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-fixture",
+        "title": "Spike: pin a real Kimi wire.jsonl fixture and resolve the delivery checkpoint",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "spike",
+          "issueLabel": "pan-1837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/fixtures/kimi/wire.jsonl",
+            "tests/fixtures/kimi/state.json",
+            "tests/fixtures/kimi/README.md",
+            ".overdeck/continue.json"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "ls tests/fixtures/kimi/wire.jsonl tests/fixtures/kimi/state.json",
+            "grep -c inputCacheRead tests/fixtures/kimi/wire.jsonl"
+          ],
+          "expected_outputs": [
+            "a committed wire.jsonl fixture (and session state.json) exists under tests/fixtures/kimi/",
+            "the fixture contains inputCacheRead/inputCacheCreation usage fields"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Against the installed `kimi` binary (~/.kimi-code/bin/kimi, verified 0.29.2): run one throwaway interactive session in a scratch dir, then (1) copy its sessions/<workDirKey>/<sessionId>/agents/main/wire.jsonl and state.json into tests/fixtures/kimi/ as the pinned parser fixture — it must include a multi-turn exchange with inputCacheRead/inputCacheCreation usage fields and at least one tool call; (2) resolve the delivery checkpoint: launch kimi under the PTY supervisor and confirm supervisor-written stdin submits a prompt (Enter submits / Ctrl-J newline model). Record the checkpoint outcome (pty-supervisor confirmed, or tmux-paste fallback selected) as a new decision in .overdeck/continue.json. This is investigation plus fixture capture — no production code."
+        },
+        "items": [
+          {
+            "id": "wi-fixture.ac1",
+            "title": "A committed wire.jsonl fixture under tests/fixtures/kimi/ contains inputCacheRead/inputCacheCreation usage fields and at least 2 turns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-fixture.ac2",
+            "title": "The fixture directory preserves the session state.json and layout (sessions/<workDirKey>/<sessionId>/agents/main/) and records the observed workDirKey format",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-fixture.ac3",
+            "title": "continue.json records the delivery-checkpoint outcome: either PTY-supervisor stdin submits prompts, or the tmux-paste fallback is selected with the observed failure noted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-launcher-command",
+        "title": "Launcher: native kimi command generation wrapped in the PTY supervisor",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "src/lib/agents/runtime-command.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "launcher-generator tests pass including the new kimi-code command-shape assertions"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/launcher-generator.ts: extend LauncherHarness (line 14) with 'kimi-code'; add the kimiCode* LauncherConfig field group (kimiCodeModel, kimiCodeYolo, kimiCodeAddDirs — NO session-id field, Kimi generates its own); add buildKimiCodeCommand(config, useExec) emitting, after the prepareHarnessLaunch PATH export, `cd <workspace> && kimi -m <kimiModel> --yolo` with every value shellQuote'd, wrapped via the existing wrapWithSupervisor helper (line 219, as claude-code does at 463). Per erratum E1 / decision D2: NO --session, NO --work-dir, NO -p/--print. Wire both dispatch sites switching on behavior.launchCommandKind === 'kimi-code-tui': buildCommand (~439-448) and buildNonConversationCommand (~529-539). In src/lib/agents/runtime-command.ts: add the kimi-code-tui arms in getAgentRuntimeBaseCommand (~706-780) and getRoleRuntimeBaseCommand (~891-929) plus the launcher-field builder alongside the ohmypi/codex/acp builders (~167-255)."
+        },
+        "items": [
+          {
+            "id": "wi6-launcher-command.ac1",
+            "title": "A kimi-code work config produces a command whose joined string contains `kimi`, `-m <model>`, `--yolo`, a `cd` into the workspace, and the PTY supervisor wrapper",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-launcher-command.ac2",
+            "title": "The generated command contains no --print/-p, no --session, and no --work-dir",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-launcher-command.ac3",
+            "title": "Both buildCommand and buildNonConversationCommand dispatch launchCommandKind 'kimi-code-tui' to buildKimiCodeCommand (conversation and work/role spawns produce kimi commands)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-launcher-command.ac4",
+            "title": "buildKimiCodeCommand applies the file's existing shellQuote helper to every interpolated value (workspace path, model)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-runtime-adapter",
+        "title": "Runtime adapter src/lib/runtimes/kimi-code.ts + registry wiring",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1837",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wi8a-wire-resolver",
+            "wi14-e2e"
+          ],
+          "files_scope": [
+            "src/lib/runtimes/kimi-code.ts",
+            "src/lib/runtimes/index.ts",
+            "src/lib/runtimes/__tests__/registry-dispatch.test.ts",
+            "src/lib/runtimes/__tests__/kimi-code.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/runtimes/__tests__/registry-dispatch.test.ts src/lib/runtimes/__tests__/kimi-code.test.ts src/lib/runtimes/__tests__/acp.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "registry-dispatch resolves harness 'kimi-code' to the new adapter; kimi-code adapter unit tests pass; acp suite stays green"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/runtimes/kimi-code.ts implementing the full AgentRuntimeSync contract (src/lib/runtimes/types.ts:145-262), modeled on claude-code.ts (supervisor delivery) and codex.ts (post-launch session capture, TUI readiness): name 'kimi-code'; getHarnessBehavior → KIMI_CODE_BEHAVIOR; spawnAgent = prepareHarnessLaunch('kimi-code') → launcher command (wi6) → tmuxCreateSession on the overdeck socket → kimi-session-signal readiness (poll for a new sessions/<workDirKey>/*/agents/main/wire.jsonl under the workspace bucket, bounded by readyTimeoutSeconds) → capture Kimi's generated session_<uuid> as the newest session dir by mtime and persist it per-agent (like codex's thread-id) → kickoff via PTY supervisor; sendMessage via supervisor with async tmux-paste fallback (sendKeysAsync + load-buffer/paste-buffer + 300ms + C-m — never sync sendKeys); getSessionPath delegates to the wi8a resolver; getLastActivity/getHeartbeat tiered transcript-mtime → tmux liveness; getTokenUsage/getSessionCost call the wi8b parser; killAgent/isRunning/listSessions mirror the tmux-based codex/claude implementations. Include a module header documenting the launch/delivery/transcript model. Registry: barrel-export from index.ts, add the getRuntimeForAgent branch (~91-109), register createKimiCodeRuntimeSync() in getGlobalRegistry (~130-133)."
+        },
+        "items": [
+          {
+            "id": "wi5-runtime-adapter.ac1",
+            "title": "getRuntimeForAgent with state.harness 'kimi-code' returns the kimi-code adapter (registry-dispatch test, mirroring the existing claude-code case)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-runtime-adapter.ac2",
+            "title": "spawnAgent captures Kimi's generated session id post-launch (newest session dir under the workspace's workDirKey bucket) and persists it per-agent for stable transcript resolution",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-runtime-adapter.ac3",
+            "title": "sendMessage delivers via the PTY supervisor and falls back to async tmux paste; no sync sendKeys or execSync appears anywhere in the new module",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-runtime-adapter.ac4",
+            "title": "killAgent, isRunning, and listSessions operate against the overdeck tmux socket and behave like the codex/claude analogs under unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-runtime-adapter.ac5",
+            "title": "The full existing acp adapter suite passes unchanged after registry wiring",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7a-provider-env-gate",
+        "title": "Gate the Kimi Anthropic-compat env shim off for harness kimi-code",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/providers.ts",
+            "src/lib/launcher-generator.ts",
+            "tests/unit/lib/providers.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/providers.test.ts src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "expected_outputs": [
+            "provider-env tests pass: {kimi, kimi-code} omits ANTHROPIC_BASE_URL; {kimi, claude-code} still sets it"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "getProviderEnvSync (src/lib/providers.ts:391-481) injects KIMI_API_KEY/ANTHROPIC_BASE_URL for the kimi provider — correct for claude-code against the Anthropic-compat endpoint, wrong for native kimi-code (auth is host-owned via kimi login / config.toml). Checkpoint: confirm where provider env layers into the launcher (provider-export block at launcher-generator.ts:328-334) and gate the Kimi Anthropic-compat exports on harness !== 'kimi-code'. Fallback if env is applied unconditionally upstream: emit PROVIDER_ENV_UNSETS for ANTHROPIC_BASE_URL/ANTHROPIC_AUTH_TOKEN (list at launcher-generator.ts:422-433) for kimi-code so a leaked shim cannot redirect the native binary."
+        },
+        "items": [
+          {
+            "id": "wi7a-provider-env-gate.ac1",
+            "title": "For {provider: kimi, harness: kimi-code} the generated launcher env contains no ANTHROPIC_BASE_URL or KIMI_API_KEY compat shim (or actively unsets them)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7a-provider-env-gate.ac2",
+            "title": "For {provider: kimi, harness: claude-code} the generated env still contains ANTHROPIC_BASE_URL exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7a-provider-env-gate.ac3",
+            "title": "The provider-env generator produces byte-identical output for acp and codex before and after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8a-wire-resolver",
+        "title": "Transcript resolver: resolveKimiWirePath + kimi-code trust in resolveAgentHarness",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/jsonl-resolver.ts",
+            "tests/unit/dashboard/jsonl-resolver.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/jsonl-resolver.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "resolver tests pass: wire.jsonl resolves from a fixture Kimi home for a kimi-code agent"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/jsonl-resolver.ts: (1) resolveAgentHarness (~275-292) — add 'kimi-code' to the recorded-harness trust list and add `if (await resolveKimiWirePath(agentId, opts)) return 'kimi-code'` to the stale-default correction chain (~288-290). (2) Add resolveKimiWirePath modeled on resolveCodexRolloutPath (~320): read the per-agent captured session_<uuid> (persisted by wi5 at spawn), glob <kimiHome>/sessions/*/<sessionId>/agents/main/wire.jsonl (kimiHome = KIMI_CODE_HOME or ~/.kimi-code) to avoid recomputing workDirKey; fallback when no captured id: newest session dir by mtime under the workspace's wd_<basename>_<sha256[:12]> bucket. (3) resolveJsonlPath dispatch (~395-448): before the claude path, `if (behavior.transcriptKind === 'kimi-wire-jsonl') return resolveKimiWirePath(agentId, opts)`. Test against a fixture Kimi home directory (create the test file if none exists for this route)."
+        },
+        "items": [
+          {
+            "id": "wi8a-wire-resolver.ac1",
+            "title": "resolveJsonlPath returns the native wire.jsonl path for a kimi-code agent with a captured session id (fixture Kimi home)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8a-wire-resolver.ac2",
+            "title": "With no captured id, the resolver falls back to the newest session dir under the workspace's workDirKey bucket and still returns a wire.jsonl path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8a-wire-resolver.ac3",
+            "title": "resolveAgentHarness returns a recorded 'kimi-code' as-is (trusted explicit) and the stale-default correction identifies kimi-code from an on-disk wire.jsonl probe",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8b-wire-parser-cost",
+        "title": "wire.jsonl parser: normalized transcript, feed, and cost wiring",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost-parsers/kimi-parser.ts",
+            "src/lib/overdeck/cost.ts",
+            "src/lib/overdeck/conversation-reads.ts",
+            "src/lib/overdeck/conversation-message.ts",
+            "src/lib/overdeck/activity-summary.ts",
+            "src/lib/cost-parsers/__tests__/kimi-parser.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cost-parsers/__tests__/kimi-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "parser tests over the pinned fixture pass with expected turn count and non-zero token usage"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Add src/lib/cost-parsers/kimi-parser.ts mirroring codex-parser.ts/ohmypi-parser.ts, built against the pinned wi-fixture wire.jsonl: yield normalized transcript events (roles, tool calls) for the feed and token/cost usage from inputCacheRead/inputCacheCreation/maxTokens. Wire every switch on transcriptKind/feedKind: the conversation feed (conversation-reads.ts, conversation-message.ts, activity-summary.ts:72-73) renders feedKind 'kimi_code', and cost (src/lib/overdeck/cost.ts ~805, next to the codex arm) gains a kimi-code arm. The fixture's record schema is authoritative — do not guess fields not present in it."
+        },
+        "items": [
+          {
+            "id": "wi8b-wire-parser-cost.ac1",
+            "title": "The parser over the pinned fixture produces a non-empty normalized transcript whose turn count matches the fixture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8b-wire-parser-cost.ac2",
+            "title": "The parser returns token usage with non-zero cache-read accounting (inputCacheRead/inputCacheCreation mapped into Overdeck's usage model)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8b-wire-parser-cost.ac3",
+            "title": "The cost surface returns a non-zero session cost for a kimi-code agent pointed at the fixture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8b-wire-parser-cost.ac4",
+            "title": "The conversation feed renders events for feedKind 'kimi_code' (tool calls and assistant turns appear, not raw JSON passthrough)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-context-skills",
+        "title": "Context-layer marker and skill-sync fan-out for kimi-code",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/context-layers/harness.ts",
+            "src/lib/sync.ts",
+            "src/lib/harness-skill-sync.ts",
+            "tests/lib/context-layers/harness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/context-layers/harness.test.ts tests/lib/context-layers/render.test.ts"
+          ],
+          "expected_outputs": [
+            "context-layer tests pass: kimi-code spans render for kimi-code and drop for others; validateTemplate accepts the marker"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/context-layers/harness.ts: HarnessMarker (line 27) += 'kimi-code'; HARNESS_MARKERS (line 30, compiler-enforced) += 'kimi-code': 'kimi-code'; KNOWN_HARNESS_MARKERS (line 38) += 'kimi-code' — enabling {{#harness:kimi-code}} spans. In src/lib/sync.ts (render blocks near 586, 597, 613, 634-635): per decision D6, reuse the shared AGENTS.md layer — add no new kimi-code-global.md file; leave a one-line comment at the render block stating kimi-code reads AGENTS.md natively. In src/lib/harness-skill-sync.ts:15: add 'kimi-code' to SKILL_SYNC_HARNESSES; the shared AGENT_SKILLS_DIR (~/.agents/skills) is the sync target — only add ~/.kimi-code/skills as a second target if wi-fixture showed ~/.agents is not on Kimi's discovery path."
+        },
+        "items": [
+          {
+            "id": "wi9-context-skills.ac1",
+            "title": "renderForHarness keeps {{#harness:kimi-code}} spans when rendering for kimi-code and drops them for every other harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-context-skills.ac2",
+            "title": "validateTemplate accepts the kimi-code marker without warnings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-context-skills.ac3",
+            "title": "SKILL_SYNC_HARNESSES contains kimi-code and pan sync syncs skills to Kimi's discovery path without erroring",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-prereq",
+        "title": "Broaden the kimi prerequisite to cover native + ACP (no duplicate row)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-1837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/system-prerequisites.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/system-prerequisites.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "prerequisites suite (if present; otherwise pan doctor output) reports the kimi prerequisite exactly once"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/system-prerequisites.ts (~169-180): change the existing kimi entry's purpose from 'Kimi Code agents through the Agent Client Protocol (ACP)' to 'Kimi Code agents — native (kimi-code) and ACP (acp) harnesses'. Keep the resolver as-is (resolveHarnessBinary already finds the kimi binary). Do NOT add a second prerequisite row — one binary, one probe, or pan doctor double-reports."
+        },
+        "items": [
+          {
+            "id": "wi10-prereq.ac1",
+            "title": "pan doctor shows the Kimi Code CLI prerequisite exactly once, with a purpose string covering both native and ACP harnesses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-prereq.ac2",
+            "title": "The prerequisite's binary probe still resolves the kimi binary through the existing resolver (no behavior change beyond the string)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-frontend",
+        "title": "Frontend: pickers, labels, and Kimi Code brand entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-1837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/ProviderManagementSection.tsx",
+            "src/dashboard/frontend/src/components/shared/branding/index.tsx",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
+            "src/dashboard/frontend/src/components/SwitchModelModal.tsx",
+            "src/dashboard/frontend/src/components/PlanDialog.tsx",
+            "src/dashboard/frontend/src/components/issue-view/StartAgentCta.tsx",
+            "src/dashboard/frontend/src/components/context/ContextPage.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/shared/ModelPicker"
+          ],
+          "expected_outputs": [
+            "frontend typecheck ratchet completes without new errors",
+            "ModelPicker tests pass with kimi-code present in HARNESS_OPTIONS"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-11: add the kimi-code entry to HARNESS_OPTIONS (ModelPicker.tsx:18-23, label 'Kimi Code', description 'Moonshot Kimi Code CLI (native, Kimi models only)'); extend the hardcoded HARNESSES arrays (TieredExecutionSection.tsx:36, CrewRow.tsx:11); add 'kimi-code': 'Kimi Code' to HARNESS_LABELS (ProviderManagementSection.tsx:50-55, compiler-enforced); add the HARNESS_BRANDS entry (branding/index.tsx:113-118, compiler-enforced) reusing KimiIcon (lines 51-54) and PROVIDER_BRANDS.kimi color (line 106); widen the narrow-literal harness props where relevant (ComposerFooter.tsx:115, ConversationPanel.tsx:177, ForkModal.tsx:164,166, SwitchModelModal.tsx:29, PlanDialog.tsx:101, StartAgentCta.tsx:22, ContextPage.tsx:394). Leave simple/TalkItThrough.tsx:54 alone — its 'claude-code' | 'codex' narrowing is deliberate. Follow pan-style-guide: no decorative color; the brand color is the existing kimi provider color."
+        },
+        "items": [
+          {
+            "id": "wi11-frontend.ac1",
+            "title": "HARNESS_OPTIONS renders a kimi-code option labeled 'Kimi Code' in the composer and Settings harness pickers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-frontend.ac2",
+            "title": "HARNESS_BRANDS['kimi-code'] renders KimiIcon with the existing kimi provider brand color (compiler enforces map completeness)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-frontend.ac3",
+            "title": "The harness picker renders kimi-code policy-locked (disabled with the Kimi-only reason) for non-Kimi models, driven by the wi4 decisions map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-frontend.ac4",
+            "title": "The frontend typecheck ratchet (scripts/lint-frontend-types.sh) exits 0 with no new errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi12-docs",
+        "title": "Documentation: harnesses.mdx, harness-landscape.mdx, CLAUDE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "reference/harness-landscape.mdx",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including skills/docs cross-checks) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "configuration/harnesses.mdx: add a kimi-code section — install (kimi binary at ~/.kimi-code/bin, kimi login auth), Kimi-only policy, how native differs from the acp (ACP) path and from claude-code→Kimi-endpoint, picker locations; update the harness table/count (four → five). reference/harness-landscape.mdx: mark Kimi Code as a supported native harness. CLAUDE.md 'Harnesses' section: update the harness enumeration to include kimi-code and restate it is Kimi-only. (The kimi-code.ts module header is delivered in wi5.) docs/HARNESSES.md redirect stub: no change unless it states a count."
+        },
+        "items": [
+          {
+            "id": "wi12-docs.ac1",
+            "title": "configuration/harnesses.mdx lists kimi-code with install steps (kimi binary, kimi login), the Kimi-only policy, and the native-vs-acp distinction; its harness count/table shows five harnesses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-docs.ac2",
+            "title": "CLAUDE.md's harness enumeration contains kimi-code and states it runs Kimi models only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-docs.ac3",
+            "title": "npm run lint exits 0 with no skills/docs lint errors after the doc changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi14-e2e",
+        "title": "End-to-end: a kimi-code work agent runs to pan done with live transcript and cost",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-1837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/kimi-code.ts",
+            "src/lib/launcher-generator.ts"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "tmux -L overdeck list-sessions",
+            "npx vitest run src/lib/runtimes/__tests__/acp.test.ts src/lib/runtimes/__tests__/registry-dispatch.test.ts"
+          ],
+          "expected_outputs": [
+            "a live kimi-code agent session exists on the overdeck socket during the run and reaches pan done",
+            "acp and registry suites stay green after any fixes this item produces"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Live verification of FR-10 against the installed kimi binary: spawn a work agent with {harness: kimi-code, model: <kimi model>} on a throwaway/benchmark issue; observe it launch in its own tmux session (overdeck socket), accept the kickoff prompt, produce a live transcript in the dashboard feed (from wire.jsonl), report cost/health, and reach pan done. Confirm the agent's recorded harness stays 'kimi-code' end-to-end (no silent fallback). Fix any defects found in the touched modules (scope: the adapter/launcher files, low confidence). Verify rendering yourself per the self-verify rule (tmux capture-pane / Playwright screenshot), not by asking the operator."
+        },
+        "items": [
+          {
+            "id": "wi14-e2e.ac1",
+            "title": "A {kimi-code, Kimi model} work agent spawns in its own tmux session on the overdeck socket and reaches pan done",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-e2e.ac2",
+            "title": "The dashboard renders a live transcript and non-zero cost for the running kimi-code agent during the run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-e2e.ac3",
+            "title": "The agent's recorded harness remains 'kimi-code' for the whole run — no path falls back to or coerces into another harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-e2e.ac4",
+            "title": "vitest exits 0 for the acp, registry, policy, and behavior suites after the run and any resulting fixes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7b-default-flip",
+        "title": "Flip PROVIDERS.kimi.defaultHarness to 'kimi-code' (final step, gated on e2e)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T15:57:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1837",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/providers.ts",
+            "tests/unit/lib/providers.test.ts",
+            "src/lib/config-yaml/__tests__/merge.test.ts",
+            "tests/unit/lib/harness-resolve.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/providers.test.ts src/lib/config-yaml/__tests__/merge.test.ts tests/unit/lib/harness-resolve.test.ts"
+          ],
+          "expected_outputs": [
+            "all three pinning suites pass asserting the new 'kimi-code' default; harness-resolve override tests stay green"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "The final in-scope step (PRD WI-7.1 two-phase decision, D5): change PROVIDERS.kimi.defaultHarness (src/lib/providers.ts:85) from 'claude-code' to 'kimi-code', and move the three tests that pin the old default: tests/unit/lib/providers.test.ts:10,35, src/lib/config-yaml/__tests__/merge.test.ts:45, tests/unit/lib/harness-resolve.test.ts:96. Do this ONLY after wi14-e2e proves the harness live. The operator override providerHarnesses.kimi (harness-resolve.ts:80-83) must still win over the new built-in default."
+        },
+        "items": [
+          {
+            "id": "wi7b-default-flip.ac1",
+            "title": "resolveHarness for a Kimi model with no operator override returns 'kimi-code' as the built-in default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7b-default-flip.ac2",
+            "title": "The three previously-pinning tests now assert kimi-code and vitest exits 0 for all three suites; no other default-harness assertion regresses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7b-default-flip.ac3",
+            "title": "A providerHarnesses.kimi config override (e.g. 'acp') still wins over the new built-in default in harness-resolve tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-union-validators",
+        "to": "wi2-behavior-matrix",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-union-validators",
+        "to": "wi3-binary-map",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-union-validators",
+        "to": "wi4-policy-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-behavior-matrix",
+        "to": "wi6-launcher-command",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-behavior-matrix",
+        "to": "wi5-runtime-adapter",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-behavior-matrix",
+        "to": "wi8a-wire-resolver",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-binary-map",
+        "to": "wi6-launcher-command",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-launcher-command",
+        "to": "wi5-runtime-adapter",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-fixture",
+        "to": "wi8b-wire-parser-cost",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-fixture",
+        "to": "wi6-launcher-command",
+        "type": "informs"
+      },
+      {
+        "from": "wi-fixture",
+        "to": "wi9-context-skills",
+        "type": "informs"
+      },
+      {
+        "from": "wi5-runtime-adapter",
+        "to": "wi8a-wire-resolver",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8a-wire-resolver",
+        "to": "wi8b-wire-parser-cost",
+        "type": "informs"
+      },
+      {
+        "from": "wi4-policy-gate",
+        "to": "wi11-frontend",
+        "type": "informs"
+      },
+      {
+        "from": "wi4-policy-gate",
+        "to": "wi14-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-runtime-adapter",
+        "to": "wi14-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7a-provider-env-gate",
+        "to": "wi14-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8a-wire-resolver",
+        "to": "wi14-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8b-wire-parser-cost",
+        "to": "wi14-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-frontend",
+        "to": "wi14-e2e",
+        "type": "informs"
+      },
+      {
+        "from": "wi14-e2e",
+        "to": "wi7b-default-flip",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-launcher-command",
+        "to": "wi7a-provider-env-gate",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
