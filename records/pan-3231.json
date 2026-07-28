@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-28T23:23:44.955Z",
+  "updated": "2026-07-28T23:33:20.983Z",
   "pipeline": {
     "issueId": "PAN-3231",
     "reviewStatus": "pending",
@@ -88,16 +88,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "mockups": {
-        "writerId": "agent-pan-3231",
-        "agentId": "agent-pan-3231",
-        "pid": 3773349,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T23:23:44.954Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3231",
@@ -153,12 +145,23 @@
         "outcome": "completed",
         "reason": "Added the canonical PRD chip signal, store-driven global ChatMarkdown viewer, 404 empty state, accessible close behavior, and focused tests.",
         "releasedAt": "2026-07-28T23:17:47.890Z"
+      },
+      {
+        "writerId": "agent-pan-3231",
+        "agentId": "agent-pan-3231",
+        "pid": 3773349,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T23:23:44.954Z",
+        "itemId": "mockups",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-3231 dead)",
+        "releasedAt": "2026-07-28T23:33:20.940Z"
       }
     ],
     "statusReasons": {
       "mockups": {
         "reason": "stale claim released (agent-pan-3231 dead)",
-        "updatedAt": "2026-07-28T22:05:00.833Z"
+        "updatedAt": "2026-07-28T23:33:20.940Z"
       },
       "tasks-viewer": {
         "reason": "Replaced the legacy self-fetching dialog with TasksPanel, added store-driven issue-row chip opening, explicit xBRIEF status buckets, and focused frontend tests; typecheck, lint, and 62 targeted tests pass.",
@@ -179,7 +182,7 @@
     }
   },
   "statusOverrides": {
-    "mockups": "running",
+    "mockups": "pending",
     "tasks-viewer": "completed",
     "tasks-viewer.tasks-viewer.ac1": "completed",
     "tasks-viewer.tasks-viewer.ac2": "completed",
