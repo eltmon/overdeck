@@ -10,17 +10,33 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/lib/pipeline-membership-gather.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/lib/pipeline-membership-gather.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "recordedAt": "2026-07-28T08:49:28.640Z"
+  },
   "created": "2026-07-28T06:36:21.767Z",
-  "updated": "2026-07-28T08:49:31.710Z",
+  "updated": "2026-07-28T08:49:33.672Z",
   "pipeline": {
     "issueId": "PAN-3217",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T08:49:31.709Z",
+    "updatedAt": "2026-07-28T08:49:32.995Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3225",
     "reviewRequestedAt": "2026-07-28T08:49:31.709Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -36,19 +52,36 @@
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ],
       "recordedAt": "2026-07-28T08:49:28.640Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3225"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 277,
+            "output": 10225,
+            "cacheRead": 5652130,
+            "cacheWrite": 175407
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 277,
+          "output": 10225,
+          "cacheRead": 5652130,
+          "cacheWrite": 175407
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-28T08:34:27.132Z"
+        "usd": 0.835871,
+        "pricingAsOf": "2026-07-28T08:49:33.023Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3225"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -110,20 +143,5 @@
     "document-reason-precedence": "completed",
     "document-reason-precedence.document-reason-precedence.ac1": "completed",
     "document-reason-precedence.document-reason-precedence.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/PIPELINE-MEMBERSHIP.md",
-      "src/lib/pipeline-membership-gather.ts",
-      "tests/unit/lib/pipeline-membership-gather.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/PIPELINE-MEMBERSHIP.md",
-      "src/lib/pipeline-membership-gather.ts",
-      "tests/unit/lib/pipeline-membership-gather.test.ts"
-    ],
-    "recordedAt": "2026-07-28T08:49:28.640Z"
   }
 }
