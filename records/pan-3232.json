@@ -16,16 +16,17 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T20:53:24.722Z",
+  "updated": "2026-07-28T20:57:23.950Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T20:18:01.017Z",
+    "updatedAt": "2026-07-28T20:57:23.844Z",
+    "verificationNotes": "Verification FAILED at typecheck (163568ms):\n\n\n> @overdeck/core@0.47.1 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.47.1 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.47.1 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3232/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m360.02 kB\u001b[22m \u001b[2m│ gzip: 58.52 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 360.02 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3323ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m330.08 kB\u001b[22m \u001b[2m│ gzip: 56.38 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m544.32 kB\u001b[22m \u001b[2m│ gzip: 87.74 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 46.28 kB\u001b[22m \u001b[2m│ gzip:  5.66 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m766.00 kB\u001b[22m \u001b[2m│ gzip: 76.25 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.69 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3675ms\u001b[39m\n\n> @overdeck/core@0.47.1 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\n\n> @overdeck/core@0.47.1 typecheck:hooks\n> tsc --noEmit -p tsconfig.hooks.json\n\n\n> @overdeck/core@0.47.1 typecheck:evals\n> tsc --noEmit -p tsconfig.evals.json\n\n\n> @overdeck/core@0.47.1 typecheck:dashboard\n> bash scripts/lint-dashboard-types.sh\n\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (81%)\n  - rolldown-plugin-dts:fake-js (14%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n✖ dashboard server typecheck regressed: 62 errors (baseline 61).\n  New type errors in src/dashboard/server. Offending lines:\nsrc/dashboard/server/routes/admin.ts(132,57): error TS2454: Variable 'reason' is used before being assigned.\nsrc/dashboard/server/routes/command-deck.ts(380,9): error TS2322: Type 'readonly string[] | undefined' is not assignable to type 'string[] | undefined'.\nsrc/dashboard/server/routes/command-deck.ts(563,11): error TS2353: Object literal may only specify known properties, and 'harness' does not exist in type '{ type: string; role?: string | undefined\n…(3869 chars elided)…\n9: Property 'stuckCount' does not exist on type 'DeaconState | { lastPa\n...(truncated)",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -49,10 +50,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 318,
-            "output": 6147,
-            "cacheRead": 5101862,
-            "cacheWrite": 213806
+            "input": 1091,
+            "output": 36130,
+            "cacheRead": 25485753,
+            "cacheWrite": 977299
           }
         }
       },
@@ -64,15 +65,15 @@
           "cacheWrite": 193438
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 318,
-          "output": 6147,
-          "cacheRead": 5101862,
-          "cacheWrite": 213806
+          "input": 1091,
+          "output": 36130,
+          "cacheRead": 25485753,
+          "cacheWrite": 977299
         }
       },
       "costAtCloseOut": {
-        "usd": 11.016975,
-        "pricingAsOf": "2026-07-28T20:18:02.974Z"
+        "usd": 14.16042,
+        "pricingAsOf": "2026-07-28T20:57:23.879Z"
       }
     },
     "merges": [],
