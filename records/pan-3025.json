@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T06:45:24.868Z",
+  "updated": "2026-07-28T06:47:16.270Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "pending",
@@ -47,16 +47,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "post-merge-row-journal-fallback": {
-        "writerId": "agent-pan-3025",
-        "agentId": "agent-pan-3025",
-        "pid": 2494715,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T06:45:24.867Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3025",
@@ -79,6 +71,17 @@
         "outcome": "completed",
         "reason": "Added verificationStatus: 'pending' to reopenWorkspaceState's setReviewStatusSync call. Added test case verifying reset behavior.",
         "releasedAt": "2026-07-28T06:45:17.929Z"
+      },
+      {
+        "writerId": "agent-pan-3025",
+        "agentId": "agent-pan-3025",
+        "pid": 2494715,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:45:24.867Z",
+        "itemId": "post-merge-row-journal-fallback",
+        "outcome": "completed",
+        "reason": "Changed row 5's readMergeStatus to use loadStatus for journal fallback. Added 4 passing test cases verifying live-first and journal-fallback behavior.",
+        "releasedAt": "2026-07-28T06:47:16.270Z"
       }
     ],
     "statusReasons": {
@@ -89,6 +92,10 @@
       "reopen-resets-verification-verdict": {
         "reason": "Added verificationStatus: 'pending' to reopenWorkspaceState's setReviewStatusSync call. Added test case verifying reset behavior.",
         "updatedAt": "2026-07-28T06:45:17.929Z"
+      },
+      "post-merge-row-journal-fallback": {
+        "reason": "Changed row 5's readMergeStatus to use loadStatus for journal fallback. Added 4 passing test cases verifying live-first and journal-fallback behavior.",
+        "updatedAt": "2026-07-28T06:47:16.270Z"
       }
     }
   },
@@ -101,6 +108,10 @@
     "reopen-resets-verification-verdict.reopen-resets-verification-verdict.ac1": "completed",
     "reopen-resets-verification-verdict.reopen-resets-verification-verdict.ac2": "completed",
     "reopen-resets-verification-verdict.reopen-resets-verification-verdict.ac3": "completed",
-    "post-merge-row-journal-fallback": "running"
+    "post-merge-row-journal-fallback": "completed",
+    "post-merge-row-journal-fallback.post-merge-row-journal-fallback.ac1": "completed",
+    "post-merge-row-journal-fallback.post-merge-row-journal-fallback.ac2": "completed",
+    "post-merge-row-journal-fallback.post-merge-row-journal-fallback.ac3": "completed",
+    "post-merge-row-journal-fallback.post-merge-row-journal-fallback.ac4": "completed"
   }
 }
