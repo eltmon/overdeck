@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T17:47:09.196Z",
+  "updated": "2026-07-28T17:52:04.432Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "server-marker-cleanup": {
-        "writerId": "agent-pan-3229",
-        "agentId": "agent-pan-3229",
-        "pid": 1858167,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T17:47:09.196Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3229",
@@ -128,6 +120,17 @@
         "outcome": "completed",
         "reason": "Wired reconciliation into runPatrol and compacted the adjacent loops to preserve the deacon file-size ratchet.",
         "releasedAt": "2026-07-28T17:46:57.920Z"
+      },
+      {
+        "writerId": "agent-pan-3229",
+        "agentId": "agent-pan-3229",
+        "pid": 1858167,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:47:09.196Z",
+        "itemId": "server-marker-cleanup",
+        "outcome": "completed",
+        "reason": "Added successful complete-planning marker cleanup with absent-marker tolerance, focused tests, and an audited file-size allowance.",
+        "releasedAt": "2026-07-28T17:52:04.432Z"
       }
     ],
     "statusReasons": {
@@ -142,6 +145,10 @@
       "patrol-wiring": {
         "reason": "Wired reconciliation into runPatrol and compacted the adjacent loops to preserve the deacon file-size ratchet.",
         "updatedAt": "2026-07-28T17:46:57.920Z"
+      },
+      "server-marker-cleanup": {
+        "reason": "Added successful complete-planning marker cleanup with absent-marker tolerance, focused tests, and an audited file-size allowance.",
+        "updatedAt": "2026-07-28T17:52:04.432Z"
       }
     }
   },
@@ -160,6 +167,8 @@
     "patrol-wiring": "completed",
     "patrol-wiring.patrol-wiring.ac1": "completed",
     "patrol-wiring.patrol-wiring.ac2": "completed",
-    "server-marker-cleanup": "running"
+    "server-marker-cleanup": "completed",
+    "server-marker-cleanup.server-marker-cleanup.ac1": "completed",
+    "server-marker-cleanup.server-marker-cleanup.ac2": "completed"
   }
 }
