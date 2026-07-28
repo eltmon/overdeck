@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T17:41:30.838Z",
+  "updated": "2026-07-28T17:44:00.318Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "fix-tier-supervisor-prd-read": {
-        "writerId": "agent-pan-3230",
-        "agentId": "agent-pan-3230",
-        "pid": 1673732,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T17:41:30.838Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3230",
@@ -134,6 +126,17 @@
         "outcome": "completed",
         "reason": "Auto-synthesized specs now write to the state-aware canonical specsDir, with migrated findPlanSync regression coverage.",
         "releasedAt": "2026-07-28T17:41:19.614Z"
+      },
+      {
+        "writerId": "agent-pan-3230",
+        "agentId": "agent-pan-3230",
+        "pid": 1673732,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:41:30.838Z",
+        "itemId": "fix-tier-supervisor-prd-read",
+        "outcome": "completed",
+        "reason": "Standing tier supervisors now load PRD drafts through the state-aware drafts read door while preserving casing fallback.",
+        "releasedAt": "2026-07-28T17:44:00.317Z"
       }
     ],
     "statusReasons": {
@@ -156,6 +159,10 @@
       "fix-auto-synthesize-write-dir": {
         "reason": "Auto-synthesized specs now write to the state-aware canonical specsDir, with migrated findPlanSync regression coverage.",
         "updatedAt": "2026-07-28T17:41:19.614Z"
+      },
+      "fix-tier-supervisor-prd-read": {
+        "reason": "Standing tier supervisors now load PRD drafts through the state-aware drafts read door while preserving casing fallback.",
+        "updatedAt": "2026-07-28T17:44:00.317Z"
       }
     }
   },
@@ -177,6 +184,8 @@
     "fix-auto-synthesize-write-dir.fix-auto-synthesize-write-dir.ac1": "completed",
     "fix-auto-synthesize-write-dir.fix-auto-synthesize-write-dir.ac2": "completed",
     "fix-auto-synthesize-write-dir.fix-auto-synthesize-write-dir.ac3": "completed",
-    "fix-tier-supervisor-prd-read": "running"
+    "fix-tier-supervisor-prd-read": "completed",
+    "fix-tier-supervisor-prd-read.fix-tier-supervisor-prd-read.ac1": "completed",
+    "fix-tier-supervisor-prd-read.fix-tier-supervisor-prd-read.ac2": "completed"
   }
 }
