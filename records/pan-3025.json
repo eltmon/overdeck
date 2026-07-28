@@ -55,7 +55,7 @@
     "recordedAt": "2026-07-28T07:42:23.831Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T07:42:28.653Z",
+  "updated": "2026-07-28T07:42:30.944Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "pending",
@@ -64,9 +64,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T07:42:28.602Z",
+    "updatedAt": "2026-07-28T07:42:28.686Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (493540ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3025\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3025/src/dashboard/frontend\u001b[39m\n\nNo test files found, exiting with code 0\n\n\u001b[90mstdout\u001b[2m | src/lib/database/__tests__/pending-auto-merges-schema.test.ts\u001b[2m > \u001b[22m\u001b[2mpending auto-merges schema\u001b[2m > \u001b[22m\u001b[2muses current schema version and creates pending_auto_merges on fresh init\n\u001b[22m\u001b[39m[db] Migrating SQLite to incremental_vacuum (current=0, size=0.4MB) — one-time, may take ~30s on a large DB...\n[db] Migration complete in 5ms (0.4MB → 0.4MB)\n\n\u001b[90mstdout\u001b[2m | src/lib/database/__tests__/pending-auto-merges-schema.test.ts\u001b[2m > \u001b[22m\u001b[2mpending auto-merges schema\u001b[2m > \u001b[22m\u001b[2mcreates indexed event access paths for flywheel stats\n\u001b[22m\u001b[39m[db] Migrating SQLite to incremental_vacuum (current=0, size=0.4MB) — one-time, may take ~30s on a large DB...\n[db] Migration complete in 4ms (0.4MB → 0.4MB)\n\n \u001b[31m❯\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/close-out-terminal.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m | \u001b[22m\u001b[31m1 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[32m 77\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m     \u001b[31m×\u001b[31m prevents stale active pipeline state from being re-derived after close-out\u001b[39m\u001b[32m 76\u001b[2mms\u001b[22m\u001b[39m\u001b[33m (retry x1)\u001b[39m\n\u001b[90mstdout\u001b[2m | src/lib/conversations/__tests__/summary-fork-handoff.test.ts\u001b[2m > \u001b[22m\u001b[2msummary fork transcript resolution\u001b[2m > \u001b[22m\u001b[2msummarizes an ACP conversation without a Claude session ID\n\u001b[22m\u001b[39m[summary-fork] Forking conv=conv-source launchModel=claude-haiku-4-5 summaryModel=claude-haiku-4-5 localOnly=false forkMode=summary\n\n\u001b[90mstdout\u001b[2m | src/lib/conversations/__tests__/summary-fork-handoff.test.ts\u001b[2m > \u001b[22m\u001b[2msummary fork transcript resolution\u001b[2m > \u001b[22m\u001b[2msummarizes an ACP conversation without a Claude session ID\n\u001b[22m\u001b[39m[claude-invoke] purpose=summary-fork | model=claude-haiku-4-5 | summ\n…(533387 chars elided)…\n\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/remote/__tests__/remote-state-gate.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agents-barrel-exports.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/pan-dir/pipeline-monotonic.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/agents-normalize-id.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/cli/commands/start-conflicting-work.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/deacon-review-status-completed.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3221",
     "reviewRequestedAt": "2026-07-28T07:42:24.626Z",
     "scopeDrift": {
@@ -126,7 +125,7 @@
       },
       "costAtCloseOut": {
         "usd": 3.802436,
-        "pricingAsOf": "2026-07-28T07:42:28.650Z"
+        "pricingAsOf": "2026-07-28T07:42:30.940Z"
       }
     },
     "merges": [
