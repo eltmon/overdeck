@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T06:53:34.199Z",
+  "updated": "2026-07-28T06:57:55.951Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "stop-docker-via-resolver": {
-        "writerId": "agent-pan-3049",
-        "agentId": "agent-pan-3049",
-        "pid": 3130748,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T06:53:34.199Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -111,6 +103,17 @@
         "outcome": "completed",
         "reason": "Moved compose-name resolution in rebuildWorkspaceStack to after ensureDevcontainerSync render, using requireComposeProjectNameForWorkspace (strict) for the bring-up name and tryComposeProjectNameForWorkspace (best-effort) for the pre-render teardown; added a stale-name teardown pass when the two differ. Added tests/unit/lib/workspace/rebuild-stack.test.ts covering all 3 ACs (3 passing tests). Full workspace test suite (56 tests) still green; typecheck and lint clean.",
         "releasedAt": "2026-07-28T06:53:26.888Z"
+      },
+      {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 3130748,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:53:34.199Z",
+        "itemId": "stop-docker-via-resolver",
+        "outcome": "completed",
+        "reason": "Replaced the hardcoded overdeck- prefix and duplicate dev-script parsing in stopWorkspaceDockerPromise with a call to the canonical composeProjectNameForWorkspace resolver. Mismatch still throws (same protection). Added tests/unit/lib/workspace-manager/docker.test.ts (3 passing tests covering both ACs plus the mismatch-throw case). Existing docker.test.ts (11 tests) and full workspace-manager suite (30 tests) still pass; typecheck/lint clean.",
+        "releasedAt": "2026-07-28T06:57:55.951Z"
       }
     ],
     "statusReasons": {
@@ -121,6 +124,10 @@
       "rebuild-resolve-after-render": {
         "reason": "Moved compose-name resolution in rebuildWorkspaceStack to after ensureDevcontainerSync render, using requireComposeProjectNameForWorkspace (strict) for the bring-up name and tryComposeProjectNameForWorkspace (best-effort) for the pre-render teardown; added a stale-name teardown pass when the two differ. Added tests/unit/lib/workspace/rebuild-stack.test.ts covering all 3 ACs (3 passing tests). Full workspace test suite (56 tests) still green; typecheck and lint clean.",
         "updatedAt": "2026-07-28T06:53:26.888Z"
+      },
+      "stop-docker-via-resolver": {
+        "reason": "Replaced the hardcoded overdeck- prefix and duplicate dev-script parsing in stopWorkspaceDockerPromise with a call to the canonical composeProjectNameForWorkspace resolver. Mismatch still throws (same protection). Added tests/unit/lib/workspace-manager/docker.test.ts (3 passing tests covering both ACs plus the mismatch-throw case). Existing docker.test.ts (11 tests) and full workspace-manager suite (30 tests) still pass; typecheck/lint clean.",
+        "updatedAt": "2026-07-28T06:57:55.951Z"
       }
     }
   },
@@ -134,6 +141,8 @@
     "rebuild-resolve-after-render.rebuild-resolve-after-render.ac1": "completed",
     "rebuild-resolve-after-render.rebuild-resolve-after-render.ac2": "completed",
     "rebuild-resolve-after-render.rebuild-resolve-after-render.ac3": "completed",
-    "stop-docker-via-resolver": "running"
+    "stop-docker-via-resolver": "completed",
+    "stop-docker-via-resolver.stop-docker-via-resolver.ac1": "completed",
+    "stop-docker-via-resolver.stop-docker-via-resolver.ac2": "completed"
   }
 }
