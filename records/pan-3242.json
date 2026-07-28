@@ -32,6 +32,11 @@
       "reason": "feedback",
       "note": "[2026-07-28T22:06Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-28T22:06:37.601Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-07-28T22:06:52.540Z"
     }
   ],
   "feedback": [
@@ -69,7 +74,7 @@
     "recordedAt": "2026-07-28T20:52:11.749Z"
   },
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-28T22:06:37.601Z",
+  "updated": "2026-07-28T22:06:52.540Z",
   "pipeline": {
     "issueId": "PAN-3242",
     "reviewStatus": "blocked",
