@@ -22,6 +22,8 @@ const {
   mockHealUatPromotionVerification,
   mockCapturePipelineStage,
   mockResolvePipelineTelemetryContext,
+  mockGetReviewStatus,
+  mockReadIssueRecord,
 } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   mockClearReviewStatus: vi.fn(),
@@ -29,15 +31,29 @@ const {
   mockMarkRecordPipelineClosedOutSync: vi.fn(),
   mockWriteCloseOutDodGateSync: vi.fn(),
   mockSweepOrphanedTasks: vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }),
-  mockEvaluateDodGate: vi.fn(),
+  mockEvaluateDodGate: vi.fn().mockResolvedValue({
+    passed: true,
+    misses: [],
+    accepted: [],
+    rows: [{
+      id: 'review', num: 1, title: 'Review', expected: 'recorded verdict',
+      observed: 'reviewStatus: passed', status: 'pass',
+    }],
+  }),
   mockHealUatPromotionVerification: vi.fn(),
   mockCapturePipelineStage: vi.fn(),
   mockResolvePipelineTelemetryContext: vi.fn(async () => null),
+  mockGetReviewStatus: vi.fn(),
+  mockReadIssueRecord: vi.fn(),
 }));
 
-vi.mock('../../../../src/lib/lifecycle/dod-gate.js', () => ({
-  evaluateDodGate: mockEvaluateDodGate,
-}));
+vi.mock('../../../../src/lib/lifecycle/dod-gate.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/lifecycle/dod-gate.js')>();
+  return {
+    ...actual,
+    evaluateDodGate: mockEvaluateDodGate,
+  };
+});
 
 vi.mock('../../../../src/lib/cloister/uat-promote-verification.js', () => ({
   healUatPromotionVerification: mockHealUatPromotionVerification,
@@ -91,6 +107,7 @@ vi.mock('../../../../src/lib/shadow-state.js', () => ({
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   clearReviewStatus: mockClearReviewStatus,
+  getReviewStatus: mockGetReviewStatus,
 }));
 
 vi.mock('../../../../src/lib/pan-dir/record.js', async (importOriginal) => {
@@ -100,6 +117,7 @@ vi.mock('../../../../src/lib/pan-dir/record.js', async (importOriginal) => {
     getProjectConfigFromWorkspacePath: vi.fn((workspacePath: string) => ({ name: 'inferred', path: workspacePath })),
     markRecordPipelineClosedOutSync: mockMarkRecordPipelineClosedOutSync,
     writeCloseOutDodGate: mockWriteCloseOutDodGateSync,
+    readIssueRecord: mockReadIssueRecord,
   };
 });
 
@@ -189,6 +207,8 @@ describe('workflows', () => {
 
     vi.clearAllMocks();
     mockHealUatPromotionVerification.mockResolvedValue(null);
+    mockGetReviewStatus.mockResolvedValue(null);
+    mockReadIssueRecord.mockResolvedValue(null);
     mockEvaluateDodGate.mockResolvedValue({
       passed: true,
       misses: [],

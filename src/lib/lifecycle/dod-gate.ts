@@ -664,3 +664,17 @@ export async function evaluateDodGate(
     passed: rows.every(row => row.status !== 'miss' || Boolean(row.acceptedBy)),
   };
 }
+
+/**
+ * PAN-3025: completion witness for the close-out ceremony. Returns closedOutAt
+ * only when the journal is terminal AND the live row is gone (the ceremony's
+ * final mutating step). closedOut with live status present means a prior run
+ * aborted mid-ceremony and must fall through to complete it.
+ */
+export async function readCompletedCloseOut(issueId: string, projectPath: string): Promise<string | null> {
+  const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(projectPath);
+  const record = await readIssueRecord(project, issueId.toUpperCase());
+  if (!record?.pipeline.closedOut) return null;
+  const live = await Effect.runPromise(getReviewStatus(issueId)).catch(() => null);
+  return live ? null : (record.pipeline.closedOutAt ?? 'unknown');
+}
