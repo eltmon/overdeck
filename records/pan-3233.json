@@ -15,8 +15,42 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "docs/FLYWHEEL-STATE.md",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/PENDING-INPUT.md",
+      "src/dashboard/frontend/src/__tests__/store.test.ts",
+      "src/dashboard/frontend/src/lib/__tests__/pendingInput.test.ts",
+      "src/dashboard/frontend/src/lib/pendingInput.ts",
+      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+      "src/lib/__tests__/agent-enrichment.test.ts",
+      "src/lib/__tests__/compute-agent-enrichment.test.ts",
+      "src/lib/agent-enrichment.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/FLYWHEEL-STATE.md",
+      "docs/PENDING-INPUT.md",
+      "src/dashboard/frontend/src/__tests__/store.test.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/pendingInput.test.ts",
+      "src/dashboard/frontend/src/lib/pendingInput.ts",
+      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+      "src/lib/__tests__/agent-enrichment.test.ts",
+      "src/lib/__tests__/compute-agent-enrichment.test.ts",
+      "src/lib/agent-enrichment.ts"
+    ],
+    "recordedAt": "2026-07-28T20:46:26.914Z"
+  },
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T20:46:30.626Z",
+  "updated": "2026-07-28T20:46:34.509Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "pending",
@@ -25,7 +59,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T20:46:30.624Z",
+    "updatedAt": "2026-07-28T20:46:34.465Z",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -35,6 +69,7 @@
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ]
     },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3247",
     "reviewRequestedAt": "2026-07-28T20:46:30.624Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -69,8 +104,7 @@
         "src/lib/agent-enrichment.ts"
       ],
       "recordedAt": "2026-07-28T20:46:26.914Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3247"
+    }
   },
   "closeOut": {
     "usage": {
@@ -82,6 +116,14 @@
             "cacheRead": 4661726,
             "cacheWrite": 181658
           }
+        },
+        "work": {
+          "anthropic/claude-sonnet-5": {
+            "input": 274,
+            "output": 53378,
+            "cacheRead": 28435821,
+            "cacheWrite": 708474
+          }
         }
       },
       "totals": {
@@ -90,14 +132,22 @@
           "output": 41213,
           "cacheRead": 4661726,
           "cacheWrite": 181658
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 274,
+          "output": 53378,
+          "cacheRead": 28435821,
+          "cacheWrite": 708474
         }
       },
       "costAtCloseOut": {
-        "usd": 8.993654,
-        "pricingAsOf": "2026-07-28T20:02:37.668Z"
+        "usd": 16.986338,
+        "pricingAsOf": "2026-07-28T20:46:34.498Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3247"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -213,39 +263,5 @@
     "docs-pending-input": "completed",
     "docs-pending-input.docs-pending-input.ac1": "completed",
     "docs-pending-input.docs-pending-input.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "docs/FLYWHEEL-STATE.md",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
-      "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/PENDING-INPUT.md",
-      "src/dashboard/frontend/src/__tests__/store.test.ts",
-      "src/dashboard/frontend/src/lib/__tests__/pendingInput.test.ts",
-      "src/dashboard/frontend/src/lib/pendingInput.ts",
-      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
-      "src/lib/__tests__/agent-enrichment.test.ts",
-      "src/lib/__tests__/compute-agent-enrichment.test.ts",
-      "src/lib/agent-enrichment.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/FLYWHEEL-STATE.md",
-      "docs/PENDING-INPUT.md",
-      "src/dashboard/frontend/src/__tests__/store.test.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
-      "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx",
-      "src/dashboard/frontend/src/lib/__tests__/pendingInput.test.ts",
-      "src/dashboard/frontend/src/lib/pendingInput.ts",
-      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
-      "src/lib/__tests__/agent-enrichment.test.ts",
-      "src/lib/__tests__/compute-agent-enrichment.test.ts",
-      "src/lib/agent-enrichment.ts"
-    ],
-    "recordedAt": "2026-07-28T20:46:26.914Z"
   }
 }
