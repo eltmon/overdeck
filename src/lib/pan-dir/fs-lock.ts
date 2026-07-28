@@ -62,7 +62,7 @@ async function sweepRecordTmpFiles(recordPath: string): Promise<void> {
   }
 }
 
-async function readOwner(lockPath: string): Promise<{ description: string; pid?: number }> {
+export async function readOwner(lockPath: string): Promise<{ description: string; pid?: number }> {
   try {
     const owner = JSON.parse(await readFile(join(lockPath, 'owner.json'), 'utf8')) as Partial<RecordLockOwner>;
     return {

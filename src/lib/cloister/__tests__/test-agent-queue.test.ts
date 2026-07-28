@@ -73,6 +73,17 @@ describe('test role dispatch', () => {
     expect(artifactIdx).toBeLessThan(postIdx);
   });
 
+  it('tells the test role one POST attempt is enough, with the artifact as the durable copy (PAN-3092)', () => {
+    const prompt = buildTestRolePrompt({ issueId: 'PAN-503' });
+
+    // MIN-902 burned ~$5/hr re-signalling a verdict that was already durable.
+    expect(prompt).toContain('Make exactly ONE POST attempt');
+    expect(prompt).toContain('do NOT retry the POST in a loop');
+    // The instruction must point at the step-8 artifact as the surviving copy.
+    const oneAttemptIdx = prompt.indexOf('Make exactly ONE POST attempt');
+    expect(prompt.slice(oneAttemptIdx)).toContain('.pan/test/result.json');
+  });
+
   it('starts spawnRun(issueId, test) and marks testing', async () => {
     const notifyAgent = vi.fn(async () => {});
 
