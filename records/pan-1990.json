@@ -11,16 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T20:39:38.004Z",
+  "updated": "2026-07-28T20:39:46.090Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T20:03:58.683Z",
+    "updatedAt": "2026-07-28T20:39:46.071Z",
+    "inspectNotes": "Inspecting item schema-v64",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -41,6 +43,14 @@
             "cacheRead": 3601034,
             "cacheWrite": 194048
           }
+        },
+        "work": {
+          "anthropic/claude-sonnet-5": {
+            "input": 250,
+            "output": 58752,
+            "cacheRead": 26000014,
+            "cacheWrite": 248457
+          }
         }
       },
       "totals": {
@@ -49,18 +59,24 @@
           "output": 48591,
           "cacheRead": 3601034,
           "cacheWrite": 194048
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 250,
+          "output": 58752,
+          "cacheRead": 26000014,
+          "cacheWrite": 248457
         }
       },
       "costAtCloseOut": {
-        "usd": 8.456626,
-        "pricingAsOf": "2026-07-28T20:03:58.695Z"
+        "usd": 14.865796,
+        "pricingAsOf": "2026-07-28T20:39:46.080Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-1990",
