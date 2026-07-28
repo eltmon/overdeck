@@ -4,17 +4,17 @@
     "created": "2026-07-28T17:14:48Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3229: Planning promotion has no recovery owner: a finalized-but-unpromoted plan stalls forever if the dashboard is down at finalize time (PAN-3212 sat 9.5h)",
-    "updated": "2026-07-28T17:17:16.806Z"
+    "updated": "2026-07-28T17:18:12.738Z"
   },
   "plan": {
     "id": "pan-3229",
     "title": "Pending-promotion marker + deacon recovery owner for finalized-but-unpromoted plans",
-    "status": "proposed",
+    "status": "approved",
     "uid": "cc23cee9-68c7-4bd5-a16d-c1b077721720",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-28T17:14:48Z",
-    "updated": "2026-07-28T17:17:16.806Z",
+    "updated": "2026-07-28T17:18:12.738Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3229",
@@ -476,5 +476,5 @@
       "canonicalFilename": "2026-07-28-PAN-3229-pending-promotion-marker-deacon-recovery-owner-for-finalized-but-unpromoted-plans.xbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
