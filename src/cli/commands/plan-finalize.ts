@@ -7,7 +7,8 @@ import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync, serializeXBrief
 import { generateXBriefFilename, slugify } from '../../lib/xbrief/lifecycle.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
-import { checkPrdGateSync, getIssueDraftPath, MIN_PRD_LINES, type PrdGateResult, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
+import { checkPrdGateSync, getIssueDraftPath, MIN_PRD_LINES, type PrdGateResult, PAN_DIRNAME, PAN_SPEC_FILENAME, WORKSPACE_RUNTIME_DIRNAME } from '../../lib/pan-dir/index.js';
+import { PENDING_PROMOTION_FILENAME } from '../../lib/pan-dir/types.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import { formatQualityIssues, lintPlanQuality, type QualityIssue } from '../../lib/xbrief/quality-lint.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/xbrief/swarm-readiness.js';
@@ -22,6 +23,18 @@ interface PlanFinalizeOptions {
   qualityLint?: boolean;
   /** Commander negation: `--no-prd` arrives as `prd: false` (default true) — bypass the PRD-first gate. */
   prd?: boolean;
+}
+
+export interface PendingPromotionMarker {
+  version: '1';
+  issueId: string;
+  canonicalFilename: string;
+  noPrd: boolean;
+  autoSpawnRequested: boolean;
+  finalizedAt: string;
+  lastError: string;
+  lastAttemptAt: string;
+  patrolAttempts: number;
 }
 
 export type PlanFinalizeQualityGateResult =
@@ -159,6 +172,16 @@ export function formatPrdGateFailureMessage(
   return `✗ PRD-first gate: no PRD draft found for ${issueId}. Write ${canonical} first (roles/plan.md, Outputs #1), then re-run finalize. For a genuinely trivial issue use --no-prd.`;
 }
 
+export function writePendingPromotionMarker(
+  workspacePath: string,
+  marker: PendingPromotionMarker,
+): void {
+  const markerPath = join(workspacePath, WORKSPACE_RUNTIME_DIRNAME, PENDING_PROMOTION_FILENAME);
+  const tmp = markerPath + '.tmp';
+  writeFileSync(tmp, JSON.stringify(marker, null, 2) + '\n', 'utf-8');
+  renameSync(tmp, markerPath);
+}
+
 export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Promise<void> {
   const startDir = options.workspace ? resolve(options.workspace) : process.cwd();
   const workspacePath = findWorkspaceRoot(startDir);
@@ -253,6 +276,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   // Stamp plan.status='proposed' and plan.metadata.canonicalFilename onto the
   // xBRIEF only after beads creation succeeds. Atomic temp+rename.
   const canonicalFilename = stampPlanForFinalization(planPath, issueId);
+  const finalizedAt = new Date().toISOString();
 
   emitActivityEntrySync({
     source: 'plan',
@@ -279,6 +303,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   let workAgentMessage: string | null = null;
   let workAgentError: string | null = null;
   let workAgentSkipReason: string | null = null;
+  let promotionDeferred = false;
 
   const noPromote = options.promote === false;
   if (!noPromote) {
@@ -300,6 +325,22 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     emitAutoPromotePhase(issueId, 'completePlanning', 'skipped', 'promotion skipped by --no-promote');
   }
 
+  if (!noPromote && !promoted) {
+    const now = new Date().toISOString();
+    writePendingPromotionMarker(workspacePath, {
+      version: '1',
+      issueId,
+      canonicalFilename,
+      noPrd: options.prd === false,
+      autoSpawnRequested: autoSpawnOnFinalize,
+      finalizedAt,
+      lastError: promoteError ?? 'complete-planning failed',
+      lastAttemptAt: now,
+      patrolAttempts: 0,
+    });
+    promotionDeferred = true;
+  }
+
   emitAutoPromotePhase(issueId, 'terminal', promoted || noPromote ? 'success' : 'failure', promoted ? 'planning promoted' : noPromote ? 'promotion skipped' : (promoteError ?? 'promotion failed'), {
     workAgentSpawned,
     workAgentSkipReason,
@@ -312,6 +353,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       canonicalFilename,
       planStatus: 'proposed',
       promoted,
+      promotionDeferred,
       workAgentSpawned,
       ...(promoteMessage ? { promoteMessage } : {}),
       ...(promoteError ? { promoteError } : {}),
@@ -341,9 +383,8 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
         console.log(chalk.dim('Run `pan start ' + issueId + '` or click Start Agent to begin implementation.'));
       }
     } else {
-      console.log(chalk.yellow('⚠ Planning finalized but auto-promotion failed.'));
+      console.log(chalk.yellow('⚠ Promotion deferred — the dashboard was unreachable. A pending-promotion marker was written; the deacon will complete promotion automatically once the dashboard is healthy. Manual fallback: pan plan done ' + issueId + '.'));
       if (promoteError) console.log(chalk.dim('  ' + promoteError));
-      console.log(chalk.dim('Run `pan plan done ' + issueId + '` to retry, or click Done in the dashboard.'));
     }
   }
 
