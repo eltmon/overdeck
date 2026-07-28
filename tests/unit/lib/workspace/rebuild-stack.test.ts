@@ -123,7 +123,7 @@ describe('rebuildWorkspaceStack — resolve name after render (PAN-3049)', () =>
     expect(upCalls[0]).not.toContain('overdeck-feature-min-901');
   });
 
-  it('ac2: tears down the stale fallback-named stack in addition to the declared-name pass', async () => {
+  it('ac2: tears down the workspace\'s own current (fallback-named) stack before re-rendering, and never touches it again after render', async () => {
     const workspacePath = makeWorkspace();
     setupProject(workspacePath);
     // Pre-existing render with no declared name anywhere — resolves to the overdeck- fallback.
@@ -137,14 +137,15 @@ describe('rebuildWorkspaceStack — resolve name after render (PAN-3049)', () =>
 
     expect(result.success).toBe(true);
     const downCalls = composeCalls('down');
-    // One teardown before the re-render (existing compose file) and one more
-    // after render because the declared name changed — both under the stale
-    // fallback name, never the freshly declared one.
-    expect(downCalls).toHaveLength(2);
-    for (const call of downCalls) {
-      expect(call).toContain('overdeck-feature-min-901');
-      expect(call).not.toContain('myn-feature-min-901');
-    }
+    // Exactly one teardown: the pre-render pass on the workspace's own
+    // current compose file, under its then-current (fallback) name. There is
+    // no second, post-render teardown of the now-stale name — that proactive
+    // sweep was removed (review fix): guessing a name is safe to stop is
+    // exactly the fail-open pattern a transient Docker error or a
+    // restarting/paused stack could slip through.
+    expect(downCalls).toHaveLength(1);
+    expect(downCalls[0]).toContain('overdeck-feature-min-901');
+    expect(downCalls[0]).not.toContain('myn-feature-min-901');
     const upCalls = composeCalls('up');
     expect(upCalls).toHaveLength(1);
     expect(upCalls[0]).toContain('myn-feature-min-901');
@@ -173,9 +174,35 @@ describe('rebuildWorkspaceStack — resolve name after render (PAN-3049)', () =>
     const result = await Effect.runPromise(rebuildWorkspaceStack('MIN-901'));
 
     expect(result.success).toBe(true);
-    // No pre-existing compose file, so there is no pre-render teardown call —
-    // the only down candidate is the post-render stale-name sweep, which must
-    // NOT fire against a stack confirmed running.
+    // No pre-existing compose file, so there is no pre-render teardown call,
+    // and there is no post-render stale-name teardown at all (removed) — a
+    // running foreign-prefixed stack is never a `down` candidate regardless
+    // of what Docker reports.
+    expect(composeCalls('down')).toHaveLength(0);
+    const upCalls = composeCalls('up');
+    expect(upCalls).toHaveLength(1);
+    expect(upCalls[0]).toContain('myn-feature-min-901');
+  });
+
+  it('review fix: a conflicting pre-render declaration is never converted into a guessed teardown target', async () => {
+    const workspacePath = makeWorkspace();
+    setupProject(workspacePath);
+    // The CURRENT devcontainer declares a name that does not end in this
+    // workspace's feature folder — composeProjectNameForWorkspace throws
+    // rather than returning a guess. The old code swallowed that via
+    // tryComposeProjectNameForWorkspace(...) ?? fallback and ran `down`
+    // against the guessed fallback name anyway; that must not happen.
+    writeComposeFile(workspacePath, 'name: victim-project\nservices:\n  api:\n    image: test\n');
+    mocks.ensureDevcontainerSync.mockImplementation(() => {
+      writeComposeFile(workspacePath, 'name: myn-feature-min-901\nservices:\n  api:\n    image: test\n');
+      return { step: { success: true } };
+    });
+
+    const result = await Effect.runPromise(rebuildWorkspaceStack('MIN-901'));
+
+    expect(result.success).toBe(true);
+    // No pre-render teardown at all — the conflicting declaration means the
+    // real running project (if any) is unknown, so nothing is guessed.
     expect(composeCalls('down')).toHaveLength(0);
     const upCalls = composeCalls('up');
     expect(upCalls).toHaveLength(1);

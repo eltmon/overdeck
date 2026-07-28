@@ -124,4 +124,40 @@ describe('diagnoseDuplicateComposeStacks (PAN-3049)', () => {
     expect(results[0].fix).not.toContain('down');
     expect(results[0].fix).toContain('pan workspace rebuild MIN-901');
   });
+
+  // PAN-3049 review fix (cycle 2): a canonical project with only an
+  // init/setup container running is not confirmed healthy — recommending a
+  // foreign-stack teardown here can remove the only working stack while the
+  // canonical one is still initializing.
+  it('emits diagnosis-only guidance when the canonical project has only an init container running, even with a complete foreign stack', () => {
+    const containers: DuplicateStackContainerRow[] = [
+      { name: 'myn-feature-min-901-init-1', composeProject: 'myn-feature-min-901' },
+      { name: 'overdeck-feature-min-901-api-1', composeProject: 'overdeck-feature-min-901' },
+      { name: 'overdeck-feature-min-901-frontend-1', composeProject: 'overdeck-feature-min-901' },
+      { name: 'overdeck-feature-min-901-dev-1', composeProject: 'overdeck-feature-min-901' },
+    ];
+
+    const results = diagnoseDuplicateComposeStacks(containers, resolver({ 'MIN-901': 'myn-feature-min-901' }));
+
+    expect(results).toHaveLength(1);
+    expect(results[0].status).toBe('warn');
+    expect(results[0].message).toContain('no running service container yet');
+    expect(results[0].fix).not.toContain('docker compose');
+    expect(results[0].fix).not.toContain('down');
+    expect(results[0].fix).toContain('pan workspace rebuild MIN-901');
+  });
+
+  it('emits a down command when the canonical project has a real running service, not just init', () => {
+    const containers: DuplicateStackContainerRow[] = [
+      { name: 'myn-feature-min-901-init-1', composeProject: 'myn-feature-min-901' },
+      { name: 'myn-feature-min-901-server-1', composeProject: 'myn-feature-min-901' },
+      { name: 'overdeck-feature-min-901-api-1', composeProject: 'overdeck-feature-min-901' },
+    ];
+
+    const results = diagnoseDuplicateComposeStacks(containers, resolver({ 'MIN-901': 'myn-feature-min-901' }));
+
+    expect(results).toHaveLength(1);
+    expect(results[0].fix).toContain('foreign stack overdeck-feature-min-901 is a duplicate');
+    expect(results[0].fix).toContain('docker compose -p "overdeck-feature-min-901" down');
+  });
 });

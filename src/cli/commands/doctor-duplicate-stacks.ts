@@ -40,6 +40,13 @@ export interface CanonicalProjectInfo {
   workspacePath: string | null;
 }
 
+// One-shot/setup containers (init, migrations, test runners) can be
+// "running" (mid-execution) without the canonical stack actually serving
+// anything yet. Recommending a foreign-stack teardown on the strength of an
+// init container alone can remove the only working stack while the
+// canonical one is still initializing (review finding).
+const NON_SERVICE_CONTAINER_RE = /(?:^|[-_])(?:init|setup|migrate|test-unit)(?:$|[-_])/i;
+
 /**
  * Group running containers by issue (via `inferIssueIdFromStackContainerName`)
  * and flag any issue whose running stack doesn't match its canonical
@@ -53,21 +60,24 @@ export function diagnoseDuplicateComposeStacks(
   containers: DuplicateStackContainerRow[],
   resolveCanonicalProject: (issueId: string) => CanonicalProjectInfo,
 ): CheckResult[] {
-  const projectsByIssue = new Map<string, Set<string>>();
+  const projectsByIssue = new Map<string, Map<string, string[]>>();
   for (const container of containers) {
     if (!container.composeProject) continue;
     const issueId =
       inferIssueIdFromStackContainerName(container.composeProject) ??
       inferIssueIdFromStackContainerName(container.name);
     if (!issueId) continue;
-    const projects = projectsByIssue.get(issueId) ?? new Set<string>();
-    projects.add(container.composeProject);
+    const projects = projectsByIssue.get(issueId) ?? new Map<string, string[]>();
+    const names = projects.get(container.composeProject) ?? [];
+    names.push(container.name);
+    projects.set(container.composeProject, names);
     projectsByIssue.set(issueId, projects);
   }
 
   const results: CheckResult[] = [];
   for (const issueId of [...projectsByIssue.keys()].sort()) {
-    const runningProjects = [...projectsByIssue.get(issueId)!].sort();
+    const projectContainers = projectsByIssue.get(issueId)!;
+    const runningProjects = [...projectContainers.keys()].sort();
     const { project: canonical, workspacePath } = resolveCanonicalProject(issueId);
 
     if (runningProjects.length === 1) {
@@ -88,16 +98,24 @@ export function diagnoseDuplicateComposeStacks(
 
     // ≥2 distinct running compose projects for the same issue — a duplicate.
     // Only recommend stopping a project when the canonical one is confirmed
-    // among the running set — otherwise we cannot safely tell which stack is
-    // the real one, and must not point the operator at stopping all of them.
-    const canonicalConfirmedRunning = canonical !== null && runningProjects.includes(canonical);
-    if (!canonicalConfirmedRunning) {
+    // running AND has at least one real service container up (not just an
+    // init/setup container) — otherwise we cannot safely tell whether the
+    // canonical stack is actually serving anything yet, and must not point
+    // the operator at stopping the foreign stack that might be the only one
+    // actually working.
+    const canonicalNames = canonical ? projectContainers.get(canonical) ?? [] : [];
+    const canonicalHasRunningService = canonicalNames.some((name) => !NON_SERVICE_CONTAINER_RE.test(name));
+    const canonicalConfirmedHealthy = canonical !== null && canonicalHasRunningService;
+    if (!canonicalConfirmedHealthy) {
+      const canonicalPresentButNotHealthy = canonical !== null && runningProjects.includes(canonical);
       results.push({
         name: `Duplicate Docker stack (${issueId})`,
         status: 'warn',
-        message: canonical
-          ? `${issueId} has ${runningProjects.length} running compose projects, none matching its canonical name ${canonical}: ${runningProjects.join(', ')}`
-          : `${issueId} has ${runningProjects.length} running compose projects and no resolvable canonical name: ${runningProjects.join(', ')}`,
+        message: canonicalPresentButNotHealthy
+          ? `${issueId}'s canonical project ${canonical} is present but has no running service container yet (only init/setup): ${runningProjects.join(', ')}`
+          : canonical
+            ? `${issueId} has ${runningProjects.length} running compose projects, none matching its canonical name ${canonical}: ${runningProjects.join(', ')}`
+            : `${issueId} has ${runningProjects.length} running compose projects and no resolvable canonical name: ${runningProjects.join(', ')}`,
         fix: `Run \`pan workspace rebuild ${issueId}\` to bring the canonical stack up, then run \`pan doctor\` again once it is healthy to see which of the running projects is safe to stop.`,
       });
       continue;

@@ -32,7 +32,6 @@ import {
   composeProjectNameForWorkspace,
   hasIssueToken,
   requireComposeProjectNameForWorkspace,
-  tryComposeProjectNameForWorkspace,
 } from './stack-health.js';
 import { reconcileTraefikNetworks } from './traefik-connect.js';
 
@@ -186,15 +185,27 @@ export const rebuildWorkspaceStack = (
       } satisfies RebuildWorkspaceStackResult;
     }
 
-    // Best-effort pre-render name: the workspace's current (possibly stale or
-    // not-yet-declared) devcontainer state. Falls back to the overdeck- prefix
-    // like the pre-PAN-3049 behavior when nothing is resolvable yet.
-    const preRenderComposeProjectName =
-      tryComposeProjectNameForWorkspace(workspacePath, normalizedIssueId) ??
-      `overdeck-feature-${normalizedIssueId}`;
+    // Pre-render name: the workspace's current devcontainer state, if any.
+    // Resolves the fallback cleanly when nothing is declared yet (matching
+    // pre-PAN-3049 behavior for a brand-new workspace), but a genuinely
+    // CONFLICTING declaration throws — and that must never be converted into
+    // a guessed name to run `down` against. Guessing-then-mutating on an
+    // unresolvable identity is exactly the fail-open path NonGoal 1
+    // forbids: we do not know what the real running stack (if any) is
+    // named, so the safe action is to skip the pre-render teardown
+    // entirely and let the existing stale-container sweep
+    // (removeStaleIssueContainers, below) reconcile it — that sweep only
+    // ever acts on containers Docker positively reports as non-running,
+    // never on an absence of evidence.
+    let preRenderComposeProjectName: string | null = null;
+    try {
+      preRenderComposeProjectName = composeProjectNameForWorkspace(workspacePath, normalizedIssueId);
+    } catch {
+      progress('Current devcontainer state has a conflicting declaration — skipping pre-render teardown.');
+    }
 
     const existingComposeFile = findDevcontainerComposeFile(workspacePath);
-    if (existingComposeFile) {
+    if (existingComposeFile && preRenderComposeProjectName) {
       progress('Tearing down existing workspace stack...');
       yield* dockerCompose(
         ['-f', existingComposeFile, '-p', preRenderComposeProjectName, 'down', '-v', '--remove-orphans'],
@@ -233,31 +244,17 @@ export const rebuildWorkspaceStack = (
       catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
     });
 
-    // The pre-render name (fallback or a stale declaration) can differ from
-    // what the freshly rendered compose file declares — e.g. the workspace
-    // previously had no rendered .devcontainer/ and ran under the overdeck-
-    // fallback. Only reap that stale name when it is confirmed NOT running —
-    // rebuild must never automatically stop a live foreign-prefixed stack
-    // (NonGoal: reconciling a genuinely running duplicate is an
-    // operator/`pan doctor`-guided action, not something code does silently).
-    if (preRenderComposeProjectName !== composeProjectName) {
-      const preRenderContainers = yield* collectDockerContainerLifecycleSnapshot();
-      const preRenderStackRunning = preRenderContainers.some(
-        (container) =>
-          container.composeProject === preRenderComposeProjectName &&
-          (container.state?.toLowerCase() === 'running' || /^up\b/i.test(container.status)),
+    // No proactive teardown of a "differently-named" stack here. Guessing
+    // that a resolvable name difference means the OLD name is safe to stop
+    // is exactly the fail-open pattern review flagged: a transient Docker
+    // query failure or a live-but-restarting/paused stack under that name
+    // could be silently torn down. removeStaleIssueContainers below is the
+    // sole cleanup path for other-project-named residue, and it only
+    // removes containers Docker positively reports as non-running.
+    if (preRenderComposeProjectName && preRenderComposeProjectName !== composeProjectName) {
+      progress(
+        `Devcontainer now declares ${composeProjectName}, previously ${preRenderComposeProjectName} — any leftover stack under the old name is left for the stale-container sweep or \`pan doctor\`.`,
       );
-      if (preRenderStackRunning) {
-        progress(
-          `Leaving running stack ${preRenderComposeProjectName} untouched — run \`pan doctor\` to reconcile duplicate stacks.`,
-        );
-      } else {
-        progress('Tearing down stale fallback-named stack...');
-        yield* dockerCompose(
-          ['-f', composeFile, '-p', preRenderComposeProjectName, 'down', '-v', '--remove-orphans'],
-          dirname(composeFile),
-        ).pipe(Effect.ignore);
-      }
     }
 
     progress('Ensuring shared docker network...');
