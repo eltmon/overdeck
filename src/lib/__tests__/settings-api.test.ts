@@ -270,7 +270,7 @@ describe('loadSettingsApi', () => {
       google: 'ohmypi',
       minimax: 'ohmypi',
       zai: 'ohmypi',
-      kimi: 'claude-code', // PAN-2102: omp can no longer launch Kimi; default to native claude-code
+      kimi: 'kimi-code', // PAN-1837 wi7b: native Kimi Code CLI harness, proven end-to-end (wi14-e2e)
       mimo: 'ohmypi',
       openrouter: 'ohmypi',
       nous: 'ohmypi',

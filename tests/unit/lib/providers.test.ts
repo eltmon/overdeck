@@ -7,7 +7,7 @@ const EXPECTED_DEFAULT_HARNESSES: Record<ProviderName, RuntimeName> = {
   anthropic: 'claude-code',
   openai: 'codex',
   google: 'ohmypi',
-  kimi: 'claude-code',
+  kimi: 'kimi-code',
   minimax: 'ohmypi',
   zai: 'ohmypi',
   mimo: 'ohmypi',
@@ -32,7 +32,7 @@ describe('providers', () => {
   it('returns the built-in default harness for known providers', () => {
     expect(getBuiltInDefaultHarness('openai')).toBe('codex');
     expect(getBuiltInDefaultHarness('anthropic')).toBe('claude-code');
-    expect(getBuiltInDefaultHarness('kimi')).toBe('claude-code');
+    expect(getBuiltInDefaultHarness('kimi')).toBe('kimi-code');
   });
 
   it('falls back to claude-code for unknown providers', () => {

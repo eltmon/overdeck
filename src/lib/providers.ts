@@ -75,14 +75,17 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'kimi',
     displayName: 'Kimi (Moonshot AI)',
     compatibility: 'direct',
-    // claude-code, not ohmypi (PAN-2102). omp v16.1.16 renamed Kimi's provider
-    // (kimi-coding → kimi-code), changed its model ids (kimi-k2.7-code →
-    // kimi-for-coding), and switched it to OAuth, so omp can no longer launch a
-    // Kimi work agent — it exits immediately and the tmux session orphans. Kimi
-    // exposes an Anthropic-compatible endpoint (api.kimi.com/coding + sk-kimi-*
-    // token), so claude-code talks to it natively — no omp, no CLIProxy, no
-    // 200k-window deadlock.
-    defaultHarness: 'claude-code',
+    // Not ohmypi (PAN-2102). omp v16.1.16 renamed Kimi's provider (kimi-coding
+    // → kimi-code), changed its model ids (kimi-k2.7-code → kimi-for-coding),
+    // and switched it to OAuth, so omp can no longer launch a Kimi work agent
+    // — it exits immediately and the tmux session orphans.
+    // PAN-1837 wi7b: flipped from 'claude-code' to 'kimi-code' — the native
+    // Kimi Code CLI harness, proven end-to-end (wi14-e2e: real spawn, kickoff
+    // + mid-session delivery, session/cost resolution, no fallback, all live
+    // against the installed 0.29.2 binary). An operator's providerHarnesses.kimi
+    // config override (e.g. 'acp' or 'claude-code') still wins over this
+    // built-in default (harness-resolve.ts:80-83).
+    defaultHarness: 'kimi-code',
     // PAN-1837: the native kimi-code harness resolves its own model aliases
     // under the installed CLI's config.toml, which are namespaced
     // `kimi-code/<alias>` (verified against the installed 0.29.2 binary's
