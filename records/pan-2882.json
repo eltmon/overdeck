@@ -37,7 +37,7 @@
     "recordedAt": "2026-07-28T07:25:54.489Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T07:26:07.637Z",
+  "updated": "2026-07-28T07:26:27.840Z",
   "pipeline": {
     "issueId": "PAN-2882",
     "reviewStatus": "pending",
@@ -49,7 +49,7 @@
     "updatedAt": "2026-07-28T07:26:07.576Z",
     "reviewNotes": "Verification failed at typecheck — fix and resubmit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
-    "reviewRequestedAt": "2026-07-28T07:25:57.739Z",
+    "reviewRequestedAt": "2026-07-28T07:26:27.252Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -70,7 +70,8 @@
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ],
       "recordedAt": "2026-07-28T07:25:54.489Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-28T07:26:27.252Z"
   },
   "closeOut": {
     "usage": {
