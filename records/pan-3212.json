@@ -125,18 +125,18 @@
     "recordedAt": "2026-07-28T17:49:31.882Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T19:25:50.336Z",
+  "updated": "2026-07-28T19:28:32.612Z",
   "pipeline": {
     "issueId": "PAN-3212",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:49:41.828Z",
-    "updatedAt": "2026-07-28T19:25:50.096Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: cursor-anchored live composer parsing now matches the current Claude pane, and a crash-independent payload-unverified marker limits composer proof to pre-Enter recovery while preserving no-repaste rollback semantics.",
+    "updatedAt": "2026-07-28T19:28:32.212Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues: keyed pending claims now carry strictly-read explicit unverified or enter-attempted payload states; read failures, legacy-unset, and unknown states fail closed without Enter or re-paste.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
     "reviewedAtCommit": "d04d8fd58e4d19c9165ab6a90efeee7a7196229a",
     "lastVerifiedCommit": "d04d8fd58e4d19c9165ab6a90efeee7a7196229a",
@@ -189,24 +189,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4575353,
-            "output": 401298,
-            "cacheRead": 152325632,
+            "input": 4580209,
+            "output": 401710,
+            "cacheRead": 153987072,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 8965111,
-          "output": 755681,
-          "cacheRead": 206896640,
+          "input": 8969967,
+          "output": 756093,
+          "cacheRead": 208558080,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 170.94430499999999,
-        "pricingAsOf": "2026-07-28T19:25:50.173Z"
+        "usd": 171.811665,
+        "pricingAsOf": "2026-07-28T19:28:32.382Z"
       }
     },
     "merges": [
