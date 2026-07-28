@@ -140,6 +140,25 @@ describe('reopenWorkspaceState', () => {
     rmSync(wsDir, { recursive: true, force: true });
   });
 
+  it('resets verificationStatus to pending alongside other verdicts (PAN-3025)', async () => {
+    seedStatus({
+      'PAN-999': { reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', mergeStatus: 'merged', readyForMerge: false },
+    });
+    const wsDir = createWorkspace();
+
+    const result = await Effect.runPromise(reopenWorkspaceState('PAN-999', wsDir));
+
+    expect(result.specialistStatesReset).toBe(true);
+
+    const row = readStatus('PAN-999')!;
+    expect(row.review_status).toBe('pending');
+    expect(row.test_status).toBe('pending');
+    expect(row.verification_status).toBe('pending');
+    expect(row.merge_status).toBe('pending');
+
+    rmSync(wsDir, { recursive: true, force: true });
+  });
+
   it('creates initial pending status when no prior status exists', async () => {
     const wsDir = createWorkspace();
 
