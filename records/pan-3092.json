@@ -190,7 +190,7 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T11:51:21.468Z",
+  "updated": "2026-07-28T11:51:27.029Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "blocked",
@@ -201,11 +201,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T11:51:20.654Z",
+    "updatedAt": "2026-07-28T11:51:27.024Z",
     "reviewNotes": "The shared warning budget is consumed by the first hanging episode every patrol; stable iteration then skips emitActivityEntryOnce for later issues indefinitely, violating one warning per episode.",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
-    "reviewedAtCommit": "6986a22ca9666f15c36f1b58d62cfbd56043be38",
+    "reviewedAtCommit": "767b20a2125267b798422a20769185b418eff205",
     "lastVerifiedCommit": "51f15f597ae7b2b54c2e21b4f81ce496648728c9",
     "reviewSpawnedAt": "2026-07-28T11:48:41.318Z",
     "scopeDrift": {
@@ -301,7 +301,7 @@
       },
       "costAtCloseOut": {
         "usd": 105.9865993,
-        "pricingAsOf": "2026-07-28T11:51:20.673Z"
+        "pricingAsOf": "2026-07-28T11:51:27.027Z"
       }
     },
     "merges": [
