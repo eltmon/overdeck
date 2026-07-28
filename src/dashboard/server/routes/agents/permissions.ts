@@ -9,6 +9,12 @@ import {
 } from '../../../../lib/agents.js';
 import { getAgentJsonlPath, scanPendingInputsPromise } from '../../../../lib/agent-enrichment.js';
 import { deliverPlanActionToSession } from '../../../../lib/overdeck/conversation-delivery.js';
+import {
+  answerSessionPaneChoice,
+  captureSessionPaneChoice,
+  type PendingPaneChoice,
+  type SessionPaneChoiceResult,
+} from '../../../../lib/session-pane-choice.js';
 import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
 import { ReadModelService } from '../../read-model.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -28,6 +34,74 @@ import {
   getAgentPendingQuestions,
   readJsonBody,
 } from './shared.js';
+
+interface AgentPaneChoiceDeps {
+  getAgentState?: (agentId: string) => Promise<{ issueId: string } | null>;
+  captureSessionPaneChoice?: (sessionName: string) => Promise<PendingPaneChoice | null>;
+  answerSessionPaneChoice?: (
+    sessionName: string,
+    body: Record<string, unknown>,
+  ) => Promise<SessionPaneChoiceResult>;
+  emitActivityEntry?: typeof emitActivityEntrySync;
+}
+
+export async function handleGetAgentPaneChoice(
+  agentId: string,
+  deps: AgentPaneChoiceDeps = {},
+): Promise<SessionPaneChoiceResult> {
+  if (!agentId.trim()) return { body: { error: 'missing agent id' }, status: 400 };
+  const capture = deps.captureSessionPaneChoice ?? captureSessionPaneChoice;
+  const paneChoice = await capture(agentId);
+  return paneChoice
+    ? { body: { pending: true, ...paneChoice } }
+    : { body: { pending: false } };
+}
+
+export async function handlePostAgentPaneChoice(
+  agentId: string,
+  body: Record<string, unknown>,
+  deps: AgentPaneChoiceDeps = {},
+): Promise<SessionPaneChoiceResult> {
+  if (!agentId.trim()) return { body: { error: 'missing agent id' }, status: 400 };
+  const readAgentState = deps.getAgentState
+    ?? ((id: string) => Effect.runPromise(getAgentState(id)));
+  const agentState = await readAgentState(agentId);
+  if (!agentState) return { body: { error: `Agent ${agentId} not found` }, status: 404 };
+
+  const answer = deps.answerSessionPaneChoice ?? answerSessionPaneChoice;
+  const result = await answer(agentId, body);
+  const answeredLabel = result.body['answeredLabel'];
+  if (result.status === undefined && result.body['ok'] === true && typeof answeredLabel === 'string') {
+    (deps.emitActivityEntry ?? emitActivityEntrySync)({
+      source: 'dashboard',
+      level: 'info',
+      issueId: agentState.issueId,
+      message: `Operator answered ${agentId}'s pane menu: ${answeredLabel}`,
+    });
+  }
+  return result;
+}
+
+export const getAgentPaneChoiceRoute = HttpRouter.add(
+  'GET',
+  '/api/agents/:id/pane-choice',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const result = yield* Effect.promise(() => handleGetAgentPaneChoice(params['id'] ?? ''));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
+export const postAgentPaneChoiceRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/pane-choice',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const body = (yield* readJsonBody) as Record<string, unknown>;
+    const result = yield* Effect.promise(() => handlePostAgentPaneChoice(params['id'] ?? '', body));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
 
 // ─── Route: GET /api/agents/:id/pending-questions ────────────────────────────
 
