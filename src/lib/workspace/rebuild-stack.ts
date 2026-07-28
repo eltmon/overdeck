@@ -31,6 +31,8 @@ import {
   collectDockerContainerLifecycleSnapshot,
   composeProjectNameForWorkspace,
   hasIssueToken,
+  requireComposeProjectNameForWorkspace,
+  tryComposeProjectNameForWorkspace,
 } from './stack-health.js';
 import { reconcileTraefikNetworks } from './traefik-connect.js';
 
@@ -184,13 +186,18 @@ export const rebuildWorkspaceStack = (
       } satisfies RebuildWorkspaceStackResult;
     }
 
-    const composeProjectName = composeProjectNameForWorkspace(workspacePath, normalizedIssueId);
+    // Best-effort pre-render name: the workspace's current (possibly stale or
+    // not-yet-declared) devcontainer state. Falls back to the overdeck- prefix
+    // like the pre-PAN-3049 behavior when nothing is resolvable yet.
+    const preRenderComposeProjectName =
+      tryComposeProjectNameForWorkspace(workspacePath, normalizedIssueId) ??
+      `overdeck-feature-${normalizedIssueId}`;
 
     const existingComposeFile = findDevcontainerComposeFile(workspacePath);
     if (existingComposeFile) {
       progress('Tearing down existing workspace stack...');
       yield* dockerCompose(
-        ['-f', existingComposeFile, '-p', composeProjectName, 'down', '-v', '--remove-orphans'],
+        ['-f', existingComposeFile, '-p', preRenderComposeProjectName, 'down', '-v', '--remove-orphans'],
         dirname(existingComposeFile),
       );
     }
@@ -216,6 +223,27 @@ export const rebuildWorkspaceStack = (
         error: `No devcontainer compose file found in ${devcontainerDir}`,
         workspacePath,
       } satisfies RebuildWorkspaceStackResult;
+    }
+
+    // Strict: a freshly rendered workspace must declare a resolvable name.
+    // Silently falling back here is exactly the loud failure PAN-3049 needs —
+    // a rebuild that can't confirm the declared name must not guess one.
+    const composeProjectName = yield* Effect.try({
+      try: () => requireComposeProjectNameForWorkspace(workspacePath, normalizedIssueId),
+      catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+    });
+
+    // The pre-render name (fallback or a stale declaration) can differ from
+    // what the freshly rendered compose file declares — e.g. the workspace
+    // previously had no rendered .devcontainer/ and ran under the overdeck-
+    // fallback. Tear down that stale-named stack too so it cannot leak
+    // alongside the correctly-named one (PAN-3049).
+    if (preRenderComposeProjectName !== composeProjectName) {
+      progress('Tearing down stale fallback-named stack...');
+      yield* dockerCompose(
+        ['-f', composeFile, '-p', preRenderComposeProjectName, 'down', '-v', '--remove-orphans'],
+        dirname(composeFile),
+      ).pipe(Effect.ignore);
     }
 
     progress('Ensuring shared docker network...');
