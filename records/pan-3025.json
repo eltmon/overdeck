@@ -22,6 +22,7 @@
   "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
+      "src/lib/__tests__/close-out-terminal.test.ts",
       "src/lib/pan-dir/__tests__/records.test.ts"
     ],
     "declaredScopeUntouched": [],
@@ -40,6 +41,7 @@
     "actualChangedFiles": [
       "docs/DEFINITION-OF-DONE.md",
       "scripts/file-size-allowlist.txt",
+      "src/lib/__tests__/close-out-terminal.test.ts",
       "src/lib/lifecycle/dod-gate.ts",
       "src/lib/lifecycle/workflows.ts",
       "src/lib/pan-dir/__tests__/records.test.ts",
@@ -50,10 +52,10 @@
       "tests/unit/lib/lifecycle/workflows.test.ts",
       "tests/unit/lib/pan-dir/record-close-out.test.ts"
     ],
-    "recordedAt": "2026-07-28T07:27:47.268Z"
+    "recordedAt": "2026-07-28T07:42:23.831Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T07:42:16.821Z",
+  "updated": "2026-07-28T07:42:23.832Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "failed",
