@@ -97,7 +97,7 @@
     "recordedAt": "2026-07-28T07:25:54.489Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T16:54:29.984Z",
+  "updated": "2026-07-28T17:16:28.667Z",
   "pipeline": {
     "issueId": "PAN-2882",
     "reviewStatus": "pending",
@@ -106,7 +106,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-28T07:26:27.252Z",
     "updatedAt": "2026-07-28T16:54:29.973Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
     "scopeDrift": {
