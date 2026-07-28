@@ -386,11 +386,19 @@ export function getDirectProviders(): ProviderConfig[] {
 }
 
 /**
- * Get environment variables for spawning agent with specific provider
+ * Get environment variables for spawning agent with specific provider.
+ *
+ * `harness` is optional and defaults to preserving the pre-PAN-1837 behavior
+ * for every existing caller. When harness === 'kimi-code', the Kimi
+ * Anthropic-compatibility shim (ANTHROPIC_BASE_URL / ANTHROPIC_AUTH_TOKEN /
+ * KIMI_API_KEY) is skipped entirely: native Kimi Code auth is host-owned via
+ * `kimi login` / ~/.kimi-code/config.toml, and leaking these vars into the
+ * native binary's env would risk silently redirecting or breaking its auth.
  */
 export function getProviderEnvSync(
   provider: ProviderConfig,
-  apiKey: string
+  apiKey: string,
+  harness?: RuntimeName,
 ): Record<string, string> {
   if (provider.name === 'openai') {
     // OpenAI never receives provider-native or Anthropic token env here.
@@ -399,15 +407,19 @@ export function getProviderEnvSync(
     return {};
   }
 
+  const isKimiCode = provider.name === 'kimi' && harness === 'kimi-code';
+
   const env: Record<string, string> = {};
 
-  if (provider.name === 'kimi') {
-    env.ANTHROPIC_BASE_URL = getKimiAnthropicBaseUrl(apiKey);
-  } else if (provider.baseUrl) {
-    env.ANTHROPIC_BASE_URL = provider.baseUrl;
+  if (!isKimiCode) {
+    if (provider.name === 'kimi') {
+      env.ANTHROPIC_BASE_URL = getKimiAnthropicBaseUrl(apiKey);
+    } else if (provider.baseUrl) {
+      env.ANTHROPIC_BASE_URL = provider.baseUrl;
+    }
   }
 
-  if (provider.name !== 'anthropic') {
+  if (provider.name !== 'anthropic' && !isKimiCode) {
     if (provider.authType === 'credential-file') {
       // Credential-file providers use apiKeyHelper for dynamic token refresh.
       // We still need an initial ANTHROPIC_AUTH_TOKEN for the first request,
@@ -423,7 +435,8 @@ export function getProviderEnvSync(
 
   // Pi-native provider env vars so the Pi harness can authenticate directly
   // when driving non-Anthropic models (Pi has its own provider registry).
-  if (provider.name === 'kimi') {
+  // Native kimi-code ignores this var (auth is host-owned), so it's skipped too.
+  if (provider.name === 'kimi' && !isKimiCode) {
     env.KIMI_API_KEY = apiKey;
   } else if (provider.name === 'minimax') {
     env.MINIMAX_API_KEY = apiKey;

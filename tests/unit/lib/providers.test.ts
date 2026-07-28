@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getBuiltInDefaultHarness, PROVIDERS, type ProviderName } from '../../../src/lib/providers.js';
+import { getBuiltInDefaultHarness, getProviderEnvSync, PROVIDERS, type ProviderName } from '../../../src/lib/providers.js';
 import type { RuntimeName } from '../../../src/lib/runtimes/types.js';
 
 const EXPECTED_DEFAULT_HARNESSES: Record<ProviderName, RuntimeName> = {
@@ -37,5 +37,36 @@ describe('providers', () => {
 
   it('falls back to claude-code for unknown providers', () => {
     expect(getBuiltInDefaultHarness('unknown-provider')).toBe('claude-code');
+  });
+});
+
+describe('getProviderEnvSync — kimi-code Anthropic-compat gate (PAN-1837 wi7a)', () => {
+  it('AC1: omits ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, and KIMI_API_KEY for {kimi, kimi-code}', () => {
+    const env = getProviderEnvSync(PROVIDERS.kimi, 'sk-kimi-test-key', 'kimi-code');
+    expect(env.ANTHROPIC_BASE_URL).toBeUndefined();
+    expect(env.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
+    expect(env.KIMI_API_KEY).toBeUndefined();
+  });
+
+  it('AC2: still sets ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, and KIMI_API_KEY for {kimi, claude-code}', () => {
+    const withHarness = getProviderEnvSync(PROVIDERS.kimi, 'sk-kimi-test-key', 'claude-code');
+    const withoutHarness = getProviderEnvSync(PROVIDERS.kimi, 'sk-kimi-test-key');
+    for (const env of [withHarness, withoutHarness]) {
+      expect(env.ANTHROPIC_BASE_URL).toBeTruthy();
+      expect(env.ANTHROPIC_AUTH_TOKEN).toBe('sk-kimi-test-key');
+      expect(env.KIMI_API_KEY).toBe('sk-kimi-test-key');
+    }
+    // Omitting harness must produce byte-identical output to explicit claude-code.
+    expect(withoutHarness).toEqual(withHarness);
+  });
+
+  it('AC3: acp and codex env output is byte-identical whether or not harness is passed', () => {
+    const acpProvider = PROVIDERS.kimi;
+    expect(getProviderEnvSync(acpProvider, 'sk-kimi-test-key', 'acp')).toEqual(
+      getProviderEnvSync(acpProvider, 'sk-kimi-test-key'),
+    );
+    expect(getProviderEnvSync(PROVIDERS.minimax, 'mm-key', 'codex')).toEqual(
+      getProviderEnvSync(PROVIDERS.minimax, 'mm-key'),
+    );
   });
 });
