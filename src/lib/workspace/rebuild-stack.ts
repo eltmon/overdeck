@@ -31,6 +31,7 @@ import {
   collectDockerContainerLifecycleSnapshot,
   composeProjectNameForWorkspace,
   hasIssueToken,
+  requireComposeProjectNameForWorkspace,
 } from './stack-health.js';
 import { reconcileTraefikNetworks } from './traefik-connect.js';
 
@@ -184,13 +185,30 @@ export const rebuildWorkspaceStack = (
       } satisfies RebuildWorkspaceStackResult;
     }
 
-    const composeProjectName = composeProjectNameForWorkspace(workspacePath, normalizedIssueId);
+    // Pre-render name: the workspace's current devcontainer state, if any.
+    // Resolves the fallback cleanly when nothing is declared yet (matching
+    // pre-PAN-3049 behavior for a brand-new workspace), but a genuinely
+    // CONFLICTING declaration throws — and that must never be converted into
+    // a guessed name to run `down` against. Guessing-then-mutating on an
+    // unresolvable identity is exactly the fail-open path NonGoal 1
+    // forbids: we do not know what the real running stack (if any) is
+    // named, so the safe action is to skip the pre-render teardown
+    // entirely and let the existing stale-container sweep
+    // (removeStaleIssueContainers, below) reconcile it — that sweep only
+    // ever acts on containers Docker positively reports as non-running,
+    // never on an absence of evidence.
+    let preRenderComposeProjectName: string | null = null;
+    try {
+      preRenderComposeProjectName = composeProjectNameForWorkspace(workspacePath, normalizedIssueId);
+    } catch {
+      progress('Current devcontainer state has a conflicting declaration — skipping pre-render teardown.');
+    }
 
     const existingComposeFile = findDevcontainerComposeFile(workspacePath);
-    if (existingComposeFile) {
+    if (existingComposeFile && preRenderComposeProjectName) {
       progress('Tearing down existing workspace stack...');
       yield* dockerCompose(
-        ['-f', existingComposeFile, '-p', composeProjectName, 'down', '-v', '--remove-orphans'],
+        ['-f', existingComposeFile, '-p', preRenderComposeProjectName, 'down', '-v', '--remove-orphans'],
         dirname(existingComposeFile),
       );
     }
@@ -216,6 +234,27 @@ export const rebuildWorkspaceStack = (
         error: `No devcontainer compose file found in ${devcontainerDir}`,
         workspacePath,
       } satisfies RebuildWorkspaceStackResult;
+    }
+
+    // Strict: a freshly rendered workspace must declare a resolvable name.
+    // Silently falling back here is exactly the loud failure PAN-3049 needs —
+    // a rebuild that can't confirm the declared name must not guess one.
+    const composeProjectName = yield* Effect.try({
+      try: () => requireComposeProjectNameForWorkspace(workspacePath, normalizedIssueId),
+      catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
+    });
+
+    // No proactive teardown of a "differently-named" stack here. Guessing
+    // that a resolvable name difference means the OLD name is safe to stop
+    // is exactly the fail-open pattern review flagged: a transient Docker
+    // query failure or a live-but-restarting/paused stack under that name
+    // could be silently torn down. removeStaleIssueContainers below is the
+    // sole cleanup path for other-project-named residue, and it only
+    // removes containers Docker positively reports as non-running.
+    if (preRenderComposeProjectName && preRenderComposeProjectName !== composeProjectName) {
+      progress(
+        `Devcontainer now declares ${composeProjectName}, previously ${preRenderComposeProjectName} — any leftover stack under the old name is left for the stale-container sweep or \`pan doctor\`.`,
+      );
     }
 
     progress('Ensuring shared docker network...');

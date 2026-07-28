@@ -2335,7 +2335,7 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
   try {
     // Find all workspace-related containers that are exited (crashed)
     const { stdout } = await execAsync(
-      'docker ps -a --filter "status=exited" --filter "name=overdeck-feature-" --format "{{.Names}}|{{.Status}}" 2>/dev/null || true',
+      'docker ps -a --filter "status=exited" --filter "name=feature-" --format "{{.Names}}|{{.Status}}" 2>/dev/null || true',
       { encoding: 'utf-8', timeout: 10000 },
     );
     const crashed = stdout.trim().split('\n').filter(Boolean);
@@ -2353,8 +2353,8 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
 
       // Init containers are one-shot by design — they run setup, exit, and stay exited.
       // Restarting them is meaningless and floods agents with bogus "container crashed" alerts.
-      // Match service containers only (frontend/server), not init.
-      const match = name.match(/overdeck-feature-([\w-]+?)-(frontend|server)-/);
+      // Match only the final Compose feature-<issue>-<service>-<index> suffix; an earlier feature segment may be a decoy.
+      const match = name.match(/feature-((?:[a-z]+-\d+)|(?:(?:f|us|de|ta|tc)\d+))-(frontend|server)-\d+$/i);
       if (!match) continue;
 
       // Skip clean shutdowns (exit code 0). Status format: "Exited (N) X minutes ago".
