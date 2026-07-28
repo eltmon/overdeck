@@ -28,32 +28,113 @@ function declaredComposeProjectName(content: string, featureFolder: string): str
   return literalMatch?.[1] ?? null;
 }
 
+// Duplicated from rebuild-stack.ts's COMPOSE_FILES intentionally: this module
+// cannot import from rebuild-stack.ts (it imports composeProjectNameForWorkspace
+// from here), and health checks need the same candidate list without a cycle.
+const COMPOSE_FILE_CANDIDATES = [
+  'docker-compose.devcontainer.yml',
+  'docker-compose.yml',
+  'docker-compose.yaml',
+  'compose.yml',
+  'compose.yaml',
+];
+
+function findDevcontainerComposeFile(workspacePath: string): string | null {
+  const devcontainerDir = join(workspacePath, '.devcontainer');
+  for (const file of COMPOSE_FILE_CANDIDATES) {
+    const fullPath = join(devcontainerDir, file);
+    if (existsSync(fullPath)) return fullPath;
+  }
+  return null;
+}
+
+/** Parse a top-level (unindented) compose `name:` key, e.g. `name: myn-feature-min-901`. */
+function declaredComposeFileProjectName(content: string, featureFolder: string): string | null {
+  const match = content.match(/^name:\s*['"]?([^'"\n]+?)['"]?\s*$/m);
+  if (!match) return null;
+  const raw = match[1].trim();
+  return raw.includes('${FEATURE_FOLDER}') ? raw.replace('${FEATURE_FOLDER}', featureFolder) : raw;
+}
+
+function assertDeclaredNameMatchesFeatureFolder(
+  sourcePath: string,
+  declaredKey: string,
+  declared: string,
+  featureFolder: string,
+): void {
+  if (!declared.endsWith(featureFolder)) {
+    throw new Error(
+      `Refusing workspace rebuild: ${sourcePath} declares ${declaredKey}=${declared}, expected a name ending in ${featureFolder}`,
+    );
+  }
+}
+
+/**
+ * Resolve the compose project name declared by the workspace's dev script or
+ * devcontainer compose file, without applying the `overdeck-` fallback.
+ * Returns `{ name: null, composeFilePath }` when neither source declares one —
+ * `composeFilePath` is non-null when a compose file exists so callers can
+ * report where they looked.
+ */
+function resolveDeclaredComposeProjectName(
+  workspacePath: string,
+  featureFolder: string,
+): { name: string | null; composeFilePath: string | null } {
+  for (const devPath of [join(workspacePath, '.devcontainer', 'dev'), join(workspacePath, 'dev')]) {
+    if (!existsSync(devPath)) continue;
+    try {
+      const declared = declaredComposeProjectName(readFileSync(devPath, 'utf-8'), featureFolder);
+      if (!declared) continue;
+      assertDeclaredNameMatchesFeatureFolder(devPath, 'COMPOSE_PROJECT_NAME', declared, featureFolder);
+      return { name: declared, composeFilePath: null };
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.startsWith('Refusing workspace rebuild:')) throw err;
+    }
+  }
+
+  const composeFilePath = findDevcontainerComposeFile(workspacePath);
+  if (!composeFilePath) return { name: null, composeFilePath: null };
+
+  const declared = declaredComposeFileProjectName(readFileSync(composeFilePath, 'utf-8'), featureFolder);
+  if (!declared) return { name: null, composeFilePath };
+  assertDeclaredNameMatchesFeatureFolder(composeFilePath, 'name', declared, featureFolder);
+  return { name: declared, composeFilePath };
+}
+
 /**
  * Derive the canonical `COMPOSE_PROJECT_NAME` for a workspace. Throws when the
  * workspace declares a name that does not end in the feature folder — a
  * mismatch means `docker compose down` would target the wrong stack.
  * (Lives here rather than in rebuild-stack so health checks can scope
  * container matching without an import cycle.)
+ *
+ * Silently falls back to `overdeck-feature-<issue>` when no dev script or
+ * compose file declares a name. Use `requireComposeProjectNameForWorkspace`
+ * at bring-up time, where a workspace with a compose file but no resolvable
+ * name is a bug to surface, not a condition to paper over with a guess.
  */
 export function composeProjectNameForWorkspace(workspacePath: string, issueId: string): string {
   const featureFolder = `feature-${issueId.toLowerCase()}`;
   const fallback = `overdeck-${featureFolder}`;
-  for (const devPath of [join(workspacePath, '.devcontainer', 'dev'), join(workspacePath, 'dev')]) {
-    if (!existsSync(devPath)) continue;
-    try {
-      const declared = declaredComposeProjectName(readFileSync(devPath, 'utf-8'), featureFolder);
-      if (!declared) continue;
-      if (!declared.endsWith(featureFolder)) {
-        throw new Error(
-          `Refusing workspace rebuild: ${devPath} declares COMPOSE_PROJECT_NAME=${declared}, expected a name ending in ${featureFolder}`,
-        );
-      }
-      return declared;
-    } catch (err: unknown) {
-      if (err instanceof Error && err.message.startsWith('Refusing workspace rebuild:')) throw err;
-    }
-  }
-  return fallback;
+  return resolveDeclaredComposeProjectName(workspacePath, featureFolder).name ?? fallback;
+}
+
+/**
+ * Strict counterpart to `composeProjectNameForWorkspace`. When a devcontainer
+ * compose file exists but neither it nor any dev script declares a name,
+ * throws instead of silently returning the `overdeck-` fallback — that
+ * silent guess is what let a second stack spring up beside a workspace's real
+ * `myn-feature-*` stack (PAN-3049). Non-docker workspaces (no compose file at
+ * all) still resolve to the `overdeck-` fallback, matching the lenient variant.
+ */
+export function requireComposeProjectNameForWorkspace(workspacePath: string, issueId: string): string {
+  const featureFolder = `feature-${issueId.toLowerCase()}`;
+  const resolved = resolveDeclaredComposeProjectName(workspacePath, featureFolder);
+  if (resolved.name) return resolved.name;
+  if (!resolved.composeFilePath) return `overdeck-${featureFolder}`;
+  throw new Error(
+    `Cannot resolve compose project name for workspace ${workspacePath}: ${resolved.composeFilePath} declares no top-level 'name:' and neither ${join(workspacePath, '.devcontainer', 'dev')} nor ${join(workspacePath, 'dev')} declares COMPOSE_PROJECT_NAME`,
+  );
 }
 
 /**
