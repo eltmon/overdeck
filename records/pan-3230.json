@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T17:38:12.301Z",
+  "updated": "2026-07-28T17:41:19.615Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "fix-auto-synthesize-write-dir": {
-        "writerId": "agent-pan-3230",
-        "agentId": "agent-pan-3230",
-        "pid": 1430813,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T17:38:12.301Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3230",
@@ -123,6 +115,17 @@
         "outcome": "completed",
         "reason": "Backlog lookups, input collection, and dashboard route now reuse authoritative state-aware spec and draft directories.",
         "releasedAt": "2026-07-28T17:38:01.238Z"
+      },
+      {
+        "writerId": "agent-pan-3230",
+        "agentId": "agent-pan-3230",
+        "pid": 1430813,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:38:12.301Z",
+        "itemId": "fix-auto-synthesize-write-dir",
+        "outcome": "completed",
+        "reason": "Auto-synthesized specs now write to the state-aware canonical specsDir, with migrated findPlanSync regression coverage.",
+        "releasedAt": "2026-07-28T17:41:19.614Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +144,10 @@
       "fix-backlog-spec-drafts-scan": {
         "reason": "Backlog lookups, input collection, and dashboard route now reuse authoritative state-aware spec and draft directories.",
         "updatedAt": "2026-07-28T17:38:01.238Z"
+      },
+      "fix-auto-synthesize-write-dir": {
+        "reason": "Auto-synthesized specs now write to the state-aware canonical specsDir, with migrated findPlanSync regression coverage.",
+        "updatedAt": "2026-07-28T17:41:19.614Z"
       }
     }
   },
@@ -158,6 +165,9 @@
     "fix-backlog-spec-drafts-scan": "completed",
     "fix-backlog-spec-drafts-scan.fix-backlog-spec-drafts-scan.ac1": "completed",
     "fix-backlog-spec-drafts-scan.fix-backlog-spec-drafts-scan.ac2": "completed",
-    "fix-auto-synthesize-write-dir": "running"
+    "fix-auto-synthesize-write-dir": "completed",
+    "fix-auto-synthesize-write-dir.fix-auto-synthesize-write-dir.ac1": "completed",
+    "fix-auto-synthesize-write-dir.fix-auto-synthesize-write-dir.ac2": "completed",
+    "fix-auto-synthesize-write-dir.fix-auto-synthesize-write-dir.ac3": "completed"
   }
 }
