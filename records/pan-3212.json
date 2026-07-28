@@ -41,7 +41,13 @@
   ],
   "feedback": [],
   "scopeDrift": {
-    "outsideDeclaredScope": [],
+    "outsideDeclaredScope": [
+      "src/lib/__tests__/linear-mcp-auth-wake.test.ts",
+      "src/lib/agents/delivery.ts",
+      "src/lib/errors.ts",
+      "src/lib/linear-mcp-auth.ts",
+      "src/lib/tmux.ts"
+    ],
     "declaredScopeUntouched": [],
     "declaredScope": [
       "CLAUDE.md",
@@ -54,17 +60,22 @@
     ],
     "actualChangedFiles": [
       "CLAUDE.md",
+      "src/lib/__tests__/linear-mcp-auth-wake.test.ts",
       "src/lib/__tests__/tmux-dedup.test.ts",
+      "src/lib/agents/delivery.ts",
+      "src/lib/errors.ts",
+      "src/lib/linear-mcp-auth.ts",
       "src/lib/overdeck/conversation-runtime.ts",
       "src/lib/overdeck/resume-contract-delivery.ts",
       "src/lib/tmux-dedup.ts",
+      "src/lib/tmux.ts",
       "tests/lib/tmux-send-keys-blocking-menu.test.ts",
       "tests/unit/lib/overdeck/resume-contract-delivery.test.ts"
     ],
-    "recordedAt": "2026-07-28T16:44:14.261Z"
+    "recordedAt": "2026-07-28T17:49:31.882Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T17:49:23.053Z",
+  "updated": "2026-07-28T17:49:31.884Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "reviewing",
