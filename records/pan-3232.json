@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T20:28:59.826Z",
+  "updated": "2026-07-28T20:32:04.672Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -86,16 +86,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "decisions-prompt-threading": {
-        "writerId": "agent-pan-3232",
-        "agentId": "agent-pan-3232",
-        "pid": 3471084,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:28:59.826Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3232",
@@ -106,6 +98,16 @@
         "itemId": "issue-view-awaiting-fields",
         "outcome": "completed",
         "releasedAt": "2026-07-28T20:28:53.639Z"
+      },
+      {
+        "writerId": "agent-pan-3232",
+        "agentId": "agent-pan-3232",
+        "pid": 3471084,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:28:59.826Z",
+        "itemId": "decisions-prompt-threading",
+        "outcome": "completed",
+        "releasedAt": "2026-07-28T20:32:04.672Z"
       }
     ]
   },
@@ -114,6 +116,10 @@
     "issue-view-awaiting-fields.issue-view-awaiting-fields.ac1": "completed",
     "issue-view-awaiting-fields.issue-view-awaiting-fields.ac2": "completed",
     "issue-view-awaiting-fields.issue-view-awaiting-fields.ac3": "completed",
-    "decisions-prompt-threading": "running"
+    "decisions-prompt-threading": "completed",
+    "decisions-prompt-threading.decisions-prompt-threading.ac1": "completed",
+    "decisions-prompt-threading.decisions-prompt-threading.ac2": "completed",
+    "decisions-prompt-threading.decisions-prompt-threading.ac3": "completed",
+    "decisions-prompt-threading.decisions-prompt-threading.ac4": "completed"
   }
 }
