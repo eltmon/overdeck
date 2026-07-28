@@ -1,0 +1,502 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T18:36:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3233: Enrichment classification defects hide genuinely frozen agents: specialist suppression zeroes the work agent's permission prompt, user_question yields empty kinds (35 agents invisible + unreapable), count semantics exclude pane prompts",
+    "updated": "2026-07-28T18:27:45.208Z"
+  },
+  "plan": {
+    "id": "pan-3233",
+    "title": "Enrichment classification defects hide genuinely frozen agents (suppression, empty kinds, count semantics)",
+    "status": "proposed",
+    "uid": "fac9c034-de34-4924-be96-beb8cc165804",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-28T18:36:00.000Z",
+    "updated": "2026-07-28T18:27:45.208Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3233",
+        "label": "PAN-3233",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3228",
+        "label": "PAN-3228",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "enrichment",
+      "pending-input",
+      "decisions-surface",
+      "reaper",
+      "server"
+    ],
+    "narratives": {
+      "Problem": "Three verified defects in src/lib/agent-enrichment.ts hide genuinely frozen agents: (1) specialist suppression zeroes a work agent's live tool-permission pane prompt while review/test runs, with an ungated pendingQuestionReason producing a contradictory fingerprint; (2) user_question/confirmation/disambiguation/planning_done detections yield empty pendingInputKinds, making 35 live agents invisible to the Decisions surface (kinds.length > 0 gate at store.ts:467) and unreapable (pendingInputCount > 0 gate in agent-enrichment-service.ts); (3) pendingQuestionCount counts only JSONL AskUserQuestion entries, so pane prompts always report count 0 against hasPendingQuestion true.",
+      "Proposal": "Narrow, decision-complete fixes in the enrichment layer per the PRD (drafts/pan-3233.md): exempt blocking pane detections from specialist suppression; gate the whole question fingerprint (count/prompt/reason) on suppression; add a new 'paneQuestion' kind for question-family detections with an askUserQuestion guard; fold blocking detections into pendingQuestionCount (JSONL length, else 1, 0 when suppressed); add the frontend label; lock Decisions and reap eligibility with regression tests; document kind/suppression/count semantics in docs/PENDING-INPUT.md. The 35 stuck agents self-heal via the 10s enrichment poller after deploy; stopped agents are already cleared by projectPendingInput.",
+      "NonGoals": "- No renaming of pendingQuestionCount (fold chosen; contracts/reducers/frontend untouched by a rename)\n- No changes to packages/contracts schemas (kinds are plain strings there)\n- No new reconciliation/backfill machinery for the 35 stuck agents (poller re-enrichment + existing projectPendingInput cover it)\n- No promotion of 'other'-reason detections into kinds/count (PAN-1591 phantom-row rule preserved)\n- No changes to conversation enrichment call sites (they inherit the new kind via shared appendPaneDetectionKind)\n- No render-layer fixes (filed separately per the issue)\n- No changes to the PAN-3228 recovery gate itself"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Suppression exemption keyed on blocking pane detections only (paneDetection non-null and reason in BLOCKING_AWAITING_INPUT_REASONS).",
+        "rationale": "Pane detections are live tmux evidence computed only when JSONL/runtime detections are null, so the exemption cannot expose the stale parked-agent surfaces PAN-1834 suppression exists for; the issue names blocking pane detections (tool_permission foremost) as the mandatory exemption."
+      },
+      {
+        "summary": "Existing suppression test (compute-agent-enrichment.test.ts:56-72) is rewritten to assert suppression via a JSONL AskUserQuestion instead of a rate_limit pane detection.",
+        "rationale": "That test locks the defective behavior the issue mandates removing; rate_limit is a blocking pane reason and must now surface. Suppression itself still needs a lock, so the test is inverted rather than deleted."
+      },
+      {
+        "summary": "New kind named 'paneQuestion' covering user_question, confirmation, disambiguation, and planning_done detections, guarded against double-representation with askUserQuestion.",
+        "rationale": "Symmetric with the existing 'paneChoice' kind; these detections carry no structured payload so reusing 'askUserQuestion' would break payload-expecting consumers; contracts type kinds as plain strings and the frontend label map has a safe fallback, so the addition is purely additive."
+      },
+      {
+        "summary": "Defect 3 resolved by folding blocking detections into pendingQuestionCount rather than renaming the field.",
+        "rationale": "The issue offers either option; folding fixes every count > 0 gate in place (audited: pipeline-state.ts hasActualPendingQuestion, getPendingQuestionTitle, listing.ts, event-reducers.ts pass-throughs) while a rename would touch contracts, events, reducers, and frontend for the same observable result."
+      },
+      {
+        "summary": "The 35 currently-stuck agents are reconciled by the poller, not by new machinery.",
+        "rationale": "Active agents re-enrich every 10s and the kinds change emits an enrichment_changed event; stopped agents already have pending fields cleared by projectPendingInput (read-model.ts:267-280). Issue acceptance explicitly allows 'classify correctly after the fix'."
+      }
+    ],
+    "items": [
+      {
+        "id": "suppression-exemption",
+        "title": "Blocking pane detections bypass specialist suppression",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T18:36:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3233",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agent-enrichment.ts",
+            "src/lib/__tests__/compute-agent-enrichment.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/compute-agent-enrichment.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "compute-agent-enrichment.test.ts passes including the new tool_permission-under-active-specialist test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W1: in computeAgentEnrichmentPromise (src/lib/agent-enrichment.ts:626), add hasBlockingPaneDetection = paneDetection !== null && BLOCKING_AWAITING_INPUT_REASONS.has(paneDetection.reason), and AND shouldSuppressPendingInput with !hasBlockingPaneDetection. Add a regression test: role work, hasActiveSpecialist true, pane detection mock returns { reason: 'tool_permission', prompt: '...' }, empty scan. Rewrite the existing test at compute-agent-enrichment.test.ts:56-72 to assert suppression using a JSONL AskUserQuestion in the scan with the pane mock returning null (decision D2)."
+        },
+        "items": [
+          {
+            "id": "suppression-exemption.ac1",
+            "title": "Given a work-role agent with hasActiveSpecialist=true and a tool_permission pane detection, enrichment returns hasPendingQuestion: true, pendingInputKinds containing 'permissionRequest', and resolution 'needs_input'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "suppression-exemption.ac2",
+            "title": "Given a work-role agent with hasActiveSpecialist=true whose scan carries a JSONL AskUserQuestion and no pane detection, enrichment returns hasPendingQuestion: false and pendingInputKinds [] (rewritten suppression lock)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "suppression-exemption.ac3",
+            "title": "Given a review-role agent with hasActiveSpecialist=true and a rate_limit pane detection, enrichment still produces pendingInputKinds containing 'rateLimit' (existing behavior preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fingerprint-consistency",
+        "title": "Gate pendingQuestionCount/prompt/reason on suppression",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:36:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3233",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agent-enrichment.ts",
+            "src/lib/__tests__/compute-agent-enrichment.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/compute-agent-enrichment.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "suppressed-fingerprint test passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W2: in the return object of computeAgentEnrichmentPromise (src/lib/agent-enrichment.ts:664-666), when shouldSuppressPendingInput is true emit pendingQuestionCount: 0, pendingQuestionPrompt: undefined, pendingQuestionReason: undefined. Add a test asserting the suppressed enrichment carries the consistent fingerprint (no more {hasPendingQuestion: false, pendingQuestionReason: 'tool_permission'} contradiction)."
+        },
+        "items": [
+          {
+            "id": "fingerprint-consistency.ac1",
+            "title": "Given suppression applies, enrichment emits pendingQuestionReason undefined, pendingQuestionPrompt undefined, and pendingQuestionCount 0 alongside hasPendingQuestion false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fingerprint-consistency.ac2",
+            "title": "Given suppression does not apply, enrichment preserves detection prompt and reason unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pane-question-kind",
+        "title": "Add 'paneQuestion' kind for question-family detections",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T18:36:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3233",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agent-enrichment.ts",
+            "src/lib/__tests__/agent-enrichment.test.ts",
+            "src/lib/__tests__/compute-agent-enrichment.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/agent-enrichment.test.ts src/lib/__tests__/compute-agent-enrichment.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "appendPaneDetectionKind unit tests pass for all four question-family reasons, the askUserQuestion guard, and the 'other' exclusion",
+            "compute-level user_question test yields pendingInputKinds ['paneQuestion'] and pendingInputCount 1",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W3: add | 'paneQuestion' to the PendingInputKind union (src/lib/agent-enrichment.ts:46-60) with a doc comment (question/confirmation prompt detected from pane or runtime state, no structured payload, answered in the terminal). Extend appendPaneDetectionKind (:103-118) to push 'paneQuestion' for reasons user_question, confirmation, disambiguation, planning_done, guarded by !kinds.includes('askUserQuestion') && !kinds.includes('paneQuestion'). Unit tests in agent-enrichment.test.ts; compute-level test with runtime state { state: 'waiting-on-human', waitingReason: 'user_question' } and empty scan. appendPaneDetectionKind is shared with conversation-list.ts/conversation-reads.ts — no changes there (hazard H3)."
+        },
+        "items": [
+          {
+            "id": "pane-question-kind.ac1",
+            "title": "appendPaneDetectionKind pushes 'paneQuestion' for each of user_question, confirmation, disambiguation, and planning_done detections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-question-kind.ac2",
+            "title": "appendPaneDetectionKind does not push 'paneQuestion' when kinds already contains 'askUserQuestion', and pushes nothing for reason 'other'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-question-kind.ac3",
+            "title": "Given runtime state waiting-on-human with waitingReason user_question and an empty JSONL scan, enrichment returns hasPendingQuestion true, pendingInputKinds ['paneQuestion'], and pendingInputCount 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "count-fold",
+        "title": "Fold blocking detections into pendingQuestionCount",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:36:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3233",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agent-enrichment.ts",
+            "src/lib/__tests__/compute-agent-enrichment.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/compute-agent-enrichment.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "count-fold tests pass (1 for blocking detections, 0 for 'other', JSONL length otherwise)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W4, building on fingerprint-consistency: pendingQuestionCount = 0 when suppressed; else pendingQuestions.length when > 0; else 1 when isBlockedOnPendingInput({ hasPendingQuestion, pendingQuestionReason: detection?.reason }) is true; else 0. Tests: pane tool_permission gives count 1; runtime user_question gives count 1; 'other' fallback gives count 0; JSONL questions give count === length. The consumer audit is in the PRD — no consumer changes needed."
+        },
+        "items": [
+          {
+            "id": "count-fold.ac1",
+            "title": "Given an unsuppressed blocking detection with no JSONL questions, enrichment returns pendingQuestionCount 1 so hasPendingQuestion true never pairs with count 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "count-fold.ac2",
+            "title": "Given only an 'other'-reason fallback detection, enrichment returns pendingQuestionCount 0 (PAN-1591 preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "count-fold.ac3",
+            "title": "Given N JSONL AskUserQuestion entries, enrichment returns pendingQuestionCount N unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-kind-label",
+        "title": "Frontend vocabulary: paneQuestion union member and label",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:36:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3233",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/pendingInput.ts",
+            "src/dashboard/frontend/src/lib/__tests__/pendingInput.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/pendingInput.test.ts"
+          ],
+          "expected_outputs": [
+            "pendingInput.test.ts passes including the paneQuestion label assertion"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W5: add | 'paneQuestion' to the PendingInputKind union (src/dashboard/frontend/src/lib/pendingInput.ts:12-20) and add paneQuestion: 'Question in terminal — answer the agent' to PENDING_INPUT_KIND_LABEL (:23-32). Test that describePendingInput(['paneQuestion']) returns the label. The kind string must exactly match the server-side literal added in pane-question-kind."
+        },
+        "items": [
+          {
+            "id": "frontend-kind-label.ac1",
+            "title": "describePendingInput(['paneQuestion']) returns 'Question in terminal — answer the agent' instead of the raw kind string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-kind-label.ac2",
+            "title": "The frontend PendingInputKind union accepts 'paneQuestion' so typed consumers compile against the new kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reap-decisions-regression",
+        "title": "Regression tests: paneQuestion agents are Decisions-eligible and reapable",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T18:36:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-3233",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+            "src/dashboard/frontend/src/__tests__/store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/__tests__/store.test.ts"
+          ],
+          "expected_outputs": [
+            "hasReapablePendingInput returns true for a paneQuestion-only enrichment",
+            "selectPendingInputSubjects includes an agent whose only kind is paneQuestion"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W6: (a) in agent-enrichment-service.test.ts, assert hasReapablePendingInput returns true for an enrichment with pendingInputCount 1 and pendingInputKinds ['paneQuestion'] and no pendingAskUserQuestion/pendingProposedPlan payload; (b) in the frontend store.test.ts, assert selectPendingInputSubjects returns a subject for an agent snapshot whose pendingInputKinds is ['paneQuestion'] (kinds.length > 0 gate at store.ts:467). These lock the issue's second acceptance bullet end-to-end."
+        },
+        "items": [
+          {
+            "id": "reap-decisions-regression.ac1",
+            "title": "hasReapablePendingInput returns true for an enrichment carrying only pendingInputKinds ['paneQuestion'] with pendingInputCount 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reap-decisions-regression.ac2",
+            "title": "selectPendingInputSubjects returns a subject with kinds ['paneQuestion'] for an agent whose enrichment carries that kind, so the Decisions surface renders it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pending-input",
+        "title": "Document paneQuestion kind, suppression exemption, and count semantics",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:36:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3233",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PENDING-INPUT.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'paneQuestion' docs/PENDING-INPUT.md"
+          ],
+          "expected_outputs": [
+            "grep prints at least one matching line in the kinds table and one in the invariants section"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W7: add a paneQuestion row to the kinds table in docs/PENDING-INPUT.md (Detected from: pane/runtime question-family reasons user_question/confirmation/disambiguation/planning_done; Payload: none; Responder: terminal only). In the Invariants section, state the post-PAN-3233 suppression rule (specialist suppression hides the parked agent's JSONL/runtime/turn-end surfaces; blocking pane detections always surface) and the pendingQuestionCount semantics (JSONL AskUserQuestion count, else 1 for a blocking detection, 0 when suppressed)."
+        },
+        "items": [
+          {
+            "id": "docs-pending-input.ac1",
+            "title": "The kinds table in docs/PENDING-INPUT.md renders a paneQuestion row naming its detection sources and terminal-only responder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pending-input.ac2",
+            "title": "The invariants section contains the rule that blocking pane detections survive specialist suppression and shows the three-branch pendingQuestionCount semantics",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "suppression-exemption",
+        "to": "fingerprint-consistency",
+        "type": "blocks"
+      },
+      {
+        "from": "fingerprint-consistency",
+        "to": "pane-question-kind",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-question-kind",
+        "to": "count-fold",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-question-kind",
+        "to": "reap-decisions-regression",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-kind-label",
+        "to": "reap-decisions-regression",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-question-kind",
+        "to": "frontend-kind-label",
+        "type": "informs"
+      },
+      {
+        "from": "count-fold",
+        "to": "docs-pending-input",
+        "type": "informs"
+      },
+      {
+        "from": "suppression-exemption",
+        "to": "docs-pending-input",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-28-PAN-3233-enrichment-classification-defects-hide-genuinely-frozen-agents-specialist-suppression-zeroes-the-work-agent-s-permission-prompt-user-question-yields-empty-kinds-35-agents-invisible-unreapable-count-semantics-exclude-pane-prompts.xbrief.json"
+    }
+  },
+  "status": "proposed"
+}
