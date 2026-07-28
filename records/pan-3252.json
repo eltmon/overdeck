@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-28T22:21:30.447Z",
+  "updated": "2026-07-28T22:22:06.624Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T22:21:30.437Z",
-    "inspectNotes": "Inspecting item ql-provider-registry"
+    "updatedAt": "2026-07-28T22:22:06.599Z",
+    "inspectNotes": "All 3 ACs met: getProviderForModelSync resolves ql-reason-70b/ql-swift-8b/ql-nano-1b to PROVIDERS.quantumllama (providers.ts:392-395, reached — no earlier branch matches ql-* ids); getProviderEnvSync emits ANTHROPIC_BASE_URL=https://api.quantumllama.ai/v1 via provider.baseUrl and QUANTUMLLAMA_API_KEY (providers.ts:469-470); defaultHarness 'claude-code' declared and EXPECTED_DEFAULT_HARNESSES updated. NFR-1 respected: registry/env only, no HTTP, request, or streaming code and no agent-spawn changes. Verified locally: tests/unit/lib/providers.test.ts + tests/lib/providers.test.ts, 23 passed."
   },
   "closeOut": {
     "usage": {
@@ -46,7 +46,7 @@
       },
       "costAtCloseOut": {
         "usd": 6.911624,
-        "pricingAsOf": "2026-07-28T22:21:30.441Z"
+        "pricingAsOf": "2026-07-28T22:22:06.614Z"
       }
     },
     "merges": [],
