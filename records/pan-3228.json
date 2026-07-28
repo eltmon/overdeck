@@ -196,7 +196,7 @@
     "recordedAt": "2026-07-28T22:30:42.486Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T23:02:05.876Z",
+  "updated": "2026-07-28T23:28:51.155Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "passed",
@@ -205,18 +205,24 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T22:45:26.215Z",
-    "updatedAt": "2026-07-28T23:01:58.985Z",
+    "updatedAt": "2026-07-28T23:28:51.135Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3228-review",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since 04bcaeb (2 paths): docs/FLYWHEEL-STATE.md, roles/flywheel.md",
+        "detectedAt": "2026-07-28T23:28:38.244Z"
+      }
+    ],
     "conflictsSince": {
-      "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
-      "detectedAt": "2026-07-28T19:59:33.733Z",
+      "sha": "04bcaeb9f6b9d766a637e3e18eafcc828b0fbdbf",
+      "detectedAt": "2026-07-28T23:28:38.244Z",
       "paths": [
-        "src/lib/gitlab-merge-requests.ts",
-        "tests/unit/lib/gitlab-merge-requests.test.ts",
-        "tests/unit/lib/pipeline-membership-gather.test.ts"
+        "docs/FLYWHEEL-STATE.md",
+        "roles/flywheel.md"
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3241",
@@ -359,7 +365,7 @@
       },
       "costAtCloseOut": {
         "usd": 220.22739,
-        "pricingAsOf": "2026-07-28T23:01:59.022Z"
+        "pricingAsOf": "2026-07-28T23:28:51.142Z"
       }
     },
     "merges": [
