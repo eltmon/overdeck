@@ -316,10 +316,10 @@ export const postAgentRestartRoute = HttpRouter.add(
 
           const result = await restartAgent(id, { model: restartModel, harness, graceful: true, message, force });
 
-          if (result.success) {
-            const updatedState = await Effect.runPromise(getAgentState(id));
-            // PAN-1908: write-through projection — agents-row upsert + lifecycle
-            // event append in one SQLite transaction.
+          if (result.success || result.code === 'pending-operator-decision') {
+            const updatedState = result.success ? await Effect.runPromise(getAgentState(id)) : agentState;
+            // PAN-1908: write-through projection — preserve running state when a
+            // late operator decision aborts before the destructive stop boundary.
             if (updatedState) {
               await Effect.runPromise(saveAgentStateAndEmitEventProgram(updatedState, {
                 type: 'agent.started',
