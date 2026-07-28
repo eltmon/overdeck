@@ -615,6 +615,14 @@ export interface YamlConfig {
     };
   };
 
+  /**
+   * Native Kimi Code CLI spawn behavior. The `kimi` binary installs to
+   * ~/.kimi-code/bin and is not added to PATH, so the configured path matters.
+   */
+  kimiCode?: {
+    binaryPath?: string;
+  };
+
   /** Remote work-agent provisioning settings (dashboard-editable subset). */
   remote?: RemoteConfig;
 }
@@ -926,6 +934,11 @@ export interface NormalizedConfig {
     kimi?: {
       binaryPath?: string;
     };
+  };
+
+  /** Native Kimi Code CLI process settings. */
+  kimiCode: {
+    binaryPath?: string;
   };
 
   /** Remote work-agent provisioning settings surfaced by the dashboard. */
