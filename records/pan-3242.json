@@ -29,7 +29,7 @@
     "recordedAt": "2026-07-28T20:52:11.749Z"
   },
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-28T20:52:23.829Z",
+  "updated": "2026-07-28T20:52:32.810Z",
   "pipeline": {
     "issueId": "PAN-3242",
     "reviewStatus": "pending",
@@ -50,7 +50,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3249",
-    "reviewRequestedAt": "2026-07-28T20:52:15.015Z",
+    "reviewRequestedAt": "2026-07-28T20:52:32.420Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/FLYWHEEL-STATE.md"
@@ -68,7 +68,8 @@
         "src/dashboard/frontend/src/components/orders/__tests__/RunSettingsPanel.test.tsx"
       ],
       "recordedAt": "2026-07-28T20:52:11.749Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-28T20:52:32.420Z"
   },
   "closeOut": {
     "usage": {
