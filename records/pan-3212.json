@@ -24,15 +24,7 @@
       "timestamp": "2026-07-28T16:52:25.986Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T16:52:25Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3212\n\n# Review — PAN-3212 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED\n\nThe blocking-menu checks prevent an immediate stray Enter, and the focused tests and typecheck pass, but the keyed fallback can silently lose the message on its next retry because the new abort preserves a pending claim for text that the menu swallowed.\n\n## Context\n\n- Branch: `feature/pan-3212`\n- HEAD reviewed: `aeeb4e52141c6723b3fecaebae95872197109986`\n- PR: `#3227`\n- Dimensions reviewed: correctness, security, requirements/acceptance criteria, performance\n\n## Blocking Findings\n\n### ! A menu-aborted keyed paste is later submitted as an empty message — `src/lib/tmux-dedup.ts:429`\n\n**Evidence tier:** Tier 1 — static data-flow proof\n\n**Changed code:** When `paneHasBlockingChoiceMenu()` matches, `completeKeyedSubmit()` throws `MessageDeliveryFailed` before the atomic submit and deliberately leaves `pendingBefore` intact.\n\n**Problem:** A blocking harness menu does not accept the preceding `paste-buffer`; that swallowed paste is the root behavior this issue is fixing. Preserving the pending marker nevertheless tells `sendKeysDedup()` that the content still exists. On the next delivery attempt, if the operator has cleared the menu and the pane PID is unchanged, `sendKeysDedup()` follows the existing same-target branch at lines 322–333 and returns `submit-pending` without re-pasting. `completeKeyedSubmit()` then sees a clear pane, sends a bare `C-m`, sets the terminal marker, and clears pending.\n\n**Runtime impact:** The keyed tmux fallback reports the delivery as terminal even though the message never reached the composer. Agent feedback or wake messages can be silently lost, and later retries are suppressed by the terminal marker.\n\n**Fix:** The menu-abort path must make the next retry re-paste the content rather than reuse the swallowed pending claim. Preserve the existing atomic marker/poison invariants while invalidating that pending paste safely, or prevent the keyed paste from being claimed while the menu is present. Add a regression test covering the full sequence: keyed paste encounters a menu, submit aborts, the menu clears without a pane-PID change, retry re-pastes the payload, and only then does Enter establish the terminal marker.\n\n## Requirements Coverage\n\nThe three stated work items are present as written: the shared `sendKeys` guard has focused coverage, resume-contract gate handling is extracted and unit-tested, and keyed submission checks the menu before its `if-shell` Enter. The keyed work item's “pending marker survives for retry” behavior is the source of the blocker because the current retry contract assumes a pending claim still represents text in the composer, which is false after a menu swallowed the paste.\n\n## Security Review\n\nNo authentication, authorization, injection, secret-handling, path-traversal, or unsafe-deserialization issue was introduced by this diff.\n\n## Performance Review\n\nNo blocking performance regression was found. The extra bounded 90-line pane capture occurs only on keyed tmux fallback submission and adds constant work outside request-scale loops.\n\n## Non-blocking Findings\n\nNone.\n\n## Verification Performed\n\n- `npx vitest run tests/lib/tmux-send-keys-blocking-menu.test.ts tests/unit/lib/overdeck/resume-contract-delivery.test.ts src/lib/__tests__/tmux-dedup.test.ts` — 3 files, 25 tests passed.\n- `npm run typecheck` — passed, including dashboard and frontend type ratchets.\n- `git diff --check origin/main...HEAD` — passed.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3212/.pan/review/agent-pan-3212-review-aeeb4e52/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3212 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -57,20 +49,19 @@
     "recordedAt": "2026-07-28T16:44:14.261Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T16:52:31.561Z",
+  "updated": "2026-07-28T16:58:39.426Z",
   "pipeline": {
     "issueId": "PAN-3212",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T16:44:36.232Z",
-    "updatedAt": "2026-07-28T16:52:31.554Z",
+    "updatedAt": "2026-07-28T16:58:38.972Z",
     "reviewNotes": "Keyed menu abort preserves a pending claim for swallowed text, so the next same-pane retry sends an empty Enter and marks the message delivered.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
-    "reviewedAtCommit": "aeeb4e52141c6723b3fecaebae95872197109986",
     "lastVerifiedCommit": "aeeb4e52141c6723b3fecaebae95872197109986",
     "reviewSpawnedAt": "2026-07-28T16:45:36.799Z",
     "scopeDrift": {
@@ -102,32 +93,32 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 581338,
-            "output": 60383,
-            "cacheRead": 9086976,
+            "input": 587050,
+            "output": 60607,
+            "cacheRead": 9366528,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 987748,
-            "output": 48193,
-            "cacheRead": 18916352,
+            "input": 1298675,
+            "output": 181098,
+            "cacheRead": 27748864,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1569086,
-          "output": 108576,
-          "cacheRead": 28003328,
+          "input": 1885725,
+          "output": 241705,
+          "cacheRead": 37115392,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 25.104374,
-        "pricingAsOf": "2026-07-28T16:52:31.558Z"
+        "usd": 35.237471,
+        "pricingAsOf": "2026-07-28T16:58:38.995Z"
       }
     },
     "merges": [
