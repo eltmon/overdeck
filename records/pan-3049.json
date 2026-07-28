@@ -75,18 +75,18 @@
     "recordedAt": "2026-07-28T07:46:15.165Z"
   },
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T07:56:52.661Z",
+  "updated": "2026-07-28T07:57:06.060Z",
   "pipeline": {
     "issueId": "PAN-3049",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:47:47.911Z",
-    "updatedAt": "2026-07-28T07:56:50.871Z",
+    "updatedAt": "2026-07-28T07:57:06.039Z",
     "reviewNotes": "Verification failed at lint — fix and resubmit",
     "verificationNotes": "Verification FAILED at lint (282778ms):\n\n\n> @overdeck/core@0.47.1 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.47.1 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.47.1 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.47.1 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.47.1 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.47.1 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.47.1 prelint:skills\n> npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli\n\n\n> @overdeck/core@0.47.1 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.47.1 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\nℹ tsdown v0.21.10 powered by rolldown v1.0.0-rc.17\nℹ config file: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3049/packages/contracts/tsdown.config.ts \nℹ entry: src/index.ts\nℹ tsconfig: tsconfig.json\nℹ entry: sr\n…(39527 chars elided)…\n                          0.10 kB │ gzip:   0.10 kB\nℹ dist/flywheel-DQg8LFaK.js                             0.09 kB │ gzip:   0.09 kB\nℹ dist/search-DVtdbiLb.js                               0.09 kB │ gzip:   0.09 kB\nℹ dist/sync-B6lcrttf.js                                 0.08 kB │ gzip:   0.08 kB\nℹ dist/index.d.ts                                      70.11 kB │ gzip:  19.44 kB\nℹ dist/acp-host.d.ts                                   10.74 kB │ gzip:   2.36 kB\nℹ dist/codex-app-server-host.d.ts                       3.16 kB │ gzip:   1.09 kB\nℹ dist/pty-supervisor.d.ts                              2.20 kB │ gzip:   0.97 kB\nℹ dist/cli/index.d.ts                                   0.01 kB │ gzip:   0.03 kB\nℹ dist/lib/memory/fts-worker.d.ts                       0.01 kB │ gzip:   0.03 kB\nℹ dist/supervisor/server.d.ts                           0.01 kB │ gzip:   0.03 kB\nℹ dist/verification-worker.d.ts                         0.01 kB │ gzip:   0.03 kB\nℹ 468 files, total: 15\n...(truncated)",
     "inspectNotes": "All 4 ACs met. AC1: declaredComposeFileProjectName parses top-level name: (stack-health.ts:52-57), verified against real MYN workspaces which declare 'name: myn-feature-min-XXX' at col 0. AC2: requireComposeProjectNameForWorkspace throws naming workspacePath + composeFilePath + both dev-script paths (stack-health.ts:135-137). AC3: both variants return overdeck-feature-<issue> when composeFilePath is null (lines 119, 134). AC4: assertDeclaredNameMatchesFeatureFolder reuses the exact 'Refusing workspace rebuild:' message for both sources (lines 59-70); dev-script rethrow guard preserved at line 91. COMPOSE_FILE_CANDIDATES and findDevcontainerComposeFile match rebuild-stack.ts:43-58 exactly, so no directory-scope drift. Tests cover all four plus dev-script-wins precedence.",
@@ -165,10 +165,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 630,
-            "output": 147714,
-            "cacheRead": 109745026,
-            "cacheWrite": 459158
+            "input": 636,
+            "output": 148445,
+            "cacheRead": 110752844,
+            "cacheWrite": 924817
           }
         }
       },
@@ -180,15 +180,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 630,
-          "output": 147714,
-          "cacheRead": 109745026,
-          "cacheWrite": 459158
+          "input": 636,
+          "output": 148445,
+          "cacheRead": 110752844,
+          "cacheWrite": 924817
         }
       },
       "costAtCloseOut": {
-        "usd": 24.5939302,
-        "pricingAsOf": "2026-07-28T07:56:52.659Z"
+        "usd": 25.9669632,
+        "pricingAsOf": "2026-07-28T07:57:06.056Z"
       }
     },
     "merges": [
