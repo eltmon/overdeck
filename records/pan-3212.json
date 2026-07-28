@@ -57,7 +57,7 @@
     "recordedAt": "2026-07-28T16:44:14.261Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T16:52:25.986Z",
+  "updated": "2026-07-28T16:52:31.561Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "blocked",
@@ -67,9 +67,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T16:44:36.232Z",
-    "updatedAt": "2026-07-28T16:52:24.955Z",
+    "updatedAt": "2026-07-28T16:52:31.554Z",
     "reviewNotes": "Keyed menu abort preserves a pending claim for swallowed text, so the next same-pane retry sends an empty Enter and marks the message delivered.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
+    "reviewedAtCommit": "aeeb4e52141c6723b3fecaebae95872197109986",
     "lastVerifiedCommit": "aeeb4e52141c6723b3fecaebae95872197109986",
     "reviewSpawnedAt": "2026-07-28T16:45:36.799Z",
     "scopeDrift": {
@@ -126,7 +127,7 @@
       },
       "costAtCloseOut": {
         "usd": 25.104374,
-        "pricingAsOf": "2026-07-28T16:52:24.972Z"
+        "pricingAsOf": "2026-07-28T16:52:31.558Z"
       }
     },
     "merges": [
