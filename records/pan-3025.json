@@ -110,20 +110,21 @@
     "recordedAt": "2026-07-28T08:50:14.585Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T08:50:15.511Z",
+  "updated": "2026-07-28T08:50:18.903Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T08:50:15.509Z",
+    "updatedAt": "2026-07-28T08:50:18.865Z",
     "reviewNotes": "! [correctness] A live-status read failure is treated as proof that no live row exists — `src/lib/lifecycle/dod-gate.ts:678`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3221",
     "reviewedAtCommit": "6b218e665a20aeecd3e51dd3a9da4e695b49aa3e",
     "lastVerifiedCommit": "6b218e665a20aeecd3e51dd3a9da4e695b49aa3e",
+    "reviewRequestedAt": "2026-07-28T08:50:15.509Z",
     "reviewSpawnedAt": "2026-07-28T08:32:15.204Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -158,46 +159,45 @@
         "tests/unit/lib/pan-dir/record-close-out.test.ts"
       ],
       "recordedAt": "2026-07-28T08:50:14.585Z"
-    },
-    "reviewRequestedAt": "2026-07-28T08:50:15.509Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1375090,
-            "output": 66564,
-            "cacheRead": 8691712,
+            "input": 1383375,
+            "output": 67424,
+            "cacheRead": 9477632,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1540,
-            "output": 75286,
-            "cacheRead": 36145423,
-            "cacheWrite": 1889708
+            "input": 1596,
+            "output": 78279,
+            "cacheRead": 38186221,
+            "cacheWrite": 1894758
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1375090,
-          "output": 66564,
-          "cacheRead": 8691712,
+          "input": 1383375,
+          "output": 67424,
+          "cacheRead": 9477632,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1540,
-          "output": 75286,
-          "cacheRead": 36145423,
-          "cacheWrite": 1889708
+          "input": 1596,
+          "output": 78279,
+          "cacheRead": 38186221,
+          "cacheWrite": 1894758
         }
       },
       "costAtCloseOut": {
-        "usd": 19.57288,
-        "pricingAsOf": "2026-07-28T08:48:52.837Z"
+        "usd": 20.25848,
+        "pricingAsOf": "2026-07-28T08:50:18.892Z"
       }
     },
     "merges": [
