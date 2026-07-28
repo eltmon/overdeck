@@ -127,20 +127,21 @@
     "recordedAt": "2026-07-28T17:16:31.850Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T18:34:49.359Z",
+  "updated": "2026-07-28T18:40:07.315Z",
   "pipeline": {
     "issueId": "PAN-2882",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:16:51.273Z",
-    "updatedAt": "2026-07-28T18:34:49.303Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: merged-MR pagination now follows the accepted xBRIEF, and a deferred multi-repo regression proves aggregate GitLab lookup concurrency never exceeds five while excluding GitHub repositories.",
+    "updatedAt": "2026-07-28T18:40:07.219Z",
+    "reviewNotes": "Merged pagination and aggregate five-call concurrency coverage now satisfy the accepted requirements; all review dimensions are clean",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
-    "reviewedAtCommit": "e38216258512564fa52df36c0ff3f1b67c667fd6",
+    "reviewedAtCommit": "b7a35b9729a69b0774c778036bd0257033ee63fa",
     "lastVerifiedCommit": "e38216258512564fa52df36c0ff3f1b67c667fd6",
     "reviewSpawnedAt": "2026-07-28T18:34:42.262Z",
     "scopeDrift": {
@@ -170,9 +171,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6041249,
-            "output": 213395,
-            "cacheRead": 22514176,
+            "input": 6448281,
+            "output": 228418,
+            "cacheRead": 25951232,
             "cacheWrite": 0
           }
         },
@@ -184,18 +185,18 @@
             "cacheWrite": 2019325
           },
           "openai/gpt-5.6-sol": {
-            "input": 1823736,
-            "output": 93320,
-            "cacheRead": 23133184,
+            "input": 1825294,
+            "output": 93534,
+            "cacheRead": 23527424,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 7864985,
-          "output": 306715,
-          "cacheRead": 45647360,
+          "input": 8273575,
+          "output": 321952,
+          "cacheRead": 49478656,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -206,8 +207,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 78.365587,
-        "pricingAsOf": "2026-07-28T18:34:49.353Z"
+        "usd": 82.781295,
+        "pricingAsOf": "2026-07-28T18:40:07.304Z"
       }
     },
     "merges": [
