@@ -123,19 +123,19 @@
     "recordedAt": "2026-07-28T20:15:30.548Z"
   },
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T23:35:01.191Z",
+  "updated": "2026-07-28T23:43:19.813Z",
   "pipeline": {
     "issueId": "PAN-3229",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:16:31.872Z",
-    "updatedAt": "2026-07-28T23:35:01.186Z",
-    "reviewNotes": "Latest main merge reverts the shipped subagent transcript scrolling/full-width fix and deletes its regression test",
+    "updatedAt": "2026-07-28T23:43:19.727Z",
+    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "conflictsSince": {
       "sha": "04bcaeb9f6b9d766a637e3e18eafcc828b0fbdbf",
       "detectedAt": "2026-07-28T23:28:38.244Z",
@@ -161,17 +161,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3938081,
-            "output": 161917,
-            "cacheRead": 36653056,
+            "input": 3944964,
+            "output": 165289,
+            "cacheRead": 37597696,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 7214223,
-            "output": 326065,
-            "cacheRead": 153660928,
+            "input": 7256608,
+            "output": 330943,
+            "cacheRead": 160999936,
             "cacheWrite": 0
           }
         }
@@ -184,15 +184,15 @@
           "cacheWrite": 170493
         },
         "openai/gpt-5.6-sol": {
-          "input": 11152304,
-          "output": 487982,
-          "cacheRead": 190313984,
+          "input": 11201572,
+          "output": 496232,
+          "cacheRead": 198597632,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 173.418651,
-        "pricingAsOf": "2026-07-28T23:35:01.189Z"
+        "usd": 178.054315,
+        "pricingAsOf": "2026-07-28T23:43:19.792Z"
       }
     },
     "merges": [
