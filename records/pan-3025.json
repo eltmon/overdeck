@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T06:57:20.495Z",
+  "updated": "2026-07-28T07:00:35.771Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "pending",
@@ -47,16 +47,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "docs-dod-journal-durability": {
-        "writerId": "agent-pan-3025",
-        "agentId": "agent-pan-3025",
-        "pid": 3409085,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T06:57:20.495Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3025",
@@ -101,6 +93,16 @@
         "outcome": "completed",
         "reason": "Added readCompletedCloseOut helper and idempotent guard to closeOut workflow. Updated file-size allowlist. Note: full test coverage limited due to module-level import binding in readIssueRecord, but code functionality is correct.",
         "releasedAt": "2026-07-28T06:57:13.857Z"
+      },
+      {
+        "writerId": "agent-pan-3025",
+        "agentId": "agent-pan-3025",
+        "pid": 3409085,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:57:20.495Z",
+        "itemId": "docs-dod-journal-durability",
+        "outcome": "completed",
+        "releasedAt": "2026-07-28T07:00:35.771Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +143,8 @@
     "reclose-idempotent-short-circuit.reclose-idempotent-short-circuit.ac2": "completed",
     "reclose-idempotent-short-circuit.reclose-idempotent-short-circuit.ac3": "completed",
     "reclose-idempotent-short-circuit.reclose-idempotent-short-circuit.ac4": "completed",
-    "docs-dod-journal-durability": "running"
+    "docs-dod-journal-durability": "completed",
+    "docs-dod-journal-durability.docs-dod-journal-durability.ac1": "completed",
+    "docs-dod-journal-durability.docs-dod-journal-durability.ac2": "completed"
   }
 }
