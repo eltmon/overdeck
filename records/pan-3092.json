@@ -104,15 +104,7 @@
       "timestamp": "2026-07-28T11:20:44.815Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T11:20:44Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3092\n\n# Review — PAN-3092 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED — the settled append request has no deadline and can wedge the entire Deacon patrol while its heartbeat continues reporting healthy\n\n## Context\n- Branch: `feature/pan-3092`\n- HEAD reviewed: `f110307644701e83f5413011b79bea06fb74cd73`\n- Prior reviewed HEAD: `4db74b5910033b9d19d1f4b3f99dea7fbf1a2225`\n- Cycle scope: rework commit `f110307644701e83f5413011b79bea06fb74cd73` only; the blocker is in the new HTTP settlement path and could not have been raised before this commit introduced that path\n- Manifest: `.pan/review/agent-pan-3092-review-f1103076/context.json`\n- Dimensions reviewed: correctness/logic, security, requirements/acceptance criteria, and performance\n\n## P1 (Major) — Blocking\n\n### A hung `/append-once` request wedges all later patrol work without tripping the Deacon health watchdog — `src/lib/cloister/deacon-event-client.ts:169`\n\n**Evidence tier:** Tier 1 — static, traced through the production patrol scheduler and heartbeat.\n\n**Changed code:** `DeaconEventClient.appendOnce()` performs a direct `fetch()` and awaits both the response and `response.json()`, but supplies no `AbortSignal` or other deadline (`src/lib/cloister/deacon-event-client.ts:169-192`). `sweepStrandedVerdictFallbacks()` awaits that call inline while iterating issues (`src/lib/cloister/deacon-verdict-fallback-sweep.ts:176-191`).\n\n**Problem:** A connection that is accepted but does not complete can hold this promise until the runtime's long transport timeout, with no application-level bound. This stalls `runPatrol()` at the first old fallback and prevents every remaining issue and every patrol phase after the sweep from running. Scheduled patrols are then skipped because the prior patrol remains in flight (`src/lib/cloister/deacon.ts:3229-3246`). At the same time, `runPatrol()` keeps `startPatrolHeartbeatTicker()` running until its `finally` block, so the stalled patrol refreshes its heartbeat every half interval and the supervisor sees it as healthy (`src/lib/cloister/deacon.ts:414-416,2616,3220-3222`). The new recovery path can therefore disable Deacon indefinitely while defeating the watchdog intended to detect exactly that condition.\n\nThe test named “reports failed when the request never completes” does not exercise this state: its fetch mock throws `ECONNREFUSED` immediately (`tests/unit/lib/cloister/deacon-event-client.test.ts:201-205`). A never-settling promise would leave that test and the production patrol pending forever.\n\n**Runtime impact:** During the degraded state this feature is meant to surface, an overloaded, restarting, or event-loop-starved dashboard can make the Deacon child wait on the new loopback request. Agent recovery, fallback draining for later issues, lifecycle cleanup, and subsequent patrols stop, while the heartbeat continues to claim the Deacon is alive. Manual patrol IPC can also start additional unguarded `runPatrol()` calls in the child, compounding the blocked work.\n\n**Fix:** Give `appendOnce()` a bounded request deadline shorter than the patrol interval, abort the fetch/body read on expiry, and return `failed` so the existing sweep logic retries next patrol. A timeout after a server commit is safe: retrying the same idempotency key returns `duplicate`. Add a fake-timer test whose fetch promise truly never settles until its signal aborts, and assert the client returns `failed` at the configured deadline with nothing added to the batch queue. The timeout must cover both response headers and body parsing.\n\n## Previous Finding Rechecked\n- Fixed: both production activity providers now expose a settled `appendOnce` path.\n- Fixed: the SQLite store claims the idempotency key and inserts the event in one transaction, so concurrent retries cannot append twice.\n- Fixed: the Deacon child uses a dedicated HTTP endpoint and does not treat local queueing as durability.\n- Fixed: transaction failure throws, the HTTP client reports `failed`, and the sweep leaves the episode eligible for retry.\n\n## P2 (Minor) — Non-blocking\n\n- `emitActivityEntryOnce()` documents `unconfirmed` as an outcome callers requiring delivery must not treat as success, and `docs/AGENT-STATE-PLANES.md:121-125` says the sweep marks only `appended`/`duplicate` as warned. The sweep currently treats every outcome except `failed` as success, so `unconfirmed` is added to `warnedEpisodes` at `src/lib/cloister/deacon-verdict-fallback-sweep.ts:184-190`. Both production providers implement `appendOnce`, so this does not block the production path, but the code and contract should agree: handle `unconfirmed` like `failed` or remove the fallback outcome.\n- `event_idempotency` is never compacted when seven-day event retention deletes the corresponding event. Warning frequency is low, so this is not an immediate performance blocker, but the table is monotonically growing and its orphaned keys permanently suppress recreation after the activity event itself is compacted. Add lifecycle cleanup tied to event retention or document the intentionally permanent key retention.\n\n## Security\nNo blocking security findings. The new endpoint reuses constant-time internal-token validation and loopback-origin enforcement, validates the event shape and non-empty key, uses bound SQL parameters, and exposes no unauthenticated state mutation. Database error details are returned only across the authenticated internal route.\n\n## Performance\nThe atomic insert is low-frequency and indexed by a primary key, avoiding the prior JSON scan. The missing network deadline is the blocking performance/availability issue because it stalls the serial patrol while the heartbeat masks the stall. Synchronous SQLite work in the route is small and transactionally bounded under normal operation.\n\n## Requirements and Acceptance Criteria\nThe new transaction and HTTP round trip close the prior at-most-once and false-durability gaps for FR-4. FR-5 remains incomplete because the new awaited request can prevent the sweep from reaching later issues or returning for future patrol cycles. No new violation was found for the lock-protocol constraint, verdict fabrication rules, cross-machine non-goal, or the remaining functional requirements.\n\n## Advisory Context\nThe supplied CodeRabbit findings concern code unchanged since the prior review HEAD and remain non-gating under the cycle-2+ convergence rule. They should be handled as follow-up work rather than promoted during this rework cycle.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3092/.pan/review/agent-pan-3092-review-f1103076/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3092 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/concerns.md",
@@ -170,10 +162,10 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T11:31:54.655Z",
+  "updated": "2026-07-28T11:32:41.538Z",
   "pipeline": {
     "issueId": "PAN-3092",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -181,13 +173,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T11:31:53.083Z",
+    "updatedAt": "2026-07-28T11:32:41.512Z",
     "reviewNotes": "Verification infrastructure error: Verification worker 1786496 exited before writing a result",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
     "reviewedAtCommit": "f110307644701e83f5413011b79bea06fb74cd73",
     "lastVerifiedCommit": "51f15f597ae7b2b54c2e21b4f81ce496648728c9",
-    "reviewSpawnedAt": "2026-07-28T11:14:41.328Z",
+    "reviewSpawnedAt": "2026-07-28T11:32:41.511Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/concerns.md",
@@ -281,7 +273,7 @@
       },
       "costAtCloseOut": {
         "usd": 85.1754813,
-        "pricingAsOf": "2026-07-28T11:31:54.653Z"
+        "pricingAsOf": "2026-07-28T11:32:41.529Z"
       }
     },
     "merges": [
