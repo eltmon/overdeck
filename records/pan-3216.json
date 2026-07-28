@@ -64,7 +64,7 @@
     "recordedAt": "2026-07-28T06:40:20.292Z"
   },
   "created": "2026-07-28T04:43:34.296Z",
-  "updated": "2026-07-28T10:32:53.943Z",
+  "updated": "2026-07-28T11:32:54.972Z",
   "pipeline": {
     "issueId": "PAN-3216",
     "reviewStatus": "passed",
@@ -75,7 +75,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:08:58.012Z",
-    "updatedAt": "2026-07-28T10:32:53.917Z",
+    "updatedAt": "2026-07-28T11:32:54.948Z",
     "reviewNotes": "Agent re-review request (1/25): Narrowed briefing troubled-agents filter to gate alone; tests pass; GitHub checks passing",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -134,7 +134,7 @@
       },
       "costAtCloseOut": {
         "usd": 6.921691,
-        "pricingAsOf": "2026-07-28T10:32:53.940Z"
+        "pricingAsOf": "2026-07-28T11:32:54.969Z"
       }
     },
     "merges": [
