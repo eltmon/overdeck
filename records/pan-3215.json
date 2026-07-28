@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T06:35:52.620Z",
-  "updated": "2026-07-28T09:13:01.585Z",
+  "updated": "2026-07-28T09:23:53.739Z",
   "pipeline": {
     "issueId": "PAN-3215",
     "reviewStatus": "pending",
@@ -48,16 +48,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "merged-row-gitlab-evidence": {
-        "writerId": "agent-pan-3215",
-        "agentId": "agent-pan-3215",
-        "pid": 3453654,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T09:13:01.585Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3215",
@@ -91,6 +83,17 @@
         "outcome": "completed",
         "reason": "Resolved required project repos, verified feature/strike branches in parallel per repo root, aggregated repo-qualified success and failure evidence, and preserved the all-absent sentinel; targeted tests, typecheck, and lint pass",
         "releasedAt": "2026-07-28T09:12:39.727Z"
+      },
+      {
+        "writerId": "agent-pan-3215",
+        "agentId": "agent-pan-3215",
+        "pid": 3453654,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T09:13:01.585Z",
+        "itemId": "merged-row-gitlab-evidence",
+        "outcome": "completed",
+        "reason": "Added default per-repo merged-artifact lookup for non-GitHub branch-absence cases, recorded GitLab MR ids and URLs as positive row-4 evidence without containment evidence, and preserved unavailable/containment fallbacks; targeted tests, typecheck, and lint pass",
+        "releasedAt": "2026-07-28T09:23:53.739Z"
       }
     ],
     "statusReasons": {
@@ -105,6 +108,10 @@
       "polyrepo-verify-loop": {
         "reason": "Resolved required project repos, verified feature/strike branches in parallel per repo root, aggregated repo-qualified success and failure evidence, and preserved the all-absent sentinel; targeted tests, typecheck, and lint pass",
         "updatedAt": "2026-07-28T09:12:39.727Z"
+      },
+      "merged-row-gitlab-evidence": {
+        "reason": "Added default per-repo merged-artifact lookup for non-GitHub branch-absence cases, recorded GitLab MR ids and URLs as positive row-4 evidence without containment evidence, and preserved unavailable/containment fallbacks; targeted tests, typecheck, and lint pass",
+        "updatedAt": "2026-07-28T09:23:53.739Z"
       }
     }
   },
@@ -123,6 +130,10 @@
     "polyrepo-verify-loop.polyrepo-verify-loop.ac2": "completed",
     "polyrepo-verify-loop.polyrepo-verify-loop.ac3": "completed",
     "polyrepo-verify-loop.polyrepo-verify-loop.ac4": "completed",
-    "merged-row-gitlab-evidence": "running"
+    "merged-row-gitlab-evidence": "completed",
+    "merged-row-gitlab-evidence.merged-row-gitlab-evidence.ac1": "completed",
+    "merged-row-gitlab-evidence.merged-row-gitlab-evidence.ac2": "completed",
+    "merged-row-gitlab-evidence.merged-row-gitlab-evidence.ac3": "completed",
+    "merged-row-gitlab-evidence.merged-row-gitlab-evidence.ac4": "completed"
   }
 }
