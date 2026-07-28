@@ -31,12 +31,14 @@ import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
 
 import type { AgentState } from '../agents/agent-state.js';
-import { getAgentStateSync } from '../agents/agent-state.js';
+import { getAgentStateSync, saveAgentStateSync } from '../agents/agent-state.js';
 import { listAgentStates } from '../agents/queries.js';
 import { deliverAgentMessage } from '../agents/delivery.js';
+import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
+import { writePtyToken } from '../pty-token.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
-import { getOverdeckHome, packageRoot } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 import { getRuntimeBehavior } from './behavior.js';
 import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js';
 import type {
@@ -143,6 +145,10 @@ export interface KimiCodeRuntimeOptions {
   readonly prepareLaunch?: () => Promise<{ readonly binaryPath: string; readonly pathExport: string }>;
   readonly listAgentStates?: () => AgentState[];
   readonly deliverMessage?: (agentId: string, message: string) => Promise<{ readonly ok: boolean; readonly failure?: string }>;
+  /** Resolves the PTY supervisor script path. Defaults to resolvePtySupervisorScriptPath(). */
+  readonly resolveSupervisorScriptPath?: () => string;
+  /** Writes the PTY supervisor's auth token for an agent. Defaults to the real writePtyToken(). */
+  readonly writePtyTokenFor?: (agentId: string) => Promise<string>;
 }
 
 export class KimiCodeRuntimeSync implements AgentRuntimeSync {
@@ -153,6 +159,8 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   private readonly prepareLaunch: () => Promise<{ readonly binaryPath: string; readonly pathExport: string }>;
   private readonly resolveAgentStates: () => AgentState[];
   private readonly deliverMessage: (agentId: string, message: string) => Promise<{ readonly ok: boolean; readonly failure?: string }>;
+  private readonly resolveSupervisorScriptPath: () => string;
+  private readonly writePtyTokenFor: (agentId: string) => Promise<string>;
 
   constructor(options: KimiCodeRuntimeOptions = {}) {
     this.overdeckHomeOverride = options.overdeckHome;
@@ -161,6 +169,8 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
     this.prepareLaunch = options.prepareLaunch ?? (() => prepareHarnessLaunch('kimi-code'));
     this.resolveAgentStates = options.listAgentStates ?? (() => listAgentStates());
     this.deliverMessage = options.deliverMessage ?? ((agentId, message) => deliverAgentMessage(agentId, message, 'runtime:kimi-code'));
+    this.resolveSupervisorScriptPath = options.resolveSupervisorScriptPath ?? resolvePtySupervisorScriptPath;
+    this.writePtyTokenFor = options.writePtyTokenFor ?? writePtyToken;
   }
 
   getHarnessBehavior(): HarnessBehavior {
@@ -258,6 +268,16 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
       // Bucket doesn't exist yet — every session dir that appears is new.
     }
 
+    // The PTY supervisor tier of deliverAgentMessage requires BOTH the
+    // pty-<id>.sock (created when the supervisor process binds it) AND a
+    // readable pty-token it authenticates requests against — write the token
+    // and resolve the real, package/desktop-safe script path (not a hardcoded
+    // dist/ literal, which silently breaks under desktop packaging or a
+    // mid-reload generation, PAN-3172) before the tmux session exists.
+    mkdirSync(join(this.home(), 'agents', config.agentId), { recursive: true });
+    const supervisorScriptPath = this.resolveSupervisorScriptPath();
+    await this.writePtyTokenFor(config.agentId);
+
     const launcherContent = generateLauncherScriptSync({
       role: 'work',
       workingDir: config.workspace,
@@ -268,11 +288,10 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
       overdeckEnv: { agentId: config.agentId },
       setTerminalEnv: true,
       useSupervisor: true,
-      supervisorScriptPath: join(packageRoot, 'dist', 'pty-supervisor.js'),
+      supervisorScriptPath,
       unsetProviderEnv: true,
     });
     const launcherScript = this.agentPath(config.agentId, 'launcher.sh');
-    mkdirSync(join(this.home(), 'agents', config.agentId), { recursive: true });
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
 
     await tmuxCreateSession(config.agentId, config.workspace, `bash ${shellQuote(launcherScript)}`, config.env ?? {});
@@ -281,6 +300,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
       const sessionId = await this.waitForNewSessionId(config.workspace, existingBefore);
       if (!sessionId) throw new KimiCodeSpawnTimeout(config.agentId);
       this.writeSessionId(config.agentId, sessionId);
+      this.markSupervisorEnabled(config.agentId);
 
       if (config.prompt) await this.sendMessage(config.agentId, config.prompt);
 
@@ -358,6 +378,20 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
 
   private writeSessionId(agentId: string, sessionId: string): void {
     writeFileSync(this.agentPath(agentId, 'kimi-session-id'), sessionId, 'utf-8');
+  }
+
+  /**
+   * Best-effort: mark the persisted agent state as supervisor-enabled so
+   * prepareSupervisorForRelaunch (supervisor-channels.ts) re-supervises this
+   * agent on relaunch instead of falling back to useSupervisor:false. A
+   * no-op when no state has been saved for this agent yet (some callers of
+   * this adapter's spawnAgent create state afterward).
+   */
+  private markSupervisorEnabled(agentId: string): void {
+    const state = getAgentStateSync(agentId);
+    if (!state) return;
+    state.supervisorEnabled = true;
+    saveAgentStateSync(state);
   }
 
   private async waitForNewSessionId(workspace: string, existingBefore: Set<string>): Promise<string | null> {

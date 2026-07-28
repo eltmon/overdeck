@@ -16,8 +16,11 @@ vi.mock('../tmux-cli.js', () => ({
   tmuxSessionExists: tmuxMocks.sessionExists,
 }));
 
-const agentStateMocks = vi.hoisted(() => ({ getAgentStateSync: vi.fn() }));
-vi.mock('../../agents/agent-state.js', () => ({ getAgentStateSync: agentStateMocks.getAgentStateSync }));
+const agentStateMocks = vi.hoisted(() => ({ getAgentStateSync: vi.fn(), saveAgentStateSync: vi.fn() }));
+vi.mock('../../agents/agent-state.js', () => ({
+  getAgentStateSync: agentStateMocks.getAgentStateSync,
+  saveAgentStateSync: agentStateMocks.saveAgentStateSync,
+}));
 
 import {
   createKimiCodeRuntimeSync,
@@ -49,6 +52,7 @@ beforeEach(() => {
   tmuxMocks.killSession.mockReset();
   tmuxMocks.sessionExists.mockReset();
   agentStateMocks.getAgentStateSync.mockReset();
+  agentStateMocks.saveAgentStateSync.mockReset();
 });
 
 afterEach(() => {
@@ -144,6 +148,15 @@ describe('KimiCodeRuntimeSync', () => {
     });
     tmuxMocks.sessionExists.mockResolvedValue(true);
 
+    const writePtyTokenFor = vi.fn(async (agentId: string) => {
+      const dir = join(overdeckHome, 'agents', agentId);
+      mkdirSync(dir, { recursive: true });
+      const token = 'test-pty-token';
+      writeFileSync(join(dir, 'pty-token'), `${token}\n`);
+      return token;
+    });
+    agentStateMocks.getAgentStateSync.mockReturnValue({ id: 'agent-kimi-spawn', workspace });
+
     const runtime = new KimiCodeRuntimeSync({
       overdeckHome,
       kimiHome,
@@ -152,6 +165,8 @@ describe('KimiCodeRuntimeSync', () => {
         pathExport: 'export PATH=\'/home/eltmon/.kimi-code/bin\':"$PATH"',
       }),
       deliverMessage: vi.fn(async () => ({ ok: true })),
+      resolveSupervisorScriptPath: () => '/dist/pty-supervisor.js',
+      writePtyTokenFor,
     });
 
     const agent = await runtime.spawnAgent({
@@ -180,9 +195,26 @@ describe('KimiCodeRuntimeSync', () => {
     const launcherContent = readFileSync(launcherScript, 'utf-8');
     expect(launcherContent).toMatch(/kimi -m 'k3' --yolo/);
     expect(launcherContent).toContain('unset ANTHROPIC_BASE_URL');
+    expect(launcherContent).toContain("node '/dist/pty-supervisor.js'");
 
     const persistedId = readFileSync(join(overdeckHome, 'agents', 'agent-kimi-spawn', 'kimi-session-id'), 'utf-8');
     expect(persistedId).toBe('session_fresh');
+
+    // FIX 3 (inspection finding): the PTY supervisor tier of deliverAgentMessage
+    // requires a readable pty-token file — spawnAgent must write it, and write
+    // it BEFORE the tmux session (and thus the supervisor process) exists.
+    expect(writePtyTokenFor).toHaveBeenCalledWith('agent-kimi-spawn');
+    expect(writePtyTokenFor.mock.invocationCallOrder[0]).toBeLessThan(
+      tmuxMocks.createSession.mock.invocationCallOrder[0],
+    );
+    const tokenPath = join(overdeckHome, 'agents', 'agent-kimi-spawn', 'pty-token');
+    expect(existsSync(tokenPath)).toBe(true);
+    expect(readFileSync(tokenPath, 'utf-8')).toBe('test-pty-token\n');
+
+    // FIX 1: the agent state is marked supervisor-enabled so relaunch re-supervises.
+    expect(agentStateMocks.saveAgentStateSync).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-kimi-spawn', supervisorEnabled: true }),
+    );
   });
 
   it('kills the tmux session and throws when no new session appears within the readiness timeout', async () => {
@@ -197,6 +229,8 @@ describe('KimiCodeRuntimeSync', () => {
       overdeckHome,
       kimiHome,
       prepareLaunch: async () => ({ binaryPath: '/opt/kimi/bin/kimi', pathExport: 'export PATH=/opt/kimi/bin:"$PATH"' }),
+      resolveSupervisorScriptPath: () => '/dist/pty-supervisor.js',
+      writePtyTokenFor: vi.fn(async () => 'test-token'),
     });
 
     const spawn = runtime.spawnAgent({
