@@ -46,7 +46,7 @@
     "recordedAt": "2026-07-28T09:38:47.050Z"
   },
   "created": "2026-07-28T06:35:52.620Z",
-  "updated": "2026-07-28T10:04:36.449Z",
+  "updated": "2026-07-28T10:04:42.009Z",
   "pipeline": {
     "issueId": "PAN-3215",
     "reviewStatus": "blocked",
@@ -55,9 +55,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T10:04:35.666Z",
+    "updatedAt": "2026-07-28T10:04:42.002Z",
     "reviewNotes": "FR-2 still hardcodes origin/main in target-branch-aware GitHub verification; NFR-2 also duplicates GitLab MR lookups",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3226",
+    "reviewedAtCommit": "50cd213b7b5a05a60886c7842e2b864ce3810b0f",
     "reviewSpawnedAt": "2026-07-28T09:52:41.379Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -112,7 +113,7 @@
       },
       "costAtCloseOut": {
         "usd": 56.672947,
-        "pricingAsOf": "2026-07-28T10:04:35.682Z"
+        "pricingAsOf": "2026-07-28T10:04:42.005Z"
       }
     },
     "merges": [
