@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T06:36:51.076Z",
+  "updated": "2026-07-28T06:42:37.473Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
@@ -45,5 +45,20 @@
       "open": true,
       "needsYouEmittedAt": "2026-07-28T03:54:06.879Z"
     }
-  ]
+  ],
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "verdict-aware-pipeline-merge": {
+        "writerId": "agent-pan-3092",
+        "agentId": "agent-pan-3092",
+        "pid": 2123683,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:42:37.473Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "verdict-aware-pipeline-merge": "running"
+  }
 }
