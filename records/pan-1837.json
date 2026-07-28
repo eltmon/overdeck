@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T20:14:32.140Z",
+  "updated": "2026-07-28T20:14:46.307Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,8 +79,16 @@
     }
   ],
   "tasks": {
-    "sequence": 20,
-    "claims": {},
+    "sequence": 21,
+    "claims": {
+      "wi9-context-skills": {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 2893252,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:14:46.307Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -282,6 +290,7 @@
     "wi8b-wire-parser-cost.wi8b-wire-parser-cost.ac1": "completed",
     "wi8b-wire-parser-cost.wi8b-wire-parser-cost.ac2": "completed",
     "wi8b-wire-parser-cost.wi8b-wire-parser-cost.ac3": "completed",
-    "wi8b-wire-parser-cost.wi8b-wire-parser-cost.ac4": "completed"
+    "wi8b-wire-parser-cost.wi8b-wire-parser-cost.ac4": "completed",
+    "wi9-context-skills": "running"
   }
 }
