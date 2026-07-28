@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T18:59:11.267Z",
+  "updated": "2026-07-28T18:59:19.961Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "pending",
@@ -207,5 +207,44 @@
     "add-state-paths-lint-guard.add-state-paths-lint-guard.ac2": "completed",
     "add-state-paths-lint-guard.add-state-paths-lint-guard.ac3": "completed",
     "add-state-paths-lint-guard.add-state-paths-lint-guard.ac4": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/AGENT-STATE-PLANES.md",
+      "package.json",
+      "scripts/lint-state-paths.sh",
+      "src/cli/commands/__tests__/doctor-orphan-proposed-specs.test.ts",
+      "src/cli/commands/doctor.ts",
+      "src/dashboard/server/routes/backlog.ts",
+      "src/lib/agents/tier-supervisor.ts",
+      "src/lib/backlog/backlog-input.ts",
+      "src/lib/backlog/lookups.ts",
+      "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
+      "src/lib/cloister/flywheel.ts",
+      "src/lib/cloister/orphan-proposed-reconciler.ts",
+      "src/lib/xbrief/__tests__/auto-synthesize.test.ts",
+      "src/lib/xbrief/auto-synthesize.ts",
+      "tests/unit/scripts/lint-state-paths.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/AGENT-STATE-PLANES.md",
+      "package.json",
+      "scripts/lint-state-paths.sh",
+      "src/cli/commands/__tests__/doctor-orphan-proposed-specs.test.ts",
+      "src/cli/commands/doctor.ts",
+      "src/dashboard/server/routes/backlog.ts",
+      "src/lib/agents/tier-supervisor.ts",
+      "src/lib/backlog/backlog-input.ts",
+      "src/lib/backlog/lookups.ts",
+      "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
+      "src/lib/cloister/flywheel.ts",
+      "src/lib/cloister/orphan-proposed-reconciler.ts",
+      "src/lib/xbrief/__tests__/auto-synthesize.test.ts",
+      "src/lib/xbrief/auto-synthesize.ts",
+      "tests/unit/scripts/lint-state-paths.test.ts"
+    ],
+    "recordedAt": "2026-07-28T18:59:19.959Z"
   }
 }
