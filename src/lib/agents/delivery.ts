@@ -556,7 +556,7 @@ async function deliverKeyedAgentMessage(
 /**
  * Keyed tmux delivery: paste under the two-phase marker protocol, then
  * complete the submit. A replay reuses a pending claim only when the payload
- * is still visible on the recorded pane; otherwise it re-pastes. A terminal
+ * is still visible in the active composer; otherwise it re-pastes. A terminal
  * marker suppresses the replay entirely.
  */
 async function deliverKeyedViaTmux(

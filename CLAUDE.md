@@ -275,8 +275,9 @@ a menu Overdeck did not open: at the resume gate the highlighted row is "Resume
 from summary", and a stray Enter there discarded an operator's full session
 (PAN-3212). `paneHasBlockingChoiceMenu()` in `src/lib/pane-choice-menu.ts` is
 the shared detector. The keyed dedup submit applies the same guard before its
-server-owned `if-shell` Enter; recovery reuses a pending claim only when the payload is still
-visible in the pane, otherwise it re-pastes before submission.
+server-owned `if-shell` Enter; recovery reuses a pending claim only when the payload is visible
+in the active composer, leaves unreadable captures pending, and re-pastes only after a successful
+capture proves the composer does not contain it.
 
 Summary forks add a pane-verified recovery above that transport: when the
 runtime transcript stays silent but the delivered tail remains in the composer,

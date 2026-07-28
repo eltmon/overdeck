@@ -134,16 +134,35 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(showOption('@overdeck-dedup-target-menu-key')).toBe(paneBefore.pid);
     expect(showOption('@overdeck-dedup-menu-key')).toBe('');
 
+    // An unreadable viewport is unproven, not evidence that the payload is
+    // absent. Recovery must leave the original paste and markers untouched.
+    const repasteSpy = vi.fn(async () => {});
+    await expect(sendKeysDedup(session, payload, 'menu-key', 'test', {
+      readPaneViewport: () => Promise.reject(new Error('capture unavailable')),
+      runTmuxCommand: repasteSpy,
+    })).rejects.toThrow(KeyedMarkerVerificationError);
+    expect(repasteSpy).not.toHaveBeenCalled();
+    expect(showOption('@overdeck-dedup-pending-menu-key')).toBe(pendingBefore);
+    expect(showOption('@overdeck-dedup-target-menu-key')).toBe(paneBefore.pid);
+
     // Model the harness consuming the menu without accepting the earlier paste:
     // clear the terminal input line while keeping the same pane process alive.
     execFileSync('tmux', ['-L', socket, 'send-keys', '-t', session, 'C-u']);
     expect((await readPaneTargetReal(session)).pid).toBe(paneBefore.pid);
 
+    const oldPayloadAboveEmptyComposer = [
+      payload,
+      'older terminal output',
+      '─────────────────────────────',
+      '❯ ',
+      '─────────────────────────────',
+    ].join('\n');
+
     // Fault injection: the first recovery cannot execute its atomic re-paste.
     // The stale matching target remains, but the next retry still cannot reuse
-    // it because payload presence must be proven before returning submit-pending.
+    // it because the matching scrollback text is outside the active composer.
     await expect(sendKeysDedup(session, payload, 'menu-key', 'test', {
-      readPaneText: () => Promise.resolve('clear composer'),
+      readPaneViewport: () => Promise.resolve(oldPayloadAboveEmptyComposer),
       runTmuxCommand: () => Promise.reject(new Error('tmux command unavailable')),
     })).rejects.toThrow(KeyedMarkerVerificationError);
     expect(showOption('@overdeck-dedup-pending-menu-key')).toBe(pendingBefore);
@@ -151,7 +170,7 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(showOption('@overdeck-dedup-menu-key')).toBe('');
 
     const retry = await sendKeysDedup(session, payload, 'menu-key', 'test', {
-      readPaneText: () => Promise.resolve('clear composer'),
+      readPaneViewport: () => Promise.resolve(oldPayloadAboveEmptyComposer),
     });
     expect(retry).toBe('pasted');
     expect(showOption('@overdeck-dedup-target-menu-key')).toBe(paneBefore.pid);

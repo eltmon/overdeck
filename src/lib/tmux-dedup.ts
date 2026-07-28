@@ -18,9 +18,10 @@
  *
  * - `sendKeysDedup` atomically pastes and sets the PENDING option only when
  *   neither option is set. A replay that finds PENDING reuses it only when the
- *   payload is still visible on the recorded pane; otherwise it re-pastes and
- *   replaces the claim. A POISON breadcrumb (a terminal marker that proved false but could not be
- *   rolled back) is repaired first and never honored as a dedup.
+ *   payload is still visible in the active composer; otherwise it re-pastes and
+ *   replaces the claim. A POISON breadcrumb (a terminal marker that proved
+ *   false but could not be rolled back) is repaired first and never honored as
+ *   a dedup.
  * - `completeKeyedSubmit` issues ONE `if-shell`: only when PENDING is
  *   present, TERMINAL absent, and the pane alive does the tmux server send
  *   the Enter and then flip TERMINAL and clear PENDING — in that order, in a
@@ -184,15 +185,52 @@ async function readMarkerStrict(sessionName: string, option: string): Promise<st
   return String(result.stdout).trim();
 }
 
-async function paneContainsDeliveryPayload(
+type PayloadPresence = 'present' | 'absent' | 'unproven';
+
+async function captureVisiblePane(sessionName: string): Promise<string> {
+  const result = await tmuxExecAsync(['capture-pane', '-t', sessionName, '-p'], { encoding: 'utf-8' });
+  return String(result.stdout);
+}
+
+const PANE_ANSI_PATTERN = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;
+const COMPOSER_SEPARATOR_LINE = /^\s*[─━═]{6,}\s*$/;
+
+function activeComposerRegion(paneText: string): string | null {
+  const lines = paneText
+    .replace(PANE_ANSI_PATTERN, '')
+    .split('\n')
+    .map(line => line.replace(/\s+$/g, ''));
+  if (lines.every(line => line.trim() === '')) return null;
+
+  const separators = lines
+    .map((line, index) => COMPOSER_SEPARATOR_LINE.test(line) ? index : -1)
+    .filter(index => index >= 0);
+  if (separators.length >= 2) {
+    const end = separators.at(-1)!;
+    const start = separators.at(-2)!;
+    return lines.slice(start + 1, end).join('\n');
+  }
+
+  return [...lines].reverse().find(line => line.trim() !== '') ?? null;
+}
+
+async function pendingPayloadPresence(
   sessionName: string,
   keys: string,
-  readPane: (sessionName: string, lines: number) => Promise<string>,
-): Promise<boolean> {
+  readViewport: (sessionName: string) => Promise<string>,
+): Promise<PayloadPresence> {
   const verifyLine = deliveryVerifyLine(keys);
-  if (verifyLine.length < 3) return false;
-  const pane = await readPane(sessionName, 200).catch(() => '');
-  return pane.includes(verifyLine.slice(0, 40));
+  if (verifyLine.length < 3) return 'unproven';
+
+  let pane: string;
+  try {
+    pane = await readViewport(sessionName);
+  } catch {
+    return 'unproven';
+  }
+  const composer = activeComposerRegion(pane);
+  if (composer === null) return 'unproven';
+  return composer.includes(verifyLine.slice(0, 40)) ? 'present' : 'absent';
 }
 
 /**
@@ -230,8 +268,10 @@ export interface KeyedTmuxDeps {
   readMarkerStrict?: (sessionName: string, option: string) => Promise<string>;
   /** Test seam for target-read failures; production uses the real tmux read. */
   readPaneTarget?: (sessionName: string) => Promise<PaneTarget>;
-  /** Test seam for blocking-menu detection; production captures the real pane. */
+  /** Test seam for blocking-menu detection; production captures the pane tail. */
   readPaneText?: (sessionName: string, lines: number) => Promise<string>;
+  /** Test seam for payload proof; production captures only the visible pane grid. */
+  readPaneViewport?: (sessionName: string) => Promise<string>;
   /** Test seam for recovery re-paste command failures. */
   runTmuxCommand?: (args: string[]) => Promise<void>;
 }
@@ -365,14 +405,13 @@ export async function sendKeysDedup(
       // replacing the pane, so PID equality alone cannot authorize Enter.
       const recordedTarget = await read(sessionName, targetOption);
       const currentPid = (await (deps.readPaneTarget ?? readPaneTarget)(sessionName)).pid;
-      const readPane = deps.readPaneText ?? capturePaneText;
-      if (
-        recordedTarget !== ''
-        && currentPid !== ''
-        && recordedTarget === currentPid
-        && await paneContainsDeliveryPayload(sessionName, keys, readPane)
-      ) {
-        return 'submit-pending';
+      const readViewport = deps.readPaneViewport ?? captureVisiblePane;
+      if (recordedTarget !== '' && currentPid !== '' && recordedTarget === currentPid) {
+        const presence = await pendingPayloadPresence(sessionName, keys, readViewport);
+        if (presence === 'present') return 'submit-pending';
+        if (presence === 'unproven') {
+          throw new KeyedMarkerVerificationError(sessionName, `pending payload visibility (key "${dedupKey}")`);
+        }
       }
 
       // Re-paste atomically only while the exact claim we inspected is still
@@ -404,16 +443,14 @@ export async function sendKeysDedup(
       if (repastedPending === sendId) return 'pasted';
       if (repastedPending !== '') {
         // A concurrent attempt owns the claim; honor it only if its target and
-        // payload both match the current pane.
+        // payload both match the current active composer. Any other state is
+        // recoverable but unproven, so a later pass re-evaluates it.
         const nowPid = (await (deps.readPaneTarget ?? readPaneTarget)(sessionName)).pid;
-        if (
-          repastedTarget !== ''
-          && nowPid !== ''
-          && repastedTarget === nowPid
-          && await paneContainsDeliveryPayload(sessionName, keys, readPane)
-        ) {
-          return 'submit-pending';
+        if (repastedTarget !== '' && nowPid !== '' && repastedTarget === nowPid) {
+          const presence = await pendingPayloadPresence(sessionName, keys, readViewport);
+          if (presence === 'present') return 'submit-pending';
         }
+        throw new KeyedMarkerVerificationError(sessionName, `concurrent pending payload visibility (key "${dedupKey}")`);
       }
     }
     throw new Error(
