@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-28T22:52:07.228Z",
+  "updated": "2026-07-28T22:52:19.632Z",
   "pipeline": {
     "issueId": "PAN-3231",
     "reviewStatus": "pending",
@@ -88,8 +88,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "prd-resource-signal": {
+        "writerId": "agent-pan-3231",
+        "agentId": "agent-pan-3231",
+        "pid": 1818424,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T22:52:19.632Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3231",
@@ -151,6 +159,7 @@
     "prd-endpoint.prd-endpoint.ac1": "completed",
     "prd-endpoint.prd-endpoint.ac2": "completed",
     "prd-endpoint.prd-endpoint.ac3": "completed",
-    "prd-endpoint.prd-endpoint.ac4": "completed"
+    "prd-endpoint.prd-endpoint.ac4": "completed",
+    "prd-resource-signal": "running"
   }
 }
