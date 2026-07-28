@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-3242",
   "schemaVersion": 2,
-  "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-28T19:57:12.140Z",
-  "pipeline": {
-    "issueId": "PAN-3242",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-28T19:57:10.246Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,6 +9,61 @@
       "timestamp": "2026-07-28T19:57:10.246Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-28T19:57:10.246Z",
+  "updated": "2026-07-28T20:00:07.015Z",
+  "pipeline": {
+    "issueId": "PAN-3242",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-28T20:00:06.998Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since b9820a5 (3 paths): src/lib/gitlab-merge-requests.ts, tests/unit/lib/gitlab-merge-requests.test.ts, tests/unit/lib/pipeline-membership-gather.test.ts",
+        "detectedAt": "2026-07-28T19:59:33.733Z"
+      }
+    ],
+    "conflictsSince": {
+      "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
+      "detectedAt": "2026-07-28T19:59:33.733Z",
+      "paths": [
+        "src/lib/gitlab-merge-requests.ts",
+        "tests/unit/lib/gitlab-merge-requests.test.ts",
+        "tests/unit/lib/pipeline-membership-gather.test.ts"
+      ]
+    }
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 29,
+            "output": 9348,
+            "cacheRead": 2105024,
+            "cacheWrite": 161108
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 29,
+          "output": 9348,
+          "cacheRead": 2105024,
+          "cacheWrite": 161108
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 4.586568,
+        "pricingAsOf": "2026-07-28T20:00:07.005Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
   "model": "claude-fable-5"
 }
