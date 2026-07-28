@@ -20,6 +20,7 @@ import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { UpdateDialog } from './components/UpdateDialog';
 import { TasksDialog } from './components/TasksDialog';
+import { PrdViewer } from './components/PrdViewer';
 
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { CostWarningStyles } from './components/shared/costWarning';
@@ -90,6 +91,13 @@ function TasksViewerHost() {
   const closeTasksViewer = useDashboardStore((state) => state.closeTasksViewer);
   if (!issueId) return null;
   return <TasksDialog issueId={issueId} isOpen onClose={closeTasksViewer} />;
+}
+
+function PrdViewerHost() {
+  const issueId = useDashboardStore((state) => state.prdViewerIssueId);
+  const closePrdViewer = useDashboardStore((state) => state.closePrdViewer);
+  if (!issueId) return null;
+  return <PrdViewer issueId={issueId} onClose={closePrdViewer} />;
 }
 
 export default function App() {
@@ -877,6 +885,7 @@ export default function App() {
 
       <IssueDrawer />
       <TasksViewerHost />
+      <PrdViewerHost />
       {/* PAN-2908 C-CONVO: persistent conversation dock (level 2 · talk). */}
       <ConversationDock />
       {/* Resume-session recovery: the 409 "has a resumable session" becomes a

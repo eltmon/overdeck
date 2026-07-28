@@ -38,6 +38,7 @@ export type DrawerState = {
 export interface DashboardState extends ReadModelState {
   drawer: DrawerState
   tasksViewerIssueId: string | null
+  prdViewerIssueId: string | null
   /** Whether the initial snapshot has been loaded */
   bootstrapComplete: boolean
   /** ISO timestamp of the last received snapshot (used for freshness indicator) */
@@ -62,6 +63,8 @@ export interface DashboardStore extends DashboardState {
   closeIssue(): void
   openTasksViewer(issueId: string): void
   closeTasksViewer(): void
+  openPrdViewer(issueId: string): void
+  closePrdViewer(): void
   setDrawerTab(tab: string): void
   syncDrawerFromUrl(): void
 }
@@ -72,6 +75,7 @@ const initialState: DashboardState = {
   ...INITIAL_READ_MODEL_STATE,
   drawer: { issueId: null, tab: 'overview' },
   tasksViewerIssueId: null,
+  prdViewerIssueId: null,
   bootstrapComplete: false,
   snapshotTimestamp: null,
 }
@@ -83,6 +87,7 @@ function syncSnapshot(state: DashboardState, snapshot: DashboardSnapshot): Dashb
     ...syncSnapshotShared(state, snapshot),
     drawer: state.drawer,
     tasksViewerIssueId: state.tasksViewerIssueId,
+    prdViewerIssueId: state.prdViewerIssueId,
     bootstrapComplete: true,
     snapshotTimestamp: snapshot.timestamp,
   }
@@ -93,6 +98,7 @@ function applyEvent(state: DashboardState, event: DomainEvent): DashboardState {
     ...applyEventShared(state, event),
     drawer: state.drawer,
     tasksViewerIssueId: state.tasksViewerIssueId,
+    prdViewerIssueId: state.prdViewerIssueId,
     bootstrapComplete: state.bootstrapComplete,
     snapshotTimestamp: state.snapshotTimestamp,
   }
@@ -103,6 +109,7 @@ function applyEvents(state: DashboardState, events: DomainEvent[]): DashboardSta
     ...applyEventsShared(state, events),
     drawer: state.drawer,
     tasksViewerIssueId: state.tasksViewerIssueId,
+    prdViewerIssueId: state.prdViewerIssueId,
     bootstrapComplete: state.bootstrapComplete,
     snapshotTimestamp: state.snapshotTimestamp,
   }
@@ -198,6 +205,8 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
 
   openTasksViewer: (issueId) => set({ tasksViewerIssueId: issueId }),
   closeTasksViewer: () => set({ tasksViewerIssueId: null }),
+  openPrdViewer: (issueId) => set({ prdViewerIssueId: issueId }),
+  closePrdViewer: () => set({ prdViewerIssueId: null }),
 
   setDrawerTab: (tab) =>
     set((state) => {

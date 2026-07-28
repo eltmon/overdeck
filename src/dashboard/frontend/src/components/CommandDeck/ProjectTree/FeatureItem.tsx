@@ -3,7 +3,7 @@ import { useLiveFlash } from '../../../lib/useLiveFlash';
 import {
   Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge,
   ChevronRight, ChevronDown, FolderOpen, GitBranch,
-  BookText, Bug, Container, Radio, Workflow, MessageSquare,
+  BookText, Bug, Container, FileText, Radio, Workflow, MessageSquare,
 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
@@ -57,7 +57,7 @@ interface FeatureItemProps {
   onOpenPlanDialog?: (issueId: string) => void;
   containerStats?: Record<string, { id: string; name: string; cpuPercent: number; memoryUsage: number; status: 'running' | 'stopped' | 'unhealthy' | 'restarting' }>;
 }
-const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'remote-agent', 'vbrief', 'tasks', 'pr', 'docker'];
+const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'remote-agent', 'vbrief', 'prd', 'tasks', 'pr', 'docker'];
 
 function resourceColor(_feature: ProjectFeature): string {
   // v1.2 color restraint: resources are infrastructure facts, not status —
@@ -86,6 +86,8 @@ function resourceSummary(feature: ProjectFeature, source: ResourceSource): { lab
       return details.tmuxSessionCount > 0 ? { label: 'tmux', detail: `${details.tmuxSessionCount} session${details.tmuxSessionCount === 1 ? '' : 's'}` } : null;
     case 'vbrief':
       return details.hasXbrief ? { label: 'xBRIEF', detail: 'present' } : null;
+    case 'prd':
+      return details.hasPrd ? { label: 'PRD', detail: 'present' } : null;
     case 'tasks':
       return details.hasTasks ? { label: 'tasks', detail: 'present' } : null;
     case 'pr':
@@ -127,7 +129,8 @@ function ResourceIcon({
     : source === 'branch' ? <GitBranch {...props} />
       : source === 'tmux' ? <Radio {...props} />
         : source === 'vbrief' ? <BookText {...props} />
-          : source === 'tasks' ? <Bug {...props} />
+          : source === 'prd' ? <FileText {...props} />
+            : source === 'tasks' ? <Bug {...props} />
             : source === 'pr' ? <Workflow {...props} />
               : <Container {...props} />;
   const label = source === 'pr' ? summary.detail.split(' ')[0]
@@ -171,6 +174,7 @@ function ResourceStrip({
 }) {
   const details = feature.resourceDetails;
   const openTasksViewer = useDashboardStore((state) => state.openTasksViewer);
+  const openPrdViewer = useDashboardStore((state) => state.openPrdViewer);
   const resources = RESOURCE_ICON_ORDER.filter((source) => feature.resourceSources?.includes(source) && resourceSummary(feature, source));
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
@@ -241,6 +245,7 @@ function ResourceStrip({
     }
 
     if (details.hasXbrief) rows.push({ key: 'vbrief', label: 'xBRIEF present' });
+    if (details.hasPrd) rows.push({ key: 'prd', label: 'PRD present' });
     if (details.hasTasks) rows.push({ key: 'tasks', label: 'tasks present' });
     for (const pr of identifiers?.prs ?? details.prs) {
       rows.push({ key: `pr-${pr.number}`, label: `PR: #${pr.number} ${pr.title} (${formatPrState(pr)})` });
@@ -276,7 +281,11 @@ function ResourceStrip({
           key={source}
           source={source}
           feature={feature}
-          onActivate={source === 'tasks' ? () => openTasksViewer(feature.issueId) : undefined}
+          onActivate={source === 'tasks'
+            ? () => openTasksViewer(feature.issueId)
+            : source === 'prd'
+              ? () => openPrdViewer(feature.issueId)
+              : undefined}
         />
       ))}
       {details && popoverOpen && (

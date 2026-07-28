@@ -26,6 +26,7 @@ vi.mock('lucide-react', async (importOriginal) => {
     GitMerge: () => <svg data-testid="merge" />,
     GitBranch: () => <svg data-testid="git-branch" />,
     BookText: () => <svg data-testid="book-text" />,
+    FileText: () => <svg data-testid="file-text" />,
     Bug: () => <svg data-testid="bug" />,
     Container: () => <svg data-testid="container" />,
     Radio: () => <svg data-testid="radio" />,
@@ -157,6 +158,7 @@ function makeFeature(overrides?: Partial<ProjectFeature>): ProjectFeature {
       prs: [],
       hasXbrief: false,
       hasTasks: false,
+      hasPrd: false,
       dockerContainerCount: 0,
       dockerContainerNames: [],
       conversations: [],
@@ -302,6 +304,7 @@ describe('FeatureItem', () => {
     useDashboardStore.setState({
       drawer: { issueId: null, tab: 'overview' },
       tasksViewerIssueId: null,
+      prdViewerIssueId: null,
     });
     vi.restoreAllMocks();
     vi.mocked(refreshDashboardState).mockClear();
@@ -982,7 +985,7 @@ describe('FeatureItem', () => {
     const view = renderFeature(
       <FeatureItem
         feature={makeFeature({
-          resourceSources: ['workspace', 'branch', 'tmux', 'pr', 'docker', 'vbrief', 'tasks'],
+          resourceSources: ['workspace', 'branch', 'tmux', 'pr', 'docker', 'vbrief', 'prd', 'tasks'],
           resourceDetails: {
             hasWorkspace: true,
             localBranchCount: 1,
@@ -998,6 +1001,7 @@ describe('FeatureItem', () => {
             ],
             hasXbrief: true,
             hasTasks: true,
+            hasPrd: true,
             dockerContainerCount: 2,
           },
         })}
@@ -1017,6 +1021,7 @@ describe('FeatureItem', () => {
     expect(screen.getByText('branch (remote): origin/feature/pan-821')).toBeInTheDocument();
     expect(screen.getByText('tmux: agent-pan-821')).toBeInTheDocument();
     expect(screen.getByText('xBRIEF present')).toBeInTheDocument();
+    expect(screen.getByText('PRD present')).toBeInTheDocument();
     expect(screen.getByText('tasks present')).toBeInTheDocument();
     expect(screen.getByText('PR: #123 Test PR (open)')).toBeInTheDocument();
     expect(screen.getByText('docker: pan-821-db')).toBeInTheDocument();
@@ -1050,6 +1055,62 @@ describe('FeatureItem', () => {
 
     expect(useDashboardStore.getState().tasksViewerIssueId).toBe('PAN-821');
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('opens the PRD viewer from the PRD chip without selecting the issue row', () => {
+    const onSelect = vi.fn();
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          resourceSources: ['prd'],
+          resourceDetails: {
+            hasWorkspace: false,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasXbrief: false,
+            hasTasks: false,
+            hasPrd: true,
+            dockerContainerCount: 0,
+            conversations: [],
+          },
+        })}
+        isSelected={false}
+        onSelect={onSelect}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open PRD for PAN-821' }));
+
+    expect(useDashboardStore.getState().prdViewerIssueId).toBe('PAN-821');
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('does not render the PRD chip when canonical PRD presence is false', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          resourceSources: ['prd'],
+          resourceDetails: {
+            hasWorkspace: false,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasXbrief: false,
+            hasTasks: false,
+            hasPrd: false,
+            dockerContainerCount: 0,
+            conversations: [],
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Open PRD for PAN-821' })).not.toBeInTheDocument();
   });
 
   it('collapses UAT environment panel by default and expands on header click for ready-for-merge issues', async () => {
