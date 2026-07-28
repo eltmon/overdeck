@@ -180,7 +180,7 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T11:36:09.397Z",
+  "updated": "2026-07-28T11:36:14.969Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "blocked",
@@ -191,11 +191,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T11:36:08.689Z",
+    "updatedAt": "2026-07-28T11:36:14.964Z",
     "reviewNotes": "event_idempotency is added to panopticon.db's schema, but appendOnce runs against overdeck.db where no init migration or runtime top-up creates the table, so every production append-once request fails.",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
-    "reviewedAtCommit": "f110307644701e83f5413011b79bea06fb74cd73",
+    "reviewedAtCommit": "6986a22ca9666f15c36f1b58d62cfbd56043be38",
     "lastVerifiedCommit": "51f15f597ae7b2b54c2e21b4f81ce496648728c9",
     "reviewSpawnedAt": "2026-07-28T11:32:41.511Z",
     "scopeDrift": {
@@ -291,7 +291,7 @@
       },
       "costAtCloseOut": {
         "usd": 92.3297493,
-        "pricingAsOf": "2026-07-28T11:36:08.705Z"
+        "pricingAsOf": "2026-07-28T11:36:14.966Z"
       }
     },
     "merges": [
