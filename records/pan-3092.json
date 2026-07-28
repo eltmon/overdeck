@@ -57,6 +57,11 @@
       "reason": "feedback",
       "note": "[2026-07-28T09:05Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-28T09:05:50.784Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-28T09:31:54.427Z"
     }
   ],
   "feedback": [],
@@ -117,10 +122,10 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T09:31:53.295Z",
+  "updated": "2026-07-28T09:31:55.081Z",
   "pipeline": {
     "issueId": "PAN-3092",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -128,12 +133,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T09:31:52.885Z",
+    "updatedAt": "2026-07-28T09:31:53.318Z",
     "reviewNotes": "Conflicting verdicts are surfaced as transient lock contention, and warning dedupe repeats after dashboard restart",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
     "lastVerifiedCommit": "566db378cb92103431348231524716843b9cf751",
-    "reviewSpawnedAt": "2026-07-28T09:00:45.507Z",
+    "reviewSpawnedAt": "2026-07-28T09:31:53.317Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/concerns.md",
@@ -227,7 +232,7 @@
       },
       "costAtCloseOut": {
         "usd": 32.0353693,
-        "pricingAsOf": "2026-07-28T09:31:52.936Z"
+        "pricingAsOf": "2026-07-28T09:31:55.077Z"
       }
     },
     "merges": [
