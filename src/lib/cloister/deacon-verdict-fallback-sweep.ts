@@ -34,37 +34,46 @@ export const VERDICT_CONTENTION_SURFACE_MS = 10 * 60 * 1000;
  * Episodes warned about whose durable recovery trip is not yet on disk, keyed by
  * recovery path + issue + the fallback's own `updatedAt`.
  *
- * The durable trip is the cross-restart dedupe and is consulted first. This set
- * covers only the window where the trip write itself keeps losing to the
- * contended record lock — precisely when the durable plane cannot help — and
- * entries are dropped as soon as the trip lands, so it does not grow for the
- * lifetime of the server.
+ * This is only an optimisation, never the dedupe of record: it saves a redundant
+ * emit inside one process while the trip write keeps losing the contended lock.
+ * Correctness across restarts comes from the two durable planes — the open
+ * recovery trip, and the episode-derived activity-entry id. Entries are dropped
+ * as soon as either plane takes over, so the set does not grow for the lifetime
+ * of the server.
  */
 const warnedEpisodes = new Set<string>();
 
-/** Which specialist owns each gate, for the "apply the right verdict" instruction. */
-const GATE_SPECIALIST: Record<string, string> = {
-  reviewStatus: 'review',
-  testStatus: 'test',
-  uatStatus: 'uat',
-  inspectStatus: 'inspect',
-  mergeStatus: 'merge',
-};
-
+/**
+ * Describe a verdict conflict and the one action that reliably clears it.
+ *
+ * Deliberately does NOT hand out a `pan admin specialists done` command. That
+ * command is not a general conflict resolver: `merge` takes passed|failed and
+ * maps them to merged|failed (so the displayed `merged` is rejected), `inspect`
+ * requires an `--item` this pipeline-level conflict cannot identify, `review`
+ * does not accept `skipped`, verification has no specialist at all, and
+ * re-signalling the value already in the journal writes no replacement fallback
+ * — so the conflicting one survives and every later drain withholds it again.
+ * A conflict can also span several gates, which one command cannot settle.
+ *
+ * A strictly newer review cycle is the only instruction correct for every gate
+ * and every choice, so that is what the operator is told, along with what it
+ * costs. A dedicated resolve-this-generation operation through the verdict write
+ * door would let an operator adopt a specific written verdict instead; until
+ * that exists, promising it here would be a lie.
+ */
 function conflictMessage(issueId: string, conflicts: VerdictConflict[], ageMinutes: number): string {
   const detail = conflicts
-    .map((c) => `${c.gate}: the record holds "${c.journalValue}" and the workspace fallback holds "${c.fallbackValue}"`)
+    .map((c) => `${c.gate} (the record holds "${c.journalValue}", the workspace fallback holds "${c.fallbackValue}")`)
     .join('; ');
-  const specialist = GATE_SPECIALIST[conflicts[0]!.gate];
-  const apply = specialist
-    ? `pan admin specialists done ${specialist} ${issueId} --status <the correct value>`
-    : `re-signal the correct verdict for that gate`;
+  const gateCount = conflicts.length === 1 ? 'one gate' : `${conflicts.length} gates`;
   return (
-    `${issueId} — two different verdicts have been written for the same gate and Overdeck cannot tell which `
-    + `is newer, so it will not choose: ${detail}. This has been unresolved for ${ageMinutes}min and will NOT `
-    + `clear on its own — the fold is withheld on every patrol, by design, to avoid destroying the losing `
-    + `verdict. An operator must decide. To apply the verdict you believe is correct, run: ${apply}. `
-    + `To discard both and start over, dispatch a new review cycle for ${issueId}.`
+    `${issueId} — two different verdicts have been written for ${gateCount} and Overdeck cannot tell which is `
+    + `newer, so it refuses to choose: ${detail}. This has been unresolved for ${ageMinutes}min and will NOT `
+    + `clear on its own: the fold is withheld on every patrol, by design, so that neither written verdict is `
+    + `destroyed. An operator must decide. The one action that reliably clears it for every gate is to dispatch `
+    + `a strictly newer review cycle for ${issueId} — that supersedes the stranded fallback and re-runs the `
+    + `gates, rather than adopting either of the verdicts already written. Overdeck has no command today that `
+    + `adopts one specific written verdict, so do not expect a re-signal of an existing value to clear this.`
   );
 }
 
@@ -142,20 +151,36 @@ export async function sweepStrandedVerdictFallbacks(now = Date.now()): Promise<s
         summary = `${issueId}: verdict contended ${ageMinutes}min (lock owner: ${owner})`;
       }
 
-      // Dedupe across restarts by consulting the durable trip, which is the
-      // canonical record of "already surfaced". An unreadable record returns
-      // undefined and we warn — losing a first warning is worse than repeating
-      // one. The in-process set then covers the window where the trip write
-      // itself keeps losing to the contended lock.
       const openTrip = await findRecoveryTrip(issueId, recoveryPath, fallback.updatedAt);
-      const alreadySurfaced = openTrip?.open === true || warnedEpisodes.has(episode);
+      if (openTrip?.open === true) {
+        // Already durably surfaced. Do NOT call recordRecoveryFailure: its
+        // mutator returns the record unchanged for an open trip, but the write
+        // door still takes the per-issue lock and runs the commit/flush path.
+        // A retained verdict conflict is permanent by design, so that would be
+        // one no-op record write per patrol forever — manufacturing contention
+        // on the very lock family this issue exists to relieve.
+        warnedEpisodes.delete(episode);
+        continue;
+      }
 
       // The warning goes out BEFORE the trip write and never touches the record
       // lock. Ordering it after would put the only immediate operator signal
       // behind the very lock whose contention it is reporting.
-      if (!alreadySurfaced) {
+      //
+      // Its id is derived from the episode, not random: `emitActivityEntry`
+      // treats a reused id as a newer state transition of the SAME logical
+      // activity, so this is a durable, lock-independent idempotency key. That
+      // is what keeps one episode to one operator warning even when the trip
+      // write never lands and a dashboard restart wipes the in-process set.
+      if (!warnedEpisodes.has(episode)) {
         warnedEpisodes.add(episode);
-        emitActivityEntrySync({ source: 'cloister', level: 'warn', issueId, message });
+        emitActivityEntrySync({
+          id: `verdict-fallback:${episode}`,
+          source: 'cloister',
+          level: 'warn',
+          issueId,
+          message,
+        });
         actions.push(summary);
       }
 
@@ -166,10 +191,11 @@ export async function sweepStrandedVerdictFallbacks(now = Date.now()): Promise<s
         const { emitNeedsYou } = await recordRecoveryFailure(
           workspacePath, issueId, recoveryPath, fallback.updatedAt, 1,
         );
-        // The durable trip now carries this episode, so the in-process entry is
-        // redundant — drop it rather than growing the set for the server's life.
-        if (!emitNeedsYou) warnedEpisodes.delete(episode);
-        else actions.push(`needs-you ${summary}`);
+        // The trip landed, so the durable plane owns dedupe from here — drop the
+        // in-process key regardless of `emitNeedsYou`, which controls whether
+        // this was the notifying trip, not whether the write succeeded.
+        warnedEpisodes.delete(episode);
+        if (emitNeedsYou) actions.push(`needs-you ${summary}`);
       } catch {
         actions.push(
           `${issueId}: ${recoveryPath} needs-you trip could not be recorded (record lock contended) — retrying next patrol`,

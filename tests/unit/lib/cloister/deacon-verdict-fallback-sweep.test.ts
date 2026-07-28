@@ -56,10 +56,15 @@ vi.mock('../../../../src/lib/activity-logger.js', () => ({
   emitActivityEntrySync: mocks.emitActivityEntrySync,
 }));
 
-import {
-  sweepStrandedVerdictFallbacks,
-  VERDICT_CONTENTION_SURFACE_MS,
-} from '../../../../src/lib/cloister/deacon-verdict-fallback-sweep.js';
+import { VERDICT_CONTENTION_SURFACE_MS } from '../../../../src/lib/cloister/deacon-verdict-fallback-sweep.js';
+
+const SWEEP_MODULE = '../../../../src/lib/cloister/deacon-verdict-fallback-sweep.js';
+
+/** A fresh module instance — i.e. what a dashboard restart produces. */
+async function loadSweep(): Promise<(now?: number) => Promise<string[]>> {
+  vi.resetModules();
+  return (await import(SWEEP_MODULE)).sweepStrandedVerdictFallbacks;
+}
 
 const ISSUE = 'PAN-9999';
 const NOW = Date.parse('2026-07-27T01:00:00.000Z');
@@ -80,11 +85,15 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
    * dashboard restart leaves the record on disk.
    */
   let durableTrips: Map<string, { open: boolean; tripCount: number }>;
+  // Each test gets its own module instance so the sweep's process-local dedupe
+  // set cannot leak between cases — and so "restart" means exactly one thing.
+  let sweepStrandedVerdictFallbacks: (now?: number) => Promise<string[]>;
   const tripKey = (issueId: string, path: string, generation: string) => `${issueId}|${path}|${generation}`;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     durableTrips = new Map();
+    sweepStrandedVerdictFallbacks = await loadSweep();
     mocks.loadReviewStatuses.mockReturnValue({ [ISSUE]: { issueId: ISSUE, reviewStatus: 'reviewing' } });
     mocks.readWorkspaceVerdictFallback.mockResolvedValue(null);
     mocks.drainWorkspaceVerdictFallback.mockResolvedValue(true);
@@ -185,6 +194,79 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     expect(second.some((a) => a.includes('verdict contended'))).toBe(false);
   });
 
+  it.each([
+    ['mergeStatus', 'merged', 'failed'],
+    ['inspectStatus', 'passed', 'blocked'],
+    ['verificationStatus', 'passed', 'failed'],
+    ['reviewStatus', 'skipped', 'passed'],
+  ])(
+    'never prescribes a specialist command for a %s conflict it cannot resolve (PAN-3092)',
+    async (gate, journalValue, fallbackValue) => {
+      // `specialists done` is not a general resolver: merge maps passed->merged
+      // so "merged" is rejected, inspect needs an --item this conflict cannot
+      // name, verification has no specialist, and review rejects "skipped".
+      // Prescribing it would send the operator to a command that errors.
+      mocks.readWorkspaceVerdictFallback.mockResolvedValue(
+        fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 60_000),
+      );
+      mocks.drainWorkspaceVerdictFallback.mockResolvedValue(false);
+      mocks.findWorkspaceVerdictConflicts.mockResolvedValue([{ gate, journalValue, fallbackValue }]);
+
+      await sweepStrandedVerdictFallbacks(NOW);
+
+      const message = String(
+        (mocks.emitActivityEntrySync.mock.calls[0]![0] as Record<string, unknown>).message,
+      );
+      expect(message).toContain(gate);
+      expect(message).toContain(`"${journalValue}"`);
+      expect(message).toContain(`"${fallbackValue}"`);
+      expect(message).not.toContain('pan admin specialists done');
+      // The one instruction that is correct for every gate.
+      expect(message).toContain('strictly newer review cycle');
+    },
+  );
+
+  it('names every conflicting gate when a fallback conflicts on more than one (PAN-3092)', async () => {
+    mocks.readWorkspaceVerdictFallback.mockResolvedValue(
+      fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 60_000),
+    );
+    mocks.drainWorkspaceVerdictFallback.mockResolvedValue(false);
+    mocks.findWorkspaceVerdictConflicts.mockResolvedValue([
+      { gate: 'reviewStatus', journalValue: 'blocked', fallbackValue: 'passed' },
+      { gate: 'testStatus', journalValue: 'failed', fallbackValue: 'passed' },
+    ]);
+
+    const actions = await sweepStrandedVerdictFallbacks(NOW);
+
+    const message = String(
+      (mocks.emitActivityEntrySync.mock.calls[0]![0] as Record<string, unknown>).message,
+    );
+    // A single-gate command could never settle both — both are named instead.
+    expect(message).toContain('2 gates');
+    expect(message).toContain('reviewStatus');
+    expect(message).toContain('testStatus');
+    expect(actions.some((a) => a.includes('reviewStatus, testStatus'))).toBe(true);
+  });
+
+  it('tells the operator a re-signal of an existing value will not clear it (PAN-3092)', async () => {
+    // Choosing the value already in the journal writes no replacement fallback,
+    // so the conflicting one survives and every later drain withholds it again.
+    mocks.readWorkspaceVerdictFallback.mockResolvedValue(
+      fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 60_000),
+    );
+    mocks.drainWorkspaceVerdictFallback.mockResolvedValue(false);
+    mocks.findWorkspaceVerdictConflicts.mockResolvedValue([
+      { gate: 'reviewStatus', journalValue: 'blocked', fallbackValue: 'passed' },
+    ]);
+
+    await sweepStrandedVerdictFallbacks(NOW);
+
+    const message = String(
+      (mocks.emitActivityEntrySync.mock.calls[0]![0] as Record<string, unknown>).message,
+    );
+    expect(message).toContain('do not expect a re-signal of an existing value to clear this');
+  });
+
   it('names a verdict conflict as needing adjudication, never as transient contention (PAN-3092)', async () => {
     // A withheld fold and a lost lock race both surface as a failed drain, but
     // only contention clears on its own. Telling the operator to wait for an
@@ -206,9 +288,10 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     expect(message).toContain('reviewStatus');
     expect(message).toContain('"blocked"');
     expect(message).toContain('"passed"');
-    // Says plainly that waiting will not help, and how to resolve it.
+    // Says plainly that waiting will not help, and gives the one action that
+    // reliably clears it for every gate.
     expect(message).toContain('will NOT');
-    expect(message).toContain('pan admin specialists done review PAN-9999 --status');
+    expect(message).toContain('strictly newer review cycle');
     // And never claims the lock will free itself.
     expect(message).not.toContain('folds automatically');
     expect(message).not.toContain('record lock is contended');
@@ -217,6 +300,74 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     const [, , recoveryPath] = mocks.recordRecoveryFailure.mock.calls[0] as [string, string, string];
     expect(recoveryPath).toBe('verdict-fallback-conflict');
     expect(actions.some((a) => a.includes('needs operator adjudication'))).toBe(true);
+  });
+
+  it('does not repeat the warning after a restart when the trip write never landed (PAN-3092)', async () => {
+    // The hard case: the trip write fails for exactly the reason being reported
+    // (the record lock is contended), so the durable trip plane cannot dedupe.
+    // The episode-derived activity id must carry it instead.
+    mocks.readWorkspaceVerdictFallback.mockResolvedValue(
+      fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 60_000),
+    );
+    mocks.drainWorkspaceVerdictFallback.mockResolvedValue(false);
+    mocks.recordRecoveryFailure.mockRejectedValue(new Error('record lock is held'));
+
+    await sweepStrandedVerdictFallbacks(NOW);
+    expect(mocks.emitActivityEntrySync).toHaveBeenCalledTimes(1);
+    const firstId = (mocks.emitActivityEntrySync.mock.calls[0]![0] as Record<string, unknown>).id;
+    expect(firstId).toBe(`verdict-fallback:verdict-fallback-contention:${ISSUE}:${fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 60_000).updatedAt}`);
+
+    // Dashboard restart: in-process state is gone and no durable trip exists.
+    const afterRestart = await loadSweep();
+    expect(durableTrips.size).toBe(0);
+
+    await afterRestart(NOW + 60_000);
+
+    // A second emit happens, but it reuses the SAME id — the activity log treats
+    // that as a further state transition of one logical entry, so the operator
+    // still sees a single warning for this episode rather than a nag loop.
+    const ids = mocks.emitActivityEntrySync.mock.calls.map(
+      (call) => (call[0] as Record<string, unknown>).id,
+    );
+    expect(new Set(ids).size).toBe(1);
+    expect(ids[1]).toBe(firstId);
+  });
+
+  it('makes no record write once the episode is durably surfaced (PAN-3092)', async () => {
+    // A retained verdict conflict is permanent by design, so a per-patrol no-op
+    // record write would take the contended lock forever, for nothing.
+    mocks.readWorkspaceVerdictFallback.mockResolvedValue(
+      fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 60_000),
+    );
+    mocks.drainWorkspaceVerdictFallback.mockResolvedValue(false);
+
+    await sweepStrandedVerdictFallbacks(NOW);
+    expect(mocks.recordRecoveryFailure).toHaveBeenCalledTimes(1);
+
+    await sweepStrandedVerdictFallbacks(NOW + 60_000);
+    await sweepStrandedVerdictFallbacks(NOW + 120_000);
+
+    // Zero additional writes, while the drain is still retried every patrol.
+    expect(mocks.recordRecoveryFailure).toHaveBeenCalledTimes(1);
+    expect(mocks.drainWorkspaceVerdictFallback).toHaveBeenCalledTimes(3);
+    expect(mocks.emitActivityEntrySync).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears its process-local key once the trip lands, so the durable plane owns dedupe (PAN-3092)', async () => {
+    mocks.readWorkspaceVerdictFallback.mockResolvedValue(
+      fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 60_000),
+    );
+    mocks.drainWorkspaceVerdictFallback.mockResolvedValue(false);
+
+    await sweepStrandedVerdictFallbacks(NOW);
+    expect(mocks.emitActivityEntrySync).toHaveBeenCalledTimes(1);
+
+    // An operator acknowledges the trip, clearing the durable plane. If the
+    // in-process key had been retained, this episode could never warn again.
+    durableTrips.clear();
+    await sweepStrandedVerdictFallbacks(NOW + 60_000);
+
+    expect(mocks.emitActivityEntrySync).toHaveBeenCalledTimes(2);
   });
 
   it('does not repeat the warning after a dashboard restart clears module state (PAN-3092)', async () => {
@@ -230,9 +381,7 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
 
     // Simulate a dashboard restart: module-local dedupe is gone, but the durable
     // recovery trip written above survives in the per-issue record.
-    vi.resetModules();
-    const { sweepStrandedVerdictFallbacks: afterRestart } =
-      await import('../../../../src/lib/cloister/deacon-verdict-fallback-sweep.js');
+    const afterRestart = await loadSweep();
     expect(durableTrips.size).toBe(1);
 
     const actions = await afterRestart(NOW + 60_000);

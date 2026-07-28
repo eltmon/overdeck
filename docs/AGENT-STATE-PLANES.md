@@ -58,10 +58,23 @@ write-recency from verdict-truth:
   drain withholds the fold, keeps the fallback, and lets the sweep put the
   conflict in front of an operator. That state is permanent by design — every
   later drain withholds the same fold — so the sweep reports it under its own
-  `verdict-fallback-conflict` recovery path, naming the gate and both written
-  values and saying plainly that it will not clear on its own. The
+  `verdict-fallback-conflict` recovery path, naming every conflicting gate and
+  both written values and saying plainly that it will not clear on its own. The
   `verdict-fallback-contention` path is reserved for an actual write failure,
   which does clear when the lock frees.
+
+  The conflict message deliberately does **not** hand out a `pan admin
+  specialists done` command. That command is not a general resolver: `merge`
+  takes `passed|failed` and maps them to `merged|failed`, `inspect` requires an
+  `--item` a pipeline-level conflict cannot identify, `review` does not accept
+  `skipped`, verification has no specialist, re-signalling the value already in
+  the journal writes no replacement fallback (so the conflict survives), and a
+  conflict can span several gates at once. A strictly newer review cycle is the
+  only instruction correct for every gate, so that is what the operator is told.
+  A resolve-this-generation operation through the verdict write door — accepting
+  the exact fallback generation plus per-gate choices and consuming only that
+  generation — would let an operator adopt a specific written verdict; it does
+  not exist yet and is tracked as follow-up work.
 - **Every merge-gating verdict is projected durably.** `uatStatus`/`uatNotes`
   join the pipeline block, `projectPipeline()`, and `durableSubset()` — UAT
   gates merge eligibility, so a contended UAT verdict that the fallback silently
@@ -80,11 +93,16 @@ write-recency from verdict-truth:
   activity warning is emitted before, and independently of, the recovery-trip
   write: that write goes through the very lock whose contention is being
   reported, so it is best-effort and retried on later patrols while the
-  operator-visible warning always lands. Dedupe consults the durable trip first
-  (`findRecoveryTrip()`, a lock-free record read), so a dashboard restart does
-  not re-warn about an episode already surfaced; a small in-process set covers
-  only the window where the trip write itself keeps losing the lock, and its
-  entries are dropped once the trip lands.
+  operator-visible warning always lands. Once the trip is durably open the sweep
+  skips the write entirely — an open trip's mutator returns the record unchanged
+  but the write door still takes the lock, and a retained conflict is permanent,
+  so that would be a no-op record write every patrol forever on the lock under
+  repair. Dedupe rests on two lock-independent durable facts: the open trip
+  (`findRecoveryTrip()`, a lock-free record read) and the activity entry's
+  episode-derived `id` — the `activity.entry` reducer merges by id, so a repeat
+  refreshes one row instead of adding a second, which covers the case where the
+  trip write never lands at all. The in-process set is only an optimisation and
+  is dropped as soon as either durable plane takes over.
 - **A frozen test agent escalates.** A live, idle test session that was already
   nudged and wrote no `.pan/test/result.json` now yields `escalate` from
   `decideUnsignaledTestAction()` instead of being ignored forever; the deacon
