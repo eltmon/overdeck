@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T20:24:43.883Z",
+  "updated": "2026-07-28T20:26:24.794Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "pending",
@@ -72,16 +72,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "count-fold": {
-        "writerId": "agent-pan-3233",
-        "agentId": "agent-pan-3233",
-        "pid": 3300900,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:24:43.882Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3233",
@@ -112,6 +104,16 @@
         "itemId": "pane-question-kind",
         "outcome": "completed",
         "releasedAt": "2026-07-28T20:24:35.770Z"
+      },
+      {
+        "writerId": "agent-pan-3233",
+        "agentId": "agent-pan-3233",
+        "pid": 3300900,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:24:43.882Z",
+        "itemId": "count-fold",
+        "outcome": "completed",
+        "releasedAt": "2026-07-28T20:26:24.794Z"
       }
     ]
   },
@@ -127,6 +129,9 @@
     "pane-question-kind.pane-question-kind.ac1": "completed",
     "pane-question-kind.pane-question-kind.ac2": "completed",
     "pane-question-kind.pane-question-kind.ac3": "completed",
-    "count-fold": "running"
+    "count-fold": "completed",
+    "count-fold.count-fold.ac1": "completed",
+    "count-fold.count-fold.ac2": "completed",
+    "count-fold.count-fold.ac3": "completed"
   }
 }
