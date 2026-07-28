@@ -32,9 +32,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-28T20:55:38.658Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-28T21:15Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-28T21:15:16.392Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-28T21:15:16.692Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-28T21:15:16Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3229\n\n# Review — PAN-3229 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED — markerless recovery overrides deliberate `--no-promote`\n\n## Context\n- Branch: `feature/pan-3229`\n- HEAD reviewed: `db15a4f22f3a2a4edb6bf834336b8de69ec0dab3`\n- PR: https://github.com/eltmon/overdeck/pull/3246\n- Review scope: correctness, security, requirements/acceptance criteria, and performance\n- Verification run: focused changed-behavior tests passed (15 tests across 4 root-suite files); `npm run typecheck` passed; GitHub CI is green.\n\n## Blocking Findings\n\n### ! Markerless recovery silently cancels the operator's `--no-promote` decision — `src/lib/cloister/pending-promotion-reconciler.ts:196`\n**Dimension:** correctness / requirements  \n**Evidence tier:** Tier 1 — static, with the new markerless-candidate test demonstrating the second half of the path\n\n**Changed code:** `planFinalizeCommand` stamps the workspace plan to `proposed` before it evaluates `options.promote`, intentionally writes no marker when `--no-promote` is used, and tells the caller that promotion was skipped and must be triggered manually (`src/cli/commands/plan-finalize.ts:277-280`, `src/cli/commands/plan-finalize.ts:309-343`, `src/cli/commands/plan-finalize.ts:369-371`). The new markerless scan then treats every old markerless `proposed` workspace spec with no promoted counterpart as recoverable (`src/lib/cloister/pending-promotion-reconciler.ts:196-219`) and POSTs `complete-planning` (`src/lib/cloister/pending-promotion-reconciler.ts:282-295`). The test at `src/lib/cloister/__tests__/pending-promotion-reconciler.test.ts:220-245` confirms that exact markerless state is promoted.\n\n**Runtime impact:** A user who deliberately runs `pan plan finalize --no-promote` is promised that the issue will wait for `pan plan done` or the dashboard Done action. Five minutes later, the deacon promotes it automatically. That bypasses the operator-approval handoff and changes an existing CLI contract outside this issue's requested behavior.\n\n**Fix:** Make the defensive markerless path mechanically distinguish an exhausted/legacy promotion failure from a deliberate `--no-promote` finalize, and exclude the deliberate skip state. Add a regression that runs finalize with `promote: false`, advances beyond the five-minute markerless grace period, and proves the reconciler issues no POST.\n\n### ! The promised promotion-service regression test never exercises `completePlanningForIssue` — `src/lib/overdeck/__tests__/planning-promotion-marker-cleanup.test.ts:25`\n**Dimension:** requirements / acceptance criteria  \n**Evidence tier:** Tier 1 — static\n\n**Changed code:** WI-4 requires a test proving that a successful `completePlanningForIssue` run removes the marker and that the absent-marker success path remains valid. The production call is wired at `src/lib/overdeck/planning-promotion.ts:829`, but the new test invokes only the extracted `removePendingPromotionMarker` helper (`src/lib/overdeck/__tests__/planning-promotion-marker-cleanup.test.ts:25-44`). It never calls the service function or reaches its success response path.\n\n**Runtime impact:** The acceptance criterion is unproven: deleting or misplacing the call inside `completePlanningForIssue`, or returning before it, leaves this test green. The helper's filesystem behavior is covered, but the required service integration is not.\n\n**Fix:** Exercise a successful `completePlanningForIssue` path with a temp workspace marker and assert the marker is gone before the returned success response; run the same path without a marker and assert it succeeds without a removal log.\n\n## Non-blocking Findings\n\n### ~ Marker persistence failure is still an unhandled finalize exception — `src/cli/commands/plan-finalize.ts:329`\nThe PRD explicitly requires the CLI to retain honest fallback wording and report the marker error if the marker itself cannot be written. `writePendingPromotionMarker` is called without a catch, so permission, disk-full, or rename failures escape before the JSON/human result and normal `exitCli(1)` path. This is a secondary failure-mode gap rather than the main recovery path, but it should be handled while the branch is revised.\n\n### ~ NFR-4's marker-I/O injection was not implemented — `src/lib/cloister/pending-promotion-reconciler.ts:50`\nThe options object injects projects, clock, fetch, promoted-spec lookup, issue closure, needs-you, and activity emission, but marker discovery/read/write/delete remain hard-wired filesystem calls. The tests are hermetic through temp directories, so this is not a runtime blocker, but the explicit NFR is only partially satisfied.\n\n### ≉ The PR contains unrelated dashboard transcript and flywheel-state changes\n`src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx`, its CSS/test, and `docs/FLYWHEEL-STATE.md` are outside the PAN-3229 xBRIEF scope. The changes appear internally coherent and introduce no blocker found in this pass, but they expand the PR's review and rollback surface without contributing to pending-promotion recovery.\n\n## Security Review\nNo security blocker found. Workspace names and marker issue IDs are constrained before endpoint construction, the reconciler uses the existing internal-token/origin pattern, and no credential, injection, or destructive external-input path was introduced.\n\n## Performance Review\nNo performance blocker found. The patrol scan is linear in configured workspaces and promotion calls are limited to old `proposed` candidates. The duplicate promoted-spec lookup for markerless candidates is avoidable but not material at the expected candidate volume.\n\n## Requirements Coverage\nFR-1 through FR-3 and FR-5 through FR-9 are represented in code and focused tests; FR-4's defensive markerless implementation is present but currently breaks deliberate `--no-promote` behavior. NFR-1 through NFR-3 are met. NFR-4 is partial because marker I/O is not injectable. Documentation names the marker, patrol owner, grace windows, escalation, cleanup owner, and manual fallback.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3229/.pan/review/agent-pan-3229-review-db15a4f2/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3229 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -80,7 +98,7 @@
     "recordedAt": "2026-07-28T20:15:30.548Z"
   },
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T21:15:15.609Z",
+  "updated": "2026-07-28T21:15:16.693Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "blocked",
