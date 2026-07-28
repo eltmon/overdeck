@@ -19,6 +19,8 @@ import {
 import { getAutoCloseOutCanonicalState } from '../cloister/deacon-canonical-state.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
 import { fetchCommitCheckRuns, fetchIssuePullRequest } from '../overdeck/pull-requests.js';
+import { getForgeAdapter } from '../forge.js';
+import { resolveProjectReposForIssueSync } from '../project-repos.js';
 import {
   gatherIssueBranchContainment,
   type IssueBranchContainment,
@@ -53,6 +55,12 @@ export interface MergedDodRowResult extends DodRowResult {
   evidence?: 'branch-containment';
 }
 
+interface MergedForgeArtifact {
+  forge: string;
+  url?: string;
+  id?: string;
+}
+
 interface MergedRowDeps {
   verifyMerged: (ctx: LifecycleContext) => Promise<StepResult>;
   readPullRequest: (ctx: LifecycleContext, branchName: string) => Promise<{
@@ -62,6 +70,7 @@ interface MergedRowDeps {
     mergeCommit?: { oid?: string } | string | null;
   }>;
   readDurableMerges?: (ctx: LifecycleContext) => Promise<string[]>;
+  readMergedForgeArtifacts?: (ctx: LifecycleContext) => Promise<MergedForgeArtifact[]>;
   readBranchContainment?: (ctx: LifecycleContext) => Promise<IssueBranchContainment>;
 }
 
@@ -82,6 +91,15 @@ const defaultMergedRowDeps: MergedRowDeps = {
   readDurableMerges: async ctx => {
     const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
     return (await readIssueRecord(project, ctx.issueId))?.closeOut.merges ?? [];
+  },
+  readMergedForgeArtifacts: async ctx => {
+    const repos = resolveProjectReposForIssueSync(ctx.issueId)?.filter(repo => repo.required) ?? [];
+    const artifacts = await Promise.all(repos.map(repo => getForgeAdapter(repo.forge).findMergedArtifact({
+      sourceBranch: repo.sourceBranch,
+      targetBranch: repo.targetBranch,
+      cwd: repo.repoPath,
+    })));
+    return artifacts.filter((artifact): artifact is NonNullable<typeof artifact> => artifact !== null);
   },
   readBranchContainment: async ctx => {
     const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
@@ -359,6 +377,7 @@ export async function checkMergedRow(
   const merged = result('merged', verified.success || verified.skipped ? 'pass' : 'miss', observed) as MergedDodRowResult;
   const branchAbsent = verified.error === BRANCH_ABSENT_MERGE_ERROR;
   let durableMerges: string[] = [];
+  let forgeArtifacts: MergedForgeArtifact[] = [];
 
   if (branchAbsent) {
     try {
@@ -366,6 +385,21 @@ export async function checkMergedRow(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       merged.observed = `${merged.observed}; durable merge evidence unavailable: ${message}`;
+    }
+    if (!ctx.github && deps.readMergedForgeArtifacts) {
+      try {
+        forgeArtifacts = await deps.readMergedForgeArtifacts(ctx);
+        const labels = forgeArtifacts.map(artifact => {
+          const label = artifact.forge === 'gitlab'
+            ? (artifact.id ? `MR !${artifact.id}` : 'GitLab MR')
+            : (artifact.id ? `PR #${artifact.id}` : 'GitHub PR');
+          return `${label} merged${artifact.url ? ` (${artifact.url})` : ''}`;
+        });
+        if (labels.length > 0) merged.observed = `${merged.observed}; ${labels.join('; ')}`;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        merged.observed = `${merged.observed}; forge artifact evidence unavailable: ${message}`;
+      }
     }
   }
 
@@ -391,7 +425,7 @@ export async function checkMergedRow(
 
   if (branchAbsent) {
     const forgeMerged = pullRequestState?.toUpperCase() === 'MERGED';
-    if (durableMerges.length > 0 || forgeMerged) {
+    if (durableMerges.length > 0 || forgeMerged || forgeArtifacts.length > 0) {
       merged.status = 'pass';
       if (durableMerges.length > 0) {
         merged.observed = `${merged.observed}; durable close-out record contains ${durableMerges.length} merge artifact(s)`;
