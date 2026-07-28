@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-28T20:52:03.880Z",
+  "updated": "2026-07-28T20:52:11.750Z",
   "pipeline": {
     "issueId": "PAN-3242",
     "reviewStatus": "pending",
@@ -176,5 +176,23 @@
     "docs-order-books": "completed",
     "docs-order-books.docs-order-books.ac1": "completed",
     "docs-order-books.docs-order-books.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "docs/FLYWHEEL-STATE.md"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "configuration/order-books.mdx",
+      "src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx",
+      "src/dashboard/frontend/src/components/orders/__tests__/RunSettingsPanel.test.tsx"
+    ],
+    "actualChangedFiles": [
+      "configuration/order-books.mdx",
+      "docs/FLYWHEEL-STATE.md",
+      "src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx",
+      "src/dashboard/frontend/src/components/orders/__tests__/RunSettingsPanel.test.tsx"
+    ],
+    "recordedAt": "2026-07-28T20:52:11.749Z"
   }
 }
