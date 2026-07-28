@@ -118,17 +118,17 @@
     "recordedAt": "2026-07-28T17:49:31.882Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T19:05:53.731Z",
+  "updated": "2026-07-28T19:05:55.978Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:49:41.828Z",
-    "updatedAt": "2026-07-28T19:05:53.605Z",
+    "updatedAt": "2026-07-28T19:05:54.531Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: cursor-anchored live composer parsing now matches the current Claude pane, and a crash-independent payload-unverified marker limits composer proof to pre-Enter recovery while preserving no-repaste rollback semantics.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
     "reviewedAtCommit": "2ed6db586f52912214c64dc79ee02efcf7fe2400",
@@ -182,24 +182,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4466297,
-            "output": 375921,
-            "cacheRead": 123229696,
+            "input": 4469215,
+            "output": 376365,
+            "cacheRead": 124481024,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 8067761,
-          "output": 649257,
-          "cacheRead": 166553600,
+          "input": 8070679,
+          "output": 649701,
+          "cacheRead": 167804928,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 143.093315,
-        "pricingAsOf": "2026-07-28T19:05:53.694Z"
+        "usd": 143.746889,
+        "pricingAsOf": "2026-07-28T19:05:55.974Z"
       }
     },
     "merges": [
