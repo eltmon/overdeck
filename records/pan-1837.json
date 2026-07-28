@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T18:54:45.473Z",
+  "updated": "2026-07-28T18:59:05.249Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "wi4-policy-gate": {
-        "writerId": "agent-pan-1837",
-        "agentId": "agent-pan-1837",
-        "pid": 137252,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T18:54:45.473Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -122,6 +114,17 @@
         "outcome": "completed",
         "reason": "Implemented the binary map per PRD WI-3: explicit 'Kimi Code CLI' name-ladder arm, new config.kimiCode.binaryPath setting (schema/defaults/merge), and configuredHarnessBinaryPath reading it for kimi-code independently of acp's config.acp.kimi.binaryPath. Also fixed 4 additional hand-rolled harness allowlists discovered along the way (config-yaml merge/roles validators, settings-api validators, tier-table isRuntimeName) that would have silently rejected 'kimi-code' as invalid config despite the type permitting it — updated the 3 tests asserting the old error strings. Had to add an audited file-size-allowlist.txt entry for config-yaml/schema.ts (1023 lines, was 1010) since the new kimiCode config section pushed it past the ratchet. All harness-binary/config-yaml/settings-api/tier-table tests pass; npm run typecheck stays at the same green state as after wi2 (only wi11's frontend gap remains).",
         "releasedAt": "2026-07-28T18:54:36.403Z"
+      },
+      {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 137252,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T18:54:45.473Z",
+        "itemId": "wi4-policy-gate",
+        "outcome": "completed",
+        "reason": "Added KIMI_CODE_KIMI_ONLY_BLOCK and the canUseHarnessSync('kimi-code', ...) branch (allowed for Kimi models, blocked with a Kimi-specific reason otherwise), plus the 'kimi-code' key in buildHarnessPolicyDecisions's per-model map. Extended harness-policy.test.ts and settings-harness-policy.test.ts with matching allowed/blocked/decisions-map assertions; widened the shared HARNESSES fixture without touching any existing acp assertion. All 64 policy tests pass; typecheck unchanged (only wi11's frontend gap remains).",
+        "releasedAt": "2026-07-28T18:59:05.249Z"
       }
     ],
     "statusReasons": {
@@ -136,6 +139,10 @@
       "wi3-binary-map": {
         "reason": "Implemented the binary map per PRD WI-3: explicit 'Kimi Code CLI' name-ladder arm, new config.kimiCode.binaryPath setting (schema/defaults/merge), and configuredHarnessBinaryPath reading it for kimi-code independently of acp's config.acp.kimi.binaryPath. Also fixed 4 additional hand-rolled harness allowlists discovered along the way (config-yaml merge/roles validators, settings-api validators, tier-table isRuntimeName) that would have silently rejected 'kimi-code' as invalid config despite the type permitting it — updated the 3 tests asserting the old error strings. Had to add an audited file-size-allowlist.txt entry for config-yaml/schema.ts (1023 lines, was 1010) since the new kimiCode config section pushed it past the ratchet. All harness-binary/config-yaml/settings-api/tier-table tests pass; npm run typecheck stays at the same green state as after wi2 (only wi11's frontend gap remains).",
         "updatedAt": "2026-07-28T18:54:36.403Z"
+      },
+      "wi4-policy-gate": {
+        "reason": "Added KIMI_CODE_KIMI_ONLY_BLOCK and the canUseHarnessSync('kimi-code', ...) branch (allowed for Kimi models, blocked with a Kimi-specific reason otherwise), plus the 'kimi-code' key in buildHarnessPolicyDecisions's per-model map. Extended harness-policy.test.ts and settings-harness-policy.test.ts with matching allowed/blocked/decisions-map assertions; widened the shared HARNESSES fixture without touching any existing acp assertion. All 64 policy tests pass; typecheck unchanged (only wi11's frontend gap remains).",
+        "updatedAt": "2026-07-28T18:59:05.249Z"
       }
     }
   },
@@ -153,6 +160,10 @@
     "wi3-binary-map.wi3-binary-map.ac1": "completed",
     "wi3-binary-map.wi3-binary-map.ac2": "completed",
     "wi3-binary-map.wi3-binary-map.ac3": "completed",
-    "wi4-policy-gate": "running"
+    "wi4-policy-gate": "completed",
+    "wi4-policy-gate.wi4-policy-gate.ac1": "completed",
+    "wi4-policy-gate.wi4-policy-gate.ac2": "completed",
+    "wi4-policy-gate.wi4-policy-gate.ac3": "completed",
+    "wi4-policy-gate.wi4-policy-gate.ac4": "completed"
   }
 }
