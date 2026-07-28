@@ -12,8 +12,8 @@ that runs in tmux. The **model** is what the binary calls. They are picked
 independently per spawn.
 
 <Info>
-**Supported today:** `claude-code` (default), `ohmypi`, `codex`, and `acp`. For the wider field of
-coding-agent harnesses Overdeck could adopt next — and how each one handles
+**Supported today:** `claude-code` (default), `ohmypi`, `codex`, `acp`, and `kimi-code`. For the wider
+field of coding-agent harnesses Overdeck could adopt next — and how each one handles
 skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-landscape).
 </Info>
 
@@ -23,10 +23,11 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 | `ohmypi` | [oh-my-pi](https://github.com/oh-my-pi/pi-coding-agent) (`omp`) | Multi-provider work, large workspaces | Adds oh-my-pi RPC over a named pipe; reads `~/.claude/skills` for skill parity. |
 | `codex` | [OpenAI Codex CLI](https://github.com/openai/codex) (`codex`) | OpenAI-model work | Uses persistent `codex app-server` sessions by default; requires Codex CLI `0.144.0` or newer. |
 | `acp` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Opt-in Kimi work | Uses the open Agent Client Protocol over a persistent authenticated host; Kimi is the first wired ACP agent. |
+| `kimi-code` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Kimi-only work (opt-in) | Drives Kimi's own native terminal UI directly — no ACP host, no Anthropic-compatibility endpoint. Kimi models only. |
 
 ## Composer commands across harnesses
 
-The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The dashboard parses and executes this namespace before a message reaches the coding harness, so `/pan` has the same syntax, validation, canonical arguments, confirmations, and result shape under `claude-code`, `codex`, `ohmypi`, and `acp`. Unprefixed `pan ...` text is still delivered as an ordinary prompt.
+The dashboard reserves `/pan <verb> [args]` for Overdeck operator commands. The dashboard parses and executes this namespace before a message reaches the coding harness, so `/pan` has the same syntax, validation, canonical arguments, confirmations, and result shape under `claude-code`, `codex`, `ohmypi`, `acp`, and `kimi-code`. Unprefixed `pan ...` text is still delivered as an ordinary prompt.
 
 Harness-native slash commands are a separate lane and are not uniform. The composer menu reads the active harness's verified capability list: for example, Claude Code exposes native commands such as `/model`, while a harness with no verified inventory shows no native entries. Overdeck commands appear in their own **Overdeck** group, so choosing a harness never changes the `/pan` control-plane surface.
 
@@ -177,6 +178,77 @@ token, ACP session id, and append-only transcript stored under
 `~/.overdeck/agents/<agentId>/`. The runtime adapter is
 `src/lib/runtimes/acp.ts`; Kimi-specific launch and authentication behavior is
 in `src/lib/acp/kimi.ts`.
+
+### Kimi Code CLI, native (alternative)
+
+`kimi-code` drives Moonshot's own Kimi Code CLI directly through its native
+terminal UI — no Agent Client Protocol host, no JSON-RPC, no shell-out to a
+subprocess wrapper. Overdeck launches `kimi` in a tmux session under the PTY
+supervisor (the same delivery path `claude-code` uses), reads Kimi's own
+`wire.jsonl` transcript for cost and conversation-feed rendering, and lets
+Kimi's server-side context cache discipline apply exactly as it would for a
+human running `kimi` at a terminal.
+
+This is a **different harness from `acp`**, even though both ultimately run
+the same `kimi` binary:
+
+| | `acp` | `kimi-code` |
+| --- | --- | --- |
+| Drives | `kimi acp` (Agent Client Protocol JSON-RPC host) | native `kimi` terminal UI |
+| Delivery | Persistent authenticated host process | PTY supervisor + tmux paste fallback |
+| Transcript | Normalized `acp-session.jsonl` | Kimi's own `wire.jsonl` |
+| Why pick it | Portable across any ACP-capable agent | Reaches Kimi-specific behavior the ACP lowest-common-denominator surface can't |
+
+Neither replaces `claude-code` pointed at Kimi's Anthropic-compatibility
+endpoint (`ANTHROPIC_BASE_URL` + `KIMI_API_KEY`, still supported and still the
+built-in default — see [When to pick which](#when-to-pick-which)): that route
+runs the Claude Code binary itself against Kimi's models, forfeiting Kimi's
+own server-side context cache accounting that `kimi-code` and `acp` both keep.
+
+Install Kimi Code CLI using its
+[getting-started guide](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html).
+The binary installs to `~/.kimi-code/bin/kimi` — it is **not** added to your
+shell `PATH` by the installer, so configure the path explicitly if `pan doctor`
+can't resolve it from a login shell:
+
+```yaml
+kimiCode:
+  binaryPath: /home/you/.kimi-code/bin/kimi
+```
+
+Then complete the one-time interactive login before starting a `kimi-code`
+session:
+
+```text
+kimi
+/login
+```
+
+`kimi-code` is **Kimi-only**: `canUseHarness('kimi-code', model, authMode)`
+blocks every non-Kimi model with a reason naming the restriction, the same
+way the ToS gate blocks `ohmypi` + Anthropic + subscription (see
+[ToS rules](#tos-rules) below — this is a model-provider restriction, not a
+Terms of Service one, but it is enforced identically at every spawn entry
+point and every picker). Pick a Kimi model, or use the model's supported
+harness.
+
+Opt a Kimi provider into the native harness in `~/.overdeck/config.yaml`:
+
+```yaml
+providers:
+  kimi:
+    harness: kimi-code
+```
+
+Kimi remains on its built-in `claude-code` default until you set this — the
+native harness is opt-in while its end-to-end path is proven out, the same
+posture `acp` shipped under.
+
+Runtime adapter is `src/lib/runtimes/kimi-code.ts`; the per-agent
+`kimi-session-id` file (captured post-launch, since Kimi generates its own
+session id and it cannot be preset) enables transcript resolution
+(`resolveKimiWirePath` in `src/dashboard/server/routes/jsonl-resolver.ts`) and
+cost parsing (`src/lib/cost-parsers/kimi-parser.ts`).
 
 ## Installing oh-my-pi
 
@@ -380,14 +452,20 @@ difference today.
   the named-pipe RPC is materially faster than paste-buffer delivery.
 - **Mix per role** in Settings if you want, e.g., an ohmypi work role feeding a
   Claude Code review role.
+- **Switch to `kimi-code`** for Kimi models when you want native Kimi behavior
+  without the ACP host layer; use `acp` instead when you want a portable
+  protocol surface (or plan to reuse the same setup with a future non-Kimi ACP
+  agent).
 
 ## Implementation
 
 - `src/lib/runtimes/ohmypi.ts` — `OhmypiRuntime` (the `AgentRuntime` adapter for omp)
 - `src/lib/runtimes/ohmypi-fifo.ts` — `createOhmypiFifo`, `writeOhmypiCommandSync`, `OhmypiNotReady`
 - `src/lib/cost-parsers/ohmypi-parser.ts` — omp JSONL active-branch walker
-- `src/lib/harness-policy.ts` — `canUseHarness` ToS gate
+- `src/lib/harness-policy.ts` — `canUseHarness` ToS/model-provider gate
 - `packages/ohmypi-extension/` — vendored lifecycle extension omp loads via `--extension`
+- `src/lib/runtimes/kimi-code.ts` — `KimiCodeRuntimeSync` (native Kimi Code adapter)
+- `src/lib/cost-parsers/kimi-parser.ts` — Kimi `wire.jsonl` usage/cost parser
 
 ## See also
 

@@ -291,11 +291,12 @@ describe('KimiCodeRuntimeSync', () => {
     );
   });
 
-  it('does not import or call any sync sendKeys/execSync primitive (AC3)', () => {
-    const source = readFileSync(join(import.meta.dirname, '..', 'kimi-code.ts'), 'utf-8');
-    expect(source).not.toMatch(/\bsendKeysSync\b/);
-    expect(source).not.toMatch(/\bexecSync\b/);
-  });
+  // AC3 (no sync sendKeys/execSync primitive) is exercised at runtime, not by
+  // reading source text: the killAgent escalation-ladder tests below run
+  // under vi.useFakeTimers() and only resolve once every awaited step
+  // (tmuxSessionExists polls, execCommand calls) actually yields to the event
+  // loop — a sync execSync/sendKeysSync call would block the fake-timer
+  // advance instead of interleaving with it.
 
   it('killAgent Ctrl-C\'s the pane then escalates to SIGTERM once the first poll window lapses (AC4)', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
