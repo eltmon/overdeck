@@ -72,6 +72,11 @@
       "reason": "feedback",
       "note": "[2026-07-28T18:46Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-28T18:46:11.818Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-28T19:06:24.048Z"
     }
   ],
   "feedback": [],
@@ -110,7 +115,7 @@
     "recordedAt": "2026-07-28T17:49:31.882Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T19:06:22.736Z",
+  "updated": "2026-07-28T19:06:24.049Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "reviewing",
