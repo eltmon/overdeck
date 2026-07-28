@@ -111,7 +111,7 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T22:07:26.007Z",
+  "updated": "2026-07-28T22:22:47.779Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "failed",
@@ -121,7 +121,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-28T22:07:26.001Z",
+    "updatedAt": "2026-07-28T22:22:47.771Z",
     "reviewNotes": "FR-7 conversation-only decisions remain invisible or use the agent-only answer endpoint; required regression tests are still absent",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -268,7 +268,7 @@
       },
       "costAtCloseOut": {
         "usd": 58.858323,
-        "pricingAsOf": "2026-07-28T22:07:26.004Z"
+        "pricingAsOf": "2026-07-28T22:22:47.775Z"
       }
     },
     "merges": [
