@@ -47,17 +47,17 @@
     "recordedAt": "2026-07-28T07:25:54.489Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T07:42:34.095Z",
+  "updated": "2026-07-28T07:43:26.709Z",
   "pipeline": {
     "issueId": "PAN-2882",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:26:27.252Z",
-    "updatedAt": "2026-07-28T07:27:37.358Z",
+    "updatedAt": "2026-07-28T07:43:26.567Z",
     "reviewNotes": "Verification failed at typecheck — fix and resubmit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
     "lastVerifiedCommit": "b68a67e56eeca91f055135b583a9ca284a20c748",
@@ -88,26 +88,40 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 833195,
+            "output": 32400,
+            "cacheRead": 4307456,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1158,
-            "output": 61968,
-            "cacheRead": 27996790,
-            "cacheWrite": 764437
+            "input": 1179,
+            "output": 62583,
+            "cacheRead": 28190446,
+            "cacheWrite": 1011048
           }
         }
       },
       "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 833195,
+          "output": 32400,
+          "cacheRead": 4307456,
+          "cacheWrite": 0
+        },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1158,
-          "output": 61968,
-          "cacheRead": 27996790,
-          "cacheWrite": 764437
+          "input": 1179,
+          "output": 62583,
+          "cacheRead": 28190446,
+          "cacheWrite": 1011048
         }
       },
       "costAtCloseOut": {
-        "usd": 4.066229,
-        "pricingAsOf": "2026-07-28T07:27:37.545Z"
+        "usd": 11.688658,
+        "pricingAsOf": "2026-07-28T07:43:26.687Z"
       }
     },
     "merges": [
