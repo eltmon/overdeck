@@ -10,8 +10,67 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/__tests__/workspace-reap.test.ts",
+      "src/cli/commands/doctor-duplicate-stacks.ts",
+      "src/lib/__tests__/close-out.test.ts",
+      "src/lib/workspace-manager/__tests__/docker.test.ts",
+      "tests/lib/cloister/pan-464-container-health.test.ts",
+      "tests/lib/workspace-manager.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "tests/unit/cli/workspace-reap.test.ts",
+      "tests/unit/lib/cloister/check-workspace-container-health.test.ts"
+    ],
+    "declaredScope": [
+      "docs/WORKSPACE-CONTAINERS.md",
+      "infra/.devcontainer-template/docker-compose.devcontainer.yml.template",
+      "src/cli/commands/doctor.ts",
+      "src/cli/commands/workspace-reap.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/idle-stack-reaper.ts",
+      "src/lib/close-out.ts",
+      "src/lib/workspace-manager/docker.ts",
+      "src/lib/workspace-manager/types.ts",
+      "src/lib/workspace/rebuild-stack.ts",
+      "src/lib/workspace/stack-health.ts",
+      "tests/unit/cli/doctor-duplicate-stacks.test.ts",
+      "tests/unit/cli/workspace-reap.test.ts",
+      "tests/unit/lib/cloister/check-workspace-container-health.test.ts",
+      "tests/unit/lib/cloister/idle-stack-reaper.test.ts",
+      "tests/unit/lib/workspace-manager/docker.test.ts",
+      "tests/unit/lib/workspace/rebuild-stack.test.ts",
+      "tests/unit/lib/workspace/stack-health-compose-name.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/WORKSPACE-CONTAINERS.md",
+      "infra/.devcontainer-template/docker-compose.devcontainer.yml.template",
+      "src/cli/commands/__tests__/workspace-reap.test.ts",
+      "src/cli/commands/doctor-duplicate-stacks.ts",
+      "src/cli/commands/doctor.ts",
+      "src/cli/commands/workspace-reap.ts",
+      "src/lib/__tests__/close-out.test.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/idle-stack-reaper.ts",
+      "src/lib/close-out.ts",
+      "src/lib/workspace-manager/__tests__/docker.test.ts",
+      "src/lib/workspace-manager/docker.ts",
+      "src/lib/workspace-manager/types.ts",
+      "src/lib/workspace/rebuild-stack.ts",
+      "src/lib/workspace/stack-health.ts",
+      "tests/lib/cloister/pan-464-container-health.test.ts",
+      "tests/lib/workspace-manager.test.ts",
+      "tests/unit/cli/doctor-duplicate-stacks.test.ts",
+      "tests/unit/lib/cloister/idle-stack-reaper.test.ts",
+      "tests/unit/lib/workspace-manager/docker.test.ts",
+      "tests/unit/lib/workspace/rebuild-stack.test.ts",
+      "tests/unit/lib/workspace/stack-health-compose-name.test.ts"
+    ],
+    "recordedAt": "2026-07-28T07:46:15.165Z"
+  },
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T07:46:17.902Z",
+  "updated": "2026-07-28T07:46:22.450Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -21,8 +80,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T07:46:17.901Z",
+    "updatedAt": "2026-07-28T07:46:22.397Z",
     "inspectNotes": "All 4 ACs met. AC1: declaredComposeFileProjectName parses top-level name: (stack-health.ts:52-57), verified against real MYN workspaces which declare 'name: myn-feature-min-XXX' at col 0. AC2: requireComposeProjectNameForWorkspace throws naming workspacePath + composeFilePath + both dev-script paths (stack-health.ts:135-137). AC3: both variants return overdeck-feature-<issue> when composeFilePath is null (lines 119, 134). AC4: assertDeclaredNameMatchesFeatureFolder reuses the exact 'Refusing workspace rebuild:' message for both sources (lines 59-70); dev-script rethrow guard preserved at line 91. COMPOSE_FILE_CANDIDATES and findDevcontainerComposeFile match rebuild-stack.ts:43-58 exactly, so no directory-scope drift. Tests cover all four plus dev-script-wins precedence.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3223",
     "reviewRequestedAt": "2026-07-28T07:46:17.901Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -82,8 +142,7 @@
         "tests/unit/lib/workspace/stack-health-compose-name.test.ts"
       ],
       "recordedAt": "2026-07-28T07:46:15.165Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3223"
+    }
   },
   "closeOut": {
     "usage": {
@@ -98,10 +157,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 72,
-            "output": 18526,
-            "cacheRead": 7114709,
-            "cacheWrite": 200513
+            "input": 626,
+            "output": 147176,
+            "cacheRead": 108769124,
+            "cacheWrite": 458092
           }
         }
       },
@@ -113,22 +172,24 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 72,
-          "output": 18526,
-          "cacheRead": 7114709,
-          "cacheWrite": 200513
+          "input": 626,
+          "output": 147176,
+          "cacheRead": 108769124,
+          "cacheWrite": 458092
         }
       },
       "costAtCloseOut": {
-        "usd": 2.1282472,
-        "pricingAsOf": "2026-07-28T06:45:07.487Z"
+        "usd": 24.3906972,
+        "pricingAsOf": "2026-07-28T07:46:22.447Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3223"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3049",
@@ -333,64 +394,5 @@
     "docs-container-naming": "completed",
     "docs-container-naming.docs-container-naming.ac1": "completed",
     "docs-container-naming.docs-container-naming.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "src/cli/commands/__tests__/workspace-reap.test.ts",
-      "src/cli/commands/doctor-duplicate-stacks.ts",
-      "src/lib/__tests__/close-out.test.ts",
-      "src/lib/workspace-manager/__tests__/docker.test.ts",
-      "tests/lib/cloister/pan-464-container-health.test.ts",
-      "tests/lib/workspace-manager.test.ts"
-    ],
-    "declaredScopeUntouched": [
-      "tests/unit/cli/workspace-reap.test.ts",
-      "tests/unit/lib/cloister/check-workspace-container-health.test.ts"
-    ],
-    "declaredScope": [
-      "docs/WORKSPACE-CONTAINERS.md",
-      "infra/.devcontainer-template/docker-compose.devcontainer.yml.template",
-      "src/cli/commands/doctor.ts",
-      "src/cli/commands/workspace-reap.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/idle-stack-reaper.ts",
-      "src/lib/close-out.ts",
-      "src/lib/workspace-manager/docker.ts",
-      "src/lib/workspace-manager/types.ts",
-      "src/lib/workspace/rebuild-stack.ts",
-      "src/lib/workspace/stack-health.ts",
-      "tests/unit/cli/doctor-duplicate-stacks.test.ts",
-      "tests/unit/cli/workspace-reap.test.ts",
-      "tests/unit/lib/cloister/check-workspace-container-health.test.ts",
-      "tests/unit/lib/cloister/idle-stack-reaper.test.ts",
-      "tests/unit/lib/workspace-manager/docker.test.ts",
-      "tests/unit/lib/workspace/rebuild-stack.test.ts",
-      "tests/unit/lib/workspace/stack-health-compose-name.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/WORKSPACE-CONTAINERS.md",
-      "infra/.devcontainer-template/docker-compose.devcontainer.yml.template",
-      "src/cli/commands/__tests__/workspace-reap.test.ts",
-      "src/cli/commands/doctor-duplicate-stacks.ts",
-      "src/cli/commands/doctor.ts",
-      "src/cli/commands/workspace-reap.ts",
-      "src/lib/__tests__/close-out.test.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/idle-stack-reaper.ts",
-      "src/lib/close-out.ts",
-      "src/lib/workspace-manager/__tests__/docker.test.ts",
-      "src/lib/workspace-manager/docker.ts",
-      "src/lib/workspace-manager/types.ts",
-      "src/lib/workspace/rebuild-stack.ts",
-      "src/lib/workspace/stack-health.ts",
-      "tests/lib/cloister/pan-464-container-health.test.ts",
-      "tests/lib/workspace-manager.test.ts",
-      "tests/unit/cli/doctor-duplicate-stacks.test.ts",
-      "tests/unit/lib/cloister/idle-stack-reaper.test.ts",
-      "tests/unit/lib/workspace-manager/docker.test.ts",
-      "tests/unit/lib/workspace/rebuild-stack.test.ts",
-      "tests/unit/lib/workspace/stack-health-compose-name.test.ts"
-    ],
-    "recordedAt": "2026-07-28T07:46:15.165Z"
   }
 }
