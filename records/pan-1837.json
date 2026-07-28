@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T20:16:36.679Z",
+  "updated": "2026-07-28T20:19:46.284Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "wi9-context-skills": {
-        "writerId": "agent-pan-1837",
-        "agentId": "agent-pan-1837",
-        "pid": 2893252,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:14:46.307Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -199,6 +191,17 @@
         "outcome": "completed",
         "reason": "Added kimi-parser.ts (SessionUsage summed across every usage.record, ac1/ac2/ac3) and kimi-conversation-parser.ts (ParseResult for the chat panel, ac4: user turns from turn.prompt, assistant text from content.part, tool calls matched by toolCallId, think parts hidden). Wired kimi-code.ts getTokenUsage/getSessionCost to the real parser (replacing the wi5 stub). Wired kimi-wire-jsonl dispatch into activity-summary.ts, and 3 dispatch points in conversation-reads.ts (resolveSessionFile, getCachedMessages via new isKimiWireSessionFile, resolveSpecialistSessionFile). conversation-message.ts needed no changes -- its harness checks are all claude-jsonl-specific and kimi-code already falls through correctly. All 8+4 new tests pass against the pinned wi-fixture; 658 tests pass across cost-parsers/dashboard-conversation-services with no regressions. Deviation: did not extend cost.ts's separate bulk historical-reconcile sweep (~805) since it is structurally ohmypi/codex-only today and ACP -- a sibling harness -- isn't wired into it either; the live per-agent getSessionCost surface (AC3's literal ask) is fully wired.",
         "releasedAt": "2026-07-28T20:14:32.140Z"
+      },
+      {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 2893252,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:14:46.307Z",
+        "itemId": "wi9-context-skills",
+        "outcome": "completed",
+        "reason": "HarnessMarker/HARNESS_MARKERS/KNOWN_HARNESS_MARKERS were already done in wi1's validator sweep. Added kimi-code to SKILL_SYNC_HARNESSES (confirmed on the shared ~/.agents/skills discovery path from the wi-fixture capture's system prompt -- no second sync target needed per D6). Documented the D6 no-dedicated-global-file decision with a one-line comment in sync.ts. Extended harness.test.ts (span render + validateTemplate no-warning cases) and sync-agent-skills.test.ts's assertion. Had to allowlist sync.ts's growth (1208 lines, was 1205). typecheck unchanged.",
+        "releasedAt": "2026-07-28T20:19:46.284Z"
       }
     ],
     "statusReasons": {
@@ -241,6 +244,10 @@
       "wi8b-wire-parser-cost": {
         "reason": "Added kimi-parser.ts (SessionUsage summed across every usage.record, ac1/ac2/ac3) and kimi-conversation-parser.ts (ParseResult for the chat panel, ac4: user turns from turn.prompt, assistant text from content.part, tool calls matched by toolCallId, think parts hidden). Wired kimi-code.ts getTokenUsage/getSessionCost to the real parser (replacing the wi5 stub). Wired kimi-wire-jsonl dispatch into activity-summary.ts, and 3 dispatch points in conversation-reads.ts (resolveSessionFile, getCachedMessages via new isKimiWireSessionFile, resolveSpecialistSessionFile). conversation-message.ts needed no changes -- its harness checks are all claude-jsonl-specific and kimi-code already falls through correctly. All 8+4 new tests pass against the pinned wi-fixture; 658 tests pass across cost-parsers/dashboard-conversation-services with no regressions. Deviation: did not extend cost.ts's separate bulk historical-reconcile sweep (~805) since it is structurally ohmypi/codex-only today and ACP -- a sibling harness -- isn't wired into it either; the live per-agent getSessionCost surface (AC3's literal ask) is fully wired.",
         "updatedAt": "2026-07-28T20:14:32.140Z"
+      },
+      "wi9-context-skills": {
+        "reason": "HarnessMarker/HARNESS_MARKERS/KNOWN_HARNESS_MARKERS were already done in wi1's validator sweep. Added kimi-code to SKILL_SYNC_HARNESSES (confirmed on the shared ~/.agents/skills discovery path from the wi-fixture capture's system prompt -- no second sync target needed per D6). Documented the D6 no-dedicated-global-file decision with a one-line comment in sync.ts. Extended harness.test.ts (span render + validateTemplate no-warning cases) and sync-agent-skills.test.ts's assertion. Had to allowlist sync.ts's growth (1208 lines, was 1205). typecheck unchanged.",
+        "updatedAt": "2026-07-28T20:19:46.284Z"
       }
     }
   },
@@ -291,6 +298,9 @@
     "wi8b-wire-parser-cost.wi8b-wire-parser-cost.ac2": "completed",
     "wi8b-wire-parser-cost.wi8b-wire-parser-cost.ac3": "completed",
     "wi8b-wire-parser-cost.wi8b-wire-parser-cost.ac4": "completed",
-    "wi9-context-skills": "running"
+    "wi9-context-skills": "completed",
+    "wi9-context-skills.wi9-context-skills.ac1": "completed",
+    "wi9-context-skills.wi9-context-skills.ac2": "completed",
+    "wi9-context-skills.wi9-context-skills.ac3": "completed"
   }
 }
