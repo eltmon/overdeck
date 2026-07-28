@@ -12,7 +12,7 @@ import {
   listOpenIssuesWithLabelsPromise,
 } from './github-app.js';
 import { createSettledTtlPromiseCache, withConcurrencyLimitPromise } from './concurrency.js';
-import { listOpenGitLabMergeRequests, type GitLabMergeRequestRow } from './gitlab-merge-requests.js';
+import { listOpenGitLabMergeRequests, listGitLabMergedMergeRequestHeads, type GitLabMergeRequestRow } from './gitlab-merge-requests.js';
 import { STALE_PIPELINE_LABELS } from './cloister/label-reconciler.js';
 import { loadConfigSync } from './config.js';
 import { listSpecs } from './pan-dir/specs.js';
@@ -277,6 +277,7 @@ export interface PipelineMembershipGatherDeps {
   listOpenPullRequests(owner: string, repo: string): Promise<PullRequestRow[]>;
   listOpenMergeRequests(repoPath: string): Promise<GitLabMergeRequestRow[]>;
   listMergedPullRequestHeads(owner: string, repo: string, heads: string[]): Promise<string[]>;
+  listMergedMergeRequestHeads(repoPath: string, heads: string[]): Promise<string[]>;
   listIssueStates(owner: string, repo: string, numbers: number[]): Promise<Array<{ number: number; state: 'open' | 'closed' }>>;
   listTrackerIssues(project: ProjectConfig): Promise<ProjectTrackerIssueRow[]>;
   listSpecIssueIds(projectPath: string): Promise<string[]>;
@@ -289,6 +290,7 @@ const defaultDeps: PipelineMembershipGatherDeps = {
   listOpenPullRequests: listOpenPullRequestsSnapshot,
   listOpenMergeRequests: listOpenGitLabMergeRequests,
   listMergedPullRequestHeads: listMergedPullRequestHeadsBatched,
+  listMergedMergeRequestHeads: listGitLabMergedMergeRequestHeads,
   listIssueStates: listIssueStatesBatched,
   listTrackerIssues: listProjectTrackerIssues,
   listSpecIssueIds: async (projectPath) =>
@@ -657,21 +659,39 @@ export async function gatherProjectLensSignals(
       if (state) knownStateByIssue.set(id, state);
       else candidates.delete(id);
     }
+  }
 
-    // Closed issues resolve terminal regardless of merged-PR history (unless a PR
-    // is still open, already captured above), so only open candidates need the
-    // expensive merged-head oracle. This keeps historical refs/specs out of the
-    // GraphQL fan-out without changing membership semantics.
-    const openCandidates = [...candidates].filter((id) => knownStateByIssue.get(id) === 'open');
-    const candidateHeads = [...new Set(openCandidates.flatMap((id) => [
-      ...(headRefsByIssue.get(id) ?? []),
-      `feature/${id.toLowerCase()}`,
-      `strike/${id.toLowerCase()}`,
-    ]))];
+  // Closed issues resolve terminal regardless of merged-PR history (unless a PR
+  // is still open, already captured above), so only open candidates need the
+  // expensive merged-head oracle. This keeps historical refs/specs out of the
+  // GraphQL/GitLab fan-out without changing membership semantics.
+  const openCandidates = [...candidates].filter((id) => knownStateByIssue.get(id) === 'open');
+  const candidateHeads = [...new Set(openCandidates.flatMap((id) => [
+    ...(headRefsByIssue.get(id) ?? []),
+    `feature/${id.toLowerCase()}`,
+    `strike/${id.toLowerCase()}`,
+  ]))];
+
+  if (owner && repo) {
     const mergedHeads = new Set(await withUnavailableReason(
       'forge_unavailable',
       () => deps.listMergedPullRequestHeads(owner, repo, candidateHeads),
     ));
+    for (const id of openCandidates) {
+      const possibleHeads = [
+        ...(headRefsByIssue.get(id) ?? []),
+        `feature/${id.toLowerCase()}`,
+        `strike/${id.toLowerCase()}`,
+      ];
+      if (possibleHeads.some((head) => mergedHeads.has(head))) mergedPrIssues.add(id);
+    }
+  } else if (gitlabRepos.length > 0) {
+    // Query merged MRs from all GitLab repos and union results
+    const gitlabMergedHeadsByRepo = await Promise.all(
+      gitlabRepos.map((repo) =>
+        withUnavailableReason('forge_unavailable', () => deps.listMergedMergeRequestHeads(repo.path, candidateHeads))),
+    );
+    const mergedHeads = new Set(gitlabMergedHeadsByRepo.flat());
     for (const id of openCandidates) {
       const possibleHeads = [
         ...(headRefsByIssue.get(id) ?? []),
