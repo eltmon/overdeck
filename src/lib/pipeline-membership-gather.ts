@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import type { MembershipUnavailableReason } from '@overdeck/contracts';
 import { Effect } from 'effect';
 
+import type { ForgeType } from './forge.js';
 import {
   listIssuesWithAnyLabelPromise,
   listOpenIssuesWithLabelsPromise,
@@ -16,6 +17,7 @@ import { loadConfigSync } from './config.js';
 import { listSpecs } from './pan-dir/specs.js';
 import type { IssueLensSignals } from './pipeline-membership.js';
 import { getIssuePrefix, type ProjectConfig } from './projects.js';
+import { getRepoForge, inferProjectForgeSync } from './project-repos.js';
 import { parseIssueIdFromTextSync } from './resource-utils.js';
 import { createTracker } from './tracker/factory.js';
 import type { Issue, TrackerType } from './tracker/interface.js';
@@ -314,6 +316,8 @@ function issueIdFromRef(ref: string, issuePrefix: string): string | null {
 export interface ProjectRepository {
   path: string;
   defaultBranch: string;
+  forge: ForgeType;
+  repoKey?: string;
 }
 
 export interface IssueBranchContainment {
@@ -333,12 +337,15 @@ export function projectRepositories(project: ProjectConfig): ProjectRepository[]
     return [{
       path: project.path,
       defaultBranch: project.workspace?.default_branch ?? 'main',
+      forge: inferProjectForgeSync(project) || 'github',
     }];
   }
 
   return project.workspace.repos.map((repo) => ({
     path: join(project.path, repo.path),
     defaultBranch: repo.default_branch ?? project.workspace?.default_branch ?? 'main',
+    forge: getRepoForge(repo, project),
+    repoKey: repo.name,
   }));
 }
 
