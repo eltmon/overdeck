@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-28T20:40:48.940Z",
+  "updated": "2026-07-28T20:41:29.413Z",
   "pipeline": {
     "issueId": "PAN-3242",
     "reviewStatus": "pending",
@@ -72,8 +72,16 @@
     }
   ],
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "brief-overlay": {
+        "writerId": "agent-pan-3242",
+        "agentId": "agent-pan-3242",
+        "pid": 4157108,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:41:29.413Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3242",
@@ -135,6 +143,7 @@
     "lane-stepper": "completed",
     "lane-stepper.lane-stepper.ac1": "completed",
     "lane-stepper.lane-stepper.ac2": "completed",
-    "lane-stepper.lane-stepper.ac3": "completed"
+    "lane-stepper.lane-stepper.ac3": "completed",
+    "brief-overlay": "running"
   }
 }
