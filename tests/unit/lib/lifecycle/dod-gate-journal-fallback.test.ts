@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   resolveProjectForIssue: vi.fn(),
   getProjectConfigFromWorkspacePath: vi.fn(),
   listRunningAgents: vi.fn(),
+  getAutoCloseOutCanonicalState: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({
@@ -33,7 +34,11 @@ vi.mock('../../../../src/lib/pan-dir/record.js', async (importOriginal) => {
 });
 
 vi.mock('../../../../src/lib/agents.js', () => ({
-  listRunningAgents: vi.fn(() => Effect.succeed([])),
+  listRunningAgents: mocks.listRunningAgents,
+}));
+
+vi.mock('../../../../src/lib/cloister/deacon-canonical-state.js', () => ({
+  getAutoCloseOutCanonicalState: mocks.getAutoCloseOutCanonicalState,
 }));
 
 import { checkPostMergeRow } from '../../../../src/lib/lifecycle/dod-gate.js';
@@ -52,6 +57,7 @@ describe('DoD row 5 (post-merge) journal fallback for mergeStatus (PAN-3025)', (
     mocks.resolveProjectForIssue.mockReturnValue(null);
     mocks.getProjectConfigFromWorkspacePath.mockReturnValue({ name: 'test', path: projectPath });
     mocks.listRunningAgents.mockReturnValue(Effect.succeed([]));
+    mocks.getAutoCloseOutCanonicalState.mockResolvedValue(null); // Deterministic: no canonical state
   });
 
   it('ac1: live absent + journal merged → pass (journal fallback read)', async () => {

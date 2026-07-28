@@ -995,12 +995,15 @@ describe('workflows', () => {
       );
 
       expect(result.success).toBe(true);
-      const idempotentStep = result.steps.find(step => step.step === 'close-out:idempotent');
-      expect(idempotentStep).toBeDefined();
-      expect(idempotentStep?.skipped).toBe(true);
+      // Early return means exactly one step (the idempotent skip step)
+      expect(result.steps).toHaveLength(1);
+      const idempotentStep = result.steps[0];
+      expect(idempotentStep.step).toBe('close-out:idempotent');
+      expect(idempotentStep.skipped).toBe(true);
       // Verify ceremony was skipped (gate not called, status mutations not run)
       expect(mockEvaluateDodGate).not.toHaveBeenCalled();
       expect(mockClearReviewStatus).not.toHaveBeenCalled();
+      expect(mockMarkRecordPipelineClosedOutSync).not.toHaveBeenCalled();
     });
 
     it('workflow proceeds to gate when guard returns null (normal path)', async () => {
