@@ -26,18 +26,18 @@
     "recordedAt": "2026-07-28T09:10:19.628Z"
   },
   "created": "2026-07-28T06:36:21.767Z",
-  "updated": "2026-07-28T16:15:36.134Z",
+  "updated": "2026-07-28T16:15:38.941Z",
   "pipeline": {
     "issueId": "PAN-3217",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "merged",
-    "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "skipped",
+    "mergeStep": "merged",
+    "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T09:33:42.483Z",
-    "updatedAt": "2026-07-28T16:15:36.113Z",
+    "updatedAt": "2026-07-28T16:15:36.307Z",
     "reviewNotes": "Verification infrastructure error: Verification worker 15189 exited before writing a result",
     "testNotes": "Backend-only fix (pipeline-membership-gather.ts reorder) + docs update; no UI/dashboard surface touched, xBRIEF verify_commands are vitest/typecheck/grep only, so no browser UAT required. Ran: npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts (42/42 passed); npm run typecheck (clean, dashboard/frontend shrink-only ratchets show no new errors); npm run lint (full eslint + all lint:* gates passed, exit 0); npm test full suite (1256 files / 11759 tests passed, 50 skipped, 0 failures on a clean untruncated rerun). An initial full-suite run showed 12 failures, all 'Hook timed out in 5000ms' on setupOverdeckTestDb() in unrelated files (conversations scan/search, cost-reconcile, merge-sync, observability RPC, harness-metadata) while 15 sibling-workspace agents were concurrently running vitest — none of those files touch pipeline-membership-gather.ts, and a clean rerun with no code changes passed all of them, confirming resource-contention flakiness rather than a regression from this change.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -112,7 +112,7 @@
       },
       "costAtCloseOut": {
         "usd": 9.7953,
-        "pricingAsOf": "2026-07-28T16:15:36.115Z"
+        "pricingAsOf": "2026-07-28T16:15:38.939Z"
       }
     },
     "merges": [
