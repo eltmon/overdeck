@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T06:36:21.767Z",
-  "updated": "2026-07-28T08:35:02.173Z",
+  "updated": "2026-07-28T08:46:24.292Z",
   "pipeline": {
     "issueId": "PAN-3217",
     "reviewStatus": "pending",
@@ -47,18 +47,33 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "reorder-tracker-before-prefix": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3217",
         "agentId": "agent-pan-3217",
         "pid": 1173556,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T08:35:02.173Z"
+        "claimedAt": "2026-07-28T08:35:02.173Z",
+        "itemId": "reorder-tracker-before-prefix",
+        "outcome": "completed",
+        "reason": "Reordered tracker type resolution before issue prefix guard in both gatherProjectLensSignals() and listProjectTrackerIssues(). Added tests for path-only project (tracker_unconfigured) and project with tracker but no prefix (missing_issue_prefix). All existing tests pass.",
+        "releasedAt": "2026-07-28T08:46:24.291Z"
+      }
+    ],
+    "statusReasons": {
+      "reorder-tracker-before-prefix": {
+        "reason": "Reordered tracker type resolution before issue prefix guard in both gatherProjectLensSignals() and listProjectTrackerIssues(). Added tests for path-only project (tracker_unconfigured) and project with tracker but no prefix (missing_issue_prefix). All existing tests pass.",
+        "updatedAt": "2026-07-28T08:46:24.291Z"
       }
     }
   },
   "statusOverrides": {
-    "reorder-tracker-before-prefix": "running"
+    "reorder-tracker-before-prefix": "completed",
+    "reorder-tracker-before-prefix.reorder-tracker-before-prefix.ac1": "completed",
+    "reorder-tracker-before-prefix.reorder-tracker-before-prefix.ac2": "completed",
+    "reorder-tracker-before-prefix.reorder-tracker-before-prefix.ac3": "completed",
+    "reorder-tracker-before-prefix.reorder-tracker-before-prefix.ac4": "completed"
   }
 }
