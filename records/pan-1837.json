@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T20:24:38.696Z",
+  "updated": "2026-07-28T20:40:29.888Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 25,
-    "claims": {
-      "wi11-frontend": {
-        "writerId": "agent-pan-1837",
-        "agentId": "agent-pan-1837",
-        "pid": 3298375,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:24:38.695Z"
-      }
-    },
+    "sequence": 26,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -221,6 +213,17 @@
         "outcome": "completed",
         "reason": "Updated the kimi prerequisite's purpose string to cover both native (kimi-code) and ACP (acp) harnesses, keeping the single row and unchanged resolver per the narrative (resolveHarnessBinary already resolves the one kimi binary for both). Added a test asserting exactly one kimi row with the updated purpose text. All 8 tests pass, including the pre-existing ACP-resolver-routing test confirming no behavior change (AC2).",
         "releasedAt": "2026-07-28T20:24:15.140Z"
+      },
+      {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 3298375,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:24:38.695Z",
+        "itemId": "wi11-frontend",
+        "outcome": "completed",
+        "reason": "Added kimi-code to HARNESS_OPTIONS/HARNESS_BRANDS/HARNESS_LABELS/TieredExecutionSection/CrewRow. This closes the LAST remaining typecheck gap left open since wi1 -- npm run typecheck is now 100% clean across root/hooks/evals/dashboard/frontend for the first time this issue. Widening ModelPicker.tsx's own local Harness type surfaced 4 more orphaned hand-rolled unions (PlanDialog.tsx, RolesPanel.tsx, FlywheelConversationPane.tsx, useConversationMutations.ts 9x) not named in the PRD, all fixed. wi11.ac3 (policy-lock) needed no new code -- canUsePickerHarness already dispatches generically on the wi4 policyDecisions map; added a test proving it. ContextPage.tsx had no harness code to widen; TalkItThrough.tsx's narrowing is deliberately left alone per the PRD. 2561 frontend tests pass; full typecheck clean.",
+        "releasedAt": "2026-07-28T20:40:29.888Z"
       }
     ],
     "statusReasons": {
@@ -271,6 +274,10 @@
       "wi10-prereq": {
         "reason": "Updated the kimi prerequisite's purpose string to cover both native (kimi-code) and ACP (acp) harnesses, keeping the single row and unchanged resolver per the narrative (resolveHarnessBinary already resolves the one kimi binary for both). Added a test asserting exactly one kimi row with the updated purpose text. All 8 tests pass, including the pre-existing ACP-resolver-routing test confirming no behavior change (AC2).",
         "updatedAt": "2026-07-28T20:24:15.140Z"
+      },
+      "wi11-frontend": {
+        "reason": "Added kimi-code to HARNESS_OPTIONS/HARNESS_BRANDS/HARNESS_LABELS/TieredExecutionSection/CrewRow. This closes the LAST remaining typecheck gap left open since wi1 -- npm run typecheck is now 100% clean across root/hooks/evals/dashboard/frontend for the first time this issue. Widening ModelPicker.tsx's own local Harness type surfaced 4 more orphaned hand-rolled unions (PlanDialog.tsx, RolesPanel.tsx, FlywheelConversationPane.tsx, useConversationMutations.ts 9x) not named in the PRD, all fixed. wi11.ac3 (policy-lock) needed no new code -- canUsePickerHarness already dispatches generically on the wi4 policyDecisions map; added a test proving it. ContextPage.tsx had no harness code to widen; TalkItThrough.tsx's narrowing is deliberately left alone per the PRD. 2561 frontend tests pass; full typecheck clean.",
+        "updatedAt": "2026-07-28T20:40:29.888Z"
       }
     }
   },
@@ -328,6 +335,10 @@
     "wi10-prereq": "completed",
     "wi10-prereq.wi10-prereq.ac1": "completed",
     "wi10-prereq.wi10-prereq.ac2": "completed",
-    "wi11-frontend": "running"
+    "wi11-frontend": "completed",
+    "wi11-frontend.wi11-frontend.ac1": "completed",
+    "wi11-frontend.wi11-frontend.ac2": "completed",
+    "wi11-frontend.wi11-frontend.ac3": "completed",
+    "wi11-frontend.wi11-frontend.ac4": "completed"
   }
 }
