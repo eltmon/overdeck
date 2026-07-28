@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   diagnoseDuplicateComposeStacks,
   type DuplicateStackContainerRow,
-} from '../../../src/cli/commands/doctor.js';
+} from '../../../src/cli/commands/doctor-duplicate-stacks.js';
 
 describe('diagnoseDuplicateComposeStacks (PAN-3049)', () => {
   it('ac1: reports a duplicate with myn- as canonical and overdeck- as foreign', () => {
