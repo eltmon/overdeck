@@ -137,18 +137,17 @@
     "recordedAt": "2026-07-28T17:16:31.850Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T18:22:07.758Z",
+  "updated": "2026-07-28T18:22:44.307Z",
   "pipeline": {
     "issueId": "PAN-2882",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:16:51.273Z",
-    "updatedAt": "2026-07-28T18:22:07.748Z",
-    "reviewNotes": "! [requirements] The latest commit deletes the accepted merged-pagination test instead of satisfying or revising the requirement — `tests/unit/lib/gitlab-merge-requests.test.ts:184`",
+    "updatedAt": "2026-07-28T18:22:44.277Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
     "reviewedAtCommit": "e38216258512564fa52df36c0ff3f1b67c667fd6",
     "lastVerifiedCommit": "e38216258512564fa52df36c0ff3f1b67c667fd6",
@@ -180,9 +179,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5686641,
-            "output": 212173,
-            "cacheRead": 22300160,
+            "input": 6041249,
+            "output": 213395,
+            "cacheRead": 22514176,
             "cacheWrite": 0
           }
         },
@@ -203,9 +202,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 7421043,
-          "output": 298100,
-          "cacheRead": 41658880,
+          "input": 7775651,
+          "output": 299322,
+          "cacheRead": 41872896,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -216,8 +215,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 73.893187,
-        "pricingAsOf": "2026-07-28T18:22:07.755Z"
+        "usd": 75.809895,
+        "pricingAsOf": "2026-07-28T18:22:44.302Z"
       }
     },
     "merges": [
