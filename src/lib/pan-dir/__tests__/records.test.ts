@@ -353,7 +353,7 @@ describe('markRecordPipelineClosedOutSync', () => {
     expect(record?.pipeline.closedOutAt).toEqual(expect.any(String));
     expect(Number.isNaN(Date.parse(record?.pipeline.closedOutAt ?? ''))).toBe(false);
     expect(record?.pipeline.readyForMerge).toBe(false);
-    expect(record?.pipeline.verificationStatus).toBeUndefined();
+    expect(record?.pipeline.verificationStatus).toBe('running'); // Preserved for journal fallback (PAN-3025)
     expect(record?.pipeline.mergeStatus).toBe('merged');
     expect(record?.pipeline.updatedAt).toBe(record?.pipeline.closedOutAt);
     expect(mockQueueAutoCommit).toHaveBeenCalled();

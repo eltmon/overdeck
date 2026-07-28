@@ -104,7 +104,7 @@ describe('close-out terminal journal integration (PAN-2054)', () => {
     expect(record?.pipeline.closedOut).toBe(true);
     expect(record?.pipeline.closedOutAt).toEqual(expect.any(String));
     expect(record?.pipeline.readyForMerge).toBe(false);
-    expect(record?.pipeline.verificationStatus).toBeUndefined();
+    expect(record?.pipeline.verificationStatus).toBe('running'); // Preserved for journal fallback (PAN-3025)
     expect(record?.pipeline.mergeStatus).toBe('merged');
     expect(mocks.dbDelete).toHaveBeenCalledWith('PAN-2054');
     expect(mocks.dbUpsert).not.toHaveBeenCalled();
