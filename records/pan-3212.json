@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T16:44:14.262Z",
+  "updated": "2026-07-28T16:44:17.625Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "pending",
@@ -25,7 +25,32 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T16:24:35.045Z"
+    "updatedAt": "2026-07-28T16:44:17.624Z",
+    "reviewRequestedAt": "2026-07-28T16:44:17.624Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "CLAUDE.md",
+        "src/lib/__tests__/tmux-dedup.test.ts",
+        "src/lib/overdeck/conversation-runtime.ts",
+        "src/lib/overdeck/resume-contract-delivery.ts",
+        "src/lib/tmux-dedup.ts",
+        "tests/lib/tmux-send-keys-blocking-menu.test.ts",
+        "tests/unit/lib/overdeck/resume-contract-delivery.test.ts"
+      ],
+      "actualChangedFiles": [
+        "CLAUDE.md",
+        "src/lib/__tests__/tmux-dedup.test.ts",
+        "src/lib/overdeck/conversation-runtime.ts",
+        "src/lib/overdeck/resume-contract-delivery.ts",
+        "src/lib/tmux-dedup.ts",
+        "tests/lib/tmux-send-keys-blocking-menu.test.ts",
+        "tests/unit/lib/overdeck/resume-contract-delivery.test.ts"
+      ],
+      "recordedAt": "2026-07-28T16:44:14.261Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3227"
   },
   "closeOut": {
     "usage": {
