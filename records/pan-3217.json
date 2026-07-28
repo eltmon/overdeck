@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T06:36:21.767Z",
-  "updated": "2026-07-28T08:46:37.329Z",
+  "updated": "2026-07-28T08:47:19.714Z",
   "pipeline": {
     "issueId": "PAN-3217",
     "reviewStatus": "pending",
@@ -47,16 +47,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "document-reason-precedence": {
-        "writerId": "agent-pan-3217",
-        "agentId": "agent-pan-3217",
-        "pid": 2030386,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T08:46:37.329Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3217",
@@ -68,12 +60,27 @@
         "outcome": "completed",
         "reason": "Reordered tracker type resolution before issue prefix guard in both gatherProjectLensSignals() and listProjectTrackerIssues(). Added tests for path-only project (tracker_unconfigured) and project with tracker but no prefix (missing_issue_prefix). All existing tests pass.",
         "releasedAt": "2026-07-28T08:46:24.291Z"
+      },
+      {
+        "writerId": "agent-pan-3217",
+        "agentId": "agent-pan-3217",
+        "pid": 2030386,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T08:46:37.329Z",
+        "itemId": "document-reason-precedence",
+        "outcome": "completed",
+        "reason": "Extended docs/PIPELINE-MEMBERSHIP.md line 48 with precedence rule explaining that tracker type is resolved first, then issue prefix. All acceptance criteria met.",
+        "releasedAt": "2026-07-28T08:47:19.714Z"
       }
     ],
     "statusReasons": {
       "reorder-tracker-before-prefix": {
         "reason": "Reordered tracker type resolution before issue prefix guard in both gatherProjectLensSignals() and listProjectTrackerIssues(). Added tests for path-only project (tracker_unconfigured) and project with tracker but no prefix (missing_issue_prefix). All existing tests pass.",
         "updatedAt": "2026-07-28T08:46:24.291Z"
+      },
+      "document-reason-precedence": {
+        "reason": "Extended docs/PIPELINE-MEMBERSHIP.md line 48 with precedence rule explaining that tracker type is resolved first, then issue prefix. All acceptance criteria met.",
+        "updatedAt": "2026-07-28T08:47:19.714Z"
       }
     }
   },
@@ -83,6 +90,8 @@
     "reorder-tracker-before-prefix.reorder-tracker-before-prefix.ac2": "completed",
     "reorder-tracker-before-prefix.reorder-tracker-before-prefix.ac3": "completed",
     "reorder-tracker-before-prefix.reorder-tracker-before-prefix.ac4": "completed",
-    "document-reason-precedence": "running"
+    "document-reason-precedence": "completed",
+    "document-reason-precedence.document-reason-precedence.ac1": "completed",
+    "document-reason-precedence.document-reason-precedence.ac2": "completed"
   }
 }
