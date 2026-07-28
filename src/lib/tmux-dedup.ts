@@ -16,11 +16,12 @@
  *
  *   (none) ──paste──► PENDING ──atomic claim+Enter──► TERMINAL
  *
- * - `sendKeysDedup` atomically pastes and sets PENDING plus a payload-unverified
- *   marker only when neither terminal phase is set. Recovery proves that payload
- *   in the cursor-anchored composer before reusing the claim, or re-pastes after
- *   positive absence. The unverified marker clears when an Enter attempt begins,
- *   so rollback recovery does not duplicate content that may already have landed.
+ * - `sendKeysDedup` atomically pastes and sets PENDING plus payload-state
+ *   `unverified`. Recovery proves that payload in the cursor-anchored composer
+ *   before reusing the claim, or re-pastes after positive absence. An Enter
+ *   attempt atomically advances the state to `enter-attempted`, so rollback
+ *   recovery does not duplicate content that may already have landed. State
+ *   reads are strict; unset legacy and unknown values fail closed.
  *   A POISON breadcrumb (a terminal marker that proved
  *   false but could not be rolled back) is repaired first and never honored as
  *   a dedup.
@@ -81,10 +82,13 @@ export function dedupTargetOptionName(dedupKey: string): string {
   return `@overdeck-dedup-target-${dedupKey}`;
 }
 
-/** Set with a paste until an Enter attempt begins; recovery must prove payload presence. */
-export function dedupPayloadUnverifiedOptionName(dedupKey: string): string {
-  return `@overdeck-dedup-payload-unverified-${dedupKey}`;
+/** Explicit payload phase for a pending claim; unset means legacy/unknown. */
+export function dedupPayloadStateOptionName(dedupKey: string): string {
+  return `@overdeck-dedup-payload-state-${dedupKey}`;
 }
+
+const PAYLOAD_STATE_UNVERIFIED = 'unverified';
+const PAYLOAD_STATE_ENTER_ATTEMPTED = 'enter-attempted';
 
 export function assertValidDedupKey(dedupKey: string): void {
   if (!DEDUP_KEY_RE.test(dedupKey)) {
@@ -190,6 +194,26 @@ async function readMarker(sessionName: string, option: string): Promise<string> 
 async function readMarkerStrict(sessionName: string, option: string): Promise<string> {
   const result = await tmuxExecAsync(['show-option', '-qv', '-t', sessionName, option], { encoding: 'utf-8' });
   return String(result.stdout).trim();
+}
+
+type PendingPayloadState = typeof PAYLOAD_STATE_UNVERIFIED | typeof PAYLOAD_STATE_ENTER_ATTEMPTED;
+
+async function readPendingPayloadState(
+  sessionName: string,
+  dedupKey: string,
+  option: string,
+  readStrict: (sessionName: string, option: string) => Promise<string>,
+  context: string,
+): Promise<PendingPayloadState> {
+  let state: string;
+  try {
+    state = await readStrict(sessionName, option);
+  } catch (error) {
+    throw new KeyedMarkerVerificationError(sessionName, `${context} payload-state read (key "${dedupKey}")`, { cause: error });
+  }
+  if (state === PAYLOAD_STATE_UNVERIFIED || state === PAYLOAD_STATE_ENTER_ATTEMPTED) return state;
+  const detail = state === '' ? 'legacy/unset' : `unknown value "${state}"`;
+  throw new KeyedMarkerVerificationError(sessionName, `${context} payload-state is ${detail} (key "${dedupKey}")`);
 }
 
 type PayloadPresence = 'present' | 'absent' | 'unproven';
@@ -314,27 +338,27 @@ async function repairPoisonedMarkers(
   const terminalOption = dedupTerminalOptionName(dedupKey);
   const pendingOption = dedupPendingOptionName(dedupKey);
   const poisonOption = dedupPoisonOptionName(dedupKey);
-  const payloadUnverifiedOption = dedupPayloadUnverifiedOptionName(dedupKey);
+  const payloadStateOption = dedupPayloadStateOptionName(dedupKey);
   await tmuxExecAsync([
     'set-option', '-u', '-t', sessionName, terminalOption,
     ';', 'set-option', '-t', sessionName, pendingOption, sendId,
-    ';', 'set-option', '-u', '-t', sessionName, payloadUnverifiedOption,
+    ';', 'set-option', '-t', sessionName, payloadStateOption, PAYLOAD_STATE_ENTER_ATTEMPTED,
   ], { encoding: 'utf-8' });
   let repairedTerminal: string;
   let repairedPending: string;
-  let repairedPayloadUnverified: string;
+  let repairedPayloadState: string;
   try {
     // STRICT reads (cycle 13): a failed verification read must abort while
     // the breadcrumb stays authoritative — never convert it to empty state.
-    [repairedTerminal, repairedPending, repairedPayloadUnverified] = await Promise.all([
+    [repairedTerminal, repairedPending, repairedPayloadState] = await Promise.all([
       readStrict(sessionName, terminalOption),
       readStrict(sessionName, pendingOption),
-      readStrict(sessionName, payloadUnverifiedOption),
+      readStrict(sessionName, payloadStateOption),
     ]);
   } catch {
     throw new KeyedMarkerVerificationError(sessionName, `repair verification of key "${dedupKey}"`);
   }
-  if (repairedTerminal !== '' || repairedPending === '' || repairedPayloadUnverified !== '') {
+  if (repairedTerminal !== '' || repairedPending === '' || repairedPayloadState !== PAYLOAD_STATE_ENTER_ATTEMPTED) {
     throw new Error(`Keyed tmux markers for ${sessionName} are poisoned and could not be repaired (key "${dedupKey}")`);
   }
   await clearPoisonVerified(sessionName, poisonOption, `repair of key "${dedupKey}"`, readStrict);
@@ -366,7 +390,7 @@ export async function sendKeysDedup(
   const terminalOption = dedupTerminalOptionName(dedupKey);
   const pendingOption = dedupPendingOptionName(dedupKey);
   const poisonOption = dedupPoisonOptionName(dedupKey);
-  const payloadUnverifiedOption = dedupPayloadUnverifiedOptionName(dedupKey);
+  const payloadStateOption = dedupPayloadStateOptionName(dedupKey);
 
   const sendId = randomUUID();
 
@@ -408,7 +432,7 @@ export async function sendKeysDedup(
       await tmuxExecAsync([
         'if-shell', '-t', sessionName,
         `test -z "$(tmux show-option -qv -t ${sessionName} ${pendingOption})" && test -z "$(tmux show-option -qv -t ${sessionName} ${terminalOption})"`,
-        `paste-buffer -b ${bufferName} -p -t ${sessionName} \; set-option -t ${sessionName} ${pendingOption} ${sendId} \; set-option -F -t ${sessionName} ${targetOption} '#{pane_pid}' \; set-option -t ${sessionName} ${payloadUnverifiedOption} 1`,
+        `paste-buffer -b ${bufferName} -p -t ${sessionName} \; set-option -t ${sessionName} ${pendingOption} ${sendId} \; set-option -F -t ${sessionName} ${targetOption} '#{pane_pid}' \; set-option -t ${sessionName} ${payloadStateOption} ${PAYLOAD_STATE_UNVERIFIED}`,
       ], { encoding: 'utf-8' });
     }
 
@@ -429,10 +453,16 @@ export async function sendKeysDedup(
       // may already have been accepted.
       const recordedTarget = await read(sessionName, targetOption);
       const currentPid = (await (deps.readPaneTarget ?? readPaneTarget)(sessionName)).pid;
-      const payloadUnverified = await read(sessionName, payloadUnverifiedOption);
+      const payloadState = await readPendingPayloadState(
+        sessionName,
+        dedupKey,
+        payloadStateOption,
+        readStrict,
+        'pending claim',
+      );
       const readViewport = deps.readPaneViewport ?? captureVisiblePane;
       if (recordedTarget !== '' && currentPid !== '' && recordedTarget === currentPid) {
-        if (payloadUnverified === '') return 'submit-pending';
+        if (payloadState === PAYLOAD_STATE_ENTER_ATTEMPTED) return 'submit-pending';
         const presence = await pendingPayloadPresence(sessionName, keys, readViewport);
         if (presence === 'present') return 'submit-pending';
         if (presence === 'unproven') {
@@ -448,7 +478,7 @@ export async function sendKeysDedup(
         'if-shell', '-t', sessionName,
         `test "$(tmux show-option -qv -t ${sessionName} ${pendingOption})" = ${shellQuote(pendingMarker)} && ` +
         `test -z "$(tmux show-option -qv -t ${sessionName} ${terminalOption})"`,
-        `paste-buffer -b ${bufferName} -p -t ${sessionName} \; set-option -t ${sessionName} ${pendingOption} ${sendId} \; set-option -F -t ${sessionName} ${targetOption} '#{pane_pid}' \; set-option -t ${sessionName} ${payloadUnverifiedOption} 1`,
+        `paste-buffer -b ${bufferName} -p -t ${sessionName} \; set-option -t ${sessionName} ${pendingOption} ${sendId} \; set-option -F -t ${sessionName} ${targetOption} '#{pane_pid}' \; set-option -t ${sessionName} ${payloadStateOption} ${PAYLOAD_STATE_UNVERIFIED}`,
       ];
       try {
         if (deps.runTmuxCommand) {
@@ -460,11 +490,10 @@ export async function sendKeysDedup(
         throw new KeyedMarkerVerificationError(sessionName, `pending payload re-paste command (key "${dedupKey}")`, { cause: error });
       }
 
-      const [repastedPending, repastedTerminal, repastedTarget, repastedPayloadUnverified] = await Promise.all([
+      const [repastedPending, repastedTerminal, repastedTarget] = await Promise.all([
         read(sessionName, pendingOption),
         read(sessionName, terminalOption),
         read(sessionName, targetOption),
-        read(sessionName, payloadUnverifiedOption),
       ]);
       if (repastedTerminal !== '') return 'deduplicated';
       if (repastedPending === sendId) return 'pasted';
@@ -473,8 +502,15 @@ export async function sendKeysDedup(
         // payload both match the current active composer. Any other state is
         // recoverable but unproven, so a later pass re-evaluates it.
         const nowPid = (await (deps.readPaneTarget ?? readPaneTarget)(sessionName)).pid;
+        const repastedPayloadState = await readPendingPayloadState(
+          sessionName,
+          dedupKey,
+          payloadStateOption,
+          readStrict,
+          'concurrent claim',
+        );
         if (repastedTarget !== '' && nowPid !== '' && repastedTarget === nowPid) {
-          if (repastedPayloadUnverified === '') return 'submit-pending';
+          if (repastedPayloadState === PAYLOAD_STATE_ENTER_ATTEMPTED) return 'submit-pending';
           const presence = await pendingPayloadPresence(sessionName, keys, readViewport);
           if (presence === 'present') return 'submit-pending';
         }
@@ -541,7 +577,7 @@ export async function completeKeyedSubmit(
   const pendingOption = dedupPendingOptionName(dedupKey);
   const poisonOption = dedupPoisonOptionName(dedupKey);
   const targetOption = dedupTargetOptionName(dedupKey);
-  const payloadUnverifiedOption = dedupPayloadUnverifiedOptionName(dedupKey);
+  const payloadStateOption = dedupPayloadStateOptionName(dedupKey);
 
   await new Promise(resolve => setTimeout(resolve, PASTE_SETTLE_MS));
 
@@ -573,7 +609,7 @@ export async function completeKeyedSubmit(
     `test -n "$(tmux show-option -qv -t ${sessionName} ${pendingOption})" && ` +
     `test "$(tmux display-message -p -t ${sessionName} '#{pane_dead}')" = "0" && ` +
     `test "$(tmux display-message -p -t ${sessionName} '#{pane_pid}')" = "$(tmux show-option -qv -t ${sessionName} ${targetOption})"`,
-    `send-keys -t ${sessionName} C-m \; set-option -t ${sessionName} ${poisonOption} 1 \; set-option -t ${sessionName} ${terminalOption} 1 \; set-option -u -t ${sessionName} ${pendingOption} \; set-option -u -t ${sessionName} ${payloadUnverifiedOption}`,
+    `send-keys -t ${sessionName} C-m \; set-option -t ${sessionName} ${poisonOption} 1 \; set-option -t ${sessionName} ${terminalOption} 1 \; set-option -u -t ${sessionName} ${pendingOption} \; set-option -t ${sessionName} ${payloadStateOption} ${PAYLOAD_STATE_ENTER_ATTEMPTED}`,
   ], { encoding: 'utf-8' });
 
   const [terminalAfter, pendingAfter, postTarget, recordedTarget] = await Promise.all([
@@ -611,29 +647,33 @@ export async function completeKeyedSubmit(
       ? [
           'set-option', '-u', '-t', sessionName, terminalOption,
           ';', 'set-option', '-u', '-t', sessionName, pendingOption,
-          ';', 'set-option', '-u', '-t', sessionName, payloadUnverifiedOption,
+          ';', 'set-option', '-t', sessionName, payloadStateOption, PAYLOAD_STATE_ENTER_ATTEMPTED,
         ]
       : [
           'set-option', '-u', '-t', sessionName, terminalOption,
           ';', 'set-option', '-t', sessionName, pendingOption, pendingBefore,
-          ';', 'set-option', '-u', '-t', sessionName, payloadUnverifiedOption,
+          ';', 'set-option', '-t', sessionName, payloadStateOption, PAYLOAD_STATE_ENTER_ATTEMPTED,
         ];
     await tmuxExecAsync(rollbackArgs, { encoding: 'utf-8' }).catch(() => {});
     let rolledTerminal: string;
     let restoredPending: string;
-    let remainingPayloadUnverified: string;
+    let remainingPayloadState: string;
     try {
-      [rolledTerminal, restoredPending, remainingPayloadUnverified] = await Promise.all([
+      [rolledTerminal, restoredPending, remainingPayloadState] = await Promise.all([
         readStrict(sessionName, terminalOption),
         readStrict(sessionName, pendingOption),
-        readStrict(sessionName, payloadUnverifiedOption),
+        readStrict(sessionName, payloadStateOption),
       ]);
     } catch {
       // Verification read failed — rollback state unproven; the breadcrumb
       // stays authoritative and recovery retries.
       throw new KeyedMarkerVerificationError(sessionName, `rollback verification of key "${dedupKey}"`);
     }
-    if (rolledTerminal === '' && restoredPending !== '' && remainingPayloadUnverified === '') {
+    if (
+      rolledTerminal === ''
+      && restoredPending !== ''
+      && remainingPayloadState === PAYLOAD_STATE_ENTER_ATTEMPTED
+    ) {
       // Verified rollback — lift the breadcrumb. If the clear fails the
       // surviving poison is idempotent-safe here (terminal is already clear,
       // so a later repair restores the same pending state and retries).

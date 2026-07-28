@@ -555,10 +555,10 @@ async function deliverKeyedAgentMessage(
 
 /**
  * Keyed tmux delivery: paste under the two-phase marker protocol, then
- * complete the submit. Crash-left payload-unverified claims are reused only
- * when the text is visible in the active composer; positive absence re-pastes.
- * Claims restored after an Enter attempt retain the existing no-repaste recovery
- * semantics. A terminal marker suppresses the replay entirely.
+ * complete the submit. Pending claims carry a strictly-read payload state:
+ * unverified requires active-composer proof, while enter-attempted preserves
+ * no-repaste rollback recovery. Unset legacy/unknown states fail closed. A
+ * terminal marker suppresses the replay entirely.
  */
 async function deliverKeyedViaTmux(
   normalizedId: string,

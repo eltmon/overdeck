@@ -141,7 +141,7 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(await sendKeysDedup(session, payload, 'menu-key')).toBe('pasted');
     const pendingBefore = showOption('@overdeck-dedup-pending-menu-key');
     expect(pendingBefore).not.toBe('');
-    expect(showOption('@overdeck-dedup-payload-unverified-menu-key')).toBe('1');
+    expect(showOption('@overdeck-dedup-payload-state-menu-key')).toBe('unverified');
 
     vi.useFakeTimers();
     try {
@@ -158,7 +158,23 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(showOption('@overdeck-dedup-pending-menu-key')).toBe(pendingBefore);
     expect(showOption('@overdeck-dedup-target-menu-key')).toBe(paneBefore.pid);
     expect(showOption('@overdeck-dedup-menu-key')).toBe('');
-    expect(showOption('@overdeck-dedup-payload-unverified-menu-key')).toBe('1');
+    expect(showOption('@overdeck-dedup-payload-state-menu-key')).toBe('unverified');
+
+    // A selective read failure on the stored payload state is fail-closed: it
+    // cannot be mistaken for the explicit enter-attempted phase.
+    const payloadStateOption = '@overdeck-dedup-payload-state-menu-key';
+    const stateReadRepasteSpy = vi.fn(async () => {});
+    await expect(sendKeysDedup(session, payload, 'menu-key', 'test', {
+      readMarkerStrict: (_name, option) => (
+        option === payloadStateOption
+          ? Promise.reject(new Error('payload-state read unavailable'))
+          : Promise.resolve(showOption(option))
+      ),
+      readPaneViewport: () => Promise.resolve({ text: `❯ ${payload}`, cursorY: 0 }),
+      runTmuxCommand: stateReadRepasteSpy,
+    })).rejects.toThrow(KeyedMarkerVerificationError);
+    expect(stateReadRepasteSpy).not.toHaveBeenCalled();
+    expect(showOption(payloadStateOption)).toBe('unverified');
 
     // An unreadable viewport is unproven, not evidence that the payload is
     // absent. Recovery must leave the original paste and markers untouched.
@@ -218,7 +234,29 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
 
     expect(showOption('@overdeck-dedup-menu-key')).toBe('1');
     expect(showOption('@overdeck-dedup-pending-menu-key')).toBe('');
-    expect(showOption('@overdeck-dedup-payload-unverified-menu-key')).toBe('');
+    expect(showOption('@overdeck-dedup-payload-state-menu-key')).toBe('enter-attempted');
+  });
+
+  it('fails closed for a legacy pending claim with no explicit payload state', async () => {
+    const payload = 'legacy swallowed delivery';
+    expect(await sendKeysDedup(session, payload, 'legacy-key')).toBe('pasted');
+    const pendingBefore = showOption('@overdeck-dedup-pending-legacy-key');
+    execFileSync('tmux', [
+      '-L', socket,
+      'set-option', '-u', '-t', session,
+      '@overdeck-dedup-payload-state-legacy-key',
+    ]);
+    execFileSync('tmux', ['-L', socket, 'send-keys', '-t', session, 'C-u']);
+
+    const repasteSpy = vi.fn(async () => {});
+    await expect(sendKeysDedup(session, payload, 'legacy-key', 'test', {
+      readPaneViewport: () => Promise.resolve({ text: '❯ ', cursorY: 0 }),
+      runTmuxCommand: repasteSpy,
+    })).rejects.toThrow(KeyedMarkerVerificationError);
+
+    expect(repasteSpy).not.toHaveBeenCalled();
+    expect(showOption('@overdeck-dedup-pending-legacy-key')).toBe(pendingBefore);
+    expect(showOption('@overdeck-dedup-legacy-key')).toBe('');
   });
 
   it('submits normal composer content when pane capture is busy or unavailable', async () => {
@@ -464,9 +502,9 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(showOption('@overdeck-dedup-test-key-1')).toBe('');
     expect(showOption('@overdeck-dedup-pending-test-key-1')).not.toBe('');
     // The rollback was verified, so the poison breadcrumb was lifted. The
-    // payload-unverified marker also stays clear because Enter may have landed.
+    // explicit payload state records that Enter may already have landed.
     expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('');
-    expect(showOption('@overdeck-dedup-payload-unverified-test-key-1')).toBe('');
+    expect(showOption('@overdeck-dedup-payload-state-test-key-1')).toBe('enter-attempted');
 
     // Recovery completes the preserved claim without re-pasting.
     const replay = await sendKeysDedup(session, 'wake up agent', 'test-key-1');

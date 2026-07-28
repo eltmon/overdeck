@@ -275,10 +275,10 @@ a menu Overdeck did not open: at the resume gate the highlighted row is "Resume
 from summary", and a stray Enter there discarded an operator's full session
 (PAN-3212). `paneHasBlockingChoiceMenu()` in `src/lib/pane-choice-menu.ts` is
 the shared detector. The keyed dedup submit applies the same guard before its
-server-owned `if-shell` Enter. A crash-left payload-unverified claim is reused only when its
-text is visible in the cursor-anchored active composer; unreadable captures remain pending, and a
-successful capture proving absence causes an atomic re-paste. Once an Enter attempt begins, the
-unverified marker clears so rollback recovery never duplicates content that may already have landed.
+server-owned `if-shell` Enter. Each pending claim has an explicit, strictly-read payload state:
+`unverified` requires text in the cursor-anchored active composer (positive absence atomically
+re-pastes), while `enter-attempted` preserves no-repaste rollback recovery. Unreadable, unset legacy,
+or unknown states remain pending and fail closed rather than authorizing Enter.
 
 Summary forks add a pane-verified recovery above that transport: when the
 runtime transcript stays silent but the delivered tail remains in the composer,
