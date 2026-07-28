@@ -30,8 +30,8 @@ vi.mock('os', async (importOriginal) => {
 
 // The two seams the resolver reads. Standing them up for real would drag in the
 // whole two-door state stack, which this test says nothing about.
-vi.mock('../../src/lib/agents.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/lib/agents.js')>();
+vi.mock('../../src/lib/agents/agent-state.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/lib/agents/agent-state.js')>();
   return {
     ...actual,
     getAgentStateSync: (id: string) => {
