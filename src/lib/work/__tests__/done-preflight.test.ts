@@ -91,6 +91,22 @@ describe('filterUncommittedPorcelainLines (MIN-896/MIN-898 generated-harness exc
     expect(filterUncommittedPorcelainLines('?? .pan/review/run-1/context.json\n?? .pan/test/results.json\n')).toEqual([]);
   });
 
+  it('excludes every Overdeck runtime path at the wrapper root, not just the state-plane allowlist (PAN-3245)', async () => {
+    const { filterUncommittedPorcelainLines } = await import('../done-preflight.js');
+    expect(filterUncommittedPorcelainLines([
+      '?? .pan/drafts/MIN-911.md',
+      '?? .pan/user-notes.md',
+      '?? .overdeck/continue.json',
+      '?? .pan/',
+    ].join('\n'))).toEqual([]);
+  });
+
+  it('does not over-match lookalike runtime prefixes (.pancake, .overdeckish)', async () => {
+    const { filterUncommittedPorcelainLines } = await import('../done-preflight.js');
+    const out = filterUncommittedPorcelainLines('?? .pancake/file.md\n?? .overdeckish\n');
+    expect(out).toEqual(['?? .pancake/file.md', '?? .overdeckish']);
+  });
+
   it('keeps real source dirt visible', async () => {
     const { filterUncommittedPorcelainLines } = await import('../done-preflight.js');
     const out = filterUncommittedPorcelainLines('?? .devcontainer/\n?? dev\n M src/foo.ts\n?? src/new-file.ts\n');
