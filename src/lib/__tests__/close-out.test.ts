@@ -206,6 +206,7 @@ describe('executeCloseOut workspace resolution (PAN-2510)', () => {
     mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
       networkRemoved: false,
       steps: ['compose down attempted', 'network still present'],
+      remainingNetworks: ['myn-feature-pan-2510_devnet'],
     });
 
     const result = await Effect.runPromise(executeCloseOut({
@@ -220,7 +221,33 @@ describe('executeCloseOut workspace resolution (PAN-2510)', () => {
     expect(result.success).toBe(true);
     const dockerStep = result.steps.find((step) => step.name === 'Docker stack removed');
     expect(dockerStep?.status).toBe('skipped');
-    expect(dockerStep?.message).toContain('overdeck-feature-pan-2510_devnet');
+    // PAN-3049: the warning must name the actual remaining network(s), not a
+    // hardcoded overdeck-feature- prefix that may not match this workspace's
+    // declared compose project name.
+    expect(dockerStep?.message).toContain('myn-feature-pan-2510_devnet');
+  });
+
+  it('falls back to a generic phrasing when the teardown result carries no remainingNetworks', async () => {
+    const issueId = 'PAN-2510';
+    mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
+      networkRemoved: false,
+      steps: ['compose down attempted', 'network still present'],
+    });
+
+    const result = await Effect.runPromise(executeCloseOut({
+      issueId,
+      projectPath,
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'overdeck',
+      number: 2510,
+    }));
+
+    expect(result.success).toBe(true);
+    const dockerStep = result.steps.find((step) => step.name === 'Docker stack removed');
+    expect(dockerStep?.status).toBe('skipped');
+    expect(dockerStep?.message).toContain('one or more workspace devnets');
+    expect(dockerStep?.message).toContain('the closed-issue reaper will retry');
   });
 
   it('runs Docker teardown before git worktree removal', async () => {

@@ -7,9 +7,9 @@ import { join } from 'path';
 import chalk from 'chalk';
 import { getOverdeckHome } from '../../lib/paths.js';
 import { getAgentStateSync } from '../../lib/agents.js';
+import { inferIssueIdFromStackContainerName } from '../../lib/workspace/stack-health.js';
 
 const execFileAsync = promisify(execFile);
-const WORKSPACE_PROJECT_PREFIX = 'overdeck-feature-';
 const ACTIVE_AGENT_STATUSES = new Set(['running', 'starting']);
 
 export interface WorkspaceReapOptions {
@@ -70,12 +70,15 @@ function normalizeIssueId(value: string): string {
   return value.toLowerCase().replace(/^feature-/, '').replace(/[^a-z0-9-]/g, '-');
 }
 
-function issueIdFromProject(project: string): string {
-  const lower = project.toLowerCase();
-  if (lower.startsWith(WORKSPACE_PROJECT_PREFIX)) {
-    return normalizeIssueId(lower.slice(WORKSPACE_PROJECT_PREFIX.length));
-  }
-  return normalizeIssueId(lower);
+/**
+ * Extract the issue token from a compose project name or container name,
+ * regardless of the declared compose-project prefix (overdeck-, myn-, or
+ * none) — PAN-3049. Returns null when no `feature-<issue>` token is present
+ * (e.g. shared infra like overdeck-traefik).
+ */
+function issueIdFromProject(project: string): string | null {
+  const inferred = inferIssueIdFromStackContainerName(project);
+  return inferred ? normalizeIssueId(inferred) : null;
 }
 
 function parseComposeFiles(value: string | undefined): string[] {
@@ -103,9 +106,11 @@ export function collectWorkspaceReapCandidatesFromInspect(
     const labels = container.Config?.Labels ?? {};
     const name = (container.Name ?? '').replace(/^\//, '');
     const project = labels['com.docker.compose.project'] ?? name.split('-').slice(0, -2).join('-');
-    if (!name.includes(WORKSPACE_PROJECT_PREFIX) && !project.startsWith(WORKSPACE_PROJECT_PREFIX)) {
-      continue;
-    }
+    // PAN-3049: a reap candidate is any container/project carrying a
+    // `feature-<issue>` token, regardless of declared compose-project prefix
+    // (overdeck-, myn-, or none) — not just the overdeck- fallback.
+    const issueId = issueIdFromProject(project) ?? issueIdFromProject(name);
+    if (!issueId) continue;
 
     const status = (container.State?.Status ?? '').toLowerCase();
     const exitCode = container.State?.ExitCode ?? 0;
@@ -122,7 +127,7 @@ export function collectWorkspaceReapCandidatesFromInspect(
     if (!group) {
       group = {
         project,
-        issueId: issueIdFromProject(project),
+        issueId,
         containers: [],
         composeFiles: new Set(),
         workingDir: labels['com.docker.compose.project.working_dir'],
@@ -179,11 +184,16 @@ function collectActiveAgentIssueIds(): Set<string> {
 }
 
 async function listMatchingContainerIds(): Promise<string[]> {
+  // PAN-3049: match `feature-` anywhere in the name, not just the
+  // overdeck- fallback prefix, so myn-feature-* (or any other declared
+  // prefix) containers are discovered too. The per-container/per-project
+  // issue-token check in collectWorkspaceReapCandidatesFromInspect still
+  // filters out anything without a resolvable `feature-<issue>` token.
   const { stdout } = await execFileAsync('docker', [
     'ps',
     '-a',
     '--filter',
-    `name=${WORKSPACE_PROJECT_PREFIX}`,
+    'name=feature-',
     '--format',
     '{{.ID}}',
   ], { encoding: 'utf-8' });
