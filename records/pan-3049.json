@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T07:11:57.544Z",
+  "updated": "2026-07-28T07:12:06.943Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,8 +79,16 @@
     }
   ],
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "workspace-reap-prefix-agnostic": {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 4012313,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T07:12:06.943Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -198,6 +206,7 @@
     "idle-reaper-ui-regex-prefix-agnostic.idle-reaper-ui-regex-prefix-agnostic.ac2": "completed",
     "closeout-warning-actual-networks": "completed",
     "closeout-warning-actual-networks.closeout-warning-actual-networks.ac1": "completed",
-    "closeout-warning-actual-networks.closeout-warning-actual-networks.ac2": "completed"
+    "closeout-warning-actual-networks.closeout-warning-actual-networks.ac2": "completed",
+    "workspace-reap-prefix-agnostic": "running"
   }
 }
