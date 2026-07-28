@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T06:44:55.060Z",
+  "updated": "2026-07-28T06:49:49.874Z",
   "pipeline": {
     "issueId": "PAN-2882",
     "reviewStatus": "pending",
@@ -47,16 +47,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "open-mr-lens": {
-        "writerId": "agent-pan-2882",
-        "agentId": "agent-pan-2882",
-        "pid": 2448379,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T06:44:55.059Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2882",
@@ -79,6 +71,17 @@
         "outcome": "completed",
         "reason": "Created gitlab-merge-requests.ts module with injectable runner, TTL caching, pagination support, and comprehensive tests for both open and merged MR queries",
         "releasedAt": "2026-07-28T06:44:46.167Z"
+      },
+      {
+        "writerId": "agent-pan-2882",
+        "agentId": "agent-pan-2882",
+        "pid": 2448379,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:44:55.059Z",
+        "itemId": "open-mr-lens",
+        "outcome": "completed",
+        "reason": "Wired GitLab open MRs into gather's hasOpenPr lens, updated fork-filter for GitLab support, added tests for open MR behavior",
+        "releasedAt": "2026-07-28T06:49:49.874Z"
       }
     ],
     "statusReasons": {
@@ -89,6 +92,10 @@
       "gitlab-mr-module": {
         "reason": "Created gitlab-merge-requests.ts module with injectable runner, TTL caching, pagination support, and comprehensive tests for both open and merged MR queries",
         "updatedAt": "2026-07-28T06:44:46.167Z"
+      },
+      "open-mr-lens": {
+        "reason": "Wired GitLab open MRs into gather's hasOpenPr lens, updated fork-filter for GitLab support, added tests for open MR behavior",
+        "updatedAt": "2026-07-28T06:49:49.874Z"
       }
     }
   },
@@ -103,6 +110,10 @@
     "gitlab-mr-module.gitlab-mr-module.ac3": "completed",
     "gitlab-mr-module.gitlab-mr-module.ac4": "completed",
     "gitlab-mr-module.gitlab-mr-module.ac5": "completed",
-    "open-mr-lens": "running"
+    "open-mr-lens": "completed",
+    "open-mr-lens.open-mr-lens.ac1": "completed",
+    "open-mr-lens.open-mr-lens.ac2": "completed",
+    "open-mr-lens.open-mr-lens.ac3": "completed",
+    "open-mr-lens.open-mr-lens.ac4": "completed"
   }
 }
