@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   },
   listProjectsSync: vi.fn(),
   listSessionNames: vi.fn(),
+  listWorkspaces: vi.fn(),
   listConversations: vi.fn(),
   loadReadyForMergeFlags: vi.fn(),
   openPullRequests: [] as unknown[],
@@ -72,6 +73,10 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
   listSessionNames: mocks.listSessionNames,
+}));
+
+vi.mock('../../../../../src/lib/workspaces/resolver.js', () => ({
+  listWorkspaces: mocks.listWorkspaces,
 }));
 
 vi.mock('../../../../../src/lib/runtime-census.js', () => ({
@@ -139,6 +144,7 @@ beforeEach(() => {
     { key: 'overdeck', config: { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN', github_repo: 'eltmon/overdeck' } },
   ]);
   mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
+  mocks.listWorkspaces.mockReturnValue([]);
   mocks.getRuntimeCensus.mockImplementation(async () => ({
     sessionNames: new Set(await Effect.runPromise(mocks.listSessionNames())),
   }));
@@ -810,5 +816,57 @@ describe('resource-discovery xbrief recency signal', () => {
 describe('resource-discovery cache test hooks', () => {
   it('allows cache state to be reset between tests', () => {
     expect(() => resetResourceAllocatedIssuesCacheForTests()).not.toThrow();
+  });
+});
+
+describe('resource-discovery workspaces resolver (PAN-1990)', () => {
+  it('prefers the workspaces resolver over the directory scan when rows exist for the project', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9010', title: 'Resolver-backed issue', state: 'open', rawTrackerState: 'OPEN' },
+    ]);
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([
+      membership('PAN-9010'),
+    ]);
+    mocks.listWorkspaces.mockReturnValue([
+      {
+        id: 'ws-uuid-1', projectId: 'overdeck', kind: 'issue', name: 'feature-pan-9010',
+        path: '/tmp/overdeck/workspaces/feature-pan-9010', branchName: 'feature/pan-9010',
+        parentBranch: null, parentBranchGuessed: false, isGitRepository: true,
+        issueId: 'PAN-9010', layoutConfig: null, isFavorite: false, isArchived: false,
+        title: null, createdAt: 0, lastAccessedAt: 0,
+      },
+    ]);
+    mocks.readdir.mockImplementation(async (path: string) => {
+      if (typeof path === 'string' && path.endsWith('/workspaces')) {
+        throw new Error('directory scan must not run when the resolver has rows');
+      }
+      return [];
+    });
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-9010']);
+    expect(discovered[0]?.resourceSources).toContain('workspace');
+  });
+
+  it('falls back to the directory scan when the resolver has no rows for the project', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9011', title: 'Fallback issue', state: 'open', rawTrackerState: 'OPEN' },
+    ]);
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([
+      membership('PAN-9011'),
+    ]);
+    mocks.listWorkspaces.mockReturnValue([]); // not yet backfilled for this project
+    mocks.readdir.mockImplementation(async (path: string, options?: { withFileTypes?: boolean }) => {
+      if (typeof path === 'string' && path.endsWith('/workspaces') && options?.withFileTypes) {
+        return [{ name: 'feature-pan-9011', isDirectory: () => true }];
+      }
+      return [];
+    });
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-9011']);
+    expect(discovered[0]?.resourceSources).toContain('workspace');
   });
 });
