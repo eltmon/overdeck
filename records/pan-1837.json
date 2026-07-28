@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T19:31:27.917Z",
+  "updated": "2026-07-28T19:31:45.358Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "passed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T18:43:05.320Z",
-    "inspectNotes": "All 3 ACs verified: getRuntimeBehavior('kimi-code') and getHarnessBehavior('kimi-code') both return the same KIMI_CODE_BEHAVIOR object (BEHAVIORS['kimi-code'] + explicit branch); the four required discriminants (kimi-wire-jsonl / pty-supervisor / kimi-session-signal / kimi-session-newest) are present; BEHAVIORS stays Record<RuntimeName, HarnessBehavior> with RuntimeName=Harness now including 'kimi-code' (types.ts:87), so a missing key fails typecheck. behavior.test.ts 7/7 green. Non-blocking: src/lib/runtimes/behavior.ts re-exports the other *_BEHAVIOR consts but not KIMI_CODE_BEHAVIOR, so the test imports it from @overdeck/contracts directly."
+    "updatedAt": "2026-07-28T19:31:45.342Z",
+    "inspectNotes": "Inspecting item wi5-runtime-adapter"
   },
   "closeOut": {
     "usage": {
@@ -37,10 +37,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 332,
-            "output": 66642,
-            "cacheRead": 42579060,
-            "cacheWrite": 312376
+            "input": 918,
+            "output": 193672,
+            "cacheRead": 179180096,
+            "cacheWrite": 598453
           }
         }
       },
@@ -52,22 +52,22 @@
           "cacheWrite": 187167
         },
         "anthropic/claude-sonnet-5": {
-          "input": 332,
-          "output": 66642,
-          "cacheRead": 42579060,
-          "cacheWrite": 312376
+          "input": 918,
+          "output": 193672,
+          "cacheRead": 179180096,
+          "cacheWrite": 598453
         }
       },
       "costAtCloseOut": {
-        "usd": 17.636855,
-        "pricingAsOf": "2026-07-28T18:43:05.382Z"
+        "usd": 46.94374,
+        "pricingAsOf": "2026-07-28T19:31:45.350Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-1837",
