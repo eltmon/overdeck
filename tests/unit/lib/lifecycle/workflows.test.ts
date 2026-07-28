@@ -124,6 +124,7 @@ import {
   deepWipe as deepWipeProgram,
   close as closeProgram,
   resetToTodo as resetToTodoProgram,
+  verifyConventionBranchMerged,
   __testInternals,
 } from '../../../../src/lib/lifecycle/workflows.js';
 
@@ -581,7 +582,7 @@ describe('workflows', () => {
       });
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const verifyStep = await __testInternals.verifyConventionBranchMerged(ctx, {
+      const verifyStep = await verifyConventionBranchMerged(ctx, {
         dir: testDir,
         sourceBranch: 'feature/pan-100',
         targetBranch: 'master',
