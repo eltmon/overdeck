@@ -87,6 +87,7 @@ import { startServerBootTelemetry } from './telemetry.js';
 import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
 import { flushAllPendingAutoCommits } from '../../lib/pan-dir/auto-commit.js';
 import { listProjectsSync } from '../../lib/projects.js';
+import { backfillIssueWorkspaces, seedProjectsFromYaml } from '../../lib/workspaces/rebuild.js';
 import { ensureAutomaticStateMigration, decideDeaconBootGate } from '../../lib/state-auto-migrate.js';
 import { broadcastServerRestarting } from './ws-terminal.js';
 
@@ -521,6 +522,12 @@ console.log('[overdeck] Attachment cleanup started');
 await refreshTtsRuntimeConfig();
 void startTtsSummarizer().catch(err => console.warn('[tts-summarizer] start failed:', err));
 void startTtsPlayback().catch(err => console.warn('[tts-playback] start failed:', err));
+
+// PAN-1990: seed the projects/workspaces runtime tables from projects.yaml +
+// existing feature-* worktrees. Idempotent; never removes or modifies rows.
+seedProjectsFromYaml();
+void backfillIssueWorkspaces().catch(err => console.warn('[workspaces] issue-worktree backfill failed:', err?.message ?? err));
+console.log('[overdeck] Workspaces boot seeding started');
 
 void syncTranscriptPollerRegistry().catch(err => console.warn('[memory-poller] initial registry sync failed:', err?.message ?? err));
 void reconcileStaleTranscriptCheckpoints({ log: (message) => console.log(message) })
