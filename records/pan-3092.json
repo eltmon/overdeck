@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T06:57:21.668Z",
+  "updated": "2026-07-28T07:09:20.481Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "verdict-write-backoff": {
-        "writerId": "agent-pan-3092",
-        "agentId": "agent-pan-3092",
-        "pid": 3410332,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T06:57:21.668Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3092",
@@ -97,6 +89,17 @@
         "outcome": "completed",
         "reason": "Drain supersede now requires pipelineCoversFallbackVerdicts; PAN-2989 supersede test split into same-verdict/verdict-free/newer-cycle cases; 32 tests green",
         "releasedAt": "2026-07-28T06:57:10.692Z"
+      },
+      {
+        "writerId": "agent-pan-3092",
+        "agentId": "agent-pan-3092",
+        "pid": 3410332,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:57:21.668Z",
+        "itemId": "verdict-write-backoff",
+        "outcome": "completed",
+        "reason": "Terminal-verdict writes retry on a bounded 2.6min exponential schedule (env-tunable) before the fallback; bookkeeping writes stay single-shot; CLI prints the do-not-retry durability message; 5 new tests",
+        "releasedAt": "2026-07-28T07:09:20.481Z"
       }
     ],
     "statusReasons": {
@@ -107,6 +110,10 @@
       "drain-content-aware-supersede": {
         "reason": "Drain supersede now requires pipelineCoversFallbackVerdicts; PAN-2989 supersede test split into same-verdict/verdict-free/newer-cycle cases; 32 tests green",
         "updatedAt": "2026-07-28T06:57:10.692Z"
+      },
+      "verdict-write-backoff": {
+        "reason": "Terminal-verdict writes retry on a bounded 2.6min exponential schedule (env-tunable) before the fallback; bookkeeping writes stay single-shot; CLI prints the do-not-retry durability message; 5 new tests",
+        "updatedAt": "2026-07-28T07:09:20.481Z"
       }
     }
   },
@@ -121,6 +128,10 @@
     "drain-content-aware-supersede.drain-content-aware-supersede.ac2": "completed",
     "drain-content-aware-supersede.drain-content-aware-supersede.ac3": "completed",
     "drain-content-aware-supersede.drain-content-aware-supersede.ac4": "completed",
-    "verdict-write-backoff": "running"
+    "verdict-write-backoff": "completed",
+    "verdict-write-backoff.verdict-write-backoff.ac1": "completed",
+    "verdict-write-backoff.verdict-write-backoff.ac2": "completed",
+    "verdict-write-backoff.verdict-write-backoff.ac3": "completed",
+    "verdict-write-backoff.verdict-write-backoff.ac4": "completed"
   }
 }
