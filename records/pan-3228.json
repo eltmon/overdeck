@@ -106,7 +106,6 @@
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
-      "docs/PIPELINE-MEMBERSHIP.md",
       "packages/contracts/src/composer-commands.generated.ts",
       "scripts/file-size-allowlist.txt",
       "src/cli/commands/__tests__/answer.test.ts",
@@ -114,18 +113,16 @@
       "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
       "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
       "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx",
+      "src/dashboard/server/routes/__tests__/agents-pane-choice-auth.test.ts",
+      "src/dashboard/server/routes/__tests__/agents-restart-projection.test.ts",
       "src/dashboard/server/routes/agents.ts",
       "src/lib/__tests__/compute-agent-enrichment.test.ts",
       "src/lib/agent-enrichment.ts",
       "src/lib/cloister/swarm-failed-slot.ts",
       "src/lib/concurrency.ts",
-      "src/lib/gitlab-merge-requests.ts",
-      "src/lib/pipeline-membership-gather.ts",
-      "src/lib/project-repos.ts",
       "tests/lib/agent-enrichment-jsonl-identity.test.ts",
       "tests/unit/dashboard/routes/agents-no-loss.test.ts",
-      "tests/unit/lib/gitlab-merge-requests.test.ts",
-      "tests/unit/lib/pipeline-membership-gather.test.ts"
+      "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -155,7 +152,6 @@
     "actualChangedFiles": [
       "docs/FLYWHEEL-STATE.md",
       "docs/PENDING-INPUT.md",
-      "docs/PIPELINE-MEMBERSHIP.md",
       "docs/RECOVERY-NET.md",
       "docs/SKILLS-CONVENTION.md",
       "packages/contracts/src/composer-commands.generated.ts",
@@ -170,7 +166,9 @@
       "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
       "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
       "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx",
+      "src/dashboard/server/routes/__tests__/agents-pane-choice-auth.test.ts",
       "src/dashboard/server/routes/__tests__/agents-pane-choice.test.ts",
+      "src/dashboard/server/routes/__tests__/agents-restart-projection.test.ts",
       "src/dashboard/server/routes/agents.ts",
       "src/dashboard/server/routes/agents/lifecycle-restart.ts",
       "src/dashboard/server/routes/agents/permissions.ts",
@@ -187,20 +185,16 @@
       "src/lib/cloister/redrive-gate.ts",
       "src/lib/cloister/swarm-failed-slot.ts",
       "src/lib/concurrency.ts",
-      "src/lib/gitlab-merge-requests.ts",
       "src/lib/overdeck/conversation-pane-choice.ts",
-      "src/lib/pipeline-membership-gather.ts",
-      "src/lib/project-repos.ts",
       "src/lib/session-pane-choice.ts",
       "tests/lib/agent-enrichment-jsonl-identity.test.ts",
       "tests/unit/dashboard/routes/agents-no-loss.test.ts",
-      "tests/unit/lib/gitlab-merge-requests.test.ts",
-      "tests/unit/lib/pipeline-membership-gather.test.ts"
+      "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts"
     ],
-    "recordedAt": "2026-07-28T19:16:09.927Z"
+    "recordedAt": "2026-07-28T22:30:42.486Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T22:30:38.541Z",
+  "updated": "2026-07-28T22:30:42.488Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "pending",
