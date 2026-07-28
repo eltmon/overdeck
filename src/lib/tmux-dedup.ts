@@ -17,9 +17,9 @@
  *   (none) ──paste──► PENDING ──atomic claim+Enter──► TERMINAL
  *
  * - `sendKeysDedup` atomically pastes and sets the PENDING option only when
- *   neither option is set. A replay that finds PENDING (a prior attempt
- *   crashed before submitting) returns 'submit-pending' WITHOUT re-pasting.
- *   A POISON breadcrumb (a terminal marker that proved false but could not be
+ *   neither option is set. A replay that finds PENDING reuses it only when the
+ *   payload is still visible on the recorded pane; otherwise it re-pastes and
+ *   replaces the claim. A POISON breadcrumb (a terminal marker that proved false but could not be
  *   rolled back) is repaired first and never honored as a dedup.
  * - `completeKeyedSubmit` issues ONE `if-shell`: only when PENDING is
  *   present, TERMINAL absent, and the pane alive does the tmux server send
@@ -37,7 +37,8 @@ import { randomUUID } from 'node:crypto';
 import { unlink, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { capturePaneText, MessageDeliveryFailed, tmuxExecAsync, validateSessionName } from './tmux.js';
+import { capturePaneText, deliveryVerifyLine, tmuxExecAsync, validateSessionName } from './tmux.js';
+import { MessageDeliveryFailed } from './errors.js';
 import { paneHasBlockingChoiceMenu } from './pane-choice-menu.js';
 
 export const DEDUP_KEY_RE = /^[A-Za-z0-9:_-]+$/;
@@ -113,6 +114,28 @@ export class KeyedSubmitTargetDeadError extends Error {
 }
 
 /**
+ * The pane is blocked on a harness choice menu, so Enter was deliberately not
+ * sent. Recoverable: the pending outbox entry must re-drive the same key, and
+ * sendKeysDedup proves the payload is still visible before reusing any pending
+ * claim; a swallowed paste is re-pasted instead.
+ */
+export class KeyedSubmitBlockedMenuError extends MessageDeliveryFailed {
+  constructor(sessionName: string, dedupKey: string, paneSnapshot: string) {
+    super(
+      `Keyed submit to ${sessionName} aborted: the pane is blocked on a choice menu, so Enter would answer that menu (key "${dedupKey}")`,
+      sessionName,
+      paneSnapshot,
+    );
+    this.name = 'KeyedSubmitBlockedMenuError';
+  }
+}
+
+export function isKeyedSubmitBlockedMenuError(error: unknown): error is KeyedSubmitBlockedMenuError {
+  return error instanceof KeyedSubmitBlockedMenuError
+    || (error instanceof Error && error.name === 'KeyedSubmitBlockedMenuError');
+}
+
+/**
  * A safety-critical marker read/verification failed (cycle 13) or a poison
  * breadcrumb could not be verifiably cleared (cycle 14) — the marker state
  * is UNPROVEN, neither delivered nor lost. Recoverable: the caller's
@@ -161,6 +184,17 @@ async function readMarkerStrict(sessionName: string, option: string): Promise<st
   return String(result.stdout).trim();
 }
 
+async function paneContainsDeliveryPayload(
+  sessionName: string,
+  keys: string,
+  readPane: (sessionName: string, lines: number) => Promise<string>,
+): Promise<boolean> {
+  const verifyLine = deliveryVerifyLine(keys);
+  if (verifyLine.length < 3) return false;
+  const pane = await readPane(sessionName, 200).catch(() => '');
+  return pane.includes(verifyLine.slice(0, 40));
+}
+
 /**
  * Clear the poison breadcrumb and VERIFY it is gone with a strict read.
  * EVERY failure here — the clear command, the verification read, or a
@@ -198,6 +232,8 @@ export interface KeyedTmuxDeps {
   readPaneTarget?: (sessionName: string) => Promise<PaneTarget>;
   /** Test seam for blocking-menu detection; production captures the real pane. */
   readPaneText?: (sessionName: string, lines: number) => Promise<string>;
+  /** Test seam for recovery re-paste command failures. */
+  runTmuxCommand?: (args: string[]) => Promise<void>;
 }
 
 /**
@@ -324,27 +360,41 @@ export async function sendKeysDedup(
     if (terminalMarker !== '') return 'deduplicated';
     if (!repaired && pendingMarker === sendId) return 'pasted';
     if (pendingMarker !== '') {
-      // A prior attempt's claim (or a repaired one) is still pending. The
-      // pasted content is only reusable when the current pane IS the pane
-      // that received it (cycle 13): a replaced pane (respawned harness,
-      // crashed session that kept its options) has an empty composer, so
-      // completing with Enter alone would acknowledge a blank submission.
-      // Re-paste the real content instead.
+      // A pending claim is reusable only when BOTH the pane identity and the
+      // payload are still present. A blocking menu can swallow a paste without
+      // replacing the pane, so PID equality alone cannot authorize Enter.
       const recordedTarget = await read(sessionName, targetOption);
       const currentPid = (await (deps.readPaneTarget ?? readPaneTarget)(sessionName)).pid;
-      if (recordedTarget !== '' && currentPid !== '' && recordedTarget === currentPid) {
+      const readPane = deps.readPaneText ?? capturePaneText;
+      if (
+        recordedTarget !== ''
+        && currentPid !== ''
+        && recordedTarget === currentPid
+        && await paneContainsDeliveryPayload(sessionName, keys, readPane)
+      ) {
         return 'submit-pending';
       }
-      // One server-side command: re-paste only when the pending claim still
-      // stands, no terminal exists, and the recorded target does NOT match
-      // the current pane — and record the NEW target in the same breath.
-      await tmuxExecAsync([
+
+      // Re-paste atomically only while the exact claim we inspected is still
+      // pending and no terminal marker exists. If this command fails, recovery
+      // retries the same key; it can never reuse the stale claim without again
+      // proving the payload is visible.
+      const repasteArgs = [
         'if-shell', '-t', sessionName,
-        `test -n "$(tmux show-option -qv -t ${sessionName} ${pendingOption})" && ` +
-        `test -z "$(tmux show-option -qv -t ${sessionName} ${terminalOption})" && ` +
-        `! test "$(tmux display-message -p -t ${sessionName} '#{pane_pid}')" = "$(tmux show-option -qv -t ${sessionName} ${targetOption})"`,
+        `test "$(tmux show-option -qv -t ${sessionName} ${pendingOption})" = ${shellQuote(pendingMarker)} && ` +
+        `test -z "$(tmux show-option -qv -t ${sessionName} ${terminalOption})"`,
         `paste-buffer -b ${bufferName} -p -t ${sessionName} \; set-option -t ${sessionName} ${pendingOption} ${sendId} \; set-option -F -t ${sessionName} ${targetOption} '#{pane_pid}'`,
-      ], { encoding: 'utf-8' });
+      ];
+      try {
+        if (deps.runTmuxCommand) {
+          await deps.runTmuxCommand(repasteArgs);
+        } else {
+          await tmuxExecAsync(repasteArgs, { encoding: 'utf-8' });
+        }
+      } catch (error) {
+        throw new KeyedMarkerVerificationError(sessionName, `pending payload re-paste command (key "${dedupKey}")`, { cause: error });
+      }
+
       const [repastedPending, repastedTerminal, repastedTarget] = await Promise.all([
         read(sessionName, pendingOption),
         read(sessionName, terminalOption),
@@ -353,10 +403,17 @@ export async function sendKeysDedup(
       if (repastedTerminal !== '') return 'deduplicated';
       if (repastedPending === sendId) return 'pasted';
       if (repastedPending !== '') {
-        // A concurrent attempt owns the claim; honor it only if its target
-        // matches the current pane.
+        // A concurrent attempt owns the claim; honor it only if its target and
+        // payload both match the current pane.
         const nowPid = (await (deps.readPaneTarget ?? readPaneTarget)(sessionName)).pid;
-        if (repastedTarget !== '' && nowPid !== '' && repastedTarget === nowPid) return 'submit-pending';
+        if (
+          repastedTarget !== ''
+          && nowPid !== ''
+          && repastedTarget === nowPid
+          && await paneContainsDeliveryPayload(sessionName, keys, readPane)
+        ) {
+          return 'submit-pending';
+        }
       }
     }
     throw new Error(
@@ -433,46 +490,7 @@ export async function completeKeyedSubmit(
   if (pendingBefore !== '') {
     const paneSnapshot = await (deps.readPaneText ?? capturePaneText)(sessionName, 90).catch(() => '');
     if (paneSnapshot && paneHasBlockingChoiceMenu(paneSnapshot)) {
-      // The menu swallowed the paste, so the recorded pane target no longer
-      // proves that the pending content exists. Invalidate that target only if
-      // this exact pending claim still owns it; the next retry will re-paste
-      // instead of submitting an empty line on the unchanged pane.
-      try {
-        await tmuxExecAsync([
-          'if-shell', '-t', sessionName,
-          `test "$(tmux show-option -qv -t ${sessionName} ${pendingOption})" = ${shellQuote(pendingBefore)} && ` +
-          `test -z "$(tmux show-option -qv -t ${sessionName} ${terminalOption})"`,
-          `set-option -u -t ${sessionName} ${targetOption}`,
-        ], { encoding: 'utf-8' });
-      } catch (error) {
-        throw new KeyedMarkerVerificationError(sessionName, `blocking-menu target invalidation (key "${dedupKey}")`, { cause: error });
-      }
-
-      let pendingAfterInvalidation: string;
-      let terminalAfterInvalidation: string;
-      let targetAfterInvalidation: string;
-      try {
-        [pendingAfterInvalidation, terminalAfterInvalidation, targetAfterInvalidation] = await Promise.all([
-          readStrict(sessionName, pendingOption),
-          readStrict(sessionName, terminalOption),
-          readStrict(sessionName, targetOption),
-        ]);
-      } catch (error) {
-        throw new KeyedMarkerVerificationError(sessionName, `blocking-menu invalidation verification (key "${dedupKey}")`, { cause: error });
-      }
-      if (
-        pendingAfterInvalidation === pendingBefore
-        && terminalAfterInvalidation === ''
-        && targetAfterInvalidation !== ''
-      ) {
-        throw new KeyedMarkerVerificationError(sessionName, `blocking-menu target survived invalidation (key "${dedupKey}")`);
-      }
-
-      throw new MessageDeliveryFailed(
-        `Keyed submit to ${sessionName} aborted: the pane is blocked on a choice menu, so Enter would answer that menu`,
-        sessionName,
-        paneSnapshot,
-      );
+      throw new KeyedSubmitBlockedMenuError(sessionName, dedupKey, paneSnapshot);
     }
   }
 

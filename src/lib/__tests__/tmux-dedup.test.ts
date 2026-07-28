@@ -4,8 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MessageDeliveryFailed } from '../tmux.js';
-import { completeKeyedSubmit, KeyedMarkerVerificationError, KeyedSubmitTargetDeadError, sendKeysDedup } from '../tmux-dedup.js';
+import { completeKeyedSubmit, KeyedMarkerVerificationError, KeyedSubmitBlockedMenuError, KeyedSubmitTargetDeadError, sendKeysDedup } from '../tmux-dedup.js';
 
 const socket = `dedup-test-${process.pid}`;
 const session = 'agent-dedup';
@@ -124,7 +123,7 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
       const completion = completeKeyedSubmit(session, 'menu-key', {
         readPaneText: () => Promise.resolve(RESUME_GATE_MENU),
       });
-      const rejection = expect(completion).rejects.toThrow(MessageDeliveryFailed);
+      const rejection = expect(completion).rejects.toThrow(KeyedSubmitBlockedMenuError);
       await vi.advanceTimersByTimeAsync(300);
       await rejection;
     } finally {
@@ -132,7 +131,7 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     }
 
     expect(showOption('@overdeck-dedup-pending-menu-key')).toBe(pendingBefore);
-    expect(showOption('@overdeck-dedup-target-menu-key')).toBe('');
+    expect(showOption('@overdeck-dedup-target-menu-key')).toBe(paneBefore.pid);
     expect(showOption('@overdeck-dedup-menu-key')).toBe('');
 
     // Model the harness consuming the menu without accepting the earlier paste:
@@ -140,7 +139,20 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     execFileSync('tmux', ['-L', socket, 'send-keys', '-t', session, 'C-u']);
     expect((await readPaneTargetReal(session)).pid).toBe(paneBefore.pid);
 
-    const retry = await sendKeysDedup(session, payload, 'menu-key');
+    // Fault injection: the first recovery cannot execute its atomic re-paste.
+    // The stale matching target remains, but the next retry still cannot reuse
+    // it because payload presence must be proven before returning submit-pending.
+    await expect(sendKeysDedup(session, payload, 'menu-key', 'test', {
+      readPaneText: () => Promise.resolve('clear composer'),
+      runTmuxCommand: () => Promise.reject(new Error('tmux command unavailable')),
+    })).rejects.toThrow(KeyedMarkerVerificationError);
+    expect(showOption('@overdeck-dedup-pending-menu-key')).toBe(pendingBefore);
+    expect(showOption('@overdeck-dedup-target-menu-key')).toBe(paneBefore.pid);
+    expect(showOption('@overdeck-dedup-menu-key')).toBe('');
+
+    const retry = await sendKeysDedup(session, payload, 'menu-key', 'test', {
+      readPaneText: () => Promise.resolve('clear composer'),
+    });
     expect(retry).toBe('pasted');
     expect(showOption('@overdeck-dedup-target-menu-key')).toBe(paneBefore.pid);
 
