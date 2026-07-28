@@ -75,16 +75,16 @@
     "recordedAt": "2026-07-28T17:49:31.882Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T17:49:31.884Z",
+  "updated": "2026-07-28T17:49:33.184Z",
   "pipeline": {
     "issueId": "PAN-3212",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T17:45:38.398Z",
+    "updatedAt": "2026-07-28T17:49:33.180Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (494312ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3212/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3212\n\nNo test files found, exiting with code 0\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-iWYo7W/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-re\n…(11308 chars elided)…\npreserves pipeline verdicts and post-merge state when the reviewed anchor is current 5596ms (retry x1)\n     × refreshes the reviewed anchor while preserving verdicts after benign drift 5124ms (retry x1)\n     × resets pipeline and post-merge state when reviewed code drifted 4944ms (retry x1)\n     × does not evaluate work-verdict preservation for non-work role spawns 4730ms (retry x1)\n     × pins and persists a fresh Claude work-agent session before hooks run 4906ms (retry x1)\n     × persists provider-default harnesses from resolveHarness for OpenAI and Kimi work agents 4474ms (retry x1)\n     × persists fresh work-agent session origin when the tmux session is created 4257ms (retry x1)\n     × claims planning consent for fresh autonomous spawnRun work launches 4838ms (retry x1)\n     × does not inspect planning consent for specialist spawnRun launches 4560ms (retry x1)\n     × threads active flywheel provenance env into spawnRun work agents 4636ms (retry x1)\n     × pe\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
@@ -92,7 +92,13 @@
     "lastVerifiedCommit": "aeeb4e52141c6723b3fecaebae95872197109986",
     "reviewSpawnedAt": "2026-07-28T17:45:38.397Z",
     "scopeDrift": {
-      "outsideDeclaredScope": [],
+      "outsideDeclaredScope": [
+        "src/lib/__tests__/linear-mcp-auth-wake.test.ts",
+        "src/lib/agents/delivery.ts",
+        "src/lib/errors.ts",
+        "src/lib/linear-mcp-auth.ts",
+        "src/lib/tmux.ts"
+      ],
       "declaredScopeUntouched": [],
       "declaredScope": [
         "CLAUDE.md",
@@ -105,15 +111,21 @@
       ],
       "actualChangedFiles": [
         "CLAUDE.md",
+        "src/lib/__tests__/linear-mcp-auth-wake.test.ts",
         "src/lib/__tests__/tmux-dedup.test.ts",
+        "src/lib/agents/delivery.ts",
+        "src/lib/errors.ts",
+        "src/lib/linear-mcp-auth.ts",
         "src/lib/overdeck/conversation-runtime.ts",
         "src/lib/overdeck/resume-contract-delivery.ts",
         "src/lib/tmux-dedup.ts",
+        "src/lib/tmux.ts",
         "tests/lib/tmux-send-keys-blocking-menu.test.ts",
         "tests/unit/lib/overdeck/resume-contract-delivery.test.ts"
       ],
-      "recordedAt": "2026-07-28T16:44:14.261Z"
-    }
+      "recordedAt": "2026-07-28T17:49:31.882Z"
+    },
+    "reviewRequestedAt": "2026-07-28T17:49:33.180Z"
   },
   "closeOut": {
     "usage": {
