@@ -11,7 +11,7 @@ import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 64;
+export const SCHEMA_VERSION = 63;
 
 function tryIdempotentDdl(db: SqliteDatabase, targetVersion: number, statement: string): void {
   try {
@@ -469,8 +469,7 @@ export function initSchema(db: SqliteDatabase): void {
       delivery_method TEXT,
       supervisor_enabled INTEGER,
       channels_enabled INTEGER,
-      updated_at    TEXT NOT NULL,
-      workspace_id  TEXT
+      updated_at    TEXT NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_agents_status_role
@@ -510,8 +509,7 @@ export function initSchema(db: SqliteDatabase): void {
       fork_fallback_reason TEXT,                           -- reason a requested fork mode fell back to summary fork
       cleared_to_conv_id INTEGER,                          -- PAN-1458: if this conv was cleared via /clear, the sibling conv that continues it
       fork_request TEXT,                                   -- JSON blob of fork pipeline parameters for restart recovery
-      fork_retry_count INTEGER NOT NULL DEFAULT 0,          -- restart recovery retry guard
-      workspace_id     TEXT                                 -- PAN-1990: owning workspace row (nullable; SET NULL on workspace delete)
+      fork_retry_count INTEGER NOT NULL DEFAULT 0           -- restart recovery retry guard
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -524,66 +522,6 @@ export function initSchema(db: SqliteDatabase): void {
       ON conversations(archived_at, created_at);
     CREATE INDEX IF NOT EXISTS idx_conversations_status_archived_created
       ON conversations(status, archived_at, created_at);
-
-    -- ===== Projects/Workspaces (PAN-1990: first-class workspaces and projects) =====
-    -- Runtime-plane cache (NFR-4): fully reconstructible from projects.yaml, worktree
-    -- scans, and memory-home metadata.json via 'pan admin db rebuild-workspaces'.
-    CREATE TABLE IF NOT EXISTS projects (
-      id               TEXT PRIMARY KEY,
-      name             TEXT NOT NULL,
-      primary_path     TEXT NOT NULL UNIQUE,
-      created_at       INTEGER NOT NULL,
-      last_accessed_at INTEGER NOT NULL,
-      is_system        INTEGER NOT NULL DEFAULT 0
-    );
-
-    CREATE TABLE IF NOT EXISTS workspaces (
-      id                    TEXT PRIMARY KEY,
-      project_id            TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-      kind                  TEXT NOT NULL CHECK (kind IN ('main','issue','scratch')),
-      name                  TEXT NOT NULL,
-      path                  TEXT NOT NULL,
-      branch_name           TEXT,
-      parent_branch         TEXT,
-      parent_branch_guessed INTEGER NOT NULL DEFAULT 0,
-      is_git_repository     INTEGER NOT NULL DEFAULT 1,
-      issue_id              TEXT,
-      layout_config         TEXT,
-      is_favorite           INTEGER DEFAULT 0,
-      is_archived           INTEGER DEFAULT 0,
-      title                 TEXT,
-      created_at            INTEGER NOT NULL,
-      last_accessed_at      INTEGER NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_workspace_project
-      ON workspaces(project_id);
-    CREATE INDEX IF NOT EXISTS idx_workspace_kind
-      ON workspaces(kind);
-    CREATE INDEX IF NOT EXISTS idx_workspace_last_accessed
-      ON workspaces(last_accessed_at);
-
-    CREATE TABLE IF NOT EXISTS project_targets (
-      project_id   TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-      path         TEXT NOT NULL,
-      is_primary   INTEGER NOT NULL DEFAULT 0,
-      created_at   INTEGER NOT NULL,
-      last_used_at INTEGER NOT NULL,
-      PRIMARY KEY (project_id, path)
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_project_targets_one_primary
-      ON project_targets(project_id) WHERE is_primary = 1;
-
-    CREATE TABLE IF NOT EXISTS pinned_docs (
-      id         TEXT PRIMARY KEY,
-      scope      TEXT NOT NULL CHECK (scope IN ('workspace','project')),
-      scope_id   TEXT NOT NULL,
-      doc_path   TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      UNIQUE (scope, scope_id, doc_path)
-    );
-    CREATE INDEX IF NOT EXISTS idx_pinned_docs_scope
-      ON pinned_docs(scope, scope_id);
 
     -- ===== Favorites (PAN-662: conversation favorites) =====
     CREATE TABLE IF NOT EXISTS favorites (
@@ -1810,74 +1748,6 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   if (currentVersion < 63) {
     tryIdempotentDdl(db, 63, 'ALTER TABLE review_status ADD COLUMN review_cycle_history TEXT');
     tryIdempotentDdl(db, 63, 'ALTER TABLE review_status ADD COLUMN conflicts_since TEXT');
-  }
-
-  // v63 -> v64: PAN-1990 first-class projects/workspaces + pin store.
-  if (currentVersion < 64) {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS projects (
-        id               TEXT PRIMARY KEY,
-        name             TEXT NOT NULL,
-        primary_path     TEXT NOT NULL UNIQUE,
-        created_at       INTEGER NOT NULL,
-        last_accessed_at INTEGER NOT NULL,
-        is_system        INTEGER NOT NULL DEFAULT 0
-      );
-
-      CREATE TABLE IF NOT EXISTS workspaces (
-        id                    TEXT PRIMARY KEY,
-        project_id            TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-        kind                  TEXT NOT NULL CHECK (kind IN ('main','issue','scratch')),
-        name                  TEXT NOT NULL,
-        path                  TEXT NOT NULL,
-        branch_name           TEXT,
-        parent_branch         TEXT,
-        parent_branch_guessed INTEGER NOT NULL DEFAULT 0,
-        is_git_repository     INTEGER NOT NULL DEFAULT 1,
-        issue_id              TEXT,
-        layout_config         TEXT,
-        is_favorite           INTEGER DEFAULT 0,
-        is_archived           INTEGER DEFAULT 0,
-        title                 TEXT,
-        created_at            INTEGER NOT NULL,
-        last_accessed_at      INTEGER NOT NULL
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_workspace_project
-        ON workspaces(project_id);
-      CREATE INDEX IF NOT EXISTS idx_workspace_kind
-        ON workspaces(kind);
-      CREATE INDEX IF NOT EXISTS idx_workspace_last_accessed
-        ON workspaces(last_accessed_at);
-
-      CREATE TABLE IF NOT EXISTS project_targets (
-        project_id   TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-        path         TEXT NOT NULL,
-        is_primary   INTEGER NOT NULL DEFAULT 0,
-        created_at   INTEGER NOT NULL,
-        last_used_at INTEGER NOT NULL,
-        PRIMARY KEY (project_id, path)
-      );
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_project_targets_one_primary
-        ON project_targets(project_id) WHERE is_primary = 1;
-
-      CREATE TABLE IF NOT EXISTS pinned_docs (
-        id         TEXT PRIMARY KEY,
-        scope      TEXT NOT NULL CHECK (scope IN ('workspace','project')),
-        scope_id   TEXT NOT NULL,
-        doc_path   TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        UNIQUE (scope, scope_id, doc_path)
-      );
-      CREATE INDEX IF NOT EXISTS idx_pinned_docs_scope
-        ON pinned_docs(scope, scope_id);
-    `);
-    if (db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'conversations'`).get()) {
-      tryIdempotentDdl(db, 64, 'ALTER TABLE conversations ADD COLUMN workspace_id TEXT');
-    }
-    if (db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'agents'`).get()) {
-      tryIdempotentDdl(db, 64, 'ALTER TABLE agents ADD COLUMN workspace_id TEXT');
-    }
   }
 
   // After all migrations, set the version
