@@ -44,18 +44,18 @@
     "recordedAt": "2026-07-28T20:52:11.749Z"
   },
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-28T21:24:16.102Z",
+  "updated": "2026-07-28T21:28:10.072Z",
   "pipeline": {
     "issueId": "PAN-3242",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:52:32.420Z",
-    "updatedAt": "2026-07-28T21:24:14.614Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-28T21:28:10.007Z",
+    "reviewNotes": "Rework fixes both correctness bugs but changes OrderBookPage.tsx despite the still-active must-not constraint",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -100,9 +100,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 960523,
-            "output": 91871,
-            "cacheRead": 12117504,
+            "input": 2318194,
+            "output": 150183,
+            "cacheRead": 18879488,
             "cacheWrite": 0
           }
         },
@@ -123,9 +123,9 @@
           "cacheWrite": 198801
         },
         "openai/gpt-5.6-sol": {
-          "input": 960523,
-          "output": 91871,
-          "cacheRead": 12117504,
+          "input": 2318194,
+          "output": 150183,
+          "cacheRead": 18879488,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -136,8 +136,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 35.801801,
-        "pricingAsOf": "2026-07-28T21:24:14.677Z"
+        "usd": 47.720508,
+        "pricingAsOf": "2026-07-28T21:28:10.052Z"
       }
     },
     "merges": [
@@ -146,7 +146,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3242",
