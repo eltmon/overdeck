@@ -1,0 +1,407 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T06:50:30Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3215: DoD gate verify-merged path is GitHub-only and monorepo-scoped — GitLab squash-merges fall through to branch-containment fallback with mislabeled evidence",
+    "updated": "2026-07-28T06:55:44.714Z"
+  },
+  "plan": {
+    "id": "pan-3215",
+    "title": "DoD gate verify-merged path is GitHub-only and monorepo-scoped — GitLab squash-merges fall through to branch-containment fallback with mislabeled evidence",
+    "status": "proposed",
+    "uid": "32c696fa-a5fe-44bf-9cb5-780ede506dd0",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-28T06:50:30Z",
+    "updated": "2026-07-28T06:55:44.714Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3215",
+        "label": "PAN-3215",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "lifecycle",
+      "dod-gate",
+      "gitlab",
+      "polyrepo",
+      "close-out"
+    ],
+    "narratives": {
+      "Problem": "pan close MIN-908 passed DoD row 4 (merged) only through the branch-containment fallback labeled 'non-PR landing' while GitLab MR !75 sat merged. Two stacked gaps: (1) verifySquashMergedPrByBranch (src/lib/lifecycle/workflows.ts:710) returns null when !ctx.github and has no GitLab equivalent; (2) verifyConventionBranchMerged (workflows.ts:555) runs all git probes in ctx.projectPath, which for polyrepo mind-your-now is the wrapper dir, not the sub-repos where the convention branches live. checkMergedRow (dod-gate.ts:372-390) also enriches forge metadata only when ctx.github, so a merged GitLab MR can never be named in row-4 evidence.",
+      "Proposal": "Parameterize the convention-branch verification on a repo root {dir, sourceBranch, targetBranch, forge} (synthetic default root reproduces today's commands byte-for-byte); add a GitLab merged-MR oracle via getForgeAdapter('gitlab').findMergedArtifact with the head-sha discipline from assessRepoMergeCompleteness; loop resolveProjectReposForIssueSync's required repos in verifyBranchMergedImpl with repo-qualified aggregation; and give checkMergedRow a readMergedForgeArtifacts dep so GitLab MRs appear as row-4 evidence including the branch-absent pass path. The branch-containment fallback stays as last resort and keeps exclusive ownership of the 'branch-containment' evidence marker.",
+      "NonGoals": "- No changes to verifySquashMergedPrByBranch GitHub logic or ordering\n- No port of the GitHub post-PR-commit policies (post-PR commits on main, state-plane-only deltas) to GitLab — exact head-sha match only\n- No GitLab equivalent of the gh issue view closed-issue skip (PAN-3187 terminal-verdict settlement already covers tracker-closed settlement)\n- No changes to DoD row 6 (main-verify) or row 7 (deploy), which have their own GitHub-only paths\n- No changes to assessMergeCompleteness / observeForgeMergeState (merge-gate surface, already GitLab-aware via PAN-2882)\n- No MergedDodRowResult.evidence union extension and no post-merge row changes"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Reuse getForgeAdapter('gitlab').findMergedArtifact from src/lib/forge.ts as the GitLab oracle instead of creating a new helper module",
+        "rationale": "The issue body points at a PAN-2882 helper it names src/lib/gitlab-merge-requests.ts, but the verified code shows the merged-artifact lookup landed in forge.ts (commit 1ac4841532 'feat(forge): find merged review artifacts') and is already exercised by merge-completeness.ts with the exact head-sha discipline this fix needs — reusing it avoids a second GitLab query implementation."
+      },
+      {
+        "summary": "GitLab oracle requires exact MR-sha == branch-tip match; the GitHub post-PR-commit and state-plane-only policies are not ported",
+        "rationale": "Exact-match is the discipline merge-completeness.ts:147-160 already applies for GitLab, it keeps the new evidence path strict, and a mismatch still falls through to the existing diff-empty heuristic and containment fallback rather than failing."
+      },
+      {
+        "summary": "Insert the GitLab oracle immediately after merge-base --is-ancestor fails, before the diff-empty squash heuristic; GitHub ordering unchanged",
+        "rationale": "The issue's core complaint is evidence labeling — a real merged MR must be recorded as evidence instead of the anonymous 'squash-merged' or 'non-PR landing' labels. GitHub ordering is deliberately untouched to keep blast radius at zero for the incumbent path."
+      },
+      {
+        "summary": "Do not extend MergedDodRowResult.evidence beyond 'branch-containment'",
+        "rationale": "checkPostMergeRow (dod-gate.ts:474) special-cases containment evidence as 'post-merge lifecycle not applicable'. An MR landing IS a forge landing whose lifecycle runs normally (MYN merge trains write mergeStatus), so the correct behavior is the default lifecycle path with evidence left undefined."
+      },
+      {
+        "summary": "Fall back to the synthetic single root when repo resolution returns null",
+        "rationale": "Keeps unconfigured projects and hermetic CI working byte-identically to today, and lets the existing mocked-command test suite run without a projects.yaml."
+      }
+    ],
+    "items": [
+      {
+        "id": "repo-root-parameterization",
+        "title": "Parameterize verify-merged convention-branch checks on a repo root",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T06:50:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3215",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "gitlab-mr-oracle",
+            "polyrepo-verify-loop"
+          ],
+          "files_scope": [
+            "src/lib/lifecycle/workflows.ts",
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/workflows.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all pre-existing verify-merged tests in workflows.test.ts pass unmodified",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/lifecycle/workflows.ts, introduce a repo-root shape { dir, sourceBranch, targetBranch, forge } (local interface near verifyBranchMergedImpl, line ~518). Change verifyConventionBranchMerged (line 555) and verifyRemoteBranchIfPresent (line 648) to accept a root and use root.dir as the exec cwd and root.targetBranch everywhere 'main' is currently hardcoded (merge-base --is-ancestor, git diff main...<branch>, git log main..<branch>). verifyBranchMergedImpl builds a synthetic default root { dir: ctx.projectPath, sourceBranch: feature/<issue-lowercase>, targetBranch: 'main', forge: 'github' } and calls the per-root verify for both convention branch names (feature/<id>, strike/<id>) exactly as today. verifySquashMergedPrByBranch's exec cwd moves from ctx.projectPath to root.dir. Do not change any command text on the single-root path: the existing tests in tests/unit/lib/lifecycle/workflows.test.ts:451-570 mock execAsync by exact command string and must pass unmodified. Add one new test asserting a root with targetBranch 'master' produces 'git merge-base --is-ancestor <branch> master'."
+        },
+        "items": [
+          {
+            "id": "repo-root-parameterization.ac1",
+            "title": "Given the synthetic default root, when verifyBranchMergedImpl runs, then every emitted git/gh command string is byte-identical to the pre-change commands (proven by the unmodified existing workflows.test.ts verify-merged suite passing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-root-parameterization.ac2",
+            "title": "Given a repo root with targetBranch 'master', when the convention-branch check runs, then the ancestry probe executes 'git merge-base --is-ancestor <branch> master' in root.dir",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-root-parameterization.ac3",
+            "title": "npm run typecheck exits 0 without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gitlab-mr-oracle",
+        "title": "Add GitLab merged-MR oracle to the per-root verify-merged path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T06:50:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3215",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/workflows.ts",
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/workflows.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new GitLab-oracle tests pass",
+            "pre-existing verify-merged tests pass unmodified"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/lifecycle/workflows.ts, add a per-root GitLab squash-merge check used when root.forge === 'gitlab', wired into verifyConventionBranchMerged and verifyRemoteBranchIfPresent alongside (not replacing) the GitHub check. Implementation: reuse getForgeAdapter('gitlab').findMergedArtifact from src/lib/forge.ts (import { getForgeAdapter } from '../forge.js'). Mirror the head-sha discipline at src/lib/cloister/merge-completeness.ts:147-160: run 'git rev-parse <branchRef>' in root.dir; on success call findMergedArtifact({ sourceBranch: <convention branch name>, targetBranch: root.targetBranch, headSha: <tip>, cwd: root.dir }). findMergedArtifact runs 'glab mr list --source-branch <b> --all --output json' and matches state === 'merged' with sha === headSha via matchesCurrentArtifact. Placement in the local-branch path: immediately after merge-base --is-ancestor throws and BEFORE the diff-empty heuristic, so a real merged MR produces evidence 'MR !<iid> is merged and <branchRef> matches the merged MR head (<web_url>)' instead of the anonymous squash-merged label. In the remote-branch path (verifyRemoteBranchIfPresent): run alongside the GitHub check after the diff-empty heuristic, using origin/<branch> as the rev-parse ref. When the forge is gitlab, skip the GitHub-only 'gh issue view' closed-issue probe. When the oracle returns null, fall through to the existing heuristics unchanged. Tests (mock execAsync by command string as the existing suite does, including the glab command): (a) local branch, squash-merged, glab returns a merged MR whose sha equals the mocked rev-parse tip → stepOk whose details contain the MR iid and URL, and the containment/diff-empty paths are not consulted; (b) MR sha mismatches the branch tip → falls through to the unmerged-commits report; (c) glab returns no merged MR → falls through to the diff-empty heuristic."
+        },
+        "items": [
+          {
+            "id": "gitlab-mr-oracle.ac1",
+            "title": "Given a gitlab-forge root with a squash-merged convention branch, when glab returns a merged MR whose sha equals the branch tip, then verifyBranchMergedImpl returns success with details containing the MR iid (e.g. '!75') and the MR web_url",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitlab-mr-oracle.ac2",
+            "title": "Given the merged MR's sha differs from the branch tip, when the oracle runs, then it returns no match and the flow falls through to the existing unmerged-commits failure for that branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitlab-mr-oracle.ac3",
+            "title": "Given glab returns no merged MR for the branch, when the oracle runs, then the diff-empty squash heuristic still applies exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitlab-mr-oracle.ac4",
+            "title": "Given a gitlab-forge root, when the convention-branch check reaches the closed-issue probe, then no 'gh issue view' command is executed for that root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "polyrepo-verify-loop",
+        "title": "Loop resolved project repos in verifyBranchMergedImpl with repo-qualified aggregation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T06:50:30Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3215",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/workflows.ts",
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/workflows.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new polyrepo aggregation tests pass",
+            "pre-existing verify-merged tests pass unmodified"
+          ],
+          "readiness": "sequential",
+          "parallelSafeReason": "Not parallel-safe: shares src/lib/lifecycle/workflows.ts and its test file with gitlab-mr-oracle; must land after the oracle it aggregates.",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/lifecycle/workflows.ts, verifyBranchMergedImpl resolves repos via resolveProjectReposForIssueSync(ctx.issueId) (import from '../project-repos.js'). Build roots from the required repos (repo.required === true): { dir: repo.repoPath, sourceBranch: repo.sourceBranch, targetBranch: repo.targetBranch, forge: repo.forge, repoKey: repo.repoKey }. When resolution returns null or exactly one usable root, behave exactly as the single-root path (the synthetic default root covers the null case). For multiple roots: run the per-root convention-branch verification for each root in parallel (Promise.all), probing [root.sourceBranch, 'strike/<issue-lowercase>'] per root, then aggregate: (1) any root returning a hard failure (unmerged commits) → stepFailed listing each failing repoKey with its detail; (2) at least one root returning success and the rest branch-absent → stepOk with every contributing root's details prefixed by its repoKey (e.g. 'fe: MR !75 is merged …'); (3) all roots branch-absent → return the BRANCH_ABSENT_MERGE_ERROR sentinel so the existing durable-merge/containment machinery at the dod-gate level is untouched. Keep the review-status pre-check (loadReviewStatuses mergeStatus === 'merged') running once before the loop, as today. Tests must vi.mock the project-repos module (hazard H2 — otherwise PAN-100 resolves against the developer's real projects.yaml): (a) two roots, branch merged in 'fe' via the GitLab oracle and absent in 'api' → stepOk, details contain 'fe' and the MR iid, and every mocked git command carries the fe/api repoPath cwd; (b) two roots, unmerged commits in 'api' → stepFailed whose error names 'api'; (c) all roots branch-absent → error equals the BRANCH_ABSENT_MERGE_ERROR sentinel."
+        },
+        "items": [
+          {
+            "id": "polyrepo-verify-loop.ac1",
+            "title": "Given two required roots where 'fe' verifies merged via MR evidence and 'api' has no convention branch, when verifyBranchMergedImpl runs, then it returns success with evidence strings prefixed by the contributing repo key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "polyrepo-verify-loop.ac2",
+            "title": "Given two required roots where 'api' retains unmerged commits, when verifyBranchMergedImpl runs, then it returns a failure whose error message names the 'api' repo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "polyrepo-verify-loop.ac3",
+            "title": "Given every required root reports its convention branches absent, when verifyBranchMergedImpl runs, then it fails with the exact BRANCH_ABSENT_MERGE_ERROR sentinel text so the containment fallback still engages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "polyrepo-verify-loop.ac4",
+            "title": "Given the polyrepo path, when per-root probes execute, then every git/glab command runs with cwd set to that repo's repoPath and never only to the wrapper ctx.projectPath",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merged-row-gitlab-evidence",
+        "title": "Record merged GitLab MRs as DoD row-4 evidence in checkMergedRow",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T06:50:30Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3215",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new merged-row GitLab evidence tests pass",
+            "pre-existing checkMergedRow tests pass unmodified"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/lifecycle/dod-gate.ts, extend MergedRowDeps (line ~59) with an optional readMergedForgeArtifacts: (ctx) => Promise<Array<{ forge: string; url?: string; id?: string }>>. Default implementation: resolveProjectReposForIssueSync(ctx.issueId); for each required repo call getForgeAdapter(repo.forge).findMergedArtifact({ sourceBranch: repo.sourceBranch, targetBranch: repo.targetBranch, cwd: repo.repoPath }) in parallel (NO headSha — the branch may be deleted at close time; hazard H4 accepted and documented in the PRD); collect non-null results. In checkMergedRow (line 347): when ctx.github is absent, call the dep and append each artifact to merged.observed as 'MR !<id> merged (<url>)' (or 'PR #<id>' for github-forge artifacts). In the branchAbsent block (line 392): treat artifacts.length > 0 as forge evidence alongside durableMerges/forgeMerged — set merged.status = 'pass' and observed to name the MR(s) instead of 'no merged forge artifact or durable close-out merge record found'. Do NOT set merged.evidence for this path: evidence stays undefined unless the containment fallback (line 404-416) actually supplies the pass, preserving checkPostMergeRow's containment special case. Do not change the ctx.github enrichment block. Tests in tests/unit/lib/lifecycle/dod-gate.test.ts using dep injection: (a) branch-absent sentinel + readMergedForgeArtifacts returning [{ forge: 'gitlab', id: '75', url: 'https://gitlab/.../merge_requests/75' }] → status 'pass', observed contains '!75' and does NOT contain 'non-PR landing' or 'no merged forge artifact'; (b) verifyMerged pass whose details already name the MR → observed includes the MR reference without any new dep call requirement; (c) branch-absent + no artifacts + containment succeeds → evidence === 'branch-containment' exactly as today (regression lock)."
+        },
+        "items": [
+          {
+            "id": "merged-row-gitlab-evidence.ac1",
+            "title": "Given the branch-absent sentinel and a stubbed readMergedForgeArtifacts returning MR !75, when checkMergedRow runs, then the row passes with observed containing '!75' and containing neither 'non-PR landing' nor 'no merged forge artifact'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-row-gitlab-evidence.ac2",
+            "title": "Given the branch-absent sentinel with no forge artifacts and successful containment, when checkMergedRow runs, then evidence equals 'branch-containment' and the observed text is unchanged from today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-row-gitlab-evidence.ac3",
+            "title": "Given readMergedForgeArtifacts rejects, when checkMergedRow runs, then the row falls back to existing behavior with an 'unavailable' note appended rather than throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-row-gitlab-evidence.ac4",
+            "title": "npm run typecheck completes without errors and the pre-existing checkMergedRow suite passes unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dod-docs-update",
+        "title": "Document the GitLab MR oracle and per-repo resolution in DEFINITION-OF-DONE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T06:50:30Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3215",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DEFINITION-OF-DONE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'GitLab' docs/DEFINITION-OF-DONE.md"
+          ],
+          "expected_outputs": [
+            "row 4 and the branch-absence note describe the GitLab MR oracle and per-repo resolution"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/DEFINITION-OF-DONE.md: (1) row 4 (`merged`, line 16) — extend the evidence column and description to state that the forge squash-merge detection covers GitLab merge requests via per-repo findMergedArtifact with head-sha match, and that convention-branch probes run per resolved repo for polyrepo projects; (2) the 'Branch absence is not merge evidence' note (lines 38-42) — add that a merged GitLab MR for an absent convention branch is positive forge evidence recorded with the MR iid/URL, while the L2-work containment lens remains the last-resort fallback labeled 'non-PR landing'. Keep the doc's existing terse table style."
+        },
+        "items": [
+          {
+            "id": "dod-docs-update.ac1",
+            "title": "docs/DEFINITION-OF-DONE.md row 4 text contains a statement that forge merge evidence includes GitLab merge requests matched by head sha per resolved repo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-docs-update.ac2",
+            "title": "The branch-absence note in docs/DEFINITION-OF-DONE.md contains a statement that a merged MR for an absent branch is recorded with its iid/URL and that containment remains the last-resort 'non-PR landing' fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "repo-root-parameterization",
+        "to": "gitlab-mr-oracle",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-root-parameterization",
+        "to": "polyrepo-verify-loop",
+        "type": "blocks"
+      },
+      {
+        "from": "gitlab-mr-oracle",
+        "to": "polyrepo-verify-loop",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-28-PAN-3215-dod-gate-verify-merged-path-is-github-only-and-monorepo-scoped-gitlab-squash-merges-fall-through-to-branch-containment-fallback-with-mislabeled-evidence.xbrief.json"
+    }
+  },
+  "status": "proposed"
+}
