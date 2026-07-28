@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T07:17:11.325Z",
+  "updated": "2026-07-28T07:17:19.778Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,8 +79,16 @@
     }
   ],
   "tasks": {
-    "sequence": 14,
-    "claims": {},
+    "sequence": 15,
+    "claims": {
+      "doctor-duplicate-stack-check": {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 4183146,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T07:17:19.778Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -216,6 +224,7 @@
     "closeout-warning-actual-networks.closeout-warning-actual-networks.ac2": "completed",
     "workspace-reap-prefix-agnostic": "completed",
     "workspace-reap-prefix-agnostic.workspace-reap-prefix-agnostic.ac1": "completed",
-    "workspace-reap-prefix-agnostic.workspace-reap-prefix-agnostic.ac2": "completed"
+    "workspace-reap-prefix-agnostic.workspace-reap-prefix-agnostic.ac2": "completed",
+    "doctor-duplicate-stack-check": "running"
   }
 }
