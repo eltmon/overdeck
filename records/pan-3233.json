@@ -73,7 +73,7 @@
     "recordedAt": "2026-07-28T20:46:26.914Z"
   },
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T21:10:02.365Z",
+  "updated": "2026-07-28T21:10:12.394Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "blocked",
@@ -83,7 +83,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:48:00.219Z",
-    "updatedAt": "2026-07-28T21:10:01.223Z",
+    "updatedAt": "2026-07-28T21:10:12.385Z",
     "reviewNotes": "Pane exemption disables suppression globally, leaking stale plan-mode payloads during active specialist runs",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -95,6 +95,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3247",
+    "reviewedAtCommit": "5510c0bc6fe12742621bbf6982752ed6e1a1fd65",
     "reviewSpawnedAt": "2026-07-28T21:05:23.518Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -181,7 +182,7 @@
       },
       "costAtCloseOut": {
         "usd": 30.456841,
-        "pricingAsOf": "2026-07-28T21:10:01.276Z"
+        "pricingAsOf": "2026-07-28T21:10:12.389Z"
       }
     },
     "merges": [
