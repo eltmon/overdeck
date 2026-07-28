@@ -25,11 +25,13 @@ function NeedsYouRow({
   kind,
   question,
   onOpen,
+  isConversation,
 }: {
   item: SimpleIssueDerivation;
   kind: NeedsYouKind;
   question?: string;
   onOpen: (id: string) => void;
+  isConversation?: boolean;
 }) {
   const actions = useSimpleActions();
   const [answer, setAnswer] = useState('');
@@ -56,13 +58,13 @@ function NeedsYouRow({
             <input
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && answer.trim() && questionAgent) actions.answer.mutate({ agentId: questionAgent.id, text: answer.trim() }); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && answer.trim() && questionAgent) actions.answer.mutate({ agentId: questionAgent.id, text: answer.trim(), isConversation }); }}
               placeholder="Type your answer…"
               className="h-7 flex-1 rounded-md border border-input bg-muted px-2 text-[11.5px] text-foreground outline-none focus:border-ring"
             />
             <button
               disabled={!answer.trim() || !questionAgent || busy}
-              onClick={() => questionAgent && actions.answer.mutate({ agentId: questionAgent.id, text: answer.trim() })}
+              onClick={() => questionAgent && actions.answer.mutate({ agentId: questionAgent.id, text: answer.trim(), isConversation })}
               className="h-7 flex-none rounded-md bg-primary px-2.5 text-[11px] font-medium text-primary-foreground disabled:opacity-40"
             >
               Answer
