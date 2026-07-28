@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T17:44:13.865Z",
+  "updated": "2026-07-28T17:51:20.926Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "add-state-paths-lint-guard": {
-        "writerId": "agent-pan-3230",
-        "agentId": "agent-pan-3230",
-        "pid": 1792487,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T17:44:13.865Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3230",
@@ -145,6 +137,17 @@
         "outcome": "completed",
         "reason": "Standing tier supervisors now load PRD drafts through the state-aware drafts read door while preserving casing fallback.",
         "releasedAt": "2026-07-28T17:44:00.317Z"
+      },
+      {
+        "writerId": "agent-pan-3230",
+        "agentId": "agent-pan-3230",
+        "pid": 1792487,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:44:13.865Z",
+        "itemId": "add-state-paths-lint-guard",
+        "outcome": "completed",
+        "reason": "Added a tested lint guard for direct spec/draft path derivations, wired it into npm lint, and documented the canonical path authority.",
+        "releasedAt": "2026-07-28T17:51:20.926Z"
       }
     ],
     "statusReasons": {
@@ -171,6 +174,10 @@
       "fix-tier-supervisor-prd-read": {
         "reason": "Standing tier supervisors now load PRD drafts through the state-aware drafts read door while preserving casing fallback.",
         "updatedAt": "2026-07-28T17:44:00.317Z"
+      },
+      "add-state-paths-lint-guard": {
+        "reason": "Added a tested lint guard for direct spec/draft path derivations, wired it into npm lint, and documented the canonical path authority.",
+        "updatedAt": "2026-07-28T17:51:20.926Z"
       }
     }
   },
@@ -195,6 +202,10 @@
     "fix-tier-supervisor-prd-read": "completed",
     "fix-tier-supervisor-prd-read.fix-tier-supervisor-prd-read.ac1": "completed",
     "fix-tier-supervisor-prd-read.fix-tier-supervisor-prd-read.ac2": "completed",
-    "add-state-paths-lint-guard": "running"
+    "add-state-paths-lint-guard": "completed",
+    "add-state-paths-lint-guard.add-state-paths-lint-guard.ac1": "completed",
+    "add-state-paths-lint-guard.add-state-paths-lint-guard.ac2": "completed",
+    "add-state-paths-lint-guard.add-state-paths-lint-guard.ac3": "completed",
+    "add-state-paths-lint-guard.add-state-paths-lint-guard.ac4": "completed"
   }
 }
