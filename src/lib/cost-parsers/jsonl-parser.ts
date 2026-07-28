@@ -205,6 +205,11 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
     return { provider: 'custom', model };
   }
 
+  // QuantumLlama models (synthetic benchmark provider, PAN-3252)
+  if (model.startsWith('ql-')) {
+    return { provider: 'custom', model };
+  }
+
   // Default to anthropic/claude
   return { provider: 'anthropic', model: 'claude-sonnet-4' };
 }
