@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T06:42:44.581Z",
+  "updated": "2026-07-28T06:45:17.929Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "pending",
@@ -47,16 +47,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "reopen-resets-verification-verdict": {
-        "writerId": "agent-pan-3025",
-        "agentId": "agent-pan-3025",
-        "pid": 2139569,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T06:42:44.581Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3025",
@@ -68,12 +60,27 @@
         "outcome": "completed",
         "reason": "Deleted verificationStatus=undefined from markRecordPipelineClosedOutSync, added preservation comment, created record-close-out.test.ts with 3 passing test cases.",
         "releasedAt": "2026-07-28T06:42:35.511Z"
+      },
+      {
+        "writerId": "agent-pan-3025",
+        "agentId": "agent-pan-3025",
+        "pid": 2139569,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:42:44.581Z",
+        "itemId": "reopen-resets-verification-verdict",
+        "outcome": "completed",
+        "reason": "Added verificationStatus: 'pending' to reopenWorkspaceState's setReviewStatusSync call. Added test case verifying reset behavior.",
+        "releasedAt": "2026-07-28T06:45:17.929Z"
       }
     ],
     "statusReasons": {
       "preserve-verification-verdict-at-close-out": {
         "reason": "Deleted verificationStatus=undefined from markRecordPipelineClosedOutSync, added preservation comment, created record-close-out.test.ts with 3 passing test cases.",
         "updatedAt": "2026-07-28T06:42:35.511Z"
+      },
+      "reopen-resets-verification-verdict": {
+        "reason": "Added verificationStatus: 'pending' to reopenWorkspaceState's setReviewStatusSync call. Added test case verifying reset behavior.",
+        "updatedAt": "2026-07-28T06:45:17.929Z"
       }
     }
   },
@@ -82,6 +89,9 @@
     "preserve-verification-verdict-at-close-out.preserve-verification-verdict-at-close-out.ac1": "completed",
     "preserve-verification-verdict-at-close-out.preserve-verification-verdict-at-close-out.ac2": "completed",
     "preserve-verification-verdict-at-close-out.preserve-verification-verdict-at-close-out.ac3": "completed",
-    "reopen-resets-verification-verdict": "running"
+    "reopen-resets-verification-verdict": "completed",
+    "reopen-resets-verification-verdict.reopen-resets-verification-verdict.ac1": "completed",
+    "reopen-resets-verification-verdict.reopen-resets-verification-verdict.ac2": "completed",
+    "reopen-resets-verification-verdict.reopen-resets-verification-verdict.ac3": "completed"
   }
 }
