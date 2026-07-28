@@ -50,6 +50,7 @@ import {
   type PanIssueUsageRecord,
 } from './record.js';
 import { updateIssueRecord } from './record-update.js';
+import { mergePipelineVerdictAware } from './pipeline-verdict-merge.js';
 
 export type {
   PanIssueRecord,
@@ -312,13 +313,18 @@ export {
  * the status the rebuild projects — observed clobbering PAN-399's passed
  * verdict back to a pre-verdict snapshot. Same newer-wins rule (ISO `updatedAt`
  * comparison) the journal readers use.
+ *
+ * PAN-3092: newer-wins alone conflates write-recency with verdict-truth, because
+ * `projectPipeline` stamps `updatedAt` on every write, verdict or not. The
+ * comparison now runs through `mergePipelineVerdictAware`, which keeps
+ * newer-wins for every non-verdict field but refuses to drop a terminal verdict
+ * in favour of a same-cycle verdict-free write.
  */
 export function pickNewerPipeline(
   rebuilt: PanIssuePipelineRecord,
   fresh: PanIssuePipelineRecord | undefined,
 ): PanIssuePipelineRecord {
-  if (!fresh?.updatedAt || !rebuilt?.updatedAt) return rebuilt;
-  return rebuilt.updatedAt < fresh.updatedAt ? fresh : rebuilt;
+  return mergePipelineVerdictAware(rebuilt, fresh);
 }
 
 /**
