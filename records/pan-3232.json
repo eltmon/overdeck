@@ -114,7 +114,7 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T21:46:07.461Z",
+  "updated": "2026-07-28T21:46:12.689Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -124,7 +124,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-28T21:46:06.560Z",
+    "updatedAt": "2026-07-28T21:46:12.676Z",
     "reviewNotes": "FR-7 conversation-only decisions remain invisible or use the agent-only answer endpoint; required regression tests are still absent",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -136,6 +136,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
+    "reviewedAtCommit": "51eda43167f429023a692c8fe961f1c1d664eec9",
     "reviewSpawnedAt": "2026-07-28T21:40:25.651Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -271,7 +272,7 @@
       },
       "costAtCloseOut": {
         "usd": 44.744995,
-        "pricingAsOf": "2026-07-28T21:46:06.601Z"
+        "pricingAsOf": "2026-07-28T21:46:12.682Z"
       }
     },
     "merges": [
