@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T20:18:04.501Z",
+  "updated": "2026-07-28T20:19:04.212Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "pending",
@@ -72,16 +72,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "fingerprint-consistency": {
-        "writerId": "agent-pan-3233",
-        "agentId": "agent-pan-3233",
-        "pid": 3027713,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:18:04.501Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3233",
@@ -92,6 +84,16 @@
         "itemId": "suppression-exemption",
         "outcome": "completed",
         "releasedAt": "2026-07-28T20:17:58.054Z"
+      },
+      {
+        "writerId": "agent-pan-3233",
+        "agentId": "agent-pan-3233",
+        "pid": 3027713,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:18:04.501Z",
+        "itemId": "fingerprint-consistency",
+        "outcome": "completed",
+        "releasedAt": "2026-07-28T20:19:04.212Z"
       }
     ]
   },
@@ -100,6 +102,8 @@
     "suppression-exemption.suppression-exemption.ac1": "completed",
     "suppression-exemption.suppression-exemption.ac2": "completed",
     "suppression-exemption.suppression-exemption.ac3": "completed",
-    "fingerprint-consistency": "running"
+    "fingerprint-consistency": "completed",
+    "fingerprint-consistency.fingerprint-consistency.ac1": "completed",
+    "fingerprint-consistency.fingerprint-consistency.ac2": "completed"
   }
 }
