@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-28T22:16:42.277Z",
+  "updated": "2026-07-28T22:20:42.688Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "pending",
@@ -64,18 +64,32 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "ql-provider-registry": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3252",
         "agentId": "agent-pan-3252",
         "pid": 298167,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T22:16:42.277Z"
+        "claimedAt": "2026-07-28T22:16:42.277Z",
+        "itemId": "ql-provider-registry",
+        "outcome": "completed",
+        "reason": "Registered quantumllama in PROVIDERS with model resolution, QUANTUMLLAMA_API_KEY env branch, and per-provider tests (23 passed); added quantumllama to ModelProvider union to keep typecheck green",
+        "releasedAt": "2026-07-28T22:20:42.688Z"
+      }
+    ],
+    "statusReasons": {
+      "ql-provider-registry": {
+        "reason": "Registered quantumllama in PROVIDERS with model resolution, QUANTUMLLAMA_API_KEY env branch, and per-provider tests (23 passed); added quantumllama to ModelProvider union to keep typecheck green",
+        "updatedAt": "2026-07-28T22:20:42.688Z"
       }
     }
   },
   "statusOverrides": {
-    "ql-provider-registry": "running"
+    "ql-provider-registry": "completed",
+    "ql-provider-registry.ql-provider-registry.ac1": "completed",
+    "ql-provider-registry.ql-provider-registry.ac2": "completed",
+    "ql-provider-registry.ql-provider-registry.ac3": "completed"
   }
 }
