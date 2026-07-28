@@ -6,16 +6,19 @@ import { promisify } from 'node:util';
 import type { MembershipUnavailableReason } from '@overdeck/contracts';
 import { Effect } from 'effect';
 
+import type { ForgeType } from './forge.js';
 import {
   listIssuesWithAnyLabelPromise,
   listOpenIssuesWithLabelsPromise,
 } from './github-app.js';
 import { createSettledTtlPromiseCache, withConcurrencyLimitPromise } from './concurrency.js';
+import { listOpenGitLabMergeRequests, listGitLabMergedMergeRequestHeads, type GitLabMergeRequestRow } from './gitlab-merge-requests.js';
 import { STALE_PIPELINE_LABELS } from './cloister/label-reconciler.js';
 import { loadConfigSync } from './config.js';
 import { listSpecs } from './pan-dir/specs.js';
 import type { IssueLensSignals } from './pipeline-membership.js';
 import { getIssuePrefix, type ProjectConfig } from './projects.js';
+import { getRepoForge, inferProjectForgeSync } from './project-repos.js';
 import { parseIssueIdFromTextSync } from './resource-utils.js';
 import { createTracker } from './tracker/factory.js';
 import type { Issue, TrackerType } from './tracker/interface.js';
@@ -272,7 +275,9 @@ export interface PipelineMembershipGatherDeps {
   listOpenIssues(owner: string, repo: string): Promise<Array<{ number: number; labels: string[] }>>;
   listPhaseLabeledIssues(owner: string, repo: string): Promise<Array<{ number: number; state: 'open' | 'closed'; labels: string[] }>>;
   listOpenPullRequests(owner: string, repo: string): Promise<PullRequestRow[]>;
+  listOpenMergeRequests(repoPath: string): Promise<GitLabMergeRequestRow[]>;
   listMergedPullRequestHeads(owner: string, repo: string, heads: string[]): Promise<string[]>;
+  listMergedMergeRequestHeads(repoPath: string, heads: string[]): Promise<string[]>;
   listIssueStates(owner: string, repo: string, numbers: number[]): Promise<Array<{ number: number; state: 'open' | 'closed' }>>;
   listTrackerIssues(project: ProjectConfig): Promise<ProjectTrackerIssueRow[]>;
   listSpecIssueIds(projectPath: string): Promise<string[]>;
@@ -283,7 +288,9 @@ const defaultDeps: PipelineMembershipGatherDeps = {
   listOpenIssues: listOpenIssuesWithLabelsPromise,
   listPhaseLabeledIssues: (owner, repo) => listIssuesWithAnyLabelPromise(owner, repo, STALE_PIPELINE_LABELS),
   listOpenPullRequests: listOpenPullRequestsSnapshot,
+  listOpenMergeRequests: listOpenGitLabMergeRequests,
   listMergedPullRequestHeads: listMergedPullRequestHeadsBatched,
+  listMergedMergeRequestHeads: listGitLabMergedMergeRequestHeads,
   listIssueStates: listIssueStatesBatched,
   listTrackerIssues: listProjectTrackerIssues,
   listSpecIssueIds: async (projectPath) =>
@@ -314,6 +321,8 @@ function issueIdFromRef(ref: string, issuePrefix: string): string | null {
 export interface ProjectRepository {
   path: string;
   defaultBranch: string;
+  forge: ForgeType;
+  repoKey?: string;
 }
 
 export interface IssueBranchContainment {
@@ -333,12 +342,15 @@ export function projectRepositories(project: ProjectConfig): ProjectRepository[]
     return [{
       path: project.path,
       defaultBranch: project.workspace?.default_branch ?? 'main',
+      forge: inferProjectForgeSync(project) || 'github',
     }];
   }
 
   return project.workspace.repos.map((repo) => ({
     path: join(project.path, repo.path),
     defaultBranch: repo.default_branch ?? project.workspace?.default_branch ?? 'main',
+    forge: getRepoForge(repo, project),
+    repoKey: repo.name,
   }));
 }
 
@@ -518,6 +530,7 @@ export async function gatherProjectLensSignals(
   }
 
   const repositories = projectRepositories(project);
+  const gitlabRepos = repositories.filter((r) => r.forge === 'gitlab');
   const branchRefPatterns = [
     'refs/heads/feature/*', 'refs/remotes/origin/feature/*',
     'refs/heads/strike/*', 'refs/remotes/origin/strike/*',
@@ -525,7 +538,7 @@ export async function gatherProjectLensSignals(
   const branchSnapshots = repositories.map((repository) =>
     snapshotBranchRefs(repository.path, repository.defaultBranch, branchRefPatterns, deps.run));
 
-  const [trackerIssues, openIssues, phaseLabeledIssues, openPrs, branches, specIssueIds] = await Promise.all([
+  const [trackerIssues, openIssues, phaseLabeledIssues, openPrs, openMrs, branches, specIssueIds] = await Promise.all([
     project.github_repo
       ? Promise.resolve([])
       : withUnavailableReason('forge_unavailable', () => deps.listTrackerIssues(project)),
@@ -537,6 +550,10 @@ export async function gatherProjectLensSignals(
       : Promise.resolve([]),
     owner && repo
       ? withUnavailableReason('forge_unavailable', () => deps.listOpenPullRequests(owner, repo))
+      : Promise.resolve([]),
+    !(owner && repo) && gitlabRepos.length > 0
+      ? withUnavailableReason('forge_unavailable', () =>
+          Promise.all(gitlabRepos.map((r) => deps.listOpenMergeRequests(r.path))))
       : Promise.resolve([]),
     Promise.all(branchSnapshots),
     withUnavailableReason('gather_failed', () => deps.listSpecIssueIds(project.path)),
@@ -577,12 +594,23 @@ export async function gatherProjectLensSignals(
     knownStateByIssue.set(id, issue.state);
   }
   for (const pr of openPrs) {
-    if (!owner || !repo || pr.headRepoFullName.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) continue;
+    // GitHub fork filter: only count PRs from the configured owner/repo
+    if (owner && repo && pr.headRepoFullName.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) continue;
     const id = issueIdFromRef(pr.headRefName, issuePrefix);
     if (id) {
       candidates.add(id);
       openPrIssues.add(id);
       headRefsByIssue.set(id, new Set([...(headRefsByIssue.get(id) ?? []), pr.headRefName]));
+    }
+  }
+  // Process GitLab open MRs (flatten from multi-repo array)
+  const gitlabMrs = openMrs.flat();
+  for (const mr of gitlabMrs) {
+    const id = issueIdFromRef(mr.source_branch, issuePrefix);
+    if (id) {
+      candidates.add(id);
+      openPrIssues.add(id);
+      headRefsByIssue.set(id, new Set([...(headRefsByIssue.get(id) ?? []), mr.source_branch]));
     }
   }
   for (const snapshot of branches) {
@@ -631,21 +659,46 @@ export async function gatherProjectLensSignals(
       if (state) knownStateByIssue.set(id, state);
       else candidates.delete(id);
     }
+  }
 
-    // Closed issues resolve terminal regardless of merged-PR history (unless a PR
-    // is still open, already captured above), so only open candidates need the
-    // expensive merged-head oracle. This keeps historical refs/specs out of the
-    // GraphQL fan-out without changing membership semantics.
-    const openCandidates = [...candidates].filter((id) => knownStateByIssue.get(id) === 'open');
-    const candidateHeads = [...new Set(openCandidates.flatMap((id) => [
-      ...(headRefsByIssue.get(id) ?? []),
-      `feature/${id.toLowerCase()}`,
-      `strike/${id.toLowerCase()}`,
-    ]))];
+  // Closed issues resolve terminal regardless of merged-PR history (unless a PR
+  // is still open, already captured above), so only open candidates need the
+  // expensive merged-head oracle. This keeps historical refs/specs out of the
+  // GraphQL/GitLab fan-out without changing membership semantics.
+  const openCandidates = [...candidates].filter((id) => knownStateByIssue.get(id) === 'open');
+  const candidateHeads = [...new Set(openCandidates.flatMap((id) => [
+    ...(headRefsByIssue.get(id) ?? []),
+    `feature/${id.toLowerCase()}`,
+    `strike/${id.toLowerCase()}`,
+  ]))];
+
+  if (owner && repo) {
     const mergedHeads = new Set(await withUnavailableReason(
       'forge_unavailable',
       () => deps.listMergedPullRequestHeads(owner, repo, candidateHeads),
     ));
+    for (const id of openCandidates) {
+      const possibleHeads = [
+        ...(headRefsByIssue.get(id) ?? []),
+        `feature/${id.toLowerCase()}`,
+        `strike/${id.toLowerCase()}`,
+      ];
+      if (possibleHeads.some((head) => mergedHeads.has(head))) mergedPrIssues.add(id);
+    }
+  } else if (gitlabRepos.length > 0) {
+    // Query merged MRs from all GitLab repos with global concurrency limit (max 5 parallel queries)
+    const allMergedHeads = await withConcurrencyLimitPromise(
+      gitlabRepos.flatMap((repo) =>
+        candidateHeads.map((head) => async () => {
+          const merged = await withUnavailableReason('forge_unavailable', () =>
+            deps.listMergedMergeRequestHeads(repo.path, [head]),
+          );
+          return merged.length > 0 ? head : null;
+        }),
+      ),
+      5, // Global limit of 5 concurrent glab queries across all repos
+    );
+    const mergedHeads = new Set(allMergedHeads.filter((h) => h !== null));
     for (const id of openCandidates) {
       const possibleHeads = [
         ...(headRefsByIssue.get(id) ?? []),
