@@ -1,9 +1,10 @@
-import { existsSync, readFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import type { DockerCleanupResult, WorkspaceDockerTeardownResult } from './types.js';
 import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
+import { composeProjectNameForWorkspace } from '../workspace/stack-health.js';
 
 const execAsync = promisify(exec);
 
@@ -68,27 +69,10 @@ export async function stopWorkspaceDockerPromise(
     }
   }
 
-  const featureFolder = `feature-${featureName}`;
-  const composeProjectName = `overdeck-${featureFolder}`;
-  const devScriptPaths = [
-    join(workspacePath, DEVCONTAINER_DIRNAME, 'dev'),
-    join(workspacePath, 'dev'),
-  ];
-  for (const devPath of devScriptPaths) {
-    try {
-      if (!existsSync(devPath)) continue;
-      const content = readFileSync(devPath, 'utf-8');
-      const templatedMatch = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
-      const declared = templatedMatch
-        ? `${templatedMatch[1]}${featureFolder}`
-        : content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/)?.[1];
-      if (declared && declared !== composeProjectName) {
-        throw new Error(`${devPath} declares COMPOSE_PROJECT_NAME=${declared}, expected ${composeProjectName}`);
-      }
-    } catch (error: any) {
-      if (error?.message?.includes('declares COMPOSE_PROJECT_NAME=')) throw error;
-    }
-  }
+  // Canonical resolver (PAN-3049): a mismatched declared name still throws
+  // ('Refusing workspace rebuild: ...'), protecting against tearing down the
+  // wrong stack — same behavior as before, now via the single shared resolver.
+  const composeProjectName = composeProjectNameForWorkspace(workspacePath, featureName);
 
   if (composeFiles.length > 0) {
     result.containersFound = true;
