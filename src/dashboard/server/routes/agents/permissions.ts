@@ -96,6 +96,11 @@ export const postAgentPaneChoiceRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/pane-choice',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
     const params = yield* HttpRouter.params;
     const body = (yield* readJsonBody) as Record<string, unknown>;
     const result = yield* Effect.promise(() => handlePostAgentPaneChoice(params['id'] ?? '', body));
