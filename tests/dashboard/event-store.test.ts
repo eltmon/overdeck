@@ -22,6 +22,14 @@ function makeDb(): DbAdapter {
     )
   `)
   db.exec(`CREATE INDEX events_timestamp_idx ON events (timestamp)`)
+  // PAN-3092: the at-most-once claim table.
+  db.exec(`
+    CREATE TABLE event_idempotency (
+      key        TEXT    PRIMARY KEY,
+      sequence   INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    )
+  `)
   return db as unknown as DbAdapter
 }
 
@@ -307,5 +315,132 @@ describe('EventStore payload normalization (PAN-2225)', () => {
     expect(received).toHaveLength(1)
     expect('details' in received[0].payload).toBe(false)
     expect(received[0].payload).toEqual({ id: 'e3', message: 'in-memory only' })
+  })
+})
+
+// ─── appendOnce (PAN-3092) ───────────────────────────────────────────────────
+
+/**
+ * The at-most-once primitive behind FR-4's one-warning-per-episode rule. A
+ * check-then-append pair cannot provide this: two callers can both observe
+ * absence, and a caller cannot tell a committed write from a failed one.
+ */
+describe('EventStore.appendOnce (PAN-3092)', () => {
+  let store: ReturnType<typeof createEventStore>
+
+  const warning = (message: string) => ({
+    type: 'activity.entry',
+    timestamp: ts(),
+    payload: { id: 'verdict-fallback:PAN-3092:gen-1', message },
+  }) as Parameters<ReturnType<typeof createEventStore>['appendOnce']>[0]
+
+  beforeEach(() => {
+    store = createEventStore(makeDb())
+  })
+
+  it('appends once and reports every later call for the same key as a duplicate', () => {
+    const first = store.appendOnce(warning('contended'), 'episode-1')
+    const second = store.appendOnce(warning('contended'), 'episode-1')
+    const third = store.appendOnce(warning('contended'), 'episode-1')
+
+    expect(first.outcome).toBe('appended')
+    expect(first.sequence).toBeGreaterThan(0)
+    expect(second).toEqual({ outcome: 'duplicate', sequence: first.sequence })
+    expect(third).toEqual({ outcome: 'duplicate', sequence: first.sequence })
+
+    // ONE durable event, not three — the whole point.
+    expect(store.queryByType('activity.entry', 10)).toHaveLength(1)
+  })
+
+  it('publishes to subscribers only for the append, never for a duplicate', () => {
+    const seen: number[] = []
+    store.subscribe((event) => { seen.push(event.sequence) })
+
+    store.appendOnce(warning('contended'), 'episode-1')
+    store.appendOnce(warning('contended'), 'episode-1')
+
+    // A duplicate that re-published would be a second operator warning.
+    expect(seen).toHaveLength(1)
+  })
+
+  it('keeps distinct keys independent', () => {
+    expect(store.appendOnce(warning('a'), 'episode-1').outcome).toBe('appended')
+    expect(store.appendOnce(warning('b'), 'episode-2').outcome).toBe('appended')
+    expect(store.queryByType('activity.entry', 10)).toHaveLength(2)
+  })
+
+  it('throws instead of reporting success when the transaction cannot commit', () => {
+    // A caller must be able to distinguish "durably appended" from "not
+    // written": appendAsync resolves with sequence 0 on a failed batch, which
+    // is exactly the false-success this replaces.
+    const broken = makeDb()
+    const brokenStore = createEventStore(broken)
+    // Break it after construction — statements are prepared eagerly.
+    broken.exec('DROP TABLE event_idempotency')
+
+    expect(() => brokenStore.appendOnce(warning('contended'), 'episode-1')).toThrow()
+    // And the failed attempt left no event behind.
+    expect(brokenStore.queryByType('activity.entry', 10)).toHaveLength(0)
+  })
+
+  it('leaves no half-written state when the event insert fails inside the claim', () => {
+    const broken = makeDb()
+    const brokenStore = createEventStore(broken)
+    broken.exec('DROP TABLE events')
+
+    expect(() => brokenStore.appendOnce(warning('contended'), 'episode-1')).toThrow()
+
+    // The claim was rolled back with the insert, so a later healthy retry for
+    // the same key still appends rather than being wrongly seen as a duplicate.
+    const rows = (broken as unknown as SqliteDatabase)
+      .prepare('SELECT COUNT(*) AS n FROM event_idempotency').all() as Array<{ n: number }>
+    expect(rows[0]!.n).toBe(0)
+  })
+})
+
+describe('EventStore.compact idempotency keys (PAN-3092)', () => {
+  it('ages out idempotency keys with the events they guard', () => {
+    const db = makeDb()
+    const store = createEventStore(db)
+
+    store.appendOnce(
+      { type: 'activity.entry', timestamp: ts(), payload: { id: 'a' } } as never,
+      'old-episode',
+    )
+    // Backdate the claim past the 7-day retention window.
+    const raw = db as unknown as SqliteDatabase
+    raw.prepare('UPDATE event_idempotency SET created_at = ?')
+      .run([Date.now() - 8 * 24 * 60 * 60 * 1000])
+
+    store.compact()
+
+    const rows = raw.prepare('SELECT COUNT(*) AS n FROM event_idempotency').all() as Array<{ n: number }>
+    // Retaining it would grow the table forever AND permanently suppress
+    // re-appending a warning whose event has itself been compacted away.
+    expect(rows[0]!.n).toBe(0)
+  })
+
+  it('keeps a recent idempotency key so a live episode still dedupes', () => {
+    const db = makeDb()
+    const store = createEventStore(db)
+
+    store.appendOnce(
+      { type: 'activity.entry', timestamp: ts(), payload: { id: 'a' } } as never,
+      'live-episode',
+    )
+    store.compact()
+
+    expect(store.appendOnce(
+      { type: 'activity.entry', timestamp: ts(), payload: { id: 'a' } } as never,
+      'live-episode',
+    ).outcome).toBe('duplicate')
+  })
+
+  it('compacts cleanly on a schema without the idempotency table', () => {
+    const db = makeDb()
+    const store = createEventStore(db)
+    ;(db as unknown as SqliteDatabase).exec('DROP TABLE event_idempotency')
+
+    expect(() => store.compact()).not.toThrow()
   })
 })

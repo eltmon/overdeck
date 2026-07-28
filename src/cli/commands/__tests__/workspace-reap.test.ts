@@ -76,4 +76,79 @@ describe('workspace reap', () => {
     expect(candidates[0].reason).toContain('Exited (127)');
     expect(candidates[0].containers.map(container => container.id)).toEqual(['init-id', 'server-id']);
   });
+
+  // PAN-3049: reap candidate discovery must not hardcode the overdeck-
+  // compose-project prefix — a myn-feature-* group is a candidate exactly
+  // like an overdeck-feature-* group.
+  it('ac1: groups a non-overdeck (myn-feature-) prefix under its issue exactly like overdeck-feature-', () => {
+    const now = Date.parse('2026-05-16T12:00:00.000Z');
+    const cutoff = now - 7 * 86_400_000;
+
+    const candidates = collectWorkspaceReapCandidatesFromInspect([
+      {
+        Id: 'myn-server-id',
+        Name: '/myn-feature-min-864-server-1',
+        Created: '2026-05-01T12:00:00.000000000Z',
+        Config: {
+          Labels: {
+            'com.docker.compose.project': 'myn-feature-min-864',
+            'com.docker.compose.project.working_dir': '/repo/workspaces/feature-min-864/.devcontainer',
+          },
+        },
+        State: { Status: 'exited', ExitCode: 1 },
+      },
+    ], cutoff, now);
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]).toMatchObject({
+      project: 'myn-feature-min-864',
+      issueId: 'min-864',
+    });
+  });
+
+  it('ignores containers with no feature-<issue> token (e.g. shared infra like overdeck-traefik)', () => {
+    const now = Date.parse('2026-05-16T12:00:00.000Z');
+    const cutoff = now - 7 * 86_400_000;
+
+    const candidates = collectWorkspaceReapCandidatesFromInspect([
+      {
+        Id: 'traefik-id',
+        Name: '/overdeck-traefik',
+        Created: '2026-05-01T12:00:00.000000000Z',
+        Config: { Labels: { 'com.docker.compose.project': 'overdeck-traefik' } },
+        State: { Status: 'exited', ExitCode: 1 },
+      },
+    ], cutoff, now);
+
+    expect(candidates).toEqual([]);
+  });
+
+  it('ac2: excludes a myn-feature- group with an active agent exactly like an overdeck-feature- group', () => {
+    const now = Date.parse('2026-05-16T12:00:00.000Z');
+    const cutoff = now - 7 * 86_400_000;
+
+    const candidates = collectWorkspaceReapCandidatesFromInspect([
+      {
+        Id: 'myn-server-id',
+        Name: '/myn-feature-min-864-server-1',
+        Created: '2026-05-01T12:00:00.000000000Z',
+        Config: { Labels: { 'com.docker.compose.project': 'myn-feature-min-864' } },
+        State: { Status: 'exited', ExitCode: 1 },
+      },
+      {
+        Id: 'overdeck-server-id',
+        Name: '/overdeck-feature-pan-1140-server-1',
+        Created: '2026-05-01T12:00:00.000000000Z',
+        Config: { Labels: { 'com.docker.compose.project': 'overdeck-feature-pan-1140' } },
+        State: { Status: 'exited', ExitCode: 1 },
+      },
+    ], cutoff, now);
+
+    expect(candidates.map(c => c.issueId).sort()).toEqual(['min-864', 'pan-1140']);
+
+    // Mirrors the active-agent filter applied in workspaceReapCommand.
+    const activeAgentIssueIds = new Set(['min-864', 'pan-1140']);
+    const filtered = candidates.filter(candidate => !activeAgentIssueIds.has(candidate.issueId));
+    expect(filtered).toEqual([]);
+  });
 });

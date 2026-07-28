@@ -779,6 +779,22 @@ export const __testInternals = {
   boundStateFlush,
   startSerializedFlush,
   waitForFlush,
+  /**
+   * The flush a timer turn (or an explicit flush) started for `projectRoot`,
+   * or `undefined` when nothing is in flight. Tests use this to await the
+   * timer-initiated flush deterministically instead of polling Git history.
+   */
+  getActiveFlush: (projectRoot: string): ActiveFlush | undefined => active.get(projectRoot),
+  /**
+   * Cancel every queued flush and wait for every in-flight one to settle,
+   * whatever its outcome. Test teardown calls this so removing a temporary
+   * repository cannot race a running git process.
+   */
+  settleAllFlushes: async (): Promise<void> => {
+    for (const batch of pending.values()) clearTimeout(batch.timer);
+    pending.clear();
+    await Promise.allSettled([...active.values()].map((flush) => flush.promise));
+  },
 };
 
 function relativizeToRoot(absOrRel: string, projectRoot: string): string {

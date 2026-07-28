@@ -150,6 +150,8 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   issueId: string;
   reviewStatus: string;
   testStatus: string;
+  /** PAN-3092: UAT gates merge eligibility, so its verdict must be durable too. */
+  uatStatus?: string;
   verificationStatus?: string;
   inspectStatus?: string;
   mergeStatus?: string;
@@ -158,6 +160,7 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   readyForMerge: boolean;
   reviewNotes?: string;
   testNotes?: string;
+  uatNotes?: string;
   verificationNotes?: string;
   inspectNotes?: string;
   mergeNotes?: string;
@@ -859,10 +862,10 @@ export function markRecordPipelineClosedOutSync(
 ): void {
   const record = ensureIssueRecordSync(project, issueId);
   const now = new Date().toISOString();
+  // Verdict fields deliberately preserved for journal fallback (PAN-3025)
   record.pipeline.closedOut = true;
   record.pipeline.closedOutAt = now;
   record.pipeline.readyForMerge = false;
-  record.pipeline.verificationStatus = undefined;
   record.pipeline.mergeStatus = 'merged';
   record.pipeline.updatedAt = now;
   const recordPath = writeIssueRecordSync(project, issueId, record);

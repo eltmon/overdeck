@@ -100,6 +100,30 @@ describe('teardownWorkspaceDockerByNamePromise', () => {
     expect(result.networkRemoved).toBe(false);
   });
 
+  it('carries the actual remaining network names on the result (PAN-3049)', async () => {
+    const teardown = await loadTeardown();
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (command.includes('docker network ls')) {
+        return {
+          stdout: 'bridge\nmyn-feature-min-901_devnet\nhost\n',
+          stderr: '',
+        };
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await teardown('min-901');
+    expect(result.networkRemoved).toBe(false);
+    expect(result.remainingNetworks).toEqual(['myn-feature-min-901_devnet']);
+  });
+
+  it('omits remainingNetworks when the network is fully removed', async () => {
+    const teardown = await loadTeardown();
+    const result = await teardown('pan-9999');
+    expect(result.networkRemoved).toBe(true);
+    expect(result.remainingNetworks).toBeUndefined();
+  });
+
   it('only emits project-scoped or network-scoped docker commands and never prunes', async () => {
     const teardown = await loadTeardown();
     await teardown('pan-9999');

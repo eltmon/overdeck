@@ -13,11 +13,15 @@ this table and that module from drifting silently.
 | 1 | `review` | Review passed (mode per issue policy); strike-landed work skips because no reviewer runs, and tracker-closed landed work skips when no negative review verdict exists | review role → `pan admin specialists done review` → review-status write door; terminal settlement in `evaluateDodGate()` | `reviewStatus: passed`, or `skip` preserving the original verdict and naming the strike/terminal reason |
 | 2 | `tests` | Tests passed (incl. browser UAT when required); strike-landed work skips because no test specialist runs, and tracker-closed landed work may settle under the rule below | test role → `pan admin specialists done test`; terminal settlement in `evaluateDodGate()` | `testStatus: passed`, or `skip` preserving the original verdict and naming the strike/terminal reason |
 | 3 | `verification` | Verification green on the branch (typecheck, lint, suite, build); tracker-closed landed work may settle under the rule below | supervised verification worker (`verification-runner.ts` / `verification-worker.ts`); UAT promotion (PAN-3114); terminal settlement in `evaluateDodGate()` | `verificationStatus: passed` (or policy `skipped`), or terminal `skip` preserving the original verdict |
-| 4 | `merged` | Merged to main: forge/durable merge evidence resolved through either convention head (`feature/<id>` or `strike/<id>`), including forge squash-merge detection; or a non-PR landing where the shared L2-work lens finds at least one convention-branch ref contained in its repository's default branch with the tip off the first-parent line and zero unmerged refs across all configured repositories | merge door: `triggerMerge` → merge specialist (`merge-agent.ts`); fallback: `gatherIssueBranchContainment()` | PR `MERGED`, `mergeStatus: merged`, or branch-containment evidence |
+| 4 | `merged` | Merged to main: forge/durable merge evidence resolved per required repository through either convention head (`feature/<id>` or `strike/<id>`). Polyrepo probes run inside each resolved repository; forge squash-merge detection covers GitHub PRs and GitLab MRs, with GitLab artifacts matched to the branch head SHA. The last resort is a non-PR landing where the shared L2-work lens finds at least one convention-branch ref contained in its repository's default branch with the tip off the first-parent line and zero unmerged refs across all configured repositories. | merge door: `triggerMerge` → merge specialist (`merge-agent.ts`); verification: `verifyBranchMergedImpl()` + `getForgeAdapter().findMergedArtifact()`; fallback: `gatherIssueBranchContainment()` | PR/MR id and URL, `mergeStatus: merged`, durable merge record, or branch-containment evidence |
 | 5 | `post-merge` | Post-merge handoff: work/planning agents paused, workspace Docker stack + networks stopped, `verifying-on-main` label; for a containment-evidenced non-PR landing, passes when no work/planning agents are running because no observed merge event could trigger the lifecycle; for a strike landing, skips on the same quiescence test because the strike path never runs the work-agent handoff (PAN-3180) | `postMergeLifecycle()` (`merge-agent.ts`) — at-most-once per merge (PAN-328 in-flight guard); DoD containment and strike fallbacks | issue labels, agent states |
 | 6 | `main-verify` | Verified on main (post-merge verification of the merged commit) | deacon verify-on-main flow | `verifying_on_main` → verified |
 | 7 | `deploy` | **Deployed: the live dashboard runs a canonical build that includes the merge.** When the `merged` row misses without resolving a merge commit, this row skips and reports its row-4 dependency instead of recording a second miss. | staleness-gated Step 0 (`merge-agent.ts`) + Deacon deploy patrol (`deploy-patrol.ts`) + deploy intent queue (`pending-deploy.json`), guarded by `getDeployBlockReason()` | `/api/health` `buildCommit`, `buildDirty`, and `buildBranch` + stale-build chip; the row misses when the build is dirty or `buildCommit` is not an ancestor of `origin/main` |
 | 8 | `teardown` | Close-out: worktree removed, branches per `close_out` config, xBRIEF `plan.status: completed`, planning artifacts archived, tracker issue CLOSED + `closed-out` label, review status cleared, Docker `_devnet` teardown verified | `pan close <id>` / dashboard Close Out (`closeOut`); closed-issue reaper (`reapIssueResidue`) as backstop | issue state, `workspaces/` dir |
+
+## Verdict durability
+
+Rows 1–3 read live status first and fall back to the per-issue record's `pipeline` block on `overdeck-state` when live status is absent. The durable journal preserves the full verdict triple (review/tests/verification) plus `lastVerifiedCommit` through close-out and across database rebuilds, so rows continue to read and pass after live status is cleared or the SQLite database is re-derived. Re-running `pan close <id>` on a fully closed-out issue is an idempotent no-op that returns success without re-evaluating the gate or re-running any ceremony step; it names the original `closedOutAt` timestamp to prove completion on the original run.
 
 ## Rules of the table
 
@@ -36,11 +40,13 @@ this table and that module from drifting silently.
   surfaces through its recorded auto-close-out failure. Automation never accepts a miss on
   the operator's behalf; `flywheel-*` callers are mechanically barred from `--accept-*`.
 - **Branch absence is not merge evidence.** The `merged` row requires positive evidence from
-  the forge, the durable close-out merge record, or the shared L2-work containment lens. The
-  containment fallback passes only when merged-work refs exist and no configured repository
-  reports an unmerged ref, so deleting an unmerged branch or finding only fresh pointers remains
-  a miss. A strike-landed issue passes through the strike branch's own merge evidence; unmerged
-  commits on the superseded feature branch remain in the observed string instead of causing a miss.
+  the forge, the durable close-out merge record, or the shared L2-work containment lens. A merged
+  GitLab MR for an absent convention branch is positive forge evidence recorded with its MR iid
+  and URL. The L2-work containment lens remains the last-resort fallback, labeled `non-PR landing`,
+  and passes only when merged-work refs exist and no configured repository reports an unmerged ref,
+  so deleting an unmerged branch or finding only fresh pointers remains a miss. A strike-landed
+  issue passes through the strike branch's own merge evidence; unmerged commits on the superseded
+  feature branch remain in the observed string instead of causing a miss.
 - **The verification verdict is the row; `lastVerifiedCommit` is not required** (PAN-3067). The
   runner writes that anchor best-effort — it snapshots HEAD inside a `try/catch` for the
   test-skip drift check, and a policy `skipped` verdict never has one — so its absence proves

@@ -198,7 +198,8 @@ import { reapLeftoverPlaywrightBrowsers } from './playwright-mcp-reaper.js';
 import { reapMergedStrikeWorkspaces } from './strike-workspace-reaper.js';
 import { cleanupOrphanedInspectSessions } from './inspect-session-reaper.js';
 import { isIssueClosed } from './issue-closed.js';
-import { decideUnsignaledTestAction, readTestVerdictArtifact } from './test-verdict.js';
+import { decideUnsignaledTestAction, readTestVerdictArtifact, recordUnsignaledTestEscalation } from './test-verdict.js';
+import { sweepStrandedVerdictFallbacks } from './deacon-verdict-fallback-sweep.js';
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
 
 // ============================================================================
@@ -1385,6 +1386,8 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
  *   - Only honors an artifact newer than the current test dispatch (H3)
  */
 const unsignaledTestNudges = new Map<string, number>();
+/** PAN-3092: test dispatch generations already escalated — never nudged again. */
+const unsignaledTestEscalations = new Set<string>();
 
 export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
   const actions: string[] = [];
@@ -1413,15 +1416,20 @@ export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
       const sessionLive = sessionAlive && !paneDead;
       const idle = sessionLive ? isAgentIdleForNudge(testSession, TEST_SETTLE_MS, now) : false;
 
-      const lastNudged = unsignaledTestNudges.get(testSession);
-      const alreadyNudged = !!(lastNudged && now - lastNudged < NUDGE_DEDUP_MS);
-
       // Only honor an artifact newer than the current test dispatch so a previous
       // cycle's verdict is never read after a re-dispatch (H3). The latest
       // test→'testing' history entry is the dispatch time.
       const lastDispatchAt = status.history
         ?.filter(h => h.type === 'test' && h.status === 'testing')
         .pop()?.timestamp;
+
+      const lastNudged = unsignaledTestNudges.get(testSession);
+      // PAN-3092: once a dispatch generation has been escalated to the operator,
+      // it stays escalated. Without this the 30-minute nudge window reopens and
+      // the patrol keeps waking an agent the operator has already been told about.
+      const escalationKey = `${testSession}:${lastDispatchAt ?? 'unknown'}`;
+      const alreadyNudged = unsignaledTestEscalations.has(escalationKey)
+        || !!(lastNudged && now - lastNudged < NUDGE_DEDUP_MS);
       const minMtimeMs = lastDispatchAt ? new Date(lastDispatchAt).getTime() : undefined;
       const artifact = readTestVerdictArtifact(wsPath, minMtimeMs);
 
@@ -1470,6 +1478,18 @@ export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
           } catch (err: any) {
             console.error(`[deacon] Failed to nudge ${testSession}:`, err.message);
           }
+          break;
+        }
+        case 'escalate': {
+          // PAN-3092 (MIN-858): alive, idle, already nudged, no artifact — the
+          // verdict exists only in the pane, if at all, and nothing automatic can
+          // reach it. Tell a human once per dispatch generation rather than going
+          // quiet for six hours while every surface reports the agent healthy.
+          unsignaledTestEscalations.add(escalationKey);
+          const msg = await recordUnsignaledTestEscalation(
+            wsPath, issueId, testSession, lastDispatchAt ?? 'unknown',
+          );
+          if (msg) { actions.push(msg); console.warn(`[deacon] ${msg}`); }
           break;
         }
         case 'wait':
@@ -2314,7 +2334,7 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
   try {
     // Find all workspace-related containers that are exited (crashed)
     const { stdout } = await execAsync(
-      'docker ps -a --filter "status=exited" --filter "name=overdeck-feature-" --format "{{.Names}}|{{.Status}}" 2>/dev/null || true',
+      'docker ps -a --filter "status=exited" --filter "name=feature-" --format "{{.Names}}|{{.Status}}" 2>/dev/null || true',
       { encoding: 'utf-8', timeout: 10000 },
     );
     const crashed = stdout.trim().split('\n').filter(Boolean);
@@ -2332,8 +2352,8 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
 
       // Init containers are one-shot by design — they run setup, exit, and stay exited.
       // Restarting them is meaningless and floods agents with bogus "container crashed" alerts.
-      // Match service containers only (frontend/server), not init.
-      const match = name.match(/overdeck-feature-([\w-]+?)-(frontend|server)-/);
+      // Match only the final Compose feature-<issue>-<service>-<index> suffix; an earlier feature segment may be a decoy.
+      const match = name.match(/feature-((?:[a-z]+-\d+)|(?:(?:f|us|de|ta|tc)\d+))-(frontend|server)-\d+$/i);
       if (!match) continue;
 
       // Skip clean shutdowns (exit code 0). Status format: "Exited (N) X minutes ago".
@@ -2861,6 +2881,18 @@ export async function runPatrol(): Promise<PatrolResult> {
   const unappliedReviewActions = await reconcileUnappliedReviewVerdicts();
   actions.push(...unappliedReviewActions);
   for (const a of unappliedReviewActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-3092: fold verdict fallbacks whose writing process died before its own
+  // drain timer fired, and surface the ones the record lock keeps stuck.
+  // Budget derived from the RESOLVED patrol interval, not a hardcoded 60s
+  // assumption: a shorter configured interval would otherwise let the sweep
+  // overrun it and start overlapping patrols.
+  const verdictFallbackActions = await sweepStrandedVerdictFallbacks(
+    Date.now(),
+    Math.max(1_000, Math.floor(config.patrolIntervalMs / 2)),
+  );
+  actions.push(...verdictFallbackActions);
+  for (const a of verdictFallbackActions) addLog('action', a, state.patrolCycle);
 
   // PAN-796: Bypass review for issues where verification passed but review infra keeps failing
   const verifContradictionActions = await checkVerificationReviewContradiction();
