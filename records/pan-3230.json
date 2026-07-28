@@ -88,7 +88,7 @@
     "recordedAt": "2026-07-28T18:59:19.959Z"
   },
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T19:25:58.178Z",
+  "updated": "2026-07-28T19:26:03.863Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "blocked",
@@ -98,10 +98,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:00:36.689Z",
-    "updatedAt": "2026-07-28T19:25:57.467Z",
+    "updatedAt": "2026-07-28T19:26:03.850Z",
     "reviewNotes": "Shared pan-dir writer changed outside scope, and template-literal state paths still bypass the lint guard",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3239",
-    "reviewedAtCommit": "ce4feae7b06ca159b5967603f389d4919236fa01",
+    "reviewedAtCommit": "6b894c9ac4f59b5a323eecade8d2674c93b1f616",
     "lastVerifiedCommit": "ce4feae7b06ca159b5967603f389d4919236fa01",
     "reviewSpawnedAt": "2026-07-28T19:18:25.990Z",
     "scopeDrift": {
@@ -188,7 +188,7 @@
       },
       "costAtCloseOut": {
         "usd": 97.705327,
-        "pricingAsOf": "2026-07-28T19:25:57.486Z"
+        "pricingAsOf": "2026-07-28T19:26:03.858Z"
       }
     },
     "merges": [
