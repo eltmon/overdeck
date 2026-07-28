@@ -10,8 +10,30 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/DEFINITION-OF-DONE.md",
+      "src/lib/lifecycle/dod-gate.ts",
+      "src/lib/lifecycle/workflows.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts",
+      "tests/unit/lib/lifecycle/workflows.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DEFINITION-OF-DONE.md",
+      "scripts/file-size-allowlist.txt",
+      "src/lib/lifecycle/dod-gate.ts",
+      "src/lib/lifecycle/workflows.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts",
+      "tests/unit/lib/lifecycle/workflows.test.ts"
+    ],
+    "recordedAt": "2026-07-28T09:38:47.050Z"
+  },
   "created": "2026-07-28T06:35:52.620Z",
-  "updated": "2026-07-28T09:38:49.691Z",
+  "updated": "2026-07-28T09:38:53.217Z",
   "pipeline": {
     "issueId": "PAN-3215",
     "reviewStatus": "pending",
@@ -20,7 +42,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T09:38:49.689Z",
+    "updatedAt": "2026-07-28T09:38:53.178Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3226",
     "reviewRequestedAt": "2026-07-28T09:38:49.689Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -43,19 +66,36 @@
         "tests/unit/lib/lifecycle/workflows.test.ts"
       ],
       "recordedAt": "2026-07-28T09:38:47.050Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3226"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 1098956,
+            "output": 123823,
+            "cacheRead": 58137088,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 1098956,
+          "output": 123823,
+          "cacheRead": 58137088,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-28T08:33:30.152Z"
+        "usd": 38.278014,
+        "pricingAsOf": "2026-07-28T09:38:53.210Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3226"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -177,27 +217,5 @@
     "dod-docs-update": "completed",
     "dod-docs-update.dod-docs-update.ac1": "completed",
     "dod-docs-update.dod-docs-update.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "scripts/file-size-allowlist.txt"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/DEFINITION-OF-DONE.md",
-      "src/lib/lifecycle/dod-gate.ts",
-      "src/lib/lifecycle/workflows.ts",
-      "tests/unit/lib/lifecycle/dod-gate.test.ts",
-      "tests/unit/lib/lifecycle/workflows.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/DEFINITION-OF-DONE.md",
-      "scripts/file-size-allowlist.txt",
-      "src/lib/lifecycle/dod-gate.ts",
-      "src/lib/lifecycle/workflows.ts",
-      "tests/unit/lib/lifecycle/dod-gate.test.ts",
-      "tests/unit/lib/lifecycle/workflows.test.ts"
-    ],
-    "recordedAt": "2026-07-28T09:38:47.050Z"
   }
 }
