@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T06:48:23.612Z",
+  "updated": "2026-07-28T06:54:32.042Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
@@ -65,8 +65,16 @@
     }
   ],
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "drain-content-aware-supersede": {
+        "writerId": "agent-pan-3092",
+        "agentId": "agent-pan-3092",
+        "pid": 3213658,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:54:32.042Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3092",
@@ -92,6 +100,7 @@
     "verdict-aware-pipeline-merge.verdict-aware-pipeline-merge.ac1": "completed",
     "verdict-aware-pipeline-merge.verdict-aware-pipeline-merge.ac2": "completed",
     "verdict-aware-pipeline-merge.verdict-aware-pipeline-merge.ac3": "completed",
-    "verdict-aware-pipeline-merge.verdict-aware-pipeline-merge.ac4": "completed"
+    "verdict-aware-pipeline-merge.verdict-aware-pipeline-merge.ac4": "completed",
+    "drain-content-aware-supersede": "running"
   }
 }
