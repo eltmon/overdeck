@@ -304,8 +304,11 @@ describe('stopWorkspaceDocker', () => {
     );
 
     const { stopWorkspaceDocker } = await import('../../src/lib/workspace-manager.js');
+    // PAN-3049: the message now comes from the canonical resolver
+    // (composeProjectNameForWorkspace), which reports "a name ending in
+    // <feature folder>" rather than one exact expected literal.
     await expect(Effect.runPromise(stopWorkspaceDocker(workspaceDir, 'pan-1140'))).rejects.toThrow(
-      'declares COMPOSE_PROJECT_NAME=victim-project, expected overdeck-feature-pan-1140',
+      'declares COMPOSE_PROJECT_NAME=victim-project, expected a name ending in feature-pan-1140',
     );
     expect(mockExecAsync).not.toHaveBeenCalledWith(expect.stringContaining('docker compose'), expect.anything());
   });
