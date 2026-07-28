@@ -128,7 +128,7 @@
     "recordedAt": "2026-07-28T08:50:14.585Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T09:22:10.949Z",
+  "updated": "2026-07-28T09:22:16.600Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "blocked",
@@ -138,9 +138,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:50:42.357Z",
-    "updatedAt": "2026-07-28T09:22:10.166Z",
+    "updatedAt": "2026-07-28T09:22:16.589Z",
     "reviewNotes": "New production-path tests mock Effect APIs as Promises, causing four required regression tests to fail",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3221",
+    "reviewedAtCommit": "bcbc3a3c93ffe3fec08bb93297517e42b1a0f3c3",
     "lastVerifiedCommit": "6b218e665a20aeecd3e51dd3a9da4e695b49aa3e",
     "reviewSpawnedAt": "2026-07-28T09:11:09.871Z",
     "scopeDrift": {
@@ -191,10 +192,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2025,
-            "output": 100933,
-            "cacheRead": 46834902,
-            "cacheWrite": 2313515
+            "input": 2030,
+            "output": 101101,
+            "cacheRead": 46976328,
+            "cacheWrite": 2313704
           }
         }
       },
@@ -206,15 +207,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2025,
-          "output": 100933,
-          "cacheRead": 46834902,
-          "cacheWrite": 2313515
+          "input": 2030,
+          "output": 101101,
+          "cacheRead": 46976328,
+          "cacheWrite": 2313704
         }
       },
       "costAtCloseOut": {
-        "usd": 38.137069,
-        "pricingAsOf": "2026-07-28T09:22:10.193Z"
+        "usd": 38.152293,
+        "pricingAsOf": "2026-07-28T09:22:16.596Z"
       }
     },
     "merges": [
