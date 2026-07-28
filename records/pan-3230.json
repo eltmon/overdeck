@@ -95,18 +95,18 @@
     "recordedAt": "2026-07-28T18:59:19.959Z"
   },
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T20:05:33.665Z",
+  "updated": "2026-07-28T20:05:45.730Z",
   "pipeline": {
     "issueId": "PAN-3230",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-28T19:00:36.689Z",
-    "updatedAt": "2026-07-28T19:57:54.048Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: auto-synthesis now uses writeSpecForIssue with a clean-and-pushed state-worktree durability test, and lint-state-paths detects multiline specs/drafts joins with adversarial fixtures.",
+    "updatedAt": "2026-07-28T20:05:45.497Z",
+    "reviewNotes": "All prior blockers are resolved; state paths, durable writes, and lint enforcement meet the requirements",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3239",
     "reviewedAtCommit": "d5a0bf4e352a7a2ccb09b850b195aff8733bc1c9",
     "lastVerifiedCommit": "d5a0bf4e352a7a2ccb09b850b195aff8733bc1c9",
@@ -172,10 +172,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 34,
-            "output": 5833,
-            "cacheRead": 2566036,
-            "cacheWrite": 158838
+            "input": 36,
+            "output": 6010,
+            "cacheRead": 2755544,
+            "cacheWrite": 159363
           }
         },
         "work": {
@@ -201,15 +201,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 34,
-          "output": 5833,
-          "cacheRead": 2566036,
-          "cacheWrite": 158838
+          "input": 36,
+          "output": 6010,
+          "cacheRead": 2755544,
+          "cacheWrite": 159363
         }
       },
       "costAtCloseOut": {
-        "usd": 116.116594,
-        "pricingAsOf": "2026-07-28T19:57:56.322Z"
+        "usd": 116.157582,
+        "pricingAsOf": "2026-07-28T20:05:45.692Z"
       }
     },
     "merges": [
