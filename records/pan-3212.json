@@ -105,18 +105,18 @@
     "recordedAt": "2026-07-28T17:49:31.882Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T18:41:19.708Z",
+  "updated": "2026-07-28T18:46:11.093Z",
   "pipeline": {
     "issueId": "PAN-3212",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:49:41.828Z",
-    "updatedAt": "2026-07-28T18:41:18.358Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: pending keyed payload proof now inspects only the active composer, treats empty or failed captures as unproven, and re-pastes only after positive absence.",
+    "updatedAt": "2026-07-28T18:46:11.056Z",
+    "reviewNotes": "The new active-composer parser does not match the live Claude Code pane, so recovery still re-pastes and duplicates a valid pending payload.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
     "reviewedAtCommit": "72d3b812b0d38b8a05441f6dd8f478386595c690",
     "lastVerifiedCommit": "72d3b812b0d38b8a05441f6dd8f478386595c690",
@@ -161,9 +161,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2335709,
-            "output": 236396,
-            "cacheRead": 32613376,
+            "input": 3073798,
+            "output": 273138,
+            "cacheRead": 43323904,
             "cacheWrite": 0
           }
         },
@@ -178,15 +178,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 6663224,
-          "output": 565165,
-          "cacheRead": 122409984,
+          "input": 7401313,
+          "output": 601907,
+          "cacheRead": 133120512,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 111.476062,
-        "pricingAsOf": "2026-07-28T18:41:18.372Z"
+        "usd": 121.624031,
+        "pricingAsOf": "2026-07-28T18:46:11.082Z"
       }
     },
     "merges": [
