@@ -16,18 +16,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T17:35:41.511Z",
+  "updated": "2026-07-28T17:36:00.959Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T17:35:41.493Z",
-    "inspectNotes": "Inspecting item marker-write-cli"
+    "updatedAt": "2026-07-28T17:36:00.776Z",
+    "inspectNotes": "All 4 ACs met. Blocking ENOENT fixed: plan-finalize.ts:180 now mkdirSync(dirname(markerPath),{recursive:true}) before the temp write, so the marker lands regardless of whether the workspace has .overdeck/, and the new '.pan-only legacy workspace' regression test in tests/unit/cli/plan-finalize-pending-promotion.test.ts covers it (createWorkspace('.pan') writes only .pan/spec.vbrief.json, asserts no marker pre-run, then asserts the marker after 5 failed attempts). Secondary wording note also addressed at plan-finalize.ts:387 — 'the dashboard did not complete promotion' now covers non-2xx as well as unreachable. AC-1 marker fields + patrolAttempts:0, AC-2 'deferred'/deacon named/promotionDeferred:true/exit 1 at plan-finalize.ts:392, AC-3 !noPromote && !promoted guard, AC-4 .gitignore entry all verified in tree at 5b93276e."
   },
   "closeOut": {
     "usage": {
@@ -42,9 +42,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 682112,
-            "output": 63655,
-            "cacheRead": 21511168,
+            "input": 683598,
+            "output": 63763,
+            "cacheRead": 21866496,
             "cacheWrite": 0
           }
         }
@@ -57,15 +57,15 @@
           "cacheWrite": 170493
         },
         "openai/gpt-5.6-sol": {
-          "input": 682112,
-          "output": 63655,
-          "cacheRead": 21511168,
+          "input": 683598,
+          "output": 63763,
+          "cacheRead": 21866496,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 23.936473,
-        "pricingAsOf": "2026-07-28T17:35:41.504Z"
+        "usd": 24.124807,
+        "pricingAsOf": "2026-07-28T17:36:00.923Z"
       }
     },
     "merges": [],
