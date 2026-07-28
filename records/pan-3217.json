@@ -26,7 +26,7 @@
     "recordedAt": "2026-07-28T08:49:28.640Z"
   },
   "created": "2026-07-28T06:36:21.767Z",
-  "updated": "2026-07-28T09:01:27.408Z",
+  "updated": "2026-07-28T09:10:14.997Z",
   "pipeline": {
     "issueId": "PAN-3217",
     "reviewStatus": "passed",
@@ -35,7 +35,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-28T08:49:53.504Z",
     "updatedAt": "2026-07-28T09:01:27.402Z",
     "reviewNotes": "Approved: tracker-before-prefix precedence is correct, tested, documented, and introduces no blockers.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
