@@ -17,6 +17,11 @@
       "timestamp": "2026-07-28T23:16:59.760Z",
       "reason": "end",
       "note": "Fixed lint: composer-commands.generated.ts had drifted from the CLI registry after the --harness help text was widened to include kimi-code (plan/start/strike). Regenerated via npm run generate:slash-commands, no manual edits. Full lint chain now exits 0; typecheck clean."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-28T23:23:32.830Z"
     }
   ],
   "feedback": [],
@@ -234,7 +239,7 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T23:23:31.839Z",
+  "updated": "2026-07-28T23:23:32.857Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "reviewing",
@@ -524,7 +529,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-1837",
