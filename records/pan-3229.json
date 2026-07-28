@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T20:15:27.169Z",
+  "updated": "2026-07-28T20:15:30.550Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "pending",
@@ -207,5 +207,49 @@
     "docs-recovery-owner": "completed",
     "docs-recovery-owner.docs-recovery-owner.ac1": "completed",
     "docs-recovery-owner.docs-recovery-owner.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "docs/FLYWHEEL-STATE.md",
+      "scripts/file-size-allowlist.txt",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      ".gitignore",
+      "docs/DEACON-HEALTH-MONITORING.md",
+      "docs/XBRIEF.md",
+      "src/cli/commands/plan-finalize.ts",
+      "src/lib/cloister/__tests__/pending-promotion-convergence.test.ts",
+      "src/lib/cloister/__tests__/pending-promotion-reconciler.test.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/pending-promotion-reconciler.ts",
+      "src/lib/overdeck/__tests__/planning-promotion-marker-cleanup.test.ts",
+      "src/lib/overdeck/planning-promotion.ts",
+      "src/lib/pan-dir/types.ts",
+      "tests/unit/cli/plan-finalize-pending-promotion.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".gitignore",
+      "docs/DEACON-HEALTH-MONITORING.md",
+      "docs/FLYWHEEL-STATE.md",
+      "docs/XBRIEF.md",
+      "scripts/file-size-allowlist.txt",
+      "src/cli/commands/plan-finalize.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx",
+      "src/lib/cloister/__tests__/pending-promotion-convergence.test.ts",
+      "src/lib/cloister/__tests__/pending-promotion-reconciler.test.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/pending-promotion-reconciler.ts",
+      "src/lib/overdeck/__tests__/planning-promotion-marker-cleanup.test.ts",
+      "src/lib/overdeck/planning-promotion.ts",
+      "src/lib/pan-dir/types.ts",
+      "tests/unit/cli/plan-finalize-pending-promotion.test.ts"
+    ],
+    "recordedAt": "2026-07-28T20:15:30.548Z"
   }
 }
