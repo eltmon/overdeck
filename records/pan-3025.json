@@ -75,22 +75,22 @@
     "recordedAt": "2026-07-28T07:42:23.831Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T08:22:36.434Z",
+  "updated": "2026-07-28T08:32:15.379Z",
   "pipeline": {
     "issueId": "PAN-3025",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:42:37.547Z",
-    "updatedAt": "2026-07-28T08:11:35.456Z",
+    "updatedAt": "2026-07-28T08:32:15.205Z",
     "reviewNotes": "Verification failed at test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3221",
     "lastVerifiedCommit": "6b218e665a20aeecd3e51dd3a9da4e695b49aa3e",
     "reviewRequestedAt": "2026-07-28T07:42:37.547Z",
-    "reviewSpawnedAt": "2026-07-28T07:55:33.958Z",
+    "reviewSpawnedAt": "2026-07-28T08:32:15.204Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/__tests__/close-out-terminal.test.ts",
@@ -139,10 +139,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1157,
-            "output": 51424,
-            "cacheRead": 26006494,
-            "cacheWrite": 1148935
+            "input": 1204,
+            "output": 52237,
+            "cacheRead": 26472372,
+            "cacheWrite": 1487143
           }
         }
       },
@@ -154,15 +154,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1157,
-          "output": 51424,
-          "cacheRead": 26006494,
-          "cacheWrite": 1148935
+          "input": 1204,
+          "output": 52237,
+          "cacheRead": 26472372,
+          "cacheWrite": 1487143
         }
       },
       "costAtCloseOut": {
-        "usd": 6.254863,
-        "pricingAsOf": "2026-07-28T08:11:35.485Z"
+        "usd": 6.728322,
+        "pricingAsOf": "2026-07-28T08:32:15.343Z"
       }
     },
     "merges": [
