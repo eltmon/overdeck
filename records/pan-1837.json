@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T19:31:19.414Z",
+  "updated": "2026-07-28T19:31:27.917Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "wi5-runtime-adapter": {
-        "writerId": "agent-pan-1837",
-        "agentId": "agent-pan-1837",
-        "pid": 1484166,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T19:31:19.413Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -155,6 +147,17 @@
         "outcome": "completed",
         "reason": "Added buildKimiCodeCommand (kimi -m <model> [--yolo] [--add-dir <dir>]..., wrapped in the PTY supervisor, no --session/--work-dir/-p per D2/erratum E1), wired into both dispatch sites, plus the kimiCodeModel/kimiCodeYolo/kimiCodeAddDirs LauncherConfig fields. Added getKimiCodeLauncherFields and the kimi-code-tui stub-command branch in both getAgentRuntimeBaseCommand/getRoleRuntimeBaseCommand, mirroring the acp-host pattern; unsetProviderEnv:true reuses the existing PROVIDER_ENV_UNSETS list for D4/H3. Extended launcher-generator.test.ts with 6 new kimi-code assertions (all 70 tests pass). Had to allowlist launcher-generator.ts's growth (1005 lines, was 1000). typecheck unchanged (only wi11's frontend gap remains). Actually wiring these fields into the real spawn call sites (spawn.ts/spawn-prep.ts/conversation-runtime.ts) is wi5's scope, not touched here.",
         "releasedAt": "2026-07-28T19:14:42.907Z"
+      },
+      {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 1484166,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T19:31:19.413Z",
+        "itemId": "wi5-runtime-adapter",
+        "outcome": "completed",
+        "reason": "Implemented src/lib/runtimes/kimi-code.ts (full AgentRuntimeSync contract) modeled on acp.ts and codex.ts: workDirKey derivation verified against installed kimi 0.29.2 and real sessions; spawnAgent uses wi6's launcher plus tmuxCreateSession and polls for a newly-appeared session dir; sendMessage delegates to the existing generic deliverAgentMessage cascade; killAgent mirrors ACPs escalation ladder; getTokenUsage/getSessionCost stub null until wi8b lands (matches ACPs own stub). Registered in runtimes/index.ts. 39/39 tests pass across the three verify_commands files, acp suite unchanged and green (NFR-1). Deviation: spawn.ts per-harness launcher-fields switch has no kimi-code branch yet -- no xBRIEF item claims that wiring; deferred to be wired alongside wi14 end-to-end verification instead of done speculatively now.",
+        "releasedAt": "2026-07-28T19:31:27.917Z"
       }
     ],
     "statusReasons": {
@@ -181,6 +184,10 @@
       "wi6-launcher-command": {
         "reason": "Added buildKimiCodeCommand (kimi -m <model> [--yolo] [--add-dir <dir>]..., wrapped in the PTY supervisor, no --session/--work-dir/-p per D2/erratum E1), wired into both dispatch sites, plus the kimiCodeModel/kimiCodeYolo/kimiCodeAddDirs LauncherConfig fields. Added getKimiCodeLauncherFields and the kimi-code-tui stub-command branch in both getAgentRuntimeBaseCommand/getRoleRuntimeBaseCommand, mirroring the acp-host pattern; unsetProviderEnv:true reuses the existing PROVIDER_ENV_UNSETS list for D4/H3. Extended launcher-generator.test.ts with 6 new kimi-code assertions (all 70 tests pass). Had to allowlist launcher-generator.ts's growth (1005 lines, was 1000). typecheck unchanged (only wi11's frontend gap remains). Actually wiring these fields into the real spawn call sites (spawn.ts/spawn-prep.ts/conversation-runtime.ts) is wi5's scope, not touched here.",
         "updatedAt": "2026-07-28T19:14:42.907Z"
+      },
+      "wi5-runtime-adapter": {
+        "reason": "Implemented src/lib/runtimes/kimi-code.ts (full AgentRuntimeSync contract) modeled on acp.ts and codex.ts: workDirKey derivation verified against installed kimi 0.29.2 and real sessions; spawnAgent uses wi6's launcher plus tmuxCreateSession and polls for a newly-appeared session dir; sendMessage delegates to the existing generic deliverAgentMessage cascade; killAgent mirrors ACPs escalation ladder; getTokenUsage/getSessionCost stub null until wi8b lands (matches ACPs own stub). Registered in runtimes/index.ts. 39/39 tests pass across the three verify_commands files, acp suite unchanged and green (NFR-1). Deviation: spawn.ts per-harness launcher-fields switch has no kimi-code branch yet -- no xBRIEF item claims that wiring; deferred to be wired alongside wi14 end-to-end verification instead of done speculatively now.",
+        "updatedAt": "2026-07-28T19:31:27.917Z"
       }
     }
   },
@@ -212,6 +219,11 @@
     "wi6-launcher-command.wi6-launcher-command.ac2": "completed",
     "wi6-launcher-command.wi6-launcher-command.ac3": "completed",
     "wi6-launcher-command.wi6-launcher-command.ac4": "completed",
-    "wi5-runtime-adapter": "running"
+    "wi5-runtime-adapter": "completed",
+    "wi5-runtime-adapter.wi5-runtime-adapter.ac1": "completed",
+    "wi5-runtime-adapter.wi5-runtime-adapter.ac2": "completed",
+    "wi5-runtime-adapter.wi5-runtime-adapter.ac3": "completed",
+    "wi5-runtime-adapter.wi5-runtime-adapter.ac4": "completed",
+    "wi5-runtime-adapter.wi5-runtime-adapter.ac5": "completed"
   }
 }
