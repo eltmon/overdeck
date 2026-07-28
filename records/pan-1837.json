@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T18:43:05.403Z",
+  "updated": "2026-07-28T18:54:36.403Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "wi3-binary-map": {
-        "writerId": "agent-pan-1837",
-        "agentId": "agent-pan-1837",
-        "pid": 3804293,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T18:42:45.933Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -111,6 +103,17 @@
         "outcome": "completed",
         "reason": "Added KIMI_CODE_BEHAVIOR to the harness behavior matrix exactly per PRD WI-2: extended the *Kind discriminant unions, registered the constant in BEHAVIORS (Record<RuntimeName,...>, compiler-forced) and getHarnessBehavior(). Added matrix tests (getRuntimeBehavior/getHarnessBehavior identity + discriminant field assertions). This closes the harness-behavior.ts typecheck gap left open by wi1; only wi11's frontend Record<Harness,...> gaps remain in the frontend ratchet.",
         "releasedAt": "2026-07-28T18:42:17.054Z"
+      },
+      {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 3804293,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T18:42:45.933Z",
+        "itemId": "wi3-binary-map",
+        "outcome": "completed",
+        "reason": "Implemented the binary map per PRD WI-3: explicit 'Kimi Code CLI' name-ladder arm, new config.kimiCode.binaryPath setting (schema/defaults/merge), and configuredHarnessBinaryPath reading it for kimi-code independently of acp's config.acp.kimi.binaryPath. Also fixed 4 additional hand-rolled harness allowlists discovered along the way (config-yaml merge/roles validators, settings-api validators, tier-table isRuntimeName) that would have silently rejected 'kimi-code' as invalid config despite the type permitting it — updated the 3 tests asserting the old error strings. Had to add an audited file-size-allowlist.txt entry for config-yaml/schema.ts (1023 lines, was 1010) since the new kimiCode config section pushed it past the ratchet. All harness-binary/config-yaml/settings-api/tier-table tests pass; npm run typecheck stays at the same green state as after wi2 (only wi11's frontend gap remains).",
+        "releasedAt": "2026-07-28T18:54:36.403Z"
       }
     ],
     "statusReasons": {
@@ -121,6 +124,10 @@
       "wi2-behavior-matrix": {
         "reason": "Added KIMI_CODE_BEHAVIOR to the harness behavior matrix exactly per PRD WI-2: extended the *Kind discriminant unions, registered the constant in BEHAVIORS (Record<RuntimeName,...>, compiler-forced) and getHarnessBehavior(). Added matrix tests (getRuntimeBehavior/getHarnessBehavior identity + discriminant field assertions). This closes the harness-behavior.ts typecheck gap left open by wi1; only wi11's frontend Record<Harness,...> gaps remain in the frontend ratchet.",
         "updatedAt": "2026-07-28T18:42:17.054Z"
+      },
+      "wi3-binary-map": {
+        "reason": "Implemented the binary map per PRD WI-3: explicit 'Kimi Code CLI' name-ladder arm, new config.kimiCode.binaryPath setting (schema/defaults/merge), and configuredHarnessBinaryPath reading it for kimi-code independently of acp's config.acp.kimi.binaryPath. Also fixed 4 additional hand-rolled harness allowlists discovered along the way (config-yaml merge/roles validators, settings-api validators, tier-table isRuntimeName) that would have silently rejected 'kimi-code' as invalid config despite the type permitting it — updated the 3 tests asserting the old error strings. Had to add an audited file-size-allowlist.txt entry for config-yaml/schema.ts (1023 lines, was 1010) since the new kimiCode config section pushed it past the ratchet. All harness-binary/config-yaml/settings-api/tier-table tests pass; npm run typecheck stays at the same green state as after wi2 (only wi11's frontend gap remains).",
+        "updatedAt": "2026-07-28T18:54:36.403Z"
       }
     }
   },
@@ -134,6 +141,9 @@
     "wi2-behavior-matrix.wi2-behavior-matrix.ac1": "completed",
     "wi2-behavior-matrix.wi2-behavior-matrix.ac2": "completed",
     "wi2-behavior-matrix.wi2-behavior-matrix.ac3": "completed",
-    "wi3-binary-map": "running"
+    "wi3-binary-map": "completed",
+    "wi3-binary-map.wi3-binary-map.ac1": "completed",
+    "wi3-binary-map.wi3-binary-map.ac2": "completed",
+    "wi3-binary-map.wi3-binary-map.ac3": "completed"
   }
 }
