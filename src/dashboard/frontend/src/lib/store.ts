@@ -384,6 +384,10 @@ export interface PendingInputSubject {
   permissionRequestIds: string[]
   /** Oldest blocking timestamp for stable ordering. */
   since: string
+  /** The pending input prompt from the agent enrichment (for pending-input display). */
+  pendingQuestionPrompt?: string
+  /** The pending input reason from the agent enrichment (for classification). */
+  pendingQuestionReason?: string
 }
 
 function deriveMemo<S, A, B, R>(
@@ -479,6 +483,8 @@ export const selectPendingInputSubjects = deriveMemo<
         pendingProposedPlan: a.pendingProposedPlan,
         permissionRequestIds: agentPerms.map((p) => p.requestId),
         since,
+        pendingQuestionPrompt: a.pendingQuestionPrompt,
+        pendingQuestionReason: a.pendingQuestionReason,
       })
     }
     subjects.sort((x, y) =>

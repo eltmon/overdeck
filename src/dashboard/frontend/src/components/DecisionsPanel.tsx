@@ -14,6 +14,7 @@
 import { useAskUserQuestionUiStore } from '../lib/askUserQuestionUiStore';
 import { useDecisions, type Decision } from '../lib/useDecisions';
 import { describePendingInput } from '../lib/pendingInput';
+import { getPendingQuestionTitle } from '../lib/pipeline-state';
 import { AwaitingInputIndicator } from './AwaitingInputIndicator';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { formatIssueRef } from '../lib/issueLabel';
@@ -23,9 +24,16 @@ import styles from './styles/decisions.module.css';
 function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSubject?: (d: Decision) => void }) {
   const requestReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
   const now = useNow();
+  const enrichmentTitle = decision.pendingQuestionPrompt
+    ? getPendingQuestionTitle({
+        pendingQuestionPrompt: decision.pendingQuestionPrompt,
+        pendingQuestionReason: decision.pendingQuestionReason,
+        pendingQuestionCount: 1,
+      })
+    : undefined;
   const prompt =
     decision.pendingAskUserQuestion?.questions?.[0]?.question ??
-    (decision.pendingProposedPlan ? 'A plan is ready for your review.' : describePendingInput(decision.kinds));
+    (decision.pendingProposedPlan ? 'A plan is ready for your review.' : enrichmentTitle ?? describePendingInput(decision.kinds));
   const issueRef = formatIssueRef(decision.issueId, decision.issueTitle);
 
   return (
