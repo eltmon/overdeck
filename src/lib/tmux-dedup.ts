@@ -16,11 +16,15 @@
  *
  *   (none) ──paste──► PENDING ──atomic claim+Enter──► TERMINAL
  *
- * - `sendKeysDedup` atomically pastes and sets the PENDING option only when
- *   neither option is set. A replay that finds PENDING (a prior attempt
- *   crashed before submitting) returns 'submit-pending' WITHOUT re-pasting.
- *   A POISON breadcrumb (a terminal marker that proved false but could not be
- *   rolled back) is repaired first and never honored as a dedup.
+ * - `sendKeysDedup` atomically pastes and sets PENDING plus payload-state
+ *   `unverified`. Recovery proves that payload in the cursor-anchored composer
+ *   before reusing the claim, or re-pastes after positive absence. An Enter
+ *   attempt atomically advances the state to `enter-attempted`, so rollback
+ *   recovery does not duplicate content that may already have landed. State
+ *   reads are strict; unset legacy and unknown values fail closed.
+ *   A POISON breadcrumb (a terminal marker that proved
+ *   false but could not be rolled back) is repaired first and never honored as
+ *   a dedup.
  * - `completeKeyedSubmit` issues ONE `if-shell`: only when PENDING is
  *   present, TERMINAL absent, and the pane alive does the tmux server send
  *   the Enter and then flip TERMINAL and clear PENDING — in that order, in a
@@ -37,9 +41,15 @@ import { randomUUID } from 'node:crypto';
 import { unlink, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { tmuxExecAsync, validateSessionName } from './tmux.js';
+import { capturePaneText, deliveryVerifyLine, tmuxExecAsync, validateSessionName } from './tmux.js';
+import { MessageDeliveryFailed } from './errors.js';
+import { paneHasBlockingChoiceMenu } from './pane-choice-menu.js';
 
 export const DEDUP_KEY_RE = /^[A-Za-z0-9:_-]+$/;
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
 
 /** Set once the keyed message has been SUBMITTED (Enter sent). */
 export function dedupTerminalOptionName(dedupKey: string): string {
@@ -71,6 +81,14 @@ export function dedupPoisonOptionName(dedupKey: string): string {
 export function dedupTargetOptionName(dedupKey: string): string {
   return `@overdeck-dedup-target-${dedupKey}`;
 }
+
+/** Explicit payload phase for a pending claim; unset means legacy/unknown. */
+export function dedupPayloadStateOptionName(dedupKey: string): string {
+  return `@overdeck-dedup-payload-state-${dedupKey}`;
+}
+
+const PAYLOAD_STATE_UNVERIFIED = 'unverified';
+const PAYLOAD_STATE_ENTER_ATTEMPTED = 'enter-attempted';
 
 export function assertValidDedupKey(dedupKey: string): void {
   if (!DEDUP_KEY_RE.test(dedupKey)) {
@@ -105,6 +123,28 @@ export class KeyedSubmitTargetDeadError extends Error {
     );
     this.name = 'KeyedSubmitTargetDeadError';
   }
+}
+
+/**
+ * The pane is blocked on a harness choice menu, so Enter was deliberately not
+ * sent. Recoverable: the pending outbox entry must re-drive the same key, and
+ * sendKeysDedup proves the payload is still visible before reusing any pending
+ * claim; a swallowed paste is re-pasted instead.
+ */
+export class KeyedSubmitBlockedMenuError extends MessageDeliveryFailed {
+  constructor(sessionName: string, dedupKey: string, paneSnapshot: string) {
+    super(
+      `Keyed submit to ${sessionName} aborted: the pane is blocked on a choice menu, so Enter would answer that menu (key "${dedupKey}")`,
+      sessionName,
+      paneSnapshot,
+    );
+    this.name = 'KeyedSubmitBlockedMenuError';
+  }
+}
+
+export function isKeyedSubmitBlockedMenuError(error: unknown): error is KeyedSubmitBlockedMenuError {
+  return error instanceof KeyedSubmitBlockedMenuError
+    || (error instanceof Error && error.name === 'KeyedSubmitBlockedMenuError');
 }
 
 /**
@@ -156,6 +196,83 @@ async function readMarkerStrict(sessionName: string, option: string): Promise<st
   return String(result.stdout).trim();
 }
 
+type PendingPayloadState = typeof PAYLOAD_STATE_UNVERIFIED | typeof PAYLOAD_STATE_ENTER_ATTEMPTED;
+
+async function readPendingPayloadState(
+  sessionName: string,
+  dedupKey: string,
+  option: string,
+  readStrict: (sessionName: string, option: string) => Promise<string>,
+  context: string,
+): Promise<PendingPayloadState> {
+  let state: string;
+  try {
+    state = await readStrict(sessionName, option);
+  } catch (error) {
+    throw new KeyedMarkerVerificationError(sessionName, `${context} payload-state read (key "${dedupKey}")`, { cause: error });
+  }
+  if (state === PAYLOAD_STATE_UNVERIFIED || state === PAYLOAD_STATE_ENTER_ATTEMPTED) return state;
+  const detail = state === '' ? 'legacy/unset' : `unknown value "${state}"`;
+  throw new KeyedMarkerVerificationError(sessionName, `${context} payload-state is ${detail} (key "${dedupKey}")`);
+}
+
+type PayloadPresence = 'present' | 'absent' | 'unproven';
+
+interface PaneViewport {
+  text: string;
+  cursorY: number;
+}
+
+async function captureVisiblePane(sessionName: string): Promise<PaneViewport> {
+  const [pane, cursor] = await Promise.all([
+    tmuxExecAsync(['capture-pane', '-t', sessionName, '-p'], { encoding: 'utf-8' }),
+    tmuxExecAsync(['display-message', '-p', '-t', sessionName, '#{cursor_y}'], { encoding: 'utf-8' }),
+  ]);
+  const cursorY = Number.parseInt(String(cursor.stdout).trim(), 10);
+  if (!Number.isInteger(cursorY)) throw new Error(`Unreadable cursor row for ${sessionName}`);
+  return { text: String(pane.stdout), cursorY };
+}
+
+const PANE_ANSI_PATTERN = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;
+const COMPOSER_TOP_BOUNDARY = /^\s*[─━═]{6,}/;
+
+function activeComposerRegion(viewport: PaneViewport): string | null {
+  const lines = viewport.text
+    .replace(PANE_ANSI_PATTERN, '')
+    .split('\n')
+    .map(line => line.replace(/\s+$/g, ''));
+  if (lines.every(line => line.trim() === '')) return null;
+  if (viewport.cursorY < 0 || viewport.cursorY >= lines.length) return null;
+
+  let start = viewport.cursorY;
+  for (let index = viewport.cursorY; index >= 0; index -= 1) {
+    if (COMPOSER_TOP_BOUNDARY.test(lines[index]!)) {
+      start = index + 1;
+      break;
+    }
+  }
+  return lines.slice(start, viewport.cursorY + 1).join('\n');
+}
+
+async function pendingPayloadPresence(
+  sessionName: string,
+  keys: string,
+  readViewport: (sessionName: string) => Promise<PaneViewport>,
+): Promise<PayloadPresence> {
+  const verifyLine = deliveryVerifyLine(keys);
+  if (verifyLine.length < 3) return 'unproven';
+
+  let viewport: PaneViewport;
+  try {
+    viewport = await readViewport(sessionName);
+  } catch {
+    return 'unproven';
+  }
+  const composer = activeComposerRegion(viewport);
+  if (composer === null) return 'unproven';
+  return composer.includes(verifyLine.slice(0, 40)) ? 'present' : 'absent';
+}
+
 /**
  * Clear the poison breadcrumb and VERIFY it is gone with a strict read.
  * EVERY failure here — the clear command, the verification read, or a
@@ -191,6 +308,12 @@ export interface KeyedTmuxDeps {
   readMarkerStrict?: (sessionName: string, option: string) => Promise<string>;
   /** Test seam for target-read failures; production uses the real tmux read. */
   readPaneTarget?: (sessionName: string) => Promise<PaneTarget>;
+  /** Test seam for blocking-menu detection; production captures the pane tail. */
+  readPaneText?: (sessionName: string, lines: number) => Promise<string>;
+  /** Test seam for payload proof; production captures the visible grid + cursor row. */
+  readPaneViewport?: (sessionName: string) => Promise<PaneViewport>;
+  /** Test seam for recovery re-paste command failures. */
+  runTmuxCommand?: (args: string[]) => Promise<void>;
 }
 
 /**
@@ -215,24 +338,27 @@ async function repairPoisonedMarkers(
   const terminalOption = dedupTerminalOptionName(dedupKey);
   const pendingOption = dedupPendingOptionName(dedupKey);
   const poisonOption = dedupPoisonOptionName(dedupKey);
+  const payloadStateOption = dedupPayloadStateOptionName(dedupKey);
   await tmuxExecAsync([
     'set-option', '-u', '-t', sessionName, terminalOption,
-    ';',
-    'set-option', '-t', sessionName, pendingOption, sendId,
+    ';', 'set-option', '-t', sessionName, pendingOption, sendId,
+    ';', 'set-option', '-t', sessionName, payloadStateOption, PAYLOAD_STATE_ENTER_ATTEMPTED,
   ], { encoding: 'utf-8' });
   let repairedTerminal: string;
   let repairedPending: string;
+  let repairedPayloadState: string;
   try {
     // STRICT reads (cycle 13): a failed verification read must abort while
     // the breadcrumb stays authoritative — never convert it to empty state.
-    [repairedTerminal, repairedPending] = await Promise.all([
+    [repairedTerminal, repairedPending, repairedPayloadState] = await Promise.all([
       readStrict(sessionName, terminalOption),
       readStrict(sessionName, pendingOption),
+      readStrict(sessionName, payloadStateOption),
     ]);
   } catch {
     throw new KeyedMarkerVerificationError(sessionName, `repair verification of key "${dedupKey}"`);
   }
-  if (repairedTerminal !== '' || repairedPending === '') {
+  if (repairedTerminal !== '' || repairedPending === '' || repairedPayloadState !== PAYLOAD_STATE_ENTER_ATTEMPTED) {
     throw new Error(`Keyed tmux markers for ${sessionName} are poisoned and could not be repaired (key "${dedupKey}")`);
   }
   await clearPoisonVerified(sessionName, poisonOption, `repair of key "${dedupKey}"`, readStrict);
@@ -264,6 +390,7 @@ export async function sendKeysDedup(
   const terminalOption = dedupTerminalOptionName(dedupKey);
   const pendingOption = dedupPendingOptionName(dedupKey);
   const poisonOption = dedupPoisonOptionName(dedupKey);
+  const payloadStateOption = dedupPayloadStateOptionName(dedupKey);
 
   const sendId = randomUUID();
 
@@ -305,7 +432,7 @@ export async function sendKeysDedup(
       await tmuxExecAsync([
         'if-shell', '-t', sessionName,
         `test -z "$(tmux show-option -qv -t ${sessionName} ${pendingOption})" && test -z "$(tmux show-option -qv -t ${sessionName} ${terminalOption})"`,
-        `paste-buffer -b ${bufferName} -p -t ${sessionName} \; set-option -t ${sessionName} ${pendingOption} ${sendId} \; set-option -F -t ${sessionName} ${targetOption} '#{pane_pid}'`,
+        `paste-buffer -b ${bufferName} -p -t ${sessionName} \; set-option -t ${sessionName} ${pendingOption} ${sendId} \; set-option -F -t ${sessionName} ${targetOption} '#{pane_pid}' \; set-option -t ${sessionName} ${payloadStateOption} ${PAYLOAD_STATE_UNVERIFIED}`,
       ], { encoding: 'utf-8' });
     }
 
@@ -317,27 +444,52 @@ export async function sendKeysDedup(
     if (terminalMarker !== '') return 'deduplicated';
     if (!repaired && pendingMarker === sendId) return 'pasted';
     if (pendingMarker !== '') {
-      // A prior attempt's claim (or a repaired one) is still pending. The
-      // pasted content is only reusable when the current pane IS the pane
-      // that received it (cycle 13): a replaced pane (respawned harness,
-      // crashed session that kept its options) has an empty composer, so
-      // completing with Enter alone would acknowledge a blank submission.
-      // Re-paste the real content instead.
+      // A pending claim is reusable only when BOTH the pane identity and the
+      // payload are still present. A blocking menu can swallow a paste without
+      // replacing the pane, so PID equality alone cannot authorize Enter while
+      // the paste is still marked payload-unverified. Once an Enter attempt
+      // begins, that marker is cleared atomically; rollback recovery then keeps
+      // the prior submit-pending semantics and never duplicates content that
+      // may already have been accepted.
       const recordedTarget = await read(sessionName, targetOption);
       const currentPid = (await (deps.readPaneTarget ?? readPaneTarget)(sessionName)).pid;
+      const payloadState = await readPendingPayloadState(
+        sessionName,
+        dedupKey,
+        payloadStateOption,
+        readStrict,
+        'pending claim',
+      );
+      const readViewport = deps.readPaneViewport ?? captureVisiblePane;
       if (recordedTarget !== '' && currentPid !== '' && recordedTarget === currentPid) {
-        return 'submit-pending';
+        if (payloadState === PAYLOAD_STATE_ENTER_ATTEMPTED) return 'submit-pending';
+        const presence = await pendingPayloadPresence(sessionName, keys, readViewport);
+        if (presence === 'present') return 'submit-pending';
+        if (presence === 'unproven') {
+          throw new KeyedMarkerVerificationError(sessionName, `pending payload visibility (key "${dedupKey}")`);
+        }
       }
-      // One server-side command: re-paste only when the pending claim still
-      // stands, no terminal exists, and the recorded target does NOT match
-      // the current pane — and record the NEW target in the same breath.
-      await tmuxExecAsync([
+
+      // Re-paste atomically only while the exact claim we inspected is still
+      // pending and no terminal marker exists. If this command fails, recovery
+      // retries the same key; it can never reuse the stale claim without again
+      // proving the payload is visible.
+      const repasteArgs = [
         'if-shell', '-t', sessionName,
-        `test -n "$(tmux show-option -qv -t ${sessionName} ${pendingOption})" && ` +
-        `test -z "$(tmux show-option -qv -t ${sessionName} ${terminalOption})" && ` +
-        `! test "$(tmux display-message -p -t ${sessionName} '#{pane_pid}')" = "$(tmux show-option -qv -t ${sessionName} ${targetOption})"`,
-        `paste-buffer -b ${bufferName} -p -t ${sessionName} \; set-option -t ${sessionName} ${pendingOption} ${sendId} \; set-option -F -t ${sessionName} ${targetOption} '#{pane_pid}'`,
-      ], { encoding: 'utf-8' });
+        `test "$(tmux show-option -qv -t ${sessionName} ${pendingOption})" = ${shellQuote(pendingMarker)} && ` +
+        `test -z "$(tmux show-option -qv -t ${sessionName} ${terminalOption})"`,
+        `paste-buffer -b ${bufferName} -p -t ${sessionName} \; set-option -t ${sessionName} ${pendingOption} ${sendId} \; set-option -F -t ${sessionName} ${targetOption} '#{pane_pid}' \; set-option -t ${sessionName} ${payloadStateOption} ${PAYLOAD_STATE_UNVERIFIED}`,
+      ];
+      try {
+        if (deps.runTmuxCommand) {
+          await deps.runTmuxCommand(repasteArgs);
+        } else {
+          await tmuxExecAsync(repasteArgs, { encoding: 'utf-8' });
+        }
+      } catch (error) {
+        throw new KeyedMarkerVerificationError(sessionName, `pending payload re-paste command (key "${dedupKey}")`, { cause: error });
+      }
+
       const [repastedPending, repastedTerminal, repastedTarget] = await Promise.all([
         read(sessionName, pendingOption),
         read(sessionName, terminalOption),
@@ -346,10 +498,23 @@ export async function sendKeysDedup(
       if (repastedTerminal !== '') return 'deduplicated';
       if (repastedPending === sendId) return 'pasted';
       if (repastedPending !== '') {
-        // A concurrent attempt owns the claim; honor it only if its target
-        // matches the current pane.
+        // A concurrent attempt owns the claim; honor it only if its target and
+        // payload both match the current active composer. Any other state is
+        // recoverable but unproven, so a later pass re-evaluates it.
         const nowPid = (await (deps.readPaneTarget ?? readPaneTarget)(sessionName)).pid;
-        if (repastedTarget !== '' && nowPid !== '' && repastedTarget === nowPid) return 'submit-pending';
+        const repastedPayloadState = await readPendingPayloadState(
+          sessionName,
+          dedupKey,
+          payloadStateOption,
+          readStrict,
+          'concurrent claim',
+        );
+        if (repastedTarget !== '' && nowPid !== '' && repastedTarget === nowPid) {
+          if (repastedPayloadState === PAYLOAD_STATE_ENTER_ATTEMPTED) return 'submit-pending';
+          const presence = await pendingPayloadPresence(sessionName, keys, readViewport);
+          if (presence === 'present') return 'submit-pending';
+        }
+        throw new KeyedMarkerVerificationError(sessionName, `concurrent pending payload visibility (key "${dedupKey}")`);
       }
     }
     throw new Error(
@@ -412,6 +577,7 @@ export async function completeKeyedSubmit(
   const pendingOption = dedupPendingOptionName(dedupKey);
   const poisonOption = dedupPoisonOptionName(dedupKey);
   const targetOption = dedupTargetOptionName(dedupKey);
+  const payloadStateOption = dedupPayloadStateOptionName(dedupKey);
 
   await new Promise(resolve => setTimeout(resolve, PASTE_SETTLE_MS));
 
@@ -422,6 +588,13 @@ export async function completeKeyedSubmit(
   // post-submit check below (cycle 10).
   const preTarget = await readTarget(sessionName);
   const pendingBefore = await read(sessionName, pendingOption);
+
+  if (pendingBefore !== '') {
+    const paneSnapshot = await (deps.readPaneText ?? capturePaneText)(sessionName, 90).catch(() => '');
+    if (paneSnapshot && paneHasBlockingChoiceMenu(paneSnapshot)) {
+      throw new KeyedSubmitBlockedMenuError(sessionName, dedupKey, paneSnapshot);
+    }
+  }
 
   // PROVISIONAL from birth (cycle 12): the Enter, the POISON breadcrumb, the
   // TERMINAL marker, and the pending clear are ONE server-owned command list,
@@ -436,7 +609,7 @@ export async function completeKeyedSubmit(
     `test -n "$(tmux show-option -qv -t ${sessionName} ${pendingOption})" && ` +
     `test "$(tmux display-message -p -t ${sessionName} '#{pane_dead}')" = "0" && ` +
     `test "$(tmux display-message -p -t ${sessionName} '#{pane_pid}')" = "$(tmux show-option -qv -t ${sessionName} ${targetOption})"`,
-    `send-keys -t ${sessionName} C-m \; set-option -t ${sessionName} ${poisonOption} 1 \; set-option -t ${sessionName} ${terminalOption} 1 \; set-option -u -t ${sessionName} ${pendingOption}`,
+    `send-keys -t ${sessionName} C-m \; set-option -t ${sessionName} ${poisonOption} 1 \; set-option -t ${sessionName} ${terminalOption} 1 \; set-option -u -t ${sessionName} ${pendingOption} \; set-option -t ${sessionName} ${payloadStateOption} ${PAYLOAD_STATE_ENTER_ATTEMPTED}`,
   ], { encoding: 'utf-8' });
 
   const [terminalAfter, pendingAfter, postTarget, recordedTarget] = await Promise.all([
@@ -471,22 +644,36 @@ export async function completeKeyedSubmit(
     // 13): the breadcrumb set by the submit list already marks the terminal
     // provisional, so a failed rollback can never leave it honorable.
     const rollbackArgs = pendingBefore === ''
-      ? ['set-option', '-u', '-t', sessionName, terminalOption, ';', 'set-option', '-u', '-t', sessionName, pendingOption]
-      : ['set-option', '-u', '-t', sessionName, terminalOption, ';', 'set-option', '-t', sessionName, pendingOption, pendingBefore];
+      ? [
+          'set-option', '-u', '-t', sessionName, terminalOption,
+          ';', 'set-option', '-u', '-t', sessionName, pendingOption,
+          ';', 'set-option', '-t', sessionName, payloadStateOption, PAYLOAD_STATE_ENTER_ATTEMPTED,
+        ]
+      : [
+          'set-option', '-u', '-t', sessionName, terminalOption,
+          ';', 'set-option', '-t', sessionName, pendingOption, pendingBefore,
+          ';', 'set-option', '-t', sessionName, payloadStateOption, PAYLOAD_STATE_ENTER_ATTEMPTED,
+        ];
     await tmuxExecAsync(rollbackArgs, { encoding: 'utf-8' }).catch(() => {});
     let rolledTerminal: string;
     let restoredPending: string;
+    let remainingPayloadState: string;
     try {
-      [rolledTerminal, restoredPending] = await Promise.all([
+      [rolledTerminal, restoredPending, remainingPayloadState] = await Promise.all([
         readStrict(sessionName, terminalOption),
         readStrict(sessionName, pendingOption),
+        readStrict(sessionName, payloadStateOption),
       ]);
     } catch {
       // Verification read failed — rollback state unproven; the breadcrumb
       // stays authoritative and recovery retries.
       throw new KeyedMarkerVerificationError(sessionName, `rollback verification of key "${dedupKey}"`);
     }
-    if (rolledTerminal === '' && restoredPending !== '') {
+    if (
+      rolledTerminal === ''
+      && restoredPending !== ''
+      && remainingPayloadState === PAYLOAD_STATE_ENTER_ATTEMPTED
+    ) {
       // Verified rollback — lift the breadcrumb. If the clear fails the
       // surviving poison is idempotent-safe here (terminal is already clear,
       // so a later repair restores the same pending state and retries).

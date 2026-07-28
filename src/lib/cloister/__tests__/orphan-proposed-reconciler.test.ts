@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { basename, join } from 'path';
 
 const activityLogger = vi.hoisted(() => ({
   emitActivityEntrySync: vi.fn(),
@@ -123,6 +123,39 @@ function writeSpec(
       edges: [],
     },
   }, null, 2));
+}
+
+function markMigrated(projectPath: string): string {
+  const stateRoot = join(testDir, 'state', basename(projectPath));
+  mkdirSync(stateRoot, { recursive: true });
+  writeFileSync(join(stateRoot, 'migration-complete.json'), JSON.stringify({
+    version: 1,
+    sourceMainSha: 'a'.repeat(40),
+    stateBranchSha: 'b'.repeat(40),
+    completedAt: '2026-07-28T00:00:00.000Z',
+  }));
+  return stateRoot;
+}
+
+function writeSpecToDir(
+  specsDir: string,
+  issueId: string,
+  status: string,
+  planItemCount = 2,
+): string {
+  mkdirSync(specsDir, { recursive: true });
+  const specPath = join(specsDir, `${issueId}.xbrief.json`);
+  writeFileSync(specPath, JSON.stringify({
+    xBRIEFInfo: { version: '0.8', created: '2026-07-28T00:00:00.000Z' },
+    plan: {
+      id: issueId,
+      title: issueId,
+      status,
+      items: Array.from({ length: planItemCount }, (_, index) => ({ id: `item-${index + 1}`, title: `Item ${index + 1}` })),
+      edges: [],
+    },
+  }, null, 2));
+  return specPath;
 }
 
 function writeTasks(projectPath: string, issueId: string, taskCount = 2): void {
@@ -286,6 +319,45 @@ describe('orphan proposed spec reconciler', () => {
 
     expect(reviewStatusStore.getReviewStatusSync).toHaveBeenCalledWith('PAN-3403');
     expect(activityLogger.emitActivityEntrySync).not.toHaveBeenCalled();
+  });
+
+  it('enumerates proposed specs from a migrated project state worktree', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    const stateRoot = markMigrated(projectPath);
+    const specPath = writeSpecToDir(join(stateRoot, 'specs'), 'PAN-3404', 'proposed');
+    writeTasks(projectPath, 'PAN-3404');
+
+    await expect(findOrphanProposedSpecsForReconciler({
+      projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
+      tmuxSessionNames: [],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set(),
+    })).resolves.toEqual([
+      expect.objectContaining({
+        issueId: 'PAN-3404',
+        specPath,
+      }),
+    ]);
+  });
+
+  it('reactive handling re-resolves a migrated project spec from the state worktree', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    const stateRoot = markMigrated(projectPath);
+    writeSpecToDir(join(stateRoot, 'specs'), 'PAN-3405', 'proposed');
+
+    await expect(handleOrphanProposedSpec('PAN-3405', {
+      project: { projectKey: 'overdeck', projectPath },
+      evaluatePickupGate: async () => ({
+        allow: false,
+        code: 'not-released',
+        reason: 'The issue is not released.',
+      }),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+    })).resolves.toEqual([
+      'Skipped orphan proposed spec PAN-3405: pickup-gate:not-released',
+    ]);
   });
 
   it('detects proposed orphan specs and skips active, paused, and completed issues', async () => {
