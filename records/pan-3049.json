@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T06:45:09.863Z",
+  "updated": "2026-07-28T06:45:26.402Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,8 +79,16 @@
     }
   ],
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "rebuild-resolve-after-render": {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 2496933,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:45:26.402Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -106,6 +114,7 @@
     "resolver-compose-name-strict.resolver-compose-name-strict.ac1": "completed",
     "resolver-compose-name-strict.resolver-compose-name-strict.ac2": "completed",
     "resolver-compose-name-strict.resolver-compose-name-strict.ac3": "completed",
-    "resolver-compose-name-strict.resolver-compose-name-strict.ac4": "completed"
+    "resolver-compose-name-strict.resolver-compose-name-strict.ac4": "completed",
+    "rebuild-resolve-after-render": "running"
   }
 }
