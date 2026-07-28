@@ -26,17 +26,18 @@
     "recordedAt": "2026-07-28T09:10:19.628Z"
   },
   "created": "2026-07-28T06:36:21.767Z",
-  "updated": "2026-07-28T09:10:19.629Z",
+  "updated": "2026-07-28T09:28:53.774Z",
   "pipeline": {
     "issueId": "PAN-3217",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-28T09:01:27.402Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-28T09:28:53.622Z",
     "reviewNotes": "Approved: tracker-before-prefix precedence is correct, tested, documented, and introduces no blockers.",
+    "testNotes": "Backend fix + docs, no UI surface. Targeted vitest 42/42, typecheck clean, lint clean, full suite 1256 files/11759 tests passed on clean rerun (initial run's 12 failures were resource-contention flakiness unrelated to this diff, confirmed by rerun).",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3225",
     "reviewedAtCommit": "91b789bc9d5a8b63280836fe47bd5dfa54ba6c3e",
@@ -68,12 +69,20 @@
             "cacheWrite": 0
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 60,
+            "output": 12530,
+            "cacheRead": 4743995,
+            "cacheWrite": 154408
+          }
+        },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 305,
-            "output": 11356,
-            "cacheRead": 6289641,
-            "cacheWrite": 194996
+            "input": 592,
+            "output": 20270,
+            "cacheRead": 10688189,
+            "cacheWrite": 674770
           }
         }
       },
@@ -84,16 +93,22 @@
           "cacheRead": 3738112,
           "cacheWrite": 0
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 60,
+          "output": 12530,
+          "cacheRead": 4743995,
+          "cacheWrite": 154408
+        },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 305,
-          "output": 11356,
-          "cacheRead": 6289641,
-          "cacheWrite": 194996
+          "input": 592,
+          "output": 20270,
+          "cacheRead": 10688189,
+          "cacheWrite": 674770
         }
       },
       "costAtCloseOut": {
-        "usd": 5.672967,
-        "pricingAsOf": "2026-07-28T09:01:27.404Z"
+        "usd": 8.217637999999999,
+        "pricingAsOf": "2026-07-28T09:28:53.758Z"
       }
     },
     "merges": [
