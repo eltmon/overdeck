@@ -294,6 +294,10 @@ function applyEnvironmentFallbacks(config: NormalizedConfig, explicitlyDisabled:
     config.apiKeys.minimax = process.env.MINIMAX_API_KEY;
     if (!explicitlyDisabled.has('minimax')) config.enabledProviders.add('minimax');
   }
+  if (process.env.QUANTUMLLAMA_API_KEY && !config.apiKeys.quantumllama) {
+    config.apiKeys.quantumllama = process.env.QUANTUMLLAMA_API_KEY;
+    if (!explicitlyDisabled.has('quantumllama')) config.enabledProviders.add('quantumllama');
+  }
   if (process.env.ZAI_API_KEY && !config.apiKeys.zai) {
     config.apiKeys.zai = process.env.ZAI_API_KEY;
     if (!explicitlyDisabled.has('zai')) config.enabledProviders.add('zai');

@@ -69,6 +69,7 @@ export interface ApiKeysConfig {
   nous?: string;
   dashscope?: string;
   xai?: string;
+  quantumllama?: string;
 }
 
 // Complete settings structure
@@ -164,6 +165,7 @@ export function loadSettingsSync(): SettingsConfig {
   if (process.env.NOUS_API_KEY) envApiKeys.nous = process.env.NOUS_API_KEY;
   if (process.env.DASHSCOPE_API_KEY) envApiKeys.dashscope = process.env.DASHSCOPE_API_KEY;
   if (process.env.XAI_API_KEY) envApiKeys.xai = process.env.XAI_API_KEY;
+  if (process.env.QUANTUMLLAMA_API_KEY) envApiKeys.quantumllama = process.env.QUANTUMLLAMA_API_KEY;
 
   // Merge env vars as fallback (settings.json takes precedence)
   settings.api_keys = {
@@ -243,6 +245,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
   nous: NousModel[];
   dashscope: DashScopeModel[];
   xai: GrokModel[];
+  quantumllama: QuantumLlamaModel[];
 } {
   const anthropicModels: AnthropicModel[] = [
     'claude-fable-5',
@@ -287,6 +290,10 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     ? ['grok-build-0.1']
     : [];
 
+  const quantumllamaModels: QuantumLlamaModel[] = settings.api_keys.quantumllama
+    ? ['ql-reason-70b', 'ql-swift-8b', 'ql-nano-1b']
+    : [];
+
   return {
     anthropic: anthropicModels,
     openai: openaiModels,
@@ -297,6 +304,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     nous: nousModels,
     dashscope: dashscopeModels,
     xai: xaiModels,
+    quantumllama: quantumllamaModels,
   };
 }
 
