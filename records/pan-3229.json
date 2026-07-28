@@ -16,18 +16,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T17:30:05.022Z",
+  "updated": "2026-07-28T17:31:44.856Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T17:30:05.001Z",
-    "inspectNotes": "Inspecting item marker-write-cli"
+    "updatedAt": "2026-07-28T17:31:44.734Z",
+    "inspectNotes": "AC-1 not met on real workspaces: src/cli/commands/plan-finalize.ts:175-184 writePendingPromotionMarker() calls writeFileSync on <workspace>/.overdeck/pending-promotion.json.tmp with no mkdirSync — there is no mkdirSync anywhere in plan-finalize.ts. Two production paths reach it with no .overdeck/ dir: (a) legacy workspaces whose spec is at .pan/spec.vbrief.json (readableWorkspaceDraftPath legacy fallback, src/lib/xbrief/io.ts:132-137; the command's own error text at plan-finalize.ts:194 names that path), and (b) canonical specs resolved off the state branch via findPlanSync -> findSpecByIssueSync (src/lib/xbrief/io.ts:179-185), where the workspace needs no local runtime dir at all. In both cases the write throws ENOENT out of planFinalizeCommand: no marker, no deferred message, no exit(1) — a regression versus the prior warn-and-exit-1 behavior on the exact failure path this bead hardens. tests/unit/cli/plan-finalize-pending-promotion.test.ts masks it because createWorkspace() pre-creates .overdeck via mkdirSync(runtimeDir, {recursive:true}). REQUIRED FIX: mkdirSync(dirname(markerPath), {recursive:true}) before the temp write in writePendingPromotionMarker, plus a regression test whose workspace has only .pan/spec.vbrief.json and no .overdeck/ dir. SECONDARY (non-blocking): plan-finalize.ts:386 hardcodes 'the dashboard was unreachable' but the deferred branch also fires on non-2xx HTTP responses after retries, where the dashboard was reachable and refused. AC-2 (deferred wording, deacon named, promotionDeferred:true in JSON, exit 1 preserved at plan-finalize.ts:389-391), AC-3 (guard !noPromote && !promoted at plan-finalize.ts:327), and AC-4 (.gitignore entry) are all satisfied."
   },
   "closeOut": {
     "usage": {
@@ -42,9 +42,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 632946,
-            "output": 54881,
-            "cacheRead": 16178688,
+            "input": 634292,
+            "output": 55047,
+            "cacheRead": 16515584,
             "cacheWrite": 0
           }
         }
@@ -57,15 +57,15 @@
           "cacheWrite": 170493
         },
         "openai/gpt-5.6-sol": {
-          "input": 632946,
-          "output": 54881,
-          "cacheRead": 16178688,
+          "input": 634292,
+          "output": 55047,
+          "cacheRead": 16515584,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 20.761183,
-        "pricingAsOf": "2026-07-28T17:30:05.011Z"
+        "usd": 20.941341,
+        "pricingAsOf": "2026-07-28T17:31:44.775Z"
       }
     },
     "merges": [],
