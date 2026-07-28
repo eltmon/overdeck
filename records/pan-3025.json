@@ -125,7 +125,7 @@
     "recordedAt": "2026-07-28T08:50:14.585Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T09:32:55.138Z",
+  "updated": "2026-07-28T09:38:51.201Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "passed",
@@ -135,12 +135,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:50:42.357Z",
-    "updatedAt": "2026-07-28T09:32:55.131Z",
+    "updatedAt": "2026-07-28T09:38:51.190Z",
     "reviewNotes": "All lifecycle fixes and deterministic regression tests now satisfy FR-1 through FR-4 and NFR-1 through NFR-2",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3221",
     "reviewedAtCommit": "897b4e4ae6c71c3db8e3ff670c977c1875e8b619",
-    "lastVerifiedCommit": "6b218e665a20aeecd3e51dd3a9da4e695b49aa3e",
+    "lastVerifiedCommit": "897b4e4ae6c71c3db8e3ff670c977c1875e8b619",
     "reviewSpawnedAt": "2026-07-28T09:24:45.178Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -188,6 +187,14 @@
             "cacheWrite": 0
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 22,
+            "output": 2853,
+            "cacheRead": 1502492,
+            "cacheWrite": 150442
+          }
+        },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
             "input": 2136,
@@ -204,6 +211,12 @@
           "cacheRead": 20363776,
           "cacheWrite": 0
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 22,
+          "output": 2853,
+          "cacheRead": 1502492,
+          "cacheWrite": 150442
+        },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 2136,
           "output": 108687,
@@ -212,8 +225,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 46.629571,
-        "pricingAsOf": "2026-07-28T09:32:55.134Z"
+        "usd": 47.334749,
+        "pricingAsOf": "2026-07-28T09:38:51.198Z"
       }
     },
     "merges": [
