@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T20:49:30.671Z",
+  "updated": "2026-07-28T20:53:24.722Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -88,6 +88,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-07-28T18:30:25.387Z"
+    },
+    {
+      "issue": "PAN-3232",
+      "recoveryPath": "deploy-queue",
+      "obligationGeneration": "2026-07-28T20:22:39.328Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-28T20:53:24.714Z"
     }
   ],
   "tasks": {
