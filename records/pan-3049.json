@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T07:33:27.813Z",
+  "updated": "2026-07-28T07:35:17.477Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "docs-container-naming": {
-        "writerId": "agent-pan-3049",
-        "agentId": "agent-pan-3049",
-        "pid": 483765,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T07:33:27.813Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -188,6 +180,17 @@
         "outcome": "completed",
         "reason": "Added name: overdeck-{{FEATURE_FOLDER}} to docker-compose.devcontainer.yml.template, mirroring the dev script's existing overdeck-${FEATURE_FOLDER} declaration, so the compose file alone (no dev script needed) resolves the canonical name. Extended tests/unit/lib/workspace/stack-health-compose-name.test.ts to render the real template via renderDevcontainerSync and verify both ACs (compose-name-alone and dev-script-present agreement). All 10 tests in that file, plus the broader workspace/workspace-manager suite (90 tests), pass. Typecheck/lint clean.",
         "releasedAt": "2026-07-28T07:33:18.285Z"
+      },
+      {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 483765,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T07:33:27.813Z",
+        "itemId": "docs-container-naming",
+        "outcome": "completed",
+        "reason": "Added a 'Compose project naming' section to docs/WORKSPACE-CONTAINERS.md covering: composeProjectNameForWorkspace as the single resolver, the strict-at-bring-up rule, prefix-agnostic container/network filters, and the pan doctor duplicate-stack check as the only supported reconciliation path (no code auto-stops a foreign stack). Added a matching module-level doc comment to stack-health.ts. All 58 workspace tests still pass; typecheck/lint clean. Noted anomaly: the claim command surfaced a transient overdeck-state auto-push ref conflict from the state write door (not something I touched or fixed — outside agent scope per repo rules).",
+        "releasedAt": "2026-07-28T07:35:17.477Z"
       }
     ],
     "statusReasons": {
@@ -226,6 +229,10 @@
       "overdeck-template-compose-name": {
         "reason": "Added name: overdeck-{{FEATURE_FOLDER}} to docker-compose.devcontainer.yml.template, mirroring the dev script's existing overdeck-${FEATURE_FOLDER} declaration, so the compose file alone (no dev script needed) resolves the canonical name. Extended tests/unit/lib/workspace/stack-health-compose-name.test.ts to render the real template via renderDevcontainerSync and verify both ACs (compose-name-alone and dev-script-present agreement). All 10 tests in that file, plus the broader workspace/workspace-manager suite (90 tests), pass. Typecheck/lint clean.",
         "updatedAt": "2026-07-28T07:33:18.285Z"
+      },
+      "docs-container-naming": {
+        "reason": "Added a 'Compose project naming' section to docs/WORKSPACE-CONTAINERS.md covering: composeProjectNameForWorkspace as the single resolver, the strict-at-bring-up rule, prefix-agnostic container/network filters, and the pan doctor duplicate-stack check as the only supported reconciliation path (no code auto-stops a foreign stack). Added a matching module-level doc comment to stack-health.ts. All 58 workspace tests still pass; typecheck/lint clean. Noted anomaly: the claim command surfaced a transient overdeck-state auto-push ref conflict from the state write door (not something I touched or fixed — outside agent scope per repo rules).",
+        "updatedAt": "2026-07-28T07:35:17.477Z"
       }
     }
   },
@@ -262,6 +269,8 @@
     "overdeck-template-compose-name": "completed",
     "overdeck-template-compose-name.overdeck-template-compose-name.ac1": "completed",
     "overdeck-template-compose-name.overdeck-template-compose-name.ac2": "completed",
-    "docs-container-naming": "running"
+    "docs-container-naming": "completed",
+    "docs-container-naming.docs-container-naming.ac1": "completed",
+    "docs-container-naming.docs-container-naming.ac2": "completed"
   }
 }
