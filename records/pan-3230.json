@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T18:59:19.961Z",
+  "updated": "2026-07-28T18:59:23.418Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "pending",
@@ -25,7 +25,48 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T17:17:52.598Z"
+    "updatedAt": "2026-07-28T18:59:23.417Z",
+    "reviewRequestedAt": "2026-07-28T18:59:23.417Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/AGENT-STATE-PLANES.md",
+        "package.json",
+        "scripts/lint-state-paths.sh",
+        "src/cli/commands/__tests__/doctor-orphan-proposed-specs.test.ts",
+        "src/cli/commands/doctor.ts",
+        "src/dashboard/server/routes/backlog.ts",
+        "src/lib/agents/tier-supervisor.ts",
+        "src/lib/backlog/backlog-input.ts",
+        "src/lib/backlog/lookups.ts",
+        "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
+        "src/lib/cloister/flywheel.ts",
+        "src/lib/cloister/orphan-proposed-reconciler.ts",
+        "src/lib/xbrief/__tests__/auto-synthesize.test.ts",
+        "src/lib/xbrief/auto-synthesize.ts",
+        "tests/unit/scripts/lint-state-paths.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/AGENT-STATE-PLANES.md",
+        "package.json",
+        "scripts/lint-state-paths.sh",
+        "src/cli/commands/__tests__/doctor-orphan-proposed-specs.test.ts",
+        "src/cli/commands/doctor.ts",
+        "src/dashboard/server/routes/backlog.ts",
+        "src/lib/agents/tier-supervisor.ts",
+        "src/lib/backlog/backlog-input.ts",
+        "src/lib/backlog/lookups.ts",
+        "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
+        "src/lib/cloister/flywheel.ts",
+        "src/lib/cloister/orphan-proposed-reconciler.ts",
+        "src/lib/xbrief/__tests__/auto-synthesize.test.ts",
+        "src/lib/xbrief/auto-synthesize.ts",
+        "tests/unit/scripts/lint-state-paths.test.ts"
+      ],
+      "recordedAt": "2026-07-28T18:59:19.959Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3239"
   },
   "closeOut": {
     "usage": {
