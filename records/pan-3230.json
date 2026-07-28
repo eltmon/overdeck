@@ -60,7 +60,7 @@
     "recordedAt": "2026-07-28T18:59:19.959Z"
   },
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T19:00:37.074Z",
+  "updated": "2026-07-28T19:00:40.292Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "pending",
@@ -69,7 +69,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T18:59:31.401Z",
+    "panDoneRecoveredAt": "2026-07-28T19:00:36.689Z",
+    "updatedAt": "2026-07-28T19:00:37.065Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3239",
     "reviewRequestedAt": "2026-07-28T19:00:36.689Z",
     "scopeDrift": {
@@ -110,8 +111,7 @@
         "tests/unit/scripts/lint-state-paths.test.ts"
       ],
       "recordedAt": "2026-07-28T18:59:19.959Z"
-    },
-    "panDoneRecoveredAt": "2026-07-28T19:00:36.689Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -149,7 +149,7 @@
       },
       "costAtCloseOut": {
         "usd": 54.022021,
-        "pricingAsOf": "2026-07-28T18:59:31.477Z"
+        "pricingAsOf": "2026-07-28T19:00:40.289Z"
       }
     },
     "merges": [
