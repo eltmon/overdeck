@@ -9,3 +9,4 @@
 1116 src/lib/lifecycle/workflows.ts # PAN-3215
 1023 src/lib/config-yaml/schema.ts # PAN-1837
 1005 src/lib/launcher-generator.ts # PAN-1837
+1208 src/lib/sync.ts # PAN-1837
