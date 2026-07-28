@@ -85,21 +85,20 @@
     "recordedAt": "2026-07-28T07:42:23.831Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T08:34:30.090Z",
+  "updated": "2026-07-28T08:41:02.482Z",
   "pipeline": {
     "issueId": "PAN-3025",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:42:37.547Z",
-    "updatedAt": "2026-07-28T08:32:15.205Z",
-    "reviewNotes": "Verification failed at test",
+    "updatedAt": "2026-07-28T08:41:02.432Z",
+    "reviewNotes": "Idempotency guard treats live-status read failures as row absence and can skip an incomplete close-out ceremony",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3221",
     "lastVerifiedCommit": "6b218e665a20aeecd3e51dd3a9da4e695b49aa3e",
-    "reviewRequestedAt": "2026-07-28T07:42:37.547Z",
     "reviewSpawnedAt": "2026-07-28T08:32:15.204Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -141,9 +140,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 222268,
-            "output": 9405,
-            "cacheRead": 1132544,
+            "input": 1367557,
+            "output": 60231,
+            "cacheRead": 7916032,
             "cacheWrite": 0
           }
         },
@@ -158,9 +157,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 222268,
-          "output": 9405,
-          "cacheRead": 1132544,
+          "input": 1367557,
+          "output": 60231,
+          "cacheRead": 7916032,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -171,8 +170,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 6.728322,
-        "pricingAsOf": "2026-07-28T08:32:15.343Z"
+        "usd": 17.371291,
+        "pricingAsOf": "2026-07-28T08:41:02.466Z"
       }
     },
     "merges": [
