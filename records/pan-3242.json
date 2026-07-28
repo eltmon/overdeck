@@ -29,7 +29,7 @@
     "recordedAt": "2026-07-28T20:52:11.749Z"
   },
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-28T20:52:32.810Z",
+  "updated": "2026-07-28T20:52:35.370Z",
   "pipeline": {
     "issueId": "PAN-3242",
     "reviewStatus": "pending",
@@ -38,7 +38,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T20:52:23.812Z",
+    "panDoneRecoveredAt": "2026-07-28T20:52:32.420Z",
+    "updatedAt": "2026-07-28T20:52:32.801Z",
     "reviewNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-28T20:22:39.328Z by deploy-patrol, flywheel-orchestrator, merge-step0). It re-runs automatically after the deploy.",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -68,8 +69,7 @@
         "src/dashboard/frontend/src/components/orders/__tests__/RunSettingsPanel.test.tsx"
       ],
       "recordedAt": "2026-07-28T20:52:11.749Z"
-    },
-    "panDoneRecoveredAt": "2026-07-28T20:52:32.420Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -107,7 +107,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.067696,
-        "pricingAsOf": "2026-07-28T20:52:23.825Z"
+        "pricingAsOf": "2026-07-28T20:52:35.368Z"
       }
     },
     "merges": [
