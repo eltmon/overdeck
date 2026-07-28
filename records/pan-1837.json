@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T19:05:47.686Z",
+  "updated": "2026-07-28T19:05:56.125Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "wi-fixture": {
-        "writerId": "agent-pan-1837",
-        "agentId": "agent-pan-1837",
-        "pid": 554678,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T19:05:47.686Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -133,6 +125,17 @@
         "outcome": "completed",
         "reason": "Added KIMI_CODE_KIMI_ONLY_BLOCK and the canUseHarnessSync('kimi-code', ...) branch (allowed for Kimi models, blocked with a Kimi-specific reason otherwise), plus the 'kimi-code' key in buildHarnessPolicyDecisions's per-model map. Extended harness-policy.test.ts and settings-harness-policy.test.ts with matching allowed/blocked/decisions-map assertions; widened the shared HARNESSES fixture without touching any existing acp assertion. All 64 policy tests pass; typecheck unchanged (only wi11's frontend gap remains).",
         "releasedAt": "2026-07-28T18:59:05.249Z"
+      },
+      {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 554678,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T19:05:47.686Z",
+        "itemId": "wi-fixture",
+        "outcome": "completed",
+        "reason": "Pinned a real wire.jsonl fixture captured against the installed kimi 0.29.2 binary: 2-turn session (Read then Write tool calls) with inputCacheRead/inputCacheCreation usage fields, committed both flat and under the real sessions/<workDirKey>/<sessionId>/agents/main/ layout, confirming workDirKey format wd_<basename>_<12-hex-hash>. Truncated the large systemPrompt/tools_snapshot fields to placeholders (irrelevant to the parser, would embed local-machine skill catalog detail). Resolved the delivery checkpoint live: spawned the real PTY supervisor against installed kimi in a throwaway tmux session, delivered a message through the production code path, and confirmed Kimi processed and answered it -- standalone CR submits, no Ctrl-J or tmux-paste fallback needed. Recorded as D9 in .overdeck/continue.json.",
+        "releasedAt": "2026-07-28T19:05:56.125Z"
       }
     ],
     "statusReasons": {
@@ -151,6 +154,10 @@
       "wi4-policy-gate": {
         "reason": "Added KIMI_CODE_KIMI_ONLY_BLOCK and the canUseHarnessSync('kimi-code', ...) branch (allowed for Kimi models, blocked with a Kimi-specific reason otherwise), plus the 'kimi-code' key in buildHarnessPolicyDecisions's per-model map. Extended harness-policy.test.ts and settings-harness-policy.test.ts with matching allowed/blocked/decisions-map assertions; widened the shared HARNESSES fixture without touching any existing acp assertion. All 64 policy tests pass; typecheck unchanged (only wi11's frontend gap remains).",
         "updatedAt": "2026-07-28T18:59:05.249Z"
+      },
+      "wi-fixture": {
+        "reason": "Pinned a real wire.jsonl fixture captured against the installed kimi 0.29.2 binary: 2-turn session (Read then Write tool calls) with inputCacheRead/inputCacheCreation usage fields, committed both flat and under the real sessions/<workDirKey>/<sessionId>/agents/main/ layout, confirming workDirKey format wd_<basename>_<12-hex-hash>. Truncated the large systemPrompt/tools_snapshot fields to placeholders (irrelevant to the parser, would embed local-machine skill catalog detail). Resolved the delivery checkpoint live: spawned the real PTY supervisor against installed kimi in a throwaway tmux session, delivered a message through the production code path, and confirmed Kimi processed and answered it -- standalone CR submits, no Ctrl-J or tmux-paste fallback needed. Recorded as D9 in .overdeck/continue.json.",
+        "updatedAt": "2026-07-28T19:05:56.125Z"
       }
     }
   },
@@ -173,6 +180,9 @@
     "wi4-policy-gate.wi4-policy-gate.ac2": "completed",
     "wi4-policy-gate.wi4-policy-gate.ac3": "completed",
     "wi4-policy-gate.wi4-policy-gate.ac4": "completed",
-    "wi-fixture": "running"
+    "wi-fixture": "completed",
+    "wi-fixture.wi-fixture.ac1": "completed",
+    "wi-fixture.wi-fixture.ac2": "completed",
+    "wi-fixture.wi-fixture.ac3": "completed"
   }
 }
