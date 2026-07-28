@@ -70,7 +70,7 @@
     "recordedAt": "2026-07-28T07:46:15.165Z"
   },
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T07:47:28.583Z",
+  "updated": "2026-07-28T07:47:48.290Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -83,7 +83,7 @@
     "updatedAt": "2026-07-28T07:47:28.559Z",
     "inspectNotes": "All 4 ACs met. AC1: declaredComposeFileProjectName parses top-level name: (stack-health.ts:52-57), verified against real MYN workspaces which declare 'name: myn-feature-min-XXX' at col 0. AC2: requireComposeProjectNameForWorkspace throws naming workspacePath + composeFilePath + both dev-script paths (stack-health.ts:135-137). AC3: both variants return overdeck-feature-<issue> when composeFilePath is null (lines 119, 134). AC4: assertDeclaredNameMatchesFeatureFolder reuses the exact 'Refusing workspace rebuild:' message for both sources (lines 59-70); dev-script rethrow guard preserved at line 91. COMPOSE_FILE_CANDIDATES and findDevcontainerComposeFile match rebuild-stack.ts:43-58 exactly, so no directory-scope drift. Tests cover all four plus dev-script-wins precedence.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3223",
-    "reviewRequestedAt": "2026-07-28T07:46:27.013Z",
+    "reviewRequestedAt": "2026-07-28T07:47:47.911Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/cli/commands/__tests__/workspace-reap.test.ts",
@@ -142,7 +142,8 @@
         "tests/unit/lib/workspace/stack-health-compose-name.test.ts"
       ],
       "recordedAt": "2026-07-28T07:46:15.165Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-28T07:47:47.911Z"
   },
   "closeOut": {
     "usage": {
