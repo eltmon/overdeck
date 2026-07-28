@@ -19,6 +19,7 @@
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
       "docs/TELEMETRY.md",
+      "packages/contracts/src/composer-commands.generated.ts",
       "packages/contracts/src/flywheel.ts",
       "packages/contracts/src/telemetry.ts",
       "scripts/file-size-allowlist.txt",
@@ -139,6 +140,7 @@
       "configuration/harnesses.mdx",
       "docs/FLYWHEEL-STATE.md",
       "docs/TELEMETRY.md",
+      "packages/contracts/src/composer-commands.generated.ts",
       "packages/contracts/src/flywheel.ts",
       "packages/contracts/src/harness-behavior.ts",
       "packages/contracts/src/telemetry.ts",
@@ -224,10 +226,10 @@
       "tests/unit/lib/harness-resolve.test.ts",
       "tests/unit/lib/providers.test.ts"
     ],
-    "recordedAt": "2026-07-28T23:04:39.928Z"
+    "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T23:16:47.430Z",
+  "updated": "2026-07-28T23:16:54.707Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "failed",
