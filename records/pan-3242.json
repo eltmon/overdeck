@@ -57,18 +57,18 @@
     "recordedAt": "2026-07-28T20:52:11.749Z"
   },
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-28T22:04:34.807Z",
+  "updated": "2026-07-28T22:06:36.920Z",
   "pipeline": {
     "issueId": "PAN-3242",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:52:32.420Z",
-    "updatedAt": "2026-07-28T22:04:34.672Z",
-    "reviewNotes": "Rework fixes both correctness bugs but changes OrderBookPage.tsx despite the still-active must-not constraint",
+    "updatedAt": "2026-07-28T22:06:36.912Z",
+    "reviewNotes": "⊗ The rework violates the explicit `OrderBookPage.tsx` must-not constraint — `src/dashboard/frontend/src/pages/OrderBookPage.tsx:241` — applied by deacon sweep from on-disk review.md",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -151,7 +151,7 @@
       },
       "costAtCloseOut": {
         "usd": 49.309283,
-        "pricingAsOf": "2026-07-28T22:04:34.706Z"
+        "pricingAsOf": "2026-07-28T22:06:36.915Z"
       }
     },
     "merges": [
