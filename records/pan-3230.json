@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T17:31:41.654Z",
+  "updated": "2026-07-28T17:31:52.723Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "pending",
@@ -69,8 +69,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "fix-flywheel-spec-drafts-scan": {
+        "writerId": "agent-pan-3230",
+        "agentId": "agent-pan-3230",
+        "pid": 1108658,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:31:52.723Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3230",
@@ -113,6 +121,7 @@
     "fix-reconciler-spec-dir.fix-reconciler-spec-dir.ac3": "completed",
     "fix-doctor-orphan-scan": "completed",
     "fix-doctor-orphan-scan.fix-doctor-orphan-scan.ac1": "completed",
-    "fix-doctor-orphan-scan.fix-doctor-orphan-scan.ac2": "completed"
+    "fix-doctor-orphan-scan.fix-doctor-orphan-scan.ac2": "completed",
+    "fix-flywheel-spec-drafts-scan": "running"
   }
 }
