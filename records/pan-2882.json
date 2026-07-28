@@ -37,21 +37,22 @@
     "recordedAt": "2026-07-28T07:25:54.489Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T07:27:36.855Z",
+  "updated": "2026-07-28T07:27:38.209Z",
   "pipeline": {
     "issueId": "PAN-2882",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:26:27.252Z",
-    "updatedAt": "2026-07-28T07:27:35.929Z",
+    "updatedAt": "2026-07-28T07:27:37.358Z",
     "reviewNotes": "Verification failed at typecheck — fix and resubmit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
     "lastVerifiedCommit": "b68a67e56eeca91f055135b583a9ca284a20c748",
     "reviewRequestedAt": "2026-07-28T07:26:27.252Z",
+    "reviewSpawnedAt": "2026-07-28T07:27:37.357Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -96,7 +97,7 @@
       },
       "costAtCloseOut": {
         "usd": 4.066229,
-        "pricingAsOf": "2026-07-28T07:27:35.955Z"
+        "pricingAsOf": "2026-07-28T07:27:37.545Z"
       }
     },
     "merges": [
@@ -105,7 +106,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-2882",
