@@ -22,7 +22,7 @@ import { getAgentStateSync } from '../../../lib/agents.js';
 import { isExtendedReviewEnabled } from '../../../lib/cloister/review-agent.js';
 
 import { Effect } from 'effect';
-import type { AgentStatus, SessionNodePresence } from '@overdeck/contracts';
+import type { AgentStatus, SessionNodePresence, AgentSnapshot } from '@overdeck/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import {
   getReviewerSessionName,
@@ -31,6 +31,7 @@ import {
 } from '../../../lib/cloister/specialists.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { capturePane } from '../../../lib/tmux.js';
+import type { AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 
 const CONVOY_REVIEWER_ROLES: readonly ReviewerRole[] = [
   'correctness',
@@ -48,6 +49,19 @@ const API_ERROR_PATTERNS = [
   /ECONNREFUSED/,
   /overloaded/i,
 ];
+
+function awaitingInputFromProjection(
+  agentId: string,
+  agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>,
+): AwaitingInputDetection | null | undefined {
+  const agent = agentSnapshotsById?.get(agentId);
+  if (!agent) return undefined;
+  if (agent.hasPendingQuestion !== true) return null;
+  return {
+    reason: (agent.pendingQuestionReason as AwaitingInputDetection['reason'] | undefined) ?? 'other',
+    prompt: agent.pendingQuestionPrompt || 'Agent is waiting for human input',
+  };
+}
 
 async function detectApiError(sessionId: string): Promise<boolean> {
   try {
@@ -143,6 +157,8 @@ export interface BuildReviewerNodesOptions {
   status: string;
   /** Override the ~/.overdeck/agents directory (test hook). */
   agentsDirOverride?: string;
+  /** Agent snapshots map for pending-input projection. */
+  agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>;
 }
 
 /**
@@ -417,6 +433,9 @@ export async function buildReviewerNodes(
               : (roundMetadata?.latestStatus ?? (jsonlPath ? 'completed' : opts.status)));
       const status = normalizeAgentStatus(rawStatus);
 
+      const reviewerAwaitingInput = awaitingInputFromProjection(sessionId, opts.agentSnapshotsById);
+      const reviewerSnapshot = opts.agentSnapshotsById?.get(sessionId);
+
       const node: ReviewerNode = {
         type: 'reviewer',
         role,
@@ -434,6 +453,10 @@ export async function buildReviewerNodes(
           : null,
         status,
         presence,
+        awaitingInput: reviewerAwaitingInput !== undefined ? (reviewerAwaitingInput !== null) : false,
+        awaitingInputPrompt: reviewerAwaitingInput?.prompt,
+        awaitingInputReason: reviewerAwaitingInput?.reason,
+        pendingInputKinds: reviewerSnapshot?.pendingInputKinds ? [...reviewerSnapshot.pendingInputKinds] : undefined,
         hasJsonl: !!jsonlPath,
       };
       if (roundMetadata) node.roundMetadata = roundMetadata;

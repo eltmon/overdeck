@@ -555,6 +555,8 @@ export async function fetchActivityDataWithContext(
         // restart onto pi/glm-5.2) instead of a hardcoded 'specialist' label that
         // the frontend then back-fills with the role-default model (gpt-5.6-sol).
         const orchestratorState = getAgentStateSync(orchestratorSessionName);
+        const orchestratorAwaitingInput = awaitingInputFromProjection(orchestratorSessionName, context.agentSnapshotsById);
+        const orchestratorSnapshot = context.agentSnapshotsById?.get(orchestratorSessionName);
         sections.push({
           type: 'review',
           sessionId: orchestratorSessionName,
@@ -570,6 +572,10 @@ export async function fetchActivityDataWithContext(
           status: ss.status,
           presence: orchestratorPresence,
           roundMetadata: synthesisRoundMetadata,
+          awaitingInput: orchestratorAwaitingInput !== undefined ? (orchestratorAwaitingInput !== null) : false,
+          awaitingInputPrompt: orchestratorAwaitingInput?.prompt,
+          awaitingInputReason: orchestratorAwaitingInput?.reason,
+          pendingInputKinds: orchestratorSnapshot?.pendingInputKinds ? [...orchestratorSnapshot.pendingInputKinds] : undefined,
           hasJsonl: !!orchestratorJsonlPath,
           tmuxSession: orchestratorSessionName,
         });
@@ -582,6 +588,7 @@ export async function fetchActivityDataWithContext(
           startedAt: ss.startedAt,
           endedAt: ss.endedAt,
           status: ss.status,
+          agentSnapshotsById: context.agentSnapshotsById,
         });
         for (const node of reviewerNodes) sections.push(node);
         continue;
@@ -627,6 +634,9 @@ export async function fetchActivityDataWithContext(
       const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, workspacePath);
       if (isShipStage && !specialistIsLive && !specialistJsonlPath) continue;
 
+      const specialistAwaitingInput = awaitingInputFromProjection(specialistSessionId, context.agentSnapshotsById);
+      const specialistSnapshot = context.agentSnapshotsById?.get(specialistSessionId);
+
       sections.push({
         type: nodeType,
         sessionId: specialistSessionId,
@@ -636,6 +646,10 @@ export async function fetchActivityDataWithContext(
         status: (specialistIsLive && !specialistIsZombie) ? 'running' : ss.status,
         transcript: specialistJsonlPath ? undefined : transcriptParts.join('\n'),
         presence: specialistPresence,
+        awaitingInput: specialistAwaitingInput !== undefined ? (specialistAwaitingInput !== null) : false,
+        awaitingInputPrompt: specialistAwaitingInput?.prompt,
+        awaitingInputReason: specialistAwaitingInput?.reason,
+        pendingInputKinds: specialistSnapshot?.pendingInputKinds ? [...specialistSnapshot.pendingInputKinds] : undefined,
         hasJsonl: !!specialistJsonlPath,
       });
     }
