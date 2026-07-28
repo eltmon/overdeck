@@ -10,8 +10,8 @@ import { createMinimalIssueRecord, clearSwarmSlotCompletion } from './deacon-swa
 import type { PersistedTaskOperation } from '../xbrief/dag.js';
 import type { XBriefDocument } from '../xbrief/types.js';
 import { recordRecoveryFailure } from './recovery-trip.js';
-import { getAgentStateSync } from '../agents/agent-state.js';
-import { decideAutonomousRedrive } from './redrive-gate.js';
+import { getAgentDir, getAgentStateSync } from '../agents/agent-state.js';
+import { decideAgentAutonomousRedrive, decideAutonomousRedrive } from './redrive-gate.js';
 
 /** Patrol GC never removes forensic attempts; configured issue close-out owns teardown. */
 export const SWARM_SUPERSEDED_RETENTION = 'issue-close-out' as const;
@@ -93,7 +93,13 @@ export async function requeueFailedSwarmSlots(
       actions.push(`[swarm] skipped requeue slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: failed-merge block — awaiting operator recovery`);
       continue;
     }
-    const admission = decideAutonomousRedrive(slot.agentId ? getAgentStateSync(slot.agentId) ?? {} : {}, { owesRework: true });
+    const admission = slot.agentId
+      ? await decideAgentAutonomousRedrive(
+          getAgentStateSync(slot.agentId) ?? {},
+          getAgentDir(slot.agentId),
+          true,
+        )
+      : decideAutonomousRedrive({}, { owesRework: true });
     if (admission.decision === 'defer') { actions.push(`[swarm] deferred failed slot ${slot.slotIndex}: ${admission.reason}`); continue; }
     const attempt = await archiveFailedSwarmSlot(issueId, workspacePath, slot, deps);
     await deps.applyTaskOperationToPlanFile(issueId, {
