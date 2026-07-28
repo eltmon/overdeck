@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T07:03:50.044Z",
+  "updated": "2026-07-28T07:08:03.124Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "idle-reaper-ui-regex-prefix-agnostic": {
-        "writerId": "agent-pan-3049",
-        "agentId": "agent-pan-3049",
-        "pid": 3687765,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T07:03:50.044Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -133,6 +125,17 @@
         "outcome": "completed",
         "reason": "Removed the hardcoded overdeck-feature- docker ps filter and widened the container-name regex from overdeck-feature-... to feature-..., so myn-feature-* (and any other declared prefix) crashed containers get the same auto-restart handling. Extended tests/lib/cloister/pan-464-container-health.test.ts (the existing test file for this function) with 3 new tests covering all 3 ACs, rather than creating a new file, per the item's own fallback instruction. Full cloister test suite (1312 tests) still passes; typecheck/lint clean.",
         "releasedAt": "2026-07-28T07:03:39.036Z"
+      },
+      {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 3687765,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T07:03:50.044Z",
+        "itemId": "idle-reaper-ui-regex-prefix-agnostic",
+        "outcome": "completed",
+        "reason": "Widened UI_CONTAINER_RE from requiring the overdeck-feature- prefix to an optional-prefix pattern, matching the full-stack tier's already-prefix-agnostic FEATURE_PROJECT_RE. Added 2 tests to the existing tests/unit/lib/cloister/idle-stack-reaper.test.ts covering AC1 (myn-feature- server/frontend reaped) and a regression guard that the widened regex still excludes dev containers. AC2 (dev protected via DEV_CONTAINER_RE in the full-stack tier) was already covered by a pre-existing myn-feature- test at that describe block, unaffected by this change. All 13 tests pass; typecheck/lint clean.",
+        "releasedAt": "2026-07-28T07:08:03.124Z"
       }
     ],
     "statusReasons": {
@@ -151,6 +154,10 @@
       "deacon-crash-sweep-prefix-agnostic": {
         "reason": "Removed the hardcoded overdeck-feature- docker ps filter and widened the container-name regex from overdeck-feature-... to feature-..., so myn-feature-* (and any other declared prefix) crashed containers get the same auto-restart handling. Extended tests/lib/cloister/pan-464-container-health.test.ts (the existing test file for this function) with 3 new tests covering all 3 ACs, rather than creating a new file, per the item's own fallback instruction. Full cloister test suite (1312 tests) still passes; typecheck/lint clean.",
         "updatedAt": "2026-07-28T07:03:39.036Z"
+      },
+      "idle-reaper-ui-regex-prefix-agnostic": {
+        "reason": "Widened UI_CONTAINER_RE from requiring the overdeck-feature- prefix to an optional-prefix pattern, matching the full-stack tier's already-prefix-agnostic FEATURE_PROJECT_RE. Added 2 tests to the existing tests/unit/lib/cloister/idle-stack-reaper.test.ts covering AC1 (myn-feature- server/frontend reaped) and a regression guard that the widened regex still excludes dev containers. AC2 (dev protected via DEV_CONTAINER_RE in the full-stack tier) was already covered by a pre-existing myn-feature- test at that describe block, unaffected by this change. All 13 tests pass; typecheck/lint clean.",
+        "updatedAt": "2026-07-28T07:08:03.124Z"
       }
     }
   },
@@ -171,6 +178,8 @@
     "deacon-crash-sweep-prefix-agnostic.deacon-crash-sweep-prefix-agnostic.ac1": "completed",
     "deacon-crash-sweep-prefix-agnostic.deacon-crash-sweep-prefix-agnostic.ac2": "completed",
     "deacon-crash-sweep-prefix-agnostic.deacon-crash-sweep-prefix-agnostic.ac3": "completed",
-    "idle-reaper-ui-regex-prefix-agnostic": "running"
+    "idle-reaper-ui-regex-prefix-agnostic": "completed",
+    "idle-reaper-ui-regex-prefix-agnostic.idle-reaper-ui-regex-prefix-agnostic.ac1": "completed",
+    "idle-reaper-ui-regex-prefix-agnostic.idle-reaper-ui-regex-prefix-agnostic.ac2": "completed"
   }
 }
