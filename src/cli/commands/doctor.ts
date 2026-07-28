@@ -23,6 +23,7 @@ import { readOhmypiCodexCredential } from '../../lib/ohmypi-codex-auth.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
+import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
 import { getMainDivergence, type MainDivergence } from '../../lib/state-plane.js';
 import {
   checkSystemPrerequisite,
@@ -609,7 +610,7 @@ export function findOrphanProposedSpecs(options: {
   const orphans: OrphanProposedSpec[] = [];
 
   for (const { key, config } of projects) {
-    const specsDir = join(config.path, '.pan', 'specs');
+    const specsDir = getProjectPanPaths(config.path).specsDir;
     if (!existsSync(specsDir)) continue;
 
     for (const entry of readdirSync(specsDir, { withFileTypes: true })) {
