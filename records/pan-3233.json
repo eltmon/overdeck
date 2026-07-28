@@ -70,17 +70,17 @@
     "recordedAt": "2026-07-28T20:46:26.914Z"
   },
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T21:25:47.028Z",
+  "updated": "2026-07-28T21:25:54.772Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:48:00.219Z",
-    "updatedAt": "2026-07-28T21:25:46.941Z",
+    "updatedAt": "2026-07-28T21:25:54.759Z",
     "reviewNotes": "Approved: prior suppression-scope and paneQuestion blocking-classification findings are fixed with focused regressions",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
@@ -143,9 +143,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2425258,
-            "output": 109123,
-            "cacheRead": 13910528,
+            "input": 2432868,
+            "output": 112934,
+            "cacheRead": 14885888,
             "cacheWrite": 0
           }
         },
@@ -166,9 +166,9 @@
           "cacheWrite": 181658
         },
         "openai/gpt-5.6-sol": {
-          "input": 2425258,
-          "output": 109123,
-          "cacheRead": 13910528,
+          "input": 2432868,
+          "output": 112934,
+          "cacheRead": 14885888,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -179,8 +179,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 43.611250999999996,
-        "pricingAsOf": "2026-07-28T21:25:47.006Z"
+        "usd": 44.251311,
+        "pricingAsOf": "2026-07-28T21:25:54.766Z"
       }
     },
     "merges": [
