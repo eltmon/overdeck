@@ -4,17 +4,17 @@
     "created": "2026-07-28T06:45:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3217: Tracker-less projects report reason 'missing_issue_prefix' — the accurate 'tracker_unconfigured' is unreachable because the prefix check runs first",
-    "updated": "2026-07-28T08:34:37.868Z"
+    "updated": "2026-07-28T16:15:39.642Z"
   },
   "plan": {
     "id": "pan-3217",
     "title": "Tracker-less projects report reason 'missing_issue_prefix' — the accurate 'tracker_unconfigured' is unreachable because the prefix check runs first",
-    "status": "running",
+    "status": "completed",
     "uid": "2af77419-685a-4e0a-8742-91c47f687773",
     "author": "agent:k3[1m]",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-28T06:45:00Z",
-    "updated": "2026-07-28T08:34:37.868Z",
+    "updated": "2026-07-28T16:15:39.642Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3217",
@@ -176,5 +176,5 @@
       "canonicalFilename": "2026-07-28-PAN-3217-tracker-less-projects-report-reason-missing-issue-prefix-the-accurate-tracker-unconfigured-is-unreachable-because-the-prefix-check-runs-first.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
