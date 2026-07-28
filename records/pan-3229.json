@@ -62,9 +62,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-28T23:32:04.025Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-28T23:34Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-28T23:34:56.092Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-28T23:34:56Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3229\n\n# Review — PAN-3229 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED — the latest main merge reintroduces the clipped, non-scrollable subagent transcript\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3229/.pan/review/agent-pan-3229-review-55e9df4e/context.json`\n- Branch: `feature/pan-3229`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3229`\n- PR: https://github.com/eltmon/overdeck/pull/3246\n- HEAD reviewed: `55e9df4e5a2dd09785ce0bcf86ce9d76a7a0b25a`\n- Cycle number: 3\n- Prior cycle SHA: `b5844bfff712b2a588e22d6597e4f6488d6edea0`\n- Review scope: correctness/logic, security, requirements/acceptance criteria, and performance\n\n## Blocking Findings\n\n### ! [correctness] Merge resolution reverts the shipped subagent transcript scrolling fix — `src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx:38`\n**Evidence tier:** Tier 1 — static comparison against current `origin/main` and upstream fix commit `025f482bc3`\n\nThe new merge commit keeps the feature parent's plain block wrapper (`className=\"min-h-0 min-w-0 flex-1\"`) instead of main's flex-column wrapper. `MessagesTimeline` sizes its root with `flex: 1`; under the plain block parent that flex sizing has no resolved column height, so long subagent transcripts render clipped without scrolling, open-at-bottom behavior, or the Bottom button. The same merge also removes the `subagentTranscript` CSS scope that makes the initial spawn prompt full-width and deletes the regression test that mechanically locked the required flex-parent contract.\n\nThis is inside both the PR diff and the cycle diff: it was introduced by `55e9df4e5a` after the prior approved review, so the cycle-3 convergence gate permits and requires blocking it. It could not have been raised in cycle 1 because main's scrolling fix was not being reverted by the branch at either earlier reviewed SHA.\n\n**Required fix:** Resolve the main merge without reverting `025f482bc3`: preserve the flex-column timeline wrapper, the `subagentTranscript` scoped full-width prompt style, and the regression test asserting the timeline parent carries both `flex-col` and `flex-1`.\n\n## Non-blocking Findings\n\nNone.\n\n## Correctness and Requirements\n\nThe PAN-3229 pending-promotion implementation is unchanged from the prior approved SHA and still satisfies FR-1 through FR-9 and NFR-1 through NFR-4. The verdict is blocked solely because the current PR now contains an unrelated, user-visible dashboard regression introduced by its latest merge resolution.\n\n## Security\n\nNo security finding. The pending-promotion path retains constrained issue parsing, internal-origin/token endpoint calls, and no marker-controlled command or arbitrary-path execution. The new cycle diff adds no security-sensitive behavior.\n\n## Performance\n\nNo performance finding. The pending-promotion patrol remains a bounded linear workspace scan with sequential promotion requests. The subagent transcript regression is a layout correctness defect, not a performance regression.\n\n## Verification\n\n- Pending-promotion focused Vitest: 4 files, 19 tests passed.\n- Current frontend `SubagentTranscript.test.tsx`: 3 tests passed, but the merge deleted the fourth regression test that caught the broken flex-parent layout; the green result does not cover the reverted behavior.\n- `git diff --check origin/main...HEAD`: passed.\n- Static comparison confirms current HEAD reverses all three files changed by upstream fix `025f482bc3`.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3229/.pan/review/agent-pan-3229-review-55e9df4e/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3229 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -110,7 +123,7 @@
     "recordedAt": "2026-07-28T20:15:30.548Z"
   },
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T23:34:55.332Z",
+  "updated": "2026-07-28T23:34:56.092Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "blocked",
