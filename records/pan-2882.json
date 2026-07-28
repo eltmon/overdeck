@@ -37,16 +37,16 @@
     "recordedAt": "2026-07-28T07:09:47.907Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T07:19:28.129Z",
+  "updated": "2026-07-28T07:19:54.015Z",
   "pipeline": {
     "issueId": "PAN-2882",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T07:19:28.102Z",
+    "updatedAt": "2026-07-28T07:19:53.975Z",
     "reviewNotes": "Verification failed at typecheck — fix and resubmit",
     "verificationNotes": "Verification FAILED at typecheck (20825ms):\n\n\n> @overdeck/core@0.47.1 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.47.1 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.47.1 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\nℹ tsdown v0.21.10 powered by rolldown v1.0.0-rc.17\nℹ config file: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2882/packages/contracts/tsdown.config.ts \nℹ entry: src/index.ts\nℹ tsconfig: tsconfig.json\nℹ entry: src/index.ts\nℹ tsconfig: tsconfig.json\nℹ Build start\nℹ [CJS] dist/index.cjs  360.02 kB │ gzip: 58.52 kB\nℹ [CJS] 1 files, total: 360.02 kB\n✔ Build complete in 2815ms\nℹ [ESM] dist/index.mjs       330.08 kB │ gzip: 56.38 kB\nℹ [ESM] dist/index.mjs.map   544.32 kB │ gzip: 87.74 kB\nℹ [ESM] dist/index.d.ts.map   46.28 kB │ gzip:  5.66 kB\nℹ [ESM] dist/index.d.ts      766.00 kB │ gzip: 76.25 kB\nℹ [ESM] 4 files, total: 1.69 MB\n✔ Build complete in 3100ms\n\n> @overdeck/core@0.47.1 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\nsrc/lib/pipeline-membership-gather.ts(15,108): error TS2307: Cannot find module './gitlab-merge-requests.js' or its corresponding type declarations.\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (76%)\n  - rolldown-plugin-dts:fake-js (18%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n",
     "reviewRequestedAt": "2026-07-28T07:09:48.344Z",
@@ -94,7 +94,7 @@
       },
       "costAtCloseOut": {
         "usd": 3.643157,
-        "pricingAsOf": "2026-07-28T07:19:28.126Z"
+        "pricingAsOf": "2026-07-28T07:19:54.008Z"
       }
     },
     "merges": [],
