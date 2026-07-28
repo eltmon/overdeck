@@ -895,7 +895,6 @@ describe('gatherProjectLensSignals', () => {
     expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(12);
     expect(maxActive).toBe(5);
     expect(mocked.listMergedMergeRequestHeads).not.toHaveBeenCalledWith('/test/docs', expect.any(Array));
->>>>>>> origin/main
   });
 
   it('does not query merged MRs for closed issues (they\'re already terminal)', async () => {
