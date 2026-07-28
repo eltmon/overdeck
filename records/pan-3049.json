@@ -150,18 +150,19 @@
     "recordedAt": "2026-07-28T08:02:25.990Z"
   },
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T18:14:54.999Z",
+  "updated": "2026-07-28T18:30:06.361Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merging",
+    "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:02:29.164Z",
-    "updatedAt": "2026-07-28T18:14:45.321Z",
+    "updatedAt": "2026-07-28T18:30:06.212Z",
     "reviewNotes": "Rally and standard workspace container parsing now preserves final-suffix attribution; no blocking findings remain",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs met. AC1: declaredComposeFileProjectName parses top-level name: (stack-health.ts:52-57), verified against real MYN workspaces which declare 'name: myn-feature-min-XXX' at col 0. AC2: requireComposeProjectNameForWorkspace throws naming workspacePath + composeFilePath + both dev-script paths (stack-health.ts:135-137). AC3: both variants return overdeck-feature-<issue> when composeFilePath is null (lines 119, 134). AC4: assertDeclaredNameMatchesFeatureFolder reuses the exact 'Refusing workspace rebuild:' message for both sources (lines 59-70); dev-script rethrow guard preserved at line 91. COMPOSE_FILE_CANDIDATES and findDevcontainerComposeFile match rebuild-stack.ts:43-58 exactly, so no directory-scope drift. Tests cover all four plus dev-script-wins precedence.",
@@ -250,10 +251,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 32,
-            "output": 5919,
-            "cacheRead": 2632419,
-            "cacheWrite": 163866
+            "input": 34,
+            "output": 6100,
+            "cacheRead": 2826955,
+            "cacheWrite": 164728
           }
         },
         "work": {
@@ -285,15 +286,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1053,
-          "output": 271652,
-          "cacheRead": 231861068,
-          "cacheWrite": 4809335
+          "input": 1055,
+          "output": 271833,
+          "cacheRead": 232055604,
+          "cacheWrite": 4810197
         }
       },
       "costAtCloseOut": {
-        "usd": 140.7336762,
-        "pricingAsOf": "2026-07-28T18:14:52.294Z"
+        "usd": 140.7765522,
+        "pricingAsOf": "2026-07-28T18:30:06.352Z"
       }
     },
     "merges": [
