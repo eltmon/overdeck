@@ -237,6 +237,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
 
   // ── internal-events.ts ────────────────────────────────────────────────────
   { surface: 'POST /api/internal/events',                 kind: 'http', disposition: 'WRITE',       door: 'DomainEventWriter.append (internal deacon bridge)' },
+  { surface: 'POST /api/internal/events/append-once',     kind: 'http', disposition: 'WRITE',       door: 'DomainEventWriter.appendOnce (internal deacon bridge; settled at-most-once append, PAN-3092)' },
   { surface: 'GET /api/internal/events/latest',           kind: 'http', disposition: 'READ',        door: 'DomainEventResolver.latestSequence (internal deacon bridge)' },
   { surface: 'GET /api/internal/events/stream',           kind: 'http', disposition: 'READ',        door: 'DomainEventResolver.stream (internal deacon bridge)' },
 

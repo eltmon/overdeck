@@ -125,6 +125,53 @@ const internalEventsRoute = HttpRouter.add(
   })),
 );
 
+/**
+ * PAN-3092: at-most-once append for the Deacon child.
+ *
+ * The batching `/api/internal/events` path resolves before any HTTP request or
+ * SQLite commit, so a caller there cannot know whether its event landed. This
+ * route commits (or detects the duplicate) inside one transaction and answers
+ * with the settled outcome, which is what an at-most-once operator warning
+ * needs — the child awaits this rather than treating a local enqueue as
+ * durability.
+ */
+const internalEventsAppendOnceRoute = HttpRouter.add(
+  'POST',
+  '/api/internal/events/append-once',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const auth = validateInternalEventsHeaders(request.headers as HeaderMap);
+    if (!auth.ok) return jsonResponse({ error: auth.error }, { status: auth.status });
+
+    const text = yield* request.text;
+    let parsed: unknown = {};
+    try {
+      parsed = text ? JSON.parse(text) : {};
+    } catch {
+      return jsonResponse({ error: 'invalid json' }, { status: 400 });
+    }
+
+    const body = parsed as { event?: unknown; idempotencyKey?: unknown };
+    const events = parseInternalEventsBody({ events: [body.event] });
+    const event = events[0];
+    if (!event || typeof body.idempotencyKey !== 'string' || body.idempotencyKey.length === 0) {
+      return jsonResponse({ error: 'event and idempotencyKey are required' }, { status: 400 });
+    }
+
+    try {
+      const result = getEventStore().appendOnce(event, body.idempotencyKey);
+      return jsonResponse(result);
+    } catch (err) {
+      // The transaction did not commit — say so, so the caller retries instead
+      // of recording a warning it never delivered.
+      return jsonResponse(
+        { error: err instanceof Error ? err.message : 'append failed' },
+        { status: 500 },
+      );
+    }
+  })),
+);
+
 const internalEventsLatestRoute = HttpRouter.add(
   'GET',
   '/api/internal/events/latest',
@@ -229,6 +276,6 @@ const internalEventsStreamRoute = HttpRouter.add(
   })),
 );
 
-export const internalEventsRouteLayer = Layer.mergeAll(internalEventsRoute, internalEventsLatestRoute, internalEventsStreamRoute);
+export const internalEventsRouteLayer = Layer.mergeAll(internalEventsRoute, internalEventsAppendOnceRoute, internalEventsLatestRoute, internalEventsStreamRoute);
 
 export default internalEventsRouteLayer;

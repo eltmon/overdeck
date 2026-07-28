@@ -16,6 +16,14 @@ export interface DeaconEventClientOptions {
 export interface DeaconEventClient {
   append(event: Omit<DomainEvent, 'sequence'>): number;
   appendAsync(event: Omit<DomainEvent, 'sequence'>): Promise<number>;
+  /**
+   * PAN-3092: append at most once for `idempotencyKey`, awaiting the server's
+   * settled transaction outcome rather than a local enqueue.
+   */
+  appendOnce(
+    event: Omit<DomainEvent, 'sequence'>,
+    idempotencyKey: string,
+  ): Promise<'appended' | 'duplicate' | 'failed'>;
   subscribe(fn: (event: { sequence: number; type: string; timestamp: string; payload: unknown }) => void): () => void;
   flushNow(): Promise<void>;
   bufferedCount(): number;
@@ -157,6 +165,31 @@ export function createDeaconEventClient(options: DeaconEventClientOptions = {}):
     appendAsync(event) {
       enqueue(event);
       return Promise.resolve(0);
+    },
+    async appendOnce(event, idempotencyKey) {
+      // PAN-3092: deliberately NOT queued. `append`/`appendAsync` resolve on
+      // local enqueue, before any HTTP request or SQLite commit, so a caller
+      // there cannot know whether its event landed — and a queued event can
+      // still fail delivery, be dropped on buffer overflow, or die with this
+      // child process. An at-most-once operator warning needs the settled
+      // server outcome, so this awaits the round trip and reports failure.
+      try {
+        const token = options.token ?? ensureInternalTokenSync();
+        const response = await fetchImpl(new URL('/api/internal/events/append-once', dashboardUrl), {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            origin: dashboardUrl,
+            [INTERNAL_TOKEN_HEADER]: token,
+          },
+          body: JSON.stringify({ event, idempotencyKey }),
+        });
+        if (!response.ok) return 'failed';
+        const body = await response.json() as { outcome?: unknown };
+        return body.outcome === 'appended' || body.outcome === 'duplicate' ? body.outcome : 'failed';
+      } catch {
+        return 'failed';
+      }
     },
     subscribe(fn) {
       let active = true;

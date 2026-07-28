@@ -143,3 +143,85 @@ describe('deacon event client', () => {
     ]);
   });
 });
+
+/**
+ * PAN-3092: the batching append path resolves on local enqueue, before any HTTP
+ * request or SQLite commit, so it cannot back an at-most-once guarantee. This
+ * path awaits the server's settled transaction outcome instead.
+ */
+describe('deacon event client appendOnce (PAN-3092)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  function client(fetchImpl: typeof fetch) {
+    return createDeaconEventClient({
+      dashboardUrl: 'http://127.0.0.1:3011',
+      token: 'test-token',
+      fetchImpl,
+    });
+  }
+
+  it('posts to the append-once endpoint and returns the server outcome', async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ outcome: 'appended', sequence: 7 }),
+    } as unknown as Response));
+
+    const outcome = await client(fetchImpl).appendOnce(event(1), 'episode-1');
+
+    expect(outcome).toBe('appended');
+    const [url, init] = fetchImpl.mock.calls[0] as [URL, RequestInit];
+    expect(String(url)).toBe('http://127.0.0.1:3011/api/internal/events/append-once');
+    expect(JSON.parse(String(init.body))).toMatchObject({ idempotencyKey: 'episode-1' });
+  });
+
+  it('relays a server-detected duplicate rather than appending again', async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ outcome: 'duplicate', sequence: 7 }),
+    } as unknown as Response));
+
+    expect(await client(fetchImpl).appendOnce(event(1), 'episode-1')).toBe('duplicate');
+  });
+
+  it('reports failed on an HTTP error instead of claiming the event landed', async () => {
+    const fetchImpl = vi.fn(async () => ({ ok: false, status: 500 } as Response));
+
+    expect(await client(fetchImpl).appendOnce(event(1), 'episode-1')).toBe('failed');
+  });
+
+  it('reports failed when the request never completes', async () => {
+    const fetchImpl = vi.fn(async () => { throw new Error('ECONNREFUSED'); });
+
+    expect(await client(fetchImpl).appendOnce(event(1), 'episode-1')).toBe('failed');
+  });
+
+  it('does not queue the event — a failure must not silently retry as a batch', async () => {
+    const fetchImpl = vi.fn(async () => ({ ok: false, status: 500 } as Response));
+    const c = client(fetchImpl);
+
+    await c.appendOnce(event(1), 'episode-1');
+
+    // Nothing buffered: the caller owns the retry, and a queued copy would
+    // resurface the warning without the caller ever knowing.
+    expect(c.bufferedCount()).toBe(0);
+  });
+
+  it('reports failed on an unrecognised outcome', async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ outcome: 'weird' }),
+    } as unknown as Response));
+
+    expect(await client(fetchImpl).appendOnce(event(1), 'episode-1')).toBe('failed');
+  });
+});

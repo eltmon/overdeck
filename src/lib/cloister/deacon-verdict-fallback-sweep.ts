@@ -182,10 +182,12 @@ export async function sweepStrandedVerdictFallbacks(now = Date.now()): Promise<s
           message,
         });
         if (outcome === 'failed') {
+          // Nothing landed — do NOT mark the episode warned, or this process
+          // would suppress its own retry and the operator would hear nothing.
           actions.push(`${issueId}: verdict-fallback warning could not be recorded — retrying next patrol`);
         } else {
           warnedEpisodes.add(episode);
-          if (outcome === 'appended') actions.push(summary);
+          if (outcome !== 'duplicate') actions.push(summary);
         }
       }
 

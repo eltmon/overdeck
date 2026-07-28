@@ -56,12 +56,20 @@ export interface EventStore {
   /** Return events of a given type, most recent first, capped at limit. */
   queryByType(type: string, limit?: number): StoredEvent[];
   /**
-   * PAN-3092: has an event of `type` with this `payload.id` already been
-   * appended? Lets a caller make an emit idempotent by its own identity key
-   * instead of relying on projection-time replacement, which still appends a
-   * second event and re-publishes it to every connected client.
+   * PAN-3092: append AT MOST ONCE for `idempotencyKey`, in one transaction.
+   *
+   * The key is claimed and the event inserted together, so two concurrent
+   * callers cannot both observe absence and append — a check-then-append pair
+   * has no such guarantee. Returns only after the transaction settles, and
+   * throws if it does not commit, so a caller can distinguish "durably
+   * appended" from "already there" from "not written at all". Projection-time
+   * id reuse cannot provide this: it replaces the visible row but still appends
+   * and re-publishes a second event.
    */
-  hasEventWithPayloadId(type: string, id: string): boolean;
+  appendOnce(
+    event: Omit<DomainEvent, 'sequence'>,
+    idempotencyKey: string,
+  ): { outcome: 'appended' | 'duplicate'; sequence: number };
   /** Return the latest event per payload.issueId for a given event type. */
   queryLatestPerIssue(type: string): StoredEvent[];
   /**
@@ -201,11 +209,33 @@ export function createEventStore(db: DbAdapter): EventStore {
   const purgeTypeStmt = db.prepare<void>(
     `DELETE FROM events WHERE type = ?`,
   );
-  // PAN-3092: idx_events_type keeps this to the one event type, and LIMIT 1
-  // stops at the first match — the id is unique per logical activity.
-  const hasPayloadIdStmt = db.prepare<{ one: number }>(
-    `SELECT 1 AS one FROM events WHERE type = ? AND json_extract(payload, '$.id') = ? LIMIT 1`,
-  );
+  // PAN-3092: at-most-once append. The INSERT hits event_idempotency's PRIMARY
+  // KEY, so a duplicate is detected by the uniqueness constraint rather than by
+  // a preceding read — no check-then-append race, and an indexed lookup rather
+  // than a json_extract scan.
+  //
+  // Prepared lazily, unlike the hot-path statements above: `appendOnce` is a
+  // low-frequency path, and every store built against a narrower schema (tests,
+  // fixtures) would otherwise fail at construction on a table it never uses.
+  let idempotencyStmts: {
+    claim: PreparedStatement<void>;
+    read: PreparedStatement<{ sequence: number }>;
+    setSeq: PreparedStatement<void>;
+  } | null = null;
+  function getIdempotencyStmts(): NonNullable<typeof idempotencyStmts> {
+    idempotencyStmts ??= {
+      claim: db.prepare<void>(
+        `INSERT OR IGNORE INTO event_idempotency (key, sequence, created_at) VALUES (?, ?, ?)`,
+      ),
+      read: db.prepare<{ sequence: number }>(
+        `SELECT sequence FROM event_idempotency WHERE key = ?`,
+      ),
+      setSeq: db.prepare<void>(
+        `UPDATE event_idempotency SET sequence = ? WHERE key = ?`,
+      ),
+    };
+    return idempotencyStmts;
+  }
 
   // ─── Async write queue ───────────────────────────────────────────────────────
   // Batches events and flushes them in a single transaction on the next tick.
@@ -364,8 +394,50 @@ export function createEventStore(db: DbAdapter): EventStore {
     return queryLatestPerIssueStmt.all([type]).map(rowToStored);
   }
 
-  function hasEventWithPayloadId(type: string, id: string): boolean {
-    return hasPayloadIdStmt.all([type, id]).length > 0;
+  function appendOnce(
+    event: Omit<DomainEvent, 'sequence'>,
+    idempotencyKey: string,
+  ): { outcome: 'appended' | 'duplicate'; sequence: number } {
+    const stmts = getIdempotencyStmts();
+    const timestamp = eventTimestampMillis(event);
+    const payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
+    let sequence = 0;
+    let duplicate = false;
+
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      // INSERT OR IGNORE + a read-back is the duplicate test: if the row was
+      // already there, the stored sequence is the winner's.
+      stmts.claim.run([idempotencyKey, 0, Date.now()]);
+      const claimed = stmts.read.get([idempotencyKey]);
+      if (claimed && claimed.sequence !== 0) {
+        duplicate = true;
+        sequence = claimed.sequence;
+      } else {
+        insertStmt.run([event.type, timestamp, payload]);
+        sequence = lastRowIdStmt.get()?.sequence ?? 0;
+        stmts.setSeq.run([sequence, idempotencyKey]);
+      }
+      db.exec('COMMIT');
+    } catch (err) {
+      try { db.exec('ROLLBACK'); } catch { /* no active transaction */ }
+      // Drop the cached statements: the failure may be a schema problem, and a
+      // later retry must be free to re-prepare rather than reuse a dead handle.
+      idempotencyStmts = null;
+      throw err;
+    }
+
+    // Publish only what this call actually wrote — a duplicate must not
+    // re-notify subscribers, which is the repeat the caller is avoiding.
+    if (!duplicate) {
+      emitter.emit('event', {
+        sequence,
+        type: event.type,
+        timestamp: new Date(timestamp).toISOString(),
+        payload: JSON.parse(payload),
+      } satisfies StoredEvent);
+    }
+    return { outcome: duplicate ? 'duplicate' : 'appended', sequence };
   }
 
   function queryByTypesSince(types: string[], afterSequence: number): StoredEvent[] {
@@ -392,7 +464,7 @@ export function createEventStore(db: DbAdapter): EventStore {
     readFrom,
     queryByType,
     queryLatestPerIssue,
-    hasEventWithPayloadId,
+    appendOnce,
     queryByTypesSince,
     subscribe,
     compact,

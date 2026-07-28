@@ -99,17 +99,30 @@ write-recency from verdict-truth:
   patrol forever on the lock under repair.
 
   The warning goes through `emitActivityEntryOnce()`, keyed by recovery path +
-  issue + fallback generation. That call asks the event store whether the id was
-  already appended (`hasEventWithPayloadId`) and skips the append if so, then
-  awaits durability and reports `appended | duplicate | failed`. A reused id
-  alone would NOT be enough: the `activity.entry` reducer replaces the projected
-  row, but the event is still appended, re-published to every connected client,
-  and re-dated to the front of the feed — a second warning. The sweep marks an
-  episode warned only on `appended`/`duplicate`, so a failed append is retried on
-  the next patrol rather than suppressed; the in-process set is an optimisation,
-  not the dedupe of record. Where the wired store cannot answer the query — the
-  deacon-child HTTP append client — this degrades to at-least-once, on the view
-  that a repeated warning beats a lost one.
+  issue + fallback generation, which delegates to the event store's
+  `appendOnce(event, idempotencyKey)`. That claims the key in `event_idempotency`
+  (PRIMARY KEY) and inserts the event in ONE transaction, publishes to
+  subscribers only when it actually appended, and returns `appended | duplicate`
+  after the transaction settles — or throws. Two properties matter and neither is
+  available any other way:
+
+  - **A reused payload id is not enough.** The `activity.entry` reducer replaces
+    the projected row, but the event is still appended, re-published to every
+    connected client, and re-dated to the front of the feed — a second warning.
+  - **Neither `append` path can report durability.** The Deacon runs as a child
+    process (`startDeaconChild()` → `deacon.js`), so its provider is the HTTP
+    `createDeaconEventClient()`, whose `appendAsync` resolves on local enqueue
+    before any request; and the in-process store resolves a failed batch with
+    sequence `0` rather than rejecting. Both would report success for an event
+    that never persisted. The client therefore gets its own `appendOnce()` that
+    POSTs `/api/internal/events/append-once` and awaits the server's settled
+    outcome instead of queueing.
+
+  The sweep marks an episode warned only on `appended`/`duplicate`; `failed`
+  leaves it unmarked so the next patrol retries. `unconfirmed` is returned when a
+  wired store exposes no `appendOnce` at all (narrow test doubles, early-boot
+  stubs) — best-effort hand-off, explicitly not a guarantee. The in-process set
+  is an optimisation, never the dedupe of record.
 - **A frozen test agent escalates.** A live, idle test session that was already
   nudged and wrote no `.pan/test/result.json` now yields `escalate` from
   `decideUnsignaledTestAction()` instead of being ignored forever; the deacon
