@@ -180,7 +180,7 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T11:46:50.114Z",
+  "updated": "2026-07-28T11:46:52.056Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
@@ -191,8 +191,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T11:46:50.035Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues: P0 — event_idempotency was created in panopticon.db's schema while the event store opens overdeck.db, so append-once would have 500'd on every real install; moved it to the overdeck.db schema door (init migration + idempotent runtime top-up, OVERDECK_TABLE_COUNT bumped, panopticon copy removed) with tests that open a real database via getOverdeckDatabaseSync, including an existing agents-present database where only the top-up can restore the table. P1 — warning delivery now shares one 30s SWEEP_WARNING_BUDGET_MS across the whole sweep instead of multiplying a per-request deadline by issue count; abandoned warnings are retryable failed, drains still run for every issue, and a fake-timer test with seven hanging warnings asserts the sweep returns within budget.",
+    "updatedAt": "2026-07-28T11:46:50.313Z",
+    "reviewNotes": "Verification infrastructure error: Verification worker 1915155 exited before writing a result",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
     "reviewedAtCommit": "6986a22ca9666f15c36f1b58d62cfbd56043be38",
@@ -291,7 +291,7 @@
       },
       "costAtCloseOut": {
         "usd": 96.5200223,
-        "pricingAsOf": "2026-07-28T11:46:50.102Z"
+        "pricingAsOf": "2026-07-28T11:46:52.053Z"
       }
     },
     "merges": [
