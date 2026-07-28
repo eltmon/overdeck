@@ -18,6 +18,16 @@ The `init` service must install development dependencies and must not try to ins
 - `HUSKY=0` makes Husky's prepare script a no-op inside the container while preserving host-side hook installation.
 - Do not replace this with a global removal of the `prepare` script; host installs still need hooks.
 
+## Compose project naming
+
+A workspace's Docker Compose project is its **declared** name — the dev-script's `COMPOSE_PROJECT_NAME` (e.g. `myn-${FEATURE_FOLDER}`) or a compose file's top-level `name:` field (e.g. `name: myn-feature-min-901`) — never a name independently re-derived from the issue ID. `composeProjectNameForWorkspace` in `src/lib/workspace/stack-health.ts` is the single resolver for this: it checks the dev script first, then the devcontainer compose file, and only falls back to `overdeck-feature-<issue>` when neither declares a name. Every consumer — rebuild, teardown, health checks, idle reapers, `pan doctor` — must call through this resolver rather than re-deriving the name itself. Two independent derivations disagreeing is exactly what let a duplicate `overdeck-feature-*` stack spring up beside a workspace's real `myn-feature-*` one (PAN-3049): one code path resolved the declared name, another took the fallback, and both brought up a stack.
+
+Bring-up paths use the strict variant, `requireComposeProjectNameForWorkspace`. It throws instead of silently returning the `overdeck-` fallback when a devcontainer compose file exists but declares no resolvable name — a workspace with a compose file and no declared name is a bug worth surfacing loudly, not a condition to paper over with a guess. `rebuildWorkspaceStack` resolves the bring-up name only *after* re-rendering `.devcontainer/`, so a freshly rendered compose file's own declaration is what `docker compose up -p` uses, not a stale pre-render guess.
+
+Container and network filters that scan for "workspace stacks" must match on the `feature-<issue>` token (any prefix, or none), never anchor to the `overdeck-feature-` prefix specifically. A filter hardcoded to `overdeck-feature-` is blind to every other declared prefix (`myn-feature-`, etc.) — the deacon's crash sweep, the idle-stack reaper's UI tier, and `pan workspace reap` all learned this the hard way and were widened to prefix-agnostic matching.
+
+`pan doctor` is the supported way to find and reconcile duplicate or mismatched stacks: it lists running containers by `com.docker.compose.project`, groups them by issue, and reports any issue running under more than one project or under only a non-canonical one, with the exact `docker compose -p <name> down` or `pan workspace rebuild <issue>` command to run. No Overdeck code path stops a running foreign-named stack automatically — a foreign stack may be the one actually serving a live agent, so tearing it down without a human or `pan doctor`'s explicit guidance risks killing in-progress work. Reconciliation is always operator- or doctor-guided, never automatic.
+
 ## Single-deacon invariant
 
 Workspace containers must never mount `${HOME}/.overdeck`, and the container `server` service must set `OVERDECK_DISABLE_DEACON=1`. The container server is a development-time read/UI peer, not a second orchestrator.

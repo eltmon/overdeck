@@ -1,3 +1,17 @@
+/**
+ * Canonical compose-project-name resolver (PAN-3049).
+ *
+ * `composeProjectNameForWorkspace` / `requireComposeProjectNameForWorkspace`
+ * are the ONLY place a workspace's Docker Compose project name is derived.
+ * A workspace's compose project is whatever it DECLARES — the dev-script
+ * `COMPOSE_PROJECT_NAME` or a compose file's top-level `name:` field — never
+ * an independently re-guessed prefix. Every consumer (rebuild, teardown,
+ * health checks, reapers, doctor) must call through this module rather than
+ * re-deriving the name; two independent derivations disagreeing is exactly
+ * what let a duplicate `overdeck-feature-*` stack spring up beside a
+ * workspace's real `myn-feature-*` one. See docs/WORKSPACE-CONTAINERS.md
+ * ("Compose project naming") for the full contract.
+ */
 import { execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
