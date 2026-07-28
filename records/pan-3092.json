@@ -190,7 +190,7 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T12:02:50.420Z",
+  "updated": "2026-07-28T12:02:52.349Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
@@ -201,8 +201,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T12:02:50.330Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues: the shared budget no longer starves later episodes — the sweep now drains and collects candidates, fans every candidate's warning out concurrently under one shared deadline, then writes trips last, so total wall-clock stays at one budget while every episode gets an attempt (idempotent by episode key, so concurrency cannot duplicate and an abandoned attempt retries next patrol). Tests replace the starvation expectation with per-issue attempt coverage plus a three-patrol run where the first episode's warning and trip both keep failing and every other issue still gets exactly one durable warning. Both P2s taken: budget derived from resolved patrolIntervalMs, and event_idempotency listed in OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS.",
+    "updatedAt": "2026-07-28T12:02:50.615Z",
+    "reviewNotes": "Verification infrastructure error: Verification worker 2050902 exited before writing a result",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
     "reviewedAtCommit": "767b20a2125267b798422a20769185b418eff205",
@@ -301,7 +301,7 @@
       },
       "costAtCloseOut": {
         "usd": 106.3203753,
-        "pricingAsOf": "2026-07-28T12:02:50.376Z"
+        "pricingAsOf": "2026-07-28T12:02:52.347Z"
       }
     },
     "merges": [
