@@ -49,15 +49,7 @@
       "timestamp": "2026-07-28T19:43:35.730Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T19:43:35Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3228\n\n# Review — PAN-3228 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED — current-session AUQ scoping is fixed, but the graceful dashboard projection and swarm needs-you blockers remain\n\n## Context\n- Manifest: `.pan/review/agent-pan-3228-review-57e909d2/context.json`\n- Branch: `feature/pan-3228`\n- PR: https://github.com/eltmon/overdeck/pull/3241\n- HEAD reviewed: `57e909d2bf0ee27c55919290af292bc7f6e81322`\n- Cycle number: 4\n- Prior cycle SHA: `24455ea1759d163b1cdca6b2f20871262c9c5735`\n- Cycle diff: one commit changing the AUQ gate, agent-enrichment helper/tests, and `docs/PENDING-INPUT.md`\n- Dimensions reviewed: correctness/logic, security, requirements/acceptance criteria, performance\n- Verification: focused pending-decision/JSONL identity suites passed, 11 tests across 2 files; cycle diff passes `git diff --check`\n- Scope note: the workspace has an uncommitted change in `src/lib/cloister/swarm-failed-slot.ts`. This verdict evaluates only committed HEAD.\n\n## Cycle-4 Finding Disposition\n\n| Prior finding | Disposition at committed HEAD |\n| --- | --- |\n| Pane-choice POST omitted origin/authentication guard | **Fixed in cycle 2.** |\n| Graceful restart could destroy a late decision | **Core fixed in cycle 3; dashboard projection blocker remains unchanged.** |\n| Forced discard was rediscovered from historical workspace JSONLs | **Fixed this cycle.** The recovery gate now scans the pinned session, or rejects an unpinned fallback transcript older than the replacement agent's `startedAt` boundary. The regression preserves the historical JSONL and proves it no longer recreates the gate. |\n| Failed swarm slot drops the required needs-you escalation | **Still blocking; committed file unchanged.** |\n\n## Blocking Findings\n\n### ! [correctness] A grace-period refusal leaves the live agent permanently projected as stopped — `src/lib/agents/recovery.ts:174`\n**Evidence tier:** Tier 1\n**Changed-code origin:** This defect could not have been raised in cycle 1 because the post-warning early refusal did not exist then; it was introduced by the cycle-3 race fix and identified in that cycle.\n**Problem:** The recovery core now correctly returns `pending-operator-decision` without stopping the session when a decision appears during the grace wait. Its dashboard caller still emits `agent.stopped` at `src/dashboard/server/routes/agents/lifecycle-restart.ts:311-315` before calling the core and restores `agent.started` only on success.\n**Failure scenario:** The route projects stopped, the agent reaches a permission prompt during the 60-second grace period, and the core returns the typed refusal without stopping tmux. The route logs the failure but never restores the running projection.\n**Runtime impact:** The harness remains live and operator-owned while the canonical read model says it is stopped, so dashboard controls and autonomous lifecycle logic act on false state.\n**Fix:** Move the stopped/started projection pair to confirmed successful restart, or restore the running projection on the typed refusal. Add the route-level fake-timer regression requested in cycle 3.\n\n### ! [requirements] Failed swarm slots defer silently instead of emitting the required needs-you trip — `src/lib/cloister/swarm-failed-slot.ts:103`\n**Scope:** in_pr_scope\n**Evidence tier:** Tier 1\n**Requirement:** FR-4 and the issue body require autonomous destructive recovery to defer with a needs-you escalation when the agent owns a pending decision.\n**Observed:** `requeueFailedSwarmSlots()` records only an action string and ignores `admission.needsYou`. Its recovery-trip call occurs after successful admission, so the pending-decision branch never reaches a durable needs-you writer.\n**Impact:** The slot is protected from replacement but can remain parked indefinitely without an actionable operator decision, contradicting the recovery contract and flywheel doctrine.\n**Fix:** Route `needsYou: true` through the canonical deduplicated needs-you writer before continuing, and add a failed-slot regression proving one escalation and no archive/requeue.\n\n## Cycle-Diff Review\n\nThe current-session AUQ correction is sound for its stated forced-fresh scenario:\n\n- A pinned `session.id` remains the ownership source even if its transcript mtime predates `startedAt`.\n- An unpinned fallback transcript older than `startedAt` is treated as belonging to the discarded generation.\n- Historical JSONLs remain untouched.\n- The destructive-recovery gate now scans one relevant transcript instead of every workspace transcript, resolving the prior performance advisory.\n- The existing workspace-wide counter remains available for complete-planning semantics, where scanning every transcript is intentional.\n- No security regression, non-goal violation, or new blocking performance issue was introduced.\n\nA remaining unpinned fallback can still be freshest-wins when another session shares the cwd, but the new `startedAt` boundary prevents the specific historical-generation failure under review; this is existing fallback behavior rather than a cycle-4 blocker.\n\n## Requirement Coverage\n\n| Requirement | Status at committed HEAD |\n| --- | --- |\n| FR-1 / NFR-2 pending-decision helper | Implemented for live pane and current-session AUQ evidence |\n| FR-2 fresh-start gate and force | Implemented; forced discard no longer reappears from an older generation |\n| FR-3 / NFR-1 restart-family gate | Partial — core is safe, dashboard projection remains wrong on late refusal |\n| FR-4 autonomous redrive + needs-you | Partial — failed swarm slots still drop needs-you |\n| FR-5 shared session pane-choice core | Implemented |\n| FR-6 agent GET/POST pane-choice routes | Implemented and origin-guarded |\n| FR-7 `pan answer` CLI | Implemented |\n| FR-8 flywheel doctrine | Implemented |\n| Documentation | Current-session generation behavior is now documented accurately; universal needs-you wording remains ahead of the swarm implementation |\n\n## Non-goal Audit\nAll six must-not constraints remain satisfied: no decision-card UI/read-model plumbing, no supervisor protocol endpoint, no Channels revival, no nudge-path change, no unrelated Decisions indicator fix, and no rate-limit gating or auto-answer behavior.\n\n## Coverage\nCycle 1 reviewed the complete PR across all four dimensions. Cycles 2-4 reviewed each committed correction and rechecked unresolved blockers against committed HEAD. This cycle reviewed all five changed files and their interaction with the recovery gate; unchanged clean areas from the prior full pass were not re-read.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3228/.pan/review/agent-pan-3228-review-57e909d2/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3228 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -155,10 +147,10 @@
     "recordedAt": "2026-07-28T19:16:09.927Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T19:43:41.390Z",
+  "updated": "2026-07-28T19:46:21.633Z",
   "pipeline": {
     "issueId": "PAN-3228",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -166,11 +158,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:17:21.407Z",
-    "updatedAt": "2026-07-28T19:43:41.379Z",
+    "updatedAt": "2026-07-28T19:46:21.225Z",
     "reviewNotes": "AUQ session scoping is fixed; graceful restart projection and swarm needs-you blockers remain",
     "inspectNotes": "All 3 ACs met. AC1: new src/lib/__tests__/session-pane-choice.test.ts covers 400 bad index, 400 missing signature, 409 menu-gone, 409 menu-changed, 409 delivery-unconfirmed, and 200 {ok,answeredLabel} with Down/Down/Enter keystrokes. AC2: tests/unit/lib/overdeck/conversation-pane-choice.test.ts is untouched by this commit (last touched by PAN-3113 commit 4d65ad1c) and its 12 cases pass through the delegating handler; 47/47 across the 4 pane-choice test files. AC3: captureSessionPaneChoice returns signature/title/options/recommended/selectedIndex and null on no-menu or capture throw. Delegation preserves defaults (conversation still passes tmuxSessionExists; core defaults to capturePaneText + Effect.runPromise(sessionExists)) and the validation ordering (400s before conv lookup).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3241",
-    "reviewedAtCommit": "57e909d2bf0ee27c55919290af292bc7f6e81322",
     "lastVerifiedCommit": "57e909d2bf0ee27c55919290af292bc7f6e81322",
     "reviewSpawnedAt": "2026-07-28T19:41:38.727Z",
     "scopeDrift": {
@@ -283,17 +274,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4963413,
-            "output": 171054,
-            "cacheRead": 30904320,
+            "input": 4993911,
+            "output": 184708,
+            "cacheRead": 33093632,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2740667,
-            "output": 249484,
-            "cacheRead": 155059712,
+            "input": 2749898,
+            "output": 250588,
+            "cacheRead": 156623872,
             "cacheWrite": 0
           }
         }
@@ -306,15 +297,15 @@
           "cacheWrite": 121982
         },
         "openai/gpt-5.6-sol": {
-          "input": 7704080,
-          "output": 420538,
-          "cacheRead": 185964032,
+          "input": 7743809,
+          "output": 435296,
+          "cacheRead": 189717504,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 155.108178,
-        "pricingAsOf": "2026-07-28T19:43:41.385Z"
+        "usd": 157.626299,
+        "pricingAsOf": "2026-07-28T19:46:21.265Z"
       }
     },
     "merges": [
