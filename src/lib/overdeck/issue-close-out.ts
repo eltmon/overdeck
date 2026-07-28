@@ -14,6 +14,7 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { sessionExists } from '../tmux.js';
 import { resolveIssueProjectPathSync } from './issue-reads.js';
+import { archiveIssueWorkspaceRow } from './workspace-hygiene.js';
 
 function getIssueDataService(): IssueDataService {
   return getSharedIssueService();
@@ -147,6 +148,11 @@ export function closeOutIssue(id: string, opts: { acceptedRows?: DodRowId[]; acc
     if (!result.success) {
       return closeOutFailureResponse(result);
     }
+
+    // PAN-1990: archive (never delete) the issue's workspace row alongside
+    // close-out's own teardown. Row and memory home survive; only
+    // is_archived flips.
+    archiveIssueWorkspaceRow(id.toUpperCase());
 
     let newLabels: string[] = ['closed-out'];
     try {
