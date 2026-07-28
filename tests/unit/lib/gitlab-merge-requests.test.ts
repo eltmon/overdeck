@@ -202,30 +202,23 @@ describe('gitlab-merge-requests', () => {
       expect(callCount).toBe(1);
     });
 
-    it('paginates through pages when page 1 has exactly 100 rows', async () => {
+    it('short-circuits after a full first page proves the head has a merged MR', async () => {
       let callCount = 0;
       const runner: GitLabRunner = vi.fn(async (args) => {
         callCount++;
         if (args[args.length - 1] === '1') {
-          // Page 1: exactly 100 rows (continue to page 2)
           return JSON.stringify(Array.from({ length: 100 }, (_, i) => ({
             source_branch: 'feature/multi',
             iid: i,
           } as GitLabMergeRequestRow)));
-        } else if (args[args.length - 1] === '2') {
-          // Page 2: short page with results (found, stop)
-          return JSON.stringify([{ source_branch: 'feature/multi', iid: 100 } as GitLabMergeRequestRow]);
         }
-        return '';
+        throw new Error('Should not request page 2 after finding merged rows');
       });
 
       const result = await listGitLabMergedMergeRequestHeads('/test/merged-4', ['feature/multi'], runner);
 
-      // Should identify head as merged
       expect(result).toEqual(['feature/multi']);
-      // Should have paginated to page 2
-      expect(callCount).toBe(2);
-      expect(runner).toHaveBeenNthCalledWith(2, expect.arrayContaining(['--page', '2']), '/test/merged-4');
+      expect(callCount).toBe(1);
     });
 
     it('returns empty array when no heads are provided', async () => {

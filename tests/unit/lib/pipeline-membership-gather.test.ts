@@ -835,8 +835,8 @@ describe('gatherProjectLensSignals', () => {
     expect(membership).toEqual(expect.objectContaining({
       bucket: 'post_merge_limbo',
     }));
-    // Verify both repos were queried
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(2);
+    // Two candidate heads (feature + strike) are queried in each of the two repos.
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(4);
   });
 
   it('does not query merged MRs for closed issues (they\'re already terminal)', async () => {
@@ -935,9 +935,8 @@ describe('gatherProjectLensSignals', () => {
 
     await gatherProjectLensSignals(mixedPolyrepo, mocked);
 
-    // Only the api repo (gitlab forge) should be queried, not fe (github forge)
-    // The mock was called once, meaning only one repo was queried (the gitlab one)
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(1);
+    // Only the api repo (GitLab forge) is queried, once for each candidate head.
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(2);
     expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', expect.any(Array));
   });
 
