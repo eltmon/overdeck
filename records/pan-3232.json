@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T20:03:08.689Z",
+  "updated": "2026-07-28T20:18:00.262Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -20,7 +20,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T20:03:08.672Z",
+    "updatedAt": "2026-07-28T20:18:00.223Z",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -41,6 +41,14 @@
             "cacheRead": 5086315,
             "cacheWrite": 193438
           }
+        },
+        "work": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 312,
+            "output": 6063,
+            "cacheRead": 4990361,
+            "cacheWrite": 213682
+          }
         }
       },
       "totals": {
@@ -49,11 +57,17 @@
           "output": 53706,
           "cacheRead": 5086315,
           "cacheWrite": 193438
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 312,
+          "output": 6063,
+          "cacheRead": 4990361,
+          "cacheWrite": 213682
         }
       },
       "costAtCloseOut": {
-        "usd": 10.208477,
-        "pricingAsOf": "2026-07-28T20:03:08.685Z"
+        "usd": 11.005244,
+        "pricingAsOf": "2026-07-28T20:18:00.259Z"
       }
     },
     "merges": [],
