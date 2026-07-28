@@ -11,11 +11,24 @@ export interface DeaconEventClientOptions {
   maxBufferSize?: number;
   baseRetryMs?: number;
   maxRetryMs?: number;
+  /**
+   * PAN-3092: deadline for the settled `appendOnce` round trip. Must stay well
+   * below the Deacon patrol interval (60s), because the patrol awaits it inline.
+   */
+  appendOnceTimeoutMs?: number;
 }
 
 export interface DeaconEventClient {
   append(event: Omit<DomainEvent, 'sequence'>): number;
   appendAsync(event: Omit<DomainEvent, 'sequence'>): Promise<number>;
+  /**
+   * PAN-3092: append at most once for `idempotencyKey`, awaiting the server's
+   * settled transaction outcome rather than a local enqueue.
+   */
+  appendOnce(
+    event: Omit<DomainEvent, 'sequence'>,
+    idempotencyKey: string,
+  ): Promise<'appended' | 'duplicate' | 'failed'>;
   subscribe(fn: (event: { sequence: number; type: string; timestamp: string; payload: unknown }) => void): () => void;
   flushNow(): Promise<void>;
   bufferedCount(): number;
@@ -26,6 +39,9 @@ const DEFAULT_DEBOUNCE_MS = 250;
 const DEFAULT_MAX_BUFFER_SIZE = 1000;
 const DEFAULT_BASE_RETRY_MS = 1000;
 const DEFAULT_MAX_RETRY_MS = 30_000;
+// Comfortably generous for a loopback POST, and far below the 60s patrol
+// interval so a hung dashboard cannot stall a patrol cycle.
+const DEFAULT_APPEND_ONCE_TIMEOUT_MS = 10_000;
 
 function internalDashboardOrigin(): string {
   const port = Number.parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
@@ -41,6 +57,7 @@ export function createDeaconEventClient(options: DeaconEventClientOptions = {}):
   const maxBufferSize = options.maxBufferSize ?? DEFAULT_MAX_BUFFER_SIZE;
   const baseRetryMs = options.baseRetryMs ?? DEFAULT_BASE_RETRY_MS;
   const maxRetryMs = options.maxRetryMs ?? DEFAULT_MAX_RETRY_MS;
+  const appendOnceTimeoutMs = options.appendOnceTimeoutMs ?? DEFAULT_APPEND_ONCE_TIMEOUT_MS;
 
   const queue: Array<Omit<DomainEvent, 'sequence'>> = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -157,6 +174,47 @@ export function createDeaconEventClient(options: DeaconEventClientOptions = {}):
     appendAsync(event) {
       enqueue(event);
       return Promise.resolve(0);
+    },
+    async appendOnce(event, idempotencyKey) {
+      // PAN-3092: deliberately NOT queued. `append`/`appendAsync` resolve on
+      // local enqueue, before any HTTP request or SQLite commit, so a caller
+      // there cannot know whether its event landed — and a queued event can
+      // still fail delivery, be dropped on buffer overflow, or die with this
+      // child process. An at-most-once operator warning needs the settled
+      // server outcome, so this awaits the round trip and reports failure.
+      //
+      // The deadline is not optional. The Deacon patrol awaits this inline
+      // while iterating issues, so an accepted-but-never-completed connection
+      // would stall every later issue and every later patrol phase — and the
+      // patrol heartbeat ticker keeps refreshing until its `finally`, so the
+      // supervisor would see the wedged Deacon as healthy. Exactly the
+      // overloaded/restarting dashboard this feature exists to report is the
+      // state most likely to hang the request. One controller covers both the
+      // response headers and the body read: aborting after headers also aborts
+      // the body stream. Giving up after a successful commit is safe — retrying
+      // the same idempotency key returns `duplicate`, never a second event.
+      const controller = new AbortController();
+      const deadline = setTimeout(() => controller.abort(), appendOnceTimeoutMs);
+      try {
+        const token = options.token ?? ensureInternalTokenSync();
+        const response = await fetchImpl(new URL('/api/internal/events/append-once', dashboardUrl), {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            origin: dashboardUrl,
+            [INTERNAL_TOKEN_HEADER]: token,
+          },
+          body: JSON.stringify({ event, idempotencyKey }),
+          signal: controller.signal,
+        });
+        if (!response.ok) return 'failed';
+        const body = await response.json() as { outcome?: unknown };
+        return body.outcome === 'appended' || body.outcome === 'duplicate' ? body.outcome : 'failed';
+      } catch {
+        return 'failed';
+      } finally {
+        clearTimeout(deadline);
+      }
     },
     subscribe(fn) {
       let active = true;

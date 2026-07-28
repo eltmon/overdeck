@@ -36,7 +36,127 @@ lock in time falls back to `<workspace>/.overdeck/pipeline-verdict.json`;
 `drainWorkspaceVerdictFallback()` folds that fallback into the canonical
 record (newer-wins on ISO `updatedAt`) and deletes it, triggered after every
 landed journal write for the issue and on unref'd 5s/30s/120s retries after a
-fallback write. Lock-owner attribution is truthful: the spawned dashboard
+fallback write.
+
+PAN-3092 hardened that path against verdict loss, because `pipeline.updatedAt`
+is stamped on every status write and so cannot by itself distinguish
+write-recency from verdict-truth:
+
+- **The record write door's pipeline merge is verdict-aware.**
+  `mergePipelineVerdictAware()` (`src/lib/pan-dir/pipeline-verdict-merge.ts`,
+  behind `pickNewerPipeline`) keeps newer-wins for every non-verdict field but
+  never lets a verdict-free write from the same review cycle displace a terminal
+  verdict. Only a strictly newer `reviewSpawnedAt` (a new cycle) or a newer
+  terminal verdict supersedes one.
+- **The drain's supersede check is content-aware.** A fallback is deleted as
+  superseded only when `pipelineCoversFallbackVerdicts()` confirms the journal
+  carries the same terminal value for every gate the fallback holds one for, or
+  belongs to a newer cycle. A newer-but-verdict-free journal no longer consumes
+  an unlanded verdict. When the two hold *different* terminal values for one
+  gate, `findFallbackVerdictConflicts()` sees it: nothing can order two written
+  verdicts from a whole-pipeline timestamp that bookkeeping restamps, so the
+  drain withholds the fold, keeps the fallback, and lets the sweep put the
+  conflict in front of an operator. That state is permanent by design — every
+  later drain withholds the same fold — so the sweep reports it under its own
+  `verdict-fallback-conflict` recovery path, naming every conflicting gate and
+  both written values and saying plainly that it will not clear on its own. The
+  `verdict-fallback-contention` path is reserved for an actual write failure,
+  which does clear when the lock frees.
+
+  The conflict message deliberately does **not** hand out a `pan admin
+  specialists done` command. That command is not a general resolver: `merge`
+  takes `passed|failed` and maps them to `merged|failed`, `inspect` requires an
+  `--item` a pipeline-level conflict cannot identify, `review` does not accept
+  `skipped`, verification has no specialist, re-signalling the value already in
+  the journal writes no replacement fallback (so the conflict survives), and a
+  conflict can span several gates at once. A strictly newer review cycle is the
+  only instruction correct for every gate, so that is what the operator is told.
+  A resolve-this-generation operation through the verdict write door — accepting
+  the exact fallback generation plus per-gate choices and consuming only that
+  generation — would let an operator adopt a specific written verdict; it does
+  not exist yet and is tracked as follow-up work.
+- **Every merge-gating verdict is projected durably.** `uatStatus`/`uatNotes`
+  join the pipeline block, `projectPipeline()`, and `durableSubset()` — UAT
+  gates merge eligibility, so a contended UAT verdict that the fallback silently
+  dropped would leave that gate stale.
+- **Terminal verdict writes back off in-process.** A write introducing a NEW
+  terminal verdict retries `updateIssueRecordForIssue` on
+  `OVERDECK_VERDICT_BACKOFF_DELAYS_MS` (default 2s/5s/10s/20s/40s/80s) before
+  any fallback is written; `pan admin specialists done` awaits it through
+  `flushReviewStatusJournalWrites()` and then prints a do-not-re-run notice if a
+  fallback remains. Bookkeeping writes stay single-shot.
+- **A deacon patrol owns the long tail.** `sweepStrandedVerdictFallbacks()`
+  (`src/lib/cloister/deacon-verdict-fallback-sweep.ts`) drains every pending
+  fallback each patrol cycle — the retry a short-lived CLI's unref'd timers can
+  never provide — and opens exactly one needs-you per contention episode once a
+  fallback stays undrained past 10 minutes, naming the current lock owner. The
+  activity warning is emitted before, and independently of, the recovery-trip
+  write: that write goes through the very lock whose contention is being
+  reported, so it is best-effort and retried on later patrols. Once the trip is
+  durably open the sweep skips the write entirely — an open trip's mutator
+  returns the record unchanged but the write door still takes the lock, and a
+  retained conflict is permanent, so that would be a no-op record write every
+  patrol forever on the lock under repair.
+
+  The warning goes through `emitActivityEntryOnce()`, keyed by recovery path +
+  issue + fallback generation, which delegates to the event store's
+  `appendOnce(event, idempotencyKey)`. That claims the key in `event_idempotency`
+  (PRIMARY KEY) and inserts the event in ONE transaction, publishes to
+  subscribers only when it actually appended, and returns `appended | duplicate`
+  after the transaction settles — or throws. Two properties matter and neither is
+  available any other way:
+
+  - **A reused payload id is not enough.** The `activity.entry` reducer replaces
+    the projected row, but the event is still appended, re-published to every
+    connected client, and re-dated to the front of the feed — a second warning.
+  - **Neither `append` path can report durability.** The Deacon runs as a child
+    process (`startDeaconChild()` → `deacon.js`), so its provider is the HTTP
+    `createDeaconEventClient()`, whose `appendAsync` resolves on local enqueue
+    before any request; and the in-process store resolves a failed batch with
+    sequence `0` rather than rejecting. Both would report success for an event
+    that never persisted. The client therefore gets its own `appendOnce()` that
+    POSTs `/api/internal/events/append-once` and awaits the server's settled
+    outcome instead of queueing — under a 10s `AbortSignal` deadline
+    (`appendOnceTimeoutMs`) covering both the response headers and the body
+    read. The patrol awaits this inline, so an accepted-but-hanging connection
+    would otherwise stall every later issue and every later patrol phase while
+    the patrol heartbeat kept reporting the Deacon healthy. Timing out after a
+    server commit is safe: retrying the same key returns `duplicate`. The sweep
+    additionally bounds warning delivery for the whole sweep, because a
+    per-request deadline alone still multiplies by the number of stranded
+    fallbacks. The sweep runs in three phases: drain everything and collect
+    candidates, fan every candidate's warning out **concurrently under one shared
+    deadline**, then write the durable trips. Concurrency is what keeps it fair —
+    spending a shared budget in issue order let the first hanging episode consume
+    all of it every patrol, and iteration order is stable, so later episodes were
+    silently dropped forever without ever attempting their warning. Each request
+    is idempotent by episode key, so fanning out cannot duplicate a warning, and
+    an attempt abandoned at the deadline is retried next patrol. The budget is
+    derived from the resolved `patrolIntervalMs` (half of it) rather than
+    assuming 60s. Trips come last so a slow record-lock write can never delay the
+    operator-visible warning.
+
+  The claim table lives in `overdeck.db` — created by
+  `drizzle/overdeck/0000_overdeck_init.sql` on a fresh database and by an
+  idempotent top-up in `ensureRuntimeIndexesSync()` for existing ones, since the
+  init migration short-circuits once `agents` exists.
+
+  Idempotency keys age out with the events they guard — `compact()` deletes
+  claims past the same 7-day retention, so the table cannot grow forever and an
+  orphaned key cannot permanently suppress a warning whose event is gone.
+
+  The sweep marks an episode warned only on `appended`/`duplicate`. `failed`
+  wrote nothing, and `unconfirmed` — returned when a wired store exposes no
+  `appendOnce` at all (narrow test doubles, early-boot stubs) — means delivery is
+  unknown; neither is evidence the operator was told, so both leave the episode
+  eligible for the next patrol. The in-process set is an optimisation, never the
+  dedupe of record.
+- **A frozen test agent escalates.** A live, idle test session that was already
+  nudged and wrote no `.pan/test/result.json` now yields `escalate` from
+  `decideUnsignaledTestAction()` instead of being ignored forever; the deacon
+  opens one needs-you per test dispatch generation. Nothing fabricates a verdict.
+
+Lock-owner attribution is truthful: the spawned dashboard
 server never inherits `OVERDECK_AGENT_ID`/`OVERDECK_ISSUE_ID`/
 `OVERDECK_SESSION_TYPE` (the spawner's identity is preserved as
 `OVERDECK_DASHBOARD_SPAWNED_BY` for the PAN-2322 port guard), so server-side

@@ -200,6 +200,8 @@ function resolveProjectTrackerType(project: ProjectConfig): TrackerType {
 }
 
 async function listProjectTrackerIssues(project: ProjectConfig): Promise<ProjectTrackerIssueRow[]> {
+  const trackerType = resolveProjectTrackerType(project);
+
   const issuePrefix = getIssuePrefix(project)?.toUpperCase();
   if (!issuePrefix) {
     throw new PipelineMembershipUnavailableError(
@@ -207,8 +209,6 @@ async function listProjectTrackerIssues(project: ProjectConfig): Promise<Project
       `Missing issue_prefix for project ${project.name}`,
     );
   }
-
-  const trackerType = resolveProjectTrackerType(project);
   const trackerConfig = loadConfigSync().trackers[trackerType];
   const tracker = createTracker({
     type: trackerType,
@@ -512,6 +512,8 @@ export async function gatherProjectLensSignals(
   project: ProjectConfig,
   deps: PipelineMembershipGatherDeps = defaultDeps,
 ): Promise<IssueLensSignals[]> {
+  resolveProjectTrackerType(project);
+
   const issuePrefix = getIssuePrefix(project)?.toUpperCase();
   if (!issuePrefix) {
     throw new PipelineMembershipUnavailableError(

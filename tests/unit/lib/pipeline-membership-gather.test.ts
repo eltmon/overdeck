@@ -642,6 +642,31 @@ describe('gatherProjectLensSignals', () => {
       });
   });
 
+  it('classifies a path-only project (no tracker configured) as tracker_unconfigured', async () => {
+    const pathOnlyProject: ProjectConfig = {
+      name: 'papers-please',
+      path: '/projects/papers-please',
+    };
+    await expect(gatherProjectLensSignals(pathOnlyProject, deps()))
+      .rejects.toMatchObject({
+        reason: 'tracker_unconfigured',
+        message: expect.stringContaining('papers-please'),
+      });
+  });
+
+  it('classifies a project with tracker but no prefix as missing_issue_prefix (tracker precedence)', async () => {
+    const trackerProjectNoPrefix: ProjectConfig = {
+      name: 'puzzdom',
+      path: '/projects/puzzdom',
+      gitlab_repo: 'puzzdom/puzzdom',
+    };
+    await expect(gatherProjectLensSignals(trackerProjectNoPrefix, deps()))
+      .rejects.toMatchObject({
+        reason: 'missing_issue_prefix',
+        message: expect.stringContaining('puzzdom'),
+      });
+  });
+
   it('classifies forge lens failures without parsing their messages', async () => {
     const mocked = deps();
     mocked.listOpenIssues = vi.fn().mockRejectedValue(new Error('HTTP 404'));
