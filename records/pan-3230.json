@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T17:34:56.665Z",
+  "updated": "2026-07-28T17:38:01.238Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "fix-backlog-spec-drafts-scan": {
-        "writerId": "agent-pan-3230",
-        "agentId": "agent-pan-3230",
-        "pid": 1357235,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T17:34:56.665Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3230",
@@ -112,6 +104,17 @@
         "outcome": "completed",
         "reason": "Flywheel now resolves specs and drafts once through getProjectPanPaths and reuses the authoritative directories.",
         "releasedAt": "2026-07-28T17:34:42.205Z"
+      },
+      {
+        "writerId": "agent-pan-3230",
+        "agentId": "agent-pan-3230",
+        "pid": 1357235,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:34:56.665Z",
+        "itemId": "fix-backlog-spec-drafts-scan",
+        "outcome": "completed",
+        "reason": "Backlog lookups, input collection, and dashboard route now reuse authoritative state-aware spec and draft directories.",
+        "releasedAt": "2026-07-28T17:38:01.238Z"
       }
     ],
     "statusReasons": {
@@ -126,6 +129,10 @@
       "fix-flywheel-spec-drafts-scan": {
         "reason": "Flywheel now resolves specs and drafts once through getProjectPanPaths and reuses the authoritative directories.",
         "updatedAt": "2026-07-28T17:34:42.205Z"
+      },
+      "fix-backlog-spec-drafts-scan": {
+        "reason": "Backlog lookups, input collection, and dashboard route now reuse authoritative state-aware spec and draft directories.",
+        "updatedAt": "2026-07-28T17:38:01.238Z"
       }
     }
   },
@@ -140,6 +147,8 @@
     "fix-flywheel-spec-drafts-scan": "completed",
     "fix-flywheel-spec-drafts-scan.fix-flywheel-spec-drafts-scan.ac1": "completed",
     "fix-flywheel-spec-drafts-scan.fix-flywheel-spec-drafts-scan.ac2": "completed",
-    "fix-backlog-spec-drafts-scan": "running"
+    "fix-backlog-spec-drafts-scan": "completed",
+    "fix-backlog-spec-drafts-scan.fix-backlog-spec-drafts-scan.ac1": "completed",
+    "fix-backlog-spec-drafts-scan.fix-backlog-spec-drafts-scan.ac2": "completed"
   }
 }
