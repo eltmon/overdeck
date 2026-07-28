@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T18:07:33.792Z",
+  "updated": "2026-07-28T18:07:51.899Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "pending",
@@ -85,8 +85,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 14,
-    "claims": {},
+    "sequence": 15,
+    "claims": {
+      "flywheel-doctrine": {
+        "writerId": "agent-pan-3228",
+        "agentId": "agent-pan-3228",
+        "pid": 2548070,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T18:07:51.899Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3228",
@@ -227,6 +235,7 @@
     "answer-cli": "completed",
     "answer-cli.answer-cli.ac1": "completed",
     "answer-cli.answer-cli.ac2": "completed",
-    "answer-cli.answer-cli.ac3": "completed"
+    "answer-cli.answer-cli.ac3": "completed",
+    "flywheel-doctrine": "running"
   }
 }
