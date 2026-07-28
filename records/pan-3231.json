@@ -2,7 +2,7 @@
   "issueId": "PAN-3231",
   "schemaVersion": 2,
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-28T17:08:34.539Z",
+  "updated": "2026-07-28T17:08:37.339Z",
   "pipeline": {
     "issueId": "PAN-3231",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3231: Issue-row artifact click-throughs: xBRIEF chip → full-screen viewer, tasks chip → tasks viewer (resurrect beads panel), PRD affordance → markdown viewer",
       "timestamp": "2026-07-28T17:08:34.539Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
