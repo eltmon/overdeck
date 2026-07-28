@@ -123,7 +123,7 @@
     "recordedAt": "2026-07-28T20:15:30.548Z"
   },
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T23:34:56.092Z",
+  "updated": "2026-07-28T23:35:01.191Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "blocked",
@@ -134,7 +134,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:16:31.872Z",
-    "updatedAt": "2026-07-28T23:34:55.302Z",
+    "updatedAt": "2026-07-28T23:35:01.186Z",
     "reviewNotes": "Latest main merge reverts the shipped subagent transcript scrolling/full-width fix and deletes its regression test",
     "conflictsSince": {
       "sha": "04bcaeb9f6b9d766a637e3e18eafcc828b0fbdbf",
@@ -144,6 +144,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3246",
+    "reviewedAtCommit": "55e9df4e5a2dd09785ce0bcf86ce9d76a7a0b25a",
     "lastVerifiedCommit": "b5844bfff712b2a588e22d6597e4f6488d6edea0",
     "reviewSpawnedAt": "2026-07-28T23:32:02.825Z"
   },
@@ -191,7 +192,7 @@
       },
       "costAtCloseOut": {
         "usd": 173.418651,
-        "pricingAsOf": "2026-07-28T23:34:55.319Z"
+        "pricingAsOf": "2026-07-28T23:35:01.189Z"
       }
     },
     "merges": [
