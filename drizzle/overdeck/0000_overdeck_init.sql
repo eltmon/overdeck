@@ -97,6 +97,7 @@ CREATE TABLE `conversations` (
 	`fork_fallback_reason` text,
 	`delivery_method` text,
 	`spawn_error` text,
+	`workspace_id` text,
 	FOREIGN KEY (`handoff_target_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`cleared_to_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action
 );
@@ -571,3 +572,55 @@ CREATE TABLE `event_idempotency` (
 	`sequence` integer NOT NULL,
 	`created_at` integer NOT NULL
 );--> statement-breakpoint
+CREATE TABLE `projects` (
+	`id` text PRIMARY KEY NOT NULL,
+	`name` text NOT NULL,
+	`primary_path` text NOT NULL,
+	`created_at` integer NOT NULL,
+	`last_accessed_at` integer NOT NULL,
+	`is_system` integer DEFAULT 0 NOT NULL
+);--> statement-breakpoint
+CREATE UNIQUE INDEX `projects_primary_path_idx` ON `projects` (`primary_path`);--> statement-breakpoint
+CREATE TABLE `workspaces` (
+	`id` text PRIMARY KEY NOT NULL,
+	`project_id` text NOT NULL,
+	`kind` text NOT NULL,
+	`name` text NOT NULL,
+	`path` text NOT NULL,
+	`branch_name` text,
+	`parent_branch` text,
+	`parent_branch_guessed` integer DEFAULT 0 NOT NULL,
+	`is_git_repository` integer DEFAULT 1 NOT NULL,
+	`issue_id` text,
+	`layout_config` text,
+	`is_favorite` integer DEFAULT 0,
+	`is_archived` integer DEFAULT 0,
+	`title` text,
+	`created_at` integer NOT NULL,
+	`last_accessed_at` integer NOT NULL,
+	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade,
+	CHECK (`kind` IN ('main','issue','scratch'))
+);--> statement-breakpoint
+CREATE INDEX `idx_workspace_project` ON `workspaces` (`project_id`);--> statement-breakpoint
+CREATE INDEX `idx_workspace_kind` ON `workspaces` (`kind`);--> statement-breakpoint
+CREATE INDEX `idx_workspace_last_accessed` ON `workspaces` (`last_accessed_at`);--> statement-breakpoint
+CREATE TABLE `project_targets` (
+	`project_id` text NOT NULL,
+	`path` text NOT NULL,
+	`is_primary` integer DEFAULT 0 NOT NULL,
+	`created_at` integer NOT NULL,
+	`last_used_at` integer NOT NULL,
+	PRIMARY KEY(`project_id`, `path`),
+	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade
+);--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_project_targets_one_primary` ON `project_targets` (`project_id`) WHERE `is_primary` = 1;--> statement-breakpoint
+CREATE TABLE `pinned_docs` (
+	`id` text PRIMARY KEY NOT NULL,
+	`scope` text NOT NULL,
+	`scope_id` text NOT NULL,
+	`doc_path` text NOT NULL,
+	`created_at` integer NOT NULL,
+	CHECK (`scope` IN ('workspace','project')),
+	UNIQUE(`scope`, `scope_id`, `doc_path`)
+);--> statement-breakpoint
+CREATE INDEX `idx_pinned_docs_scope` ON `pinned_docs` (`scope`, `scope_id`);--> statement-breakpoint
