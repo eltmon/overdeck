@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -18,6 +19,21 @@ async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+function git(cwd: string, args: string[]): string {
+  return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim();
+}
+
+async function initializeGitRepo(root: string, branch: string): Promise<void> {
+  await mkdir(root, { recursive: true });
+  git(root, ['init', '--quiet']);
+  git(root, ['config', 'user.email', 'test@example.com']);
+  git(root, ['config', 'user.name', 'Test']);
+  git(root, ['branch', '-m', branch]);
+  await writeFile(join(root, '.gitkeep'), 'initial\n');
+  git(root, ['add', '.gitkeep']);
+  git(root, ['commit', '--quiet', '-m', 'initial']);
 }
 
 describe('extractAcceptanceCriteriaFromIssue', () => {
@@ -116,6 +132,7 @@ describe('writeAutoStartXBrief', () => {
     await withTempDir(async (root) => {
       const projectRoot = join(root, 'project');
       const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1071');
+      await initializeGitRepo(projectRoot, 'main');
 
       const result = await Effect.runPromise(writeAutoStartXBrief(projectRoot, workspacePath, {
         issueId: 'PAN-1071',
@@ -145,13 +162,20 @@ describe('writeAutoStartXBrief', () => {
         const projectRoot = join(root, 'project');
         const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1072');
         const stateRoot = join(root, 'state', basename(projectRoot));
-        await mkdir(stateRoot, { recursive: true });
+        const stateOrigin = join(root, 'state-origin.git');
+        await mkdir(projectRoot, { recursive: true });
+        await initializeGitRepo(stateRoot, 'overdeck-state');
+        git(root, ['init', '--bare', '--quiet', stateOrigin]);
         await writeFile(join(stateRoot, 'migration-complete.json'), JSON.stringify({
           version: 1,
           sourceMainSha: 'a'.repeat(40),
           stateBranchSha: 'b'.repeat(40),
           completedAt: '2026-07-28T00:00:00.000Z',
         }));
+        git(stateRoot, ['add', 'migration-complete.json']);
+        git(stateRoot, ['commit', '--quiet', '-m', 'mark migrated']);
+        git(stateRoot, ['remote', 'add', 'origin', stateOrigin]);
+        git(stateRoot, ['push', '--quiet', '-u', 'origin', 'overdeck-state']);
 
         const result = await Effect.runPromise(writeAutoStartXBrief(projectRoot, workspacePath, {
           issueId: 'PAN-1072',
@@ -161,6 +185,14 @@ describe('writeAutoStartXBrief', () => {
 
         expect(result.projectSpecPath).toBe(join(stateRoot, 'specs', result.canonicalFilename));
         expect(findPlanSync(workspacePath)).toBe(result.projectSpecPath);
+        expect(git(stateRoot, ['status', '--porcelain'])).toBe('');
+        const remoteSpec = git(root, [
+          '--git-dir',
+          stateOrigin,
+          'show',
+          `refs/heads/overdeck-state:specs/${result.canonicalFilename}`,
+        ]);
+        expect(JSON.parse(remoteSpec).plan.id).toBe('pan-1072');
       } finally {
         if (previousOverdeckHome === undefined) delete process.env['OVERDECK_HOME'];
         else process.env['OVERDECK_HOME'] = previousOverdeckHome;

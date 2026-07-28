@@ -19,56 +19,132 @@ if [[ ! -d "$scan_root" ]]; then
   exit 2
 fi
 
-matches_file=$(mktemp)
-trap 'rm -f "$matches_file"' EXIT
+node - "$scan_root" <<'NODE'
+const fs = require('node:fs')
+const path = require('node:path')
 
-pattern="['\"]\\.pan['\"][[:space:]]*,[[:space:]]*['\"](specs|drafts)['\"]|['\"]\\.pan/(specs|drafts)['\"]"
-grep -RInE \
-  --include='*.js' \
-  --include='*.ts' \
-  --include='*.tsx' \
-  -- "$pattern" "$scan_root" > "$matches_file" || true
+const scanRoot = path.resolve(process.argv[2])
+const allowlisted = new Set([
+  'src/lib/state-read-home.ts',
+  'src/lib/state-plane.ts',
+  'src/lib/orders/validate.ts',
+  'src/lib/cloister/merge-agent.ts',
+  'src/lib/overdeck/planning-promotion.ts',
+  'src/cli/commands/admin/state-migrate.ts',
+  'src/lib/cloister/verification-runner.ts',
+])
 
-violations=0
-while IFS= read -r match; do
-  [[ -z "$match" ]] && continue
+function logicalPath(file) {
+  return `src/${path.relative(scanRoot, file).split(path.sep).join('/')}`
+}
 
-  path=${match%%:*}
-  remainder=${match#*:}
-  line_number=${remainder%%:*}
-  source_line=${remainder#*:}
+function isExcluded(file) {
+  const logical = logicalPath(file)
+  return logical.includes('/__tests__/')
+    || /\.test\.[jt]sx?$/.test(logical)
+    || logical.startsWith('src/lib/pan-dir/')
+    || allowlisted.has(logical)
+}
 
-  relative_path=${path#"$scan_root"/}
-  logical_path="src/$relative_path"
+function sourceFiles(dir) {
+  const files = []
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) files.push(...sourceFiles(full))
+    else if (entry.isFile() && /\.(?:js|ts|tsx)$/.test(entry.name)) files.push(full)
+  }
+  return files
+}
 
-  case "$logical_path" in
-    */__tests__/*|*.test.ts|*.test.tsx|*.test.js)
+function maskComments(source) {
+  const chars = [...source]
+  let state = 'code'
+  let quote = ''
+
+  for (let i = 0; i < chars.length; i += 1) {
+    const current = chars[i]
+    const next = chars[i + 1]
+
+    if (state === 'line-comment') {
+      if (current === '\n') state = 'code'
+      else chars[i] = ' '
       continue
-      ;;
-    src/lib/pan-dir/*|\
-    src/lib/state-read-home.ts|\
-    src/lib/state-plane.ts|\
-    src/lib/orders/validate.ts|\
-    src/lib/cloister/merge-agent.ts|\
-    src/lib/overdeck/planning-promotion.ts|\
-    src/cli/commands/admin/state-migrate.ts|\
-    src/lib/cloister/verification-runner.ts)
+    }
+
+    if (state === 'block-comment') {
+      if (current === '\n') continue
+      if (current === '*' && next === '/') {
+        chars[i] = ' '
+        chars[i + 1] = ' '
+        i += 1
+        state = 'code'
+      } else {
+        chars[i] = ' '
+      }
       continue
-      ;;
-  esac
+    }
 
-  trimmed=${source_line#"${source_line%%[![:space:]]*}"}
-  if [[ "$trimmed" =~ ^(//|/\*|\*|#) ]]; then
-    continue
-  fi
+    if (state === 'string') {
+      if (current === '\\') {
+        i += 1
+        continue
+      }
+      if (current === quote) {
+        state = 'code'
+        quote = ''
+      }
+      continue
+    }
 
-  printf '%s:%s:%s\n' "$logical_path" "$line_number" "$source_line"
-  violations=$((violations + 1))
-done < "$matches_file"
+    if (current === '/' && next === '/') {
+      chars[i] = ' '
+      chars[i + 1] = ' '
+      i += 1
+      state = 'line-comment'
+    } else if (current === '/' && next === '*') {
+      chars[i] = ' '
+      chars[i + 1] = ' '
+      i += 1
+      state = 'block-comment'
+    } else if (current === "'" || current === '"' || current === '`') {
+      state = 'string'
+      quote = current
+    }
+  }
 
-if (( violations > 0 )); then
-  echo "✖ state-path lint found $violations direct spec/draft path derivation(s). Use getProjectPanPaths(projectRoot)." >&2
-  exit 1
-fi
+  return chars.join('')
+}
 
-echo "✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)"
+const patterns = [
+  /(['"])\.pan\1\s*,\s*(['"])(specs|drafts)\2/g,
+  /(['"])\.pan\/(specs|drafts)\1/g,
+]
+const violations = []
+
+for (const file of sourceFiles(scanRoot).sort()) {
+  if (isExcluded(file)) continue
+  const source = fs.readFileSync(file, 'utf8')
+  const masked = maskComments(source)
+  const lines = source.split(/\r?\n/)
+  const seen = new Set()
+
+  for (const pattern of patterns) {
+    pattern.lastIndex = 0
+    for (let match = pattern.exec(masked); match; match = pattern.exec(masked)) {
+      const line = masked.slice(0, match.index).split('\n').length
+      const key = `${line}:${match[0]}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      violations.push(`${logicalPath(file)}:${line}:${lines[line - 1] ?? ''}`)
+    }
+  }
+}
+
+if (violations.length > 0) {
+  for (const violation of violations) console.log(violation)
+  console.error(`✖ state-path lint found ${violations.length} direct spec/draft path derivation(s). Use getProjectPanPaths(projectRoot).`)
+  process.exit(1)
+}
+
+console.log('✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)')
+NODE

@@ -50,6 +50,26 @@ describe('lint-state-paths.sh', () => {
     expect(result.output).toContain('Use getProjectPanPaths(projectRoot)');
   });
 
+  it.each(['specs', 'drafts'] as const)('fails for a multiline hardcoded %s-directory join', (directory) => {
+    const fixture = makeFixture();
+    const sourcePath = join(fixture.scanRoot, 'lib', `${directory}.ts`);
+    mkdirSync(join(fixture.scanRoot, 'lib'), { recursive: true });
+    writeFileSync(sourcePath, [
+      'const stateDir = join(',
+      '  projectRoot,',
+      "  '.pan',",
+      `  '${directory}',`,
+      ');',
+      '',
+    ].join('\n'));
+
+    const result = runGuard(fixture.root, fixture.scanRoot, fixture.script);
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain(`src/lib/${directory}.ts:3:`);
+    expect(result.output).toContain('Use getProjectPanPaths(projectRoot)');
+  });
+
   it('passes comment-only legacy path mentions', () => {
     const fixture = makeFixture();
     const sourcePath = join(fixture.scanRoot, 'lib', 'comment.ts');
