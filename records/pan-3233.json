@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T20:19:04.212Z",
+  "updated": "2026-07-28T20:19:12.038Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "pending",
@@ -72,8 +72,16 @@
     }
   ],
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "pane-question-kind": {
+        "writerId": "agent-pan-3233",
+        "agentId": "agent-pan-3233",
+        "pid": 3052210,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:19:12.038Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3233",
@@ -104,6 +112,7 @@
     "suppression-exemption.suppression-exemption.ac3": "completed",
     "fingerprint-consistency": "completed",
     "fingerprint-consistency.fingerprint-consistency.ac1": "completed",
-    "fingerprint-consistency.fingerprint-consistency.ac2": "completed"
+    "fingerprint-consistency.fingerprint-consistency.ac2": "completed",
+    "pane-question-kind": "running"
   }
 }
