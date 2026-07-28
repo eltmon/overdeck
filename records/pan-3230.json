@@ -42,6 +42,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-28T19:39:20.151Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-28T19:49:58.364Z"
     }
   ],
   "feedback": [],
@@ -85,22 +90,22 @@
     "recordedAt": "2026-07-28T18:59:19.959Z"
   },
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T19:49:56.681Z",
+  "updated": "2026-07-28T19:49:58.638Z",
   "pipeline": {
     "issueId": "PAN-3230",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:00:36.689Z",
-    "updatedAt": "2026-07-28T19:49:55.548Z",
+    "updatedAt": "2026-07-28T19:49:56.704Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: auto-synthesis now uses writeSpecForIssue with a clean-and-pushed state-worktree durability test, and lint-state-paths detects multiline specs/drafts joins with adversarial fixtures.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3239",
     "reviewedAtCommit": "d5a0bf4e352a7a2ccb09b850b195aff8733bc1c9",
     "lastVerifiedCommit": "d5a0bf4e352a7a2ccb09b850b195aff8733bc1c9",
-    "reviewSpawnedAt": "2026-07-28T19:39:18.922Z",
+    "reviewSpawnedAt": "2026-07-28T19:49:56.703Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -199,7 +204,7 @@
       },
       "costAtCloseOut": {
         "usd": 115.913702,
-        "pricingAsOf": "2026-07-28T19:49:55.879Z"
+        "pricingAsOf": "2026-07-28T19:49:58.635Z"
       }
     },
     "merges": [
