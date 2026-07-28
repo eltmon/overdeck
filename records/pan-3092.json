@@ -10,19 +10,76 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".overdeck/context/codebase/concerns.md",
+      "scripts/file-size-allowlist.txt",
+      "src/lib/cloister/__tests__/test-agent-queue.test.ts",
+      "tests/cli/commands/specialists/done.test.ts",
+      "tests/lib/cloister/deacon-test-signal.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/AGENT-STATE-PLANES.md",
+      "roles/review.md",
+      "roles/test.md",
+      "src/cli/commands/specialists/done.ts",
+      "src/lib/cloister/__tests__/test-verdict.test.ts",
+      "src/lib/cloister/deacon-verdict-fallback-sweep.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/test-agent-queue.ts",
+      "src/lib/cloister/test-verdict.ts",
+      "src/lib/overdeck/review-status-record-sync.ts",
+      "src/lib/pan-dir/fs-lock.ts",
+      "src/lib/pan-dir/pipeline-verdict-merge.ts",
+      "src/lib/pan-dir/records.ts",
+      "src/lib/review-status.ts",
+      "tests/unit/lib/cloister/deacon-verdict-fallback-sweep.test.ts",
+      "tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts",
+      "tests/unit/lib/overdeck/review-status-record-sync.test.ts",
+      "tests/unit/lib/pan-dir/pipeline-monotonic.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".overdeck/context/codebase/concerns.md",
+      "docs/AGENT-STATE-PLANES.md",
+      "roles/review.md",
+      "roles/test.md",
+      "scripts/file-size-allowlist.txt",
+      "src/cli/commands/specialists/done.ts",
+      "src/lib/cloister/__tests__/test-agent-queue.test.ts",
+      "src/lib/cloister/__tests__/test-verdict.test.ts",
+      "src/lib/cloister/deacon-verdict-fallback-sweep.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/test-agent-queue.ts",
+      "src/lib/cloister/test-verdict.ts",
+      "src/lib/overdeck/review-status-record-sync.ts",
+      "src/lib/pan-dir/fs-lock.ts",
+      "src/lib/pan-dir/pipeline-verdict-merge.ts",
+      "src/lib/pan-dir/records.ts",
+      "src/lib/review-status.ts",
+      "tests/cli/commands/specialists/done.test.ts",
+      "tests/lib/cloister/deacon-test-signal.test.ts",
+      "tests/unit/lib/cloister/deacon-verdict-fallback-sweep.test.ts",
+      "tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts",
+      "tests/unit/lib/overdeck/review-status-record-sync.test.ts",
+      "tests/unit/lib/pan-dir/pipeline-monotonic.test.ts"
+    ],
+    "recordedAt": "2026-07-28T07:32:57.208Z"
+  },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T07:33:00.152Z",
+  "updated": "2026-07-28T07:33:02.062Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T07:33:00.149Z",
+    "updatedAt": "2026-07-28T07:33:01.392Z",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
     "reviewRequestedAt": "2026-07-28T07:33:00.149Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -79,8 +136,7 @@
         "tests/unit/lib/pan-dir/pipeline-monotonic.test.ts"
       ],
       "recordedAt": "2026-07-28T07:32:57.208Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3222"
+    }
   },
   "closeOut": {
     "usage": {
@@ -104,10 +160,12 @@
       },
       "costAtCloseOut": {
         "usd": 0.0181193,
-        "pricingAsOf": "2026-07-28T06:48:22.942Z"
+        "pricingAsOf": "2026-07-28T07:33:01.416Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3222"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -265,61 +323,5 @@
     "state-planes-doc-update": "completed",
     "state-planes-doc-update.state-planes-doc-update.ac1": "completed",
     "state-planes-doc-update.state-planes-doc-update.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      ".overdeck/context/codebase/concerns.md",
-      "scripts/file-size-allowlist.txt",
-      "src/lib/cloister/__tests__/test-agent-queue.test.ts",
-      "tests/cli/commands/specialists/done.test.ts",
-      "tests/lib/cloister/deacon-test-signal.test.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/AGENT-STATE-PLANES.md",
-      "roles/review.md",
-      "roles/test.md",
-      "src/cli/commands/specialists/done.ts",
-      "src/lib/cloister/__tests__/test-verdict.test.ts",
-      "src/lib/cloister/deacon-verdict-fallback-sweep.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/test-agent-queue.ts",
-      "src/lib/cloister/test-verdict.ts",
-      "src/lib/overdeck/review-status-record-sync.ts",
-      "src/lib/pan-dir/fs-lock.ts",
-      "src/lib/pan-dir/pipeline-verdict-merge.ts",
-      "src/lib/pan-dir/records.ts",
-      "src/lib/review-status.ts",
-      "tests/unit/lib/cloister/deacon-verdict-fallback-sweep.test.ts",
-      "tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts",
-      "tests/unit/lib/overdeck/review-status-record-sync.test.ts",
-      "tests/unit/lib/pan-dir/pipeline-monotonic.test.ts"
-    ],
-    "actualChangedFiles": [
-      ".overdeck/context/codebase/concerns.md",
-      "docs/AGENT-STATE-PLANES.md",
-      "roles/review.md",
-      "roles/test.md",
-      "scripts/file-size-allowlist.txt",
-      "src/cli/commands/specialists/done.ts",
-      "src/lib/cloister/__tests__/test-agent-queue.test.ts",
-      "src/lib/cloister/__tests__/test-verdict.test.ts",
-      "src/lib/cloister/deacon-verdict-fallback-sweep.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/test-agent-queue.ts",
-      "src/lib/cloister/test-verdict.ts",
-      "src/lib/overdeck/review-status-record-sync.ts",
-      "src/lib/pan-dir/fs-lock.ts",
-      "src/lib/pan-dir/pipeline-verdict-merge.ts",
-      "src/lib/pan-dir/records.ts",
-      "src/lib/review-status.ts",
-      "tests/cli/commands/specialists/done.test.ts",
-      "tests/lib/cloister/deacon-test-signal.test.ts",
-      "tests/unit/lib/cloister/deacon-verdict-fallback-sweep.test.ts",
-      "tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts",
-      "tests/unit/lib/overdeck/review-status-record-sync.test.ts",
-      "tests/unit/lib/pan-dir/pipeline-monotonic.test.ts"
-    ],
-    "recordedAt": "2026-07-28T07:32:57.208Z"
   }
 }
