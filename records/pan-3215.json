@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T06:35:52.620Z",
-  "updated": "2026-07-28T09:24:08.800Z",
+  "updated": "2026-07-28T09:25:32.782Z",
   "pipeline": {
     "issueId": "PAN-3215",
     "reviewStatus": "pending",
@@ -48,16 +48,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "dod-docs-update": {
-        "writerId": "agent-pan-3215",
-        "agentId": "agent-pan-3215",
-        "pid": 3966081,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T09:24:08.800Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3215",
@@ -102,6 +94,17 @@
         "outcome": "completed",
         "reason": "Added default per-repo merged-artifact lookup for non-GitHub branch-absence cases, recorded GitLab MR ids and URLs as positive row-4 evidence without containment evidence, and preserved unavailable/containment fallbacks; targeted tests, typecheck, and lint pass",
         "releasedAt": "2026-07-28T09:23:53.739Z"
+      },
+      {
+        "writerId": "agent-pan-3215",
+        "agentId": "agent-pan-3215",
+        "pid": 3966081,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T09:24:08.800Z",
+        "itemId": "dod-docs-update",
+        "outcome": "completed",
+        "reason": "Documented per-resolved-repo merge probes, head-SHA-matched GitLab MR evidence, MR iid/URL audit output, and branch containment as the last-resort non-PR landing fallback; grep and doc-drift test pass",
+        "releasedAt": "2026-07-28T09:25:32.782Z"
       }
     ],
     "statusReasons": {
@@ -120,6 +123,10 @@
       "merged-row-gitlab-evidence": {
         "reason": "Added default per-repo merged-artifact lookup for non-GitHub branch-absence cases, recorded GitLab MR ids and URLs as positive row-4 evidence without containment evidence, and preserved unavailable/containment fallbacks; targeted tests, typecheck, and lint pass",
         "updatedAt": "2026-07-28T09:23:53.739Z"
+      },
+      "dod-docs-update": {
+        "reason": "Documented per-resolved-repo merge probes, head-SHA-matched GitLab MR evidence, MR iid/URL audit output, and branch containment as the last-resort non-PR landing fallback; grep and doc-drift test pass",
+        "updatedAt": "2026-07-28T09:25:32.782Z"
       }
     }
   },
@@ -143,6 +150,8 @@
     "merged-row-gitlab-evidence.merged-row-gitlab-evidence.ac2": "completed",
     "merged-row-gitlab-evidence.merged-row-gitlab-evidence.ac3": "completed",
     "merged-row-gitlab-evidence.merged-row-gitlab-evidence.ac4": "completed",
-    "dod-docs-update": "running"
+    "dod-docs-update": "completed",
+    "dod-docs-update.dod-docs-update.ac1": "completed",
+    "dod-docs-update.dod-docs-update.ac2": "completed"
   }
 }
