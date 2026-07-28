@@ -126,7 +126,7 @@ describe('evaluateWorkspaceAnchorDrift', () => {
     });
   });
 
-  it('treats a legacy plain anchor against a composite snapshot as drifted', async () => {
+  it('treats an anchor SHAPE mismatch as unreadable, never drifted (PAN-3254)', async () => {
     const fe = initializeRepo(workspace, 'fe');
     const api = initializeRepo(workspace, 'api');
     repoRootsMock.resolveWorkspaceRepoRootsSync.mockReturnValue([
@@ -134,12 +134,15 @@ describe('evaluateWorkspaceAnchorDrift', () => {
       root('api', api, true),
     ]);
 
+    // A composite/bare disagreement is a producer disagreement (legacy plain
+    // anchor, or a snapshot degraded to the wrapper HEAD) — not evidence of
+    // new code. Reporting it as drift re-drove MIN-901 through 426 identical
+    // review cycles; unreadable preserves the existing verdict instead.
     await expect(evaluateWorkspaceAnchorDrift(
       'PAN-3076',
       workspace,
-      // The fixture simulates a legacy anchor read back from unbranded storage.
       rehydrateHeadAnchor('a'.repeat(40)),
-    )).resolves.toMatchObject({ kind: 'drifted' });
+    )).resolves.toEqual({ kind: 'unreadable' });
   });
 
   it('preserves monorepo benign semantics and detects real code drift', async () => {

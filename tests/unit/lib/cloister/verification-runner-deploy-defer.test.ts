@@ -52,18 +52,17 @@ vi.mock('../../../../src/lib/work/done-preflight.js', () => ({
 
 import { runVerificationForIssueInProcess } from '../../../../src/lib/cloister/verification-runner.js';
 
-const issueId = 'PAN-3135';
-const workspacePath = '/tmp/feature-pan-3135';
+const issueId = 'PAN-3244';
+const workspacePath = '/tmp/feature-pan-3244';
 const workspaceInfo = { isRemote: false };
 const queuedDeploy = {
-  requestedAt: '2026-07-26T12:00:00.000Z',
-  requestedBy: ['agent-a', 'agent-z'],
-  lastReason: 'Verification is running',
-  blockedBy: ['PAN-10'],
+  requestedAt: '2026-07-28T12:00:00.000Z',
+  requestedBy: ['deploy-patrol', 'merge-step0'],
+  lastReason: 'Deployment deferred because a merge specialist session is active.',
+  blockedBy: [],
   deferralCount: 2,
   escalated: false,
 };
-const deferralReason = 'Verification deferred: a dashboard deploy is queued (requested 2026-07-26T12:00:00.000Z by agent-a, agent-z). It re-runs automatically after the deploy.';
 
 async function runVerification() {
   return Effect.runPromise(runVerificationForIssueInProcess(
@@ -75,7 +74,14 @@ async function runVerification() {
   ));
 }
 
-describe('verification deploy queue admission', () => {
+/**
+ * PAN-3244 regression lock: a queued dashboard deploy must NOT defer
+ * verification admission. Supervised verification workers are detached and
+ * survive dashboard restarts, so deploys and verification are fully
+ * decoupled — the old drain gate held every project's pipeline hostage
+ * whenever a deploy sat queued behind a busy flywheel run.
+ */
+describe('verification admission with a queued deploy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockReadPendingDeploy.mockReturnValue(null);
@@ -87,44 +93,9 @@ describe('verification deploy queue admission', () => {
     });
   });
 
-  it('defers a fresh verification admission while a deploy is queued', async () => {
+  it('admits a fresh verification even while a deploy is queued', async () => {
     mockReadPendingDeploy.mockReturnValue(queuedDeploy);
 
-    await expect(runVerification()).resolves.toEqual({
-      outcome: 'deferred',
-      reason: deferralReason,
-    });
-    expect(mockSetReviewStatus).toHaveBeenCalledTimes(1);
-    expect(mockSetReviewStatus).toHaveBeenCalledWith(issueId, {
-      verificationStatus: 'pending',
-      verificationNotes: deferralReason,
-    });
-    expect(mockSetReviewStatus).not.toHaveBeenCalledWith(
-      issueId,
-      expect.objectContaining({ verificationStatus: 'running' }),
-    );
-  });
-
-  it('does not self-defer an in-flight verification', async () => {
-    mockReadPendingDeploy.mockReturnValue(queuedDeploy);
-    mockGetReviewStatus.mockReturnValue({
-      issueId,
-      mergeStatus: 'pending',
-      verificationStatus: 'running',
-      verificationCycleCount: 0,
-    });
-
-    const result = await runVerification();
-
-    expect(result.outcome).toBe('error');
-    expect(mockSetReviewStatus).toHaveBeenCalledWith(issueId, { verificationStatus: 'running' });
-    expect(mockSetReviewStatus).not.toHaveBeenCalledWith(
-      issueId,
-      expect.objectContaining({ verificationNotes: deferralReason }),
-    );
-  });
-
-  it('preserves normal admission when no deploy is queued', async () => {
     const result = await runVerification();
 
     expect(result.outcome).toBe('error');
@@ -133,5 +104,12 @@ describe('verification deploy queue admission', () => {
       issueId,
       expect.objectContaining({ verificationNotes: expect.stringContaining('dashboard deploy is queued') }),
     );
+  });
+
+  it('admits normally when no deploy is queued', async () => {
+    const result = await runVerification();
+
+    expect(result.outcome).toBe('error');
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(issueId, { verificationStatus: 'running' });
   });
 });

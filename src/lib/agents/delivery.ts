@@ -555,9 +555,10 @@ async function deliverKeyedAgentMessage(
 
 /**
  * Keyed tmux delivery: paste under the two-phase marker protocol, then
- * complete the submit. A replay that finds the pending marker completes the
- * prior attempt's submission WITHOUT re-pasting; a terminal marker suppresses
- * the replay entirely.
+ * complete the submit. Pending claims carry a strictly-read payload state:
+ * unverified requires active-composer proof, while enter-attempted preserves
+ * no-repaste rollback recovery. Unset legacy/unknown states fail closed. A
+ * terminal marker suppresses the replay entirely.
  */
 async function deliverKeyedViaTmux(
   normalizedId: string,

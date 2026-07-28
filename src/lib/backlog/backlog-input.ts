@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { getProjectPanPaths } from '../pan-dir/paths.js';
 import type { Issue, IssueState, TrackerType } from '../tracker/interface.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { parseSequenceMd } from './sequence-io.js';
@@ -121,7 +122,8 @@ export async function collectOpenBacklog(
   const openIssues = issues.filter((issue) => !CLOSED_STATES.has(issue.state));
 
   // Build per-issue lookup sets once (filesystem scans are cheap when batched).
-  const specsDir = join(projectRoot, '.pan', 'specs');
+  const paths = getProjectPanPaths(projectRoot);
+  const specsDir = paths.specsDir;
   const workspacesDir = join(projectRoot, 'workspaces');
   const issuesWithSpecs = new Set<string>();
   if (!opts?.hasSpecFn) {
@@ -141,7 +143,7 @@ export async function collectOpenBacklog(
 
     const hasPrd = opts?.hasPrdFn
       ? opts.hasPrdFn(issue.ref)
-      : existsSync(join(projectRoot, '.pan', 'drafts', `${issue.ref.toUpperCase()}.md`));
+      : existsSync(join(paths.draftsDir, `${issue.ref.toUpperCase()}.md`));
 
     const ready = opts?.hasSpecFn
       ? opts.hasSpecFn(issue.ref)

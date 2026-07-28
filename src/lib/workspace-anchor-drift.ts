@@ -86,7 +86,13 @@ export async function evaluateWorkspaceAnchorDrift(
   const currentIsComposite = currentHeads.size > 0;
 
   if (storedIsComposite !== currentIsComposite) {
-    return { kind: 'drifted', currentAnchor };
+    // PAN-3254: a composite/bare SHAPE disagreement is a producer disagreement
+    // (one side snapshotted the never-moving polyrepo wrapper HEAD, the other
+    // the per-repo composite) — not evidence that code changed. Treating it as
+    // drift re-drove MIN-901 through 426 identical review cycles in 19.5 h.
+    // Unreadable → callers skip and preserve the existing verdict; a genuine
+    // post-review push produces a well-formed anchor that differs by CONTENT.
+    return { kind: 'unreadable' };
   }
 
   try {

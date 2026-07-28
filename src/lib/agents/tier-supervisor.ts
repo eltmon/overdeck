@@ -31,6 +31,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { renderWorkspaceGitShowPromise } from '../git-utils.js';
+import { getProjectPanPaths } from '../pan-dir/paths.js';
 import type { XBriefDocument, XBriefEdge, XBriefItem, XBriefSubItem } from '../xbrief/types.js';
 import type { AgentState } from './agent-state.js';
 import { deliverAgentMessage } from './delivery.js';
@@ -332,14 +333,15 @@ export function extractTracedFrText(prdMarkdown: string, traces: readonly string
 }
 
 /**
- * Read the Overdeck-managed PRD draft for an issue
- * (<projectRoot>/.pan/drafts/<ISSUE>.md, falling back to the lowercase
- * filename). Returns undefined when no draft exists.
+ * Read the Overdeck-managed PRD draft for an issue through the
+ * state-branch-aware path authority, falling back to the lowercase filename.
+ * Returns undefined when no draft exists.
  */
 export async function loadPrdDraft(projectRoot: string, issueId: string): Promise<string | undefined> {
+  const draftsDir = getProjectPanPaths(projectRoot).draftsDir;
   for (const name of [`${issueId.toUpperCase()}.md`, `${issueId.toLowerCase()}.md`]) {
     try {
-      return await readFile(join(projectRoot, '.pan', 'drafts', name), 'utf-8');
+      return await readFile(join(draftsDir, name), 'utf-8');
     } catch {
       // Try the next casing; missing drafts are expected.
     }

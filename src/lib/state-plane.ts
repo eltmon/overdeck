@@ -67,6 +67,32 @@ export function isStatePlaneOnlyStatus(porcelain: string): boolean {
   return parsePorcelainStatusPaths(porcelain).every(isStatePlanePath);
 }
 
+/**
+ * PAN-3245 / PAN-3042: anything under the Overdeck workspace runtime
+ * directories (`.pan/`, `.overdeck/`) is pipeline-owned, never operator or
+ * agent work product. Dirty-workspace gates use the blanket prefix; the
+ * narrow STATE_PLANE_PATHS allowlist above exists for diff classification
+ * (isStatePlanePath / isStatePlaneOnlyDiff) and must stay narrow.
+ */
+export function isOverdeckWorkspaceRuntimePath(relativePath: string): boolean {
+  const normalized = relativePath.trim().replace(/\\/g, '/');
+  return normalized === '.pan' || normalized.startsWith('.pan/')
+    || normalized === '.overdeck' || normalized.startsWith('.overdeck/');
+}
+
+/**
+ * Gate-level predicate for "does this porcelain status show uncommitted
+ * WORK?" — true when every path is state-plane or Overdeck workspace
+ * runtime. The `pan done`, request-review, and approve gates all use this;
+ * the narrower isStatePlaneOnlyStatus blocked pipeline-authored
+ * `.pan/drafts/<ISSUE>.md` files and forced agents into `--force` (PAN-3245).
+ */
+export function isOverdeckOwnedOnlyStatus(porcelain: string): boolean {
+  return parsePorcelainStatusPaths(porcelain).every(
+    (path) => isStatePlanePath(path) || isOverdeckWorkspaceRuntimePath(path),
+  );
+}
+
 export async function isStatePlaneOnlyDiff(
   baseSha: string,
   tipSha: string,
