@@ -3541,6 +3541,14 @@
   padding: 2px 0;
 }
 
+/* A subagent transcript opens with the entire spawn prompt as its "user" message.
+   At 80% right-aligned it reads as a chat aside and wastes the column, so inside
+   a subagent transcript the prompt uses the full width. */
+.subagentTranscript .userMessageBubble {
+  max-width: 100%;
+  border-radius: 18px;
+}
+
 .userMessageBubble {
   max-width: 80%;
   background: color-mix(in srgb, var(--primary) 8%, transparent);
