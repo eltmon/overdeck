@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-28T22:31:52.552Z",
+  "updated": "2026-07-28T22:41:06.344Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "pending",
@@ -66,16 +66,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "ql-settings-env": {
-        "writerId": "agent-pan-3252",
-        "agentId": "agent-pan-3252",
-        "pid": 756301,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T22:31:52.552Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3252",
@@ -120,6 +112,17 @@
         "outcome": "completed",
         "reason": "QuantumLlamaModel union on ModelId, MODEL_PROVIDERS rows, ql- prefix heuristic, FALLBACK_MAP (reason→sonnet-5, swift/nano→haiku-4-5), detectEnabledProviders quantumllama slot, three capability entries with new maxOutputTokens field; 93 tests passed, typecheck clean; file-size growth audited in allowlist",
         "releasedAt": "2026-07-28T22:31:39.155Z"
+      },
+      {
+        "writerId": "agent-pan-3252",
+        "agentId": "agent-pan-3252",
+        "pid": 756301,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T22:31:52.552Z",
+        "itemId": "ql-settings-env",
+        "outcome": "completed",
+        "reason": "ApiKeysConfig quantumllama slot, env fallback ladder, getAvailableModelsSync gating, env-loader, child-env + provider-env allowlists, config-yaml env block with schema typing; launcher unset-lines snapshot updated; 68 passed, typecheck clean; schema growth audited",
+        "releasedAt": "2026-07-28T22:41:06.344Z"
       }
     ],
     "statusReasons": {
@@ -138,6 +141,10 @@
       "ql-models-core": {
         "reason": "QuantumLlamaModel union on ModelId, MODEL_PROVIDERS rows, ql- prefix heuristic, FALLBACK_MAP (reason→sonnet-5, swift/nano→haiku-4-5), detectEnabledProviders quantumllama slot, three capability entries with new maxOutputTokens field; 93 tests passed, typecheck clean; file-size growth audited in allowlist",
         "updatedAt": "2026-07-28T22:31:39.155Z"
+      },
+      "ql-settings-env": {
+        "reason": "ApiKeysConfig quantumllama slot, env fallback ladder, getAvailableModelsSync gating, env-loader, child-env + provider-env allowlists, config-yaml env block with schema typing; launcher unset-lines snapshot updated; 68 passed, typecheck clean; schema growth audited",
+        "updatedAt": "2026-07-28T22:41:06.344Z"
       }
     }
   },
@@ -158,6 +165,10 @@
     "ql-models-core.ql-models-core.ac2": "completed",
     "ql-models-core.ql-models-core.ac3": "completed",
     "ql-models-core.ql-models-core.ac4": "completed",
-    "ql-settings-env": "running"
+    "ql-settings-env": "completed",
+    "ql-settings-env.ql-settings-env.ac1": "completed",
+    "ql-settings-env.ql-settings-env.ac2": "completed",
+    "ql-settings-env.ql-settings-env.ac3": "completed",
+    "ql-settings-env.ql-settings-env.ac4": "completed"
   }
 }
