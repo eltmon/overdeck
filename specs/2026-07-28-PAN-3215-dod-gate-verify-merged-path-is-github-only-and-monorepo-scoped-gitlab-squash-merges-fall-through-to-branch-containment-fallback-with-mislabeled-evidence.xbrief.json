@@ -4,17 +4,17 @@
     "created": "2026-07-28T06:50:30Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3215: DoD gate verify-merged path is GitHub-only and monorepo-scoped — GitLab squash-merges fall through to branch-containment fallback with mislabeled evidence",
-    "updated": "2026-07-28T08:33:38.842Z"
+    "updated": "2026-07-28T16:15:14.477Z"
   },
   "plan": {
     "id": "pan-3215",
     "title": "DoD gate verify-merged path is GitHub-only and monorepo-scoped — GitLab squash-merges fall through to branch-containment fallback with mislabeled evidence",
-    "status": "running",
+    "status": "completed",
     "uid": "32c696fa-a5fe-44bf-9cb5-780ede506dd0",
     "author": "agent:k3[1m]",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-28T06:50:30Z",
-    "updated": "2026-07-28T08:33:38.842Z",
+    "updated": "2026-07-28T16:15:14.477Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3215",
@@ -403,5 +403,5 @@
       "canonicalFilename": "2026-07-28-PAN-3215-dod-gate-verify-merged-path-is-github-only-and-monorepo-scoped-gitlab-squash-merges-fall-through-to-branch-containment-fallback-with-mislabeled-evidence.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
