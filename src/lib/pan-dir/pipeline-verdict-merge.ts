@@ -111,6 +111,24 @@ export function mergePipelineVerdictAware(
 }
 
 /**
+ * Does this status update drive some gate to a terminal verdict it was not
+ * already at? That is the write an agent cannot cheaply retry — losing it
+ * strands the verdict in the agent's pane — so the journal writer waits out lock
+ * contention for it instead of dropping to the workspace fallback on the first
+ * collision (PAN-3092). Bookkeeping writes stay single-shot; retrying those
+ * would only add lock pressure.
+ */
+export function carriesNewTerminalVerdict(
+  previous: PipelineFields,
+  update: PipelineFields,
+): boolean {
+  return GATE_NAMES.some((gate) => {
+    const next = update[gate];
+    return next !== undefined && next !== previous[gate] && isTerminal(gate, next);
+  });
+}
+
+/**
  * Has the journal settled every gate the workspace fallback holds a terminal
  * verdict for? The drain asks this before deleting a fallback as superseded: a
  * newer-but-verdict-free journal write must not consume a verdict that never

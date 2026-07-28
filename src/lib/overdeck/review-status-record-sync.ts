@@ -13,30 +13,70 @@ import { resolveProjectFromIssueSync, getProjectSync } from '../projects.js';
 // before process.exit — the long-lived server never needs to await these.
 const pendingJournalWrites = new Set<Promise<void>>();
 
-export function updateIssueRecordForReviewStatusSync(issueId: string, status: ReviewStatus): void {
+/**
+ * PAN-3092: a journal write carrying a NEW terminal verdict retries under lock
+ * contention instead of dropping straight to the workspace fallback. MIN-902's
+ * reviewer re-ran `pan admin specialists done` for an hour at LLM-turn cost
+ * (~$5/hr) because the only retry available to it was another agent turn; this
+ * schedule (~2.6 min total) does the same waiting in-process for free. The long
+ * tail belongs to the deacon sweep, not to the agent.
+ */
+const DEFAULT_VERDICT_BACKOFF_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 40_000, 80_000] as const;
+
+function verdictWriteBackoffDelaysMs(): readonly number[] {
+  const raw = process.env.OVERDECK_VERDICT_BACKOFF_DELAYS_MS;
+  if (!raw) return DEFAULT_VERDICT_BACKOFF_DELAYS_MS;
+  const parsed = raw
+    .split(',')
+    .map((part) => Number(part.trim()))
+    .filter((ms) => Number.isFinite(ms) && ms >= 0);
+  return parsed.length > 0 ? parsed : DEFAULT_VERDICT_BACKOFF_DELAYS_MS;
+}
+
+/**
+ * One journal-write attempt. `false` means the durable write definitively
+ * failed; `undefined` (a test double, say) is "unknown", not "failed", and only
+ * a definite `true` is safe to treat as a landed write.
+ */
+async function attemptJournalWrite(
+  issueId: string,
+  status: ReviewStatus,
+): Promise<boolean | undefined> {
+  try {
+    return await updateIssueRecordForIssue(issueId, status);
+  } catch {
+    return false;
+  }
+}
+
+export function updateIssueRecordForReviewStatusSync(
+  issueId: string,
+  status: ReviewStatus,
+  options?: { verdictWrite?: boolean },
+): void {
   // PAN-2583: the state-dir journal is the durable home, but a sandboxed reviewer
   // (codex workspace-write) cannot write ${OVERDECK_HOME}/state — and swallowing that
   // failure here is how blocked review verdicts silently vanished for hours. When the
   // journal write does not land, drop the durable verdict into the workspace runtime
   // dir (the one place a sandboxed agent can always write); readJournalStatusSync
   // overlays it on the next host-side read.
-  const write = Promise.resolve(updateIssueRecordForIssue(issueId, status))
-    .then((landed) => {
-      // Only an explicit `false` means the durable write failed — undefined
-      // (e.g. a test double) is "unknown", not "failed".
-      if (landed === false) {
-        writeWorkspaceVerdictFallbackSync(issueId, status);
-        scheduleVerdictFallbackDrain(issueId);
-      } else if (landed === true) {
+  const delays = options?.verdictWrite ? verdictWriteBackoffDelaysMs() : [];
+  const write = (async () => {
+    for (let attempt = 0; ; attempt += 1) {
+      const landed = await attemptJournalWrite(issueId, status);
+      if (landed !== false) {
         // PAN-2989: a landed journal write is the earliest safe moment to fold any
         // pending workspace fallback back into the canonical record.
-        trackVerdictFallbackDrain(issueId);
+        if (landed === true) trackVerdictFallbackDrain(issueId);
+        return;
       }
-    })
-    .catch(() => {
-      writeWorkspaceVerdictFallbackSync(issueId, status);
-      scheduleVerdictFallbackDrain(issueId);
-    });
+      const delay = delays[attempt];
+      if (delay === undefined) break;
+      await new Promise<void>((resolve) => { setTimeout(resolve, delay); });
+    }
+    writeWorkspaceVerdictFallbackSync(issueId, status);
+    scheduleVerdictFallbackDrain(issueId);
+  })();
   pendingJournalWrites.add(write);
   void write.finally(() => pendingJournalWrites.delete(write));
 }
@@ -163,7 +203,7 @@ function durableSubset(p: PanIssuePipelineRecord): DurableStatusFields {
  * write failed. Lives in the workspace runtime dir (gitignored), swept by
  * readJournalStatusSync on the next host-side read.
  */
-interface WorkspaceVerdictFallback {
+export interface WorkspaceVerdictFallback {
   issueId: string;
   updatedAt: string;
   pipeline: DurableStatusFields;
@@ -323,7 +363,7 @@ function claimWorkspaceVerdictFallbackSync(
   return claims.length > 0 ? claims : null;
 }
 
-function readWorkspaceVerdictFallbackSync(issueId: string): WorkspaceVerdictFallback | null {
+export function readWorkspaceVerdictFallbackSync(issueId: string): WorkspaceVerdictFallback | null {
   try {
     const path = workspaceVerdictFallbackPath(issueId);
     if (!path) return null;

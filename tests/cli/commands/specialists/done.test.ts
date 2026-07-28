@@ -8,12 +8,18 @@ const {
   mockResolveProject,
   mockReadWorkspacePlan,
   mockSnapshotWorkspaceHeads,
+  mockFlushJournalWrites,
+  mockReadVerdictFallback,
+  mockVerdictFallbackPath,
 } = vi.hoisted(() => ({
   mockSetReviewStatus: vi.fn(),
   mockDeliverReviewVerdictFeedback: vi.fn(),
   mockResolveProject: vi.fn(),
   mockReadWorkspacePlan: vi.fn(),
   mockSnapshotWorkspaceHeads: vi.fn(),
+  mockFlushJournalWrites: vi.fn(),
+  mockReadVerdictFallback: vi.fn(),
+  mockVerdictFallbackPath: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/review-status.js', async (importOriginal) => {
@@ -29,6 +35,12 @@ vi.mock('../../../../src/lib/review-status.js', async (importOriginal) => {
 
 vi.mock('../../../../src/lib/cloister/review-verdict-feedback.js', () => ({
   deliverReviewVerdictFeedback: mockDeliverReviewVerdictFeedback,
+}));
+
+vi.mock('../../../../src/lib/overdeck/review-status-record-sync.js', () => ({
+  flushReviewStatusJournalWrites: mockFlushJournalWrites,
+  readWorkspaceVerdictFallbackSync: mockReadVerdictFallback,
+  workspaceVerdictFallbackPath: mockVerdictFallbackPath,
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -56,6 +68,11 @@ describe('specialists done command', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockSnapshotWorkspaceHeads.mockResolvedValue(undefined);
+    mockFlushJournalWrites.mockResolvedValue(undefined);
+    mockReadVerdictFallback.mockReturnValue(null);
+    mockVerdictFallbackPath.mockReturnValue(
+      '/project/workspaces/feature-pan-1059/.overdeck/pipeline-verdict.json',
+    );
     mockSetReviewStatus.mockImplementation((_issueId: string, update: Record<string, unknown>) => {
       return {
         issueId: 'PAN-1059',
@@ -213,6 +230,36 @@ describe('specialists done command', () => {
 
     expect(mockSetReviewStatus).toHaveBeenCalled();
     expect(exit).toHaveBeenCalledWith(0);
+  });
+
+  it('PAN-3092: tells the agent not to re-run the signal when the verdict is in the fallback', async () => {
+    vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    mockReadVerdictFallback.mockReturnValue({
+      issueId: 'PAN-1059',
+      updatedAt: '2026-07-27T00:09:07.000Z',
+      pipeline: { testStatus: 'passed' },
+    });
+    const { doneAndExitCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneAndExitCommand('test', 'pan-1059', { status: 'passed' });
+
+    expect(mockReadVerdictFallback).toHaveBeenCalledWith('PAN-1059');
+    const printed = log.mock.calls.map((call) => String(call[0])).join('\n');
+    expect(printed).toContain('/project/workspaces/feature-pan-1059/.overdeck/pipeline-verdict.json');
+    expect(printed).toContain('Do NOT re-run this signal');
+    expect(printed).toContain('durable');
+  });
+
+  it('PAN-3092: stays quiet when the journal write landed and no fallback remains', async () => {
+    vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { doneAndExitCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneAndExitCommand('test', 'pan-1059', { status: 'passed' });
+
+    const printed = log.mock.calls.map((call) => String(call[0])).join('\n');
+    expect(printed).not.toContain('Do NOT re-run this signal');
   });
 
   it('requires an exact xBRIEF item for inspect verdicts', async () => {
