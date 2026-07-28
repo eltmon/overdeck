@@ -142,21 +142,22 @@
     "recordedAt": "2026-07-28T19:16:09.927Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T19:41:40.410Z",
+  "updated": "2026-07-28T19:42:01.190Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:17:21.407Z",
-    "updatedAt": "2026-07-28T19:41:38.728Z",
+    "updatedAt": "2026-07-28T19:42:01.147Z",
     "reviewNotes": "Late-decision restart leaves a live agent projected stopped; historical-AUQ and swarm needs-you blockers also remain",
     "inspectNotes": "All 3 ACs met. AC1: new src/lib/__tests__/session-pane-choice.test.ts covers 400 bad index, 400 missing signature, 409 menu-gone, 409 menu-changed, 409 delivery-unconfirmed, and 200 {ok,answeredLabel} with Down/Down/Enter keystrokes. AC2: tests/unit/lib/overdeck/conversation-pane-choice.test.ts is untouched by this commit (last touched by PAN-3113 commit 4d65ad1c) and its 12 cases pass through the delegating handler; 47/47 across the 4 pane-choice test files. AC3: captureSessionPaneChoice returns signature/title/options/recommended/selectedIndex and null on no-menu or capture throw. Delegation preserves defaults (conversation still passes tmuxSessionExists; core defaults to capturePaneText + Effect.runPromise(sessionExists)) and the validation ordering (400s before conv lookup).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3241",
+    "lastVerifiedCommit": "57e909d2bf0ee27c55919290af292bc7f6e81322",
     "reviewSpawnedAt": "2026-07-28T19:41:38.727Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -268,17 +269,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3680416,
-            "output": 155136,
-            "cacheRead": 27390976,
+            "input": 4834711,
+            "output": 157744,
+            "cacheRead": 27766784,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2725108,
-            "output": 243872,
-            "cacheRead": 151752704,
+            "input": 2728629,
+            "output": 244413,
+            "cacheRead": 152410624,
             "cacheWrite": 0
           }
         }
@@ -291,15 +292,15 @@
           "cacheWrite": 121982
         },
         "openai/gpt-5.6-sol": {
-          "input": 6405524,
-          "output": 399008,
-          "cacheRead": 179143680,
+          "input": 7563340,
+          "output": 402157,
+          "cacheRead": 180177408,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 144.559322,
-        "pricingAsOf": "2026-07-28T19:41:40.405Z"
+        "usd": 150.959736,
+        "pricingAsOf": "2026-07-28T19:42:01.176Z"
       }
     },
     "merges": [
