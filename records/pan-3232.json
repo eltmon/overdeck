@@ -126,18 +126,18 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T23:54:24.880Z",
+  "updated": "2026-07-28T23:59:34.156Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-28T23:54:23.683Z",
-    "reviewNotes": "Verification infrastructure error: Verification worker 3887838 exited before writing a result",
+    "updatedAt": "2026-07-28T23:59:34.089Z",
+    "reviewNotes": "FR-7 sends conversation answers to an unregistered route and still cannot surface conversation-only strip entries",
     "verificationNotes": "Checklist completion check FAILED — 8 incomplete item(s) remain:\n\n  Incomplete plan items (8):\n    - live-tree-delta.live-tree-delta.ac1 The AgentEnrichmentChangedEvent schema accepts payloads both with and without issueId, and decoding a legacy payload without the field returns a valid event (pending)\n    - live-tree-delta.live-tree-delta.ac2 mapEventToDelta returns a pending_input_changed delta carrying awaitingInput, prompt, reason, and kinds for an enrichment event with issueId, and returns null when the payload lacks issueId (pending)\n    - live-tree-delta.live-tree-delta.ac3 applySessionTreeDelta merges the four pending-input fields onto the matched session and clears them when the delta omits them, returning the same tree object when no session matches (pending)\n    - live-tree-delta.live-tree-delta.ac4 The enrichment poller emits issueId on agent.enrichment_changed events for agents with a known issue (pending)\n    - specialist-pending-input.specialist-pending-input.ac1 Session-tree review orchestrator, test, and ship nodes carry the four awaiting-input fields when the agent snapshot reports hasPendingQuestion true (pending)\n    - specialist-pending-input.specialist-pending-input.ac2 buildReviewerNodes returns reviewer nodes that carry the four awaiting-input fields taken from the provided agentSnapshotsById map (pending)\n    - specialist-pending-input.specialist-pending-input.ac3 The activity route emits specialist sections carrying the same four fields for a pending specialist snapshot (pending)\n    - specialist-pending-input.specialist-pending-input.ac4 A specialist node whose agent has no snapshot or no pending question renders with awaitingInput false and produces no prompt, reason, or kinds fields (pending)",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -247,9 +247,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3590531,
-            "output": 133169,
-            "cacheRead": 39391744,
+            "input": 4373436,
+            "output": 183311,
+            "cacheRead": 48370176,
             "cacheWrite": 0
           }
         },
@@ -276,15 +276,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 3590531,
-          "output": 133169,
-          "cacheRead": 39391744,
+          "input": 4373436,
+          "output": 183311,
+          "cacheRead": 48370176,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 59.462335,
-        "pricingAsOf": "2026-07-28T23:54:23.702Z"
+        "usd": 69.370336,
+        "pricingAsOf": "2026-07-28T23:59:34.123Z"
       }
     },
     "merges": [
@@ -293,7 +293,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3232",
