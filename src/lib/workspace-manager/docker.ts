@@ -277,6 +277,7 @@ export async function teardownWorkspaceDockerByNamePromise(
         name.endsWith(`-${featureFolder}_devnet`),
     );
     result.networkRemoved = remaining.length === 0;
+    if (remaining.length > 0) result.remainingNetworks = remaining;
     result.steps.push(
       result.networkRemoved
         ? `Verified networks for ${featureFolder} are absent`

@@ -371,10 +371,13 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
           message: `Stopped and removed Docker stack for ${issueLower}`,
         });
       } else {
+        const networksPhrase = teardownResult.remainingNetworks?.length
+          ? teardownResult.remainingNetworks.join(', ')
+          : 'one or more workspace devnets';
         steps.push({
           name: 'Docker stack removed',
           status: 'skipped',
-          message: `Warning: Docker network overdeck-feature-${issueLower}_devnet is still present; the closed-issue reaper will retry`,
+          message: `Warning: Docker network ${networksPhrase} still present; the closed-issue reaper will retry`,
         });
       }
     } catch (err) {
