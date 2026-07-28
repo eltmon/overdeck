@@ -100,10 +100,10 @@
     "recordedAt": "2026-07-28T08:02:25.990Z"
   },
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T08:32:30.312Z",
+  "updated": "2026-07-28T08:36:59.880Z",
   "pipeline": {
     "issueId": "PAN-3049",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -111,12 +111,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:02:29.164Z",
-    "updatedAt": "2026-07-28T08:32:26.974Z",
-    "reviewNotes": "Verification failed at lint — fix and resubmit",
+    "updatedAt": "2026-07-28T08:36:59.842Z",
+    "reviewNotes": "Rebuild automatically tears down a running foreign-prefixed stack, violating the explicit must-not constraint",
     "inspectNotes": "All 4 ACs met. AC1: declaredComposeFileProjectName parses top-level name: (stack-health.ts:52-57), verified against real MYN workspaces which declare 'name: myn-feature-min-XXX' at col 0. AC2: requireComposeProjectNameForWorkspace throws naming workspacePath + composeFilePath + both dev-script paths (stack-health.ts:135-137). AC3: both variants return overdeck-feature-<issue> when composeFilePath is null (lines 119, 134). AC4: assertDeclaredNameMatchesFeatureFolder reuses the exact 'Refusing workspace rebuild:' message for both sources (lines 59-70); dev-script rethrow guard preserved at line 91. COMPOSE_FILE_CANDIDATES and findDevcontainerComposeFile match rebuild-stack.ts:43-58 exactly, so no directory-scope drift. Tests cover all four plus dev-script-wins precedence.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3223",
     "lastVerifiedCommit": "633b8bec55270f16715519995ba08e7f0945a624",
-    "reviewRequestedAt": "2026-07-28T08:02:29.164Z",
     "reviewSpawnedAt": "2026-07-28T08:32:23.488Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -191,9 +190,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 521600,
-            "output": 70226,
-            "cacheRead": 6350336,
+            "input": 2593365,
+            "output": 143143,
+            "cacheRead": 10647040,
             "cacheWrite": 0
           }
         },
@@ -214,9 +213,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 521600,
-          "output": 70226,
-          "cacheRead": 6350336,
+          "input": 2593365,
+          "output": 143143,
+          "cacheRead": 10647040,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -227,8 +226,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 36.4104542,
-        "pricingAsOf": "2026-07-28T08:32:27.083Z"
+        "usd": 51.1051412,
+        "pricingAsOf": "2026-07-28T08:36:59.868Z"
       }
     },
     "merges": [
@@ -237,7 +236,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3049",
