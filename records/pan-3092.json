@@ -94,15 +94,7 @@
       "timestamp": "2026-07-28T10:50:14.345Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T10:50:14Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3092\n\n# Review — PAN-3092 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED — the new idempotent activity API is bypassed by the production Deacon transport and cannot detect real event-store write failures\n\n## Context\n- Branch: `feature/pan-3092`\n- HEAD reviewed: `4db74b5910033b9d19d1f4b3f99dea7fbf1a2225`\n- Prior reviewed HEAD: `1bec60c96e1fccf50d3343a2f79799958e70c164`\n- Cycle scope: rework commit `4db74b5910033b9d19d1f4b3f99dea7fbf1a2225` only; the blocker below was introduced by this rework and could not have been raised in cycle 1\n- Manifest: `.pan/review/agent-pan-3092-review-4db74b59/context.json`\n- Dimensions reviewed: correctness/logic, security, requirements/acceptance criteria, and performance\n\n## P1 (Major) — Blocking\n\n### The production sweep still appends repeat warnings after restart and marks failed writes as durable — `src/lib/activity-logger.ts:163`\n\n**Evidence tier:** Tier 1 — static, traced through the production provider wiring.\n\n**Requirement:** FR-4 requires one activity-log warning per fallback episode with no nag loop. The current rework claims `emitActivityEntryOnce()` provides that guarantee and reports `appended | duplicate | failed` only after durability.\n\n**Changed code:** `emitActivityEntryOnce()` makes `hasEventWithPayloadId` optional, skips the duplicate check when it is absent, awaits `appendAsync()`, and then returns `appended` (`src/lib/activity-logger.ts:163-177`). The sweep treats that outcome as durable and adds the episode to `warnedEpisodes` (`src/lib/cloister/deacon-verdict-fallback-sweep.ts:170-188`).\n\n**Problem:** The production caller is the Deacon child, and its provider is explicitly the HTTP-backed `createDeaconEventClient()` (`src/dashboard/server/deacon-main.ts:55-73`). That client has no `hasEventWithPayloadId` method (`src/lib/cloister/deacon-event-client.ts:16-22`), while its `appendAsync()` only enqueues locally and immediately resolves `0` before any HTTP request or SQLite commit (`src/lib/cloister/deacon-event-client.ts:152-160`). Consequently:\n\n1. After a dashboard/Deacon restart, the process-local set is empty, the production provider cannot query the prior ID, and `emitActivityEntryOnce()` appends the same warning again. The documented “degrades to at-least-once” path is the actual FR-4 path, so the implementation deliberately permits the repeat event the previous verdict blocked.\n2. A queued event can later fail HTTP delivery, remain buffered, be dropped on buffer overflow, or disappear with the child process, but `emitActivityEntryOnce()` has already returned `appended`; the sweep marks the episode warned and suppresses its own retry.\n3. Even the in-process SQLite provider cannot reliably return `failed`: the async batch catch resolves every queued promise with sequence `0` rather than rejecting (`src/dashboard/server/event-store.ts:237-257`), so `emitActivityEntryOnce()` returns `appended` after a failed transaction. The new unit test uses a fake `appendAsync` that throws, which does not model the real store contract (`src/lib/__tests__/activity-logger.test.ts:105-162`).\n4. The direct-store `hasEventWithPayloadId()` check and later `appendAsync()` are separate operations, so concurrent callers can both observe absence and append. There is no unique constraint or atomic insert enforcing the stated at-most-once contract (`src/dashboard/server/event-store.ts:204-208,367-369`).\n\n**Runtime impact:** The exact production patrol remains capable of publishing multiple activity warnings for one fallback episode, while a failed activity write can still be treated as durable and never retried. The new code therefore does not satisfy FR-4 and its public `ActivityEmitOutcome` can report the opposite of the real persistence result.\n\n**Fix:** Put the idempotency decision and append behind one atomic event-store write operation, then expose that operation through the Deacon HTTP client. The server must commit-or-detect-duplicate by the episode key in one transaction and return `appended`, `duplicate`, or `failed` only after that transaction settles; the child must await the server response rather than treating local enqueue as durability. Add integration tests using the real event store plus the Deacon client transport for: restart dedupe, transaction failure, HTTP failure/retry, and two concurrent calls for the same ID. The sweep should add `warnedEpisodes` only on a server-confirmed appended/duplicate result.\n\n## Previous Finding Rechecked\n- The rework now awaits a result before updating the process-local set and includes retry behavior for a mocked failed append. That is the right caller-side shape, but the production event transport does not implement the result contract, so the prior FR-4 blocker remains at the write-door boundary.\n- Conflict remediation, open-trip no-op suppression, UAT durability, content-aware fallback preservation, and terminal-verdict backoff have no new regression in this rework commit.\n\n## Security\nNo blocking security finding. The new SQL uses bound parameters, the activity ID is data rather than executable input, and the rework adds no authorization bypass, direct canonical-state write, lock exemption, or cross-machine verdict transport.\n\n## Performance\n`hasEventWithPayloadId()` scans all retained events of one type and evaluates `json_extract` because the payload ID is not indexed; this is acceptable at the low warning frequency but would not scale as a generic hot-path idempotency primitive. The atomic server-side fix should use an indexed uniqueness key rather than a check-then-scan query.\n\n## Requirements and Acceptance Criteria\nThe latest rework does not meet FR-4's one-warning/no-nag guarantee on the actual Deacon path. The added tests validate enhanced fakes rather than the production HTTP client and event-store failure semantics, so they cannot mechanically prove the requirement. No new violation was found for NFR-1 through NFR-5 or the other functional requirements in the six-file rework delta.\n\n## Advisory Findings\nThe previously supplied CodeRabbit findings target code unchanged since the prior review HEAD and remain non-gating under the cycle-2+ convergence rule. They should be handled as follow-up work rather than promoted during this rework cycle.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3092/.pan/review/agent-pan-3092-review-4db74b59/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3092 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/concerns.md",
@@ -160,10 +152,10 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T11:13:47.970Z",
+  "updated": "2026-07-28T11:14:41.366Z",
   "pipeline": {
     "issueId": "PAN-3092",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -171,13 +163,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T11:13:46.002Z",
+    "updatedAt": "2026-07-28T11:14:41.329Z",
     "reviewNotes": "Verification infrastructure error: Verification worker 1589231 exited before writing a result",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
     "reviewedAtCommit": "4db74b5910033b9d19d1f4b3f99dea7fbf1a2225",
     "lastVerifiedCommit": "51f15f597ae7b2b54c2e21b4f81ce496648728c9",
-    "reviewSpawnedAt": "2026-07-28T10:46:42.141Z",
+    "reviewSpawnedAt": "2026-07-28T11:14:41.328Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/concerns.md",
@@ -271,7 +263,7 @@
       },
       "costAtCloseOut": {
         "usd": 73.4957783,
-        "pricingAsOf": "2026-07-28T11:13:47.969Z"
+        "pricingAsOf": "2026-07-28T11:14:41.357Z"
       }
     },
     "merges": [
