@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T23:27:44.939Z",
+  "updated": "2026-07-28T23:27:55.986Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -93,8 +93,16 @@
     }
   ],
   "tasks": {
-    "sequence": 20,
-    "claims": {},
+    "sequence": 21,
+    "claims": {
+      "cli-workspace-lifecycle": {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 3899444,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T23:27:55.985Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -244,6 +252,7 @@
     "cli-workspace-new-main": "completed",
     "cli-workspace-new-main.cli-workspace-new-main.ac1": "completed",
     "cli-workspace-new-main.cli-workspace-new-main.ac2": "completed",
-    "cli-workspace-new-main.cli-workspace-new-main.ac3": "completed"
+    "cli-workspace-new-main.cli-workspace-new-main.ac3": "completed",
+    "cli-workspace-lifecycle": "running"
   }
 }
