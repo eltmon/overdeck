@@ -265,6 +265,7 @@ export async function fetchActivityDataWithContext(
     awaitingInput?: boolean;
     awaitingInputPrompt?: string;
     awaitingInputReason?: string;
+    pendingInputKinds?: string[];
     hasJsonl?: boolean;
     roundMetadata?: ReviewerRoundMetadata;
     modelOrigin?: ModelOriginData;
@@ -336,6 +337,7 @@ export async function fetchActivityDataWithContext(
           : tmuxSessionNames.has(checkId)
             ? await Effect.runPromise(detectAwaitingInputForAgent(checkId, { isPlanning }))
             : null;
+      const agentSnapshot = context.agentSnapshotsById?.get(checkId);
 
       // Resolve JSONL path for conversation rendering (PAN-821)
       const jsonlPath = await resolveJsonlPath(checkId, workspacePath);
@@ -375,6 +377,7 @@ export async function fetchActivityDataWithContext(
         awaitingInput: awaitingInput !== null,
         awaitingInputPrompt: awaitingInput?.prompt,
         awaitingInputReason: awaitingInput?.reason,
+        pendingInputKinds: agentSnapshot?.pendingInputKinds,
         hasJsonl: !!jsonlPath,
         harness: state.harness,
         tmuxSession: exposeInteractiveTerminal ? checkId : undefined,
