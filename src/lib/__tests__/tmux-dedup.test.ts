@@ -62,32 +62,6 @@ const RESUME_GATE_MENU = [
   'Enter to confirm · Esc to cancel',
 ].join('\n');
 
-describe('completeKeyedSubmit blocking-menu guard', () => {
-  it('rejects before the atomic Enter and preserves the pending claim', async () => {
-    vi.useFakeTimers();
-    const markers = new Map([
-      ['@overdeck-dedup-pending-test-key-1', 'send-id'],
-      ['@overdeck-dedup-test-key-1', ''],
-    ]);
-
-    try {
-      const completion = completeKeyedSubmit(session, 'test-key-1', {
-        readMarker: (_name, option) => Promise.resolve(markers.get(option) ?? ''),
-        readPaneTarget: () => Promise.resolve({ pid: '123', dead: false }),
-        readPaneText: () => Promise.resolve(RESUME_GATE_MENU),
-      });
-      const rejection = expect(completion).rejects.toThrow(MessageDeliveryFailed);
-      await vi.advanceTimersByTimeAsync(300);
-
-      await rejection;
-      expect(markers.get('@overdeck-dedup-pending-test-key-1')).toBe('send-id');
-      expect(markers.get('@overdeck-dedup-test-key-1')).toBe('');
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-});
-
 /**
  * Real throwaway tmux server — the dedup record is a pair of tmux session
  * options and the submission is a single server-executed `if-shell` command
@@ -136,6 +110,53 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     const second = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
     expect(second).toBe('deduplicated');
     expect(capturePane()).toBe(afterSubmit);
+  });
+
+  it('re-pastes after a menu-aborted submit clears without replacing the pane', async () => {
+    const payload = 'menu-blocked delivery';
+    const paneBefore = await readPaneTargetReal(session);
+    expect(await sendKeysDedup(session, payload, 'menu-key')).toBe('pasted');
+    const pendingBefore = showOption('@overdeck-dedup-pending-menu-key');
+    expect(pendingBefore).not.toBe('');
+
+    vi.useFakeTimers();
+    try {
+      const completion = completeKeyedSubmit(session, 'menu-key', {
+        readPaneText: () => Promise.resolve(RESUME_GATE_MENU),
+      });
+      const rejection = expect(completion).rejects.toThrow(MessageDeliveryFailed);
+      await vi.advanceTimersByTimeAsync(300);
+      await rejection;
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(showOption('@overdeck-dedup-pending-menu-key')).toBe(pendingBefore);
+    expect(showOption('@overdeck-dedup-target-menu-key')).toBe('');
+    expect(showOption('@overdeck-dedup-menu-key')).toBe('');
+
+    // Model the harness consuming the menu without accepting the earlier paste:
+    // clear the terminal input line while keeping the same pane process alive.
+    execFileSync('tmux', ['-L', socket, 'send-keys', '-t', session, 'C-u']);
+    expect((await readPaneTargetReal(session)).pid).toBe(paneBefore.pid);
+
+    const retry = await sendKeysDedup(session, payload, 'menu-key');
+    expect(retry).toBe('pasted');
+    expect(showOption('@overdeck-dedup-target-menu-key')).toBe(paneBefore.pid);
+
+    vi.useFakeTimers();
+    try {
+      const completion = completeKeyedSubmit(session, 'menu-key', {
+        readPaneText: () => Promise.resolve('busy composer'),
+      });
+      await vi.advanceTimersByTimeAsync(300);
+      await completion;
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(showOption('@overdeck-dedup-menu-key')).toBe('1');
+    expect(showOption('@overdeck-dedup-pending-menu-key')).toBe('');
   });
 
   it('submits normal composer content when pane capture is busy or unavailable', async () => {

@@ -42,6 +42,10 @@ import { paneHasBlockingChoiceMenu } from './pane-choice-menu.js';
 
 export const DEDUP_KEY_RE = /^[A-Za-z0-9:_-]+$/;
 
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 /** Set once the keyed message has been SUBMITTED (Enter sent). */
 export function dedupTerminalOptionName(dedupKey: string): string {
   return `@overdeck-dedup-${dedupKey}`;
@@ -429,6 +433,41 @@ export async function completeKeyedSubmit(
   if (pendingBefore !== '') {
     const paneSnapshot = await (deps.readPaneText ?? capturePaneText)(sessionName, 90).catch(() => '');
     if (paneSnapshot && paneHasBlockingChoiceMenu(paneSnapshot)) {
+      // The menu swallowed the paste, so the recorded pane target no longer
+      // proves that the pending content exists. Invalidate that target only if
+      // this exact pending claim still owns it; the next retry will re-paste
+      // instead of submitting an empty line on the unchanged pane.
+      try {
+        await tmuxExecAsync([
+          'if-shell', '-t', sessionName,
+          `test "$(tmux show-option -qv -t ${sessionName} ${pendingOption})" = ${shellQuote(pendingBefore)} && ` +
+          `test -z "$(tmux show-option -qv -t ${sessionName} ${terminalOption})"`,
+          `set-option -u -t ${sessionName} ${targetOption}`,
+        ], { encoding: 'utf-8' });
+      } catch (error) {
+        throw new KeyedMarkerVerificationError(sessionName, `blocking-menu target invalidation (key "${dedupKey}")`, { cause: error });
+      }
+
+      let pendingAfterInvalidation: string;
+      let terminalAfterInvalidation: string;
+      let targetAfterInvalidation: string;
+      try {
+        [pendingAfterInvalidation, terminalAfterInvalidation, targetAfterInvalidation] = await Promise.all([
+          readStrict(sessionName, pendingOption),
+          readStrict(sessionName, terminalOption),
+          readStrict(sessionName, targetOption),
+        ]);
+      } catch (error) {
+        throw new KeyedMarkerVerificationError(sessionName, `blocking-menu invalidation verification (key "${dedupKey}")`, { cause: error });
+      }
+      if (
+        pendingAfterInvalidation === pendingBefore
+        && terminalAfterInvalidation === ''
+        && targetAfterInvalidation !== ''
+      ) {
+        throw new KeyedMarkerVerificationError(sessionName, `blocking-menu target survived invalidation (key "${dedupKey}")`);
+      }
+
       throw new MessageDeliveryFailed(
         `Keyed submit to ${sessionName} aborted: the pane is blocked on a choice menu, so Enter would answer that menu`,
         sessionName,
