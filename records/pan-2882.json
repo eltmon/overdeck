@@ -107,21 +107,20 @@
     "recordedAt": "2026-07-28T17:16:31.850Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T18:04:43.500Z",
+  "updated": "2026-07-28T18:12:52.702Z",
   "pipeline": {
     "issueId": "PAN-2882",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:16:51.273Z",
-    "updatedAt": "2026-07-28T18:04:42.273Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-2882-review",
+    "updatedAt": "2026-07-28T18:12:52.619Z",
+    "reviewNotes": "Cycle-3 tests delete the accepted merged-pagination check and still omit aggregate five-call concurrency coverage",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
     "lastVerifiedCommit": "e38216258512564fa52df36c0ff3f1b67c667fd6",
-    "reviewRequestedAt": "2026-07-28T17:16:51.273Z",
     "reviewSpawnedAt": "2026-07-28T18:04:42.271Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -150,9 +149,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3484730,
-            "output": 148910,
-            "cacheRead": 15592960,
+            "input": 5680905,
+            "output": 211979,
+            "cacheRead": 22026752,
             "cacheWrite": 0
           }
         },
@@ -173,9 +172,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 4857881,
-          "output": 210828,
-          "cacheRead": 29779456,
+          "input": 7054056,
+          "output": 273897,
+          "cacheRead": 36213248,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -186,8 +185,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 52.519505,
-        "pricingAsOf": "2026-07-28T18:04:42.321Z"
+        "usd": 68.609346,
+        "pricingAsOf": "2026-07-28T18:12:52.663Z"
       }
     },
     "merges": [
