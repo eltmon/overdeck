@@ -21,6 +21,7 @@ const fakeHome = mkdtempSync(join(tmpdir(), 'pan-jsonl-identity-'));
 /** Agent id → its own pinned session id, as `session.id` on disk would report. */
 const ownSessionIds = new Map<string, string>();
 const recordedWorkspaces = new Map<string, string | null>();
+const recordedStartedAt = new Map<string, string>();
 const PROJECT_ROOT = join(fakeHome, 'Projects', 'overdeck');
 
 vi.mock('os', async (importOriginal) => {
@@ -36,7 +37,9 @@ vi.mock('../../src/lib/agents/agent-state.js', async (importOriginal) => {
     ...actual,
     getAgentStateSync: (id: string) => {
       const workspace = recordedWorkspaces.has(id) ? recordedWorkspaces.get(id) : WORKSPACE;
-      return workspace ? { id, workspace } : null;
+      return workspace
+        ? { id, workspace, startedAt: recordedStartedAt.get(id) ?? '1970-01-01T00:00:00.000Z' }
+        : null;
     },
   };
 });
@@ -59,6 +62,7 @@ const OWN_SESSION = '5f5168f3-7e17-4aed-9fe2-2bbb622e4acd';
 const OTHER_SESSION = 'ceba1402-1e09-436f-aa3d-6dd2b6a4c202';
 
 const { getAgentJsonlPath, getAgentWorkspace, getClaudeProjectDir } = await import('../../src/lib/agent-enrichment.js');
+const { detectPendingOperatorDecision } = await import('../../src/lib/agents/pending-decision-gate.js');
 const { Effect } = await import('effect');
 
 /** Populate the shared project dir; `newest` gets the latest mtime. */
@@ -71,11 +75,37 @@ function writeTranscripts(newest: string, ...others: string[]): string {
   return projectDir;
 }
 
+function writePendingAuqTranscript(sessionId: string, mtime: Date): void {
+  const projectDir = getClaudeProjectDir(WORKSPACE);
+  mkdirSync(projectDir, { recursive: true });
+  const transcript = join(projectDir, `${sessionId}.jsonl`);
+  writeFileSync(transcript, JSON.stringify({
+    timestamp: '2026-07-28T10:00:00.000Z',
+    message: {
+      content: [{
+        type: 'tool_use',
+        id: 'pending-auq',
+        name: 'AskUserQuestion',
+        input: {
+          questions: [{
+            question: 'Which recovery action?',
+            header: 'Recovery',
+            multiSelect: false,
+            options: [{ label: 'Wait', description: 'leave the session running' }],
+          }],
+        },
+      }],
+    },
+  }) + '\n');
+  utimesSync(transcript, mtime, mtime);
+}
+
 beforeEach(() => {
   rmSync(fakeHome, { recursive: true, force: true });
   mkdirSync(fakeHome, { recursive: true });
   ownSessionIds.clear();
   recordedWorkspaces.clear();
+  recordedStartedAt.clear();
 });
 
 afterEach(() => {
@@ -122,5 +152,38 @@ describe('getAgentJsonlPath()', () => {
     const resolved = await Effect.runPromise(getAgentJsonlPath('conv-20260716-6155'));
 
     expect(resolved).toBe(join(projectDir, `${OTHER_SESSION}.jsonl`));
+  });
+});
+
+describe('forced fresh-session decision boundary', () => {
+  it('does not recreate a discarded AUQ from the previous session generation', async () => {
+    const agentId = 'agent-pan-3228';
+    writePendingAuqTranscript(OTHER_SESSION, new Date('2026-07-28T10:00:01.000Z'));
+
+    // --force wipes the old agent directory, so the replacement starts without
+    // a pinned session id while the sacred historical JSONL remains on disk.
+    recordedStartedAt.set(agentId, '2026-07-28T10:01:00.000Z');
+
+    const pending = await detectPendingOperatorDecision(agentId, {
+      sessionExists: async () => false,
+    });
+
+    expect(pending).toBeNull();
+  });
+
+  it('still reports an AUQ from the replacement session pinned to the agent', async () => {
+    const agentId = 'agent-pan-3228';
+    ownSessionIds.set(agentId, OWN_SESSION);
+    recordedStartedAt.set(agentId, '2026-07-28T10:01:00.000Z');
+    writePendingAuqTranscript(OWN_SESSION, new Date('2026-07-28T10:00:01.000Z'));
+
+    const pending = await detectPendingOperatorDecision(agentId, {
+      sessionExists: async () => false,
+    });
+
+    expect(pending).toEqual({
+      source: 'jsonl-auq',
+      reason: 'ask_user_question',
+    });
   });
 });

@@ -14,7 +14,7 @@
 import { existsSync } from 'fs'
 import { readdir, readFile, stat } from 'fs/promises'
 import { homedir } from 'os'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { encodeClaudeProjectDir } from './paths.js'
 import { promisify } from 'util'
 import { exec } from 'child_process'
@@ -307,6 +307,46 @@ export const countPendingAskUserQuestionsForAgent = (
   agentId: string,
 ): Effect.Effect<number> =>
   Effect.promise(() => countPendingAskUserQuestionsForAgentPromise(agentId))
+
+/**
+ * Count pending AskUserQuestions only in the current agent session generation.
+ * A forced fresh start preserves historical JSONLs while replacing the agent
+ * state directory, so an unpinned fallback transcript older than startedAt
+ * belongs to the discarded generation and must not recreate the decision gate.
+ */
+async function countPendingAskUserQuestionsForCurrentAgentSessionPromise(
+  agentId: string,
+): Promise<number> {
+  const jsonlPath = await getAgentJsonlPathPromise(agentId)
+  if (!jsonlPath) return 0
+
+  const currentSessionId = getLatestSessionIdSync(agentId)
+  const isPinnedCurrentSession = currentSessionId !== null
+    && basename(jsonlPath) === `${currentSessionId}.jsonl`
+  if (!isPinnedCurrentSession) {
+    const startedAtMs = Date.parse(getAgentStateSync(agentId)?.startedAt ?? '')
+    if (Number.isFinite(startedAtMs)) {
+      try {
+        if ((await stat(jsonlPath)).mtimeMs < startedAtMs) return 0
+      } catch {
+        return 0
+      }
+    }
+  }
+
+  try {
+    const scan = await scanPendingInputsPromise(jsonlPath)
+    return scan.askUserQuestions.length
+  } catch {
+    return 0
+  }
+}
+
+/** Effect-native: count pending AskUserQuestions in the current agent session generation. */
+export const countPendingAskUserQuestionsForCurrentAgentSession = (
+  agentId: string,
+): Effect.Effect<number> =>
+  Effect.promise(() => countPendingAskUserQuestionsForCurrentAgentSessionPromise(agentId))
 
 // ─── JSONL scanning ───────────────────────────────────────────────────────────
 

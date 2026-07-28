@@ -11,7 +11,7 @@ function createDeps(overrides: PendingOperatorDecisionDeps = {}): PendingOperato
   return {
     sessionExists: vi.fn(async () => true),
     detectAwaitingInputForAgent: vi.fn(async () => null),
-    countPendingAskUserQuestionsForAgent: vi.fn(async () => 0),
+    countPendingAskUserQuestionsForCurrentAgentSession: vi.fn(async () => 0),
     warn: vi.fn(),
     ...overrides,
   }
@@ -31,7 +31,7 @@ describe('detectPendingOperatorDecision', () => {
       reason: 'tool_permission',
       prompt: 'Allow this Bash command?',
     })
-    expect(deps.countPendingAskUserQuestionsForAgent).not.toHaveBeenCalled()
+    expect(deps.countPendingAskUserQuestionsForCurrentAgentSession).not.toHaveBeenCalled()
   })
 
   it('does not treat rate limits as destructive-recovery blockers', async () => {
@@ -55,7 +55,7 @@ describe('detectPendingOperatorDecision', () => {
     const deps = createDeps({
       sessionExists: vi.fn(async () => false),
       detectAwaitingInputForAgent,
-      countPendingAskUserQuestionsForAgent: vi.fn(async () => 1),
+      countPendingAskUserQuestionsForCurrentAgentSession: vi.fn(async () => 1),
     })
 
     await expect(detectPendingOperatorDecision('agent-pan-3228', deps)).resolves.toEqual({
@@ -78,7 +78,7 @@ describe('detectPendingOperatorDecision', () => {
     })
 
     await expect(detectPendingOperatorDecision('agent-pan-3228', deps)).resolves.toBeNull()
-    expect(deps.countPendingAskUserQuestionsForAgent).toHaveBeenCalledWith('agent-pan-3228')
+    expect(deps.countPendingAskUserQuestionsForCurrentAgentSession).toHaveBeenCalledWith('agent-pan-3228')
     expect(warning).toHaveBeenCalledWith(
       expect.stringContaining('Pending operator decision pane check failed open for agent-pan-3228'),
     )

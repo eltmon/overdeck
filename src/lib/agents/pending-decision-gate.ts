@@ -1,6 +1,6 @@
 import { Effect } from 'effect'
 
-import { countPendingAskUserQuestionsForAgent as countPendingAskUserQuestionsForAgentEffect } from '../agent-enrichment.js'
+import { countPendingAskUserQuestionsForCurrentAgentSession as countPendingAskUserQuestionsForCurrentAgentSessionEffect } from '../agent-enrichment.js'
 import {
   detectAwaitingInputForAgent as detectAwaitingInputForAgentEffect,
   type AwaitingInputDetection,
@@ -27,7 +27,7 @@ export const DESTRUCTIVE_RECOVERY_BLOCKING_REASONS: ReadonlySet<AwaitingInputRea
 export interface PendingOperatorDecisionDeps {
   sessionExists?: (agentId: string) => Promise<boolean>
   detectAwaitingInputForAgent?: (agentId: string) => Promise<AwaitingInputDetection | null>
-  countPendingAskUserQuestionsForAgent?: (agentId: string) => Promise<number>
+  countPendingAskUserQuestionsForCurrentAgentSession?: (agentId: string) => Promise<number>
   warn?: (message: string) => void
 }
 
@@ -39,8 +39,8 @@ export async function detectPendingOperatorDecision(
     ?? ((id: string) => Effect.runPromise(sessionExistsEffect(id)))
   const detectAwaitingInputForAgent = deps.detectAwaitingInputForAgent
     ?? ((id: string) => Effect.runPromise(detectAwaitingInputForAgentEffect(id)))
-  const countPendingAskUserQuestionsForAgent = deps.countPendingAskUserQuestionsForAgent
-    ?? ((id: string) => Effect.runPromise(countPendingAskUserQuestionsForAgentEffect(id)))
+  const countPendingAskUserQuestionsForCurrentAgentSession = deps.countPendingAskUserQuestionsForCurrentAgentSession
+    ?? ((id: string) => Effect.runPromise(countPendingAskUserQuestionsForCurrentAgentSessionEffect(id)))
   const warn = deps.warn ?? console.warn
 
   let liveSession = false
@@ -67,7 +67,7 @@ export async function detectPendingOperatorDecision(
     }
   }
 
-  const pendingAskUserQuestions = await countPendingAskUserQuestionsForAgent(agentId)
+  const pendingAskUserQuestions = await countPendingAskUserQuestionsForCurrentAgentSession(agentId)
   if (pendingAskUserQuestions > 0) {
     return {
       source: 'jsonl-auq',

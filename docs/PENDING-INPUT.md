@@ -47,12 +47,15 @@ at read time) enumerates the active blocking surfaces. Labels live in one map:
 `detectPendingOperatorDecision()` blocks fresh starts, restarts, recovery,
 and autonomous re-drive when live pane detection reports `tool_permission`,
 `user_question`, `disambiguation`, `confirmation`, `planning_done`, or
-`session_resume`, or when the agent has an unanswered JSONL AskUserQuestion.
-`rate_limit` is excluded because it is not an operator decision. Operator
-restart surfaces may pass explicit `--force` or `{ force: true }` to discard
-the pending decision deliberately; autonomous actors must park the agent and
-emit needs-you instead. Detection errors fail open with a warning so a broken
-tmux capture cannot permanently close the recovery door.
+`session_resume`, or when the agent's current session generation has an
+unanswered JSONL AskUserQuestion. Historical transcripts remain intact, but an
+unpinned transcript older than the replacement agent's `startedAt` boundary is
+excluded after a forced fresh start. `rate_limit` is excluded because it is not
+an operator decision. Operator restart surfaces may pass explicit `--force` or
+`{ force: true }` to discard the pending decision deliberately; autonomous
+actors must park the agent and emit needs-you instead. Detection errors fail
+open with a warning so a broken tmux capture cannot permanently close the
+recovery door.
 
 ## Invariants
 
