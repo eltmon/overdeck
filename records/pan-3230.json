@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T17:26:13.277Z",
+  "updated": "2026-07-28T17:31:41.654Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "fix-doctor-orphan-scan": {
-        "writerId": "agent-pan-3230",
-        "agentId": "agent-pan-3230",
-        "pid": 933236,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T17:26:13.277Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3230",
@@ -90,12 +82,27 @@
         "outcome": "completed",
         "reason": "Resolved both patrol and reactive reconciler spec scans through getProjectPanPaths and added migrated-state regression coverage.",
         "releasedAt": "2026-07-28T17:26:00.641Z"
+      },
+      {
+        "writerId": "agent-pan-3230",
+        "agentId": "agent-pan-3230",
+        "pid": 933236,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:26:13.277Z",
+        "itemId": "fix-doctor-orphan-scan",
+        "outcome": "completed",
+        "reason": "Routed doctor orphan-proposed enumeration through getProjectPanPaths and added migrated state-worktree coverage.",
+        "releasedAt": "2026-07-28T17:31:41.654Z"
       }
     ],
     "statusReasons": {
       "fix-reconciler-spec-dir": {
         "reason": "Resolved both patrol and reactive reconciler spec scans through getProjectPanPaths and added migrated-state regression coverage.",
         "updatedAt": "2026-07-28T17:26:00.641Z"
+      },
+      "fix-doctor-orphan-scan": {
+        "reason": "Routed doctor orphan-proposed enumeration through getProjectPanPaths and added migrated state-worktree coverage.",
+        "updatedAt": "2026-07-28T17:31:41.654Z"
       }
     }
   },
@@ -104,6 +111,8 @@
     "fix-reconciler-spec-dir.fix-reconciler-spec-dir.ac1": "completed",
     "fix-reconciler-spec-dir.fix-reconciler-spec-dir.ac2": "completed",
     "fix-reconciler-spec-dir.fix-reconciler-spec-dir.ac3": "completed",
-    "fix-doctor-orphan-scan": "running"
+    "fix-doctor-orphan-scan": "completed",
+    "fix-doctor-orphan-scan.fix-doctor-orphan-scan.ac1": "completed",
+    "fix-doctor-orphan-scan.fix-doctor-orphan-scan.ac2": "completed"
   }
 }
