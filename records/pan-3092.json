@@ -187,18 +187,18 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T12:07:10.162Z",
+  "updated": "2026-07-28T12:23:04.866Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T12:07:10.157Z",
+    "updatedAt": "2026-07-28T12:23:04.769Z",
     "reviewNotes": "Approved: fair concurrent warning fan-out removes first-item starvation, the shared budget tracks the resolved patrol interval, and the append-once schema/transport invariants remain correct.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
@@ -281,6 +281,14 @@
             "cacheRead": 100339712,
             "cacheWrite": 0
           }
+        },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 84,
+            "output": 21457,
+            "cacheRead": 6560048,
+            "cacheWrite": 165719
+          }
         }
       },
       "totals": {
@@ -295,11 +303,17 @@
           "output": 525330,
           "cacheRead": 100339712,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 84,
+          "output": 21457,
+          "cacheRead": 6560048,
+          "cacheWrite": 165719
         }
       },
       "costAtCloseOut": {
-        "usd": 114.9018653,
-        "pricingAsOf": "2026-07-28T12:07:10.159Z"
+        "usd": 116.8429123,
+        "pricingAsOf": "2026-07-28T12:23:04.861Z"
       }
     },
     "merges": [
