@@ -642,6 +642,31 @@ describe('gatherProjectLensSignals', () => {
       });
   });
 
+  it('classifies a path-only project (no tracker configured) as tracker_unconfigured', async () => {
+    const pathOnlyProject: ProjectConfig = {
+      name: 'papers-please',
+      path: '/projects/papers-please',
+    };
+    await expect(gatherProjectLensSignals(pathOnlyProject, deps()))
+      .rejects.toMatchObject({
+        reason: 'tracker_unconfigured',
+        message: expect.stringContaining('papers-please'),
+      });
+  });
+
+  it('classifies a project with tracker but no prefix as missing_issue_prefix (tracker precedence)', async () => {
+    const trackerProjectNoPrefix: ProjectConfig = {
+      name: 'puzzdom',
+      path: '/projects/puzzdom',
+      gitlab_repo: 'puzzdom/puzzdom',
+    };
+    await expect(gatherProjectLensSignals(trackerProjectNoPrefix, deps()))
+      .rejects.toMatchObject({
+        reason: 'missing_issue_prefix',
+        message: expect.stringContaining('puzzdom'),
+      });
+  });
+
   it('classifies forge lens failures without parsing their messages', async () => {
     const mocked = deps();
     mocked.listOpenIssues = vi.fn().mockRejectedValue(new Error('HTTP 404'));
@@ -810,8 +835,66 @@ describe('gatherProjectLensSignals', () => {
     expect(membership).toEqual(expect.objectContaining({
       bucket: 'post_merge_limbo',
     }));
-    // Verify both repos were queried
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(2);
+    // Both convention heads are queried in both GitLab repos.
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(4);
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/frontend', ['feature/min-896']);
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/frontend', ['strike/min-896']);
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['feature/min-896']);
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['strike/min-896']);
+  });
+
+  it('limits merged-MR lookups to five concurrent calls across GitLab repos', async () => {
+    const mocked = deps();
+    mocked.listTrackerIssues = vi.fn().mockResolvedValue([
+      { issueId: 'MIN-1', state: 'open', labels: [] },
+      { issueId: 'MIN-2', state: 'open', labels: [] },
+      { issueId: 'MIN-3', state: 'open', labels: [] },
+    ]);
+    mocked.listOpenMergeRequests = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
+
+    let active = 0;
+    let maxActive = 0;
+    let releaseLookups = () => {};
+    const lookupGate = new Promise<void>((resolve) => { releaseLookups = resolve; });
+    let signalFiveStarted = () => {};
+    const fiveStarted = new Promise<void>((resolve) => { signalFiveStarted = resolve; });
+    mocked.listMergedMergeRequestHeads = vi.fn().mockImplementation(async () => {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      if (active === 5) signalFiveStarted();
+      await lookupGate;
+      active--;
+      return [];
+    });
+
+    const gitlabPolyrepo: ProjectConfig = {
+      name: 'test',
+      path: '/test',
+      issue_prefix: 'MIN',
+      gitlab_repo: 'test/test',
+      workspace: {
+        type: 'polyrepo',
+        repos: [
+          { name: 'fe', path: 'frontend' },
+          { name: 'api', path: 'api' },
+          { name: 'docs', path: 'docs', remote: 'github' },
+        ],
+      },
+    };
+
+    const gatherPromise = gatherProjectLensSignals(gitlabPolyrepo, mocked);
+    await fiveStarted;
+
+    expect(active).toBe(5);
+    expect(maxActive).toBe(5);
+    releaseLookups();
+    await gatherPromise;
+
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(12);
+    expect(maxActive).toBe(5);
+    expect(mocked.listMergedMergeRequestHeads).not.toHaveBeenCalledWith('/test/docs', expect.any(Array));
   });
 
   it('does not query merged MRs for closed issues (they\'re already terminal)', async () => {
@@ -910,10 +993,11 @@ describe('gatherProjectLensSignals', () => {
 
     await gatherProjectLensSignals(mixedPolyrepo, mocked);
 
-    // Only the api repo (gitlab forge) should be queried, not fe (github forge)
-    // The mock was called once, meaning only one repo was queried (the gitlab one)
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(1);
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', expect.any(Array));
+    // Only the api repo (GitLab forge) is queried, once for each convention head.
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(2);
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['feature/test-1']);
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['strike/test-1']);
+    expect(mocked.listMergedMergeRequestHeads).not.toHaveBeenCalledWith('/test/frontend', expect.any(Array));
   });
 
   it('does not query issue states or merged history for closed spec-only candidates', async () => {

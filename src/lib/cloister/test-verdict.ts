@@ -81,6 +81,7 @@ export function readTestVerdictArtifact(
 export type UnsignaledTestDecision =
   | { action: 'wait' }
   | { action: 'none' }
+  | { action: 'escalate' }
   | { action: 'auto-complete'; status: 'passed' | 'failed'; notes?: string }
   | { action: 'nudge-verdict'; status: 'passed' | 'failed'; notes?: string }
   | { action: 'nudge-write' };
@@ -127,10 +128,41 @@ export function decideUnsignaledTestAction(input: {
     return { action: 'nudge-verdict', status: artifact.status, notes: artifact.notes };
   }
 
-  // No artifact: never guess. Nudge once to write+POST, then give up here and let
-  // the strand-surfacing path make the stuck state visible.
-  if (alreadyNudged) return { action: 'none' };
+  // No artifact: never guess. Nudge once to write+POST; if the agent is still
+  // unresponsive after that, escalate to the operator. PAN-3092 (MIN-858): the
+  // old `none` here was terminal — a live agent holding a finished verdict in
+  // its pane and nothing else sat there for six hours while every surface
+  // reported it healthy. No automatic path can recover a pane-only verdict, so
+  // the honest move is to tell a human, not to keep quiet.
+  if (alreadyNudged) return { action: 'escalate' };
   return { action: 'nudge-write' };
+}
+
+/**
+ * PAN-3092: surface an `escalate` decision to the operator, once per test
+ * dispatch generation. Returns the needs-you line to log, or undefined when this
+ * generation already tripped. Never touches the verdict itself (D6) — a
+ * pane-only verdict is a human's call to read and apply.
+ */
+export async function recordUnsignaledTestEscalation(
+  workspacePath: string,
+  issueId: string,
+  testSession: string,
+  generation: string,
+): Promise<string | undefined> {
+  const { recordRecoveryFailure } = await import('./recovery-trip.js');
+  const { emitNeedsYou } = await recordRecoveryFailure(
+    workspacePath, issueId, 'unsignaled-test-verdict', generation, 1,
+  );
+  if (!emitNeedsYou) return undefined;
+  return (
+    `needs-you ${issueId}: the test agent (${testSession}) is alive but has not responded to a verdict ` +
+    `nudge, and it wrote no .pan/test/result.json — its verdict may exist only in the agent's pane, where ` +
+    `nothing can recover it automatically. Read the pane ` +
+    `(tmux -L overdeck capture-pane -t ${testSession} -p -S -200), then either apply the verdict yourself ` +
+    `(pan admin specialists done test ${issueId} --status passed|failed) or run pan kill ${issueId} and ` +
+    `re-dispatch the test.`
+  );
 }
 
 export function resolveSlotFeedbackAgentId(

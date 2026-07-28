@@ -53,7 +53,8 @@ Required steps:
    curl -s -X POST ${apiUrl}/api/review/${options.issueId}/status \\
      -H "Content-Type: application/json" \\
      -d '{"testStatus":"failed","testNotes":"<commands/UAT failures and exact unmet criteria>"}'
-11. Report TESTS PASSED or TESTS FAILED with commands run, UAT paths exercised, and concise evidence.
+11. Make exactly ONE POST attempt. If it fails, the .pan/test/result.json artifact from step 8 is the durable verdict and the deacon recovers from it — do NOT retry the POST in a loop. Report the failure in your summary and stop.
+12. Report TESTS PASSED or TESTS FAILED with commands run, UAT paths exercised, and concise evidence.
 
 Boundaries:
 - Do NOT edit code, tests, fixtures, snapshots, or configuration.

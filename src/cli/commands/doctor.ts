@@ -31,6 +31,7 @@ import {
 } from '../../lib/system-prerequisites.js';
 import { checkInotify } from './doctor-inotify.js';
 import { checkStateWorktrees } from './doctor-state-worktree.js';
+import { checkDuplicateComposeStacks } from './doctor-duplicate-stacks.js';
 import {
   assessBridgePoolPressure,
   bridgePoolLimitFromPools,
@@ -902,6 +903,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Check Docker devnet network pool exhaustion (PAN-2510)
   for (const c of await checkDockerBridgeNetworkPool()) checks.push(c);
+  for (const c of await checkDuplicateComposeStacks()) checks.push(c); // PAN-3049
 
   // Check inotify watch budget and persistence (PAN-3063)
   for (const c of await checkInotify()) checks.push(c);
