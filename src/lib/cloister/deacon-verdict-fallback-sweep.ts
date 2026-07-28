@@ -130,17 +130,38 @@ async function lockOwnerDescription(issueId: string): Promise<string> {
  * Drain every pending workspace verdict fallback, and surface the ones that stay
  * stuck. Returns one action line per drain or escalation, for the patrol log.
  */
-export async function sweepStrandedVerdictFallbacks(now = Date.now()): Promise<string[]> {
+interface WarningCandidate {
+  issueId: string;
+  workspacePath: string;
+  recoveryPath: string;
+  generation: string;
+  episode: string;
+  message: string;
+  summary: string;
+}
+
+/**
+ * Drain every pending workspace verdict fallback, and surface the ones that stay
+ * stuck. Returns one action line per drain or escalation, for the patrol log.
+ *
+ * `budgetMs` bounds the total time spent waiting on warning delivery. The deacon
+ * derives it from the resolved patrol interval so a shortened interval cannot be
+ * overrun by the sweep.
+ */
+export async function sweepStrandedVerdictFallbacks(
+  now = Date.now(),
+  budgetMs = SWEEP_WARNING_BUDGET_MS,
+): Promise<string[]> {
   const actions: string[] = [];
-  // Shared across every issue this sweep visits, so warning delivery can never
-  // stretch the patrol past its interval no matter how many verdicts stranded.
-  const warningBudgetEndsAt = Date.now() + SWEEP_WARNING_BUDGET_MS;
   let statuses: Record<string, { mergeStatus?: string; closedOut?: boolean; stuck?: boolean; deaconIgnored?: boolean }>;
   try {
     statuses = loadReviewStatuses();
   } catch {
     return actions;
   }
+
+  // ── Phase 1: drain everything, and collect who needs a warning ──────────────
+  const candidates: WarningCandidate[] = [];
 
   for (const [issueId, status] of Object.entries(statuses)) {
     // A merged or closed-out issue's fallback is history, not a pending verdict.
@@ -203,61 +224,73 @@ export async function sweepStrandedVerdictFallbacks(now = Date.now()): Promise<s
         continue;
       }
 
-      // The warning goes out BEFORE the trip write and never touches the record
-      // lock. Ordering it after would put the only immediate operator signal
-      // behind the very lock whose contention it is reporting.
-      //
-      // `emitActivityEntryOnce` keys on the episode and checks the event log
-      // before appending, so a restart cannot produce a second warning event —
-      // a reused id alone would still append and re-publish one. It also awaits
-      // durability, so the episode is marked warned only when the warning
-      // actually landed; a failed append is retried on the next patrol instead
-      // of being silently suppressed by the in-process set.
-      if (!warnedEpisodes.has(episode)) {
-        const remainingBudgetMs = warningBudgetEndsAt - Date.now();
-        const outcome: ActivityEmitOutcome = remainingBudgetMs <= 0
-          ? 'failed'
-          : await withWarningDeadline(
-            emitActivityEntryOnce({
-              id: `verdict-fallback:${episode}`,
-              source: 'cloister',
-              level: 'warn',
-              issueId,
-              message,
-            }),
-            remainingBudgetMs,
-          );
-        if (outcome === 'appended' || outcome === 'duplicate') {
-          warnedEpisodes.add(episode);
-          if (outcome === 'appended') actions.push(summary);
-        } else {
-          // `failed` wrote nothing; `unconfirmed` means the wired store offers
-          // no settled path, so delivery is unknown. Neither is evidence the
-          // operator was told, and marking the episode warned would suppress
-          // this process's own retry.
-          actions.push(`${issueId}: verdict-fallback warning could not be confirmed — retrying next patrol`);
-        }
-      }
-
-      // The durable trip is best-effort and retried on later patrols: it writes
-      // through the contended lock, so a failure here is expected during a
-      // contention episode and must never suppress the warning above.
-      try {
-        const { emitNeedsYou } = await recordRecoveryFailure(
-          workspacePath, issueId, recoveryPath, fallback.updatedAt, 1,
-        );
-        // The trip landed, so the durable plane owns dedupe from here — drop the
-        // in-process key regardless of `emitNeedsYou`, which controls whether
-        // this was the notifying trip, not whether the write succeeded.
-        warnedEpisodes.delete(episode);
-        if (emitNeedsYou) actions.push(`needs-you ${summary}`);
-      } catch {
-        actions.push(
-          `${issueId}: ${recoveryPath} needs-you trip could not be recorded (record lock contended) — retrying next patrol`,
-        );
-      }
+      candidates.push({
+        issueId, workspacePath, recoveryPath, generation: fallback.updatedAt, episode, message, summary,
+      });
     } catch {
       // A single unreadable workspace must never stop the sweep.
+    }
+  }
+
+  // ── Phase 2: warn, all candidates concurrently under ONE deadline ───────────
+  //
+  // Concurrent rather than serial, and started together rather than in turn.
+  // Spending a shared budget in issue order let the first hanging episode
+  // consume all of it every patrol — iteration order is stable, so the same
+  // episode won recursively and every later one was silently dropped without
+  // ever attempting its warning. That is the exact hard case this feature
+  // targets (a stalled dashboard plus a contended lock), so the unfairness bit
+  // hardest when it mattered most. Fanning out gives every episode an attempt
+  // and keeps total wall-clock at one budget regardless of how many stranded.
+  // Each request is idempotent by episode key, so concurrency cannot duplicate
+  // a warning, and an attempt abandoned at the deadline is retried next patrol.
+  const pending = candidates.filter((c) => !warnedEpisodes.has(c.episode));
+  if (pending.length > 0) {
+    const outcomes = await Promise.all(pending.map((candidate) =>
+      withWarningDeadline(
+        emitActivityEntryOnce({
+          id: `verdict-fallback:${candidate.episode}`,
+          source: 'cloister',
+          level: 'warn',
+          issueId: candidate.issueId,
+          message: candidate.message,
+        }),
+        budgetMs,
+      ).catch((): ActivityEmitOutcome => 'failed')));
+
+    outcomes.forEach((outcome, index) => {
+      const candidate = pending[index]!;
+      if (outcome === 'appended' || outcome === 'duplicate') {
+        warnedEpisodes.add(candidate.episode);
+        if (outcome === 'appended') actions.push(candidate.summary);
+      } else {
+        // `failed` wrote nothing; `unconfirmed` means the wired store offers no
+        // settled path, so delivery is unknown. Neither is evidence the operator
+        // was told, and marking the episode warned would suppress the retry.
+        actions.push(`${candidate.issueId}: verdict-fallback warning could not be confirmed — retrying next patrol`);
+      }
+    });
+  }
+
+  // ── Phase 3: the durable needs-you trips ───────────────────────────────────
+  //
+  // After the warnings, never before: these go through the very record lock
+  // whose contention is being reported, so a slow or failing trip write must
+  // not delay or suppress the operator-visible warning.
+  for (const candidate of candidates) {
+    try {
+      const { emitNeedsYou } = await recordRecoveryFailure(
+        candidate.workspacePath, candidate.issueId, candidate.recoveryPath, candidate.generation, 1,
+      );
+      // The trip landed, so the durable plane owns dedupe from here — drop the
+      // in-process key regardless of `emitNeedsYou`, which controls whether this
+      // was the notifying trip, not whether the write succeeded.
+      warnedEpisodes.delete(candidate.episode);
+      if (emitNeedsYou) actions.push(`needs-you ${candidate.summary}`);
+    } catch {
+      actions.push(
+        `${candidate.issueId}: ${candidate.recoveryPath} needs-you trip could not be recorded (record lock contended) — retrying next patrol`,
+      );
     }
   }
 

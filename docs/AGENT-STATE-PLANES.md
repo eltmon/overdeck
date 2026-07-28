@@ -122,10 +122,19 @@ write-recency from verdict-truth:
     would otherwise stall every later issue and every later patrol phase while
     the patrol heartbeat kept reporting the Deacon healthy. Timing out after a
     server commit is safe: retrying the same key returns `duplicate`. The sweep
-    additionally shares a single `SWEEP_WARNING_BUDGET_MS` (30s) across every
-    issue it visits, because a per-request deadline alone still multiplies by the
-    number of stranded fallbacks; once the budget is spent, remaining warnings
-    are abandoned as retryable `failed` while draining continues for every issue.
+    additionally bounds warning delivery for the whole sweep, because a
+    per-request deadline alone still multiplies by the number of stranded
+    fallbacks. The sweep runs in three phases: drain everything and collect
+    candidates, fan every candidate's warning out **concurrently under one shared
+    deadline**, then write the durable trips. Concurrency is what keeps it fair —
+    spending a shared budget in issue order let the first hanging episode consume
+    all of it every patrol, and iteration order is stable, so later episodes were
+    silently dropped forever without ever attempting their warning. Each request
+    is idempotent by episode key, so fanning out cannot duplicate a warning, and
+    an attempt abandoned at the deadline is retried next patrol. The budget is
+    derived from the resolved `patrolIntervalMs` (half of it) rather than
+    assuming 60s. Trips come last so a slow record-lock write can never delay the
+    operator-visible warning.
 
   The claim table lives in `overdeck.db` — created by
   `drizzle/overdeck/0000_overdeck_init.sql` on a fresh database and by an

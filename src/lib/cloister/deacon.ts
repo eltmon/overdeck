@@ -2884,7 +2884,13 @@ export async function runPatrol(): Promise<PatrolResult> {
 
   // PAN-3092: fold verdict fallbacks whose writing process died before its own
   // drain timer fired, and surface the ones the record lock keeps stuck.
-  const verdictFallbackActions = await sweepStrandedVerdictFallbacks();
+  // Budget derived from the RESOLVED patrol interval, not a hardcoded 60s
+  // assumption: a shorter configured interval would otherwise let the sweep
+  // overrun it and start overlapping patrols.
+  const verdictFallbackActions = await sweepStrandedVerdictFallbacks(
+    Date.now(),
+    Math.max(1_000, Math.floor(config.patrolIntervalMs / 2)),
+  );
   actions.push(...verdictFallbackActions);
   for (const a of verdictFallbackActions) addLog('action', a, state.patrolCycle);
 

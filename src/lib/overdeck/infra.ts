@@ -64,6 +64,9 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'uat_generation_repos', column: 'merge_sha' },
     { table: 'uat_generation_resolutions', column: 'kind' },
     { table: 'uat_generation_resolutions', column: 'note' },
+    // PAN-3092: listed explicitly so the drift audit reports the table's
+    // absence if the runtime top-up ever fails on an existing database.
+    { table: 'event_idempotency', column: 'key' },
   ],
   indexes: [
     'cost_session_id_idx',

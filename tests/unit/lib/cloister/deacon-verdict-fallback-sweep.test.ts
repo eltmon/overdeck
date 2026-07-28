@@ -506,19 +506,22 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
 });
 
 /**
- * PAN-3092: warning delivery is bounded for the SWEEP, not just per request.
- * Bounding one call still lets N stranded fallbacks cost N × the per-request
- * deadline, which starves every later issue and later patrol phase while the
- * patrol heartbeat keeps reporting healthy.
+ * PAN-3092: warning delivery is bounded for the SWEEP, not just per request —
+ * and bounding it must not starve anyone. Spending a shared budget in issue
+ * order let the first hanging episode consume all of it every patrol, so later
+ * episodes never even attempted their required warning.
  */
 describe('sweepStrandedVerdictFallbacks warning budget (PAN-3092)', () => {
   const ISSUES = ['PAN-1001', 'PAN-1002', 'PAN-1003', 'PAN-1004', 'PAN-1005', 'PAN-1006', 'PAN-1007'];
-  let sweep: (now?: number) => Promise<string[]>;
+  let sweep: (now?: number, budgetMs?: number) => Promise<string[]>;
+  let budget: number;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    sweep = await loadSweep();
+    const mod = await loadSweep();
+    sweep = mod as typeof sweep;
+    budget = SWEEP_WARNING_BUDGET_MS;
     mocks.loadReviewStatuses.mockReturnValue(
       Object.fromEntries(ISSUES.map((id) => [id, { issueId: id }])),
     );
@@ -533,8 +536,6 @@ describe('sweepStrandedVerdictFallbacks warning budget (PAN-3092)', () => {
     mocks.findWorkspacePath.mockImplementation((_p: string, lower: string) => `/project/workspaces/feature-${lower}`);
     mocks.findRecoveryTrip.mockResolvedValue(undefined);
     mocks.recordRecoveryFailure.mockResolvedValue({ trip: { tripCount: 1 }, emitNeedsYou: true });
-    // Every warning hangs — the systemic stall this feature exists to report.
-    mocks.emitActivityEntryOnce.mockImplementation(() => new Promise(() => {}));
   });
 
   afterEach(() => {
@@ -542,42 +543,92 @@ describe('sweepStrandedVerdictFallbacks warning budget (PAN-3092)', () => {
   });
 
   it('returns within one shared budget even when every warning hangs', async () => {
+    mocks.emitActivityEntryOnce.mockImplementation(() => new Promise(() => {}));
     const started = Date.now();
-    const pending = sweep(NOW);
+    const pending = sweep(NOW, budget);
 
-    // Advance exactly the shared budget. Seven issues × a 10s per-request
-    // deadline would need 70s; the sweep must not be waiting on any of them.
-    await vi.advanceTimersByTimeAsync(SWEEP_WARNING_BUDGET_MS);
+    // Seven issues × a 10s per-request deadline would need 70s serially.
+    await vi.advanceTimersByTimeAsync(budget);
     const actions = await pending;
 
-    expect(Date.now() - started).toBeLessThanOrEqual(SWEEP_WARNING_BUDGET_MS);
-    // Every issue was still visited and its drain still retried, so later
-    // patrol phases are reachable and no issue was skipped.
+    expect(Date.now() - started).toBeLessThanOrEqual(budget);
     expect(mocks.drainWorkspaceVerdictFallback).toHaveBeenCalledTimes(ISSUES.length);
     for (const id of ISSUES) {
       expect(actions.some((a) => a.includes(`${id}: verdict-fallback warning could not be confirmed`))).toBe(true);
     }
   });
 
-  it('stops attempting warnings once the budget is spent rather than starting more', async () => {
-    const pending = sweep(NOW);
-    await vi.advanceTimersByTimeAsync(SWEEP_WARNING_BUDGET_MS);
+  it('attempts a warning for EVERY eligible episode, not just the first', async () => {
+    // The starvation regression: a shared budget spent in issue order meant the
+    // first hanging episode used all of it and the rest were never attempted.
+    mocks.emitActivityEntryOnce.mockImplementation(() => new Promise(() => {}));
+    const pending = sweep(NOW, budget);
+    await vi.advanceTimersByTimeAsync(budget);
     await pending;
 
-    // The first attempt consumes the whole budget, so later issues short-circuit
-    // instead of each opening another doomed request.
-    expect(mocks.emitActivityEntryOnce).toHaveBeenCalledTimes(1);
+    expect(mocks.emitActivityEntryOnce).toHaveBeenCalledTimes(ISSUES.length);
+    const warned = mocks.emitActivityEntryOnce.mock.calls.map(
+      (call) => (call[0] as { issueId: string }).issueId,
+    );
+    expect(new Set(warned)).toEqual(new Set(ISSUES));
+  });
+
+  it('never lets a permanently stuck first episode starve the others across patrols', async () => {
+    // The hard case the feature targets: the FIRST issue's warning hangs and its
+    // trip write keeps losing the contended lock, patrol after patrol. Every
+    // other issue must still get its one warning.
+    const STUCK = ISSUES[0]!;
+    mocks.recordRecoveryFailure.mockImplementation(async (_ws: string, issueId: string) => {
+      if (issueId === STUCK) throw new Error('record lock is held');
+      return { trip: { tripCount: 1 }, emitNeedsYou: true };
+    });
+    const appended = new Set<string>();
+    mocks.emitActivityEntryOnce.mockImplementation((opts: { id: string; issueId: string }) => {
+      if (opts.issueId === STUCK) return new Promise(() => {});
+      if (appended.has(opts.id)) return Promise.resolve('duplicate');
+      appended.add(opts.id);
+      return Promise.resolve('appended');
+    });
+
+    for (let patrol = 0; patrol < 3; patrol += 1) {
+      const pending = sweep(NOW, budget);
+      await vi.advanceTimersByTimeAsync(budget);
+      await pending;
+    }
+
+    // Every non-stuck issue got exactly one durable warning.
+    for (const id of ISSUES.slice(1)) {
+      const ids = [...appended].filter((key) => key.includes(id));
+      expect(ids).toHaveLength(1);
+    }
+    // And the stuck one kept being retried rather than being marked warned.
+    expect([...appended].some((key) => key.includes(STUCK))).toBe(false);
+    expect(
+      mocks.emitActivityEntryOnce.mock.calls.filter((c) => (c[0] as { issueId: string }).issueId === STUCK),
+    ).toHaveLength(3);
   });
 
   it('does not mark a budget-abandoned episode as warned', async () => {
-    const first = sweep(NOW);
-    await vi.advanceTimersByTimeAsync(SWEEP_WARNING_BUDGET_MS);
+    mocks.emitActivityEntryOnce.mockImplementation(() => new Promise(() => {}));
+    const first = sweep(NOW, budget);
+    await vi.advanceTimersByTimeAsync(budget);
     await first;
 
     // A later patrol with a responsive dashboard delivers the warning.
     mocks.emitActivityEntryOnce.mockResolvedValue('appended');
-    const second = await sweep(NOW + 60_000);
+    const second = await sweep(NOW + 60_000, budget);
 
     expect(second.some((a) => a.includes('verdict contended'))).toBe(true);
+  });
+
+  it('honours a budget derived from a shorter configured patrol interval', async () => {
+    mocks.emitActivityEntryOnce.mockImplementation(() => new Promise(() => {}));
+    const started = Date.now();
+    const pending = sweep(NOW, 5_000);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    await pending;
+
+    expect(Date.now() - started).toBeLessThanOrEqual(5_000);
   });
 });
