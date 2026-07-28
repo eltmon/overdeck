@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T18:09:50.122Z",
+  "updated": "2026-07-28T18:12:19.119Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "docs": {
-        "writerId": "agent-pan-3228",
-        "agentId": "agent-pan-3228",
-        "pid": 2641044,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T18:09:50.122Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3228",
@@ -183,6 +175,17 @@
         "outcome": "completed",
         "reason": "Defined pending-decision agents as parked-on-operator, required needs-you escalation while the fleet continues, and prohibited --fresh/--force bypasses.",
         "releasedAt": "2026-07-28T18:09:33.398Z"
+      },
+      {
+        "writerId": "agent-pan-3228",
+        "agentId": "agent-pan-3228",
+        "pid": 2641044,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T18:09:50.122Z",
+        "itemId": "docs",
+        "outcome": "completed",
+        "reason": "Documented pane-choice responders, blocking reasons and force semantics, recovery-net ordering, and pan answer's wrapper exclusion.",
+        "releasedAt": "2026-07-28T18:12:19.119Z"
       }
     ],
     "statusReasons": {
@@ -217,6 +220,10 @@
       "flywheel-doctrine": {
         "reason": "Defined pending-decision agents as parked-on-operator, required needs-you escalation while the fleet continues, and prohibited --fresh/--force bypasses.",
         "updatedAt": "2026-07-28T18:09:33.398Z"
+      },
+      "docs": {
+        "reason": "Documented pane-choice responders, blocking reasons and force semantics, recovery-net ordering, and pan answer's wrapper exclusion.",
+        "updatedAt": "2026-07-28T18:12:19.119Z"
       }
     }
   },
@@ -254,6 +261,9 @@
     "flywheel-doctrine": "completed",
     "flywheel-doctrine.flywheel-doctrine.ac1": "completed",
     "flywheel-doctrine.flywheel-doctrine.ac2": "completed",
-    "docs": "running"
+    "docs": "completed",
+    "docs.docs.ac1": "completed",
+    "docs.docs.ac2": "completed",
+    "docs.docs.ac3": "completed"
   }
 }
