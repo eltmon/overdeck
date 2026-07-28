@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T20:46:26.916Z",
+  "updated": "2026-07-28T20:46:30.626Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "pending",
@@ -25,7 +25,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T20:02:37.658Z",
+    "updatedAt": "2026-07-28T20:46:30.624Z",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -34,7 +34,43 @@
         "tests/unit/lib/gitlab-merge-requests.test.ts",
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ]
-    }
+    },
+    "reviewRequestedAt": "2026-07-28T20:46:30.624Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "docs/FLYWHEEL-STATE.md",
+        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+        "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
+        "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/PENDING-INPUT.md",
+        "src/dashboard/frontend/src/__tests__/store.test.ts",
+        "src/dashboard/frontend/src/lib/__tests__/pendingInput.test.ts",
+        "src/dashboard/frontend/src/lib/pendingInput.ts",
+        "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+        "src/lib/__tests__/agent-enrichment.test.ts",
+        "src/lib/__tests__/compute-agent-enrichment.test.ts",
+        "src/lib/agent-enrichment.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/FLYWHEEL-STATE.md",
+        "docs/PENDING-INPUT.md",
+        "src/dashboard/frontend/src/__tests__/store.test.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+        "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
+        "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx",
+        "src/dashboard/frontend/src/lib/__tests__/pendingInput.test.ts",
+        "src/dashboard/frontend/src/lib/pendingInput.ts",
+        "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+        "src/lib/__tests__/agent-enrichment.test.ts",
+        "src/lib/__tests__/compute-agent-enrichment.test.ts",
+        "src/lib/agent-enrichment.ts"
+      ],
+      "recordedAt": "2026-07-28T20:46:26.914Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3247"
   },
   "closeOut": {
     "usage": {
