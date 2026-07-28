@@ -4,7 +4,7 @@ import { basename, dirname, join } from 'node:path';
 import type { ReviewStatus } from '../review-status.js';
 import { updateIssueRecordForIssue, type PanIssuePipelineRecord } from '../pan-dir/records.js';
 import { readIssueRecord, readIssueRecordSync } from '../pan-dir/record.js';
-import { pipelineCoversFallbackVerdicts } from '../pan-dir/pipeline-verdict-merge.js';
+import { pipelineConflictsWithFallbackVerdicts, pipelineCoversFallbackVerdicts } from '../pan-dir/pipeline-verdict-merge.js';
 import { resolveProjectFromIssueSync, getProjectSync } from '../projects.js';
 
 // PAN-2689: fire-and-forget journal writes die with the process in a short-lived
@@ -134,6 +134,7 @@ export function enrichReviewNotesFromRecordSync(issueId: string, status: ReviewS
     ...status,
     reviewNotes: pipeline.reviewNotes ?? status.reviewNotes,
     testNotes: pipeline.testNotes ?? status.testNotes,
+    uatNotes: pipeline.uatNotes ?? status.uatNotes,
     mergeNotes: pipeline.mergeNotes ?? status.mergeNotes,
     inspectNotes: pipeline.inspectNotes ?? status.inspectNotes,
     verificationNotes: pipeline.verificationNotes ?? status.verificationNotes,
@@ -162,6 +163,10 @@ function durableSubset(p: PanIssuePipelineRecord): DurableStatusFields {
   return {
     reviewStatus: p.reviewStatus as ReviewStatus['reviewStatus'],
     testStatus: p.testStatus as ReviewStatus['testStatus'],
+    // PAN-3092: UAT gates merge eligibility, so a contended UAT verdict must
+    // survive in the fallback like every other gate's.
+    uatStatus: (p.uatStatus as ReviewStatus['uatStatus']) ?? undefined,
+    uatNotes: p.uatNotes,
     mergeStatus: (p.mergeStatus as ReviewStatus['mergeStatus']) ?? undefined,
     mergeStep: p.mergeStep,
     inspectStatus: (p.inspectStatus as ReviewStatus['inspectStatus']) ?? undefined,
@@ -448,14 +453,18 @@ export async function drainWorkspaceVerdictFallback(issueId: string): Promise<bo
   // delete the only surviving copy (MIN-902). Supersede only when the journal
   // has actually settled the gates the fallback holds, or has moved to a newer
   // review cycle.
-  if (
-    journal?.updatedAt
-    && !(journal.updatedAt < fallback.updatedAt)
-    && pipelineCoversFallbackVerdicts(journal, fallback)
-  ) {
+  const journalAtLeastAsNew = !!journal?.updatedAt && !(journal.updatedAt < fallback.updatedAt);
+  if (journalAtLeastAsNew && pipelineCoversFallbackVerdicts(journal!, fallback)) {
     for (const claim of claims) rmSync(claim.claimPath, { force: true });
     return true;
   }
+  // PAN-3092: the journal and the fallback hold different terminal verdicts for
+  // the same gate and nothing can order them — the whole-pipeline `updatedAt`
+  // is restamped by bookkeeping, so it is not evidence either way. Folding would
+  // be declined by the verdict-aware merge and deleting would destroy the only
+  // written copy of one verdict, so preserve the fallback and let the sweep put
+  // the conflict in front of an operator.
+  const conflicted = journalAtLeastAsNew && pipelineConflictsWithFallbackVerdicts(journal!, fallback);
   // projectPipeline projects only from the ReviewStatus, so fields the fallback
   // cleared (clearedFields) stay absent and do not resurrect from the record.
   const status = {
@@ -464,12 +473,13 @@ export async function drainWorkspaceVerdictFallback(issueId: string): Promise<bo
     updatedAt: fallback.updatedAt,
     readyForMerge: false, // derived on read; the stored value is never consulted
   } as ReviewStatus;
-  const landed = await updateIssueRecordForIssue(issueId, status);
+  const landed = conflicted ? false : await updateIssueRecordForIssue(issueId, status);
   if (landed) {
     for (const claim of claims) rmSync(claim.claimPath, { force: true });
     return true;
   }
-  // The fold failed: superseded generations are dropped, and the winner is
+  // The fold failed or was withheld as conflicting: superseded generations are
+  // dropped, and the winner is
   // published back to the live path with ATOMIC no-replace semantics —
   // linkSync fails with EEXIST when a concurrent writer already created a
   // live file, so a newer verdict that arrived during the await can never be

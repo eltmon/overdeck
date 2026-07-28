@@ -95,6 +95,9 @@ function projectPipeline(
     issueId,
     reviewStatus: status?.reviewStatus ?? 'pending',
     testStatus: status?.testStatus ?? 'pending',
+    // PAN-3092: no 'pending' default — an absent uatStatus means "UAT not
+    // required", which the merge-eligibility predicates treat as satisfied.
+    uatStatus: status?.uatStatus,
     verificationStatus: status?.verificationStatus,
     inspectStatus: status?.inspectStatus,
     mergeStatus: status?.mergeStatus,
@@ -116,6 +119,7 @@ function projectPipeline(
     ...base,
     reviewNotes: status.reviewNotes,
     testNotes: status.testNotes,
+    uatNotes: status.uatNotes,
     verificationNotes: status.verificationNotes,
     inspectNotes: status.inspectNotes,
     mergeNotes: status.mergeNotes,

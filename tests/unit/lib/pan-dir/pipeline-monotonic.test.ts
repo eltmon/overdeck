@@ -113,6 +113,24 @@ describe('pickNewerPipeline verdict-awareness (PAN-3092)', () => {
     expect(merged.reviewNotes).toBe('BLOCKED: 2 findings');
   });
 
+  it('preserves a terminal UAT verdict, which gates merge eligibility', () => {
+    const rebuilt = pipeline({
+      uatStatus: 'passed',
+      uatNotes: 'golden path + 2 edge cases',
+      reviewSpawnedAt: CYCLE,
+      updatedAt: '2026-07-27T00:09:07.000Z',
+    });
+    const fresh = pipeline({
+      uatStatus: 'testing',
+      reviewSpawnedAt: CYCLE,
+      updatedAt: '2026-07-27T00:12:00.000Z',
+    });
+
+    const merged = pickNewerPipeline(rebuilt, fresh);
+    expect(merged.uatStatus).toBe('passed');
+    expect(merged.uatNotes).toBe('golden path + 2 edge cases');
+  });
+
   it('preserves a terminal test verdict against an in-flight testing status', () => {
     // MIN-858's shape: the test verdict landed, then a dispatch write reset the
     // gate to `testing` with a newer timestamp.
@@ -166,10 +184,11 @@ describe('pipelineCoversFallbackVerdicts (PAN-3092)', () => {
     ).toBe(true);
   });
 
-  it('reports covered when the newer journal settled the gate on a different verdict', () => {
-    // The caller has already established the journal is at least as new, so a
-    // journal that reached its own terminal verdict is the newer truth —
-    // folding the fallback over it would regress it.
+  it('reports the verdict uncovered when the journal holds a DIFFERENT terminal value', () => {
+    // A later whole-pipeline timestamp is no evidence the journal's value is the
+    // newer verdict: bookkeeping restamps `updatedAt` without touching a gate, so
+    // an older `blocked` carried forward can outrank a `passed` still sitting in
+    // the fallback. Fold and let the merge decide from per-gate evidence.
     const journal = pipeline({
       reviewStatus: 'blocked',
       reviewSpawnedAt: CYCLE,
@@ -177,7 +196,25 @@ describe('pipelineCoversFallbackVerdicts (PAN-3092)', () => {
     });
     expect(
       pipelineCoversFallbackVerdicts(journal, fallback({ reviewStatus: 'passed' })),
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  it('a stale terminal verdict restamped by bookkeeping never consumes the fallback', () => {
+    // The concurrent-writer regression: the reviewer's `passed` is in the
+    // fallback at T1 while a bookkeeping write restamps a carried-forward
+    // `blocked` from the same cycle at T2 > T1. The fallback must survive.
+    const journal = pipeline({
+      reviewStatus: 'blocked',
+      reviewNotes: 'BLOCKED (carried forward from an earlier write)',
+      reviewSpawnedAt: CYCLE,
+      updatedAt: '2026-07-27T02:00:00.000Z',
+    });
+    const held = fallback({ reviewStatus: 'passed', reviewNotes: 'APPROVED' });
+
+    expect(pipelineCoversFallbackVerdicts(journal, held)).toBe(false);
+    // Two terminal values for one gate cannot be ordered from a whole-pipeline
+    // timestamp, so the drain keeps the fallback rather than picking a winner —
+    // see the "conflicting terminal verdict" case in the drain suite.
   });
 
   it('reports covered when the journal belongs to a strictly newer review cycle', () => {

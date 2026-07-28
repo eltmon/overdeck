@@ -263,6 +263,12 @@ describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () 
     expect(escalation).toContain('pan admin specialists done test PAN-3092');
     expect(escalation).toContain('pan kill PAN-3092');
 
+    // PAN-3092: an escalated generation never re-enters the nudge cycle, even
+    // after the 30-minute dedup window would otherwise have reopened it.
+    mockRecordRecoveryFailure.mockResolvedValue({ trip: { tripCount: 2 }, emitNeedsYou: false });
+    const thirdPass = await checkCompletedButUnsignaledTests();
+    expect(thirdPass.some((a) => a.includes('needs-you'))).toBe(false);
+
     // No second nudge, and D6 still holds — no fabricated verdict, ever.
     expect(mockMessageAgent).toHaveBeenCalledTimes(1);
     const testStatusMutations = mockSetReviewStatus.mock.calls.filter(

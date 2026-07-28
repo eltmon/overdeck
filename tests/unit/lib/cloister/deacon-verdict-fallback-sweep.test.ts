@@ -110,10 +110,10 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     const second = await sweepStrandedVerdictFallbacks(NOW + 60_000);
     const third = await sweepStrandedVerdictFallbacks(NOW + 120_000);
 
-    expect(first).toHaveLength(1);
-    expect(first[0]).toContain(`needs-you ${ISSUE}`);
-    expect(first[0]).toContain('11min');
-    expect(first[0]).toContain('pid=4242');
+    const needsYou = first.find((a) => a.includes(`needs-you ${ISSUE}`));
+    expect(needsYou).toBeDefined();
+    expect(needsYou).toContain('11min');
+    expect(needsYou).toContain('pid=4242');
     expect(second).toEqual([]);
     expect(third).toEqual([]);
 
@@ -131,6 +131,31 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     expect(recoveryPath).toBe('verdict-fallback-contention');
     expect(generation).toBe(fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 60_000).updatedAt);
     expect(threshold).toBe(1);
+  });
+
+  it('still warns when the needs-you write itself loses to the contended lock (PAN-3092)', async () => {
+    // The condition being reported IS record-lock contention, so the durable
+    // trip write can fail for exactly the reason the drain failed. The immediate
+    // operator signal must not be collateral damage.
+    const OTHER = 'PAN-8888';
+    mocks.loadReviewStatuses.mockReturnValue({ [OTHER]: { issueId: OTHER } });
+    mocks.readWorkspaceVerdictFallback.mockResolvedValue(
+      fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 120_000),
+    );
+    mocks.drainWorkspaceVerdictFallback.mockResolvedValue(false);
+    mocks.recordRecoveryFailure.mockRejectedValue(new Error('record lock is held'));
+
+    const first = await sweepStrandedVerdictFallbacks(NOW);
+    const second = await sweepStrandedVerdictFallbacks(NOW + 60_000);
+
+    expect(mocks.emitActivityEntrySync).toHaveBeenCalledTimes(1);
+    expect(String((mocks.emitActivityEntrySync.mock.calls[0]![0] as Record<string, unknown>).message))
+      .toContain('record lock is contended');
+    // The failed durable trip is reported, not swallowed, and retried next patrol.
+    expect(first.some((a) => a.includes('could not be recorded'))).toBe(true);
+    expect(mocks.recordRecoveryFailure).toHaveBeenCalledTimes(2);
+    // ...but the warning itself does not repeat for the same episode.
+    expect(second.some((a) => a.includes('verdict contended'))).toBe(false);
   });
 
   it('stays quiet about a fallback younger than the contention threshold', async () => {

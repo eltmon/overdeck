@@ -112,6 +112,62 @@ describe('workspace verdict fallback drain (PAN-2989)', () => {
     expect(existsSync(fallbackPathOrThrow())).toBe(false);
   });
 
+  it('folds a UAT verdict through the fallback like every other gate (PAN-3092)', async () => {
+    // UAT gates merge eligibility (reviewGatesPassedSync), so a contended UAT
+    // pass/fail that the fallback silently dropped would leave the gate stale.
+    state.pipeline = { reviewStatus: 'passed', testStatus: 'passed', updatedAt: '2026-07-22T09:00:00.000Z' };
+    writeFallback('2026-07-22T10:00:00.000Z', { uatStatus: 'passed', uatNotes: 'golden path + 2 edge cases' });
+    mockUpdateIssueRecordForIssue.mockResolvedValue(true);
+
+    await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(true);
+
+    const [, status] = mockUpdateIssueRecordForIssue.mock.calls[0] as [string, ReviewStatus];
+    expect(status.uatStatus).toBe('passed');
+    expect(status.uatNotes).toBe('golden path + 2 edge cases');
+    expect(existsSync(fallbackPathOrThrow())).toBe(false);
+  });
+
+  it('does not delete a fallback whose UAT verdict the journal never landed (PAN-3092)', async () => {
+    state.pipeline = {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      uatStatus: 'testing',
+      updatedAt: '2026-07-22T10:00:00.000Z',
+    };
+    writeFallback('2026-07-22T09:00:00.000Z', { uatStatus: 'failed', uatNotes: 'AC-3 unmet' });
+    mockUpdateIssueRecordForIssue.mockResolvedValue(true);
+
+    await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(true);
+
+    // Newer journal, but verdict-free at the UAT gate → fold, not delete.
+    expect(mockUpdateIssueRecordForIssue).toHaveBeenCalledTimes(1);
+    const [, status] = mockUpdateIssueRecordForIssue.mock.calls[0] as [string, ReviewStatus];
+    expect(status.uatStatus).toBe('failed');
+  });
+
+  it('preserves the fallback when the journal holds a CONFLICTING terminal verdict (PAN-3092)', async () => {
+    // The reviewer's `passed` is in the fallback; a bookkeeping write restamped a
+    // carried-forward `blocked` from the same cycle with a later timestamp.
+    // Nothing can order two terminal values for one gate, so the drain must not
+    // pick a winner — deleting here destroys the only written copy of `passed`.
+    state.pipeline = {
+      reviewStatus: 'blocked',
+      testStatus: 'pending',
+      reviewSpawnedAt: '2026-07-22T08:00:00.000Z',
+      updatedAt: '2026-07-22T10:00:00.000Z',
+    };
+    writeFallback('2026-07-22T09:00:00.000Z', { reviewStatus: 'passed', reviewNotes: 'APPROVED' });
+
+    await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(false);
+
+    // No fold attempted — the verdict-aware merge would decline it anyway, and a
+    // pointless write only adds pressure to the lock this is contending for.
+    expect(mockUpdateIssueRecordForIssue).not.toHaveBeenCalled();
+    // The verdict is still on disk for the sweep to surface and an operator to resolve.
+    const surviving = readFileSync(fallbackPathOrThrow(), 'utf-8');
+    expect(JSON.parse(surviving).pipeline.reviewStatus).toBe('passed');
+  });
+
   it('deletes the fallback without a record write when the journal moved to a newer review cycle', async () => {
     state.pipeline = {
       reviewStatus: 'reviewing',

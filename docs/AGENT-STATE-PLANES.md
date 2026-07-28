@@ -50,9 +50,17 @@ write-recency from verdict-truth:
   terminal verdict supersedes one.
 - **The drain's supersede check is content-aware.** A fallback is deleted as
   superseded only when `pipelineCoversFallbackVerdicts()` confirms the journal
-  has settled every gate the fallback holds a terminal verdict for, or belongs
-  to a newer cycle. A newer-but-verdict-free journal no longer consumes an
-  unlanded verdict.
+  carries the same terminal value for every gate the fallback holds one for, or
+  belongs to a newer cycle. A newer-but-verdict-free journal no longer consumes
+  an unlanded verdict. When the two hold *different* terminal values for one
+  gate, `pipelineConflictsWithFallbackVerdicts()` sees it: nothing can order two
+  written verdicts from a whole-pipeline timestamp that bookkeeping restamps, so
+  the drain withholds the fold, keeps the fallback, and lets the sweep put the
+  conflict in front of an operator.
+- **Every merge-gating verdict is projected durably.** `uatStatus`/`uatNotes`
+  join the pipeline block, `projectPipeline()`, and `durableSubset()` — UAT
+  gates merge eligibility, so a contended UAT verdict that the fallback silently
+  dropped would leave that gate stale.
 - **Terminal verdict writes back off in-process.** A write introducing a NEW
   terminal verdict retries `updateIssueRecordForIssue` on
   `OVERDECK_VERDICT_BACKOFF_DELAYS_MS` (default 2s/5s/10s/20s/40s/80s) before
@@ -63,7 +71,11 @@ write-recency from verdict-truth:
   (`src/lib/cloister/deacon-verdict-fallback-sweep.ts`) drains every pending
   fallback each patrol cycle — the retry a short-lived CLI's unref'd timers can
   never provide — and opens exactly one needs-you per contention episode once a
-  fallback stays undrained past 10 minutes, naming the current lock owner.
+  fallback stays undrained past 10 minutes, naming the current lock owner. The
+  activity warning is emitted before, and independently of, the recovery-trip
+  write: that write goes through the very lock whose contention is being
+  reported, so it is best-effort and retried on later patrols while the
+  operator-visible warning always lands.
 - **A frozen test agent escalates.** A live, idle test session that was already
   nudged and wrote no `.pan/test/result.json` now yields `escalate` from
   `decideUnsignaledTestAction()` instead of being ignored forever; the deacon

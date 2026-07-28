@@ -24,7 +24,7 @@ import type { PanIssuePipelineRecord } from './record.js';
 export const TERMINAL_GATE_VALUES = {
   reviewStatus: ['passed', 'blocked', 'failed', 'skipped'],
   testStatus: ['passed', 'failed'],
-  uatStatus: ['passed', 'blocked', 'failed'],
+  uatStatus: ['passed', 'failed'],
   verificationStatus: ['passed', 'failed', 'skipped'],
   inspectStatus: ['passed', 'blocked', 'failed'],
   mergeStatus: ['merged', 'failed'],
@@ -134,11 +134,13 @@ export function carriesNewTerminalVerdict(
  * newer-but-verdict-free journal write must not consume a verdict that never
  * landed anywhere (PAN-3092; MIN-902 lost its review verdict exactly this way).
  *
- * Callers must already have established that the journal is at least as new as
- * the fallback, so a gate the journal has driven to ANY terminal value counts
- * as covered — it is the newer verdict, and folding the fallback over it would
- * regress it. Only a non-terminal journal value (reviewing, testing, pending)
- * means the verdict never landed.
+ * Coverage is per-gate VALUE equality, not merely "the journal reached some
+ * terminal value". `pipeline.updatedAt` is restamped by unrelated bookkeeping —
+ * the root defect this issue exists for — so a later whole-pipeline timestamp is
+ * no evidence that a journal's differing terminal value is the newer one; it may
+ * be an older verdict carried forward while the newer specialist result waits in
+ * the fallback. When the values differ the fallback is folded instead, and
+ * `mergePipelineVerdictAware` decides the winner from per-gate evidence.
  */
 export function pipelineCoversFallbackVerdicts(
   journal: PanIssuePipelineRecord,
@@ -153,8 +155,41 @@ export function pipelineCoversFallbackVerdicts(
   const journalFields = fields(journal);
   const fallbackFields = fields(fallback.pipeline);
   for (const gate of GATE_NAMES) {
-    if (!isTerminal(gate, fallbackFields[gate])) continue;
-    if (!isTerminal(gate, journalFields[gate])) return false;
+    const held = fallbackFields[gate];
+    if (!isTerminal(gate, held)) continue;
+    if (journalFields[gate] !== held) return false;
   }
   return true;
+}
+
+/**
+ * Do the journal and the fallback hold DIFFERENT terminal verdicts for the same
+ * gate, within the same review cycle?
+ *
+ * This is the one case the drain cannot resolve: two written terminal verdicts
+ * for one gate, and no per-gate timestamp to order them by. The whole-pipeline
+ * `updatedAt` is restamped by unrelated bookkeeping, so "the journal's is newer"
+ * is exactly the inference PAN-3092 exists to stop making. Callers preserve the
+ * fallback and let the stranded-fallback sweep put the conflict in front of an
+ * operator rather than picking a winner.
+ */
+export function pipelineConflictsWithFallbackVerdicts(
+  journal: PanIssuePipelineRecord,
+  fallback: { updatedAt: string; pipeline: PipelineFields },
+): boolean {
+  const journalCycle = cycleMs(journal.reviewSpawnedAt);
+  const fallbackWrittenMs = cycleMs(fallback.updatedAt);
+  // A newer review cycle legitimately resets the previous cycle's verdicts.
+  if (journalCycle !== undefined && fallbackWrittenMs !== undefined && journalCycle > fallbackWrittenMs) {
+    return false;
+  }
+
+  const journalFields = fields(journal);
+  const fallbackFields = fields(fallback.pipeline);
+  return GATE_NAMES.some((gate) => {
+    const held = fallbackFields[gate];
+    if (!isTerminal(gate, held)) return false;
+    const settled = journalFields[gate];
+    return isTerminal(gate, settled) && settled !== held;
+  });
 }

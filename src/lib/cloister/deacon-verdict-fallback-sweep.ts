@@ -28,6 +28,16 @@ import { emitActivityEntrySync } from '../activity-logger.js';
 /** How long a fallback may stay undrained before the operator hears about it. */
 export const VERDICT_CONTENTION_SURFACE_MS = 10 * 60 * 1000;
 
+/**
+ * Contention episodes already warned about, keyed by issue + the fallback's own
+ * `updatedAt`. This dedupe is deliberately in-process and lock-free: the thing
+ * being reported IS contention on the per-issue record lock, so the immediate
+ * operator signal must not depend on taking that lock. The durable
+ * recovery-trip record is the cross-restart dedupe; this map only stops one
+ * long-running server from warning on every patrol cycle.
+ */
+const warnedContentionEpisodes = new Set<string>();
+
 async function lockOwnerDescription(issueId: string): Promise<string> {
   try {
     const resolved = resolveProjectFromIssueSync(issueId);
@@ -80,23 +90,41 @@ export async function sweepStrandedVerdictFallbacks(now = Date.now()): Promise<s
 
       const ageMinutes = Math.round(ageMs / 60_000);
       const owner = await lockOwnerDescription(issueId);
-      // One trip per contention episode: the fallback's own updatedAt is the
-      // generation, so re-sweeping the same stuck verdict stays quiet.
-      const { emitNeedsYou } = await recordRecoveryFailure(
-        workspacePath, issueId, 'verdict-fallback-contention', fallback.updatedAt, 1,
-      );
-      if (!emitNeedsYou) continue;
+      const episode = `${issueId}:${fallback.updatedAt}`;
 
-      emitActivityEntrySync({
-        source: 'cloister',
-        level: 'warn',
-        issueId,
-        message:
-          `${issueId} — verdict fallback undrained for ${ageMinutes}min; the per-issue record lock is `
-          + `contended (current owner: ${owner}). The verdict is durable in the workspace fallback and `
-          + `folds automatically once the lock frees.`,
-      });
-      actions.push(`needs-you ${issueId}: verdict contended ${ageMinutes}min (lock owner: ${owner})`);
+      // The activity warning goes out FIRST and never touches the record lock.
+      // Ordering it after the recovery-trip write would put the only immediate
+      // operator signal behind the very lock whose contention it is reporting —
+      // so a genuine >10min episode could produce no signal at all.
+      if (!warnedContentionEpisodes.has(episode)) {
+        warnedContentionEpisodes.add(episode);
+        emitActivityEntrySync({
+          source: 'cloister',
+          level: 'warn',
+          issueId,
+          message:
+            `${issueId} — verdict fallback undrained for ${ageMinutes}min; the per-issue record lock is `
+            + `contended (current owner: ${owner}). The verdict is durable in the workspace fallback and `
+            + `folds automatically once the lock frees.`,
+        });
+        actions.push(`${issueId}: verdict contended ${ageMinutes}min (lock owner: ${owner})`);
+      }
+
+      // The durable trip is best-effort and retried on later patrols: it writes
+      // through the contended lock, so a failure here is expected during the
+      // episode and must never suppress the warning above.
+      try {
+        const { emitNeedsYou } = await recordRecoveryFailure(
+          workspacePath, issueId, 'verdict-fallback-contention', fallback.updatedAt, 1,
+        );
+        if (emitNeedsYou) {
+          actions.push(`needs-you ${issueId}: verdict contended ${ageMinutes}min (lock owner: ${owner})`);
+        }
+      } catch {
+        actions.push(
+          `${issueId}: verdict-contention needs-you trip could not be recorded (record lock contended) — retrying next patrol`,
+        );
+      }
     } catch {
       // A single unreadable workspace must never stop the sweep.
     }

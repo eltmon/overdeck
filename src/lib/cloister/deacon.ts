@@ -1386,6 +1386,8 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
  *   - Only honors an artifact newer than the current test dispatch (H3)
  */
 const unsignaledTestNudges = new Map<string, number>();
+/** PAN-3092: test dispatch generations already escalated — never nudged again. */
+const unsignaledTestEscalations = new Set<string>();
 
 export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
   const actions: string[] = [];
@@ -1414,15 +1416,20 @@ export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
       const sessionLive = sessionAlive && !paneDead;
       const idle = sessionLive ? isAgentIdleForNudge(testSession, TEST_SETTLE_MS, now) : false;
 
-      const lastNudged = unsignaledTestNudges.get(testSession);
-      const alreadyNudged = !!(lastNudged && now - lastNudged < NUDGE_DEDUP_MS);
-
       // Only honor an artifact newer than the current test dispatch so a previous
       // cycle's verdict is never read after a re-dispatch (H3). The latest
       // test→'testing' history entry is the dispatch time.
       const lastDispatchAt = status.history
         ?.filter(h => h.type === 'test' && h.status === 'testing')
         .pop()?.timestamp;
+
+      const lastNudged = unsignaledTestNudges.get(testSession);
+      // PAN-3092: once a dispatch generation has been escalated to the operator,
+      // it stays escalated. Without this the 30-minute nudge window reopens and
+      // the patrol keeps waking an agent the operator has already been told about.
+      const escalationKey = `${testSession}:${lastDispatchAt ?? 'unknown'}`;
+      const alreadyNudged = unsignaledTestEscalations.has(escalationKey)
+        || !!(lastNudged && now - lastNudged < NUDGE_DEDUP_MS);
       const minMtimeMs = lastDispatchAt ? new Date(lastDispatchAt).getTime() : undefined;
       const artifact = readTestVerdictArtifact(wsPath, minMtimeMs);
 
@@ -1478,6 +1485,7 @@ export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
           // verdict exists only in the pane, if at all, and nothing automatic can
           // reach it. Tell a human once per dispatch generation rather than going
           // quiet for six hours while every surface reports the agent healthy.
+          unsignaledTestEscalations.add(escalationKey);
           const msg = await recordUnsignaledTestEscalation(
             wsPath, issueId, testSession, lastDispatchAt ?? 'unknown',
           );

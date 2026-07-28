@@ -150,6 +150,8 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   issueId: string;
   reviewStatus: string;
   testStatus: string;
+  /** PAN-3092: UAT gates merge eligibility, so its verdict must be durable too. */
+  uatStatus?: string;
   verificationStatus?: string;
   inspectStatus?: string;
   mergeStatus?: string;
@@ -158,6 +160,7 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   readyForMerge: boolean;
   reviewNotes?: string;
   testNotes?: string;
+  uatNotes?: string;
   verificationNotes?: string;
   inspectNotes?: string;
   mergeNotes?: string;
