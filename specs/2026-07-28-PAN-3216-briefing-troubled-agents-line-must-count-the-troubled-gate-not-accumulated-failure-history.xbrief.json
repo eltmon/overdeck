@@ -1,0 +1,131 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T04:47:10Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3216: Briefing reports \"Troubled agents: 60\" when the troubled gate holds 1 — it counts routine tmux reconciliation as distress",
+    "updated": "2026-07-28T04:49:50.665Z"
+  },
+  "plan": {
+    "id": "pan-3216",
+    "title": "Briefing \"Troubled agents\" line must count the troubled gate, not accumulated failure history",
+    "status": "proposed",
+    "uid": "6c898837-1052-4934-9da3-aae34d079029",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-28T04:47:10Z",
+    "updated": "2026-07-28T04:49:50.665Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3216",
+        "label": "PAN-3216",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "briefing",
+      "dashboard",
+      "bugfix",
+      "observability"
+    ],
+    "narratives": {
+      "Problem": "The briefing fleet-health line labelled 'Troubled agents' filters on `agent.troubled || (agent.consecutiveFailures ?? 0) > 0` (src/lib/briefing-assembler.ts:151), so it counts every agent that ever recorded a consecutive failure — including 57 routine `orphaned: tmux session missing (reconcile)` records on stopped agents — as distress. The gate held 1 agent while the line reported 60. 'Troubled' is a precise gate (quarantines auto-resume, cleared by `pan untroubled`); the inflated number invites investigation of a non-problem and teaches readers to discount the whole briefing panel.",
+      "Proposal": "Count what the label says (the issue's recommended option 1): narrow the filter at src/lib/briefing-assembler.ts:151 to `agent.troubled === true`. Add a regression test at tests/unit/lib/briefing-assembler.test.ts that builds a minimal DashboardSnapshot (1 troubled + 3 failure-only agents) and asserts the rendered line is `- Troubled agents: 1`, plus a zero case. The snapshot path of assembleLiveBriefingMarkdown is pure (no fs access), so no mocking is needed. No second 'recorded failures' line is added — per-agent failure displays already surface consecutiveFailures where actionable. Other broad-set consumers (feedback-target.ts:182, spawn.ts:170, lifecycle-stop.ts:347, untroubled.ts:26) intentionally keep the broad set because they clear/quarantine failure state. Do NOT filter by agent status: the troubled gate applies to stopped agents (the 1 gated agent at filing time was stopped).",
+      "NonGoals": "- Renaming the 'Troubled agents' label or adding a second 'agents with recorded failures' line\n- Changing any other surface that consumes consecutiveFailures (frontend warning highlights, health endpoints, gate/untroubled logic)\n- Cleaning up stale consecutiveFailures rows in the agents table\n- Changing the other four fleet-health lines (Running agents, Active issues, Paused gates, Failed verification/review)\n- Bootstrapping .pan/context/codebase/ (absent at planning time; out of proportion for a one-line fix)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose issue option 1 (filter on agent.troubled alone) over option 2 (broader filter + renamed/extra line)",
+        "rationale": "The issue names option 1 as recommended; 'troubled' already has a precise gate meaning elsewhere (resume quarantine, pan untroubled), and 57/60 of the broader population is routine reconciliation noise with no operator action attached."
+      },
+      {
+        "summary": "No documentation work item; recorded plan.metadata.docsJustification instead",
+        "rationale": "The briefing fleet-health line composition is not described in any user-facing or developer doc — the only docs/ mentions are append-only Flywheel run journals. The fix aligns behavior with what readers already believed the label meant."
+      },
+      {
+        "summary": "Skipped bootstrapping .pan/context/codebase/ despite the planning template's bootstrap instruction",
+        "rationale": "Writing four trustworthy repo-wide architecture docs from the narrow exploration a one-line filter fix warrants would produce low-quality docs; the cost/benefit is wrong for this scope."
+      }
+    ],
+    "metadata": {
+      "docsJustification": "The briefing fleet-health line composition is not described in any user-facing (Mintlify) or developer doc; the only docs/ mentions are append-only Flywheel run journals (docs/FLYWHEEL-STATE.md). The fix is a label/filter alignment that makes the line say what readers already believed it said.",
+      "canonicalFilename": "2026-07-28-PAN-3216-briefing-troubled-agents-line-must-count-the-troubled-gate-not-accumulated-failure-history.xbrief.json"
+    },
+    "items": [
+      {
+        "id": "narrow-troubled-filter",
+        "title": "Filter the briefing 'Troubled agents' line on the troubled gate alone and pin it with a regression test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T04:47:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3216",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/briefing-assembler.ts",
+            "tests/unit/lib/briefing-assembler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/briefing-assembler.test.ts",
+            "npx vitest run tests/cli/commands/briefing.test.ts tests/lib/briefing-freshness.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/briefing-assembler.test.ts exits 0, with a case asserting a snapshot of 1 troubled + 3 failure-only agents renders '- Troubled agents: 1'",
+            "existing briefing suites exit 0 unchanged",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD: .pan/drafts/PAN-3216.md (promoted to drafts/pan-3216.md on overdeck-state at finalize). Step 1 — write tests/unit/lib/briefing-assembler.test.ts FIRST. Import { assembleLiveBriefingMarkdown } from '../../../src/lib/briefing-assembler.js' and type { DashboardSnapshot } from '@overdeck/contracts'. Build a minimal snapshot: { sequence: 1, agents: [...], specialists: [], reviewStatuses: [], issues: [], timestamp: new Date().toISOString() } as DashboardSnapshot; each agent needs at minimum { id, issueId, status } (AgentStatus literals: 'starting'|'running'|'stopped'|'error'|'unknown'). Case 1: 1 agent { troubled: true, status: 'stopped' } + 3 agents { consecutiveFailures: 1..3, status: 'stopped', troubled unset } → expect output toContain('- Troubled agents: 1'). Case 2: no troubled agents, several with consecutiveFailures > 0 → expect '- Troubled agents: 0'. The snapshot path does no filesystem access — no mocking needed. Run it and watch case 1 fail (renders 4). Step 2 — change src/lib/briefing-assembler.ts:151 from `snapshot.agents.filter((agent) => agent.troubled || (agent.consecutiveFailures ?? 0) > 0)` to `snapshot.agents.filter((agent) => agent.troubled === true)`. Nothing else changes: keep the variable name, the render line at :165, and the other four fleet-health lines. Do NOT add a status filter (the troubled gate applies to stopped agents). Do NOT touch other broad-set consumers (feedback-target.ts:182, spawn.ts:170, lifecycle-stop.ts:347, untroubled.ts:26). Step 3 — re-run the test; green. Then run the existing briefing suites and typecheck."
+        },
+        "items": [
+          {
+            "id": "narrow-troubled-filter.ac1",
+            "title": "Given a snapshot with 1 troubled agent and 3 agents with consecutiveFailures>0 but no troubled flag, when assembleLiveBriefingMarkdown({ snapshot }) runs, then the output contains exactly '- Troubled agents: 1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "narrow-troubled-filter.ac2",
+            "title": "Given a snapshot with zero troubled agents and several failure-only agents, when the briefing is assembled, then the output contains '- Troubled agents: 0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "narrow-troubled-filter.ac3",
+            "title": "grep of src/lib/briefing-assembler.ts shows the troubledAgents filter expression no longer references consecutiveFailures, and the other four fleet-health lines (Running agents, Active issues with agents, Paused gates, Failed verification/review states) are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "narrow-troubled-filter.ac4",
+            "title": "npx vitest run tests/cli/commands/briefing.test.ts tests/lib/briefing-freshness.test.ts exits 0 unchanged and npm run typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}
