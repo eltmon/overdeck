@@ -377,9 +377,8 @@ export async function fetchActivityDataWithContext(
         awaitingInput: awaitingInput !== null,
         awaitingInputPrompt: awaitingInput?.prompt,
         awaitingInputReason: awaitingInput?.reason,
-        pendingInputKinds: agentSnapshot?.pendingInputKinds,
+        pendingInputKinds: agentSnapshot?.pendingInputKinds ? [...agentSnapshot.pendingInputKinds] : undefined,
         hasJsonl: !!jsonlPath,
-        harness: state.harness,
         tmuxSession: exposeInteractiveTerminal ? checkId : undefined,
         planningComplete: sectionType === 'planning' ? planningFinished : undefined,
       });
@@ -560,7 +559,6 @@ export async function fetchActivityDataWithContext(
           type: 'review',
           sessionId: orchestratorSessionName,
           model: orchestratorState?.model || 'specialist',
-          harness: orchestratorState?.harness,
           startedAt: ss.startedAt,
           endedAt: ss.endedAt,
           duration: ss.startedAt && ss.endedAt
@@ -633,7 +631,6 @@ export async function fetchActivityDataWithContext(
         type: nodeType,
         sessionId: specialistSessionId,
         model: specialistState?.model || 'specialist',
-        harness: specialistState?.harness,
         startedAt: ss.startedAt,
         duration,
         status: (specialistIsLive && !specialistIsZombie) ? 'running' : ss.status,
