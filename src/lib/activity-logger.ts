@@ -71,6 +71,17 @@ export interface EmitTtsOptions {
 interface ActivityEventStore {
   append(event: Omit<DomainEvent, 'sequence'>): number;
   appendAsync(event: Omit<DomainEvent, 'sequence'>): Promise<number>;
+  /**
+   * PAN-3092: at-most-once append, settled. Both production providers implement
+   * it — the in-process SQLite store transactionally, the deacon-child client by
+   * awaiting that same transaction over HTTP. Optional only so narrow test
+   * doubles and early-boot stubs still satisfy the interface; when it is absent
+   * `emitActivityEntryOnce` reports `unconfirmed` rather than claiming success.
+   */
+  appendOnce?(
+    event: Omit<DomainEvent, 'sequence'>,
+    idempotencyKey: string,
+  ): { outcome: 'appended' | 'duplicate' } | Promise<'appended' | 'duplicate' | 'failed'>;
 }
 
 let activityEventStoreProvider: (() => ActivityEventStore) | null = null;
@@ -114,7 +125,11 @@ function appendActivityEvent(event: Omit<DomainEvent, 'sequence'>): void {
  * logical activity.
  */
 export async function emitActivityEntryDurable(options: EmitActivityOptions): Promise<void> {
-  await persistActivityEvent({
+  await persistActivityEvent(buildActivityEntryEvent(options));
+}
+
+function buildActivityEntryEvent(options: EmitActivityOptions): Omit<DomainEvent, 'sequence'> {
+  return {
     type: 'activity.entry' as const,
     timestamp: new Date().toISOString(),
     payload: {
@@ -130,7 +145,57 @@ export async function emitActivityEntryDurable(options: EmitActivityOptions): Pr
       link: options.link,
       desktop: options.desktop,
     },
-  });
+  } as Omit<DomainEvent, 'sequence'>;
+}
+
+/**
+ * Outcome of an idempotent activity emit.
+ *
+ * `unconfirmed` is deliberately distinct from `appended`: it means the wired
+ * store offers no settled at-most-once path, so the event was handed off
+ * best-effort and may repeat or may never land. Callers that need a delivery
+ * guarantee must not treat it as success.
+ */
+export type ActivityEmitOutcome = 'appended' | 'duplicate' | 'unconfirmed' | 'failed';
+
+/**
+ * PAN-3092: emit an activity entry AT MOST ONCE for a given id, and tell the
+ * caller what actually happened to it.
+ *
+ * Reusing an id is not enough on its own: the reducer replaces the visible row,
+ * but a second `activity.entry` event is still appended, re-published to every
+ * connected client, and re-dated to the front of the feed — a repeat warning.
+ * The claim and the append therefore happen inside one store transaction, so
+ * concurrent callers cannot both observe absence and append.
+ *
+ * The outcome is reported only after that transaction settles. `appendAsync`
+ * cannot be used for this: in the deacon child it resolves on local enqueue
+ * before any HTTP request, and in the in-process store a failed batch resolves
+ * with sequence 0 rather than rejecting — both would report success for an
+ * event that never persisted.
+ */
+export async function emitActivityEntryOnce(
+  options: EmitActivityOptions & { id: string },
+): Promise<ActivityEmitOutcome> {
+  const store = getActivityEventStore();
+  if (!store) return 'failed';
+  const event = buildActivityEntryEvent(options);
+  if (!store.appendOnce) {
+    // No settled path available (narrow test double / early-boot stub). Hand it
+    // off best-effort, but never call that a guarantee.
+    try {
+      await persistActivityEvent(event);
+      return 'unconfirmed';
+    } catch {
+      return 'failed';
+    }
+  }
+  try {
+    const result = await store.appendOnce(event, options.id);
+    return typeof result === 'string' ? result : result.outcome;
+  } catch {
+    return 'failed';
+  }
 }
 
 /**
