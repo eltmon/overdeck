@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T21:10:51.206Z",
+  "updated": "2026-07-28T21:11:12.547Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -101,15 +101,8 @@
     }
   ],
   "tasks": {
-    "sequence": 14,
+    "sequence": 15,
     "claims": {
-      "live-tree-delta": {
-        "writerId": "agent-pan-3232",
-        "agentId": "agent-pan-3232",
-        "pid": 3667685,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:33:30.170Z"
-      },
       "specialist-pending-input": {
         "writerId": "agent-pan-3232",
         "agentId": "agent-pan-3232",
@@ -178,8 +171,25 @@
         "itemId": "docs-askuserquestion-dashboard",
         "outcome": "completed",
         "releasedAt": "2026-07-28T21:10:51.205Z"
+      },
+      {
+        "writerId": "agent-pan-3232",
+        "agentId": "agent-pan-3232",
+        "pid": 3667685,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:33:30.170Z",
+        "itemId": "live-tree-delta",
+        "outcome": "cancelled",
+        "reason": "Deferred: pending_input_changed delta infrastructure requires backend work in ws-rpc and contracts; eligible for follow-up issue",
+        "releasedAt": "2026-07-28T21:11:12.547Z"
       }
-    ]
+    ],
+    "statusReasons": {
+      "live-tree-delta": {
+        "reason": "Deferred: pending_input_changed delta infrastructure requires backend work in ws-rpc and contracts; eligible for follow-up issue",
+        "updatedAt": "2026-07-28T21:11:12.547Z"
+      }
+    }
   },
   "statusOverrides": {
     "issue-view-awaiting-fields": "completed",
@@ -195,7 +205,7 @@
     "session-panel-kind-label.session-panel-kind-label.ac1": "completed",
     "session-panel-kind-label.session-panel-kind-label.ac2": "completed",
     "session-panel-kind-label.session-panel-kind-label.ac3": "completed",
-    "live-tree-delta": "running",
+    "live-tree-delta": "cancelled",
     "specialist-pending-input": "running",
     "remove-project-pending-input": "completed",
     "remove-project-pending-input.remove-project-pending-input.ac1": "completed",
