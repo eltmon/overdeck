@@ -15,17 +15,57 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/AGENT-STATE-PLANES.md",
+      "package.json",
+      "scripts/lint-state-paths.sh",
+      "src/cli/commands/__tests__/doctor-orphan-proposed-specs.test.ts",
+      "src/cli/commands/doctor.ts",
+      "src/dashboard/server/routes/backlog.ts",
+      "src/lib/agents/tier-supervisor.ts",
+      "src/lib/backlog/backlog-input.ts",
+      "src/lib/backlog/lookups.ts",
+      "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
+      "src/lib/cloister/flywheel.ts",
+      "src/lib/cloister/orphan-proposed-reconciler.ts",
+      "src/lib/xbrief/__tests__/auto-synthesize.test.ts",
+      "src/lib/xbrief/auto-synthesize.ts",
+      "tests/unit/scripts/lint-state-paths.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/AGENT-STATE-PLANES.md",
+      "package.json",
+      "scripts/lint-state-paths.sh",
+      "src/cli/commands/__tests__/doctor-orphan-proposed-specs.test.ts",
+      "src/cli/commands/doctor.ts",
+      "src/dashboard/server/routes/backlog.ts",
+      "src/lib/agents/tier-supervisor.ts",
+      "src/lib/backlog/backlog-input.ts",
+      "src/lib/backlog/lookups.ts",
+      "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
+      "src/lib/cloister/flywheel.ts",
+      "src/lib/cloister/orphan-proposed-reconciler.ts",
+      "src/lib/xbrief/__tests__/auto-synthesize.test.ts",
+      "src/lib/xbrief/auto-synthesize.ts",
+      "tests/unit/scripts/lint-state-paths.test.ts"
+    ],
+    "recordedAt": "2026-07-28T18:59:19.959Z"
+  },
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T18:59:23.418Z",
+  "updated": "2026-07-28T18:59:26.151Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T18:59:23.417Z",
+    "updatedAt": "2026-07-28T18:59:26.120Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3239",
     "reviewRequestedAt": "2026-07-28T18:59:23.417Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -65,8 +105,7 @@
         "tests/unit/scripts/lint-state-paths.test.ts"
       ],
       "recordedAt": "2026-07-28T18:59:19.959Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3239"
+    }
   },
   "closeOut": {
     "usage": {
@@ -78,6 +117,14 @@
             "cacheRead": 4162083,
             "cacheWrite": 177096
           }
+        },
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 1605963,
+            "output": 90862,
+            "cacheRead": 68971008,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -86,14 +133,22 @@
           "output": 41664,
           "cacheRead": 4162083,
           "cacheWrite": 177096
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 1605963,
+          "output": 90862,
+          "cacheRead": 68971008,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 8.47136,
-        "pricingAsOf": "2026-07-28T17:17:52.619Z"
+        "usd": 53.712539,
+        "pricingAsOf": "2026-07-28T18:59:26.143Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3239"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -248,44 +303,5 @@
     "add-state-paths-lint-guard.add-state-paths-lint-guard.ac2": "completed",
     "add-state-paths-lint-guard.add-state-paths-lint-guard.ac3": "completed",
     "add-state-paths-lint-guard.add-state-paths-lint-guard.ac4": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/AGENT-STATE-PLANES.md",
-      "package.json",
-      "scripts/lint-state-paths.sh",
-      "src/cli/commands/__tests__/doctor-orphan-proposed-specs.test.ts",
-      "src/cli/commands/doctor.ts",
-      "src/dashboard/server/routes/backlog.ts",
-      "src/lib/agents/tier-supervisor.ts",
-      "src/lib/backlog/backlog-input.ts",
-      "src/lib/backlog/lookups.ts",
-      "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
-      "src/lib/cloister/flywheel.ts",
-      "src/lib/cloister/orphan-proposed-reconciler.ts",
-      "src/lib/xbrief/__tests__/auto-synthesize.test.ts",
-      "src/lib/xbrief/auto-synthesize.ts",
-      "tests/unit/scripts/lint-state-paths.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/AGENT-STATE-PLANES.md",
-      "package.json",
-      "scripts/lint-state-paths.sh",
-      "src/cli/commands/__tests__/doctor-orphan-proposed-specs.test.ts",
-      "src/cli/commands/doctor.ts",
-      "src/dashboard/server/routes/backlog.ts",
-      "src/lib/agents/tier-supervisor.ts",
-      "src/lib/backlog/backlog-input.ts",
-      "src/lib/backlog/lookups.ts",
-      "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
-      "src/lib/cloister/flywheel.ts",
-      "src/lib/cloister/orphan-proposed-reconciler.ts",
-      "src/lib/xbrief/__tests__/auto-synthesize.test.ts",
-      "src/lib/xbrief/auto-synthesize.ts",
-      "tests/unit/scripts/lint-state-paths.test.ts"
-    ],
-    "recordedAt": "2026-07-28T18:59:19.959Z"
   }
 }
