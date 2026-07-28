@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-28T22:22:10.234Z",
+  "updated": "2026-07-28T22:23:35.688Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "pending",
@@ -66,16 +66,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "ql-pricing": {
-        "writerId": "agent-pan-3252",
-        "agentId": "agent-pan-3252",
-        "pid": 463382,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T22:22:10.234Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3252",
@@ -87,12 +79,27 @@
         "outcome": "completed",
         "reason": "Registered quantumllama in PROVIDERS with model resolution, QUANTUMLLAMA_API_KEY env branch, and per-provider tests (23 passed); added quantumllama to ModelProvider union to keep typecheck green",
         "releasedAt": "2026-07-28T22:20:42.688Z"
+      },
+      {
+        "writerId": "agent-pan-3252",
+        "agentId": "agent-pan-3252",
+        "pid": 463382,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T22:22:10.234Z",
+        "itemId": "ql-pricing",
+        "outcome": "completed",
+        "reason": "Added three 'custom' pricing rows with spec rates; tests cover exact rates, $0.128 baseline, and cache-priced total (48 passed)",
+        "releasedAt": "2026-07-28T22:23:35.687Z"
       }
     ],
     "statusReasons": {
       "ql-provider-registry": {
         "reason": "Registered quantumllama in PROVIDERS with model resolution, QUANTUMLLAMA_API_KEY env branch, and per-provider tests (23 passed); added quantumllama to ModelProvider union to keep typecheck green",
         "updatedAt": "2026-07-28T22:20:42.688Z"
+      },
+      "ql-pricing": {
+        "reason": "Added three 'custom' pricing rows with spec rates; tests cover exact rates, $0.128 baseline, and cache-priced total (48 passed)",
+        "updatedAt": "2026-07-28T22:23:35.687Z"
       }
     }
   },
@@ -101,6 +108,9 @@
     "ql-provider-registry.ql-provider-registry.ac1": "completed",
     "ql-provider-registry.ql-provider-registry.ac2": "completed",
     "ql-provider-registry.ql-provider-registry.ac3": "completed",
-    "ql-pricing": "running"
+    "ql-pricing": "completed",
+    "ql-pricing.ql-pricing.ac1": "completed",
+    "ql-pricing.ql-pricing.ac2": "completed",
+    "ql-pricing.ql-pricing.ac3": "completed"
   }
 }
