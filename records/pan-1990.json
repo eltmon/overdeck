@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T22:32:00.367Z",
+  "updated": "2026-07-28T22:41:41.843Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -93,16 +93,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "boot-seeding": {
-        "writerId": "agent-pan-1990",
-        "agentId": "agent-pan-1990",
-        "pid": 757732,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T22:32:00.366Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -144,6 +136,16 @@
         "itemId": "doors-guard",
         "outcome": "completed",
         "releasedAt": "2026-07-28T22:31:38.469Z"
+      },
+      {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 757732,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T22:32:00.366Z",
+        "itemId": "boot-seeding",
+        "outcome": "completed",
+        "releasedAt": "2026-07-28T22:41:41.843Z"
       }
     ],
     "statusReasons": {
@@ -169,6 +171,9 @@
     "doors-guard.doors-guard.ac1": "completed",
     "doors-guard.doors-guard.ac2": "completed",
     "doors-guard.doors-guard.ac3": "completed",
-    "boot-seeding": "running"
+    "boot-seeding": "completed",
+    "boot-seeding.boot-seeding.ac1": "completed",
+    "boot-seeding.boot-seeding.ac2": "completed",
+    "boot-seeding.boot-seeding.ac3": "completed"
   }
 }
