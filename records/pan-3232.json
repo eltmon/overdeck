@@ -27,6 +27,11 @@
       "reason": "feedback",
       "note": "[2026-07-28T21:46Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-28T21:46:07.460Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-28T21:52:16.154Z"
     }
   ],
   "feedback": [],
@@ -106,17 +111,17 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T21:52:14.711Z",
+  "updated": "2026-07-28T21:52:16.622Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-28T21:52:14.012Z",
+    "updatedAt": "2026-07-28T21:52:14.756Z",
     "reviewNotes": "FR-7 conversation-only decisions remain invisible or use the agent-only answer endpoint; required regression tests are still absent",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -128,7 +133,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewSpawnedAt": "2026-07-28T21:40:25.651Z",
+    "reviewSpawnedAt": "2026-07-28T21:52:14.755Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/FLYWHEEL-STATE.md",
@@ -263,7 +268,7 @@
       },
       "costAtCloseOut": {
         "usd": 45.380504,
-        "pricingAsOf": "2026-07-28T21:52:14.087Z"
+        "pricingAsOf": "2026-07-28T21:52:16.608Z"
       }
     },
     "merges": [
