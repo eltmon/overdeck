@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T06:45:26.402Z",
+  "updated": "2026-07-28T06:53:26.888Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "rebuild-resolve-after-render": {
-        "writerId": "agent-pan-3049",
-        "agentId": "agent-pan-3049",
-        "pid": 2496933,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T06:45:26.402Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -100,12 +92,27 @@
         "outcome": "completed",
         "reason": "Added compose-file name: declaration lookup to composeProjectNameForWorkspace and a new strict requireComposeProjectNameForWorkspace variant that throws instead of falling back when a compose file exists with no resolvable name; added tests/unit/lib/workspace/stack-health-compose-name.test.ts (8 passing tests). All existing rebuild-stack/stack-health tests still pass; typecheck and lint clean.",
         "releasedAt": "2026-07-28T06:43:50.602Z"
+      },
+      {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 2496933,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:45:26.402Z",
+        "itemId": "rebuild-resolve-after-render",
+        "outcome": "completed",
+        "reason": "Moved compose-name resolution in rebuildWorkspaceStack to after ensureDevcontainerSync render, using requireComposeProjectNameForWorkspace (strict) for the bring-up name and tryComposeProjectNameForWorkspace (best-effort) for the pre-render teardown; added a stale-name teardown pass when the two differ. Added tests/unit/lib/workspace/rebuild-stack.test.ts covering all 3 ACs (3 passing tests). Full workspace test suite (56 tests) still green; typecheck and lint clean.",
+        "releasedAt": "2026-07-28T06:53:26.888Z"
       }
     ],
     "statusReasons": {
       "resolver-compose-name-strict": {
         "reason": "Added compose-file name: declaration lookup to composeProjectNameForWorkspace and a new strict requireComposeProjectNameForWorkspace variant that throws instead of falling back when a compose file exists with no resolvable name; added tests/unit/lib/workspace/stack-health-compose-name.test.ts (8 passing tests). All existing rebuild-stack/stack-health tests still pass; typecheck and lint clean.",
         "updatedAt": "2026-07-28T06:43:50.602Z"
+      },
+      "rebuild-resolve-after-render": {
+        "reason": "Moved compose-name resolution in rebuildWorkspaceStack to after ensureDevcontainerSync render, using requireComposeProjectNameForWorkspace (strict) for the bring-up name and tryComposeProjectNameForWorkspace (best-effort) for the pre-render teardown; added a stale-name teardown pass when the two differ. Added tests/unit/lib/workspace/rebuild-stack.test.ts covering all 3 ACs (3 passing tests). Full workspace test suite (56 tests) still green; typecheck and lint clean.",
+        "updatedAt": "2026-07-28T06:53:26.888Z"
       }
     }
   },
@@ -115,6 +122,9 @@
     "resolver-compose-name-strict.resolver-compose-name-strict.ac2": "completed",
     "resolver-compose-name-strict.resolver-compose-name-strict.ac3": "completed",
     "resolver-compose-name-strict.resolver-compose-name-strict.ac4": "completed",
-    "rebuild-resolve-after-render": "running"
+    "rebuild-resolve-after-render": "completed",
+    "rebuild-resolve-after-render.rebuild-resolve-after-render.ac1": "completed",
+    "rebuild-resolve-after-render.rebuild-resolve-after-render.ac2": "completed",
+    "rebuild-resolve-after-render.rebuild-resolve-after-render.ac3": "completed"
   }
 }
