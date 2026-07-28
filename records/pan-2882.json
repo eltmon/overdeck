@@ -127,17 +127,17 @@
     "recordedAt": "2026-07-28T17:16:31.850Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T18:40:08.488Z",
+  "updated": "2026-07-28T18:40:15.664Z",
   "pipeline": {
     "issueId": "PAN-2882",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:16:51.273Z",
-    "updatedAt": "2026-07-28T18:40:07.219Z",
+    "updatedAt": "2026-07-28T18:40:15.651Z",
     "reviewNotes": "Merged pagination and aggregate five-call concurrency coverage now satisfy the accepted requirements; all review dimensions are clean",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
@@ -171,9 +171,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6448281,
-            "output": 228418,
-            "cacheRead": 25951232,
+            "input": 6452889,
+            "output": 228606,
+            "cacheRead": 26273792,
             "cacheWrite": 0
           }
         },
@@ -194,9 +194,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 8273575,
-          "output": 321952,
-          "cacheRead": 49478656,
+          "input": 8278183,
+          "output": 322140,
+          "cacheRead": 49801216,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -207,8 +207,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 82.781295,
-        "pricingAsOf": "2026-07-28T18:40:07.304Z"
+        "usd": 82.971255,
+        "pricingAsOf": "2026-07-28T18:40:15.658Z"
       }
     },
     "merges": [
@@ -217,7 +217,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-2882",
