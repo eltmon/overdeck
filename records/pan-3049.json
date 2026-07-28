@@ -150,7 +150,7 @@
     "recordedAt": "2026-07-28T08:02:25.990Z"
   },
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T18:14:45.797Z",
+  "updated": "2026-07-28T18:14:54.999Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "passed",
@@ -159,9 +159,9 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:02:29.164Z",
-    "updatedAt": "2026-07-28T18:14:45.284Z",
+    "updatedAt": "2026-07-28T18:14:45.321Z",
     "reviewNotes": "Rally and standard workspace container parsing now preserves final-suffix attribution; no blocking findings remain",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs met. AC1: declaredComposeFileProjectName parses top-level name: (stack-health.ts:52-57), verified against real MYN workspaces which declare 'name: myn-feature-min-XXX' at col 0. AC2: requireComposeProjectNameForWorkspace throws naming workspacePath + composeFilePath + both dev-script paths (stack-health.ts:135-137). AC3: both variants return overdeck-feature-<issue> when composeFilePath is null (lines 119, 134). AC4: assertDeclaredNameMatchesFeatureFolder reuses the exact 'Refusing workspace rebuild:' message for both sources (lines 59-70); dev-script rethrow guard preserved at line 91. COMPOSE_FILE_CANDIDATES and findDevcontainerComposeFile match rebuild-stack.ts:43-58 exactly, so no directory-scope drift. Tests cover all four plus dev-script-wins precedence.",
@@ -293,7 +293,7 @@
       },
       "costAtCloseOut": {
         "usd": 140.7336762,
-        "pricingAsOf": "2026-07-28T18:14:45.594Z"
+        "pricingAsOf": "2026-07-28T18:14:52.294Z"
       }
     },
     "merges": [
