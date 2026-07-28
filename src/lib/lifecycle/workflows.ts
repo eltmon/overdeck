@@ -36,7 +36,7 @@ import {
   writeCloseOutDodGate,
 } from '../pan-dir/record.js';
 import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
-import { evaluateDodGate } from './dod-gate.js';
+import { evaluateDodGate, readCompletedCloseOut } from './dod-gate.js';
 import {
   capturePipelineStage,
   resolvePipelineTelemetryContext,
@@ -170,6 +170,18 @@ export function closeOut(
   return Effect.gen(function* () {
     const start = Date.now();
     const allSteps: StepResult[] = [];
+
+    // PAN-3025: idempotent short-circuit for already-completed close-out ceremony.
+    // Fail closed: on any error, proceed to the gate (null = not-confirmed-complete).
+    const closedOutAt = yield* Effect.promise(() =>
+      readCompletedCloseOut(ctx.issueId, ctx.projectPath).catch(() => null)
+    );
+    if (closedOutAt) {
+      allSteps.push(stepSkipped('close-out:idempotent', [
+        `Issue already closed out at ${closedOutAt} — skipping the Definition-of-Done gate and ceremony`,
+      ]));
+      return buildResult('close-out', ctx.issueId, allSteps, start);
+    }
 
     // Recover UAT-promotion evidence before the gate reads the verification verdict.
     const uatEvidenceStep = yield* Effect.promise(async () => {

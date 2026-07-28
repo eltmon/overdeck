@@ -102,7 +102,9 @@ const defaultPostMergeRowDeps: PostMergeRowDeps = {
   readCanonicalState: async ctx => {
     return getAutoCloseOutCanonicalState(ctx.issueId) as Promise<CanonicalState | null>;
   },
-  readMergeStatus: async issueId => (await Effect.runPromise(getReviewStatus(issueId)))?.mergeStatus,
+  // PAN-3025: same live→journal fallback as the verdict rows — after close-out
+  // clears live status, the durable record is the only place mergeStatus survives.
+  readMergeStatus: async issueId => (await loadStatus(issueId, defaultDeps))?.status.mergeStatus,
   listAgents: async () => Effect.runPromise(listRunningAgents()),
 };
 
@@ -661,4 +663,25 @@ export async function evaluateDodGate(
     accepted,
     passed: rows.every(row => row.status !== 'miss' || Boolean(row.acceptedBy)),
   };
+}
+
+/**
+ * PAN-3025: completion witness for the close-out ceremony. Returns closedOutAt
+ * only when the journal is terminal AND the live row is gone (the ceremony's
+ * final mutating step). closedOut with live status present means a prior run
+ * aborted mid-ceremony and must fall through to complete it.
+ */
+export async function readCompletedCloseOut(issueId: string, projectPath: string): Promise<string | null> {
+  try {
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(projectPath);
+    const record = await readIssueRecord(project, issueId.toUpperCase());
+    if (!record?.pipeline.closedOut) return null;
+    // Fail closed: a read error means we cannot confirm absence, so return null (incomplete)
+    const live = await Effect.runPromise(getReviewStatus(issueId)).catch(() => 'unknown');
+    if (live === 'unknown') return null; // Reject the idempotent path on any read failure
+    return live ? null : (record.pipeline.closedOutAt ?? 'unknown');
+  } catch {
+    // On any error (record read, etc.), fail closed
+    return null;
+  }
 }

@@ -22,6 +22,9 @@ const {
   mockHealUatPromotionVerification,
   mockCapturePipelineStage,
   mockResolvePipelineTelemetryContext,
+  mockGetReviewStatus,
+  mockReadIssueRecord,
+  mockReadCompletedCloseOut,
 } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   mockClearReviewStatus: vi.fn(),
@@ -29,15 +32,31 @@ const {
   mockMarkRecordPipelineClosedOutSync: vi.fn(),
   mockWriteCloseOutDodGateSync: vi.fn(),
   mockSweepOrphanedTasks: vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }),
-  mockEvaluateDodGate: vi.fn(),
+  mockEvaluateDodGate: vi.fn().mockResolvedValue({
+    passed: true,
+    misses: [],
+    accepted: [],
+    rows: [{
+      id: 'review', num: 1, title: 'Review', expected: 'recorded verdict',
+      observed: 'reviewStatus: passed', status: 'pass',
+    }],
+  }),
   mockHealUatPromotionVerification: vi.fn(),
   mockCapturePipelineStage: vi.fn(),
   mockResolvePipelineTelemetryContext: vi.fn(async () => null),
+  mockGetReviewStatus: vi.fn(),
+  mockReadIssueRecord: vi.fn(),
+  mockReadCompletedCloseOut: vi.fn().mockResolvedValue(null),
 }));
 
-vi.mock('../../../../src/lib/lifecycle/dod-gate.js', () => ({
-  evaluateDodGate: mockEvaluateDodGate,
-}));
+vi.mock('../../../../src/lib/lifecycle/dod-gate.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/lifecycle/dod-gate.js')>();
+  return {
+    ...actual,
+    evaluateDodGate: mockEvaluateDodGate,
+    readCompletedCloseOut: mockReadCompletedCloseOut,
+  };
+});
 
 vi.mock('../../../../src/lib/cloister/uat-promote-verification.js', () => ({
   healUatPromotionVerification: mockHealUatPromotionVerification,
@@ -91,6 +110,7 @@ vi.mock('../../../../src/lib/shadow-state.js', () => ({
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   clearReviewStatus: mockClearReviewStatus,
+  getReviewStatus: mockGetReviewStatus,
 }));
 
 vi.mock('../../../../src/lib/pan-dir/record.js', async (importOriginal) => {
@@ -100,6 +120,7 @@ vi.mock('../../../../src/lib/pan-dir/record.js', async (importOriginal) => {
     getProjectConfigFromWorkspacePath: vi.fn((workspacePath: string) => ({ name: 'inferred', path: workspacePath })),
     markRecordPipelineClosedOutSync: mockMarkRecordPipelineClosedOutSync,
     writeCloseOutDodGate: mockWriteCloseOutDodGateSync,
+    readIssueRecord: mockReadIssueRecord,
   };
 });
 
@@ -189,6 +210,8 @@ describe('workflows', () => {
 
     vi.clearAllMocks();
     mockHealUatPromotionVerification.mockResolvedValue(null);
+    mockGetReviewStatus.mockResolvedValue(null);
+    mockReadIssueRecord.mockResolvedValue(null);
     mockEvaluateDodGate.mockResolvedValue({
       passed: true,
       misses: [],
@@ -957,6 +980,45 @@ describe('workflows', () => {
       expect(commands.some(command => command.includes('--add-label "closed-out"'))).toBe(true);
       expect(commands.some(command => command.includes('--remove-label "verifying-on-main"'))).toBe(true);
       expect(commands.some(command => command.includes('--remove-label "needs-close-out"'))).toBe(true);
+    });
+
+    it('idempotent guard is called on close-out workflow entry (PAN-3025 WI-4)', async () => {
+      // This test verifies that the workflow invokes readCompletedCloseOut and handles its result.
+      // The three cases (short-circuit / fall-through / error) are covered by focused
+      // dod-gate-idempotent-guard.test.ts which exercises the real helper with controllable deps.
+      // This test confirms the wiring: when the helper returns a timestamp, the workflow skips.
+      mockReadCompletedCloseOut.mockResolvedValueOnce('2026-07-28T08:00:00Z');
+
+      const result = await closeOut(
+        { issueId: 'PAN-3050', projectPath: testDir },
+        { tracker: successfulTracker() },
+      );
+
+      expect(result.success).toBe(true);
+      // Early return means exactly one step (the idempotent skip step)
+      expect(result.steps).toHaveLength(1);
+      const idempotentStep = result.steps[0];
+      expect(idempotentStep.step).toBe('close-out:idempotent');
+      expect(idempotentStep.skipped).toBe(true);
+      // Verify ceremony was skipped (gate not called, status mutations not run)
+      expect(mockEvaluateDodGate).not.toHaveBeenCalled();
+      expect(mockClearReviewStatus).not.toHaveBeenCalled();
+      expect(mockMarkRecordPipelineClosedOutSync).not.toHaveBeenCalled();
+    });
+
+    it('workflow proceeds to gate when guard returns null (normal path)', async () => {
+      // When readCompletedCloseOut returns null, the workflow proceeds to the DoD gate
+      // (this covers both "not closed out" and "live row still present" scenarios)
+      mockReadCompletedCloseOut.mockResolvedValueOnce(null);
+
+      const result = await closeOut(
+        { issueId: 'PAN-3051', projectPath: testDir },
+        { tracker: successfulTracker() },
+      );
+
+      expect(result.success).toBe(true);
+      // Gate runs normally because the guard did not short-circuit
+      expect(mockEvaluateDodGate).toHaveBeenCalledOnce();
     });
 
   });

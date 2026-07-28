@@ -19,6 +19,10 @@ this table and that module from drifting silently.
 | 7 | `deploy` | **Deployed: the live dashboard runs a canonical build that includes the merge.** When the `merged` row misses without resolving a merge commit, this row skips and reports its row-4 dependency instead of recording a second miss. | staleness-gated Step 0 (`merge-agent.ts`) + Deacon deploy patrol (`deploy-patrol.ts`) + deploy intent queue (`pending-deploy.json`), guarded by `getDeployBlockReason()` | `/api/health` `buildCommit`, `buildDirty`, and `buildBranch` + stale-build chip; the row misses when the build is dirty or `buildCommit` is not an ancestor of `origin/main` |
 | 8 | `teardown` | Close-out: worktree removed, branches per `close_out` config, xBRIEF `plan.status: completed`, planning artifacts archived, tracker issue CLOSED + `closed-out` label, review status cleared, Docker `_devnet` teardown verified | `pan close <id>` / dashboard Close Out (`closeOut`); closed-issue reaper (`reapIssueResidue`) as backstop | issue state, `workspaces/` dir |
 
+## Verdict durability
+
+Rows 1–3 read live status first and fall back to the per-issue record's `pipeline` block on `overdeck-state` when live status is absent. The durable journal preserves the full verdict triple (review/tests/verification) plus `lastVerifiedCommit` through close-out and across database rebuilds, so rows continue to read and pass after live status is cleared or the SQLite database is re-derived. Re-running `pan close <id>` on a fully closed-out issue is an idempotent no-op that returns success without re-evaluating the gate or re-running any ceremony step; it names the original `closedOutAt` timestamp to prove completion on the original run.
+
 ## Rules of the table
 
 - **Merged ≠ done.** Steps 5–8 are where "shipped" actually happens; step 7 is where the fix
