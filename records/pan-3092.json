@@ -170,10 +170,10 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T11:20:50.366Z",
+  "updated": "2026-07-28T11:31:52.850Z",
   "pipeline": {
     "issueId": "PAN-3092",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -181,8 +181,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T11:20:50.358Z",
-    "reviewNotes": "The new settled append fetch has no deadline; a hung loopback request wedges the serial Deacon patrol while its heartbeat keeps reporting healthy, so later recovery work never runs.",
+    "updatedAt": "2026-07-28T11:31:52.801Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issue: appendOnce now runs under a 10s AbortSignal deadline (appendOnceTimeoutMs, well below the 60s patrol interval) covering both response headers and body read, returning failed on expiry so the sweep retries next patrol; fake-timer tests hold a genuinely unsettled promise until abort, cover a hanging body read, a configured shorter deadline, and assert nothing is queued. Both non-blocking findings taken: the sweep treats unconfirmed like failed so code and contract agree, and compact() ages idempotency keys out on the same 7-day retention so the table cannot grow forever or orphan-suppress a recreated warning.",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
     "reviewedAtCommit": "f110307644701e83f5413011b79bea06fb74cd73",
@@ -258,9 +258,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 8001055,
-            "output": 364940,
-            "cacheRead": 66816512,
+            "input": 8021002,
+            "output": 370464,
+            "cacheRead": 67876864,
             "cacheWrite": 0
           }
         }
@@ -273,15 +273,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 8001055,
-          "output": 364940,
-          "cacheRead": 66816512,
+          "input": 8021002,
+          "output": 370464,
+          "cacheRead": 67876864,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 84.3798503,
-        "pricingAsOf": "2026-07-28T11:20:50.362Z"
+        "usd": 85.1754813,
+        "pricingAsOf": "2026-07-28T11:31:52.848Z"
       }
     },
     "merges": [
