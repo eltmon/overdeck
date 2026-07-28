@@ -191,7 +191,7 @@
     "recordedAt": "2026-07-28T22:30:42.486Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T22:45:26.645Z",
+  "updated": "2026-07-28T22:45:32.675Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "pending",
@@ -201,7 +201,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T22:44:57.485Z",
+    "panDoneRecoveredAt": "2026-07-28T22:45:26.215Z",
+    "updatedAt": "2026-07-28T22:45:26.637Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3228-review",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "conflictsSince": {
@@ -307,8 +308,7 @@
         "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts"
       ],
       "recordedAt": "2026-07-28T22:30:42.486Z"
-    },
-    "panDoneRecoveredAt": "2026-07-28T22:45:26.215Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -354,7 +354,7 @@
       },
       "costAtCloseOut": {
         "usd": 219.563395,
-        "pricingAsOf": "2026-07-28T22:44:57.502Z"
+        "pricingAsOf": "2026-07-28T22:45:32.672Z"
       }
     },
     "merges": [
