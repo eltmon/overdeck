@@ -95,10 +95,10 @@
     "recordedAt": "2026-07-28T08:02:25.990Z"
   },
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T08:30:29.004Z",
+  "updated": "2026-07-28T08:32:23.596Z",
   "pipeline": {
     "issueId": "PAN-3049",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -106,13 +106,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:02:29.164Z",
-    "updatedAt": "2026-07-28T08:18:25.754Z",
+    "updatedAt": "2026-07-28T08:32:23.489Z",
     "reviewNotes": "Verification failed at lint — fix and resubmit",
     "inspectNotes": "All 4 ACs met. AC1: declaredComposeFileProjectName parses top-level name: (stack-health.ts:52-57), verified against real MYN workspaces which declare 'name: myn-feature-min-XXX' at col 0. AC2: requireComposeProjectNameForWorkspace throws naming workspacePath + composeFilePath + both dev-script paths (stack-health.ts:135-137). AC3: both variants return overdeck-feature-<issue> when composeFilePath is null (lines 119, 134). AC4: assertDeclaredNameMatchesFeatureFolder reuses the exact 'Refusing workspace rebuild:' message for both sources (lines 59-70); dev-script rethrow guard preserved at line 91. COMPOSE_FILE_CANDIDATES and findDevcontainerComposeFile match rebuild-stack.ts:43-58 exactly, so no directory-scope drift. Tests cover all four plus dev-script-wins precedence.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3223",
     "lastVerifiedCommit": "633b8bec55270f16715519995ba08e7f0945a624",
     "reviewRequestedAt": "2026-07-28T08:02:29.164Z",
-    "reviewSpawnedAt": "2026-07-28T08:02:54.728Z",
+    "reviewSpawnedAt": "2026-07-28T08:32:23.488Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/cli/commands/__tests__/workspace-reap.test.ts",
@@ -223,7 +223,7 @@
       },
       "costAtCloseOut": {
         "usd": 36.4104542,
-        "pricingAsOf": "2026-07-28T08:18:25.785Z"
+        "pricingAsOf": "2026-07-28T08:32:23.586Z"
       }
     },
     "merges": [
