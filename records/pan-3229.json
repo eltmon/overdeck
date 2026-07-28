@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T17:44:00.094Z",
+  "updated": "2026-07-28T17:46:57.920Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "patrol-wiring": {
-        "writerId": "agent-pan-3229",
-        "agentId": "agent-pan-3229",
-        "pid": 1786558,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T17:44:00.093Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3229",
@@ -117,6 +109,17 @@
         "outcome": "completed",
         "reason": "Added state-aware workspace candidate scanning, guarded complete-planning re-drive, bounded marker attempt persistence and needs-you escalation, plus scenario tests.",
         "releasedAt": "2026-07-28T17:43:49.894Z"
+      },
+      {
+        "writerId": "agent-pan-3229",
+        "agentId": "agent-pan-3229",
+        "pid": 1786558,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:44:00.093Z",
+        "itemId": "patrol-wiring",
+        "outcome": "completed",
+        "reason": "Wired reconciliation into runPatrol and compacted the adjacent loops to preserve the deacon file-size ratchet.",
+        "releasedAt": "2026-07-28T17:46:57.920Z"
       }
     ],
     "statusReasons": {
@@ -127,6 +130,10 @@
       "pending-promotion-reconciler": {
         "reason": "Added state-aware workspace candidate scanning, guarded complete-planning re-drive, bounded marker attempt persistence and needs-you escalation, plus scenario tests.",
         "updatedAt": "2026-07-28T17:43:49.894Z"
+      },
+      "patrol-wiring": {
+        "reason": "Wired reconciliation into runPatrol and compacted the adjacent loops to preserve the deacon file-size ratchet.",
+        "updatedAt": "2026-07-28T17:46:57.920Z"
       }
     }
   },
@@ -142,6 +149,8 @@
     "pending-promotion-reconciler.pending-promotion-reconciler.ac3": "completed",
     "pending-promotion-reconciler.pending-promotion-reconciler.ac4": "completed",
     "pending-promotion-reconciler.pending-promotion-reconciler.ac5": "completed",
-    "patrol-wiring": "running"
+    "patrol-wiring": "completed",
+    "patrol-wiring.patrol-wiring.ac1": "completed",
+    "patrol-wiring.patrol-wiring.ac2": "completed"
   }
 }
