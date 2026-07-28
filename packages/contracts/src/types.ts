@@ -84,9 +84,9 @@ export type VerificationStatusValue = typeof VerificationStatusValue.Type
 // PAN-1989 retired 'pi'; legacy DB rows read as 'ohmypi' via getHarness().
 // All new write sites use canonical harness literals.
 
-export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp'
+export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code'
 
-const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'ohmypi', 'codex', 'acp'])
+const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code'])
 
 /**
  * Normalize a snapshot's runtime field to a known Harness value.

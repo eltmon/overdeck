@@ -13,6 +13,7 @@ import {
   type ContextLayerTarget,
   type ContextLayersResponse,
   type ContextPreviewDiagnostic,
+  type ContextPreviewHarness,
   type ContextPreviewResponse,
   type ContextProjectSummary,
   type ContextSyncResponse,
@@ -237,7 +238,7 @@ async function layerRecord(
  * managed region lands and whether their own content is preserved there.
  */
 async function describeSyncTarget(
-  harness: Harness,
+  harness: ContextPreviewHarness,
   layerKind: 'global' | 'project',
   projectKey: string | undefined,
   label: string,

@@ -11,7 +11,7 @@ import { buildGitGuardLines } from './launcher-git-guard.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp';
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
 
 export interface LauncherConfig {
   role: Role;

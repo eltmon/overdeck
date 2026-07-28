@@ -16,6 +16,7 @@ export const HARNESS_BINARY_BY_RUNTIME: Record<RuntimeName, string> = {
   ohmypi: 'omp',
   codex: 'codex',
   acp: 'kimi',
+  'kimi-code': 'kimi',
 };
 
 export type ExecutableCommandRunner = (command: string, args: string[]) => Promise<string>;
