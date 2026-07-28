@@ -2,7 +2,7 @@
   "issueId": "PAN-3215",
   "schemaVersion": 2,
   "created": "2026-07-28T06:35:52.620Z",
-  "updated": "2026-07-28T06:35:52.620Z",
+  "updated": "2026-07-28T06:35:53.565Z",
   "pipeline": {
     "issueId": "PAN-3215",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3215: DoD gate verify-merged path is GitHub-only and monorepo-scoped — GitLab squash-merges fall through to branch-containment fallback with mislabeled evidence",
       "timestamp": "2026-07-28T06:35:52.620Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
