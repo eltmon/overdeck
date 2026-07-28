@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T18:42:31.650Z",
+  "updated": "2026-07-28T18:42:45.933Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,8 +79,16 @@
     }
   ],
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "wi3-binary-map": {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 3804293,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T18:42:45.933Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -125,6 +133,7 @@
     "wi2-behavior-matrix": "completed",
     "wi2-behavior-matrix.wi2-behavior-matrix.ac1": "completed",
     "wi2-behavior-matrix.wi2-behavior-matrix.ac2": "completed",
-    "wi2-behavior-matrix.wi2-behavior-matrix.ac3": "completed"
+    "wi2-behavior-matrix.wi2-behavior-matrix.ac3": "completed",
+    "wi3-binary-map": "running"
   }
 }
