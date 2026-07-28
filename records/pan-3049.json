@@ -2,7 +2,7 @@
   "issueId": "PAN-3049",
   "schemaVersion": 2,
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T03:13:08.645Z",
+  "updated": "2026-07-28T03:13:09.646Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3049: Duplicate Docker stacks per workspace (myn-feature-* beside overdeck-feature-*) double memory and exhausted the host",
       "timestamp": "2026-07-28T03:13:08.645Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
