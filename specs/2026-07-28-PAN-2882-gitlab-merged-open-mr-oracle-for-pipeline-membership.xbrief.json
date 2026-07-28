@@ -4,17 +4,17 @@
     "created": "2026-07-28T03:52:15Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2882: Pipeline membership has no GitLab merged-MR oracle — squash-merged GitLab branches show as unmerged (false planned_backlog rows, mislabeled post_merge_limbo)",
-    "updated": "2026-07-28T03:59:40.155Z"
+    "updated": "2026-07-28T06:35:12.696Z"
   },
   "plan": {
     "id": "pan-2882",
     "title": "GitLab merged/open-MR oracle for pipeline membership",
-    "status": "proposed",
+    "status": "approved",
     "uid": "493271fb-5181-4cde-bae1-91222de16ccf",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-28T03:52:15Z",
-    "updated": "2026-07-28T03:59:40.155Z",
+    "updated": "2026-07-28T06:35:12.696Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2882",
@@ -463,5 +463,5 @@
       "canonicalFilename": "2026-07-28-PAN-2882-gitlab-merged-open-mr-oracle-for-pipeline-membership.xbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
