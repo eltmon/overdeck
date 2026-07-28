@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T06:35:43.228Z",
+  "updated": "2026-07-28T06:39:03.055Z",
   "pipeline": {
     "issueId": "PAN-2882",
     "reviewStatus": "pending",
@@ -47,18 +47,32 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "repo-forge-plumbing": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2882",
         "agentId": "agent-pan-2882",
         "pid": 1516620,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T06:35:43.228Z"
+        "claimedAt": "2026-07-28T06:35:43.228Z",
+        "itemId": "repo-forge-plumbing",
+        "outcome": "completed",
+        "reason": "Exported getRepoForge, extended ProjectRepository with forge+repoKey fields, updated projectRepositories to populate both monorepo and polyrepo cases, added unit tests",
+        "releasedAt": "2026-07-28T06:39:03.055Z"
+      }
+    ],
+    "statusReasons": {
+      "repo-forge-plumbing": {
+        "reason": "Exported getRepoForge, extended ProjectRepository with forge+repoKey fields, updated projectRepositories to populate both monorepo and polyrepo cases, added unit tests",
+        "updatedAt": "2026-07-28T06:39:03.055Z"
       }
     }
   },
   "statusOverrides": {
-    "repo-forge-plumbing": "running"
+    "repo-forge-plumbing": "completed",
+    "repo-forge-plumbing.repo-forge-plumbing.ac1": "completed",
+    "repo-forge-plumbing.repo-forge-plumbing.ac2": "completed",
+    "repo-forge-plumbing.repo-forge-plumbing.ac3": "completed"
   }
 }
