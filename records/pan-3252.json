@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-28T23:29:47.458Z",
+  "updated": "2026-07-28T23:45:45.242Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "pending",
@@ -21,22 +21,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T23:29:47.448Z",
-    "inspectNotes": "All 3 ACs met: getProviderForModelSync resolves ql-reason-70b/ql-swift-8b/ql-nano-1b to PROVIDERS.quantumllama (providers.ts:392-395, reached — no earlier branch matches ql-* ids); getProviderEnvSync emits ANTHROPIC_BASE_URL=https://api.quantumllama.ai/v1 via provider.baseUrl and QUANTUMLLAMA_API_KEY (providers.ts:469-470); defaultHarness 'claude-code' declared and EXPECTED_DEFAULT_HARNESSES updated. NFR-1 respected: registry/env only, no HTTP, request, or streaming code and no agent-spawn changes. Verified locally: tests/unit/lib/providers.test.ts + tests/lib/providers.test.ts, 23 passed.",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 04bcaeb (1 path): scripts/file-size-allowlist.txt",
-        "detectedAt": "2026-07-28T23:28:38.244Z"
-      }
-    ],
-    "conflictsSince": {
-      "sha": "04bcaeb9f6b9d766a637e3e18eafcc828b0fbdbf",
-      "detectedAt": "2026-07-28T23:28:38.244Z",
-      "paths": [
-        "scripts/file-size-allowlist.txt"
-      ]
-    }
+    "updatedAt": "2026-07-28T23:45:44.909Z",
+    "inspectNotes": "All 3 ACs met: getProviderForModelSync resolves ql-reason-70b/ql-swift-8b/ql-nano-1b to PROVIDERS.quantumllama (providers.ts:392-395, reached — no earlier branch matches ql-* ids); getProviderEnvSync emits ANTHROPIC_BASE_URL=https://api.quantumllama.ai/v1 via provider.baseUrl and QUANTUMLLAMA_API_KEY (providers.ts:469-470); defaultHarness 'claude-code' declared and EXPECTED_DEFAULT_HARNESSES updated. NFR-1 respected: registry/env only, no HTTP, request, or streaming code and no agent-spawn changes. Verified locally: tests/unit/lib/providers.test.ts + tests/lib/providers.test.ts, 23 passed."
   },
   "closeOut": {
     "usage": {
@@ -48,6 +34,14 @@
             "cacheRead": 2558529,
             "cacheWrite": 172477
           }
+        },
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 537740,
+            "output": 40845,
+            "cacheRead": 11538944,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -56,11 +50,17 @@
           "output": 43926,
           "cacheRead": 2558529,
           "cacheWrite": 172477
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 537740,
+          "output": 40845,
+          "cacheRead": 11538944,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 6.911624,
-        "pricingAsOf": "2026-07-28T23:29:47.455Z"
+        "usd": 16.595146,
+        "pricingAsOf": "2026-07-28T23:45:45.231Z"
       }
     },
     "merges": [],
