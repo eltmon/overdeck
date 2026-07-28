@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T17:41:19.615Z",
+  "updated": "2026-07-28T17:41:30.838Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "pending",
@@ -69,8 +69,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "fix-tier-supervisor-prd-read": {
+        "writerId": "agent-pan-3230",
+        "agentId": "agent-pan-3230",
+        "pid": 1673732,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:41:30.838Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3230",
@@ -168,6 +176,7 @@
     "fix-auto-synthesize-write-dir": "completed",
     "fix-auto-synthesize-write-dir.fix-auto-synthesize-write-dir.ac1": "completed",
     "fix-auto-synthesize-write-dir.fix-auto-synthesize-write-dir.ac2": "completed",
-    "fix-auto-synthesize-write-dir.fix-auto-synthesize-write-dir.ac3": "completed"
+    "fix-auto-synthesize-write-dir.fix-auto-synthesize-write-dir.ac3": "completed",
+    "fix-tier-supervisor-prd-read": "running"
   }
 }
