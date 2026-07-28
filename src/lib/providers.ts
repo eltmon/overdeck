@@ -83,7 +83,16 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     // token), so claude-code talks to it natively — no omp, no CLIProxy, no
     // 200k-window deadlock.
     defaultHarness: 'claude-code',
-    models: ['k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
+    // PAN-1837: the native kimi-code harness resolves its own model aliases
+    // under the installed CLI's config.toml, which are namespaced
+    // `kimi-code/<alias>` (verified against the installed 0.29.2 binary's
+    // `kimi provider list --json`) — a DIFFERENT id space than the bare
+    // claude-code-routed ids above. Both must be registered here so
+    // getProviderForModelSync resolves either shape to this provider.
+    models: [
+      'k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview',
+      'kimi-code/k3', 'kimi-code/k3-256k', 'kimi-code/kimi-for-coding', 'kimi-code/kimi-for-coding-highspeed',
+    ],
     tierModels: { opus: 'kimi-k2.6', sonnet: 'kimi-k2.5', haiku: 'kimi-k2' },
     tested: true,
     description: 'Route directly to Kimi Anthropic-compatible endpoints via claude-code; sk-kimi-* keys use the coding endpoint, platform keys use Moonshot.',
@@ -314,6 +323,12 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   }
   if (['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max'].includes(modelId)) {
     return PROVIDERS.dashscope;
+  }
+  // PAN-1837: native kimi-code CLI model aliases are namespaced `kimi-code/<alias>`
+  // (its own config.toml provider-prefixing, not an OpenRouter id) — carve out
+  // before the generic slash-delimited catch-all below.
+  if (modelId.startsWith('kimi-code/')) {
+    return PROVIDERS.kimi;
   }
   if (modelId.includes('/')) {
     return PROVIDERS.openrouter;
