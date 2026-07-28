@@ -33,17 +33,17 @@
     "recordedAt": "2026-07-28T09:38:47.050Z"
   },
   "created": "2026-07-28T06:35:52.620Z",
-  "updated": "2026-07-28T09:52:41.405Z",
+  "updated": "2026-07-28T10:04:35.698Z",
   "pipeline": {
     "issueId": "PAN-3215",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T09:52:41.380Z",
-    "reviewNotes": "Verification infrastructure error: Verification worker 466058 exited before writing a result",
+    "updatedAt": "2026-07-28T10:04:35.666Z",
+    "reviewNotes": "FR-2 still hardcodes origin/main in target-branch-aware GitHub verification; NFR-2 also duplicates GitLab MR lookups",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3226",
     "reviewSpawnedAt": "2026-07-28T09:52:41.379Z",
     "scopeDrift": {
@@ -72,6 +72,14 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 930710,
+            "output": 92560,
+            "cacheRead": 9408000,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 1164951,
@@ -83,15 +91,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1164951,
-          "output": 134647,
-          "cacheRead": 69348864,
+          "input": 2095661,
+          "output": 227207,
+          "cacheRead": 78756864,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 44.538597,
-        "pricingAsOf": "2026-07-28T09:52:41.395Z"
+        "usd": 56.672947,
+        "pricingAsOf": "2026-07-28T10:04:35.682Z"
       }
     },
     "merges": [
