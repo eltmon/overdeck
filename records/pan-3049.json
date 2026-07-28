@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T06:44:06.649Z",
+  "updated": "2026-07-28T06:45:09.863Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T06:44:06.633Z",
-    "inspectNotes": "Inspecting item resolver-compose-name-strict"
+    "updatedAt": "2026-07-28T06:45:07.280Z",
+    "inspectNotes": "All 4 ACs met. AC1: declaredComposeFileProjectName parses top-level name: (stack-health.ts:52-57), verified against real MYN workspaces which declare 'name: myn-feature-min-XXX' at col 0. AC2: requireComposeProjectNameForWorkspace throws naming workspacePath + composeFilePath + both dev-script paths (stack-health.ts:135-137). AC3: both variants return overdeck-feature-<issue> when composeFilePath is null (lines 119, 134). AC4: assertDeclaredNameMatchesFeatureFolder reuses the exact 'Refusing workspace rebuild:' message for both sources (lines 59-70); dev-script rethrow guard preserved at line 91. COMPOSE_FILE_CANDIDATES and findDevcontainerComposeFile match rebuild-stack.ts:43-58 exactly, so no directory-scope drift. Tests cover all four plus dev-script-wins precedence."
   },
   "closeOut": {
     "usage": {
@@ -37,10 +37,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 66,
-            "output": 18244,
-            "cacheRead": 6428998,
-            "cacheWrite": 199379
+            "input": 72,
+            "output": 18526,
+            "cacheRead": 7114709,
+            "cacheWrite": 200513
           }
         }
       },
@@ -52,15 +52,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 66,
-          "output": 18244,
-          "cacheRead": 6428998,
-          "cacheWrite": 199379
+          "input": 72,
+          "output": 18526,
+          "cacheRead": 7114709,
+          "cacheWrite": 200513
         }
       },
       "costAtCloseOut": {
-        "usd": 1.9854382,
-        "pricingAsOf": "2026-07-28T06:44:06.640Z"
+        "usd": 2.1282472,
+        "pricingAsOf": "2026-07-28T06:45:07.487Z"
       }
     },
     "merges": [],
