@@ -110,18 +110,17 @@
     "recordedAt": "2026-07-28T17:49:31.882Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T18:18:20.636Z",
+  "updated": "2026-07-28T18:18:40.323Z",
   "pipeline": {
     "issueId": "PAN-3212",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:49:41.828Z",
-    "updatedAt": "2026-07-28T18:18:20.610Z",
-    "reviewNotes": "! Scrollback text is accepted as proof that the pending payload is in the active composer — `src/lib/tmux-dedup.ts:187`",
+    "updatedAt": "2026-07-28T18:18:40.265Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
     "reviewedAtCommit": "72d3b812b0d38b8a05441f6dd8f478386595c690",
     "lastVerifiedCommit": "72d3b812b0d38b8a05441f6dd8f478386595c690",
@@ -166,9 +165,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2317318,
-            "output": 233908,
-            "cacheRead": 30682624,
+            "input": 2329121,
+            "output": 236026,
+            "cacheRead": 31748096,
             "cacheWrite": 0
           }
         },
@@ -183,15 +182,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 6045140,
-          "output": 558863,
-          "cacheRead": 113711616,
+          "input": 6056943,
+          "output": 560981,
+          "cacheRead": 114777088,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 103.847398,
-        "pricingAsOf": "2026-07-28T18:18:20.628Z"
+        "usd": 104.502689,
+        "pricingAsOf": "2026-07-28T18:18:40.312Z"
       }
     },
     "merges": [
