@@ -467,4 +467,117 @@ describe('checkWorkspaceContainerHealth', () => {
       'deacon:container-restart-failed',
     );
   });
+
+  // -------------------------------------------------------------------------
+  // (j) PAN-3049 — crash sweep matches any compose-project prefix, not just
+  // the overdeck- fallback, so a myn-feature-* container crash gets the same
+  // auto-restart handling as an overdeck-feature-* one.
+  // -------------------------------------------------------------------------
+
+  it('(j) restarts a myn-feature- crashed container exactly like an overdeck-feature- one', async () => {
+    writeState({ containerRestarts: {} });
+
+    setupExec({
+      'docker ps -a': { stdout: 'myn-feature-pan-464-server-1|Exited (1) 2 minutes ago\n' },
+      'tmux has-session': { stdout: '' },
+      'docker restart': { stdout: '' },
+      'lsof': { stdout: '' },
+    });
+
+    const actions = await checkWorkspaceContainerHealth();
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatch(/Auto-restarted.*pan-464-server.*attempt 1\/5/);
+    const state = readState();
+    expect(state.containerRestarts!['myn-feature-pan-464-server-1']).toBeDefined();
+  });
+
+  it('(j) skips a myn-feature- api container (service set unchanged) and overdeck-traefik (no feature token)', async () => {
+    writeState({ containerRestarts: {} });
+
+    setupExec({
+      'docker ps -a': {
+        stdout: [
+          'myn-feature-pan-464-api-1|Exited (1) 2 minutes ago',
+          'overdeck-traefik|Exited (1) 2 minutes ago',
+          '',
+        ].join('\n'),
+      },
+      'tmux has-session': { stdout: '' },
+      'docker restart': { stdout: '' },
+      'lsof': { stdout: '' },
+    });
+
+    const actions = await checkWorkspaceContainerHealth();
+
+    expect(actions).toHaveLength(0);
+    const restartCalled = (mockExec.mock.calls as Array<[string]>).some(([cmd]) => cmd.includes('docker restart'));
+    expect(restartCalled).toBe(false);
+  });
+
+  // Review finding: a loose issue-token capture could misattribute a name
+  // embedding a second `feature-...-(frontend|server)-` segment to the wrong
+  // issue. The match must anchor to the final `-<index>` at the end of the
+  // name with a strict word-digits issue token, matching the real crashed
+  // container (PAN-464), not an earlier decoy segment (FOO-1).
+  it('(k) attributes an ambiguous name to the final feature-<issue>-<service>-<index> segment, not an earlier decoy', async () => {
+    writeState({ containerRestarts: {} });
+
+    setupExec({
+      'docker ps -a': {
+        stdout: 'tenant-feature-foo-1-server-feature-pan-464-server-1|Exited (1) 2 minutes ago\n',
+      },
+      'tmux has-session': { stdout: '' },
+      'docker restart': { stdout: '' },
+      'lsof': { stdout: '' },
+    });
+
+    const actions = await checkWorkspaceContainerHealth();
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatch(/attempt 1\/5/);
+    const state = readState();
+    expect(state.containerRestarts!['tenant-feature-foo-1-server-feature-pan-464-server-1']).toBeDefined();
+    expect(mockSendKeysAsync).toHaveBeenCalledWith(
+      'agent-pan-464',
+      expect.anything(),
+      'deacon:container-restarted',
+    );
+    expect(mockSendKeysAsync).not.toHaveBeenCalledWith(
+      'agent-foo-1',
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it.each([
+    { issue: 'f29698', service: 'server' },
+    { issue: 'us12345', service: 'frontend' },
+  ])('(l) restarts a crashed Rally $issue $service container and alerts its agent', async ({ issue, service }) => {
+    writeState({ containerRestarts: {} });
+    const container = `rally-feature-${issue}-${service}-1`;
+
+    setupExec({
+      'docker ps -a': { stdout: `${container}|Exited (1) 2 minutes ago\n` },
+      'tmux has-session': { stdout: '' },
+      'docker restart': { stdout: '' },
+      'lsof': { stdout: '' },
+    });
+
+    const actions = await checkWorkspaceContainerHealth();
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain(`Auto-restarted crashed container ${container}`);
+    expect(readState().containerRestarts![container]).toBeDefined();
+    expect(mockExec).toHaveBeenCalledWith(
+      `docker restart ${container}`,
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(mockSendKeysAsync).toHaveBeenCalledWith(
+      `agent-${issue}`,
+      expect.anything(),
+      'deacon:container-restarted',
+    );
+  });
 });
