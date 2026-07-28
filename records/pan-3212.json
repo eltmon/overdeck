@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T16:33:31.708Z",
+  "updated": "2026-07-28T16:33:40.335Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "guard-keyed-submit-blocking-menu": {
+        "writerId": "agent-pan-3212",
+        "agentId": "agent-pan-3212",
+        "pid": 3860517,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T16:33:40.335Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3212",
@@ -98,6 +106,7 @@
     "extract-resume-gate-skip-seam": "completed",
     "extract-resume-gate-skip-seam.extract-resume-gate-skip-seam.ac1": "completed",
     "extract-resume-gate-skip-seam.extract-resume-gate-skip-seam.ac2": "completed",
-    "extract-resume-gate-skip-seam.extract-resume-gate-skip-seam.ac3": "completed"
+    "extract-resume-gate-skip-seam.extract-resume-gate-skip-seam.ac3": "completed",
+    "guard-keyed-submit-blocking-menu": "running"
   }
 }
