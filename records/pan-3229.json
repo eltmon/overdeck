@@ -15,8 +15,52 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "docs/FLYWHEEL-STATE.md",
+      "scripts/file-size-allowlist.txt",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      ".gitignore",
+      "docs/DEACON-HEALTH-MONITORING.md",
+      "docs/XBRIEF.md",
+      "src/cli/commands/plan-finalize.ts",
+      "src/lib/cloister/__tests__/pending-promotion-convergence.test.ts",
+      "src/lib/cloister/__tests__/pending-promotion-reconciler.test.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/pending-promotion-reconciler.ts",
+      "src/lib/overdeck/__tests__/planning-promotion-marker-cleanup.test.ts",
+      "src/lib/overdeck/planning-promotion.ts",
+      "src/lib/pan-dir/types.ts",
+      "tests/unit/cli/plan-finalize-pending-promotion.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".gitignore",
+      "docs/DEACON-HEALTH-MONITORING.md",
+      "docs/FLYWHEEL-STATE.md",
+      "docs/XBRIEF.md",
+      "scripts/file-size-allowlist.txt",
+      "src/cli/commands/plan-finalize.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx",
+      "src/lib/cloister/__tests__/pending-promotion-convergence.test.ts",
+      "src/lib/cloister/__tests__/pending-promotion-reconciler.test.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/pending-promotion-reconciler.ts",
+      "src/lib/overdeck/__tests__/planning-promotion-marker-cleanup.test.ts",
+      "src/lib/overdeck/planning-promotion.ts",
+      "src/lib/pan-dir/types.ts",
+      "tests/unit/cli/plan-finalize-pending-promotion.test.ts"
+    ],
+    "recordedAt": "2026-07-28T20:15:30.548Z"
+  },
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T20:15:33.580Z",
+  "updated": "2026-07-28T20:15:37.111Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "pending",
@@ -26,8 +70,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T20:15:33.579Z",
+    "updatedAt": "2026-07-28T20:15:37.062Z",
     "inspectNotes": "All 4 ACs met. Blocking ENOENT fixed: plan-finalize.ts:180 now mkdirSync(dirname(markerPath),{recursive:true}) before the temp write, so the marker lands regardless of whether the workspace has .overdeck/, and the new '.pan-only legacy workspace' regression test in tests/unit/cli/plan-finalize-pending-promotion.test.ts covers it (createWorkspace('.pan') writes only .pan/spec.vbrief.json, asserts no marker pre-run, then asserts the marker after 5 failed attempts). Secondary wording note also addressed at plan-finalize.ts:387 — 'the dashboard did not complete promotion' now covers non-2xx as well as unreachable. AC-1 marker fields + patrolAttempts:0, AC-2 'deferred'/deacon named/promotionDeferred:true/exit 1 at plan-finalize.ts:392, AC-3 !noPromote && !promoted guard, AC-4 .gitignore entry all verified in tree at 5b93276e.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3246",
     "reviewRequestedAt": "2026-07-28T20:15:33.579Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -72,8 +117,7 @@
         "tests/unit/cli/plan-finalize-pending-promotion.test.ts"
       ],
       "recordedAt": "2026-07-28T20:15:30.548Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3246"
+    }
   },
   "closeOut": {
     "usage": {
@@ -88,9 +132,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3702487,
-            "output": 217208,
-            "cacheRead": 88357888,
+            "input": 3711421,
+            "output": 217876,
+            "cacheRead": 90766336,
             "cacheWrite": 0
           }
         }
@@ -103,18 +147,20 @@
           "cacheWrite": 170493
         },
         "openai/gpt-5.6-sol": {
-          "input": 3702487,
-          "output": 217208,
-          "cacheRead": 88357888,
+          "input": 3711421,
+          "output": 217876,
+          "cacheRead": 90766336,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 77.068298,
-        "pricingAsOf": "2026-07-28T20:03:15.324Z"
+        "usd": 78.337232,
+        "pricingAsOf": "2026-07-28T20:15:37.104Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3246"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -253,49 +299,5 @@
     "docs-recovery-owner": "completed",
     "docs-recovery-owner.docs-recovery-owner.ac1": "completed",
     "docs-recovery-owner.docs-recovery-owner.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "docs/FLYWHEEL-STATE.md",
-      "scripts/file-size-allowlist.txt",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
-      "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      ".gitignore",
-      "docs/DEACON-HEALTH-MONITORING.md",
-      "docs/XBRIEF.md",
-      "src/cli/commands/plan-finalize.ts",
-      "src/lib/cloister/__tests__/pending-promotion-convergence.test.ts",
-      "src/lib/cloister/__tests__/pending-promotion-reconciler.test.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/pending-promotion-reconciler.ts",
-      "src/lib/overdeck/__tests__/planning-promotion-marker-cleanup.test.ts",
-      "src/lib/overdeck/planning-promotion.ts",
-      "src/lib/pan-dir/types.ts",
-      "tests/unit/cli/plan-finalize-pending-promotion.test.ts"
-    ],
-    "actualChangedFiles": [
-      ".gitignore",
-      "docs/DEACON-HEALTH-MONITORING.md",
-      "docs/FLYWHEEL-STATE.md",
-      "docs/XBRIEF.md",
-      "scripts/file-size-allowlist.txt",
-      "src/cli/commands/plan-finalize.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
-      "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx",
-      "src/lib/cloister/__tests__/pending-promotion-convergence.test.ts",
-      "src/lib/cloister/__tests__/pending-promotion-reconciler.test.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/pending-promotion-reconciler.ts",
-      "src/lib/overdeck/__tests__/planning-promotion-marker-cleanup.test.ts",
-      "src/lib/overdeck/planning-promotion.ts",
-      "src/lib/pan-dir/types.ts",
-      "tests/unit/cli/plan-finalize-pending-promotion.test.ts"
-    ],
-    "recordedAt": "2026-07-28T20:15:30.548Z"
   }
 }
