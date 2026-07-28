@@ -1,0 +1,1982 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T18:12:08Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1990: First-class workspaces and projects with per-workspace memory",
+    "updated": "2026-07-28T18:17:55.977Z"
+  },
+  "plan": {
+    "id": "pan-1990",
+    "title": "First-class workspaces and projects with per-workspace memory",
+    "status": "proposed",
+    "uid": "893feb1c-e8d0-4aee-b31b-310d37cab69f",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-28T18:12:08Z",
+    "updated": "2026-07-28T18:17:55.977Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1990",
+        "label": "PAN-1990",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-1990.md",
+        "label": "Canonical PRD (source of truth)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "workspaces",
+      "projects",
+      "memory",
+      "dashboard",
+      "schema",
+      "two-doors"
+    ],
+    "narratives": {
+      "Problem": "Workspaces are implicit (workspaces/feature-<issue>/ dirs pinned 1:1 to issues) and memory is issue-keyed, so non-issue sessions (main, scratch) get no Overdeck affordances and no recall; dashboard layout state is ephemeral. Promote projects and workspaces to first-class entities with a kind discriminator (main|issue|scratch), re-key the existing memory subsystem from (projectId, issueId) to (projectId, workspaceId), and give every workspace a dashboard surface.",
+      "Proposal": "Execute the canonical PRD drafts/pan-1990.md (decisions D-1..D-10 adopted; drift corrections in .overdeck/continue.json): new projects/workspaces/project_targets/pinned_docs tables in panopticon.db behind a resolver/writer two-door pair with a CI guard; boot seeding from projects.yaml + worktree backfill + rebuild-workspaces admin verb; pipeline integration (row-before-worktree, archive-on-closeout, deep-wipe memory exclusion, conversation workspace_id); CLI verbs (workspace new/main/get/activate/archive/list-filters/destroy --purge-memory, project add-target); memory re-key with identity records, home migration + FTS re-point, capture/injection for null-issueId turns, pins, search scope flags, state-domain mirror for summaries+pins, JSONL backfill; dashboard workspaces API, sidebar section, workspace view, Cmd-K switcher, additive workspaceId events; no-loss audit gate; docs + wrapper skills.",
+      "NonGoals": "- Cross-machine sync of rolling observations (backfill from Claude transcripts is the portability story)\n- Memory curation UI / observation editing\n- Auto-archival of stale workspaces\n- Dashboard surfacing of project_targets secondary paths (schema + CLI land; switcher shows primaries only)\n- Migrating per-issue continue files into workspace memory (different lifecycle; unchanged)\n- Sidecar corpora beside memory/ (transcripts/, diffs/, activity/, notes/) — layout reserves room; not built\n- Remote (Fly VM) workspace rows — ~/.overdeck/workspaces/{issueId}.yaml metadata remains as-is\n- No new session-context.md artifact (PRD D-2 — extend injectPromptTimeMemory instead)\n- No pan workspace delete alias (verb stays destroy, PRD D-4)\n- No changes to the event-store overdeck.db or its migration system"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted the canonical PRD drafts/pan-1990.md as source of truth without writing a new workspace PRD.",
+        "rationale": "The PRD-first gate (checkPrdGateSync) resolves the canonical draft at the state-home drafts/ dir and promotion never overwrites an existing canonical; the PRD is complete per prd-authoring rules and the issue body defers to it."
+      },
+      {
+        "summary": "Schema migration authored as current-version+1 at implementation time (63->64 today), not the PRD's 59->60.",
+        "rationale": "SCHEMA_VERSION advanced from 59 to 63 since the PRD was verified (2026-07-12); hardcoding invites a version collision on rebase."
+      },
+      {
+        "summary": "New tables land in panopticon.db via src/lib/database/schema.ts, though the issue/PRD say overdeck.db.",
+        "rationale": "schema.ts (where conversations/agents live and where the PRD's WI-1 edits point) manages ~/.overdeck/panopticon.db; the event store's overdeck.db is a separate database with its own migration system."
+      },
+      {
+        "summary": "Folded the 2026-07-26 reconciliation comment into the plan: idle-stack reaper joins through the resolver with an explicit kind='main' reaping exemption, and wrapper-repo git posture is documented in docs/WORKSPACES-AND-PROJECTS.md.",
+        "rationale": "The comment states both reaper tiers should stop tmux-name scraping when this lands, and that main-kind workspaces are excluded today only incidentally; the wrapper-posture note asks for exactly this documentation."
+      },
+      {
+        "summary": "pan project add-target --primary demotes the previous primary rather than erroring.",
+        "rationale": "The partial unique index requires exactly one primary; demotion is the least-surprising upsert semantic and matches the writer-owns-invariants door design."
+      },
+      {
+        "summary": "Kept one mega-plan with plan.metadata.sizeJustification instead of decomposing into sibling issues.",
+        "rationale": "The issue body explicitly mandates delivery as one complete feature with no partial-delivery milestones; the PRD repeats it."
+      },
+      {
+        "summary": "Ignored the PRD's 'Beads, not TODO lists' intersecting rule.",
+        "rationale": "Beads/bd/Dolt were removed in PAN-2648 after the PRD was written; task tracking runs through the pan task door against this xBRIEF."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The issue body mandates single-issue delivery: 'This is delivered as one complete feature — schema, migration, memory pipeline, CLI, and dashboard surface together... there are no prescribed phases and no partial-delivery milestones.' The schema, doors, memory re-key, and dashboard surface are load-bearing for each other (partial delivery would strand half-keyed memory homes or a sidebar over missing tables). Decomposition is expressed as 27 small, independently reviewable items with explicit blocking edges instead of sibling issues.",
+      "canonicalFilename": "2026-07-28-PAN-1990-first-class-workspaces-and-projects-with-per-workspace-memory.xbrief.json"
+    },
+    "items": [
+      {
+        "id": "schema-v64",
+        "title": "Schema migration: projects, workspaces, project_targets, pinned_docs tables + workspace_id columns",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/database/schema.ts",
+            "tests/unit/lib/database/schema-workspaces.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/database/schema-workspaces.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "schema-workspaces.test.ts green: fresh/migrated parity, CHECK rejection, partial-unique rejection"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-10"
+          ],
+          "foundationFor": [
+            "workspace-doors",
+            "memory-home-migration",
+            "conversation-linkage",
+            "cli-project-add-target"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/database/schema.ts (manages ~/.overdeck/panopticon.db — NOT the event store's overdeck.db): bump SCHEMA_VERSION from its value at implementation time (63 as of 2026-07-28) to +1. Add CREATE TABLE IF NOT EXISTS blocks in initSchema() for projects, workspaces, project_targets exactly per the issue's Schema section, plus pinned_docs per PRD WI-1 (scope CHECK IN ('workspace','project'), UNIQUE(scope, scope_id, doc_path)). workspaces gets kind CHECK (kind IN ('main','issue','scratch')), non-unique path, branch_name, parent_branch, parent_branch_guessed, is_git_repository, issue_id, layout_config, is_favorite, is_archived, title, created_at, last_accessed_at. Add workspace_id TEXT (nullable) to the base conversations and agents CREATE TABLE statements AND as try/catch ALTERs in the runMigrations() version block (follow the v58->v59 pattern). Indexes: idx_workspace_project, idx_workspace_kind, idx_workspace_last_accessed, partial unique idx_project_targets_one_primary ON project_targets(project_id) WHERE is_primary=1, idx_pinned_docs_scope(scope, scope_id)."
+        },
+        "items": [
+          {
+            "id": "schema-v64.ac1",
+            "title": "A fresh database creates all four new tables and both workspace_id columns (schema test queries sqlite_master)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-v64.ac2",
+            "title": "Migrating a previous-version fixture DB produces a schema identical to a fresh DB (sqlite_master parity comparison succeeds)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-v64.ac3",
+            "title": "INSERT with kind outside main/issue/scratch fails the CHECK constraint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-v64.ac4",
+            "title": "The partial unique index rejects a second is_primary=1 row for the same project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-doors",
+        "title": "Two doors: workspaces resolver and writer in src/lib/workspaces/",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspaces/types.ts",
+            "src/lib/workspaces/resolver.ts",
+            "src/lib/workspaces/writer.ts",
+            "tests/unit/lib/workspaces/resolver.test.ts",
+            "tests/unit/lib/workspaces/writer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/workspaces/"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "resolver/writer suites green incl. SET-NULL, main-singleton, primary-demotion"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "boot-seeding",
+            "pipeline-create-row",
+            "conversation-linkage",
+            "resource-discovery-resolver",
+            "cli-workspace-new-main",
+            "cli-workspace-lifecycle",
+            "dashboard-api",
+            "memory-pins"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/workspaces/types.ts (WorkspaceKind, WorkspaceRow, ProjectRow, ProjectTargetRow mirroring the DDL), resolver.ts (the ONLY module that SELECTs these tables: getWorkspaceById, getWorkspaceByName(projectId,name), getWorkspaceForIssue(issueId) -> non-archived kind='issue' row, getMainWorkspace(projectId), listWorkspaces({projectId?,kind?,includeArchived?}), getProjectByKey, getProjectByPath, listProjects, resolveWorkspaceForCwd(cwd) via longest-path-prefix over workspace paths then project primary paths), and writer.ts (the ONLY module that mutates them: upsertProjectFromConfig, addProjectTarget(projectId,path,isPrimary — isPrimary demotes any existing primary, per continue.json D6), createWorkspace (crypto.randomUUID id; enforces main-singleton per project), touchWorkspaceAccessed, updateWorkspaceLayout, setWorkspaceFavorite, archiveWorkspace, unarchiveWorkspace, deleteWorkspace (refuses kind='main'; UPDATE conversations SET workspace_id=NULL WHERE workspace_id=?; removes pinned_docs WHERE scope='workspace' AND scope_id=?; NEVER touches conversation rows, JSONL files, or memory homes), pinDoc, unpinDoc). Identity-record mirroring into metadata.json is wired later by memory-paths-rekey — leave a named seam (e.g. an optional onIdentityChange callback or a TODO-free direct call added in that item)."
+        },
+        "items": [
+          {
+            "id": "workspace-doors.ac1",
+            "title": "Resolver returns workspace rows by id, by issue, and by cwd longest-prefix match (unit tests exercise all three)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-doors.ac2",
+            "title": "deleteWorkspace sets conversations.workspace_id to NULL and preserves the conversation row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-doors.ac3",
+            "title": "deleteWorkspace refuses kind='main' and removes workspace-scoped pinned_docs while project-scoped pins survive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-doors.ac4",
+            "title": "createWorkspace rejects a second kind='main' row for the same project (main-singleton enforced)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-doors.ac5",
+            "title": "addProjectTarget with isPrimary updates the previous primary to non-primary so exactly one primary row remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doors-guard",
+        "title": "Guard script: build fails on direct SQL against workspace tables outside the doors",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/guard-workspace-doors.sh",
+            "package.json",
+            "tests/unit/scripts/guard-workspace-doors.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "npx vitest run tests/unit/scripts/guard-workspace-doors.test.ts"
+          ],
+          "expected_outputs": [
+            "lint exits 0 on clean tree",
+            "guard self-test green: violation detected, clean tree passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create scripts/guard-workspace-doors.sh following the scripts/guard-state-plane-branches.sh pattern: grep src/ for SQL touching workspaces/projects/project_targets/pinned_docs (patterns like 'FROM workspaces', 'INTO projects', 'UPDATE workspaces', 'DELETE FROM project_targets') outside an allowlist of src/lib/workspaces/*.ts and src/lib/database/schema.ts; exit 1 printing the offending lines. Wire into npm run lint in package.json next to scripts/lint-skills.sh. Add a self-test invoking the script against a fixture violation file."
+        },
+        "items": [
+          {
+            "id": "doors-guard.ac1",
+            "title": "Guard exits 1 and prints the offending line when a fixture file outside the doors SELECTs the workspaces table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doors-guard.ac2",
+            "title": "Guard exits 0 on the clean tree with schema.ts and the door modules allowlisted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doors-guard.ac3",
+            "title": "npm run lint executes the guard and exits 0 on a clean tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "boot-seeding",
+        "title": "Boot seeding: projects.yaml upsert + issue-worktree backfill at dashboard boot",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspaces/rebuild.ts",
+            "src/dashboard/server/main.ts",
+            "tests/unit/lib/workspaces/rebuild.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/workspaces/rebuild.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "rebuild.test.ts green: idempotent seeding + backfill"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/workspaces/rebuild.ts with seedProjectsFromYaml() (iterate listProjectsSync() from src/lib/projects.ts (~line 307), writer.upsertProjectFromConfig per entry; stable id = yaml key, primary_path = config.path; idempotent) and backfillIssueWorkspaces() (per project, scan <projectPath>/<workspaces_dir>/feature-* with the same regex resource-discovery uses (/^feature-([a-z]+-\\d+)$/i, resource-discovery.ts ~line 398); create kind='issue' rows via the writer for dirs without a row, branch feature/<id>). Call both from the dashboard server boot in src/dashboard/server/main.ts, same phase as startTranscriptPoller() (~line 528). HAZARD H4: this is a boot-path change — runtime-boot-test on a throwaway instance before any live restart; pan restart --health-timeout 120000 (milliseconds)."
+        },
+        "items": [
+          {
+            "id": "boot-seeding.ac1",
+            "title": "Given a fixture projects.yaml, seeding creates one projects row per entry and a second run creates zero additional rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-seeding.ac2",
+            "title": "Every fixture feature-* worktree directory produces a kind='issue' workspaces row with branch feature/<id>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-seeding.ac3",
+            "title": "Boot on a throwaway instance succeeds with seeding wired (health endpoint returns healthy within the timeout)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rebuild-workspaces-cmd",
+        "title": "pan admin db rebuild-workspaces command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspaces/rebuild.ts",
+            "src/cli/commands/db.ts",
+            "tests/unit/lib/workspaces/rebuild.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspaces/rebuild.test.ts"
+          ],
+          "expected_outputs": [
+            "rebuild.test.ts green: three-source rebuild, dry-run no-op, scratch recreation"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-13",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add rebuildMainAndScratchWorkspaces() to src/lib/workspaces/rebuild.ts: scan ~/.overdeck/memory/{projectId}/*/metadata.json via readWorkspaceIdentity (from memory-paths-rekey) and recreate any main/scratch row missing from the DB. Register 'rebuild-workspaces' in src/cli/commands/db.ts following the rebuild-agents pattern (~line 110): runs seedProjectsFromYaml -> backfillIssueWorkspaces -> rebuildMainAndScratchWorkspaces with --dry-run and --verbose flags."
+        },
+        "items": [
+          {
+            "id": "rebuild-workspaces-cmd.ac1",
+            "title": "rebuild-workspaces reconstructs projects and workspaces rows from yaml, worktree scan, and fixture metadata.json identity records",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rebuild-workspaces-cmd.ac2",
+            "title": "--dry-run prints planned changes and persists zero rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rebuild-workspaces-cmd.ac3",
+            "title": "The next run recreates a scratch row deleted from the DB from its fixture metadata.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-create-row",
+        "title": "pan start / pan plan create the issue workspace row before worktree creation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/create.ts",
+            "tests/unit/lib/workspace-manager/create-workspace-row.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace-manager/"
+          ],
+          "expected_outputs": [
+            "workspace-manager suites green incl. new row-creation assertions"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In createWorkspacePromise() (src/lib/workspace-manager/create.ts, export at ~line 165 — re-grep, PRD line refs are stale), after the workspace path is computed and before git worktree add runs, call writer.createWorkspace({ kind: 'issue', issueId, path, branchName, ... }); idempotent when a row already exists for the issue (resolver.getWorkspaceForIssue check)."
+        },
+        "items": [
+          {
+            "id": "pipeline-create-row.ac1",
+            "title": "createWorkspacePromise creates a kind='issue' row via the writer before the worktree directory exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-create-row.ac2",
+            "title": "Re-running for an issue that already has a row reuses it and creates no duplicate rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-create-row.ac3",
+            "title": "Existing pipeline create tests stay green (pan start flow preserves current behavior)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lifecycle-archive",
+        "title": "Close-out archives the workspace row; deep-wipe never touches memory homes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/issue-close-out.ts",
+            "src/lib/overdeck/workspace-hygiene.ts",
+            "tests/unit/lib/overdeck/workspace-lifecycle-rows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/workspace-lifecycle-rows.test.ts"
+          ],
+          "expected_outputs": [
+            "lifecycle-rows test green: archive-on-closeout, memory-home survival on deep-wipe"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In closeOutIssue() (src/lib/overdeck/issue-close-out.ts ~line 102), where workspace teardown triggers, add writer.archiveWorkspace for the issue's row — row and memory home survive while directory/stack teardown stays unchanged. In deepWipeIssue() and cleanupWorkspaceForIssue() (src/lib/overdeck/workspace-hygiene.ts ~lines 105/45): archive (not delete) the workspace row on deep-wipe, and add a regression test proving nothing under ~/.overdeck/memory/ is touched by either path."
+        },
+        "items": [
+          {
+            "id": "lifecycle-archive.ac1",
+            "title": "closeOutIssue marks the issue workspace row is_archived=1 and its fixture memory home survives intact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-archive.ac2",
+            "title": "deepWipeIssue preserves a fixture ~/.overdeck/memory/ tree byte-identical (regression test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-archive.ac3",
+            "title": "Deep-wipe marks the workspace row archived rather than deleting it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-linkage",
+        "title": "Conversations carry workspace_id resolved from cwd",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/database/conversations-db.ts",
+            "tests/unit/lib/database/conversation-workspace-linkage.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/database/conversation-workspace-linkage.test.ts"
+          ],
+          "expected_outputs": [
+            "linkage test green: persist, cwd-resolve, survive-deletion"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend createConversation() (src/lib/database/conversations-db.ts ~line 466) to accept and persist workspaceId. Callers that spawn conversations with a cwd resolve it via resolver.resolveWorkspaceForCwd(cwd) when no explicit workspace is given (enumerate callers via git grep createConversation). Deletion SET-NULL semantics are already enforced by the writer (workspace-doors item); add the integration test here."
+        },
+        "items": [
+          {
+            "id": "conversation-linkage.ac1",
+            "title": "createConversation persists workspaceId when provided",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-linkage.ac2",
+            "title": "A conversation spawned with a workspace cwd resolves and stores the matching workspace_id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-linkage.ac3",
+            "title": "After deleteWorkspace, the conversation row survives with workspace_id NULL and its JSONL transcript untouched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resource-discovery-resolver",
+        "title": "Resource discovery and idle-stack reaper join through the workspaces resolver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/resource-discovery.ts",
+            "src/lib/cloister/idle-stack-reaper.ts",
+            "tests/unit/lib/cloister/idle-stack-reaper-workspaces.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "reaper suites green incl. main-kind exemption"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the directory-name scrape in src/dashboard/server/services/resource-discovery.ts (~lines 391-416, regex at ~398) with resolver.listWorkspaces({kind:'issue'}), keeping the filesystem scan only as fallback when the table is empty (pre-first-boot). Per the 2026-07-26 reconciliation comment: both idle-stack-reaper tiers (src/lib/cloister/idle-stack-reaper.ts) stop discovering candidate stacks via container-label + tmux-name scraping and instead join through the resolver (last_accessed_at, agents.workspace_id). kind='main' workspaces are explicitly exempt from reaping (HAZARD H8 — today's feature-<issue> name rule excludes them only incidentally)."
+        },
+        "items": [
+          {
+            "id": "resource-discovery-resolver.ac1",
+            "title": "Resource discovery lists issue workspaces from the resolver and falls back to the directory scan only when the table is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resource-discovery-resolver.ac2",
+            "title": "Idle-stack reaper resolves candidate stacks through the resolver, not tmux-name scraping",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resource-discovery-resolver.ac3",
+            "title": "The reaper refuses to reap kind='main' workspaces (dedicated exemption test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-workspace-new-main",
+        "title": "pan workspace new + pan workspace main verbs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/workspace.ts",
+            "tests/unit/cli/workspace-commands.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/workspace-commands.test.ts"
+          ],
+          "expected_outputs": [
+            "workspace-commands test green: scratch creation, main singleton, non-git detection"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-18"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/workspace.ts (registerWorkspaceCommands): add 'new <name> [--project <p>] [--isolated] [--parent-branch <b>]' -> writer.createWorkspace kind='scratch' (shared default: path = project primary path, no worktree; --isolated: git worktree add <workspaces_dir>/scratch-<name> via async exec, NEVER execSync; parent_branch_guessed=1 when inferred). Add 'main [--project <p>]' -> resolver.getMainWorkspace else writer.createWorkspace kind='main' with path = project.primary_path and is_git_repository detected from .git presence (FR-18), then touchWorkspaceAccessed. Update the pan-workspace wrapper skill flag list in the same commit (lint-skills.sh enforces; see docs-skills item for the new SKILL.md)."
+        },
+        "items": [
+          {
+            "id": "cli-workspace-new-main.ac1",
+            "title": "workspace new creates a kind='scratch' row; --isolated additionally creates a git worktree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-workspace-new-main.ac2",
+            "title": "workspace main resolves-or-creates the singleton main workspace and updates last_accessed_at",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-workspace-new-main.ac3",
+            "title": "A non-git primary path produces a main workspace with is_git_repository=0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-workspace-lifecycle",
+        "title": "pan workspace get/activate/archive + list filters + destroy --purge-memory",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/workspace.ts",
+            "tests/unit/cli/workspace-commands.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/workspace-commands.test.ts"
+          ],
+          "expected_outputs": [
+            "workspace-commands test green: filters, purge semantics, main refusal"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/workspace.ts: add 'get <ws>', 'activate <ws>' (touchWorkspaceAccessed + print layout hint), 'archive <ws>'. Extend 'list' with --kind <k> and --archived, listing from the resolver (kind, name, project, branch, last-accessed). Extend the existing 'destroy' with --purge-memory: after existing destroy behavior, writer.deleteWorkspace(id); ONLY with the flag (plus existing typed confirmation) remove ~/.overdeck/memory/{projectId}/{workspaceId}/. Refuse destroy for kind='main'. Keep the verb 'destroy' — no 'delete' alias (PRD D-4). Update wrapper skill in the same commit."
+        },
+        "items": [
+          {
+            "id": "cli-workspace-lifecycle.ac1",
+            "title": "list --kind and --archived returns only matching rows read through the resolver",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-workspace-lifecycle.ac2",
+            "title": "destroy --purge-memory removes the memory home; destroy without the flag preserves it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-workspace-lifecycle.ac3",
+            "title": "destroy refuses kind='main' workspaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-workspace-lifecycle.ac4",
+            "title": "archive marks is_archived=1 and the row survives (reversible)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-project-add-target",
+        "title": "pan project add-target",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/project.ts",
+            "src/cli/index.ts",
+            "tests/unit/cli/project-commands.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/project-commands.test.ts"
+          ],
+          "expected_outputs": [
+            "project-commands test green: target row creation + primary demotion"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ],
+          "acJustification": "Two ACs: the verb has exactly two observable behaviors (row creation, primary demotion); padding would restate them."
+        },
+        "narrative": {
+          "Action": "Add 'add-target <project> --path <path> [--primary]' to the project command group (src/cli/commands/project.ts / registerProjectCommands in src/cli/index.ts — re-grep current location) -> writer.addProjectTarget. --primary demotes the previous primary (continue.json D6). Update pan-projects wrapper skill flag list in the same commit."
+        },
+        "items": [
+          {
+            "id": "cli-project-add-target.ac1",
+            "title": "add-target creates a project_targets row for the project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-project-add-target.ac2",
+            "title": "add-target --primary updates the previous primary to non-primary so exactly one primary row remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-contracts-nullable",
+        "title": "Contracts: MemoryIdentity/MemoryObservation issueId becomes nullable",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/memory.ts",
+            "src/lib/memory/injection.ts",
+            "src/lib/memory/pipeline.ts",
+            "src/lib/memory/observations.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd packages/contracts && npm run build",
+            "npm run typecheck",
+            "npx vitest run src/lib/memory/__tests__/"
+          ],
+          "expected_outputs": [
+            "contracts build exits 0",
+            "typecheck exits 0",
+            "memory suites green with null-issueId decode"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ],
+          "foundationFor": [
+            "memory-paths-rekey",
+            "memory-capture-nonissue",
+            "memory-backfill"
+          ]
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/memory.ts change issueId: IssueId to Schema.NullOr(IssueId) in MemoryIdentity (~line 7) and MemoryObservation (~line 27). Rebuild contracts (cd packages/contracts && npm run build — HAZARD H6 ordering). Fix resulting type errors across src/lib/memory/** by null-guarding issue-specific behavior; sibling-issue summary injection skips when issueId is null. projectId + workspaceId become the primary identity pair; null issueId means a main/scratch workspace turn (PRD D-6)."
+        },
+        "items": [
+          {
+            "id": "memory-contracts-nullable.ac1",
+            "title": "Schema decode accepts issueId null for MemoryIdentity and MemoryObservation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-contracts-nullable.ac2",
+            "title": "Sibling-issue summary injection skips when issueId is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-contracts-nullable.ac3",
+            "title": "npm run typecheck exits 0 across root and contracts after the rebuild",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-paths-rekey",
+        "title": "Memory paths re-key to workspaceId + identity record module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/paths.ts",
+            "src/lib/memory/identity-record.ts",
+            "src/lib/memory/observations.ts",
+            "src/lib/memory/pending.ts",
+            "src/lib/memory/rollup.ts",
+            "src/lib/memory/injection.ts",
+            "src/lib/memory/search.ts",
+            "src/lib/memory/cli.ts",
+            "src/lib/memory/health.ts",
+            "src/lib/workspaces/writer.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/memory/__tests__/"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "memory path/identity suites green under workspace keying"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/memory/paths.ts add resolveWorkspaceMemoryRoot(projectId, workspaceId) (same shape as resolveIssueMemoryRoot at ~line 31, with assertMemorySafeSegment on workspaceId); re-point resolveObservationsFile, resolvePendingDir, resolveStatusFile, resolveArchiveDir, resolveSummariesDir, resolveRagRunsFile to take workspaceId. Keep resolveIssueMemoryRoot exported, marked @deprecated, used only by the migration. Update ALL callers (enumerate via git grep -l resolveIssueMemoryRoot src/lib — observations.ts, pending.ts, rollup.ts, injection.ts, search.ts, cli.ts, health.ts at PRD time). Create src/lib/memory/identity-record.ts: writeWorkspaceIdentity(row) writes/merges metadata.json at the memory root ({id, projectId, kind, name, path, branchName, parentBranch, issueId, createdAt} merged over existing counters); readWorkspaceIdentity(path) parses it for rebuild. Wire writer.createWorkspace/rename/archive to mirror identity via writeWorkspaceIdentity (the seam left in workspace-doors)."
+        },
+        "items": [
+          {
+            "id": "memory-paths-rekey.ac1",
+            "title": "resolveWorkspaceMemoryRoot returns ~/.overdeck/memory/{projectId}/{workspaceId} and rejects unsafe segments",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-paths-rekey.ac2",
+            "title": "writeWorkspaceIdentity persists metadata.json with the full identity merged over existing counters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-paths-rekey.ac3",
+            "title": "The writer persists identity to metadata.json on workspace create and archive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-paths-rekey.ac4",
+            "title": "Deprecated resolveIssueMemoryRoot survives for migration use only (no non-migration caller remains, asserted by grep-based test or lint)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-home-migration",
+        "title": "Migrate issue-keyed memory homes to workspace UUIDs + FTS re-point",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspaces/rebuild.ts",
+            "tests/unit/lib/workspaces/memory-migration.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspaces/memory-migration.test.ts"
+          ],
+          "expected_outputs": [
+            "memory-migration test green: move, FTS re-point, idempotent re-run, unresolvable preservation"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add migrateMemoryHomesToWorkspaces() to src/lib/workspaces/rebuild.ts, invoked by rebuild-workspaces and once at boot behind marker file ~/.overdeck/memory/.workspace-keyed. For each ~/.overdeck/memory/{projectId}/{issueId}/ dir whose segment matches an issue-id pattern and has a backfilled issue-workspace row: rename dir to {projectId}/{workspaceUuid}/, write metadata.json. In each project's memory-search.db: UPDATE memory_fts SET workspace_id = ? WHERE issue_id = ? (maps by issueId, NOT by stored legacy workspaceId strings — PRD D-5). Idempotent per NFR-5 / HAZARD H3: skips dirs already containing metadata.json, never deletes observation files, leaves unresolvable dirs in place and logs them."
+        },
+        "items": [
+          {
+            "id": "memory-home-migration.ac1",
+            "title": "Migration moves a fixture issue-keyed home to {projectId}/{workspaceUuid}/ and creates metadata.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-home-migration.ac2",
+            "title": "memory_fts rows re-point: querying by the new workspace_id returns the migrated observation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-home-migration.ac3",
+            "title": "A second run respects the marker and produces zero directory or FTS changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-home-migration.ac4",
+            "title": "An unresolvable directory survives in place and is logged, never deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-capture-nonissue",
+        "title": "Observation capture + injection for main/scratch conversations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/hooks.ts",
+            "src/lib/memory/poller.ts",
+            "src/lib/memory/pipeline.ts",
+            "src/lib/memory/injection.ts",
+            "src/lib/memory/__tests__/workspace-capture.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/memory/__tests__/workspace-capture.test.ts"
+          ],
+          "expected_outputs": [
+            "workspace-capture test green: null-issueId observation, scoped injection, pin inclusion, fake timers"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "When a hook event arrives (src/dashboard/server/routes/hooks.ts, UserPromptSubmit handling ~line 273) for a session whose conversation has workspace_id but no agent/issue context, build MemoryIdentity with issueId: null, workspaceId from the conversation row; reuse the existing conversation-role convention for agentRole (extend Role in contracts only if typecheck forces it). Register the transcript for polling via registerTranscriptForPolling (src/lib/memory/poller.ts ~line 246) exactly as agent transcripts, so the claim->compress->extract->write pipeline runs unchanged with workspace identity. injectPromptTimeMemory() (src/lib/memory/injection.ts ~line 71): scope selection keys on workspaceId; sibling-issue-summaries budget line skips on null issueId; include pinned docs read through the resolver under the existing knowledge budget. Verify null-issue turns roll up in rollup.ts. All poller tests use fake timers (NFR-2 / HAZARD H7)."
+        },
+        "items": [
+          {
+            "id": "memory-capture-nonissue.ac1",
+            "title": "A fixture conversation in a scratch workspace produces an observation with issueId null and the correct workspace UUID",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-capture-nonissue.ac2",
+            "title": "Prompt-time injection for that workspace returns its status and observations and omits sibling-issue summaries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-capture-nonissue.ac3",
+            "title": "Injection output contains the pinned project doc",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-capture-nonissue.ac4",
+            "title": "The fake-timer poller test produces the observation without real timer waits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-pins",
+        "title": "pinned_docs: pan memory pin/unpin CLI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/memory.ts",
+            "src/lib/memory/cli.ts",
+            "tests/unit/cli/memory-pin-commands.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/memory-pin-commands.test.ts"
+          ],
+          "expected_outputs": [
+            "pin-commands test green: roundtrip + scope cascade"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10"
+          ],
+          "acJustification": "Two ACs: pin/unpin roundtrip and scope cascade are the verb's only observable behaviors; injection inclusion is covered by memory-capture-nonissue."
+        },
+        "narrative": {
+          "Action": "Add 'pan memory pin <doc-path> [--workspace <ws> | --project <p>]' and 'pan memory unpin <doc-path> ...' to src/cli/commands/memory.ts -> writer.pinDoc/unpinDoc (doors from workspace-doors). Paths stored project-relative. Update pan-memory wrapper skill in the same commit."
+        },
+        "items": [
+          {
+            "id": "memory-pins.ac1",
+            "title": "pin stores a project-relative pinned_docs row; unpin deletes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-pins.ac2",
+            "title": "A workspace-scoped pin is removed by deleteWorkspace while a project-scoped pin survives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-search-scopes",
+        "title": "pan memory search --workspace/--project/--global flags",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/memory.ts",
+            "src/lib/memory/search.ts",
+            "src/lib/memory/cli.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/memory/__tests__/"
+          ],
+          "expected_outputs": [
+            "search suites green: workspace filter, global merge, default preserved"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend 'pan memory search <q>' (src/cli/commands/memory.ts ~line 17) with --workspace <id|name>, --project <p> (current default behavior), --global (PRD D-3 — flags, not new subcommands). Workspace scope filters memory_fts by workspace_id; global iterates project FTS DBs under ~/.overdeck/memory/*/memory-search.db and merges by rank. Update predicates in src/lib/memory/search.ts. Update pan-memory wrapper skill in the same commit."
+        },
+        "items": [
+          {
+            "id": "memory-search-scopes.ac1",
+            "title": "--workspace returns only that workspace's FTS rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-search-scopes.ac2",
+            "title": "--global returns merged hits across two fixture project DBs ordered by rank",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-search-scopes.ac3",
+            "title": "Default invocation preserves the current project-scope behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-state-mirror",
+        "title": "Durable summaries + pins mirrored to the new memory state domain",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/state-plane.ts",
+            "src/lib/memory/rollup.ts",
+            "src/lib/memory/cli.ts",
+            "tests/unit/lib/memory/state-mirror.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/memory/state-mirror.test.ts"
+          ],
+          "expected_outputs": [
+            "state-mirror test green: summary mirror, pin roundtrip, observation-path rejection"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Add 'memory/' to STATE_BRANCH_PATHS (src/lib/state-plane.ts ~line 12 — list currently ends at notes/; no .beads entry anymore). After generateDailySummary() writes summaries/<date>.md in the memory home, mirror it to <stateDomain memory>/summaries/<projectKey>/<workspace-name>-<date>.md through resolveStateDomainPathSync (src/lib/state-home.ts) and the same state-door commit path existing domain writers use (PRD D-9; this project's state worktree is ~/.overdeck/state/panopticon-cli/). On pinDoc mirror a JSON descriptor into <stateDomain memory>/pins/; remove on unpinDoc. Rolling observations, pending/, status.json are NEVER mirrored — the mirror function rejects those paths."
+        },
+        "items": [
+          {
+            "id": "memory-state-mirror.ac1",
+            "title": "STATE_BRANCH_PATHS contains memory/ and a daily summary lands under the resolved memory domain path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-state-mirror.ac2",
+            "title": "pinDoc creates a descriptor in memory/pins/ and unpin deletes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-state-mirror.ac3",
+            "title": "The mirror function rejects paths under observations/ or pending/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-backfill",
+        "title": "pan memory backfill from Claude JSONL transcripts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/backfill.ts",
+            "src/cli/commands/memory.ts",
+            "src/lib/memory/__tests__/backfill.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/memory/__tests__/backfill.test.ts"
+          ],
+          "expected_outputs": [
+            "backfill test green: mapping, skip, dedupe, dry-run + JSONL integrity"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-12",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/memory/backfill.ts: enumerate ~/.claude/projects/*/*.jsonl; read cwdFromFirstMessage via parseSessionJsonl() (src/lib/conversations/jsonl-async.ts ~line 109); map cwd -> workspace via resolver.resolveWorkspaceForCwd; skip unmatched sessions. Feed matched transcript ranges through the existing pipeline stages (compress->extract->write) with the resolved identity, respecting provider-policy cost caps; dedupe via the deterministic observation id (SHA256 of sessionId:fromOffset) so re-runs are no-ops. Register 'pan memory backfill [--workspace <ws>] [--project <p>] [--dry-run]' in src/cli/commands/memory.ts. HAZARD H5: strictly read-only on JSONL — Claude session files are sacred. Fake timers for any polling in tests (H7)."
+        },
+        "items": [
+          {
+            "id": "memory-backfill.ac1",
+            "title": "Fixture JSONL in a temp ~/.claude/projects produces observations in the cwd-mapped workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-backfill.ac2",
+            "title": "Backfill produces no observations for sessions with unmatched cwd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-backfill.ac3",
+            "title": "A second run creates zero observation rows (deterministic id dedupe)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-backfill.ac4",
+            "title": "--dry-run persists nothing and the fixture JSONL files survive byte-identical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-api",
+        "title": "Workspaces REST API route module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/dashboard/routes/workspaces-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/workspaces-routes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "workspaces-routes test green: list, mutate, layout roundtrip, memory endpoint"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-14",
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/workspaces.ts composed in server.ts like the existing route modules: GET /api/workspaces (list with project, kind, pipeline badge data), GET /api/workspaces/:id (detail + memory status), GET /api/workspaces/:id/memory (status.json headline + observation timeline read through memory search), POST /api/workspaces/:id/activate|archive|favorite, PUT /api/workspaces/:id/layout. All handlers call the doors — no direct SQL (doors-guard enforces). No execSync anywhere (NFR-3)."
+        },
+        "items": [
+          {
+            "id": "dashboard-api.ac1",
+            "title": "GET /api/workspaces returns rows with project, kind, and pipeline badge data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-api.ac2",
+            "title": "POST activate/archive/favorite updates rows through the writer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-api.ac3",
+            "title": "PUT layout persists layout_config JSON and a subsequent GET returns it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-api.ac4",
+            "title": "GET /api/workspaces/:id/memory returns the status headline and observation timeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "events-workspaceid",
+        "title": "Domain-event payloads additively carry workspaceId",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/events.ts",
+            "src/dashboard/server/services/event-store.ts"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "cd packages/contracts && npm run build",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "contracts build + typecheck exit 0",
+            "event decode test green with and without workspaceId"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-15"
+          ],
+          "acJustification": "Two ACs: additive emission and decode-compatibility are the complete observable contract of an additive payload change."
+        },
+        "narrative": {
+          "Action": "Where domain-event payloads carry issueId, additively include workspaceId once rows exist (PRD D-10): locate emitters via git grep -n 'issueId' src/dashboard/server/services/event-store and extend the payload types in packages/contracts additively — no field removed or renamed; consumers that ignore workspaceId keep working. Rebuild contracts after the change (H6)."
+        },
+        "items": [
+          {
+            "id": "events-workspaceid.ac1",
+            "title": "Events that carry issueId also emit workspaceId when a workspace row exists for the issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "events-workspaceid.ac2",
+            "title": "Contract decode accepts payloads with and without workspaceId; no field removed or renamed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-sidebar",
+        "title": "Sidebar Workspaces section above Projects",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Sidebar.tsx",
+            "src/dashboard/frontend/src/components/__tests__/Sidebar.workspaces.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/Sidebar.workspaces.test.tsx"
+          ],
+          "expected_outputs": [
+            "Sidebar workspace-section tests green: ordering, badges, archived collapse, toggle persistence"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Sidebar.tsx add a WORKSPACES section above the current project/nav groups: favorites first, then last_accessed_at desc; kind icons (main/issue/scratch); pipeline-phase badge for issue kind reusing getPipelineIssuePhase (already imported in Sidebar.tsx); archived collapsed into a count row; flat<->grouped-by-project toggle persisted in localStorage. Existing sections below remain untouched (no-loss). Follow pan-style-guide: no decorative color, badge vocabulary, running-is-not-green."
+        },
+        "items": [
+          {
+            "id": "dashboard-sidebar.ac1",
+            "title": "Sidebar renders a Workspaces section above Projects with favorites first then recency order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-sidebar.ac2",
+            "title": "Each issue-kind row displays a pipeline-phase badge derived from getPipelineIssuePhase",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-sidebar.ac3",
+            "title": "The archived group collapses into a count row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-sidebar.ac4",
+            "title": "The flat/grouped toggle persists its state in localStorage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-workspace-view",
+        "title": "Workspace view route with terminals, conversations, memory surface",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npm run typecheck && npx vitest run"
+          ],
+          "expected_outputs": [
+            "frontend typecheck exits 0",
+            "WorkspaceView + ConversationPanel filter tests green",
+            "Playwright screenshot of the rendered view captured and inspected"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx on route /workspace/:id: terminal panel (existing XTerminal against the workspace's tmux sessions via agents.workspace_id), conversations filtered by conversations.workspace_id (ConversationPanel gains a workspace filter prop with an 'all conversations' escape hatch), memory surface (status headline/phase/next-steps + observation timeline from GET /api/workspaces/:id/memory), and for issue kind the existing VBriefViewer + pipeline status components reused, not reimplemented. layout_config persists/restores pane arrangement on activation. Verify rendering yourself with Playwright screenshots (self-verify rule) — do not ask the operator to eyeball it."
+        },
+        "items": [
+          {
+            "id": "dashboard-workspace-view.ac1",
+            "title": "/workspace/:id renders terminals, workspace-filtered conversations, and the memory surface",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-workspace-view.ac2",
+            "title": "An issue-kind workspace additionally renders the existing vBRIEF viewer and pipeline status components",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-workspace-view.ac3",
+            "title": "layout_config restores the saved pane arrangement on activation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-workspace-view.ac4",
+            "title": "The ConversationPanel workspace filter contains an all-conversations escape hatch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-switcher",
+        "title": "Cmd-K workspace switcher",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/WorkspaceSwitcher.tsx",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run"
+          ],
+          "expected_outputs": [
+            "switcher tests green: open, filter, activate+navigate"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/WorkspaceSwitcher.tsx: modal listing workspaces across all projects, fuzzy name match, most-recent-first; Enter activates (POST activate endpoint + navigate to /workspace/:id). Wire the Cmd-K binding at the app shell level."
+        },
+        "items": [
+          {
+            "id": "dashboard-switcher.ac1",
+            "title": "Cmd-K opens a modal listing workspaces across projects most-recent-first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-switcher.ac2",
+            "title": "Given typed input, the modal shows only fuzzy-matching workspaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-switcher.ac3",
+            "title": "Enter activates the selected workspace and opens its view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-loss-audit",
+        "title": "No-loss audit: surface inventory + gating test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/audits/pan-1990-surface-inventory.md",
+            "tests/unit/dashboard/no-loss-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/no-loss-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "no-loss-audit test green against the completed dashboard changes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Enumerate the pre-change dashboard surface from origin/main (git show origin/main:src/dashboard/frontend/src/components/Sidebar.tsx and peers) into docs/audits/pan-1990-surface-inventory.md: every sidebar nav item, kanban action, vBRIEF button, InspectorPanel affordance, conversations panel entry point, cost view, terminal access path. Create tests/unit/dashboard/no-loss-audit.test.ts asserting each inventory entry maps to a named component/route that exists post-change (import-and-exists + route table check); a removed affordance fails until the row is explicitly marked relocated:<where>. This test is the additive-refactor no-loss gate — it blocks retiring any old surface."
+        },
+        "items": [
+          {
+            "id": "no-loss-audit.ac1",
+            "title": "The inventory doc contains every pre-change sidebar, kanban, inspector, conversation, cost, and terminal affordance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac2",
+            "title": "The audit test resolves each inventory entry to an existing component or route post-change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac3",
+            "title": "Removing an affordance without a relocated: marker fails the audit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-skills",
+        "title": "Documentation + wrapper skills",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:12:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-1990",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "docs/AGENT-STATE-PLANES.md",
+            "CLAUDE.md",
+            "sync-sources/skills/pan-memory/SKILL.md",
+            "sync-sources/skills/pan-projects/SKILL.md",
+            "sync-sources/skills/pan-workspace/SKILL.md",
+            "configuration/workspaces.mdx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "bash scripts/lint-skills.sh",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint-skills exits 0",
+            "npm run lint exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Write docs/WORKSPACES-AND-PROJECTS.md (model, kinds, cardinalities, doors, rebuild, memory homes, AND the wrapper-repo git posture from the 2026-07-26 reconciliation comment: wrapper HEAD is workspace metadata, never a verdict anchor; scaffolding dirty-semantics belong to the workspace entity). Update docs/AGENT-STATE-PLANES.md (projects/workspaces tables join the runtime plane; rebuild-workspaces alongside rebuild-agents). Update project CLAUDE.md (new Workspaces & Projects section; re-word the memory section from issue-keyed to workspace-keyed). Add/extend Mintlify configuration/ page for workspaces + memory scopes. Update sync-sources/skills/pan-memory/SKILL.md (search flags, pin/unpin, backfill) and pan-projects SKILL.md (add-target); create sync-sources/skills/pan-workspace/SKILL.md per docs/SKILLS-CONVENTION.md (non-trivial guidance on kinds and shared-vs-isolated qualifies it). scripts/lint-skills.sh must exit 0."
+        },
+        "items": [
+          {
+            "id": "docs-skills.ac1",
+            "title": "docs/WORKSPACES-AND-PROJECTS.md covers kinds, cardinalities, doors, rebuild, and the wrapper-repo git posture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-skills.ac2",
+            "title": "docs/AGENT-STATE-PLANES.md shows projects/workspaces in the runtime plane with their rebuild command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-skills.ac3",
+            "title": "scripts/lint-skills.sh exits 0 with the updated and new wrapper skills",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-skills.ac4",
+            "title": "The project CLAUDE.md memory section shows workspace-keyed paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "schema-v64",
+        "to": "workspace-doors",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-doors",
+        "to": "doors-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-doors",
+        "to": "boot-seeding",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-doors",
+        "to": "pipeline-create-row",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-doors",
+        "to": "lifecycle-archive",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-doors",
+        "to": "conversation-linkage",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-doors",
+        "to": "resource-discovery-resolver",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-doors",
+        "to": "cli-workspace-new-main",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-doors",
+        "to": "cli-workspace-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-doors",
+        "to": "cli-project-add-target",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-doors",
+        "to": "memory-pins",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-doors",
+        "to": "dashboard-api",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-doors",
+        "to": "events-workspaceid",
+        "type": "blocks"
+      },
+      {
+        "from": "boot-seeding",
+        "to": "rebuild-workspaces-cmd",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-contracts-nullable",
+        "to": "memory-paths-rekey",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-paths-rekey",
+        "to": "memory-home-migration",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-paths-rekey",
+        "to": "rebuild-workspaces-cmd",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-paths-rekey",
+        "to": "memory-capture-nonissue",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-paths-rekey",
+        "to": "memory-search-scopes",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-paths-rekey",
+        "to": "memory-state-mirror",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-paths-rekey",
+        "to": "memory-backfill",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-linkage",
+        "to": "memory-capture-nonissue",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-doors",
+        "to": "memory-backfill",
+        "type": "blocks"
+      },
+      {
+        "from": "dashboard-api",
+        "to": "dashboard-sidebar",
+        "type": "blocks"
+      },
+      {
+        "from": "dashboard-api",
+        "to": "dashboard-workspace-view",
+        "type": "blocks"
+      },
+      {
+        "from": "dashboard-api",
+        "to": "dashboard-switcher",
+        "type": "blocks"
+      },
+      {
+        "from": "dashboard-sidebar",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "dashboard-workspace-view",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "dashboard-switcher",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-workspace-new-main",
+        "to": "docs-skills",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-workspace-lifecycle",
+        "to": "docs-skills",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-search-scopes",
+        "to": "docs-skills",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-home-migration",
+        "to": "memory-search-scopes",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
