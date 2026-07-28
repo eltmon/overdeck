@@ -26,7 +26,7 @@
     "recordedAt": "2026-07-28T09:10:19.628Z"
   },
   "created": "2026-07-28T06:36:21.767Z",
-  "updated": "2026-07-28T15:59:05.981Z",
+  "updated": "2026-07-28T15:59:41.212Z",
   "pipeline": {
     "issueId": "PAN-3217",
     "reviewStatus": "passed",
@@ -121,7 +121,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3217",
