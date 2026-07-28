@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T17:53:37.418Z",
+  "updated": "2026-07-28T17:53:46.104Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "pending",
@@ -85,8 +85,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "docs-recovery-owner": {
+        "writerId": "agent-pan-3229",
+        "agentId": "agent-pan-3229",
+        "pid": 2128764,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:53:46.103Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3229",
@@ -188,6 +196,7 @@
     "convergence-regression-test": "completed",
     "convergence-regression-test.convergence-regression-test.ac1": "completed",
     "convergence-regression-test.convergence-regression-test.ac2": "completed",
-    "convergence-regression-test.convergence-regression-test.ac3": "completed"
+    "convergence-regression-test.convergence-regression-test.ac3": "completed",
+    "docs-recovery-owner": "running"
   }
 }
