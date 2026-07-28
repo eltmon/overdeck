@@ -4,17 +4,17 @@
     "created": "2026-07-28T03:43:52Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3092: verdict writes must survive record-lock contention — verdict-aware merge, bounded backoff, contention surfacing, frozen-agent escalation",
-    "updated": "2026-07-28T06:37:20.663Z"
+    "updated": "2026-07-28T16:14:45.462Z"
   },
   "plan": {
     "id": "pan-3092",
     "title": "Review agent's own record lock blocks its own verdict write: specialists/done collides, fallback is consumed, reviewStatus stuck at reviewing (MIN-902)",
-    "status": "running",
+    "status": "completed",
     "uid": "678676ae-5732-4a58-b1cc-8f8a16ead630",
     "author": "agent:k3[1m]",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-28T03:43:52Z",
-    "updated": "2026-07-28T06:37:20.663Z",
+    "updated": "2026-07-28T16:14:45.462Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3092",
@@ -548,5 +548,5 @@
       "canonicalFilename": "2026-07-28-PAN-3092-review-agent-s-own-record-lock-blocks-its-own-verdict-write-specialists-done-collides-fallback-is-consumed-reviewstatus-stuck-at-reviewing-min-902.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
