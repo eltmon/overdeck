@@ -36,7 +36,40 @@ lock in time falls back to `<workspace>/.overdeck/pipeline-verdict.json`;
 `drainWorkspaceVerdictFallback()` folds that fallback into the canonical
 record (newer-wins on ISO `updatedAt`) and deletes it, triggered after every
 landed journal write for the issue and on unref'd 5s/30s/120s retries after a
-fallback write. Lock-owner attribution is truthful: the spawned dashboard
+fallback write.
+
+PAN-3092 hardened that path against verdict loss, because `pipeline.updatedAt`
+is stamped on every status write and so cannot by itself distinguish
+write-recency from verdict-truth:
+
+- **The record write door's pipeline merge is verdict-aware.**
+  `mergePipelineVerdictAware()` (`src/lib/pan-dir/pipeline-verdict-merge.ts`,
+  behind `pickNewerPipeline`) keeps newer-wins for every non-verdict field but
+  never lets a verdict-free write from the same review cycle displace a terminal
+  verdict. Only a strictly newer `reviewSpawnedAt` (a new cycle) or a newer
+  terminal verdict supersedes one.
+- **The drain's supersede check is content-aware.** A fallback is deleted as
+  superseded only when `pipelineCoversFallbackVerdicts()` confirms the journal
+  has settled every gate the fallback holds a terminal verdict for, or belongs
+  to a newer cycle. A newer-but-verdict-free journal no longer consumes an
+  unlanded verdict.
+- **Terminal verdict writes back off in-process.** A write introducing a NEW
+  terminal verdict retries `updateIssueRecordForIssue` on
+  `OVERDECK_VERDICT_BACKOFF_DELAYS_MS` (default 2s/5s/10s/20s/40s/80s) before
+  any fallback is written; `pan admin specialists done` awaits it through
+  `flushReviewStatusJournalWrites()` and then prints a do-not-re-run notice if a
+  fallback remains. Bookkeeping writes stay single-shot.
+- **A deacon patrol owns the long tail.** `sweepStrandedVerdictFallbacks()`
+  (`src/lib/cloister/deacon-verdict-fallback-sweep.ts`) drains every pending
+  fallback each patrol cycle — the retry a short-lived CLI's unref'd timers can
+  never provide — and opens exactly one needs-you per contention episode once a
+  fallback stays undrained past 10 minutes, naming the current lock owner.
+- **A frozen test agent escalates.** A live, idle test session that was already
+  nudged and wrote no `.pan/test/result.json` now yields `escalate` from
+  `decideUnsignaledTestAction()` instead of being ignored forever; the deacon
+  opens one needs-you per test dispatch generation. Nothing fabricates a verdict.
+
+Lock-owner attribution is truthful: the spawned dashboard
 server never inherits `OVERDECK_AGENT_ID`/`OVERDECK_ISSUE_ID`/
 `OVERDECK_SESSION_TYPE` (the spawner's identity is preserved as
 `OVERDECK_DASHBOARD_SPAWNED_BY` for the PAN-2322 port guard), so server-side
