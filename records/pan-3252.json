@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-28T22:41:18.672Z",
+  "updated": "2026-07-28T22:46:07.213Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "pending",
@@ -66,16 +66,8 @@
     }
   ],
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "ql-dashboard": {
-        "writerId": "agent-pan-3252",
-        "agentId": "agent-pan-3252",
-        "pid": 1158083,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T22:41:18.672Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3252",
@@ -131,6 +123,17 @@
         "outcome": "completed",
         "reason": "ApiKeysConfig quantumllama slot, env fallback ladder, getAvailableModelsSync gating, env-loader, child-env + provider-env allowlists, config-yaml env block with schema typing; launcher unset-lines snapshot updated; 68 passed, typecheck clean; schema growth audited",
         "releasedAt": "2026-07-28T22:41:06.344Z"
+      },
+      {
+        "writerId": "agent-pan-3252",
+        "agentId": "agent-pan-3252",
+        "pid": 1158083,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T22:41:18.672Z",
+        "itemId": "ql-dashboard",
+        "outcome": "completed",
+        "reason": "QuantumLlama group in MODELS_BY_PROVIDER (FlaskConical, premium/balanced/fast, 16/4/0.8), exact-match QL name guards in both friendlyModelName copies (exported for tests); new frontend test file, 3 passed, frontend typecheck clean",
+        "releasedAt": "2026-07-28T22:46:07.213Z"
       }
     ],
     "statusReasons": {
@@ -153,6 +156,10 @@
       "ql-settings-env": {
         "reason": "ApiKeysConfig quantumllama slot, env fallback ladder, getAvailableModelsSync gating, env-loader, child-env + provider-env allowlists, config-yaml env block with schema typing; launcher unset-lines snapshot updated; 68 passed, typecheck clean; schema growth audited",
         "updatedAt": "2026-07-28T22:41:06.344Z"
+      },
+      "ql-dashboard": {
+        "reason": "QuantumLlama group in MODELS_BY_PROVIDER (FlaskConical, premium/balanced/fast, 16/4/0.8), exact-match QL name guards in both friendlyModelName copies (exported for tests); new frontend test file, 3 passed, frontend typecheck clean",
+        "updatedAt": "2026-07-28T22:46:07.213Z"
       }
     }
   },
@@ -178,6 +185,9 @@
     "ql-settings-env.ql-settings-env.ac2": "completed",
     "ql-settings-env.ql-settings-env.ac3": "completed",
     "ql-settings-env.ql-settings-env.ac4": "completed",
-    "ql-dashboard": "running"
+    "ql-dashboard": "completed",
+    "ql-dashboard.ql-dashboard.ac1": "completed",
+    "ql-dashboard.ql-dashboard.ac2": "completed",
+    "ql-dashboard.ql-dashboard.ac3": "completed"
   }
 }
