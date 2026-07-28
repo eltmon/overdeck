@@ -196,20 +196,18 @@
     "recordedAt": "2026-07-28T22:30:42.486Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T23:29:57.086Z",
+  "updated": "2026-07-28T23:39:37.622Z",
   "pipeline": {
     "issueId": "PAN-3228",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T22:45:26.215Z",
-    "updatedAt": "2026-07-28T23:29:57.075Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3228-review",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "updatedAt": "2026-07-28T23:39:37.477Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -226,7 +224,6 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3241",
-    "reviewedAtCommit": "91c637dfa6d4fe02c4c207ac6aa8c0d1f85ff2cb",
     "lastVerifiedCommit": "91c637dfa6d4fe02c4c207ac6aa8c0d1f85ff2cb",
     "reviewRequestedAt": "2026-07-28T22:45:26.215Z",
     "reviewSpawnedAt": "2026-07-28T22:31:36.079Z",
@@ -342,9 +339,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4667910,
-            "output": 306303,
-            "cacheRead": 190469120,
+            "input": 4720540,
+            "output": 312438,
+            "cacheRead": 194257408,
             "cacheWrite": 0
           }
         }
@@ -357,15 +354,15 @@
           "cacheWrite": 121982
         },
         "openai/gpt-5.6-sol": {
-          "input": 12945036,
-          "output": 595651,
-          "cacheRead": 258272768,
+          "input": 12997666,
+          "output": 601786,
+          "cacheRead": 262061056,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 222.720716,
-        "pricingAsOf": "2026-07-28T23:29:57.083Z"
+        "usd": 225.06206,
+        "pricingAsOf": "2026-07-28T23:39:37.513Z"
       }
     },
     "merges": [
