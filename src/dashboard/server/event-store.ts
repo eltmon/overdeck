@@ -221,6 +221,7 @@ export function createEventStore(db: DbAdapter): EventStore {
     claim: PreparedStatement<void>;
     read: PreparedStatement<{ sequence: number }>;
     setSeq: PreparedStatement<void>;
+    compact: PreparedStatement<void>;
   } | null = null;
   function getIdempotencyStmts(): NonNullable<typeof idempotencyStmts> {
     idempotencyStmts ??= {
@@ -232,6 +233,9 @@ export function createEventStore(db: DbAdapter): EventStore {
       ),
       setSeq: db.prepare<void>(
         `UPDATE event_idempotency SET sequence = ? WHERE key = ?`,
+      ),
+      compact: db.prepare<void>(
+        `DELETE FROM event_idempotency WHERE created_at < ?`,
       ),
     };
     return idempotencyStmts;
@@ -371,6 +375,17 @@ export function createEventStore(db: DbAdapter): EventStore {
     const result = compactStmt.run([sevenDaysAgo]);
     if (result.changes > 0) {
       console.log(`[event-store] Compacted ${result.changes} events older than 7 days`);
+    }
+    // PAN-3092: idempotency keys age out with the events they guard. Retaining
+    // them past compaction would grow the table forever AND leave orphaned keys
+    // that permanently suppress re-appending a warning whose event is gone.
+    try {
+      const claims = getIdempotencyStmts().compact.run([sevenDaysAgo]);
+      if (claims.changes > 0) {
+        console.log(`[event-store] Compacted ${claims.changes} idempotency keys older than 7 days`);
+      }
+    } catch {
+      // The table is absent on narrower schemas (tests, fixtures) — nothing to compact.
     }
   }
 

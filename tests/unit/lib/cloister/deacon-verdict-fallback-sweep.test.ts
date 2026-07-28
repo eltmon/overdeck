@@ -201,7 +201,7 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     expect(String((mocks.emitActivityEntryOnce.mock.calls[0]![0] as Record<string, unknown>).message))
       .toContain('record lock is contended');
     // The failed durable trip is reported, not swallowed, and retried next patrol.
-    expect(first.some((a) => a.includes('could not be recorded'))).toBe(true);
+    expect(first.some((a) => a.includes('needs-you trip could not be recorded'))).toBe(true);
     expect(mocks.recordRecoveryFailure).toHaveBeenCalledTimes(2);
     // ...but the warning itself does not repeat for the same episode.
     expect(second.some((a) => a.includes('verdict contended'))).toBe(false);
@@ -343,6 +343,28 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     expect(activityEvents).toHaveLength(1);
   });
 
+  it('treats an unconfirmed emit as not-yet-warned and retries it (PAN-3092)', async () => {
+    // `unconfirmed` means the wired store offers no settled at-most-once path,
+    // so delivery is unknown. Treating it as success would suppress the retry
+    // on the strength of a guarantee nothing actually made.
+    mocks.readWorkspaceVerdictFallback.mockResolvedValue(
+      fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 60_000),
+    );
+    mocks.drainWorkspaceVerdictFallback.mockResolvedValue(false);
+    // The trip must also fail, or its durable open state short-circuits later
+    // patrols before they reach the warning at all.
+    mocks.recordRecoveryFailure.mockRejectedValue(new Error('record lock is held'));
+    mocks.emitActivityEntryOnce.mockResolvedValueOnce('unconfirmed');
+
+    const first = await sweepStrandedVerdictFallbacks(NOW);
+    expect(first.some((a) => a.includes('could not be confirmed'))).toBe(true);
+
+    // Not marked warned, so the next patrol tries again.
+    const second = await sweepStrandedVerdictFallbacks(NOW + 60_000);
+    expect(activityEvents).toHaveLength(1);
+    expect(second.some((a) => a.includes('verdict contended'))).toBe(true);
+  });
+
   it('retries the warning on the next patrol when the activity append fails (PAN-3092)', async () => {
     // The in-process set must not mark an episode warned before the write is
     // durable, or a transient store failure leaves the operator with nothing
@@ -356,7 +378,7 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
 
     const first = await sweepStrandedVerdictFallbacks(NOW);
     expect(activityEvents).toHaveLength(0);
-    expect(first.some((a) => a.includes('could not be recorded'))).toBe(true);
+    expect(first.some((a) => a.includes('could not be confirmed'))).toBe(true);
 
     // Same process, next patrol: the episode was never marked warned, so it retries.
     const second = await sweepStrandedVerdictFallbacks(NOW + 60_000);

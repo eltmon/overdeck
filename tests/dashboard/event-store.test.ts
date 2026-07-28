@@ -397,3 +397,50 @@ describe('EventStore.appendOnce (PAN-3092)', () => {
     expect(rows[0]!.n).toBe(0)
   })
 })
+
+describe('EventStore.compact idempotency keys (PAN-3092)', () => {
+  it('ages out idempotency keys with the events they guard', () => {
+    const db = makeDb()
+    const store = createEventStore(db)
+
+    store.appendOnce(
+      { type: 'activity.entry', timestamp: ts(), payload: { id: 'a' } } as never,
+      'old-episode',
+    )
+    // Backdate the claim past the 7-day retention window.
+    const raw = db as unknown as SqliteDatabase
+    raw.prepare('UPDATE event_idempotency SET created_at = ?')
+      .run([Date.now() - 8 * 24 * 60 * 60 * 1000])
+
+    store.compact()
+
+    const rows = raw.prepare('SELECT COUNT(*) AS n FROM event_idempotency').all() as Array<{ n: number }>
+    // Retaining it would grow the table forever AND permanently suppress
+    // re-appending a warning whose event has itself been compacted away.
+    expect(rows[0]!.n).toBe(0)
+  })
+
+  it('keeps a recent idempotency key so a live episode still dedupes', () => {
+    const db = makeDb()
+    const store = createEventStore(db)
+
+    store.appendOnce(
+      { type: 'activity.entry', timestamp: ts(), payload: { id: 'a' } } as never,
+      'live-episode',
+    )
+    store.compact()
+
+    expect(store.appendOnce(
+      { type: 'activity.entry', timestamp: ts(), payload: { id: 'a' } } as never,
+      'live-episode',
+    ).outcome).toBe('duplicate')
+  })
+
+  it('compacts cleanly on a schema without the idempotency table', () => {
+    const db = makeDb()
+    const store = createEventStore(db)
+    ;(db as unknown as SqliteDatabase).exec('DROP TABLE event_idempotency')
+
+    expect(() => store.compact()).not.toThrow()
+  })
+})

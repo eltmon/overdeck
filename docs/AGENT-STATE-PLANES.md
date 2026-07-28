@@ -116,13 +116,23 @@ write-recency from verdict-truth:
     sequence `0` rather than rejecting. Both would report success for an event
     that never persisted. The client therefore gets its own `appendOnce()` that
     POSTs `/api/internal/events/append-once` and awaits the server's settled
-    outcome instead of queueing.
+    outcome instead of queueing — under a 10s `AbortSignal` deadline
+    (`appendOnceTimeoutMs`) covering both the response headers and the body
+    read. The patrol awaits this inline, so an accepted-but-hanging connection
+    would otherwise stall every later issue and every later patrol phase while
+    the patrol heartbeat kept reporting the Deacon healthy. Timing out after a
+    server commit is safe: retrying the same key returns `duplicate`.
 
-  The sweep marks an episode warned only on `appended`/`duplicate`; `failed`
-  leaves it unmarked so the next patrol retries. `unconfirmed` is returned when a
-  wired store exposes no `appendOnce` at all (narrow test doubles, early-boot
-  stubs) — best-effort hand-off, explicitly not a guarantee. The in-process set
-  is an optimisation, never the dedupe of record.
+  Idempotency keys age out with the events they guard — `compact()` deletes
+  claims past the same 7-day retention, so the table cannot grow forever and an
+  orphaned key cannot permanently suppress a warning whose event is gone.
+
+  The sweep marks an episode warned only on `appended`/`duplicate`. `failed`
+  wrote nothing, and `unconfirmed` — returned when a wired store exposes no
+  `appendOnce` at all (narrow test doubles, early-boot stubs) — means delivery is
+  unknown; neither is evidence the operator was told, so both leave the episode
+  eligible for the next patrol. The in-process set is an optimisation, never the
+  dedupe of record.
 - **A frozen test agent escalates.** A live, idle test session that was already
   nudged and wrote no `.pan/test/result.json` now yields `escalate` from
   `decideUnsignaledTestAction()` instead of being ignored forever; the deacon

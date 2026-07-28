@@ -181,13 +181,15 @@ export async function sweepStrandedVerdictFallbacks(now = Date.now()): Promise<s
           issueId,
           message,
         });
-        if (outcome === 'failed') {
-          // Nothing landed — do NOT mark the episode warned, or this process
-          // would suppress its own retry and the operator would hear nothing.
-          actions.push(`${issueId}: verdict-fallback warning could not be recorded — retrying next patrol`);
-        } else {
+        if (outcome === 'appended' || outcome === 'duplicate') {
           warnedEpisodes.add(episode);
-          if (outcome !== 'duplicate') actions.push(summary);
+          if (outcome === 'appended') actions.push(summary);
+        } else {
+          // `failed` wrote nothing; `unconfirmed` means the wired store offers
+          // no settled path, so delivery is unknown. Neither is evidence the
+          // operator was told, and marking the episode warned would suppress
+          // this process's own retry.
+          actions.push(`${issueId}: verdict-fallback warning could not be confirmed — retrying next patrol`);
         }
       }
 
