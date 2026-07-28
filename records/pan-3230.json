@@ -37,17 +37,14 @@
       "reason": "feedback",
       "note": "[2026-07-28T19:25Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-28T19:25:58.178Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T19:25:58Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3230\n\n# Review — PAN-3230 — cycle 2\n\n## Verdict: CHANGES REQUESTED\n\nHEAD reviewed: `6b894c9ac4f59b5a323eecade8d2674c93b1f616`\nPrior review HEAD: `ce4feae7b06ca159b5967603f389d4919236fa01`\n\n## Prior blockers\n\n- **Resolved:** auto-synthesis now writes through `writeSpecForIssue`, and the migrated-project test proves the state worktree is clean and the spec reached the remote branch.\n- **Resolved:** the guard now scans across line breaks, with fixtures for multiline `specs` and `drafts` joins.\n\n## Blocking findings\n\n### ! [requirements] The rework changes an explicitly excluded `pan-dir/**` module — `src/lib/pan-dir/specs.ts:276`\n\nThe issue's must-not constraints explicitly forbid changes under `pan-dir/**`, but this cycle adds a new `repoRoot` branch to the shared `writeSpecForIssue` implementation. The production auto-start callers already pass a registered project root, so `queueAutoCommit` resolves a migrated project's state worktree through the existing project configuration; the new branch was added to make an unregistered temporary-project fixture commit successfully. That broadens a shared state writer outside the approved scope to accommodate the test setup. Remove the `pan-dir/specs.ts` change and exercise durability through a configured-project test seam or an existing state-door fixture instead.\n\n### ! [requirements] The lint guard still accepts hardcoded paths written as template literals — `scripts/lint-state-paths.sh:118`\n\nFR-8 requires every non-allowlisted hardcoded `.pan/specs` / `.pan/drafts` derivation to fail. The new scanner recognizes backticks while masking comments (`line 109`) but both detection regexes accept only single and double quotes. I reproduced this exact regression with exit 0:\n\n```ts\nconst specsDir = join(projectRoot, `.pan`, `specs`);\n```\n\nThe direct path form `` `.pan/specs` `` is missed for the same reason. Add template literals to both patterns and add fixtures for joined and slash-form `specs`/`drafts` paths.\n\n## Non-blocking findings\n\n### ~ [correctness] Nested scan roots bypass the allowlist — `scripts/lint-state-paths.sh:37`\n\nThe optional scan-root argument is normalized by always prepending `src/`. Running the guard with `src/lib` therefore turns `src/lib/pan-dir/paths.ts` into `src/pan-dir/paths.ts`, and the audited allowlist no longer matches; I reproduced eight false violations. Default CI and the current fixture-root tests are unaffected, so this is advisory, but deriving the logical path from the repository root would make the advertised scan-root option reliable.\n\n## Clean dimensions\n\n- **Security:** No injection, credential, authorization, or destructive-operation regression was found.\n- **Performance:** The Node scanner is linear in source size and runs only during lint; the runtime path-resolution changes remain hoisted outside per-issue loops.\n- **Correctness:** The original read-path substitutions and pickup-gate behavior remain unchanged and correct.\n\n## Verification performed\n\n- `npm run typecheck`: passed.\n- `npm run lint`: passed.\n- Focused Vitest run: 5 files, 62 tests passed.\n- Template-literal adversarial fixture: incorrectly passed, confirming the second blocker.\n- Nested `src/lib` scan: incorrectly reported eight allowlisted paths, confirming the advisory finding.\n- PR build, lint, guard, smoke, and flake-lane checks were green; the main test check was still pending.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3230/.pan/review/agent-pan-3230-review-6b894c9a/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3230 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-28T19:39:20.151Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -88,21 +85,21 @@
     "recordedAt": "2026-07-28T18:59:19.959Z"
   },
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T19:39:18.337Z",
+  "updated": "2026-07-28T19:39:20.373Z",
   "pipeline": {
     "issueId": "PAN-3230",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:00:36.689Z",
-    "updatedAt": "2026-07-28T19:39:18.303Z",
+    "updatedAt": "2026-07-28T19:39:18.923Z",
     "reviewNotes": "Shared pan-dir writer changed outside scope, and template-literal state paths still bypass the lint guard",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3239",
     "lastVerifiedCommit": "ce4feae7b06ca159b5967603f389d4919236fa01",
-    "reviewSpawnedAt": "2026-07-28T19:18:25.990Z",
+    "reviewSpawnedAt": "2026-07-28T19:39:18.922Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -187,7 +184,7 @@
       },
       "costAtCloseOut": {
         "usd": 106.763484,
-        "pricingAsOf": "2026-07-28T19:39:18.333Z"
+        "pricingAsOf": "2026-07-28T19:39:20.371Z"
       }
     },
     "merges": [
