@@ -115,7 +115,7 @@
     "recordedAt": "2026-07-28T08:50:14.585Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T08:50:20.839Z",
+  "updated": "2026-07-28T08:50:25.412Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "pending",
@@ -124,7 +124,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T08:50:19.634Z",
+    "updatedAt": "2026-07-28T08:50:25.285Z",
     "reviewNotes": "! [correctness] A live-status read failure is treated as proof that no live row exists — `src/lib/lifecycle/dod-gate.ts:678`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3221",
     "reviewedAtCommit": "6b218e665a20aeecd3e51dd3a9da4e695b49aa3e",
@@ -179,10 +179,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1596,
-            "output": 78279,
-            "cacheRead": 38186221,
-            "cacheWrite": 1894758
+            "input": 1611,
+            "output": 78564,
+            "cacheRead": 38402203,
+            "cacheWrite": 2056799
           }
         }
       },
@@ -194,15 +194,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1596,
-          "output": 78279,
-          "cacheRead": 38186221,
-          "cacheWrite": 1894758
+          "input": 1611,
+          "output": 78564,
+          "cacheRead": 38402203,
+          "cacheWrite": 2056799
         }
       },
       "costAtCloseOut": {
-        "usd": 20.25848,
-        "pricingAsOf": "2026-07-28T08:50:20.835Z"
+        "usd": 20.48407,
+        "pricingAsOf": "2026-07-28T08:50:25.356Z"
       }
     },
     "merges": [
