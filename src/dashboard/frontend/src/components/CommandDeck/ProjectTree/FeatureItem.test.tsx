@@ -299,7 +299,10 @@ describe('pickBestSession', () => {
 describe('FeatureItem', () => {
   beforeEach(() => {
     localStorage.clear();
-    useDashboardStore.setState({ drawer: { issueId: null, tab: 'overview' } });
+    useDashboardStore.setState({
+      drawer: { issueId: null, tab: 'overview' },
+      tasksViewerIssueId: null,
+    });
     vi.restoreAllMocks();
     vi.mocked(refreshDashboardState).mockClear();
     vi.stubGlobal('fetch', vi.fn(async () => ({
@@ -1019,6 +1022,34 @@ describe('FeatureItem', () => {
     expect(screen.getByText('docker: pan-821-db')).toBeInTheDocument();
     expect(screen.getByText('docker: pan-821-cache')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-821/resource-details');
+  });
+
+  it('opens the tasks viewer from the tasks chip without selecting the issue row', () => {
+    const onSelect = vi.fn();
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          resourceSources: ['tasks'],
+          resourceDetails: {
+            hasWorkspace: false,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasXbrief: false,
+            hasTasks: true,
+            dockerContainerCount: 0,
+          },
+        })}
+        isSelected={false}
+        onSelect={onSelect}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open tasks for PAN-821' }));
+
+    expect(useDashboardStore.getState().tasksViewerIssueId).toBe('PAN-821');
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it('collapses UAT environment panel by default and expands on header click for ready-for-merge issues', async () => {

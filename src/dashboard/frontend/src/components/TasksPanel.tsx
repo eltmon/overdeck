@@ -205,6 +205,7 @@ const AC_STATUS_ICONS: Record<string, { color: string; symbol: string }> = {
 
 function TaskItem({ task, planDoc }: { task: TaskTask; planDoc: XBriefDocument | null }) {
   const [expanded, setExpanded] = useState(false);
+  const statusBucket = taskStatusBucket(task.status);
 
   // Match task to plan item using the same pattern as PlanItemDetail
   const planItem: XBriefItem | undefined = planDoc
@@ -218,17 +219,22 @@ function TaskItem({ task, planDoc }: { task: TaskTask; planDoc: XBriefDocument |
 
   return (
     <div
+      data-status-bucket={statusBucket}
       className={`rounded border text-xs ${
-        taskStatusBucket(task.status) !== 'done'
-          ? 'border-border bg-card/50'
-          : 'border-border bg-card/50 opacity-60'
+        statusBucket === 'working'
+          ? 'border-primary/40 bg-primary/5'
+          : statusBucket === 'done'
+            ? 'border-border bg-card/50 opacity-60'
+            : 'border-border bg-card/50'
       }`}
     >
       <div className="flex items-start gap-2 p-2">
-        {taskStatusBucket(task.status) !== 'done' ? (
-          <Circle className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
-        ) : (
+        {statusBucket === 'working' ? (
+          <Loader2 className="w-3.5 h-3.5 text-primary animate-spin mt-0.5 shrink-0" />
+        ) : statusBucket === 'done' ? (
           <CheckCircle2 className="w-3.5 h-3.5 text-success mt-0.5 shrink-0" />
+        ) : (
+          <Circle className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
         )}
         <div className="flex-1 min-w-0">
           <div className="text-foreground break-words leading-tight">
