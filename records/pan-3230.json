@@ -88,20 +88,19 @@
     "recordedAt": "2026-07-28T18:59:19.959Z"
   },
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T19:26:03.863Z",
+  "updated": "2026-07-28T19:39:18.337Z",
   "pipeline": {
     "issueId": "PAN-3230",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:00:36.689Z",
-    "updatedAt": "2026-07-28T19:26:03.850Z",
+    "updatedAt": "2026-07-28T19:39:18.303Z",
     "reviewNotes": "Shared pan-dir writer changed outside scope, and template-literal state paths still bypass the lint guard",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3239",
-    "reviewedAtCommit": "6b894c9ac4f59b5a323eecade8d2674c93b1f616",
     "lastVerifiedCommit": "ce4feae7b06ca159b5967603f389d4919236fa01",
     "reviewSpawnedAt": "2026-07-28T19:18:25.990Z",
     "scopeDrift": {
@@ -157,17 +156,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1742563,
-            "output": 151125,
-            "cacheRead": 23924224,
+            "input": 1745331,
+            "output": 151321,
+            "cacheRead": 24322560,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2270876,
-            "output": 134961,
-            "cacheRead": 97244160,
+            "input": 2781387,
+            "output": 180516,
+            "cacheRead": 107084288,
             "cacheWrite": 0
           }
         }
@@ -180,15 +179,15 @@
           "cacheWrite": 177096
         },
         "openai/gpt-5.6-sol": {
-          "input": 4013439,
-          "output": 286086,
-          "cacheRead": 121168384,
+          "input": 4526718,
+          "output": 331837,
+          "cacheRead": 131406848,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 97.705327,
-        "pricingAsOf": "2026-07-28T19:26:03.858Z"
+        "usd": 106.763484,
+        "pricingAsOf": "2026-07-28T19:39:18.333Z"
       }
     },
     "merges": [
