@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T06:42:37.473Z",
+  "updated": "2026-07-28T06:43:08.696Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
@@ -47,18 +47,33 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "verdict-aware-pipeline-merge": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3092",
         "agentId": "agent-pan-3092",
         "pid": 2123683,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T06:42:37.473Z"
+        "claimedAt": "2026-07-28T06:42:37.473Z",
+        "itemId": "verdict-aware-pipeline-merge",
+        "outcome": "completed",
+        "reason": "New pipeline-verdict-merge.ts (mergePipelineVerdictAware + pipelineCoversFallbackVerdicts); pickNewerPipeline delegates; 9 new tests, 4 PAN-2587 cases unmodified and green",
+        "releasedAt": "2026-07-28T06:43:08.695Z"
+      }
+    ],
+    "statusReasons": {
+      "verdict-aware-pipeline-merge": {
+        "reason": "New pipeline-verdict-merge.ts (mergePipelineVerdictAware + pipelineCoversFallbackVerdicts); pickNewerPipeline delegates; 9 new tests, 4 PAN-2587 cases unmodified and green",
+        "updatedAt": "2026-07-28T06:43:08.695Z"
       }
     }
   },
   "statusOverrides": {
-    "verdict-aware-pipeline-merge": "running"
+    "verdict-aware-pipeline-merge": "completed",
+    "verdict-aware-pipeline-merge.verdict-aware-pipeline-merge.ac1": "completed",
+    "verdict-aware-pipeline-merge.verdict-aware-pipeline-merge.ac2": "completed",
+    "verdict-aware-pipeline-merge.verdict-aware-pipeline-merge.ac3": "completed",
+    "verdict-aware-pipeline-merge.verdict-aware-pipeline-merge.ac4": "completed"
   }
 }
