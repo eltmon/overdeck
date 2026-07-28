@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T23:18:58.475Z",
+  "updated": "2026-07-28T23:19:13.994Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -93,8 +93,16 @@
     }
   ],
   "tasks": {
-    "sequence": 18,
-    "claims": {},
+    "sequence": 19,
+    "claims": {
+      "cli-workspace-new-main": {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 3584292,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T23:19:13.994Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -230,6 +238,7 @@
     "resource-discovery-resolver": "completed",
     "resource-discovery-resolver.resource-discovery-resolver.ac1": "completed",
     "resource-discovery-resolver.resource-discovery-resolver.ac2": "completed",
-    "resource-discovery-resolver.resource-discovery-resolver.ac3": "completed"
+    "resource-discovery-resolver.resource-discovery-resolver.ac3": "completed",
+    "cli-workspace-new-main": "running"
   }
 }
