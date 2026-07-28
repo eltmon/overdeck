@@ -303,3 +303,105 @@ describe('deliverReviewVerdictFeedback', () => {
     expect(mockMessageAgent.mock.calls[1]![3]).toEqual({ owesRework: true });
   });
 });
+
+describe('ambiguous keyed delivery retry (PAN-1837)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockResolveProjectFromIssue.mockReturnValue(null);
+    mockGetReviewStatus.mockReturnValue({ prUrl: 'https://github.com/eltmon/overdeck/pull/1059' });
+    mockWriteFeedbackFile.mockReturnValue(Effect.succeed({
+      success: true,
+      filePath: '/tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md',
+      relativePath: '.pan/feedback/001-review-agent-changes-requested.md',
+    }));
+    mockResolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-1059' });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function ambiguousError(): Error {
+    const err = new Error(
+      'MessageDeliveryFailed: ambiguous keyed delivery for agent-pan-1059 (messageAgent:internal): socket POST timeout — the supervisor may have completed the injection; NOT crossing to the tmux tier with the same key',
+    );
+    err.name = 'AmbiguousKeyedDeliveryError';
+    return err;
+  }
+
+  async function makeWorkspace(): Promise<string> {
+    const workspace = join(tmpdir(), `pan-1837-retry-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const reviewDir = join(workspace, '.pan', 'review', 'agent-pan-1059-review-abcdef12');
+    await mkdir(reviewDir, { recursive: true });
+    await writeFile(join(reviewDir, 'synthesis.md'), '## Verdict\n\nRequest changes.');
+    return workspace;
+  }
+
+  it('retries the same key and delivers without surfacing needs-you', async () => {
+    vi.useFakeTimers();
+    try {
+      const workspace = await makeWorkspace();
+      mockMessageAgent
+        .mockRejectedValueOnce(ambiguousError())
+        .mockRejectedValueOnce(ambiguousError())
+        .mockResolvedValueOnce({ delivered: true, queuedToMail: false });
+
+      const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
+      const promise = Effect.runPromise(deliverReviewVerdictFeedback({
+        issueId: 'pan-1059',
+        verdict: 'blocked',
+        notes: 'correctness blocker',
+        workspacePath: workspace,
+        runId: 'agent-pan-1059-review-abcdef12',
+      }));
+      // Drive fake time until every retry has fired; each advance also flushes
+      // the interleaved fs/microtask turns before the sleep gets scheduled.
+      for (let i = 0; i < 50 && mockMessageAgent.mock.calls.length < 3; i++) {
+        await vi.advanceTimersByTimeAsync(2_000);
+      }
+      const result = await promise;
+
+      expect(result.agentMessageSent).toBe(true);
+      expect(mockMessageAgent).toHaveBeenCalledTimes(3);
+      expect(mockSurfaceIssueFeedbackNeedsYou).not.toHaveBeenCalled();
+      // Every attempt reuses the SAME dedup key — the supervisor's dedup
+      // store is what makes the retry safe.
+      const keys = mockMessageAgent.mock.calls.map((call) => call[3]?.dedupKey);
+      expect(new Set(keys).size).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('surfaces needs-you only after exhausting the bounded retries', async () => {
+    vi.useFakeTimers();
+    try {
+      const workspace = await makeWorkspace();
+      mockMessageAgent.mockRejectedValue(ambiguousError());
+
+      const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
+      const promise = Effect.runPromise(deliverReviewVerdictFeedback({
+        issueId: 'pan-1059',
+        verdict: 'blocked',
+        notes: 'correctness blocker',
+        workspacePath: workspace,
+        runId: 'agent-pan-1059-review-abcdef12',
+      }));
+      for (let i = 0; i < 50 && mockMessageAgent.mock.calls.length < 4; i++) {
+        await vi.advanceTimersByTimeAsync(2_000);
+      }
+      const result = await promise;
+
+      expect(result.agentMessageSent).toBe(false);
+      expect(mockMessageAgent).toHaveBeenCalledTimes(4);
+      expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledWith(
+        'PAN-1059',
+        expect.stringContaining('ambiguous keyed delivery'),
+        expect.anything(),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
