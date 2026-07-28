@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T17:34:59.309Z",
+  "updated": "2026-07-28T17:43:55.138Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "gate-restart": {
-        "writerId": "agent-pan-3228",
-        "agentId": "agent-pan-3228",
-        "pid": 1358097,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T17:34:59.309Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3228",
@@ -117,6 +109,17 @@
         "outcome": "completed",
         "reason": "Blocked pan start --fresh before any session stop/state wipe when operator input is pending, with explicit --force override and help text.",
         "releasedAt": "2026-07-28T17:34:46.130Z"
+      },
+      {
+        "writerId": "agent-pan-3228",
+        "agentId": "agent-pan-3228",
+        "pid": 1358097,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:34:59.309Z",
+        "itemId": "gate-restart",
+        "outcome": "completed",
+        "reason": "Added typed pending-decision refusal to restartAgent/recoverAgent and force-aware 409/skip behavior across restart, recover, restart-fresh, restart-all, and config-restart routes.",
+        "releasedAt": "2026-07-28T17:43:55.138Z"
       }
     ],
     "statusReasons": {
@@ -127,6 +130,10 @@
       "gate-fresh": {
         "reason": "Blocked pan start --fresh before any session stop/state wipe when operator input is pending, with explicit --force override and help text.",
         "updatedAt": "2026-07-28T17:34:46.130Z"
+      },
+      "gate-restart": {
+        "reason": "Added typed pending-decision refusal to restartAgent/recoverAgent and force-aware 409/skip behavior across restart, recover, restart-fresh, restart-all, and config-restart routes.",
+        "updatedAt": "2026-07-28T17:43:55.138Z"
       }
     }
   },
@@ -140,6 +147,10 @@
     "gate-fresh.gate-fresh.ac1": "completed",
     "gate-fresh.gate-fresh.ac2": "completed",
     "gate-fresh.gate-fresh.ac3": "completed",
-    "gate-restart": "running"
+    "gate-restart": "completed",
+    "gate-restart.gate-restart.ac1": "completed",
+    "gate-restart.gate-restart.ac2": "completed",
+    "gate-restart.gate-restart.ac3": "completed",
+    "gate-restart.gate-restart.ac4": "completed"
   }
 }
