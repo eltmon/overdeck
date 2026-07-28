@@ -1,13 +1,34 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import type { ReviewStatus } from '../../../../src/lib/review-status.js';
+import type { PanIssuePipelineRecord } from '../../../../src/lib/pan-dir/record.js';
 
 const mocks = vi.hoisted(() => ({
   isIssueClosed: vi.fn(),
   isTrackerIssueClosed: vi.fn(),
+  getReviewStatus: vi.fn(),
+  readIssueRecord: vi.fn(),
+  listRunningAgents: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({
   isIssueClosed: mocks.isIssueClosed,
   isTrackerIssueClosed: mocks.isTrackerIssueClosed,
+}));
+
+vi.mock('../../../../src/lib/review-status.js', () => ({
+  getReviewStatus: mocks.getReviewStatus,
+}));
+
+vi.mock('../../../../src/lib/pan-dir/record.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/pan-dir/record.js')>();
+  return {
+    ...actual,
+    readIssueRecord: mocks.readIssueRecord,
+  };
+});
+
+vi.mock('../../../../src/lib/agents.js', () => ({
+  listRunningAgents: mocks.listRunningAgents,
 }));
 
 import { checkPostMergeRow } from '../../../../src/lib/lifecycle/dod-gate.js';
@@ -22,46 +43,54 @@ const ctx = {
 describe('DoD row 5 (post-merge) journal fallback for mergeStatus (PAN-3025)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.listRunningAgents.mockResolvedValue([]);
   });
 
-  it('ac1: row-5 uses production live→journal fallback for mergeStatus (existence proof)', async () => {
-    // This test verifies that the production readMergeStatus default
-    // reads live status and falls back to journal. The actual values
-    // depend on the mocked dependencies, but we verify the machinery is wired.
+  it('ac1: live absent + journal merged → pass (journal fallback read)', async () => {
+    // Live status absent; journal has mergeStatus: merged → row passes via journal read
+    mocks.getReviewStatus.mockResolvedValue(null);
+    const record: PanIssuePipelineRecord = {
+      issueId,
+      schemaVersion: 2,
+      pipeline: { mergeStatus: 'merged' } as any,
+    } as any;
+    mocks.readIssueRecord.mockResolvedValue(record);
 
-    // With no live status and no prior verifications, the row should report missing
-    // (This is an integration test that checks the defaults are connected correctly)
+    const row = await checkPostMergeRow(ctx);
 
-    const row = await checkPostMergeRow(ctx, 'verifying_on_main');
-
-    // The row evaluates; it may pass, miss, or skip depending on test environment
-    // The key point is that readMergeStatus was called via the production path
-    expect(row).toHaveProperty('status');
-    expect(row).toHaveProperty('observed');
+    expect(row.status).toBe('pass');
+    expect(row.observed).toContain('mergeStatus: merged');
+    // Verify journal was read (because live was absent)
+    expect(mocks.readIssueRecord).toHaveBeenCalled();
   });
 
-  it('ac2: live-first ordering is enforced in production readMergeStatus', async () => {
-    // Verify that when row-5 checks the merge status, it uses the production default
-    // which reads live first, then falls back to journal.
-    // This is verified by the existence of defaultPostMergeRowDeps in dod-gate.ts
-    // using loadStatus() which implements live→journal fallback.
+  it('ac2: live merged → pass (live precedence, no journal read)', async () => {
+    // Live status shows merged → row passes without reading journal
+    mocks.getReviewStatus.mockResolvedValue({
+      mergeStatus: 'merged',
+    } as ReviewStatus);
+    mocks.readIssueRecord.mockResolvedValue(null); // Should not be called
 
-    const row = await checkPostMergeRow(ctx, undefined);
+    const row = await checkPostMergeRow(ctx);
 
-    // Row evaluates normally with production dependencies
-    expect(row).toHaveProperty('id');
-    expect(row.id).toBe('post-merge');
+    expect(row.status).toBe('pass');
+    // Verify journal was NOT called because live has the answer
+    expect(mocks.readIssueRecord).not.toHaveBeenCalled();
   });
 
-  it('ac3: row-5 evaluated without custom deps exercises production loadStatus fallback', async () => {
-    // Calling checkPostMergeRow without custom dependencies ensures
-    // the production defaultPostMergeRowDeps.readMergeStatus is used,
-    // which calls loadStatus() with live-first fallback.
+  it('ac3: live absent + journal missing → miss', async () => {
+    // Live status absent; journal has no mergeStatus → row misses
+    mocks.getReviewStatus.mockResolvedValue(null);
+    const record: PanIssuePipelineRecord = {
+      issueId,
+      schemaVersion: 2,
+      pipeline: {} as any,
+    } as any;
+    mocks.readIssueRecord.mockResolvedValue(record);
 
-    const row = await checkPostMergeRow(ctx, 'verifying_on_main');
+    const row = await checkPostMergeRow(ctx);
 
-    // The presence of status and observed proves the row evaluated
-    expect(row.status).toBeDefined();
-    expect(row.observed).toBeDefined();
+    expect(row.status).toBe('miss');
+    expect(row.observed).toContain('missing');
   });
 });

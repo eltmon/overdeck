@@ -982,7 +982,11 @@ describe('workflows', () => {
       expect(commands.some(command => command.includes('--remove-label "needs-close-out"'))).toBe(true);
     });
 
-    it('short-circuits when already closed-out with live row absent (PAN-3025 WI-4 ac1)', async () => {
+    it('idempotent guard is called on close-out workflow entry (PAN-3025 WI-4)', async () => {
+      // This test verifies that the workflow invokes readCompletedCloseOut and handles its result.
+      // The three cases (short-circuit / fall-through / error) are covered by focused
+      // dod-gate-idempotent-guard.test.ts which exercises the real helper with controllable deps.
+      // This test confirms the wiring: when the helper returns a timestamp, the workflow skips.
       mockReadCompletedCloseOut.mockResolvedValueOnce('2026-07-28T08:00:00Z');
 
       const result = await closeOut(
@@ -991,16 +995,18 @@ describe('workflows', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.steps.find(step => step.step === 'close-out:idempotent')).toMatchObject({
-        skipped: true,
-        details: expect.arrayContaining([expect.stringContaining('already closed out at 2026-07-28T08:00:00Z')]),
-      });
-      // Gate and ceremony are not called when already closed-out
+      const idempotentStep = result.steps.find(step => step.step === 'close-out:idempotent');
+      expect(idempotentStep).toBeDefined();
+      expect(idempotentStep?.skipped).toBe(true);
+      // Verify ceremony was skipped (gate not called, status mutations not run)
       expect(mockEvaluateDodGate).not.toHaveBeenCalled();
+      expect(mockClearReviewStatus).not.toHaveBeenCalled();
     });
 
-    it('falls through to the gate when closed-out guard does not trigger (PAN-3025 WI-4 ac2)', async () => {
-      mockReadCompletedCloseOut.mockResolvedValueOnce(null); // Not closed-out, or live row exists
+    it('workflow proceeds to gate when guard returns null (normal path)', async () => {
+      // When readCompletedCloseOut returns null, the workflow proceeds to the DoD gate
+      // (this covers both "not closed out" and "live row still present" scenarios)
+      mockReadCompletedCloseOut.mockResolvedValueOnce(null);
 
       const result = await closeOut(
         { issueId: 'PAN-3051', projectPath: testDir },
@@ -1009,19 +1015,6 @@ describe('workflows', () => {
 
       expect(result.success).toBe(true);
       // Gate runs normally because the guard did not short-circuit
-      expect(mockEvaluateDodGate).toHaveBeenCalledOnce();
-    });
-
-    it('does not short-circuit when close-out guard read fails (PAN-3025 WI-4 ac3)', async () => {
-      mockReadCompletedCloseOut.mockRejectedValueOnce(new Error('database read error'));
-
-      const result = await closeOut(
-        { issueId: 'PAN-3052', projectPath: testDir },
-        { tracker: successfulTracker() },
-      );
-
-      expect(result.success).toBe(true);
-      // On guard error, we conservatively do not short-circuit
       expect(mockEvaluateDodGate).toHaveBeenCalledOnce();
     });
 
