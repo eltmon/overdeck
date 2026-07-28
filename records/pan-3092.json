@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T06:43:37.401Z",
+  "updated": "2026-07-28T06:48:23.612Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T06:43:37.382Z",
-    "inspectNotes": "Inspecting item verdict-aware-pipeline-merge"
+    "updatedAt": "2026-07-28T06:48:22.742Z",
+    "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false."
   },
   "closeOut": {
     "usage": {
@@ -46,7 +46,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.0181193,
-        "pricingAsOf": "2026-07-28T06:43:37.390Z"
+        "pricingAsOf": "2026-07-28T06:48:22.942Z"
       }
     },
     "merges": [],
