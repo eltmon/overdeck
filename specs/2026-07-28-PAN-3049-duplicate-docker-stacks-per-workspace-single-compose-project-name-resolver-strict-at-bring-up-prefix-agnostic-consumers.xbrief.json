@@ -4,17 +4,17 @@
     "created": "2026-07-28T03:20:45Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3049: Duplicate Docker stacks per workspace (myn-feature-* beside overdeck-feature-*) double memory and exhausted the host",
-    "updated": "2026-07-28T03:27:53.316Z"
+    "updated": "2026-07-28T06:38:18.482Z"
   },
   "plan": {
     "id": "pan-3049",
     "title": "Duplicate Docker stacks per workspace — single compose-project-name resolver, strict at bring-up, prefix-agnostic consumers",
-    "status": "proposed",
+    "status": "approved",
     "uid": "ca717aaa-c424-4dd0-91b9-88ff7b410fbf",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-28T03:20:45Z",
-    "updated": "2026-07-28T03:27:53.316Z",
+    "updated": "2026-07-28T06:38:18.482Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3049",
@@ -678,5 +678,5 @@
       "canonicalFilename": "2026-07-28-PAN-3049-duplicate-docker-stacks-per-workspace-single-compose-project-name-resolver-strict-at-bring-up-prefix-agnostic-consumers.xbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
