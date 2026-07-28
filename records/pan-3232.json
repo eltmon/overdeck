@@ -91,18 +91,18 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T21:15:20.125Z",
+  "updated": "2026-07-28T21:24:51.802Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-28T21:15:14.061Z",
-    "reviewNotes": "Verification failed at typecheck — fix and resubmit",
+    "updatedAt": "2026-07-28T21:24:51.710Z",
+    "reviewNotes": "FR-4 live pending-input delta is incomplete: producer/schema/client paths are missing, so no tree update can occur",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -113,7 +113,6 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewRequestedAt": "2026-07-28T21:12:13.614Z",
     "reviewSpawnedAt": "2026-07-28T21:15:10.984Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -202,6 +201,14 @@
             "cacheWrite": 193438
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 718924,
+            "output": 80950,
+            "cacheRead": 20841472,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
             "input": 1382,
@@ -218,6 +225,12 @@
           "cacheRead": 5086315,
           "cacheWrite": 193438
         },
+        "openai/gpt-5.6-sol": {
+          "input": 718924,
+          "output": 80950,
+          "cacheRead": 20841472,
+          "cacheWrite": 0
+        },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 1382,
           "output": 47183,
@@ -226,8 +239,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 15.017239,
-        "pricingAsOf": "2026-07-28T21:15:20.110Z"
+        "usd": 31.461095,
+        "pricingAsOf": "2026-07-28T21:24:51.757Z"
       }
     },
     "merges": [
