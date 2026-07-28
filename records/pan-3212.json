@@ -115,18 +115,18 @@
     "recordedAt": "2026-07-28T17:49:31.882Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T19:06:24.049Z",
+  "updated": "2026-07-28T19:11:46.914Z",
   "pipeline": {
     "issueId": "PAN-3212",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:49:41.828Z",
-    "updatedAt": "2026-07-28T19:06:22.693Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: cursor-anchored live composer parsing now matches the current Claude pane, and a crash-independent payload-unverified marker limits composer proof to pre-Enter recovery while preserving no-repaste rollback semantics.",
+    "updatedAt": "2026-07-28T19:11:46.864Z",
+    "reviewNotes": "The payload-unverified marker is read fail-open and absence also means legacy state, so recovery can bypass composer proof and submit an empty pending message.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
     "reviewedAtCommit": "2ed6db586f52912214c64dc79ee02efcf7fe2400",
     "lastVerifiedCommit": "72d3b812b0d38b8a05441f6dd8f478386595c690",
@@ -171,9 +171,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3601464,
-            "output": 273336,
-            "cacheRead": 43323904,
+            "input": 4383750,
+            "output": 354185,
+            "cacheRead": 53994496,
             "cacheWrite": 0
           }
         },
@@ -188,15 +188,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 8070679,
-          "output": 649701,
-          "cacheRead": 167804928,
+          "input": 8852965,
+          "output": 730550,
+          "cacheRead": 178475520,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 143.746889,
-        "pricingAsOf": "2026-07-28T19:06:22.722Z"
+        "usd": 155.419085,
+        "pricingAsOf": "2026-07-28T19:11:46.887Z"
       }
     },
     "merges": [
