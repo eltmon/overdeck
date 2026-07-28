@@ -70,7 +70,7 @@
     "recordedAt": "2026-07-28T20:46:26.914Z"
   },
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T21:42:17.346Z",
+  "updated": "2026-07-28T23:30:04.599Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "passed",
@@ -80,10 +80,14 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:48:00.219Z",
-    "updatedAt": "2026-07-28T21:42:13.197Z",
-    "reviewNotes": "Approved: prior suppression-scope and paneQuestion blocking-classification findings are fixed with focused regressions",
-    "testNotes": "Scope: pure backend enrichment-classification fix (agent-enrichment.ts) + frontend label/blocking-kind vocabulary, all 7 xBRIEF ACs unit-test verifiable, no UI/browser ACs -> UAT not required. Gates: npm run typecheck (root+hooks+evals+dashboard+frontend ratchets) all green; npm run lint (eslint + effect/permissions/state-writes/state-paths/overdeck-boundaries/pipeline-membership/skills/slash-commands/prompts/file-size/circular-deps/ratchet-audit/quarantine-audit) all green. npm test: 1268 test files / 11972 tests passed, 3 files/50 tests skipped (pre-existing quarantine, unrelated to this change), 0 failures; frontend suite 3 files/51 tests passed. Explicitly re-ran PAN-3233-scoped files for direct evidence: src/lib/__tests__/agent-enrichment.test.ts + compute-agent-enrichment.test.ts + agent-enrichment-service.test.ts = 3 files/65 tests passed; frontend pendingInput.test.ts + useDecisions.test.ts + store.test.ts + SubagentTranscript.test.tsx = 4 files/68 tests passed. Branch also carries pre-existing out-of-declared-scope flywheel-contamination commits (docs/FLYWHEEL-STATE.md tick, SubagentTranscript.tsx/command-deck.module.css scrolling fix) already assessed and passed by review; not re-litigated here.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-28T23:30:04.546Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-28T23:30:04.546Z"
+      }
+    ],
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -95,41 +99,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3247",
     "reviewedAtCommit": "66cb23d0d69083300e7175959f38616b00b19956",
-    "reviewSpawnedAt": "2026-07-28T21:23:12.987Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "docs/FLYWHEEL-STATE.md",
-        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-        "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
-        "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx"
-      ],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "docs/PENDING-INPUT.md",
-        "src/dashboard/frontend/src/__tests__/store.test.ts",
-        "src/dashboard/frontend/src/lib/__tests__/pendingInput.test.ts",
-        "src/dashboard/frontend/src/lib/pendingInput.ts",
-        "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
-        "src/lib/__tests__/agent-enrichment.test.ts",
-        "src/lib/__tests__/compute-agent-enrichment.test.ts",
-        "src/lib/agent-enrichment.ts"
-      ],
-      "actualChangedFiles": [
-        "docs/FLYWHEEL-STATE.md",
-        "docs/PENDING-INPUT.md",
-        "src/dashboard/frontend/src/__tests__/store.test.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-        "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
-        "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx",
-        "src/dashboard/frontend/src/lib/__tests__/pendingInput.test.ts",
-        "src/dashboard/frontend/src/lib/pendingInput.ts",
-        "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
-        "src/lib/__tests__/agent-enrichment.test.ts",
-        "src/lib/__tests__/compute-agent-enrichment.test.ts",
-        "src/lib/agent-enrichment.ts"
-      ],
-      "recordedAt": "2026-07-28T20:46:26.914Z"
-    }
+    "reviewSpawnedAt": "2026-07-28T21:23:12.987Z"
   },
   "closeOut": {
     "usage": {
@@ -152,18 +122,18 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 32,
-            "output": 8330,
-            "cacheRead": 2444432,
-            "cacheWrite": 148105
+            "input": 34,
+            "output": 8531,
+            "cacheRead": 2623207,
+            "cacheWrite": 148828
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 358,
-            "output": 79693,
-            "cacheRead": 41235840,
-            "cacheWrite": 1287012
+            "input": 362,
+            "output": 81423,
+            "cacheRead": 41918065,
+            "cacheWrite": 1291879
           }
         }
       },
@@ -181,15 +151,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 390,
-          "output": 88023,
-          "cacheRead": 43680272,
-          "cacheWrite": 1435117
+          "input": 396,
+          "output": 89954,
+          "cacheRead": 44541272,
+          "cacheWrite": 1440707
         }
       },
       "costAtCloseOut": {
-        "usd": 45.193825,
-        "pricingAsOf": "2026-07-28T21:42:17.337Z"
+        "usd": 45.399323,
+        "pricingAsOf": "2026-07-28T23:30:04.578Z"
       }
     },
     "merges": [
