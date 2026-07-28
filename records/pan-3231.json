@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-28T20:06:28.919Z",
+  "updated": "2026-07-28T22:05:04.606Z",
   "pipeline": {
     "issueId": "PAN-3231",
     "reviewStatus": "pending",
@@ -83,18 +83,29 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "mockups": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3231",
         "agentId": "agent-pan-3231",
         "pid": 937745,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T17:26:28.877Z"
+        "claimedAt": "2026-07-28T17:26:28.877Z",
+        "itemId": "mockups",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-3231 dead)",
+        "releasedAt": "2026-07-28T22:05:00.833Z"
+      }
+    ],
+    "statusReasons": {
+      "mockups": {
+        "reason": "stale claim released (agent-pan-3231 dead)",
+        "updatedAt": "2026-07-28T22:05:00.833Z"
       }
     }
   },
   "statusOverrides": {
-    "mockups": "running"
+    "mockups": "pending"
   }
 }
