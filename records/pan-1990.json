@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T20:43:30.931Z",
+  "updated": "2026-07-28T20:50:14.359Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "failed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T20:43:30.858Z",
-    "inspectNotes": "AC-2 NOT MET (AC-1/3/4 pass). tests/unit/lib/database/schema-workspaces.test.ts:58-59 builds its 'previous-version fixture' by running the full v64 initSchema(db) and then lying the pragma down to user_version=63. Every CREATE TABLE IF NOT EXISTS in the v63->v64 block then no-ops and both ALTER TABLE ADD COLUMN workspace_id calls throw 'duplicate column' and are swallowed by tryIdempotentDdl, so the assertion at :67 compares a fresh v64 DB against another fresh v64 DB. It is vacuous and cannot detect fresh-init vs migration drift. Verified against a GENUINE v63 fixture (fresh initSchema, then DROP the 4 new tables and DROP COLUMN both workspace_id, set user_version=63, runMigrations): 11 of 92 sqlite_master rows differ - agents, conversations, projects, workspaces, project_targets, pinned_docs, idx_workspace_project, idx_workspace_kind, idx_workspace_last_accessed, idx_project_targets_one_primary, idx_pinned_docs_scope - so expect(migratedTables).toEqual(freshTables) FAILS on a real fixture. Two independent causes: (1) sqlite_master stores CREATE text verbatim and the migration DDL at src/lib/database/schema.ts:1817-1874 is indented 6 spaces while the fresh-init DDL at src/lib/database/schema.ts:531-586 is indented 4, so all 9 new tables/indexes differ by whitespace only; (2) conversations/agents get workspace_id via ALTER TABLE, which appends ', workspace_id TEXT' to the stored CREATE text instead of the inline commented column at :472 and :514. REQUIRED FIXES: (a) construct the fixture without the v64 objects so the migration actually executes - e.g. run initSchema then drop the four tables and both workspace_id columns before setting user_version=63, or check in a real v63 fixture DB; (b) make the parity comparison structural rather than raw-text, e.g. compare PRAGMA table_info/index_list/index_info per object, or normalize whitespace in the sql column before toEqual, since byte-identical DDL text is unattainable once ALTER TABLE is involved. Re-run must fail before the fix and pass after.",
+    "updatedAt": "2026-07-28T20:50:14.341Z",
+    "inspectNotes": "Inspecting item schema-v64",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -46,10 +46,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 274,
-            "output": 63568,
-            "cacheRead": 29356013,
-            "cacheWrite": 256464
+            "input": 304,
+            "output": 75300,
+            "cacheRead": 33794778,
+            "cacheWrite": 279400
           }
         }
       },
@@ -61,15 +61,15 @@
           "cacheWrite": 194048
         },
         "anthropic/claude-sonnet-5": {
-          "input": 274,
-          "output": 63568,
-          "cacheRead": 29356013,
-          "cacheWrite": 256464
+          "input": 304,
+          "output": 75300,
+          "cacheRead": 33794778,
+          "cacheWrite": 279400
         }
       },
       "costAtCloseOut": {
-        "usd": 15.605221,
-        "pricingAsOf": "2026-07-28T20:43:30.922Z"
+        "usd": 16.667693,
+        "pricingAsOf": "2026-07-28T20:50:14.353Z"
       }
     },
     "merges": [],
