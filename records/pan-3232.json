@@ -101,18 +101,18 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T21:40:36.255Z",
+  "updated": "2026-07-28T21:46:06.625Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-28T21:40:25.652Z",
-    "reviewNotes": "FR-4 live pending-input delta is incomplete: producer/schema/client paths are missing, so no tree update can occur",
+    "updatedAt": "2026-07-28T21:46:06.560Z",
+    "reviewNotes": "FR-7 conversation-only decisions remain invisible or use the agent-only answer endpoint; required regression tests are still absent",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -205,10 +205,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 302,
-            "output": 17165,
-            "cacheRead": 6194319,
-            "cacheWrite": 289324
+            "input": 399,
+            "output": 26228,
+            "cacheRead": 8975459,
+            "cacheWrite": 305385
           }
         },
         "plan": {
@@ -221,9 +221,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 726148,
-            "output": 81322,
-            "cacheRead": 21233664,
+            "input": 1929879,
+            "output": 118546,
+            "cacheRead": 29638144,
             "cacheWrite": 0
           }
         },
@@ -238,10 +238,10 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1748,
-          "output": 67508,
-          "cacheRead": 39319429,
-          "cacheWrite": 1517461
+          "input": 1845,
+          "output": 76571,
+          "cacheRead": 42100569,
+          "cacheWrite": 1533522
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -250,15 +250,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 726148,
-          "output": 81322,
-          "cacheRead": 21233664,
+          "input": 1929879,
+          "output": 118546,
+          "cacheRead": 29638144,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 33.063778,
-        "pricingAsOf": "2026-07-28T21:40:28.587Z"
+        "usd": 44.744995,
+        "pricingAsOf": "2026-07-28T21:46:06.601Z"
       }
     },
     "merges": [
@@ -267,7 +267,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3232",
