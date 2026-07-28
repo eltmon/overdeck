@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T20:56:16.209Z",
+  "updated": "2026-07-28T21:02:32.864Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "passed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T20:55:37.888Z",
-    "inspectNotes": "All four ACs met; suite green 4/4. AC-1: fresh DB test asserts all four tables, all five indexes, and workspace_id present on both conversations and agents via sqlite_master + PRAGMA table_info. AC-2: fixture at tests/unit/lib/database/schema-workspaces.test.ts:79-91 is genuinely pre-v64 (drops the four tables and both workspace_id columns, sets user_version=63, asserts projects is absent before migrating), so runMigrations really executes rather than no-opping; schemaSnapshot now includes PRAGMA index_list per table alongside table_info/index_info, closing the uniqueness/partial-predicate blind spot from the previous cycle. AC-3 and AC-4 assert the kind CHECK and the partial unique index on the fresh DB, and are additionally re-run behaviorally against the MIGRATED fixture, which is the only way to prove the hand-copied migration DDL kept constraint text no PRAGMA exposes. INDEPENDENTLY MUTATION-VERIFIED rather than taken on the commit message's word: I copied src outside the repo, stripped ONLY the migration copy's CHECK (kind IN (...)) and demoted its CREATE UNIQUE INDEX ... WHERE is_primary = 1 to a plain non-partial index, and re-ran the parity plus both migrated-DB behavioral assertions. Mutated run: snapshot parity=false, migrated CHECK assertion=false, migrated partial-unique assertion=false (all three correctly fail). Unmutated control run against the real workspace src: all three true. The test therefore fails on real constraint drift between the fresh-init DDL (src/lib/database/schema.ts:531-586) and the migration copy (src/lib/database/schema.ts:1817-1874) and is not vacuous. Also confirmed declaring agents.workspace_id last at src/lib/database/schema.ts:473 is required, since ALTER TABLE ADD COLUMN appends and PRAGMA table_info compares cid ordering. No blocking findings.",
+    "updatedAt": "2026-07-28T21:02:32.818Z",
+    "inspectNotes": "Inspecting item workspace-doors",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -46,10 +46,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 336,
-            "output": 81848,
-            "cacheRead": 38524627,
-            "cacheWrite": 561354
+            "input": 408,
+            "output": 107958,
+            "cacheRead": 50825241,
+            "cacheWrite": 605768
           }
         }
       },
@@ -61,15 +61,15 @@
           "cacheWrite": 194048
         },
         "anthropic/claude-sonnet-5": {
-          "input": 336,
-          "output": 81848,
-          "cacheRead": 38524627,
-          "cacheWrite": 561354
+          "input": 408,
+          "output": 107958,
+          "cacheRead": 50825241,
+          "cacheWrite": 605768
         }
       },
       "costAtCloseOut": {
-        "usd": 18.384092,
-        "pricingAsOf": "2026-07-28T20:55:37.933Z"
+        "usd": 21.216494,
+        "pricingAsOf": "2026-07-28T21:02:32.847Z"
       }
     },
     "merges": [],
