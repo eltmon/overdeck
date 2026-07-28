@@ -14,6 +14,7 @@ import { Effect } from 'effect';
 import { getAgentState, type AgentState } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
+import { getProjectPanPaths } from '../pan-dir/paths.js';
 import { listProjects, resolveProjectFromIssueSync, type ProjectConfig } from '../projects.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { listSessionNames } from '../tmux.js';
@@ -120,7 +121,7 @@ export interface HandleOrphanProposedSpecOptions {
 }
 
 async function findSpecPathForIssue(projectPath: string, issueId: string): Promise<string | null> {
-  const specsDir = join(projectPath, '.pan', 'specs');
+  const specsDir = getProjectPanPaths(projectPath).specsDir;
   if (!existsSync(specsDir)) return null;
   let filenames: string[];
   try {
@@ -213,7 +214,7 @@ export async function findOrphanProposedSpecsForReconciler(options: FindOrphanPr
   const candidates: OrphanProposedCandidate[] = [];
 
   for (const { key, config } of projects) {
-    const specsDir = join(config.path, '.pan', 'specs');
+    const specsDir = getProjectPanPaths(config.path).specsDir;
     if (!existsSync(specsDir)) continue;
 
     const entries = await readdir(specsDir, { withFileTypes: true }).catch(() => []);
