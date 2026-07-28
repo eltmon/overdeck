@@ -4,17 +4,17 @@
     "created": "2026-07-28T04:47:10Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3216: Briefing reports \"Troubled agents: 60\" when the troubled gate holds 1 — it counts routine tmux reconciliation as distress",
-    "updated": "2026-07-28T06:34:45.014Z"
+    "updated": "2026-07-28T16:00:17.590Z"
   },
   "plan": {
     "id": "pan-3216",
     "title": "Briefing \"Troubled agents\" line must count the troubled gate, not accumulated failure history",
-    "status": "running",
+    "status": "completed",
     "uid": "6c898837-1052-4934-9da3-aae34d079029",
     "author": "agent:k3[1m]",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-28T04:47:10Z",
-    "updated": "2026-07-28T06:34:45.014Z",
+    "updated": "2026-07-28T16:00:17.590Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3216",
@@ -127,5 +127,5 @@
     ],
     "edges": []
   },
-  "status": "active"
+  "status": "completed"
 }
