@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T20:53:02.011Z",
+  "updated": "2026-07-28T22:05:00.896Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 29,
-    "claims": {
-      "wi14-e2e": {
-        "writerId": "agent-pan-1837",
-        "agentId": "agent-pan-1837",
-        "pid": 518638,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:53:02.011Z"
-      }
-    },
+    "sequence": 30,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -243,6 +235,17 @@
         "outcome": "completed",
         "reason": "Added kimi-code to harnesses.mdx (Info box + table, five harnesses; full native-Kimi section: install path/kimi login, Kimi-only gate, native-vs-acp-vs-claude-code+Kimi-endpoint comparison table) and harness-landscape.mdx (marked Supported, distinguished from acp). Updated CLAUDE.md's Harnesses section. Fixed a source-introspection lint violation my own wi5 test introduced (reading its own source file and regexing it) by replacing with a comment pointing at the existing runtime-behavior tests. npm run lint exits 0 including the skills/docs cross-check chain.",
         "releasedAt": "2026-07-28T20:52:46.642Z"
+      },
+      {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 518638,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:53:02.011Z",
+        "itemId": "wi14-e2e",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-1837 dead)",
+        "releasedAt": "2026-07-28T22:05:00.833Z"
       }
     ],
     "statusReasons": {
@@ -301,6 +304,10 @@
       "wi12-docs": {
         "reason": "Added kimi-code to harnesses.mdx (Info box + table, five harnesses; full native-Kimi section: install path/kimi login, Kimi-only gate, native-vs-acp-vs-claude-code+Kimi-endpoint comparison table) and harness-landscape.mdx (marked Supported, distinguished from acp). Updated CLAUDE.md's Harnesses section. Fixed a source-introspection lint violation my own wi5 test introduced (reading its own source file and regexing it) by replacing with a comment pointing at the existing runtime-behavior tests. npm run lint exits 0 including the skills/docs cross-check chain.",
         "updatedAt": "2026-07-28T20:52:46.642Z"
+      },
+      "wi14-e2e": {
+        "reason": "stale claim released (agent-pan-1837 dead)",
+        "updatedAt": "2026-07-28T22:05:00.833Z"
       }
     }
   },
@@ -367,6 +374,6 @@
     "wi12-docs.wi12-docs.ac1": "completed",
     "wi12-docs.wi12-docs.ac2": "completed",
     "wi12-docs.wi12-docs.ac3": "completed",
-    "wi14-e2e": "running"
+    "wi14-e2e": "pending"
   }
 }
