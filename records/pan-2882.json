@@ -95,7 +95,7 @@
     "recordedAt": "2026-07-28T07:25:54.489Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T09:46:04.680Z",
+  "updated": "2026-07-28T09:46:06.864Z",
   "pipeline": {
     "issueId": "PAN-2882",
     "reviewStatus": "pending",
@@ -105,8 +105,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:26:27.252Z",
-    "updatedAt": "2026-07-28T09:46:04.591Z",
-    "reviewNotes": "Focused GitLab membership suite has five failures; pagination, TTL-clock, and global-limiter tests remain incomplete",
+    "updatedAt": "2026-07-28T09:46:04.922Z",
+    "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (917355ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2882\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2882/src/dashboard/frontend\n\nNo test files found, exiting with code 0\n\n ❯ |root| tests/unit/lib/gitlab-merge-requests.test.ts (15 tests | 3 failed) 25ms\n       × caches results by repo for 30s and dedupes concurrent calls 4ms (retry x1)\n       × paginates through pages when page 1 has exactly 100 rows 2ms (retry x1)\n       × caches results by (repoPath, head) for 30s and dedupes concurrent calls 1ms (retry x1)\n ❯ |root| tests/unit/lib/pipeline-membership-gather.test.ts (49 tests | 2 failed) 63ms\n     × sets hasMergedPr for open GitLab issues with merged MRs, yielding post_merge_limbo 6ms (retry x1)\n     × does not query merged MRs for github repos in polyrepo 1ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-GiuR42/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into worksp\n…(1015 chars elided)…\n/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-rH1lPq/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-rH1lPq/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-cont\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
     "reviewedAtCommit": "af37d2565b59677dc37584e1019c8c75cc49b336",
@@ -170,7 +170,7 @@
       },
       "costAtCloseOut": {
         "usd": 36.507856,
-        "pricingAsOf": "2026-07-28T09:46:04.626Z"
+        "pricingAsOf": "2026-07-28T09:46:06.862Z"
       }
     },
     "merges": [
