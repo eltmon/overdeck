@@ -126,3 +126,65 @@ describe('EventStore', () => {
     expect(afterCompact[0]!.type).toBe('agent.started');
   });
 });
+
+describe('trimReviewStatusHistoryPayloads (PAN-3253)', () => {
+  function insertReviewEvent(historyLength: number, issueId = 'MIN-901'): number {
+    const history = Array.from({ length: historyLength }, (_, i) => ({
+      type: 'review',
+      status: i % 2 === 0 ? 'pending' : 'passed',
+      timestamp: new Date(1_753_000_000_000 + i * 1000).toISOString(),
+      notes: 'Approved unchanged review: frontend has no PR diff, padding padding padding',
+    }));
+    const payload = JSON.stringify({ issueId, status: { issueId, reviewStatus: 'passed', history } });
+    db.prepare('INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)').run(
+      'review.status_changed', Date.now(), payload,
+    );
+    return payload.length;
+  }
+
+  it('trims oversized payload history to the bounded tail and reports saved space', async () => {
+    const { trimReviewStatusHistoryPayloads } = await import('../../src/dashboard/server/event-store.js');
+    const originalLength = insertReviewEvent(500);
+
+    const result = trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
+
+    expect(result.trimmed).toBe(1);
+    expect(result.savedChars).toBeGreaterThan(0);
+    const row = db.prepare("SELECT payload FROM events WHERE type = 'review.status_changed'").get() as { payload: string };
+    expect(row.payload.length).toBeLessThan(originalLength);
+    const parsed = JSON.parse(row.payload);
+    expect(parsed.status.history).toHaveLength(20);
+    // Keeps the most recent tail, not the head
+    expect(parsed.status.history[19].timestamp).toBe(new Date(1_753_000_000_000 + 499 * 1000).toISOString());
+    expect(parsed.issueId).toBe('MIN-901');
+  });
+
+  it('payload size is bounded regardless of how many transitions occurred', async () => {
+    const { trimReviewStatusHistoryPayloads } = await import('../../src/dashboard/server/event-store.js');
+    insertReviewEvent(500, 'MIN-901');
+    insertReviewEvent(2140, 'MIN-891');
+
+    trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
+
+    const rows = db.prepare("SELECT payload FROM events WHERE type = 'review.status_changed'").all() as Array<{ payload: string }>;
+    const sizes = rows.map((r) => r.payload.length);
+    // Both trimmed payloads carry the same bounded 20-entry tail, so their
+    // sizes are equal — independent of the 500 vs 2140 original transitions.
+    expect(sizes[0]).toBe(sizes[1]);
+  });
+
+  it('leaves small payloads and other event types untouched', async () => {
+    const { trimReviewStatusHistoryPayloads } = await import('../../src/dashboard/server/event-store.js');
+    const small = JSON.stringify({ issueId: 'PAN-1', status: { reviewStatus: 'passed', history: [] } });
+    db.prepare('INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)').run('review.status_changed', Date.now(), small);
+    const other = JSON.stringify({ agentId: 'a1', big: 'x'.repeat(20_000) });
+    db.prepare('INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)').run('agent.activity_changed', Date.now(), other);
+
+    const result = trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
+
+    expect(result.trimmed).toBe(0);
+    const rows = db.prepare('SELECT payload FROM events ORDER BY sequence').all() as Array<{ payload: string }>;
+    expect(rows[0]!.payload).toBe(small);
+    expect(rows[1]!.payload).toBe(other);
+  });
+});

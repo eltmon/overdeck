@@ -26,20 +26,14 @@ export async function agentRestartBlockReason(
   const initiator = input.initiator?.trim();
   if (!initiator || input.force) return null;
 
-  const deployDeps = initiator === 'flywheel-orchestrator'
-    ? { ...deps, getFlywheelActiveRunId: () => null }
-    : deps;
-  const assessment = await getDeployWindowAssessment(deployDeps);
+  const assessment = await getDeployWindowAssessment(deps);
   if (!assessment.reason) return null;
 
   const queued = await recordDeployIntent({
     requestedBy: initiator,
     reason: assessment.reason,
-    blockedBy: assessment.verifyingIssues,
+    blockedBy: [],
   });
-  const blockerCount = queued.blockedBy.length;
-  const blockerLabel = blockerCount === 1 ? 'verification' : 'verifications';
-  const blockerIds = blockerCount > 0 ? queued.blockedBy.join(', ') : 'none';
 
-  return `Restart refused. The active deployment gate says: "${assessment.reason}" This deploy has been queued since ${queued.requestedAt} (${formatQueueAge(queued.requestedAt)} ago); it has been held by ${blockerCount} distinct ${blockerLabel}: ${blockerIds}. It will fire automatically at the next verification boundary — do not retry or use --force, which would kill a healthy verification mid-run.`;
+  return `Restart refused. The active deployment gate says: "${assessment.reason}" This deploy has been queued since ${queued.requestedAt} (${formatQueueAge(queued.requestedAt)} ago); it fires automatically as soon as the window clears — do not retry or use --force, which would interrupt the operation the gate is protecting.`;
 }

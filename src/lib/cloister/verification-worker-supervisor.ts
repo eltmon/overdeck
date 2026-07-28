@@ -2,7 +2,6 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, w
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 
-import { readPendingDeploy } from '../deploy/deploy-queue.js';
 import { getOverdeckHome, packageRoot } from '../paths.js';
 import type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 
@@ -135,12 +134,6 @@ export async function runSupervisedVerification(
   if (existing && existing.workspacePath === workspacePath && isProcessAlive(existing.pid) && !existsSync(existing.resultPath)) {
     console.log(`[${logPrefix}] Joining live verification worker ${existing.pid} for ${issueId}`);
     return waitForResult(existing);
-  }
-
-  const pendingDeploy = await readPendingDeploy();
-  if (pendingDeploy) {
-    const reason = `Verification deferred: a dashboard deploy is queued (requested ${pendingDeploy.requestedAt} by ${pendingDeploy.requestedBy.join(', ')}). It re-runs automatically after the deploy.`;
-    return { outcome: 'deferred', reason };
   }
 
   const dir = workerDir(issueId);

@@ -47,17 +47,17 @@ describe('postMergeLifecycle Step 0 deploy gating', () => {
   it('defers a stale build and registers deploy intent when the window is unsafe', async () => {
     const log = vi.fn();
     const recordIntent = recordIntentMock();
-    const reason = 'Deployment deferred because verification is in flight for PAN-1.';
+    const reason = 'Deployment deferred because a merge specialist session is active.';
     await expect(shouldRestartForPostMerge('/repo', {
       computeStaleness: async () => staleness('stale'),
-      getWindowAssessment: async () => ({ reason, verifyingIssues: ['PAN-1'] }),
+      getWindowAssessment: async () => ({ reason }),
       recordIntent,
       log,
     })).resolves.toBe(false);
     expect(recordIntent).toHaveBeenCalledWith({
       requestedBy: 'merge-step0',
       reason,
-      blockedBy: ['PAN-1'],
+      blockedBy: [],
     });
     expect(log).toHaveBeenCalledWith(
       `Deploy window unsafe (${reason}) — deferring deploy to the staleness patrol`,
@@ -68,18 +68,18 @@ describe('postMergeLifecycle Step 0 deploy gating', () => {
     const recordIntent = recordIntentMock();
     await expect(shouldRestartForPostMerge('/repo', {
       computeStaleness: async () => staleness('stale'),
-      getWindowAssessment: async () => ({ reason: null, verifyingIssues: [] }),
+      getWindowAssessment: async () => ({ reason: null }),
       recordIntent,
     })).resolves.toBe(true);
     expect(recordIntent).not.toHaveBeenCalled();
   });
 
   it('defers an unknown legacy build when the deploy window is unsafe', async () => {
-    const reason = 'Deployment deferred because flywheel run RUN-42 owns deployment.';
+    const reason = 'Deployment deferred because the post-merge lifecycle is pending.';
     const recordIntent = recordIntentMock();
     await expect(shouldRestartForPostMerge('/repo', {
       computeStaleness: async () => staleness('unknown'),
-      getWindowAssessment: async () => ({ reason, verifyingIssues: [] }),
+      getWindowAssessment: async () => ({ reason }),
       recordIntent,
     })).resolves.toBe(false);
     expect(recordIntent).toHaveBeenCalledWith({
@@ -93,7 +93,7 @@ describe('postMergeLifecycle Step 0 deploy gating', () => {
     const recordIntent = recordIntentMock();
     await expect(shouldRestartForPostMerge('/repo', {
       computeStaleness: async () => staleness('unknown'),
-      getWindowAssessment: async () => ({ reason: null, verifyingIssues: [] }),
+      getWindowAssessment: async () => ({ reason: null }),
       recordIntent,
     })).resolves.toBe(true);
     expect(recordIntent).not.toHaveBeenCalled();
