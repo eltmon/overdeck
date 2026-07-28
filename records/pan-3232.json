@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T20:32:04.672Z",
+  "updated": "2026-07-28T20:32:13.227Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -86,8 +86,16 @@
     }
   ],
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "session-panel-kind-label": {
+        "writerId": "agent-pan-3232",
+        "agentId": "agent-pan-3232",
+        "pid": 3643068,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:32:13.226Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3232",
@@ -120,6 +128,7 @@
     "decisions-prompt-threading.decisions-prompt-threading.ac1": "completed",
     "decisions-prompt-threading.decisions-prompt-threading.ac2": "completed",
     "decisions-prompt-threading.decisions-prompt-threading.ac3": "completed",
-    "decisions-prompt-threading.decisions-prompt-threading.ac4": "completed"
+    "decisions-prompt-threading.decisions-prompt-threading.ac4": "completed",
+    "session-panel-kind-label": "running"
   }
 }
