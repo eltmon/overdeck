@@ -20,7 +20,7 @@ at read time) enumerates the active blocking surfaces. Labels live in one map:
 | `permissionRequest` | Two sources. (a) Channel permission event stream (server-side), merged at read time by `selectPendingInputSubjects` / `selectPendingPermissionAgentIds`. (b) PAN-3070: pane/runtime detection with `pendingQuestionReason === 'tool_permission'`, folded into `pendingInputKinds` by `appendPaneDetectionKind` — the only source that fires when the Channels bridge is off (the default under the PTY supervisor) | request details (source a only) | `ChannelPermissionDialog` → permission response route; terminal otherwise |
 | `sessionResume` | Pane pattern detection | — | terminal only |
 | `rateLimit` | Pane pattern detection (PAN-1834) | — | auto-dismissed by the deacon modal handler; terminal otherwise |
-| `paneQuestion` | PAN-3233: pane/runtime detection with `pendingQuestionReason` in `user_question` \| `confirmation` \| `disambiguation` \| `planning_done`, folded into `pendingInputKinds` by `appendPaneDetectionKind`. Guarded against double-representing a JSONL-backed `askUserQuestion` | — | terminal only |
+| `paneQuestion` | PAN-3233: **agent enrichment only** (`src/lib/agent-enrichment.ts`) — pane/runtime detection with `pendingQuestionReason` in `user_question` \| `confirmation` \| `disambiguation` \| `planning_done`, folded into `pendingInputKinds` by `appendPaneDetectionKind`. Guarded against double-representing a JSONL-backed `askUserQuestion`. `appendPaneDetectionKind` is currently called only from agent enrichment, not from the conversation read paths (`conversation-list.ts`, `conversation-reads.ts`), so conversations do not yet emit this kind | — | terminal only |
 
 ## The surfaces
 

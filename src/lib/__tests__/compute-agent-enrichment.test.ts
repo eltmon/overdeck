@@ -71,6 +71,30 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
     rmSync(agentDir, { recursive: true, force: true })
   })
 
+  // Review fix (PAN-3233): the pane exemption must not also unsuppress
+  // unrelated stale JSONL/plan state sitting in the same scan.
+  it('surfaces only the pane permission — not a stale pendingProposedPlan — when both are present under an active specialist', async () => {
+    const agentDir = makeAgentDir('work')
+    const agentId = `agent-test-${Date.now()}`
+    vi.spyOn(agents, 'getAgentDir').mockReturnValue(agentDir)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agents.getAgentStateSync>)
+    getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
+    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed({ reason: 'tool_permission', prompt: 'Allow background operator?' }))
+    const scanWithStalePlan = {
+      ...EMPTY_PENDING_INPUTS_SCAN,
+      exitPlanModePending: true,
+      pendingProposedPlan: { toolUseId: 'toolu_stale_plan', askedAt: '2026-07-28T11:00:00.000Z', plan: 'Stale cached plan' },
+    }
+
+    const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, true, scanWithStalePlan))
+
+    expect(enrichment.hasPendingQuestion).toBe(true)
+    expect(enrichment.pendingInputKinds).toEqual(['permissionRequest'])
+    expect(enrichment.pendingProposedPlan).toBeUndefined()
+
+    rmSync(agentDir, { recursive: true, force: true })
+  })
+
   it('suppresses a JSONL AskUserQuestion for a work-role agent when hasActiveSpecialist is true', async () => {
     const agentDir = makeAgentDir('work')
     const agentId = `agent-test-${Date.now()}`

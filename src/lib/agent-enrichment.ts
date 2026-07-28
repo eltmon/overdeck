@@ -638,11 +638,17 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   // better than the generic turn-end phrasing, so it only speaks when nothing
   // more specific did.
   const detection = questionDetection ?? runtimeDetection ?? paneDetection ?? fallbackDetection ?? turnEndedDetection
+  // PAN-1834 — suppresses every surface derived from the parked agent's stale
+  // JSONL/runtime/fallback/turn-end state while a specialist is active.
+  const isSpecialistSuppressed = hasActiveSpecialist === true && !isOwnActiveSpecialist(role)
   // PAN-3233 — a live blocking pane modal (tool_permission foremost) is fresh
-  // evidence the agent is frozen RIGHT NOW; PAN-1834 suppression exists for the
-  // parked agent's stale JSONL/runtime surfaces, never for these.
+  // evidence the agent is frozen RIGHT NOW, unlike the stale surfaces above, so
+  // it bypasses suppression. Review fix: this exemption is scoped to ONLY the
+  // pane detection's own fingerprint/kind (below) — it must never also expose
+  // unrelated stale JSONL state (a pending ExitPlanMode, an old AskUserQuestion)
+  // that happens to be sitting in the same scan.
   const hasBlockingPaneDetection = paneDetection !== null && BLOCKING_AWAITING_INPUT_REASONS.has(paneDetection.reason)
-  const shouldSuppressPendingInput = hasActiveSpecialist === true && !isOwnActiveSpecialist(role) && !hasBlockingPaneDetection
+  const shouldSuppressPendingInput = isSpecialistSuppressed && !hasBlockingPaneDetection
   const hasPendingQuestion = !shouldSuppressPendingInput && detection !== null
 
   // PAN-1520 — fold every blocking surface into a uniform set.
@@ -651,7 +657,11 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   // here owns the JSONL-derived kinds plus pane/runtime fallbacks.
   const pendingInputKinds: PendingInputKind[] = []
   let pendingAskUserQuestion: PendingAskUserQuestionSnapshot | undefined
-  if (!shouldSuppressPendingInput) {
+  // PAN-3233 review fix — gated on isSpecialistSuppressed, NOT the pane-exempt
+  // shouldSuppressPendingInput: these are all derived from the JSONL scan, which
+  // describes the parked agent's stale state regardless of what the live pane
+  // currently shows. The pane exemption must not leak them.
+  if (!isSpecialistSuppressed) {
     if (pendingQuestions.length > 0) {
       pendingInputKinds.push('askUserQuestion')
       const first = pendingQuestions[0]
@@ -671,9 +681,13 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     // Only when nothing more specific is open — an agent parked on a permission
     // prompt is idle too, and must read as the permission, not as a bare turn-end.
     if (turnEndedWaiting && pendingInputKinds.length === 0) pendingInputKinds.push('agentTurnEnded')
-    // PAN-1520 (covers #1197) — promote pane-detected session-resume dialogs
-    // into the unified pending-input set so the indicator fires.
-    // PAN-1834 — also promote pane-detected rate-limit / model-switch modals.
+  }
+  // PAN-1520 (covers #1197) — promote pane-detected session-resume dialogs
+  // into the unified pending-input set so the indicator fires.
+  // PAN-1834 — also promote pane-detected rate-limit / model-switch modals.
+  // PAN-3233 — gated on the pane-exempt shouldSuppressPendingInput (not
+  // isSpecialistSuppressed): this is the one surface the exemption exists for.
+  if (!shouldSuppressPendingInput) {
     appendPaneDetectionKind(detection, pendingInputKinds)
   }
 
@@ -694,9 +708,11 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     pendingInputCount: pendingInputKinds.length,
     pendingInputKinds,
     pendingAskUserQuestion,
-    // Suppressed alongside every other pending surface: when a specialist owns
-    // the issue the work agent is parked, not asking.
-    pendingProposedPlan: shouldSuppressPendingInput ? undefined : scan.pendingProposedPlan,
+    // Suppressed alongside every other JSONL-derived surface: when a specialist
+    // owns the issue the work agent is parked, not asking. PAN-3233 review fix —
+    // gated on isSpecialistSuppressed, not the pane exemption: a live blocking
+    // pane prompt is not evidence that a stale proposed plan is still relevant.
+    pendingProposedPlan: isSpecialistSuppressed ? undefined : scan.pendingProposedPlan,
     // PAN-3070 — an agent holding an unanswered blocking prompt is not working.
     // The runtime resolution is written by the stop hook and stays at whatever
     // it last was, so a frozen agent kept reporting `working` for hours; the
