@@ -4,17 +4,17 @@
     "created": "2026-07-28T04:20:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3025: Durable pipeline journal omits verificationStatus — DoD verification row false-MISSes whenever live status is cleared (post-close-out, DB rebuild)",
-    "updated": "2026-07-28T06:35:43.650Z"
+    "updated": "2026-07-28T16:14:18.767Z"
   },
   "plan": {
     "id": "pan-3025",
     "title": "Durable pipeline journal omits verificationStatus — DoD verification row false-MISSes whenever live status is cleared",
-    "status": "running",
+    "status": "completed",
     "uid": "0d9993db-bb04-46fd-b4f1-e536bc0f6295",
     "author": "agent:k3[1m]",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-28T04:20:00.000Z",
-    "updated": "2026-07-28T06:35:43.650Z",
+    "updated": "2026-07-28T16:14:18.767Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3025",
@@ -387,5 +387,5 @@
       "canonicalFilename": "2026-07-28-PAN-3025-durable-pipeline-journal-omits-verificationstatus-dod-verification-row-false-misses-whenever-live-status-is-cleared.xbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
