@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T18:42:45.933Z",
+  "updated": "2026-07-28T18:43:05.403Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T18:42:31.634Z",
-    "inspectNotes": "Inspecting item wi2-behavior-matrix"
+    "updatedAt": "2026-07-28T18:43:05.320Z",
+    "inspectNotes": "All 3 ACs verified: getRuntimeBehavior('kimi-code') and getHarnessBehavior('kimi-code') both return the same KIMI_CODE_BEHAVIOR object (BEHAVIORS['kimi-code'] + explicit branch); the four required discriminants (kimi-wire-jsonl / pty-supervisor / kimi-session-signal / kimi-session-newest) are present; BEHAVIORS stays Record<RuntimeName, HarnessBehavior> with RuntimeName=Harness now including 'kimi-code' (types.ts:87), so a missing key fails typecheck. behavior.test.ts 7/7 green. Non-blocking: src/lib/runtimes/behavior.ts re-exports the other *_BEHAVIOR consts but not KIMI_CODE_BEHAVIOR, so the test imports it from @overdeck/contracts directly."
   },
   "closeOut": {
     "usage": {
@@ -37,10 +37,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 324,
-            "output": 65766,
-            "cacheRead": 41217828,
-            "cacheWrite": 309542
+            "input": 332,
+            "output": 66642,
+            "cacheRead": 42579060,
+            "cacheWrite": 312376
           }
         }
       },
@@ -52,15 +52,15 @@
           "cacheWrite": 187167
         },
         "anthropic/claude-sonnet-5": {
-          "input": 324,
-          "output": 65766,
-          "cacheRead": 41217828,
-          "cacheWrite": 309542
+          "input": 332,
+          "output": 66642,
+          "cacheRead": 42579060,
+          "cacheWrite": 312376
         }
       },
       "costAtCloseOut": {
-        "usd": 17.348748,
-        "pricingAsOf": "2026-07-28T18:42:31.641Z"
+        "usd": 17.636855,
+        "pricingAsOf": "2026-07-28T18:43:05.382Z"
       }
     },
     "merges": [],
