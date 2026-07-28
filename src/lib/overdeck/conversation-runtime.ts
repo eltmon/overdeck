@@ -51,7 +51,6 @@ import { isClaudeCodeChannelsEnabled, loadConfigSync } from '../config-yaml.js';
 import { writePtyToken } from '../pty-token.js';
 import { canUseHarnessSync } from '../harness-policy.js';
 import { resolveHarness } from '../harness-resolve.js';
-import { paneHasBlockingChoiceMenu } from '../pane-choice-menu.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { getProviderForModelSync, piProviderForModel, UnknownModelError } from '../providers.js';
 import { getOhmypiCodexAuthStatus } from '../ohmypi-codex-auth.js';
@@ -71,6 +70,7 @@ import { markRespawnPending } from '../../dashboard/server/services/pending-resp
 import { cleanupConversationAttachments, cleanupUnreferencedConversationAttachments } from '../../dashboard/server/services/conversation-attachments.js';
 import { resolveCodexRolloutPath } from '../../dashboard/server/routes/jsonl-resolver.js';
 import { sendConversationControlCommand, isPiControlChannelHarness, resolveConversationDeliveryMethod } from './conversation-delivery.js';
+import { deliverResumeContractUnlessGated } from './resume-contract-delivery.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const PROCESS_CLEANUP_GRACE_MS = 750;
@@ -901,27 +901,14 @@ export async function handleConversationResume(
       await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, canResume, harness);
       await waitForTmuxSession(conv.tmuxSession);
       await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
-      // The harness may open its own blocking gate on resume — Claude Code's
-      // "Resume from summary / Resume full session as-is" menu. Its composer
-      // takes no text while that menu is up, and the answer belongs to the
-      // operator, so skip the contract rather than race it (PAN-3212).
-      const resumeGatePane = await capturePaneText(conv.tmuxSession, 90).catch(() => '');
-      if (resumeGatePane && paneHasBlockingChoiceMenu(resumeGatePane)) {
-        console.log(`[conversations] resume contract skipped for ${name} — the harness is showing a blocking choice menu; the operator answers it`);
-      } else {
-        // Best-effort: the session is already respawned, so a delivery failure must not
-        // fail the resume itself.
-        try {
-          await deliverAgentMessage(
-            conv.tmuxSession,
-            `CONVERSATION RESUME: ${buildResumeContract(resumeCause)}`,
-            'conversation-resume',
-            resolveConversationDeliveryMethod(conv),
-          );
-        } catch (err: unknown) {
-          console.error(`[conversations] resume contract delivery failed for ${name}:`, err instanceof Error ? err.message : String(err));
-        }
-      }
+      // The harness may open its own blocking gate on resume. The operator owns
+      // that answer, so the contract delivery seam skips rather than races it.
+      await deliverResumeContractUnlessGated(
+        conv.tmuxSession,
+        `CONVERSATION RESUME: ${buildResumeContract(resumeCause)}`,
+        'conversation-resume',
+        resolveConversationDeliveryMethod(conv),
+      );
       markConversationActive(name);
       return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });
     } catch (error) {
