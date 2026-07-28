@@ -64,15 +64,7 @@
       "timestamp": "2026-07-28T09:01:36.040Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T09:01:36Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2882\n\n# Review — PAN-2882 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED\n\nThe production fixes for error propagation and per-gather concurrency address the first two prior-cycle blockers, but the required focused suite now has five failures. Two acceptance-test gaps from the previous verdict also remain: the merged pagination path is unreachable, and the cache tests neither control the cache clock nor exercise concurrent single-flight behavior.\n\n## Context\n\n- PR: https://github.com/eltmon/overdeck/pull/3220\n- Branch: `feature/pan-2882`\n- HEAD reviewed: `af37d2565b59677dc37584e1019c8c75cc49b336`\n- Previous reviewed HEAD: `b68a67e56eeca91f055135b583a9ca284a20c748`\n- Review cycle: 2\n- Manifest: `.pan/review/agent-pan-2882-review-af37d256/context.json`\n\n## Blocking Findings\n\n### ! [requirements] The merged-pagination acceptance test contradicts the implementation and fails — `src/lib/gitlab-merge-requests.ts:128`\n\n**Evidence tier:** Tier 2 — changed code plus failing focused test.\n\nThe helper returns `true` immediately whenever page 1 contains any row. The subsequent short-page check and `page++` cannot run for a 100-row page because `pageRows.length > 0` already returned. The new test at `tests/unit/lib/gitlab-merge-requests.test.ts:205` expects a second page after receiving exactly 100 rows, so it fails with `expected 2, received 1`.\n\nThis leaves `gitlab-mr-module.ac3` and AC-2 unmet: the accepted xBRIEF says both helpers request page N+1 when page N returns exactly 100 rows. If the intended existence query should short-circuit after the first matching row, that is a reasonable optimization, but the canonical requirement and tests must be revised consistently rather than shipping contradictory tests.\n\n**Required fix:** Make the implementation follow the accepted pagination requirement, or durably revise the requirement to permit first-page short-circuiting and remove the impossible second-page assertion. The focused suite must pass.\n\n### ! [requirements] Fake timers cannot expire the module-level caches, and the tests still do not exercise concurrent single-flight — `tests/unit/lib/gitlab-merge-requests.test.ts:110`\n\n**Evidence tier:** Tier 2 — static clock tracing plus two failing focused tests.\n\nBoth cache instances are created at module import in `src/lib/gitlab-merge-requests.ts:19` and `:23`. `createSettledTtlPromiseCache()` captures its default `Date.now` function when those instances are created, before each test calls `vi.useFakeTimers()`. Advancing fake timers therefore does not advance the cache’s captured real clock. The open and merged TTL tests fail because the runner remains at one call after the claimed 31-second expiry.\n\nThe tests are also labeled as concurrent-dedup tests but await the first call before starting the second. They prove a settled within-TTL cache hit, not concurrent single-flight deduplication required by `gitlab-mr-module.ac5` and the PRD’s named test list.\n\n**Required fix:** Give these caches a fake-timer-visible/injectable clock or reset/recreate them after fake timers are installed. Start two loads before resolving the runner and assert one runner invocation, then advance the fake clock past the settled TTL and assert a reload.\n\n### ! [requirements] The global-concurrency rewrite left gather tests red and added no aggregate-limit test — `src/lib/pipeline-membership-gather.ts:688`\n\n**Evidence tier:** Tier 2 — changed call shape plus two failing focused tests.\n\nThe global limiter now invokes `listMergedMergeRequestHeads(repoPath, [head])` once per `(repository, head)` pair. Existing changed-file tests still expect one batched invocation per repository: the two-repository merged case expects two calls but receives four, and the mixed-forge case expects one call but receives two. No new test measures active merged-MR lookups across multiple repositories, so NFR-2’s aggregate maximum of five is not mechanically protected despite this cycle being specifically intended to fix that blocker.\n\n**Required fix:** Update the per-head invocation expectations and add a deferred-runner test that drives enough heads across at least two GitLab repositories, records maximum active calls, and proves it never exceeds five. Keep the GitHub-forge repository exclusion assertion explicit.\n\n## Non-blocking Findings\n\nNone in the cycle diff.\n\n## Prior Findings Rechecked\n\n- **Merged-MR errors and malformed JSON:** fixed. Rejections now propagate through `withUnavailableReason()` and become `forge_unavailable` rather than false “unmerged” evidence.\n- **Per-repository fan-out:** production wiring now flattens `(repo, head)` tasks under one five-slot limiter for each gather. The implementation is sound, but the required regression test is missing and existing expectations are red.\n- **Cache-key isolation:** fixed by using distinct repository paths across tests.\n\n## Security Review\n\nNo findings. The cycle changes preserve the fixed `execFile` executable, argument-array invocation, configured cwd, timeout, and bounded output buffer. Errors now propagate without exposing credentials or command output beyond the existing typed unavailable surface.\n\n## Performance Review\n\nNo new production performance blocker. The changed gather applies one five-slot limiter across all GitLab repositories and candidate heads in a gather. Candidate heads remain deduplicated and limited to open issues, while settled results retain the 30-second cache. The missing aggregate concurrency test is a blocking requirement/coverage gap rather than evidence that the current implementation exceeds five.\n\n## Verification Run\n\n- `npx vitest run tests/unit/lib/gitlab-merge-requests.test.ts tests/unit/lib/pipeline-membership-gather.test.ts` — **failed: 5 tests failed, 59 passed**.\n  - Open cache TTL expected runner call count 2, received 1.\n  - Merged pagination expected page call count 2, received 1.\n  - Merged cache TTL expected runner call count 2, received 1.\n  - Two-repo merged gather expected 2 dependency calls, received 4.\n  - Mixed-forge gather expected 1 dependency call, received 2.\n- `npm run typecheck` — passed.\n- `npm run lint` — passed.\n- `git diff --check origin/main...HEAD` — passed.\n\n## Clean Areas Checked\n\n- Correctness: GitLab error propagation, malformed-response handling, merged-head union, open/closed membership inputs, and GitHub-first gating.\n- Security: child-process argument handling, cwd use, output bounds, timeout, and error exposure.\n- Requirements: all prior blockers, FR-1 through FR-6, NFR-1 through NFR-4, the named acceptance tests, NonGoals, and documentation scope.\n- Performance: aggregate gather limiter, candidate deduplication, tracker/open-candidate scoping, and cache placement.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2882/.pan/review/agent-pan-2882-review-af37d256/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2882 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -95,23 +87,23 @@
     "recordedAt": "2026-07-28T07:25:54.489Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T09:46:42.998Z",
+  "updated": "2026-07-28T09:47:47.555Z",
   "pipeline": {
     "issueId": "PAN-2882",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:26:27.252Z",
-    "updatedAt": "2026-07-28T09:46:04.922Z",
+    "updatedAt": "2026-07-28T09:47:47.508Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (917355ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2882\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2882/src/dashboard/frontend\n\nNo test files found, exiting with code 0\n\n ❯ |root| tests/unit/lib/gitlab-merge-requests.test.ts (15 tests | 3 failed) 25ms\n       × caches results by repo for 30s and dedupes concurrent calls 4ms (retry x1)\n       × paginates through pages when page 1 has exactly 100 rows 2ms (retry x1)\n       × caches results by (repoPath, head) for 30s and dedupes concurrent calls 1ms (retry x1)\n ❯ |root| tests/unit/lib/pipeline-membership-gather.test.ts (49 tests | 2 failed) 63ms\n     × sets hasMergedPr for open GitLab issues with merged MRs, yielding post_merge_limbo 6ms (retry x1)\n     × does not query merged MRs for github repos in polyrepo 1ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-GiuR42/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into worksp\n…(1015 chars elided)…\n/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-rH1lPq/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-rH1lPq/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-cont\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
     "reviewedAtCommit": "af37d2565b59677dc37584e1019c8c75cc49b336",
     "lastVerifiedCommit": "b68a67e56eeca91f055135b583a9ca284a20c748",
-    "reviewSpawnedAt": "2026-07-28T08:52:41.991Z",
+    "reviewSpawnedAt": "2026-07-28T09:47:47.506Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -170,7 +162,7 @@
       },
       "costAtCloseOut": {
         "usd": 36.507856,
-        "pricingAsOf": "2026-07-28T09:46:06.862Z"
+        "pricingAsOf": "2026-07-28T09:47:47.520Z"
       }
     },
     "merges": [
@@ -179,7 +171,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-2882",
