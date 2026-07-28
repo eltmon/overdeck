@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T20:46:16.647Z",
+  "updated": "2026-07-28T20:46:26.916Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "pending",
@@ -177,5 +177,39 @@
     "docs-pending-input": "completed",
     "docs-pending-input.docs-pending-input.ac1": "completed",
     "docs-pending-input.docs-pending-input.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "docs/FLYWHEEL-STATE.md",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/PENDING-INPUT.md",
+      "src/dashboard/frontend/src/__tests__/store.test.ts",
+      "src/dashboard/frontend/src/lib/__tests__/pendingInput.test.ts",
+      "src/dashboard/frontend/src/lib/pendingInput.ts",
+      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+      "src/lib/__tests__/agent-enrichment.test.ts",
+      "src/lib/__tests__/compute-agent-enrichment.test.ts",
+      "src/lib/agent-enrichment.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/FLYWHEEL-STATE.md",
+      "docs/PENDING-INPUT.md",
+      "src/dashboard/frontend/src/__tests__/store.test.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
+      "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/pendingInput.test.ts",
+      "src/dashboard/frontend/src/lib/pendingInput.ts",
+      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+      "src/lib/__tests__/agent-enrichment.test.ts",
+      "src/lib/__tests__/compute-agent-enrichment.test.ts",
+      "src/lib/agent-enrichment.ts"
+    ],
+    "recordedAt": "2026-07-28T20:46:26.914Z"
   }
 }
