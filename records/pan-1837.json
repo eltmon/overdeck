@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T19:31:45.358Z",
+  "updated": "2026-07-28T19:34:24.826Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T19:31:45.342Z",
-    "inspectNotes": "Inspecting item wi5-runtime-adapter"
+    "updatedAt": "2026-07-28T19:34:24.759Z",
+    "inspectNotes": "AC3 not met end-to-end: spawnAgent wires HALF the PTY-supervisor contract, so the supervisor tier it claims can never authenticate. [src/lib/runtimes/kimi-code.ts:270] sets useSupervisor:true and [271] points at dist/pty-supervisor.js, but nothing calls writePtyToken(config.agentId) before [278] tmuxCreateSession. deliverAgentMessage's supervisor tier (src/lib/agents/delivery.ts:377-381) requires BOTH the pty-<id>.sock AND a readable ~/.overdeck/agents/<id>/pty-token; pty-supervisor.ts:107 authenticates against that same file and nothing generates it. Result: every kimi agent spawned through this adapter gets supervisorFailure='pty-token-missing' and silently degrades to the tmux paste tier — the exact unreliable path the supervisor exists to avoid. The canonical pairing is prepareSupervisorForFreshLaunch() (src/lib/agents/supervisor-channels.ts:162-177): resolvePtySupervisorScriptPath() + await writePtyToken(agentId) + state.supervisorEnabled=true. Adapter does 1 of 3. FIX 1: await writePtyToken(config.agentId) before tmuxCreateSession at :278, and set supervisorEnabled on the agent state so prepareSupervisorForRelaunch (supervisor-channels.ts:179-188) re-supervises on relaunch instead of returning useSupervisor:false. FIX 2: [kimi-code.ts:271] replace the hardcoded join(packageRoot,'dist','pty-supervisor.js') with resolvePtySupervisorScriptPath() from lib/channels/pty-supervisor-locate.js — the hardcoded literal is only candidate #1 of 3 and skips the unresolvedSupervisorImports() check, so under desktop packaging or a pan reload generation the launcher runs 'node <missing-or-unloadable>' and the session dies before binding its socket (PAN-3172, the failure that resolver was written for). FIX 3: add a spawn test asserting the pty-token file exists after spawnAgent — the current sendMessage tests inject a deliverMessage mock (kimi-code.test.ts:196-216) so they never exercise the real cascade and cannot catch this. VERIFIED PASSING, no rework needed: AC1 (registry-dispatch.test.ts kimi-code case + index.ts:114-116/144 wiring), AC2 (existingBefore snapshot taken before tmuxCreateSession correctly distinguishes a fresh session from pre-existing ones in the same bucket; id persisted to kimi-session-id), AC3's second half (no execSync/sendKeysSync in the module; sendMessage correctly delegates to the single delivery door rather than re-implementing tiering — that architectural choice is right, keep it), AC4 (killAgent/isRunning/listSessions mirror acp.ts:129-195/227-262 shape, all tmux calls on -L overdeck), AC5 (ran acp+kimi-code+registry-dispatch: 39/39 pass, acp suite untouched and green)."
   },
   "closeOut": {
     "usage": {
@@ -37,10 +37,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 918,
-            "output": 193672,
-            "cacheRead": 179180096,
-            "cacheWrite": 598453
+            "input": 954,
+            "output": 204950,
+            "cacheRead": 190691988,
+            "cacheWrite": 619644
           }
         }
       },
@@ -52,15 +52,15 @@
           "cacheWrite": 187167
         },
         "anthropic/claude-sonnet-5": {
-          "input": 918,
-          "output": 193672,
-          "cacheRead": 179180096,
-          "cacheWrite": 598453
+          "input": 954,
+          "output": 204950,
+          "cacheRead": 190691988,
+          "cacheWrite": 619644
         }
       },
       "costAtCloseOut": {
-        "usd": 46.94374,
-        "pricingAsOf": "2026-07-28T19:31:45.350Z"
+        "usd": 49.411946,
+        "pricingAsOf": "2026-07-28T19:34:24.808Z"
       }
     },
     "merges": [],
