@@ -30,6 +30,7 @@ import { teardownWorkspace } from './teardown-workspace.js';
 import { loadCloisterConfig } from '../cloister/config.js';
 import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
+import { getForgeAdapter } from '../forge.js';
 import {
   getProjectConfigFromWorkspacePath,
   markRecordPipelineClosedOutSync,
@@ -571,6 +572,13 @@ export async function verifyConventionBranchMerged(ctx: LifecycleContext, root: 
       return stepOk(step, ['All commits merged to main', ...(remoteCheck?.details ?? [])]);
     } catch {
       // --is-ancestor fails for squash merges where the branch still exists.
+      const gitlabMerged = await verifySquashMergedMrByBranch(root, root.sourceBranch);
+      if (gitlabMerged) {
+        const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root);
+        if (remoteCheck && !remoteCheck.success) return remoteCheck;
+        return stepOk(step, [...(gitlabMerged.details ?? []), ...(remoteCheck?.details ?? [])]);
+      }
+
       try {
         const { stdout: codeDiff } = await execAsync(
           `git diff ${root.targetBranch}...${root.sourceBranch} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
@@ -588,7 +596,9 @@ export async function verifyConventionBranchMerged(ctx: LifecycleContext, root: 
         // diff failed — fall through to unmerged report
       }
 
-      const githubMerged = await verifySquashMergedPrByBranch(ctx, root, root.sourceBranch);
+      const githubMerged = root.forge === 'github'
+        ? await verifySquashMergedPrByBranch(ctx, root, root.sourceBranch)
+        : null;
       if (githubMerged?.success) {
         const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root);
         if (remoteCheck && !remoteCheck.success) return remoteCheck;
@@ -605,7 +615,7 @@ export async function verifyConventionBranchMerged(ctx: LifecycleContext, root: 
       );
       const count = unmerged.trim() ? unmerged.trim().split('\n').length : 0;
 
-      if (ctx.github) {
+      if (ctx.github && root.forge === 'github') {
         try {
           const { stdout: issueState } = await execAsync(
             `gh issue view ${ctx.github.number} --repo ${ctx.github.owner}/${ctx.github.repo} --json state --jq '.state'`,
@@ -636,6 +646,27 @@ export async function verifyConventionBranchMerged(ctx: LifecycleContext, root: 
   }
 
   return null;
+}
+
+async function verifySquashMergedMrByBranch(root: MergeVerificationRoot, branchRef: string): Promise<StepResult | null> {
+  if (root.forge !== 'gitlab') return null;
+  try {
+    const { stdout } = await execAsync(`git rev-parse ${branchRef} 2>/dev/null`, { cwd: root.dir, encoding: 'utf-8' });
+    const headSha = stdout.trim();
+    if (!headSha) return null;
+    const mr = await getForgeAdapter('gitlab').findMergedArtifact({
+      sourceBranch: root.sourceBranch,
+      targetBranch: root.targetBranch,
+      headSha,
+      cwd: root.dir,
+    });
+    if (!mr) return null;
+    const label = mr.id ? `MR !${mr.id}` : 'GitLab MR';
+    const url = mr.url ? ` (${mr.url})` : '';
+    return stepOk('close-out:verify-merged', [`${label} is merged and ${branchRef} matches the merged MR head${url}`]);
+  } catch {
+    return null;
+  }
 }
 
 type GitHubMergedPr = {
@@ -680,7 +711,12 @@ async function verifyRemoteBranchIfPresent(
       // diff failed — fall through
     }
 
-    const githubMerged = await verifySquashMergedPrByBranch(ctx, root, remoteRef);
+    const gitlabMerged = await verifySquashMergedMrByBranch(root, remoteRef);
+    if (gitlabMerged) return gitlabMerged;
+
+    const githubMerged = root.forge === 'github'
+      ? await verifySquashMergedPrByBranch(ctx, root, remoteRef)
+      : null;
     if (githubMerged) return githubMerged;
 
     const { stdout: remoteUnmerged } = await execAsync(
@@ -689,7 +725,7 @@ async function verifyRemoteBranchIfPresent(
     );
     const count = remoteUnmerged.trim() ? remoteUnmerged.trim().split('\n').length : 0;
 
-    if (ctx.github) {
+    if (ctx.github && root.forge === 'github') {
       try {
         const { stdout: issueState } = await execAsync(
           `gh issue view ${ctx.github.number} --repo ${ctx.github.owner}/${ctx.github.repo} --json state --jq '.state'`,

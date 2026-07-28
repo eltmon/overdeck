@@ -6,4 +6,4 @@
 1277 src/cli/commands/start.ts # PAN-3151
 3475 src/lib/cloister/deacon.ts # PAN-3206
 1315 src/lib/tmux.ts # PAN-3212
-1006 src/lib/lifecycle/workflows.ts # PAN-3211
+1042 src/lib/lifecycle/workflows.ts # PAN-3215

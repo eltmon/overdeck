@@ -596,6 +596,142 @@ describe('workflows', () => {
       );
     });
 
+    it('accepts a squash-merged GitLab MR when the branch tip matches the MR head', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor feature/pan-100 main') {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command === 'git rev-parse feature/pan-100 2>/dev/null') {
+          return { stdout: 'gitlab-head\n', stderr: '' };
+        }
+        if (command === 'glab mr list --source-branch feature/pan-100 --all --output json') {
+          return {
+            stdout: '[{"iid":75,"web_url":"https://gitlab.com/acme/app/-/merge_requests/75","state":"merged","source_branch":"feature/pan-100","target_branch":"main","sha":"gitlab-head"}]',
+            stderr: '',
+          };
+        }
+        if (command.startsWith('git diff main...feature/pan-100')) {
+          throw new Error('containment fallback must not run after GitLab MR confirmation');
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const verifyStep = await verifyConventionBranchMerged(
+        { issueId: 'PAN-100', projectPath: testDir },
+        { dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
+      );
+
+      expect(verifyStep?.success).toBe(true);
+      expect(verifyStep?.details).toEqual([
+        'MR !75 is merged and feature/pan-100 matches the merged MR head (https://gitlab.com/acme/app/-/merge_requests/75)',
+      ]);
+      expect(mockExecAsync.mock.calls.map(([command]) => command)).not.toEqual(
+        expect.arrayContaining([expect.stringContaining('git diff main...feature/pan-100')]),
+      );
+    });
+
+    it('falls through when a merged GitLab MR head does not match the branch tip', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor feature/pan-100 main') {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command === 'git rev-parse feature/pan-100 2>/dev/null') {
+          return { stdout: 'newer-tip\n', stderr: '' };
+        }
+        if (command === 'glab mr list --source-branch feature/pan-100 --all --output json') {
+          return {
+            stdout: '[{"iid":75,"web_url":"https://gitlab.com/acme/app/-/merge_requests/75","state":"merged","source_branch":"feature/pan-100","target_branch":"main","sha":"merged-head"}]',
+            stderr: '',
+          };
+        }
+        if (command.startsWith('git diff main...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
+        }
+        if (command === 'git log main..feature/pan-100 --oneline 2>/dev/null || true') {
+          return { stdout: 'unmerged-commit\n', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const verifyStep = await verifyConventionBranchMerged(
+        { issueId: 'PAN-100', projectPath: testDir },
+        { dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
+      );
+
+      expect(verifyStep?.success).toBe(false);
+      expect(verifyStep?.error).toBe('1 unmerged commit(s) on feature/pan-100. Merge before closing out.');
+    });
+
+    it('preserves the diff-empty fallback when GitLab has no merged MR', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor feature/pan-100 main') {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command === 'git rev-parse feature/pan-100 2>/dev/null') {
+          return { stdout: 'branch-tip\n', stderr: '' };
+        }
+        if (command === 'glab mr list --source-branch feature/pan-100 --all --output json') {
+          return { stdout: '[]', stderr: '' };
+        }
+        if (command.startsWith('git diff main...feature/pan-100')) {
+          return { stdout: '', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const verifyStep = await verifyConventionBranchMerged(
+        { issueId: 'PAN-100', projectPath: testDir },
+        { dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
+      );
+
+      expect(verifyStep?.success).toBe(true);
+      expect(verifyStep?.details).toEqual([
+        'Code changes squash-merged to main (only planning artifacts remain on branch)',
+      ]);
+    });
+
+    it('does not run the GitHub closed-issue probe for a GitLab root', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor feature/pan-100 main') {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command === 'git rev-parse feature/pan-100 2>/dev/null') {
+          return { stdout: 'branch-tip\n', stderr: '' };
+        }
+        if (command === 'glab mr list --source-branch feature/pan-100 --all --output json') {
+          return { stdout: '[]', stderr: '' };
+        }
+        if (command.startsWith('git diff main...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
+        }
+        if (command === 'git log main..feature/pan-100 --oneline 2>/dev/null || true') {
+          return { stdout: 'unmerged-commit\n', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      await verifyConventionBranchMerged(
+        { issueId: 'PAN-100', projectPath: testDir, github: { owner: 'eltmon', repo: 'overdeck', number: 100 } },
+        { dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
+      );
+
+      expect(mockExecAsync.mock.calls.map(([command]) => command)).not.toEqual(
+        expect.arrayContaining([expect.stringContaining('gh issue view')]),
+      );
+    });
+
     it('accepts a squash-merged GitHub PR when the branch tip matches the merged PR head', async () => {
       mockExecAsync.mockImplementation(async (command: string) => {
         if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
