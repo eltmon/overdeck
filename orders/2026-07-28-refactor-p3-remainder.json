@@ -4,7 +4,10 @@
   "status": "draft",
   "settings": {
     "laneAConcurrency": 1,
-    "posture": "open"
+    "posture": "drain",
+    "postureReason": "Operator paused new pickup.",
+    "postureSetAt": "2026-07-28T18:06:23.596Z",
+    "postureSetBy": "dashboard"
   },
   "items": [
     {
@@ -45,5 +48,5 @@
     }
   ],
   "createdAt": "2026-07-28T16:00:14.253Z",
-  "updatedAt": "2026-07-28T16:22:06.289Z"
+  "updatedAt": "2026-07-28T18:06:23.597Z"
 }
