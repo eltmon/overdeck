@@ -23,6 +23,7 @@ node - "$scan_root" <<'NODE'
 const fs = require('node:fs')
 const path = require('node:path')
 
+const repoRoot = process.cwd()
 const scanRoot = path.resolve(process.argv[2])
 const allowlisted = new Set([
   'src/lib/state-read-home.ts',
@@ -35,7 +36,7 @@ const allowlisted = new Set([
 ])
 
 function logicalPath(file) {
-  return `src/${path.relative(scanRoot, file).split(path.sep).join('/')}`
+  return path.relative(repoRoot, file).split(path.sep).join('/')
 }
 
 function isExcluded(file) {
@@ -116,8 +117,8 @@ function maskComments(source) {
 }
 
 const patterns = [
-  /(['"])\.pan\1\s*,\s*(['"])(specs|drafts)\2/g,
-  /(['"])\.pan\/(specs|drafts)\1/g,
+  /(['"`])\.pan\1\s*,\s*(['"`])(specs|drafts)\2/g,
+  /(['"`])\.pan\/(specs|drafts)\1/g,
 ]
 const violations = []
 

@@ -70,6 +70,32 @@ describe('lint-state-paths.sh', () => {
     expect(result.output).toContain('Use getProjectPanPaths(projectRoot)');
   });
 
+  it.each(['specs', 'drafts'] as const)('fails for template-literal joined %s paths', (directory) => {
+    const fixture = makeFixture();
+    const sourcePath = join(fixture.scanRoot, 'lib', `template-${directory}.ts`);
+    mkdirSync(join(fixture.scanRoot, 'lib'), { recursive: true });
+    writeFileSync(sourcePath, `const stateDir = join(projectRoot, \`.pan\`, \`${directory}\`);\n`);
+
+    const result = runGuard(fixture.root, fixture.scanRoot, fixture.script);
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain(`src/lib/template-${directory}.ts:1:`);
+    expect(result.output).toContain('Use getProjectPanPaths(projectRoot)');
+  });
+
+  it.each(['specs', 'drafts'] as const)('fails for template-literal slash-form %s paths', (directory) => {
+    const fixture = makeFixture();
+    const sourcePath = join(fixture.scanRoot, 'lib', `slash-${directory}.ts`);
+    mkdirSync(join(fixture.scanRoot, 'lib'), { recursive: true });
+    writeFileSync(sourcePath, `const stateDir = join(projectRoot, \`.pan/${directory}\`);\n`);
+
+    const result = runGuard(fixture.root, fixture.scanRoot, fixture.script);
+
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain(`src/lib/slash-${directory}.ts:1:`);
+    expect(result.output).toContain('Use getProjectPanPaths(projectRoot)');
+  });
+
   it('passes comment-only legacy path mentions', () => {
     const fixture = makeFixture();
     const sourcePath = join(fixture.scanRoot, 'lib', 'comment.ts');
@@ -94,6 +120,19 @@ describe('lint-state-paths.sh', () => {
     writeFileSync(sourcePath, "const legacySpecs = join(root, '.pan', 'specs');\n");
 
     const result = runGuard(fixture.root, fixture.scanRoot, fixture.script);
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('state-path lint passed');
+  });
+
+  it('preserves audited allowlists when scanning a nested source root', () => {
+    const fixture = makeFixture();
+    const nestedRoot = join(fixture.scanRoot, 'lib');
+    const sourcePath = join(nestedRoot, 'pan-dir', 'paths.ts');
+    mkdirSync(join(nestedRoot, 'pan-dir'), { recursive: true });
+    writeFileSync(sourcePath, "const legacySpecs = join(root, '.pan', 'specs');\n");
+
+    const result = runGuard(fixture.root, nestedRoot, fixture.script);
 
     expect(result.ok).toBe(true);
     expect(result.output).toContain('state-path lint passed');

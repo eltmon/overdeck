@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 
 import {
   extractAcceptanceCriteriaFromIssue,
@@ -11,6 +11,28 @@ import {
   writeAutoStartXBrief,
 } from '../auto-synthesize.js';
 import { findPlanSync } from '../io.js';
+import type { ProjectConfig } from '../../projects.js';
+
+const projectRegistry = vi.hoisted(() => ({
+  entries: [] as Array<{ key: string; config: ProjectConfig }>,
+}));
+
+vi.mock('../../projects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../projects.js')>();
+  return {
+    ...actual,
+    findProjectByPathSync: (workspacePath: string) => projectRegistry.entries.find(({ config }) => (
+      workspacePath === config.path || workspacePath.startsWith(`${config.path}/`)
+    ))?.config ?? actual.findProjectByPathSync(workspacePath),
+    listProjectsSync: () => projectRegistry.entries.length > 0
+      ? projectRegistry.entries
+      : actual.listProjectsSync(),
+  };
+});
+
+beforeEach(() => {
+  projectRegistry.entries = [];
+});
 
 async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   const dir = await mkdtemp(join(tmpdir(), 'pan-auto-synthesize-'));
@@ -161,8 +183,13 @@ describe('writeAutoStartXBrief', () => {
       try {
         const projectRoot = join(root, 'project');
         const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1072');
-        const stateRoot = join(root, 'state', basename(projectRoot));
+        const projectKey = 'registered-project';
+        const stateRoot = join(root, 'state', projectKey);
         const stateOrigin = join(root, 'state-origin.git');
+        projectRegistry.entries = [{
+          key: projectKey,
+          config: { name: 'Registered project', path: projectRoot },
+        }];
         await mkdir(projectRoot, { recursive: true });
         await initializeGitRepo(stateRoot, 'overdeck-state');
         git(root, ['init', '--bare', '--quiet', stateOrigin]);

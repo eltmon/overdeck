@@ -273,7 +273,6 @@ export function writeSpecForIssue(
     yield* writeSpec(path, specDocument)
     queueAutoCommit({
       projectRoot,
-      repoRoot: deriveProjectRoot(path) ? undefined : paths.panDir,
       paths: [path],
       subject: `chore(state): update spec for ${doc.plan.id.toUpperCase()} (status=${status})`,
     })
