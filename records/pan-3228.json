@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T17:29:59.789Z",
+  "updated": "2026-07-28T17:34:46.130Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "gate-fresh": {
-        "writerId": "agent-pan-3228",
-        "agentId": "agent-pan-3228",
-        "pid": 1071256,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T17:29:59.789Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3228",
@@ -106,12 +98,27 @@
         "outcome": "completed",
         "reason": "Added fail-open live-pane plus JSONL pending-operator-decision detector with dependency-injected regression coverage.",
         "releasedAt": "2026-07-28T17:27:32.097Z"
+      },
+      {
+        "writerId": "agent-pan-3228",
+        "agentId": "agent-pan-3228",
+        "pid": 1071256,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:29:59.789Z",
+        "itemId": "gate-fresh",
+        "outcome": "completed",
+        "reason": "Blocked pan start --fresh before any session stop/state wipe when operator input is pending, with explicit --force override and help text.",
+        "releasedAt": "2026-07-28T17:34:46.130Z"
       }
     ],
     "statusReasons": {
       "gate-helper": {
         "reason": "Added fail-open live-pane plus JSONL pending-operator-decision detector with dependency-injected regression coverage.",
         "updatedAt": "2026-07-28T17:27:32.097Z"
+      },
+      "gate-fresh": {
+        "reason": "Blocked pan start --fresh before any session stop/state wipe when operator input is pending, with explicit --force override and help text.",
+        "updatedAt": "2026-07-28T17:34:46.130Z"
       }
     }
   },
@@ -121,6 +128,9 @@
     "gate-helper.gate-helper.ac2": "completed",
     "gate-helper.gate-helper.ac3": "completed",
     "gate-helper.gate-helper.ac4": "completed",
-    "gate-fresh": "running"
+    "gate-fresh": "completed",
+    "gate-fresh.gate-fresh.ac1": "completed",
+    "gate-fresh.gate-fresh.ac2": "completed",
+    "gate-fresh.gate-fresh.ac3": "completed"
   }
 }
