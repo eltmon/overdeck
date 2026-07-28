@@ -19,15 +19,7 @@
       "timestamp": "2026-07-28T21:11:12.369Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T21:11:12Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3242\n\n# Code Review — PAN-3242\n\n## Verdict: CHANGES REQUESTED\n\nTwo PR-introduced correctness bugs can apply or preserve settings other than the operator's latest intent. Security, performance, and the stated feature requirements are otherwise clean.\n\n## Context\n\n- PR: #3249\n- Branch: `feature/pan-3242`\n- HEAD reviewed: `ca0235d2e687538cc8f88cd0c79c77d1cf7083cf`\n- Review cycle: 1\n- Diff scope: `configuration/order-books.mdx`, `docs/FLYWHEEL-STATE.md`, `RunSettingsPanel.tsx`, and its focused test\n- Verification run: focused `RunSettingsPanel.test.tsx` passed (20 tests); `npm run typecheck:frontend` passed; `git diff --check` passed\n\n## Blocking Findings\n\n### ! Per-book transaction state survives BookStrip selection and can save the wrong book — `src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx:104`\n\n**Dimension:** correctness\n**Evidence tier:** Tier 1 — static\n**Changed code:** `pendingTo`, `confirmReason`, `saves`, `lastSaved`, and the retry closures are component state, but none is reset or scoped when the selected order book changes. The confirm action at lines 278–284 calls the `onChange` from the current render.\n**Problem:** `OrderBookPage` reuses the same `RunSettingsPanel` instance when `BookStrip` changes `selectedId`; it does not key the panel by book. Open a Drain confirmation for book A, select book B, and the confirmation remains rendered. Confirming now invokes book B's `onChange`, so a reason and posture chosen for A are written to B. Save chips and `lastSaved` also leak across books, while a stored error retry remains bound to the old book and is displayed beside the new book's field.\n**Runtime impact:** A normal navigation gesture can change the posture of the wrong campaign, which directly changes whether Flywheel dispatch is allowed. This is wrong user-visible behavior on the main settings path.\n**Fix:** Scope the panel's transient transaction state to a stable book identity. The simplest reliable fix is to key the panel by `selected.id` at its call site, or pass a stable book id and reset/cancel all pending confirmation, debounce, save-chip, retry, and footer state when that id changes. Because `OrderBookPage.tsx` is currently a stated NonGoal, resolve that scope conflict rather than trying to infer book identity from settings values. Add a regression test that opens a posture confirmation, switches books, and proves the old confirmation/retry cannot affect the newly selected book.\n\n### ! Brief autosave can discard the operator's final edit while an earlier save is in flight — `src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx:149`\n\n**Dimension:** correctness / requirements\n**Evidence tier:** Tier 1 — static\n**Changed code:** the debounce callback compares its captured value with `settings.briefOverlay` at lines 153–160 and skips the save when they match, even if a different value is already being persisted by an unresolved earlier `runSave`.\n**Problem:** Start from persisted `old.md`, type `new.md`, and let the 550 ms debounce start saving it. Before that request resolves, type `old.md` again. The second timer sees the still-stale prop value `old.md`, decides no save is needed, and returns. When the first request eventually succeeds, it persists `new.md`; the props-sync effect then replaces the input with `new.md`. The operator's latest edit was silently discarded.\n**Runtime impact:** State-branch commits and pushes routinely take longer than the debounce window, so reverting or correcting a brief path during a save can persist the opposite value and display it as saved. This contradicts the autosave guarantee and recreates the issue's core failure mode: typed settings can be lost without an error.\n**Fix:** Reconcile against the latest queued/local revision rather than the last server prop. Serialize per-field saves or track a monotonically increasing field revision so every latest edit is either persisted after the in-flight request or explicitly remains pending; stale completions must not overwrite newer local intent. Add a deferred-promise regression test covering `old.md → new.md (save in flight) → old.md`, and assert the final persisted patch reflects the last edit.\n\n## Non-blocking Notes\n\n### ~ Save-state completions are not generation-guarded — `src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx:133`\n\n`runSave` unconditionally applies every promise completion to the field. If the `onChange` contract ever resolves same-field calls out of order, an older failure can replace a newer success with a Retry closure for the stale patch, and an older fade timer can clear a newer Saved state early. The current orders writer serializes its state commits, so this is advisory for today's caller, but the component contract itself does not promise ordered resolution. A per-field revision used for the brief fix should also guard terminal state and timers.\n\n### ≉ Unrelated Flywheel run-log history is included in this PR — `docs/FLYWHEEL-STATE.md:8003`\n\nThe 121-line RUN-73 append does not trace to PAN-3242 or its documentation requirement. It is low-risk prose and does not block the feature, but removing unrelated branch contamination would keep the PR's review and revert surface limited to the order-book UI.\n\n## Security\n\nNo findings. The change adds no route or write surface, React escapes persisted attribution/reason text, and brief paths are still constrained by the existing server-side project-root resolution before use.\n\n## Performance\n\nNo blocking findings. Debounce windows bound write frequency, render work is constant-size, and the short-lived fade timers do not create unbounded growth.\n\n## Requirements Checked\n\nFR-1 through FR-9 and NFR-1 through NFR-3 are present in the diff: atomic posture patches, both active-state tints, attribution and the specified stale-default heuristic, keyed save chips/footer, bounded debounced stepper, brief shape validation, off-book policy copy, fake-timer tests, and the requested order-books documentation. The two blockers above are interaction failures inside those new controls rather than missing listed elements.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3242/.pan/review/agent-pan-3242-review-ca0235d2/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3242 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md"
@@ -47,17 +39,17 @@
     "recordedAt": "2026-07-28T20:52:11.749Z"
   },
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-28T21:23:42.534Z",
+  "updated": "2026-07-28T21:24:14.683Z",
   "pipeline": {
     "issueId": "PAN-3242",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:52:32.420Z",
-    "updatedAt": "2026-07-28T21:23:41.168Z",
+    "updatedAt": "2026-07-28T21:24:14.614Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -70,7 +62,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3249",
     "reviewedAtCommit": "ca0235d2e687538cc8f88cd0c79c77d1cf7083cf",
-    "reviewSpawnedAt": "2026-07-28T21:05:13.627Z",
+    "reviewSpawnedAt": "2026-07-28T21:24:14.612Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/FLYWHEEL-STATE.md"
@@ -111,10 +103,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 418,
-            "output": 125603,
-            "cacheRead": 53996721,
-            "cacheWrite": 636880
+            "input": 424,
+            "output": 127103,
+            "cacheRead": 55094636,
+            "cacheWrite": 639435
           }
         }
       },
@@ -132,15 +124,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 418,
-          "output": 125603,
-          "cacheRead": 53996721,
-          "cacheWrite": 636880
+          "input": 424,
+          "output": 127103,
+          "cacheRead": 55094636,
+          "cacheWrite": 639435
         }
       },
       "costAtCloseOut": {
-        "usd": 35.560818,
-        "pricingAsOf": "2026-07-28T21:23:42.529Z"
+        "usd": 35.801801,
+        "pricingAsOf": "2026-07-28T21:24:14.677Z"
       }
     },
     "merges": [
