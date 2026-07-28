@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { Effect } from 'effect';
 import type { ReviewStatus } from '../../../../src/lib/review-status.js';
 import type { PanIssuePipelineRecord } from '../../../../src/lib/pan-dir/record.js';
 
@@ -46,7 +47,7 @@ describe('readCompletedCloseOut idempotent guard (PAN-3025 WI-4)', () => {
       } as any,
     } as any;
     mocks.readIssueRecord.mockResolvedValue(record);
-    mocks.getReviewStatus.mockResolvedValue(null); // No live row
+    mocks.getReviewStatus.mockReturnValue(Effect.succeed(null)); // No live row
 
     const result = await readCompletedCloseOut(issueId, projectPath);
 
@@ -64,9 +65,9 @@ describe('readCompletedCloseOut idempotent guard (PAN-3025 WI-4)', () => {
       } as any,
     } as any;
     mocks.readIssueRecord.mockResolvedValue(record);
-    mocks.getReviewStatus.mockResolvedValue({
+    mocks.getReviewStatus.mockReturnValue(Effect.succeed({
       reviewStatus: 'passed',
-    } as ReviewStatus); // Live row exists
+    } as ReviewStatus)); // Live row exists
 
     const result = await readCompletedCloseOut(issueId, projectPath);
 
@@ -95,7 +96,7 @@ describe('readCompletedCloseOut idempotent guard (PAN-3025 WI-4)', () => {
       pipeline: { closedOut: true, closedOutAt: '2026-07-28T08:00:00Z' } as any,
     } as any;
     mocks.readIssueRecord.mockResolvedValue(record);
-    mocks.getReviewStatus.mockRejectedValue(new Error('database read error'));
+    mocks.getReviewStatus.mockReturnValue(Effect.fail(new Error('database read error')));
 
     const result = await readCompletedCloseOut(issueId, projectPath);
 
