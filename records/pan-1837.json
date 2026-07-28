@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T18:15:36.824Z",
+  "updated": "2026-07-28T18:38:22.702Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -63,18 +63,33 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "wi1-union-validators": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-1837",
         "agentId": "agent-pan-1837",
         "pid": 2883841,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T18:15:36.824Z"
+        "claimedAt": "2026-07-28T18:15:36.824Z",
+        "itemId": "wi1-union-validators",
+        "outcome": "completed",
+        "reason": "Widened Harness/RuntimeName to include kimi-code across the canonical union and every hand-maintained validator, including several ripple points (flywheel.ts, telemetry, launcher-generator, spawn-planning-session, context.ts, strike.ts) not covered by any other xBRIEF item. npm run typecheck is fully green at root/hooks/evals/dashboard; the only remaining Harness-widening gaps (harness-behavior.ts BEHAVIORS record, frontend pickers/branding) are wi2's and wi11's own declared scope and left for them. All getHarness/resolveAllowedHarness tests extended and passing.",
+        "releasedAt": "2026-07-28T18:38:22.702Z"
+      }
+    ],
+    "statusReasons": {
+      "wi1-union-validators": {
+        "reason": "Widened Harness/RuntimeName to include kimi-code across the canonical union and every hand-maintained validator, including several ripple points (flywheel.ts, telemetry, launcher-generator, spawn-planning-session, context.ts, strike.ts) not covered by any other xBRIEF item. npm run typecheck is fully green at root/hooks/evals/dashboard; the only remaining Harness-widening gaps (harness-behavior.ts BEHAVIORS record, frontend pickers/branding) are wi2's and wi11's own declared scope and left for them. All getHarness/resolveAllowedHarness tests extended and passing.",
+        "updatedAt": "2026-07-28T18:38:22.702Z"
       }
     }
   },
   "statusOverrides": {
-    "wi1-union-validators": "running"
+    "wi1-union-validators": "completed",
+    "wi1-union-validators.wi1-union-validators.ac1": "completed",
+    "wi1-union-validators.wi1-union-validators.ac2": "completed",
+    "wi1-union-validators.wi1-union-validators.ac3": "completed",
+    "wi1-union-validators.wi1-union-validators.ac4": "completed"
   }
 }
