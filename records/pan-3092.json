@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T07:15:49.604Z",
+  "updated": "2026-07-28T07:20:08.171Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "stranded-verdict-sweep": {
-        "writerId": "agent-pan-3092",
-        "agentId": "agent-pan-3092",
-        "pid": 4145756,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T07:15:49.604Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3092",
@@ -119,6 +111,17 @@
         "outcome": "completed",
         "reason": "decideUnsignaledTestAction returns 'escalate' for live+idle+no-artifact+nudged; deacon emits one needs-you per dispatch generation via recordUnsignaledTestEscalation; no verdict fabrication",
         "releasedAt": "2026-07-28T07:15:36.362Z"
+      },
+      {
+        "writerId": "agent-pan-3092",
+        "agentId": "agent-pan-3092",
+        "pid": 4145756,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T07:15:49.604Z",
+        "itemId": "stranded-verdict-sweep",
+        "outcome": "completed",
+        "reason": "New sweepStrandedVerdictFallbacks patrol registered in the deacon cycle; drains pending fallbacks, one needs-you + activity warning per contention episode past 10min; 7 tests",
+        "releasedAt": "2026-07-28T07:20:08.171Z"
       }
     ],
     "statusReasons": {
@@ -137,6 +140,10 @@
       "frozen-agent-escalation": {
         "reason": "decideUnsignaledTestAction returns 'escalate' for live+idle+no-artifact+nudged; deacon emits one needs-you per dispatch generation via recordUnsignaledTestEscalation; no verdict fabrication",
         "updatedAt": "2026-07-28T07:15:36.362Z"
+      },
+      "stranded-verdict-sweep": {
+        "reason": "New sweepStrandedVerdictFallbacks patrol registered in the deacon cycle; drains pending fallbacks, one needs-you + activity warning per contention episode past 10min; 7 tests",
+        "updatedAt": "2026-07-28T07:20:08.171Z"
       }
     }
   },
@@ -159,6 +166,10 @@
     "frozen-agent-escalation": "completed",
     "frozen-agent-escalation.frozen-agent-escalation.ac1": "completed",
     "frozen-agent-escalation.frozen-agent-escalation.ac2": "completed",
-    "stranded-verdict-sweep": "running"
+    "stranded-verdict-sweep": "completed",
+    "stranded-verdict-sweep.stranded-verdict-sweep.ac1": "completed",
+    "stranded-verdict-sweep.stranded-verdict-sweep.ac2": "completed",
+    "stranded-verdict-sweep.stranded-verdict-sweep.ac3": "completed",
+    "stranded-verdict-sweep.stranded-verdict-sweep.ac4": "completed"
   }
 }
