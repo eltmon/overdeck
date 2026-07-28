@@ -120,19 +120,20 @@
     "recordedAt": "2026-07-28T20:15:30.548Z"
   },
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T23:47:27.685Z",
+  "updated": "2026-07-28T23:48:54.257Z",
   "pipeline": {
     "issueId": "PAN-3229",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:16:31.872Z",
-    "updatedAt": "2026-07-28T23:47:26.505Z",
-    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
+    "updatedAt": "2026-07-28T23:48:54.197Z",
+    "reviewNotes": "Approved: prior transcript regression restored; pending-promotion feature remains requirements-complete with focused tests green",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "04bcaeb9f6b9d766a637e3e18eafcc828b0fbdbf",
       "detectedAt": "2026-07-28T23:28:38.244Z",
@@ -141,7 +142,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3246",
-    "reviewedAtCommit": "55e9df4e5a2dd09785ce0bcf86ce9d76a7a0b25a",
+    "reviewedAtCommit": "f9aca64e6271f1d11df46725473ef70d994098c7",
     "lastVerifiedCommit": "b5844bfff712b2a588e22d6597e4f6488d6edea0",
     "reviewSpawnedAt": "2026-07-28T23:47:26.503Z"
   },
@@ -158,9 +159,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3944964,
-            "output": 165289,
-            "cacheRead": 37597696,
+            "input": 5213057,
+            "output": 181575,
+            "cacheRead": 42272768,
             "cacheWrite": 0
           }
         },
@@ -181,15 +182,15 @@
           "cacheWrite": 170493
         },
         "openai/gpt-5.6-sol": {
-          "input": 11207092,
-          "output": 496525,
-          "cacheRead": 199769600,
+          "input": 12475185,
+          "output": 512811,
+          "cacheRead": 204444672,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 178.676689,
-        "pricingAsOf": "2026-07-28T23:47:26.541Z"
+        "usd": 187.84327,
+        "pricingAsOf": "2026-07-28T23:48:54.239Z"
       }
     },
     "merges": [
