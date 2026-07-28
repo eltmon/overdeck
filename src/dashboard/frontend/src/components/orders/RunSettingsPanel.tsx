@@ -1,6 +1,31 @@
 import { Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import type { OrderBookSettings } from '@overdeck/contracts';
+import type { OrderBookSettings, OrderBookPosture } from '@overdeck/contracts';
+
+const POSTURE_DEFAULT_REASON: Record<OrderBookPosture, string> = {
+  drain: 'Operator paused new pickup.',
+  open: 'Operator reopened pickup.',
+};
+
+const POSTURE_CONSEQUENCE: Record<OrderBookPosture, string> = {
+  drain: 'In-flight items will finish. Nothing new dispatches from this book until it is reopened.',
+  open: 'Eligible items will start dispatching again — Lane A up to its concurrency, Lane B one at a time in order.',
+};
+
+const POSTURE_HINT: Record<OrderBookPosture, string> = {
+  open: 'Dispatch is live: eligible items start when a slot frees, Lane B strictly in order.',
+  drain: 'Draining: in-flight items finish, nothing new starts until reopened.',
+};
+
+const POSTURE_CONFIRM_LABEL: Record<OrderBookPosture, string> = {
+  drain: 'Switch to drain',
+  open: 'Reopen pickup',
+};
+
+const POSTURE_ACTIVE_CLASSES: Record<OrderBookPosture, string> = {
+  open: 'border-info/[0.32] bg-info/[0.08] text-info-foreground',
+  drain: 'border-warning/[0.32] bg-warning/[0.08] text-warning-foreground',
+};
 
 interface RunSettingsPanelProps {
   settings: OrderBookSettings;
@@ -55,7 +80,8 @@ function SaveChip({ save }: { save: SaveState }) {
 export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) {
   const [concurrency, setConcurrency] = useState(String(settings.laneAConcurrency));
   const [briefOverlay, setBriefOverlay] = useState(settings.briefOverlay ?? '');
-  const [postureReason, setPostureReason] = useState(settings.postureReason ?? '');
+  const [pendingTo, setPendingTo] = useState<OrderBookPosture | null>(null);
+  const [confirmReason, setConfirmReason] = useState('');
   const [saves, setSaves] = useState<Record<FieldId, SaveState>>({
     posture: { state: 'idle' },
     lane: { state: 'idle' },
@@ -63,10 +89,14 @@ export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) 
   });
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const savedTimers = useRef<Record<FieldId, ReturnType<typeof setTimeout> | undefined>>({} as never);
+  const confirmReasonInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => setConcurrency(String(settings.laneAConcurrency)), [settings.laneAConcurrency]);
   useEffect(() => setBriefOverlay(settings.briefOverlay ?? ''), [settings.briefOverlay]);
-  useEffect(() => setPostureReason(settings.postureReason ?? ''), [settings.postureReason]);
+
+  useEffect(() => {
+    if (pendingTo) confirmReasonInputRef.current?.select();
+  }, [pendingTo]);
 
   const runSave = (field: FieldId, patch: Partial<OrderBookSettings>) => {
     clearTimeout(savedTimers.current[field]);
@@ -118,36 +148,66 @@ export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) 
             className="min-w-56 rounded-md border border-input bg-background px-2 py-1 font-mono text-[11px] text-foreground"
           />
         </div>
-        <label className="flex items-center gap-3">
-          <span className="flex-1 text-muted-foreground">Posture reason</span>
-          <input
-            aria-label="Posture reason"
-            value={postureReason}
-            onChange={(event) => setPostureReason(event.target.value)}
-            placeholder="Why pickup is open or draining"
-            className="min-w-56 rounded-md border border-input bg-background px-2 py-1 text-[11px] text-foreground"
-          />
-        </label>
-        <div className="flex items-center gap-3">
-          <span className="flex-1 text-muted-foreground">Pickup posture</span>
-          <SaveChip save={saves.posture} />
-          <div className="flex gap-1">
-            {(['open', 'drain'] as const).map((posture) => (
-              <button
-                key={posture}
-                type="button"
-                aria-pressed={settings.posture === posture}
-                disabled={settings.posture === posture}
-                onClick={() => runSave('posture', {
-                  posture,
-                  postureReason: postureReason.trim() || (posture === 'drain' ? 'Operator paused new pickup.' : 'Operator reopened pickup.'),
-                })}
-                className={`rounded-md border px-2 py-1 text-[10px] uppercase tracking-wide ${posture === 'drain' && settings.posture === posture ? 'border-warning/[0.32] bg-warning/[0.08] text-warning-foreground' : 'border-border text-muted-foreground'}`}
-              >
-                {posture}
-              </button>
-            ))}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-3">
+            <span className="flex-1 text-muted-foreground">Pickup posture</span>
+            <SaveChip save={saves.posture} />
+            <div className="flex gap-1">
+              {(['open', 'drain'] as const).map((posture) => (
+                <button
+                  key={posture}
+                  type="button"
+                  aria-pressed={settings.posture === posture}
+                  onClick={() => {
+                    if (posture === settings.posture) return;
+                    setPendingTo(posture);
+                    setConfirmReason(POSTURE_DEFAULT_REASON[posture]);
+                  }}
+                  className={`rounded-md border px-2 py-1 text-[10px] uppercase tracking-wide ${settings.posture === posture ? POSTURE_ACTIVE_CLASSES[posture] : 'border-border text-muted-foreground'}`}
+                >
+                  {posture}
+                </button>
+              ))}
+            </div>
           </div>
+          <p className="text-[11px] text-muted-foreground">{POSTURE_HINT[settings.posture]}</p>
+          {pendingTo && (
+            <div className={`flex flex-col gap-2 rounded-md border p-2 ${POSTURE_ACTIVE_CLASSES[pendingTo]}`}>
+              <p className="text-[11px]">{POSTURE_CONSEQUENCE[pendingTo]}</p>
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] text-muted-foreground">Why? Recorded on the run and shown to anyone reading this book.</span>
+                <input
+                  ref={confirmReasonInputRef}
+                  aria-label="Posture reason"
+                  value={confirmReason}
+                  onChange={(event) => setConfirmReason(event.target.value)}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-[11px] text-foreground"
+                />
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    runSave('posture', {
+                      posture: pendingTo,
+                      postureReason: confirmReason.trim() || POSTURE_DEFAULT_REASON[pendingTo],
+                    });
+                    setPendingTo(null);
+                  }}
+                  className={`rounded-md border px-2 py-1 text-[10px] uppercase tracking-wide ${POSTURE_ACTIVE_CLASSES[pendingTo]}`}
+                >
+                  {POSTURE_CONFIRM_LABEL[pendingTo]}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingTo(null)}
+                  className="rounded-md border border-border px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex items-start gap-3">
           <span className="flex-1 text-muted-foreground">Off-book policy</span>

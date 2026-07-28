@@ -12,15 +12,16 @@ describe('RunSettingsPanel', () => {
     vi.useRealTimers();
   });
 
-  it('persists an attributed DRAIN posture and its operator reason', async () => {
+  it('persists an attributed DRAIN posture and its operator reason via the atomic confirm', async () => {
     const onChange = vi.fn(async () => {});
     render(<RunSettingsPanel
       settings={{ laneAConcurrency: 2, posture: 'open' }}
       onChange={onChange}
     />);
 
-    fireEvent.change(screen.getByLabelText('Posture reason'), { target: { value: 'Hold until main is green' } });
     fireEvent.click(screen.getByRole('button', { name: 'drain' }));
+    fireEvent.change(screen.getByLabelText('Posture reason'), { target: { value: 'Hold until main is green' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to drain' }));
 
     await act(async () => {
       await Promise.resolve();
@@ -29,6 +30,67 @@ describe('RunSettingsPanel', () => {
       posture: 'drain',
       postureReason: 'Hold until main is green',
     });
+  });
+
+  it('renders the active posture with tinted styling and aria-pressed in both directions', () => {
+    const { rerender } = render(<RunSettingsPanel
+      settings={{ laneAConcurrency: 2, posture: 'open' }}
+      onChange={vi.fn(async () => {})}
+    />);
+
+    expect(screen.getByRole('button', { name: 'open' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'open' }).className).toContain('bg-info/[0.08]');
+    expect(screen.getByRole('button', { name: 'drain' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'drain' }).className).not.toContain('bg-warning/[0.08]');
+
+    rerender(<RunSettingsPanel
+      settings={{ laneAConcurrency: 2, posture: 'drain' }}
+      onChange={vi.fn(async () => {})}
+    />);
+
+    expect(screen.getByRole('button', { name: 'drain' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'drain' }).className).toContain('bg-warning/[0.08]');
+    expect(screen.getByRole('button', { name: 'open' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'open' }).className).not.toContain('bg-info/[0.08]');
+  });
+
+  it('collapses the confirm on Cancel with no save, and renders no standalone reason input', () => {
+    const onChange = vi.fn(async () => {});
+    render(<RunSettingsPanel
+      settings={{ laneAConcurrency: 2, posture: 'open' }}
+      onChange={onChange}
+    />);
+
+    expect(screen.queryByLabelText('Posture reason')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'drain' }));
+    expect(screen.getByLabelText('Posture reason')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByLabelText('Posture reason')).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('prefills the confirm reason and consequence copy for the clicked target', () => {
+    const { rerender } = render(<RunSettingsPanel
+      settings={{ laneAConcurrency: 2, posture: 'open' }}
+      onChange={vi.fn(async () => {})}
+    />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'drain' }));
+    expect(screen.getByLabelText('Posture reason')).toHaveValue('Operator paused new pickup.');
+    expect(screen.getByText(/In-flight items will finish/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Switch to drain' })).toBeInTheDocument();
+
+    rerender(<RunSettingsPanel
+      settings={{ laneAConcurrency: 2, posture: 'drain' }}
+      onChange={vi.fn(async () => {})}
+    />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'open' }));
+    expect(screen.getByLabelText('Posture reason')).toHaveValue('Operator reopened pickup.');
+    expect(screen.getByText(/Eligible items will start dispatching again/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reopen pickup' })).toBeInTheDocument();
   });
 
   it('shows a saving spinner, then Saved, fading to idle after 1600ms', async () => {
