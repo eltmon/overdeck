@@ -19,8 +19,9 @@
  * dispatches on socket existence, not a hardcoded harness list, so kimi-code
  * flows through it for free once its PTY supervisor socket exists.
  *
- * getTokenUsage/getSessionCost return null until wi8b (kimi-parser.ts) lands,
- * matching the ACP adapter's own stub for the same reason (acp.ts:105-111).
+ * getTokenUsage/getSessionCost delegate to wi8b's parseKimiSessionSync,
+ * which sums every usage.record in the wire.jsonl — Kimi's own server-side
+ * context cache accounting.
  */
 
 import { exec } from 'node:child_process';
@@ -38,6 +39,7 @@ import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locat
 import { writePtyToken } from '../pty-token.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
+import { parseKimiSessionSync } from '../cost-parsers/kimi-parser.js';
 import { getOverdeckHome } from '../paths.js';
 import { getRuntimeBehavior } from './behavior.js';
 import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js';
@@ -204,14 +206,25 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
     };
   }
 
-  getTokenUsage(_agentId: string): TokenUsage | null {
-    // Wired to the wi8b parser once src/lib/cost-parsers/kimi-parser.ts lands
-    // (matches the ACP adapter's own stub at acp.ts:105 for the same reason).
-    return null;
+  getTokenUsage(agentId: string): TokenUsage | null {
+    const path = this.getSessionPath(agentId);
+    if (!path) return null;
+    return parseKimiSessionSync(path)?.usage ?? null;
   }
 
-  getSessionCost(_agentId: string): CostBreakdown | null {
-    return null;
+  getSessionCost(agentId: string): CostBreakdown | null {
+    const path = this.getSessionPath(agentId);
+    if (!path) return null;
+    const parsed = parseKimiSessionSync(path);
+    if (!parsed) return null;
+    return {
+      inputCost: 0,
+      outputCost: 0,
+      cacheReadCost: 0,
+      cacheWriteCost: 0,
+      totalCost: parsed.cost_v2 ?? parsed.cost ?? 0,
+      currency: 'USD',
+    };
   }
 
   async sendMessage(agentId: string, message: string): Promise<void> {

@@ -104,7 +104,7 @@ describe('findKimiWirePath / findLatestKimiSession', () => {
 });
 
 describe('KimiCodeRuntimeSync', () => {
-  it('uses the resolved wire.jsonl mtime for activity and heartbeat, and stubs cost until wi8b (AC ohmypi-parity)', () => {
+  it('uses the resolved wire.jsonl mtime for activity and heartbeat; no cost data when the transcript has no usage.record yet', () => {
     const kimiHome = makeHome();
     const overdeckHome = makeHome();
     const workDir = '/tmp/activity-workspace';
@@ -124,6 +124,32 @@ describe('KimiCodeRuntimeSync', () => {
     });
     expect(runtime.getTokenUsage('agent-activity')).toBeNull();
     expect(runtime.getSessionCost('agent-activity')).toBeNull();
+  });
+
+  it('getTokenUsage/getSessionCost return real, non-zero values via wi8b parseKimiSessionSync (AC3)', () => {
+    const kimiHome = makeHome();
+    const overdeckHome = makeHome();
+    const workDir = '/tmp/cost-workspace';
+    agentStateMocks.getAgentStateSync.mockReturnValue({ workspace: workDir });
+    mkdirSync(join(overdeckHome, 'agents', 'agent-cost'), { recursive: true });
+    writeFileSync(join(overdeckHome, 'agents', 'agent-cost', 'kimi-session-id'), 'session_cost\n');
+    const wireDir = join(kimiSessionsRoot(kimiHome, workDir), 'session_cost', 'agents', 'main');
+    mkdirSync(wireDir, { recursive: true });
+    writeFileSync(join(wireDir, 'wire.jsonl'), [
+      JSON.stringify({ type: 'usage.record', model: 'kimi-code/k3', usage: { inputOther: 100, output: 20, inputCacheRead: 500, inputCacheCreation: 0 }, usageScope: 'turn', time: 1 }),
+    ].join('\n') + '\n');
+
+    const runtime = new KimiCodeRuntimeSync({ overdeckHome, kimiHome });
+
+    expect(runtime.getTokenUsage('agent-cost')).toEqual({
+      inputTokens: 100,
+      outputTokens: 20,
+      cacheReadTokens: 500,
+      cacheWriteTokens: 0,
+    });
+    const cost = runtime.getSessionCost('agent-cost');
+    expect(cost?.totalCost).toBeGreaterThan(0);
+    expect(cost?.currency).toBe('USD');
   });
 
   it('returns null session info for an agent with no known workspace', () => {
