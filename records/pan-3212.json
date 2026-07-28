@@ -22,6 +22,11 @@
       "reason": "feedback",
       "note": "[2026-07-28T16:52Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-28T16:52:25.986Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-28T16:58:40.863Z"
     }
   ],
   "feedback": [],
@@ -49,21 +54,21 @@
     "recordedAt": "2026-07-28T16:44:14.261Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T16:58:39.426Z",
+  "updated": "2026-07-28T16:58:41.327Z",
   "pipeline": {
     "issueId": "PAN-3212",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T16:44:36.232Z",
-    "updatedAt": "2026-07-28T16:58:38.972Z",
+    "updatedAt": "2026-07-28T16:58:39.449Z",
     "reviewNotes": "Keyed menu abort preserves a pending claim for swallowed text, so the next same-pane retry sends an empty Enter and marks the message delivered.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
     "lastVerifiedCommit": "aeeb4e52141c6723b3fecaebae95872197109986",
-    "reviewSpawnedAt": "2026-07-28T16:45:36.799Z",
+    "reviewSpawnedAt": "2026-07-28T16:58:39.449Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -118,7 +123,7 @@
       },
       "costAtCloseOut": {
         "usd": 35.237471,
-        "pricingAsOf": "2026-07-28T16:58:38.995Z"
+        "pricingAsOf": "2026-07-28T16:58:41.325Z"
       }
     },
     "merges": [
