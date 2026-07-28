@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T06:57:55.951Z",
+  "updated": "2026-07-28T06:58:08.940Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,8 +79,16 @@
     }
   ],
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "deacon-crash-sweep-prefix-agnostic": {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 3450317,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:58:08.940Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -143,6 +151,7 @@
     "rebuild-resolve-after-render.rebuild-resolve-after-render.ac3": "completed",
     "stop-docker-via-resolver": "completed",
     "stop-docker-via-resolver.stop-docker-via-resolver.ac1": "completed",
-    "stop-docker-via-resolver.stop-docker-via-resolver.ac2": "completed"
+    "stop-docker-via-resolver.stop-docker-via-resolver.ac2": "completed",
+    "deacon-crash-sweep-prefix-agnostic": "running"
   }
 }
