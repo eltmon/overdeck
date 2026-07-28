@@ -82,18 +82,18 @@
     "recordedAt": "2026-07-28T07:25:54.489Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T08:52:43.109Z",
+  "updated": "2026-07-28T09:01:35.284Z",
   "pipeline": {
     "issueId": "PAN-2882",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:26:27.252Z",
-    "updatedAt": "2026-07-28T08:52:41.992Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: error handling for merged-MR queries, global concurrency limit for polyrepo, proper fake timers and cache isolation in tests",
+    "updatedAt": "2026-07-28T09:01:35.247Z",
+    "reviewNotes": "Focused GitLab membership suite has five failures; pagination, TTL-clock, and global-limiter tests remain incomplete",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
     "reviewedAtCommit": "b68a67e56eeca91f055135b583a9ca284a20c748",
     "lastVerifiedCommit": "b68a67e56eeca91f055135b583a9ca284a20c748",
@@ -125,38 +125,38 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2521796,
-            "output": 103394,
-            "cacheRead": 7545856,
+            "input": 3474544,
+            "output": 145332,
+            "cacheRead": 14503424,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1372,
-            "output": 76607,
-            "cacheRead": 32541588,
-            "cacheWrite": 1842216
+            "input": 1393,
+            "output": 77510,
+            "cacheRead": 32940947,
+            "cacheWrite": 1903914
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2521796,
-          "output": 103394,
-          "cacheRead": 7545856,
+          "input": 3474544,
+          "output": 145332,
+          "cacheRead": 14503424,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1372,
-          "output": 76607,
-          "cacheRead": 32541588,
-          "cacheWrite": 1842216
+          "input": 1393,
+          "output": 77510,
+          "cacheRead": 32940947,
+          "cacheWrite": 1903914
         }
       },
       "costAtCloseOut": {
-        "usd": 25.425071,
-        "pricingAsOf": "2026-07-28T08:52:41.999Z"
+        "usd": 35.04733,
+        "pricingAsOf": "2026-07-28T09:01:35.276Z"
       }
     },
     "merges": [
@@ -165,7 +165,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-2882",
