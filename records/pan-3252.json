@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-28T22:20:42.688Z",
+  "updated": "2026-07-28T22:21:24.675Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "pending",
@@ -51,8 +51,8 @@
     "ranOn": "eltmon-z790"
   },
   "workModel": "kimi-code/k3",
-  "harness": "kimi-code",
-  "model": "kimi-code/k3",
+  "harness": "claude-code",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3252",
