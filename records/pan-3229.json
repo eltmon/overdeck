@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T17:36:12.989Z",
+  "updated": "2026-07-28T17:43:49.895Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "pending-promotion-reconciler": {
-        "writerId": "agent-pan-3229",
-        "agentId": "agent-pan-3229",
-        "pid": 1378446,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T17:36:12.989Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3229",
@@ -106,12 +98,27 @@
         "outcome": "completed",
         "reason": "Added atomic pending-promotion marker persistence, deferred recovery output/JSON contract, gitignore coverage, and fake-timer regression tests.",
         "releasedAt": "2026-07-28T17:29:44.945Z"
+      },
+      {
+        "writerId": "agent-pan-3229",
+        "agentId": "agent-pan-3229",
+        "pid": 1378446,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:36:12.989Z",
+        "itemId": "pending-promotion-reconciler",
+        "outcome": "completed",
+        "reason": "Added state-aware workspace candidate scanning, guarded complete-planning re-drive, bounded marker attempt persistence and needs-you escalation, plus scenario tests.",
+        "releasedAt": "2026-07-28T17:43:49.894Z"
       }
     ],
     "statusReasons": {
       "marker-write-cli": {
         "reason": "Added atomic pending-promotion marker persistence, deferred recovery output/JSON contract, gitignore coverage, and fake-timer regression tests.",
         "updatedAt": "2026-07-28T17:29:44.945Z"
+      },
+      "pending-promotion-reconciler": {
+        "reason": "Added state-aware workspace candidate scanning, guarded complete-planning re-drive, bounded marker attempt persistence and needs-you escalation, plus scenario tests.",
+        "updatedAt": "2026-07-28T17:43:49.894Z"
       }
     }
   },
@@ -121,6 +128,11 @@
     "marker-write-cli.marker-write-cli.ac2": "completed",
     "marker-write-cli.marker-write-cli.ac3": "completed",
     "marker-write-cli.marker-write-cli.ac4": "completed",
-    "pending-promotion-reconciler": "running"
+    "pending-promotion-reconciler": "completed",
+    "pending-promotion-reconciler.pending-promotion-reconciler.ac1": "completed",
+    "pending-promotion-reconciler.pending-promotion-reconciler.ac2": "completed",
+    "pending-promotion-reconciler.pending-promotion-reconciler.ac3": "completed",
+    "pending-promotion-reconciler.pending-promotion-reconciler.ac4": "completed",
+    "pending-promotion-reconciler.pending-promotion-reconciler.ac5": "completed"
   }
 }
