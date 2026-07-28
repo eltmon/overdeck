@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T20:26:24.794Z",
+  "updated": "2026-07-28T20:26:34.093Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "pending",
@@ -72,8 +72,16 @@
     }
   ],
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "frontend-kind-label": {
+        "writerId": "agent-pan-3233",
+        "agentId": "agent-pan-3233",
+        "pid": 3360965,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:26:34.093Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3233",
@@ -132,6 +140,7 @@
     "count-fold": "completed",
     "count-fold.count-fold.ac1": "completed",
     "count-fold.count-fold.ac2": "completed",
-    "count-fold.count-fold.ac3": "completed"
+    "count-fold.count-fold.ac3": "completed",
+    "frontend-kind-label": "running"
   }
 }
