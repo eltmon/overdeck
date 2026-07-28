@@ -4,6 +4,7 @@
 1008 src/lib/pan-dir/record.ts # PAN-3092
 1005 src/lib/review-status.ts # PAN-3092
 1277 src/cli/commands/start.ts # PAN-3151
+1354 src/cli/index.ts # PAN-3228
 3541 src/lib/cloister/deacon.ts # PAN-3228
 1315 src/lib/tmux.ts # PAN-3212
 1116 src/lib/lifecycle/workflows.ts # PAN-3215
