@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T06:35:05.364Z",
+  "updated": "2026-07-28T06:35:43.228Z",
   "pipeline": {
     "issueId": "PAN-2882",
     "reviewStatus": "pending",
@@ -45,5 +45,20 @@
       "open": true,
       "needsYouEmittedAt": "2026-07-28T03:59:46.322Z"
     }
-  ]
+  ],
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "repo-forge-plumbing": {
+        "writerId": "agent-pan-2882",
+        "agentId": "agent-pan-2882",
+        "pid": 1516620,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:35:43.228Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "repo-forge-plumbing": "running"
+  }
 }
