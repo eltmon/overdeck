@@ -98,7 +98,7 @@
     "recordedAt": "2026-07-28T20:15:30.548Z"
   },
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T21:15:26.621Z",
+  "updated": "2026-07-28T22:07:46.800Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "blocked",
@@ -109,7 +109,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:16:31.872Z",
-    "updatedAt": "2026-07-28T21:15:26.609Z",
+    "updatedAt": "2026-07-28T22:07:46.793Z",
     "reviewNotes": "Markerless recovery overrides deliberate --no-promote and the WI-4 test does not exercise completePlanningForIssue.",
     "inspectNotes": "All 4 ACs met. Blocking ENOENT fixed: plan-finalize.ts:180 now mkdirSync(dirname(markerPath),{recursive:true}) before the temp write, so the marker lands regardless of whether the workspace has .overdeck/, and the new '.pan-only legacy workspace' regression test in tests/unit/cli/plan-finalize-pending-promotion.test.ts covers it (createWorkspace('.pan') writes only .pan/spec.vbrief.json, asserts no marker pre-run, then asserts the marker after 5 failed attempts). Secondary wording note also addressed at plan-finalize.ts:387 — 'the dashboard did not complete promotion' now covers non-2xx as well as unreachable. AC-1 marker fields + patrolAttempts:0, AC-2 'deferred'/deacon named/promotionDeferred:true/exit 1 at plan-finalize.ts:392, AC-3 !noPromote && !promoted guard, AC-4 .gitignore entry all verified in tree at 5b93276e.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3246",
@@ -173,17 +173,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1301195,
-            "output": 73067,
-            "cacheRead": 14402048,
+            "input": 1754363,
+            "output": 102329,
+            "cacheRead": 16403968,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3714525,
-            "output": 227468,
-            "cacheRead": 93187072,
+            "input": 6335683,
+            "output": 303003,
+            "cacheRead": 128111616,
             "cacheWrite": 0
           }
         }
@@ -196,15 +196,15 @@
           "cacheWrite": 170493
         },
         "openai/gpt-5.6-sol": {
-          "input": 5015720,
-          "output": 300535,
-          "cacheRead": 107589120,
+          "input": 8090046,
+          "output": 405332,
+          "cacheRead": 144515584,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 95.749889,
-        "pricingAsOf": "2026-07-28T21:15:26.616Z"
+        "usd": 132.728661,
+        "pricingAsOf": "2026-07-28T22:07:46.796Z"
       }
     },
     "merges": [
