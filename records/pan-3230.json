@@ -85,18 +85,18 @@
     "recordedAt": "2026-07-28T18:59:19.959Z"
   },
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T19:13:48.140Z",
+  "updated": "2026-07-28T19:18:00.308Z",
   "pipeline": {
     "issueId": "PAN-3230",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:00:36.689Z",
-    "updatedAt": "2026-07-28T19:13:48.131Z",
-    "reviewNotes": "! [correctness] Auto-synthesis now writes canonical state outside the spec write door — `src/lib/xbrief/auto-synthesize.ts:148`",
+    "updatedAt": "2026-07-28T19:18:00.220Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: auto-synthesis now uses writeSpecForIssue with a clean-and-pushed state-worktree durability test, and lint-state-paths detects multiline specs/drafts joins with adversarial fixtures.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3239",
     "reviewedAtCommit": "ce4feae7b06ca159b5967603f389d4919236fa01",
     "lastVerifiedCommit": "ce4feae7b06ca159b5967603f389d4919236fa01",
@@ -154,17 +154,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 735333,
-            "output": 70560,
-            "cacheRead": 11305984,
+            "input": 743563,
+            "output": 71067,
+            "cacheRead": 11951104,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2233061,
-            "output": 129170,
-            "cacheRead": 89187840,
+            "input": 2270876,
+            "output": 134961,
+            "cacheRead": 97244160,
             "cacheWrite": 0
           }
         }
@@ -177,15 +177,15 @@
           "cacheWrite": 177096
         },
         "openai/gpt-5.6-sol": {
-          "input": 2968394,
-          "output": 199730,
-          "cacheRead": 100493824,
+          "input": 3014439,
+          "output": 206028,
+          "cacheRead": 109195264,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 79.552142,
-        "pricingAsOf": "2026-07-28T19:13:48.137Z"
+        "usd": 84.322027,
+        "pricingAsOf": "2026-07-28T19:18:00.303Z"
       }
     },
     "merges": [
