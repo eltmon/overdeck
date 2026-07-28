@@ -85,7 +85,7 @@
     "recordedAt": "2026-07-28T18:59:19.959Z"
   },
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T19:13:42.868Z",
+  "updated": "2026-07-28T19:13:48.140Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "blocked",
@@ -95,7 +95,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:00:36.689Z",
-    "updatedAt": "2026-07-28T19:13:42.157Z",
+    "updatedAt": "2026-07-28T19:13:48.131Z",
     "reviewNotes": "! [correctness] Auto-synthesis now writes canonical state outside the spec write door — `src/lib/xbrief/auto-synthesize.ts:148`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3239",
     "reviewedAtCommit": "ce4feae7b06ca159b5967603f389d4919236fa01",
@@ -185,7 +185,7 @@
       },
       "costAtCloseOut": {
         "usd": 79.552142,
-        "pricingAsOf": "2026-07-28T19:13:42.181Z"
+        "pricingAsOf": "2026-07-28T19:13:48.137Z"
       }
     },
     "merges": [
