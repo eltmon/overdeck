@@ -19,15 +19,7 @@
       "timestamp": "2026-07-28T19:26:36.590Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T19:26:36Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3228\n\n# Review — PAN-3228 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED — the new pane-choice POST is unauthenticated, and three recovery paths still fail the pending-decision contract\n\n## Context\n- Manifest: `.pan/review/agent-pan-3228-review-cb7d8f31/context.json`\n- Branch: `feature/pan-3228`\n- PR: https://github.com/eltmon/overdeck/pull/3241\n- HEAD reviewed: `cb7d8f31782f5c054514f36493ec85ec0be5e0b0`\n- Cycle number: 1\n- Dimensions reviewed: correctness/logic, security, requirements/acceptance criteria, performance\n- Focused verification: 10 changed test files, 95 tests passed\n\n## Blocking Findings\n\n### ⊗ [security] The new raw-keystroke route omits the origin/authentication guard — `src/dashboard/server/routes/agents/permissions.ts:95`\n**Evidence tier:** Tier 1\n**OWASP category:** Broken access control / CSRF\n**Changed code:** `postAgentPaneChoiceRoute` reads an arbitrary request body and calls `handlePostAgentPaneChoice`, which ultimately sends Up/Down/Enter into the agent PTY. It never reads `HttpServerRequest` or calls `validateOrigin`.\n**Attack path:** A non-dashboard caller can POST directly to `/api/agents/:id/pane-choice`; `readJsonBody` parses the raw body independently of content type, so the route itself provides no origin or internal-token boundary. The equivalent conversation route at `src/dashboard/server/routes/conversations.ts:627-643` validates the request origin before invoking the same shared answer core, and other agent mutation routes use the same guard.\n**Impact:** The issue explicitly requires an authenticated operator answer action, but this route accepts a keystroke action without proving the caller is the dashboard/operator. A forged or non-dashboard request with a current menu signature can approve a permission prompt or choose another blocking menu option.\n**Fix:** Apply the same `HttpServerRequest` + `validateOrigin` gate used by the conversation pane-choice route before reading the body or sending any keystrokes, and add a route-level regression test proving an untrusted origin receives 403 and the answer core is not called.\n\n### ! [correctness] Graceful restart can destroy a decision that appears during its 60-second grace period — `src/lib/agents/recovery.ts:149`\n**Evidence tier:** Tier 1\n**Changed code:** `restartAgent()` checks `detectPendingOperatorDecision()` once at lines 107-121, then prepares the stack/harness and calls `sendGracefulRestartWarning()` at lines 149-151 before unconditionally stopping the session at line 153. `sendGracefulRestartWarning()` waits `GRACEFUL_RESTART_GRACE_MS` (60 seconds) and also sends Escape before the warning.\n**Problem:** The gate is separated from the destructive action by a long interval in which the live agent continues working. If the agent reaches a tool-permission, confirmation, or session-choice menu after the first check, the warning path can dismiss it with Escape or the later `stopAgent()` can destroy it without another check.\n**Runtime impact:** The exact incident invariant can recur through the normal graceful restart path: the endpoint accepted a restart when no decision existed, a decision appeared during the grace window, and the restart discarded it even though `force` was false.\n**Fix:** Re-check the pending-decision gate immediately before any warning keystrokes and again immediately before `stopAgent()` after the grace wait. If a decision appeared, abort with the typed `pending-operator-decision` result and leave the live session/projection untouched. Add a fake-timer regression test where the detector returns null initially and a permission decision after the grace period.\n\n### ! [correctness] A forced discard is rediscovered forever from historical workspace JSONLs — `src/lib/agents/pending-decision-gate.ts:70`\n**Evidence tier:** Tier 1\n**Changed code:** The new gate calls `countPendingAskUserQuestionsForAgent(agentId)`. That legacy helper scans every `.jsonl` in the workspace Claude project directory and counts every unanswered AUQ, without limiting the scan to the agent's current session or filtering against the current agent start/session generation.\n**Problem:** `--force` is documented as deliberately discarding a pending decision, while fresh-session recovery preserves the sacred JSONL files. After one forced fresh restart, the old unanswered AUQ remains in its historical JSONL. Every later restart, recovery, or autonomous re-drive scans that old file and recreates the gate, even though the operator already discarded that session generation.\n**Runtime impact:** The explicit force escape hatch only bypasses one call. The replacement agent is subsequently parked by stale operator-owned state that belongs to the discarded session, and `pan answer` cannot answer a menu in that dead historical session.\n**Fix:** Make JSONL decision detection session-generation-aware. Resolve the agent's pinned/current transcript and current start/session boundary, or persist a durable discard tombstone that excludes earlier AUQs after an explicit force. Add an integration-style regression test: force a fresh session past an AUQ in the old transcript, create the replacement session, then assert the next gate check does not report the discarded AUQ.\n\n### ! [requirements] Failed swarm slots defer silently instead of emitting the required needs-you trip — `src/lib/cloister/swarm-failed-slot.ts:103`\n**Scope:** in_pr_scope\n**Evidence tier:** Tier 1\n**Requirement:** The issue requires every autonomous destructive-recovery path to defer with a needs-you escalation when an agent owns a pending operator decision; the `gate-redrive` item specifically traces FR-4.\n**Expected:** When `decideAgentAutonomousRedrive()` returns `{ decision: 'defer', needsYou: true }`, each autonomous caller must persist/emit the operator escalation and avoid requeueing.\n**Observed:** `requeueFailedSwarmSlots()` now calls the shared agent gate, but its defer branch records only an in-memory action string and ignores `admission.needsYou`. The durable `recordRecoveryFailure()` call occurs only after admission and archive, so it is never reached for the pending-decision case. The dead-end caller handles `needsYou`; this swarm caller does not.\n**Impact:** A failed swarm slot with a permission menu is correctly protected from replacement, but it can remain parked indefinitely without appearing as an actionable needs-you decision, contradicting the recovery contract and flywheel doctrine.\n**Fix:** Route `needsYou: true` through the canonical recovery-trip/needs-you writer before continuing, with decision-specific identity so patrols deduplicate it. Add a `requeueFailedSwarmSlots` regression test proving no archive/requeue occurs and one durable needs-you trip is emitted.\n\n## Non-blocking Findings\n\n### ~ [performance] The JSONL fallback performs an uncached workspace-wide scan on every gate evaluation — `src/lib/agents/pending-decision-gate.ts:70`\nEach evaluation can sequentially read and parse the last 512 KB of every transcript in the workspace. Destructive operations are infrequent, so this is not a release blocker by itself, but deacon recovery across old workspaces can turn one patrol into substantial filesystem and main-thread JSON work. The session-generation correction above should also narrow or cache this scan.\n\n## Requirement Coverage\n\n| Requirement | Scope | Status | Evidence |\n| --- | --- | --- | --- |\n| FR-1 / NFR-2 pending-decision helper | in_pr_scope | Partial, blocking semantics defect | `src/lib/agents/pending-decision-gate.ts` |\n| FR-2 fresh-start gate and force | in_pr_scope | Partial, force discard is not durable | `src/cli/commands/start-fresh-session.ts` |\n| FR-3 / NFR-1 restart family gate | in_pr_scope | Partial, graceful TOCTOU gap | `src/lib/agents/recovery.ts`, `src/dashboard/server/routes/agents/lifecycle-restart.ts` |\n| FR-4 autonomous redrive + needs-you | in_pr_scope | Partial, swarm caller drops needs-you | `src/lib/cloister/redrive-gate.ts`, `src/lib/cloister/deacon.ts`, `src/lib/cloister/swarm-failed-slot.ts` |\n| FR-5 shared session pane-choice core | in_pr_scope | Implemented | `src/lib/session-pane-choice.ts`, conversation refactor tests |\n| FR-6 agent GET/POST pane-choice routes | in_pr_scope | Partial, POST lacks required auth/origin guard | `src/dashboard/server/routes/agents/permissions.ts` |\n| FR-7 `pan answer` CLI | in_pr_scope | Implemented | `src/cli/commands/answer.ts`, generated manifest, tests |\n| FR-8 flywheel doctrine | in_pr_scope | Implemented | `roles/flywheel.md` |\n| Documentation | in_pr_scope | Implemented, but currently overstates force discard and universal needs-you behavior | `docs/PENDING-INPUT.md`, `docs/RECOVERY-NET.md`, `docs/SKILLS-CONVENTION.md` |\n\n## Non-goal Audit\n- No dashboard decision-card answer UI or pendingPaneChoice contract/read-model plumbing was added.\n- No PTY-supervisor protocol endpoint or Channels permission relay was added.\n- Non-destructive nudge behavior was not changed.\n- Rate-limit detections remain excluded, and no menu is auto-answered.\n\n## Clean Areas Checked\n- Agent route composition and no-loss inventory.\n- Shared pane capture/signature verification/keystroke confirmation and conversation behavior preservation.\n- CLI command registration, generated composer manifest, and focused command tests.\n- Deacon dead-session path and restart-family force pass-through outside the findings above.\n- Agent-enrichment import-cycle repair and identity tests.\n- GitLab open/merged MR helpers, forge-aware pipeline gathering, cache/concurrency helper, and their tests.\n- Subagent transcript layout changes.\n- Documentation, flywheel state/doctrine, and file-size allowlist changes.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3228/.pan/review/agent-pan-3228-review-cb7d8f31/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3228 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -125,10 +117,10 @@
     "recordedAt": "2026-07-28T19:16:09.927Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T19:26:42.259Z",
+  "updated": "2026-07-28T19:30:21.188Z",
   "pipeline": {
     "issueId": "PAN-3228",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -136,11 +128,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:17:21.407Z",
-    "updatedAt": "2026-07-28T19:26:42.249Z",
+    "updatedAt": "2026-07-28T19:30:20.761Z",
     "reviewNotes": "New pane-choice POST lacks origin validation, and recovery still has decision-loss/escalation gaps",
     "inspectNotes": "All 3 ACs met. AC1: new src/lib/__tests__/session-pane-choice.test.ts covers 400 bad index, 400 missing signature, 409 menu-gone, 409 menu-changed, 409 delivery-unconfirmed, and 200 {ok,answeredLabel} with Down/Down/Enter keystrokes. AC2: tests/unit/lib/overdeck/conversation-pane-choice.test.ts is untouched by this commit (last touched by PAN-3113 commit 4d65ad1c) and its 12 cases pass through the delegating handler; 47/47 across the 4 pane-choice test files. AC3: captureSessionPaneChoice returns signature/title/options/recommended/selectedIndex and null on no-menu or capture throw. Delegation preserves defaults (conversation still passes tmuxSessionExists; core defaults to capturePaneText + Effect.runPromise(sessionExists)) and the validation ordering (400s before conv lookup).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3241",
-    "reviewedAtCommit": "cb7d8f31782f5c054514f36493ec85ec0be5e0b0",
     "reviewSpawnedAt": "2026-07-28T19:18:18.159Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -252,17 +243,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 766032,
-            "output": 53101,
-            "cacheRead": 16754688,
+            "input": 857384,
+            "output": 115225,
+            "cacheRead": 19968000,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2112843,
-            "output": 177803,
-            "cacheRead": 120196608,
+            "input": 2544677,
+            "output": 203998,
+            "cacheRead": 129236992,
             "cacheWrite": 0
           }
         }
@@ -275,15 +266,15 @@
           "cacheWrite": 121982
         },
         "openai/gpt-5.6-sol": {
-          "input": 2878875,
-          "output": 230904,
-          "cacheRead": 136951296,
+          "input": 3402061,
+          "output": 319223,
+          "cacheRead": 149204992,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 100.786765,
-        "pricingAsOf": "2026-07-28T19:26:42.256Z"
+        "usd": 112.179113,
+        "pricingAsOf": "2026-07-28T19:30:20.796Z"
       }
     },
     "merges": [
