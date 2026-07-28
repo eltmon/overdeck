@@ -102,10 +102,10 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T08:33:29.044Z",
+  "updated": "2026-07-28T08:38:47.184Z",
   "pipeline": {
     "issueId": "PAN-3092",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -113,11 +113,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T08:32:34.028Z",
+    "updatedAt": "2026-07-28T08:38:47.134Z",
+    "reviewNotes": "Long-contention surfacing writes through the same contended record lock, so FR-4 can remain silent",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
     "lastVerifiedCommit": "566db378cb92103431348231524716843b9cf751",
-    "reviewRequestedAt": "2026-07-28T07:33:26.963Z",
     "reviewSpawnedAt": "2026-07-28T08:32:34.028Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -189,9 +189,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 457105,
-            "output": 26217,
-            "cacheRead": 5815808,
+            "input": 1167238,
+            "output": 151945,
+            "cacheRead": 17506304,
             "cacheWrite": 0
           }
         }
@@ -204,15 +204,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 457105,
-          "output": 26217,
-          "cacheRead": 5815808,
+          "input": 1167238,
+          "output": 151945,
+          "cacheRead": 17506304,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 5.9980583,
-        "pricingAsOf": "2026-07-28T08:32:34.140Z"
+        "usd": 19.1658113,
+        "pricingAsOf": "2026-07-28T08:38:47.166Z"
       }
     },
     "merges": [
