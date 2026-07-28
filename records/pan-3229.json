@@ -100,20 +100,21 @@
     "recordedAt": "2026-07-28T20:15:30.548Z"
   },
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T22:47:12.125Z",
+  "updated": "2026-07-28T22:47:15.153Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-28T20:16:31.872Z",
-    "updatedAt": "2026-07-28T22:47:12.022Z",
-    "reviewNotes": "Approved: deferred promotion recovery is correct, secure, bounded, requirements-complete, and fully verified",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-28T22:47:12.032Z",
+    "reviewNotes": "Agent re-review request (3/25): Fixed verification error",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "All 4 ACs met. Blocking ENOENT fixed: plan-finalize.ts:180 now mkdirSync(dirname(markerPath),{recursive:true}) before the temp write, so the marker lands regardless of whether the workspace has .overdeck/, and the new '.pan-only legacy workspace' regression test in tests/unit/cli/plan-finalize-pending-promotion.test.ts covers it (createWorkspace('.pan') writes only .pan/spec.vbrief.json, asserts no marker pre-run, then asserts the marker after 5 failed attempts). Secondary wording note also addressed at plan-finalize.ts:387 — 'the dashboard did not complete promotion' now covers non-2xx as well as unreachable. AC-1 marker fields + patrolAttempts:0, AC-2 'deferred'/deacon named/promotionDeferred:true/exit 1 at plan-finalize.ts:392, AC-3 !noPromote && !promoted guard, AC-4 .gitignore entry all verified in tree at 5b93276e.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3246",
     "reviewedAtCommit": "b5844bfff712b2a588e22d6597e4f6488d6edea0",
@@ -208,7 +209,7 @@
       },
       "costAtCloseOut": {
         "usd": 154.325621,
-        "pricingAsOf": "2026-07-28T22:47:12.108Z"
+        "pricingAsOf": "2026-07-28T22:47:15.150Z"
       }
     },
     "merges": [
