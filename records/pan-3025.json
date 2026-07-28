@@ -72,6 +72,11 @@
       "reason": "feedback",
       "note": "[2026-07-28T09:04Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-28T09:04:15.771Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-28T09:11:11.509Z"
     }
   ],
   "feedback": [],
@@ -110,21 +115,21 @@
     "recordedAt": "2026-07-28T08:50:14.585Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T09:11:09.835Z",
+  "updated": "2026-07-28T09:11:12.256Z",
   "pipeline": {
     "issueId": "PAN-3025",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:50:42.357Z",
-    "updatedAt": "2026-07-28T09:11:09.327Z",
+    "updatedAt": "2026-07-28T09:11:09.872Z",
     "reviewNotes": "Row-5 regression tests still accept any result and do not verify the production live-to-journal fallback",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3221",
     "lastVerifiedCommit": "6b218e665a20aeecd3e51dd3a9da4e695b49aa3e",
-    "reviewSpawnedAt": "2026-07-28T08:51:49.529Z",
+    "reviewSpawnedAt": "2026-07-28T09:11:09.871Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/__tests__/close-out-terminal.test.ts",
@@ -196,7 +201,7 @@
       },
       "costAtCloseOut": {
         "usd": 31.441174,
-        "pricingAsOf": "2026-07-28T09:11:09.419Z"
+        "pricingAsOf": "2026-07-28T09:11:12.237Z"
       }
     },
     "merges": [
