@@ -169,6 +169,16 @@ tracked and untracked legacy `.pan/` payloads forward, then removes them from
 `main` with an ordinary commit. Afterward, legacy paths are fallback reads only
 and their recreation trips Doctor/Deacon diagnostics.
 
+### Path authority
+
+All canonical `specs/` and `drafts/` directory derivation goes through
+`getProjectPanPaths(projectRoot)` in `src/lib/pan-dir/paths.ts`. It resolves the
+`overdeck-state` worktree for migrated projects and `<projectRoot>/.pan/` only
+for unmigrated projects. PAN-3165 and PAN-3230 both came from callers deriving
+these paths independently, so `scripts/lint-state-paths.sh` blocks new direct
+`.pan/specs` or `.pan/drafts` joins outside the audited migration and path-door
+modules.
+
 For polyrepo projects, `pan_records.repo` designates the infra/state-host
 sub-repository. `resolveInfraRepo()` places `overdeck-state` on that repository,
 not on the project root; migration can still read legacy `.pan/` from a non-Git
