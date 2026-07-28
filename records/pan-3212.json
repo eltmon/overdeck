@@ -2,7 +2,7 @@
   "issueId": "PAN-3212",
   "schemaVersion": 2,
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T06:35:27.186Z",
+  "updated": "2026-07-28T06:35:28.714Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3212: Resume-contract delivery presses Enter into the session-resume gate, silently choosing \"Resume from summary\" over the operator's \"as-is\"",
       "timestamp": "2026-07-28T06:35:27.186Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
