@@ -57,6 +57,11 @@
       "reason": "feedback",
       "note": "[2026-07-28T08:48Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-28T08:48:47.595Z"
+    },
+    {
+      "timestamp": "2026-07-28T08:50:19.638Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [
@@ -110,7 +115,7 @@
     "recordedAt": "2026-07-28T08:50:14.585Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T08:50:18.903Z",
+  "updated": "2026-07-28T08:50:19.638Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "pending",
