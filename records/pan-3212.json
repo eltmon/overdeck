@@ -98,18 +98,17 @@
     "recordedAt": "2026-07-28T17:49:31.882Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T18:06:38.127Z",
+  "updated": "2026-07-28T18:17:38.130Z",
   "pipeline": {
     "issueId": "PAN-3212",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:49:41.828Z",
-    "updatedAt": "2026-07-28T18:06:38.113Z",
-    "reviewNotes": "The new payload proof matches stale scrollback and treats capture failure as absence, so recovery can still false-ack an empty submit or duplicate a pending message.",
+    "updatedAt": "2026-07-28T18:17:38.047Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
     "reviewedAtCommit": "72d3b812b0d38b8a05441f6dd8f478386595c690",
     "lastVerifiedCommit": "72d3b812b0d38b8a05441f6dd8f478386595c690",
@@ -154,32 +153,32 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2311200,
-            "output": 233704,
-            "cacheRead": 30261760,
+            "input": 2317318,
+            "output": 233908,
+            "cacheRead": 30682624,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3608970,
-            "output": 273701,
-            "cacheRead": 64678912,
+            "input": 3727822,
+            "output": 324955,
+            "cacheRead": 83028992,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 5920170,
-          "output": 507405,
-          "cacheRead": 94940672,
+          "input": 6045140,
+          "output": 558863,
+          "cacheRead": 113711616,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 92.293336,
-        "pricingAsOf": "2026-07-28T18:06:38.122Z"
+        "usd": 103.847398,
+        "pricingAsOf": "2026-07-28T18:17:38.115Z"
       }
     },
     "merges": [
