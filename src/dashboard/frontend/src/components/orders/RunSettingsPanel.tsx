@@ -48,6 +48,21 @@ function formatTimeUtc(date: Date): string {
   return `${hh}:${mm}:${ss}Z`;
 }
 
+function formatPostureSetAt(iso: string): string {
+  const date = new Date(iso);
+  const datePart = date.toLocaleString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const hh = String(date.getUTCHours()).padStart(2, '0');
+  const mm = String(date.getUTCMinutes()).padStart(2, '0');
+  return `${datePart}, ${hh}:${mm}Z`;
+}
+
+function isStalePostureReason(posture: OrderBookPosture, reason: string | undefined): boolean {
+  return (
+    (posture === 'open' && reason === POSTURE_DEFAULT_REASON.drain) ||
+    (posture === 'drain' && reason === POSTURE_DEFAULT_REASON.open)
+  );
+}
+
 function SaveChip({ save }: { save: SaveState }) {
   if (save.state === 'saving') {
     return (
@@ -171,6 +186,21 @@ export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) 
             </div>
           </div>
           <p className="text-[11px] text-muted-foreground">{POSTURE_HINT[settings.posture]}</p>
+          <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+            <span className="capitalize text-foreground">{settings.posture}</span>
+            <span>· set by</span>
+            <span className="font-mono text-foreground">{settings.postureSetBy ?? 'operator'}</span>
+            {settings.postureSetAt && <span>· {formatPostureSetAt(settings.postureSetAt)}</span>}
+            <span>— &quot;{settings.postureReason ?? 'No reason recorded.'}&quot;</span>
+            {isStalePostureReason(settings.posture, settings.postureReason) && (
+              <span
+                className="rounded-sm border border-warning/[0.32] bg-warning/[0.08] px-1 py-0.5 text-[10px] uppercase text-warning-foreground"
+                title="This reason was recorded before the current posture was set — it describes a previous state."
+              >
+                stale reason
+              </span>
+            )}
+          </div>
           {pendingTo && (
             <div className={`flex flex-col gap-2 rounded-md border p-2 ${POSTURE_ACTIVE_CLASSES[pendingTo]}`}>
               <p className="text-[11px]">{POSTURE_CONSEQUENCE[pendingTo]}</p>

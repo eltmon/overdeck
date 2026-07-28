@@ -93,6 +93,57 @@ describe('RunSettingsPanel', () => {
     expect(screen.getByRole('button', { name: 'Reopen pickup' })).toBeInTheDocument();
   });
 
+  it('renders attribution (who, when, reason) whenever the panel renders', () => {
+    render(<RunSettingsPanel
+      settings={{
+        laneAConcurrency: 2,
+        posture: 'drain',
+        postureSetBy: 'eltmon',
+        postureSetAt: '2026-07-19T07:21:00.000Z',
+        postureReason: 'Hold until main is green',
+      }}
+      onChange={vi.fn(async () => {})}
+    />);
+
+    expect(screen.getByText('eltmon')).toBeInTheDocument();
+    expect(screen.getByText('· Jul 19, 07:21Z')).toBeInTheDocument();
+    expect(screen.getByText('— "Hold until main is green"')).toBeInTheDocument();
+  });
+
+  it('renders the stale-reason tag when the reason describes the opposite posture default', () => {
+    render(<RunSettingsPanel
+      settings={{ laneAConcurrency: 2, posture: 'open', postureReason: 'Operator paused new pickup.' }}
+      onChange={vi.fn(async () => {})}
+    />);
+
+    const tag = screen.getByText('stale reason');
+    expect(tag).toBeInTheDocument();
+    expect(tag).toHaveAttribute(
+      'title',
+      'This reason was recorded before the current posture was set — it describes a previous state.',
+    );
+  });
+
+  it('renders no stale tag and falls back to operator/no-reason-recorded when attribution is absent', () => {
+    render(<RunSettingsPanel
+      settings={{ laneAConcurrency: 2, posture: 'open' }}
+      onChange={vi.fn(async () => {})}
+    />);
+
+    expect(screen.queryByText('stale reason')).not.toBeInTheDocument();
+    expect(screen.getByText('operator')).toBeInTheDocument();
+    expect(screen.getByText('— "No reason recorded."')).toBeInTheDocument();
+  });
+
+  it('renders no stale tag when the reason matches the current posture default', () => {
+    render(<RunSettingsPanel
+      settings={{ laneAConcurrency: 2, posture: 'drain', postureReason: 'Operator paused new pickup.' }}
+      onChange={vi.fn(async () => {})}
+    />);
+
+    expect(screen.queryByText('stale reason')).not.toBeInTheDocument();
+  });
+
   it('shows a saving spinner, then Saved, fading to idle after 1600ms', async () => {
     let resolveChange: () => void = () => {};
     const onChange = vi.fn(() => new Promise<void>((resolve) => { resolveChange = resolve; }));
