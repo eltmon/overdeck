@@ -67,7 +67,7 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T07:33:03.956Z",
+  "updated": "2026-07-28T07:33:05.932Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
@@ -77,7 +77,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T07:33:03.591Z",
+    "updatedAt": "2026-07-28T07:33:03.778Z",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
     "reviewRequestedAt": "2026-07-28T07:33:00.149Z",
@@ -160,7 +160,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.0181193,
-        "pricingAsOf": "2026-07-28T07:33:03.627Z"
+        "pricingAsOf": "2026-07-28T07:33:05.929Z"
       }
     },
     "merges": [
