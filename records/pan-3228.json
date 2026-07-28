@@ -195,7 +195,7 @@
     "recordedAt": "2026-07-28T19:16:09.927Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T21:30:33.635Z",
+  "updated": "2026-07-28T21:30:43.700Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "blocked",
@@ -206,7 +206,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:17:21.407Z",
-    "updatedAt": "2026-07-28T21:30:32.411Z",
+    "updatedAt": "2026-07-28T21:30:43.687Z",
     "reviewNotes": "Graceful restart can leave a live decision-owned agent projected as stopped",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -218,7 +218,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3241",
-    "reviewedAtCommit": "7bbd981bd9677d75d32c0b3cd6a9a0abd6b7cd3c",
+    "reviewedAtCommit": "2afc5f651cb2c165fb300e4573a8a2b8a8c3f36e",
     "lastVerifiedCommit": "57e909d2bf0ee27c55919290af292bc7f6e81322",
     "reviewSpawnedAt": "2026-07-28T21:20:04.946Z"
   },
@@ -266,7 +266,7 @@
       },
       "costAtCloseOut": {
         "usd": 195.940077,
-        "pricingAsOf": "2026-07-28T21:30:32.482Z"
+        "pricingAsOf": "2026-07-28T21:30:43.695Z"
       }
     },
     "merges": [
