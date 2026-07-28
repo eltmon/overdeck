@@ -94,15 +94,7 @@
       "timestamp": "2026-07-28T22:08:03.174Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T21:30:33Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3228\n\n# Review — PAN-3228 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED — graceful restart can still project a live, decision-owned agent as stopped\n\n## Context\n- Manifest: `.pan/review/agent-pan-3228-review-2afc5f65/context.json`\n- Branch: `feature/pan-3228`\n- PR: https://github.com/eltmon/overdeck/pull/3241\n- HEAD reviewed: `2afc5f651cb2c165fb300e4573a8a2b8a8c3f36e`\n- PR base: `b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc`\n- Cycle number: 6\n- Prior cycle SHA: `7bbd981bd9677d75d32c0b3cd6a9a0abd6b7cd3c`\n- Cycle diff: merge-only synchronization from the then-current `origin/main`; it did not change the PAN-3228 restart projection path\n- Dimensions reviewed: correctness/logic, security, requirements/acceptance criteria, and performance\n\n## Blocking Finding\n\n### ! [correctness] A late pending decision abort leaves the still-running agent projected as stopped — `src/lib/agents/recovery.ts:174`\n**Evidence tier:** Tier 1 — direct control-flow proof plus a focused core regression test.\n\n**Problem:** The new graceful-restart recheck correctly returns `pending-operator-decision` immediately before `stopAgent`, preserving the live tmux session. Its dashboard caller has already emitted `agent.stopped` at `src/dashboard/server/routes/agents/lifecycle-restart.ts:311-315`, and restores `agent.started` only when `result.success` is true. The typed refusal therefore exits without compensating for the false stopped projection.\n\n**Failure scenario:** An operator requests graceful restart while no decision is pending. The route emits `agent.stopped`, the warning/grace period begins, and the agent reaches a permission or session-resume menu before the final check. `restartAgent()` returns the typed refusal at `src/lib/agents/recovery.ts:174-175` without stopping tmux, but the route logs failure and leaves the read model stopped.\n\n**Impact:** The harness remains live and owned by an unanswered operator decision while the canonical dashboard projection says it is stopped. Controls, enrichment, and autonomous lifecycle decisions can then act on false liveness state. This leaves FR-3 incomplete even though the destructive core itself preserves the session.\n\n**Required fix:** Emit `agent.stopped` only after restart has actually crossed the stop boundary, or restore a running `agent.started` projection when the graceful result is `pending-operator-decision`. Add a route-level fake-timer regression that introduces the decision during the grace window and proves the final projection remains running while `stopAgent` is not called.\n\n## Non-blocking Findings\n\n### ~ [correctness] Generic `needsYou` deferrals are recorded as pending-decision swarm trips — `src/lib/cloister/swarm-failed-slot.ts:121`\nThe branch records every `admission.needsYou` defer under `swarm-slot-pending-operator-decision`, although persisted gates such as an explicit operator stop can also produce `needsYou`. The slot still remains safely deferred and an escalation is emitted, so this does not block the stated acceptance criteria, but a structured pending-decision discriminator would prevent incorrect recovery-path attribution and acknowledgment.\n\n### ~ [stability] Missing or invalid `startedAt` disables the stale-transcript boundary — `src/lib/agent-enrichment.ts:327`\nFor an unpinned fallback JSONL, an absent or unparseable `startedAt` skips the mtime boundary and scans the transcript. Normally replacement state carries `startedAt`, so the tested forced-fresh path is correct; malformed legacy state can still rediscover a historical AUQ and unnecessarily close the recovery door. This is advisory because failing closed also preserves a potentially real unanswered decision when session identity is ambiguous.\n\n### ~ [maintainability] Restart launch failure bypasses the injected stop dependency — `src/lib/agents/recovery.ts:267`\nThe launch-failure catch calls the imported `stopAgent` instead of `stopRestartAgent`. Production defaults are equivalent, so current behavior is unaffected, but tests and alternate callers cannot observe or substitute that cleanup through the dependency contract added by this change.\n\n## Requirement Coverage\n\n| Requirement | Status at reviewed HEAD |\n| --- | --- |\n| FR-1 / NFR-2 pending-decision helper | Implemented; blocking reasons exclude `rate_limit`, tmux errors fail open, and AUQ detection is session-generation scoped |\n| FR-2 fresh-start gate and force override | Implemented |\n| FR-3 restart core and REST restart family | **Partial — destructive core refuses safely, but graceful dashboard projection remains incorrect on a late refusal** |\n| FR-4 autonomous redrive and durable needs-you | Implemented for dead-end and failed-swarm paths; recovery-path attribution has the advisory above |\n| FR-5 shared session pane-choice core | Implemented without changing the conversation answer contract |\n| FR-6 agent pane-choice GET/POST | Implemented; mutation is origin-guarded and signature-verified |\n| FR-7 `pan answer` CLI | Implemented through the shared core |\n| FR-8 flywheel doctrine | Implemented; pending-decision agents are parked and `--fresh`/`--force` are forbidden |\n| Documentation | Required files updated |\n\n## Security Review\n- The new agent pane-choice mutation validates the request origin before any keystroke path runs.\n- Menu answers are limited to parser-produced Up/Down/Enter keystrokes and require an uncached signature match, so request strings cannot become raw terminal input.\n- The POST handler resolves the agent before answering, and the CLI path is a local operator command. No Channels relay or new PTY-supervisor endpoint was introduced.\n- No new security blocker was found.\n\n## Performance Review\n- The recovery gate performs one live-pane check and at most one current-session JSONL scan per admission; it does not scan all historical transcripts on patrol.\n- Recovery-trip emission is deduplicated by obligation generation, so unresolved prompts do not create an unbounded write loop.\n- The answer path adds only bounded pane captures and fixed keystroke confirmation waits initiated by the operator.\n- No performance blocker was found.\n\n## Non-goal Audit\nAll six must-not constraints remain satisfied: no decision-card/read-model UI plumbing, no supervisor keystroke endpoint, no Channels permission relay, no nudge-path change, no unrelated Decisions-indicator fix, and no rate-limit gating or automatic menu answer.\n\n## Verification\n- `git diff --check b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc..HEAD` passed.\n- Focused backend/CLI tests: 10 files, 44 tests passed.\n- Remaining enrichment/route-inventory tests: 3 files, 23 tests passed.\n- Frontend transcript regression: 1 file, 4 tests passed.\n- Total focused verification: 14 test files, 71 tests passed.\n\n## Coverage\nReviewed the risk-ranked high/medium route changes first, then every changed production surface: CLI registration and fresh-session behavior, shared pane-choice core, agent enrichment and session identity, restart/recover paths, autonomous redrive/dead-end/swarm behavior, route composition, frontend transcript change, generated command manifest, doctrine, and required documentation. The unresolved blocker is a continuing cycle-3 finding; the cycle-6 merge commit did not alter or fix it.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3228/.pan/review/agent-pan-3228-review-2afc5f65/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3228 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -194,17 +186,17 @@
     "recordedAt": "2026-07-28T22:30:42.486Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T22:31:24.675Z",
+  "updated": "2026-07-28T22:31:36.099Z",
   "pipeline": {
     "issueId": "PAN-3228",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T22:31:24.666Z",
+    "updatedAt": "2026-07-28T22:31:36.080Z",
     "reviewNotes": "Agent re-review request (1/25): Addressed feedback: graceful restart restores the running projection on a late pending-decision refusal; added route-level fake-timer coverage proving stop is not called.",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -218,6 +210,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3241",
     "lastVerifiedCommit": "91c637dfa6d4fe02c4c207ac6aa8c0d1f85ff2cb",
     "reviewRequestedAt": "2026-07-28T22:30:43.337Z",
+    "reviewSpawnedAt": "2026-07-28T22:31:36.079Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/FLYWHEEL-STATE.md",
@@ -353,7 +346,7 @@
       },
       "costAtCloseOut": {
         "usd": 210.024635,
-        "pricingAsOf": "2026-07-28T22:31:24.673Z"
+        "pricingAsOf": "2026-07-28T22:31:36.088Z"
       }
     },
     "merges": [
