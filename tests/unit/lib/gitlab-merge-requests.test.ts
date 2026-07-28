@@ -181,27 +181,36 @@ describe('gitlab-merge-requests', () => {
       expect(result).toEqual(['feature/min-1', 'feature/min-3']);
     });
 
-    it('correctly identifies heads with merged MRs across multiple pages and stops on page 1 with results', async () => {
-      let callCount = 0;
+    it('requests page N+1 when a merged-MR page contains exactly 100 rows', async () => {
       const runner: GitLabRunner = vi.fn(async (args) => {
-        callCount++;
-        if (args[args.length - 1] === '1') {
-          // Page 1: full page (100 rows) - head is found, implementation returns immediately
+        if (args.at(-1) === '1') {
           return JSON.stringify(Array.from({ length: 100 }, (_, i) => ({
             source_branch: 'feature/min-multipage',
             iid: i,
           } as GitLabMergeRequestRow)));
         }
-        // Should not reach page 2 since page 1 has results
-        throw new Error('Should not request page 2');
+        if (args.at(-1) === '2') {
+          return JSON.stringify([{
+            source_branch: 'feature/min-multipage',
+            iid: 100,
+          } as GitLabMergeRequestRow]);
+        }
+        throw new Error(`Unexpected page: ${args.at(-1)}`);
       });
 
-      const result = await listGitLabMergedMergeRequestHeads('/test/merged-3', ['feature/min-multipage'], runner);
+      const result = await listGitLabMergedMergeRequestHeads(
+        '/test/merged-3',
+        ['feature/min-multipage'],
+        runner,
+      );
 
-      // Should correctly identify that the head has merged MRs
       expect(result).toEqual(['feature/min-multipage']);
-      // Should only have made page 1 request (short-circuit on finding any result)
-      expect(callCount).toBe(1);
+      expect(runner).toHaveBeenCalledTimes(2);
+      expect(runner).toHaveBeenNthCalledWith(
+        2,
+        ['mr', 'list', '--merged', '--source-branch', 'feature/min-multipage', '--output', 'json', '--per-page', '100', '--page', '2'],
+        '/test/merged-3',
+      );
     });
 
     it('returns empty array when no heads are provided', async () => {

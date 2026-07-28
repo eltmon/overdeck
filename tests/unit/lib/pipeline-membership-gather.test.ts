@@ -843,6 +843,60 @@ describe('gatherProjectLensSignals', () => {
     expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['strike/min-896']);
   });
 
+  it('limits merged-MR lookups to five concurrent calls across GitLab repos', async () => {
+    const mocked = deps();
+    mocked.listTrackerIssues = vi.fn().mockResolvedValue([
+      { issueId: 'MIN-1', state: 'open', labels: [] },
+      { issueId: 'MIN-2', state: 'open', labels: [] },
+      { issueId: 'MIN-3', state: 'open', labels: [] },
+    ]);
+    mocked.listOpenMergeRequests = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
+
+    let active = 0;
+    let maxActive = 0;
+    let releaseLookups = () => {};
+    const lookupGate = new Promise<void>((resolve) => { releaseLookups = resolve; });
+    let signalFiveStarted = () => {};
+    const fiveStarted = new Promise<void>((resolve) => { signalFiveStarted = resolve; });
+    mocked.listMergedMergeRequestHeads = vi.fn().mockImplementation(async () => {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      if (active === 5) signalFiveStarted();
+      await lookupGate;
+      active--;
+      return [];
+    });
+
+    const gitlabPolyrepo: ProjectConfig = {
+      name: 'test',
+      path: '/test',
+      issue_prefix: 'MIN',
+      gitlab_repo: 'test/test',
+      workspace: {
+        type: 'polyrepo',
+        repos: [
+          { name: 'fe', path: 'frontend' },
+          { name: 'api', path: 'api' },
+          { name: 'docs', path: 'docs', remote: 'github' },
+        ],
+      },
+    };
+
+    const gatherPromise = gatherProjectLensSignals(gitlabPolyrepo, mocked);
+    await fiveStarted;
+
+    expect(active).toBe(5);
+    expect(maxActive).toBe(5);
+    releaseLookups();
+    await gatherPromise;
+
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(12);
+    expect(maxActive).toBe(5);
+    expect(mocked.listMergedMergeRequestHeads).not.toHaveBeenCalledWith('/test/docs', expect.any(Array));
+  });
+
   it('does not query merged MRs for closed issues (they\'re already terminal)', async () => {
     const mocked = deps();
     mocked.listOpenIssues = vi.fn().mockResolvedValue([]);
