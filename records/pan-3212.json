@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T16:26:47.841Z",
+  "updated": "2026-07-28T16:30:12.546Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "pending",
@@ -53,18 +53,32 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "test-sendkeys-blocking-menu-guard": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3212",
         "agentId": "agent-pan-3212",
         "pid": 3766267,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T16:26:47.841Z"
+        "claimedAt": "2026-07-28T16:26:47.841Z",
+        "itemId": "test-sendkeys-blocking-menu-guard",
+        "outcome": "completed",
+        "reason": "Added fake-timer branch tests proving sendKeys rejects without Enter on blocking menus, preserves fail-open submission on an idle composer, and submits verified pastes once.",
+        "releasedAt": "2026-07-28T16:30:12.546Z"
+      }
+    ],
+    "statusReasons": {
+      "test-sendkeys-blocking-menu-guard": {
+        "reason": "Added fake-timer branch tests proving sendKeys rejects without Enter on blocking menus, preserves fail-open submission on an idle composer, and submits verified pastes once.",
+        "updatedAt": "2026-07-28T16:30:12.546Z"
       }
     }
   },
   "statusOverrides": {
-    "test-sendkeys-blocking-menu-guard": "running"
+    "test-sendkeys-blocking-menu-guard": "completed",
+    "test-sendkeys-blocking-menu-guard.test-sendkeys-blocking-menu-guard.ac1": "completed",
+    "test-sendkeys-blocking-menu-guard.test-sendkeys-blocking-menu-guard.ac2": "completed",
+    "test-sendkeys-blocking-menu-guard.test-sendkeys-blocking-menu-guard.ac3": "completed"
   }
 }
