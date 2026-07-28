@@ -62,9 +62,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-28T16:42:24.272Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-28T17:19Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-28T17:19:02.657Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-28T17:19:02Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3049\n\n# Self-Review — PAN-3049 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED\n\nThe rebuild fail-open paths from the previous verdict are fixed, but the new doctor gate still treats any non-init canonical container as proof that the canonical application is healthy. That can produce a teardown command for the only stack actually serving the workspace, so FR-9's safe-remediation requirement remains blocked.\n\n## Context\n\n- Manifest: `.pan/review/agent-pan-3049-review-69dbcf88/context.json`\n- Branch: `feature/pan-3049`\n- HEAD reviewed: `69dbcf884af0d4eec873cde2175b24995606340e`\n- Prior completed-review HEAD: `c7a85a665c290b1092da01a1abe1dfeaf390dc96`\n- Remediation commit reviewed: `b606909ffb5fecf42a70c963fe88de67c11856ba`\n- Review directory cycle: 4; this is the third completed blocking verdict because the `b606909f` dispatch produced context but no report.\n- PR: `#3223`\n- Focused verification: 8 test files / 83 tests passed.\n- Current GitHub checks: build, guard, lint, test, clean-install/server smoke, flake lane, prompt trailer, and CodeRabbit passed.\n- `git diff --check` passed.\n\n## Blocking Findings\n\n### ! [requirements/correctness] A running `dev`, database, or cache container is treated as proof that the canonical application is healthy — `src/cli/commands/doctor-duplicate-stacks.ts:106`\n\n**Scope:** `in_pr_scope` — FR-9 requires duplicate-stack diagnosis with safe remediation guidance.\n\n**Evidence tier:** Tier 2 — command reproduction.\n\n**Changed code:** The cycle-remediation commit introduced `canonicalHasRunningService`, which returns true for every canonical container whose name does not contain one of `init|setup|migrate|test-unit`. Because the input comes from `docker ps`, this treats a running `dev`, Postgres, Redis, or similarly named support container as sufficient proof that the canonical stack is healthy. It also has no status/health data with which to distinguish a healthy application service from a merely running but unhealthy one.\n\n**Reproduction:** With only `myn-feature-min-901-dev-1` and `myn-feature-min-901-postgres-1` running in the canonical project, plus a complete foreign `overdeck-feature-min-901` API/frontend stack, `diagnoseDuplicateComposeStacks` emits:\n\n```text\nforeign stack overdeck-feature-min-901 is a duplicate: ... docker compose -p \"overdeck-feature-min-901\" down -v --remove-orphans\n```\n\nThe canonical project has no running API or frontend in this scenario, so the foreign stack can be the only stack serving the workspace.\n\n**Runtime impact:** Following `pan doctor`'s advertised safe fix can remove the working application while leaving only support containers. This is the same user-visible failure the previous cycle identified; the new predicate narrows the init-only case but does not establish health.\n\n**Why this was not raised in cycle 1:** The `canonicalHasRunningService` predicate was introduced by `b606909f` as the attempted fix for the cycle-2 health-gating blocker. This exact failure mode did not exist in the cycle-1 code.\n\n**Required fix:** Emit a foreign-stack down command only after a positive canonical application-health signal establishes that the replacement stack is serving. Container-name exclusion is not a health check. If health, required-service coverage, or ownership is unavailable or ambiguous, keep the existing rebuild-first diagnosis and emit no teardown command.\n\n## Non-blocking Findings\n\n### ~ [correctness] [demoted: previously reviewed, not promotable] Deacon parses the first matching `feature-*-(frontend|server)-` segment instead of the final Compose suffix — `src/lib/cloister/deacon.ts:2356`\n\nThe current regex can misattribute `tenant-feature-foo-1-server-feature-pan-464-server-1` to `FOO-1`, so the real PAN-464 crash is skipped or the wrong agent is checked. Anchoring the match to the final service/index suffix would remove the ambiguity. This line was unchanged by the current remediation cycle and the prior completed verdict already marked FR-5 implemented, so the convergence gate prevents promoting it to a blocker now.\n\n## Prior Blockers Rechecked\n\n- **Conflicting pre-render declaration converted to a guessed teardown target:** Fixed. `rebuildWorkspaceStack` now skips pre-render teardown when canonical resolution throws.\n- **Post-render foreign-project `compose down` with fail-open liveness:** Fixed. The proactive teardown path was removed; cleanup is limited to the existing stale-container sweep.\n- **Init-only canonical doctor guidance:** Partially fixed but still blocking. Init/setup containers no longer qualify, but unrelated support containers and unhealthy application containers still do.\n\n## Requirements Coverage\n\n| Requirement | Status | Evidence |\n| --- | --- | --- |\n| FR-1 / FR-2 / NFR-3 canonical and strict resolver | Implemented | `src/lib/workspace/stack-health.ts` |\n| FR-3 rebuild resolves after render without unsafe proactive foreign-stack teardown | Implemented | `src/lib/workspace/rebuild-stack.ts` and focused tests |\n| FR-4 stop Docker through resolver | Implemented | `src/lib/workspace-manager/docker.ts` |\n| FR-5 Deacon prefix-independent frontend/server sweep | Implemented with advisory | Final-suffix parsing ambiguity noted above |\n| FR-6 prefix-independent UI reaper | Implemented | `src/lib/cloister/idle-stack-reaper.ts` |\n| FR-7 actual remaining-network warning | Implemented | `src/lib/close-out.ts` |\n| FR-8 prefix-independent workspace reap | Implemented | `src/cli/commands/workspace-reap.ts` |\n| FR-9 duplicate-stack doctor with safe guidance | Blocking | Canonical health is inferred from any non-init running container |\n| FR-10 Overdeck compose declaration | Implemented | `infra/.devcontainer-template/docker-compose.devcontainer.yml.template` |\n| NFR-1 naming-contract documentation | Implemented | `docs/WORKSPACE-CONTAINERS.md` |\n\n## Clean Dimensions Checked\n\n- **Security:** No new command-injection, authorization, secret-handling, or destructive automatic-action path remains in the current remediation diff. Docker mutations use argument arrays where workspace-controlled compose names enter the changed teardown path.\n- **Performance:** No new hot-path regression was found. The Deacon Docker-side `name=feature-` filter remains in place, and the doctor check runs only when invoked.\n- **Scope constraints:** The crash sweep and 10-minute idle tier still target only `frontend|server`; the change does not expand those services to MYN API/dev/Postgres/Redis, rename existing containers, or automatically reconcile the duplicated host stacks.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3049/.pan/review/agent-pan-3049-review-69dbcf88/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3049 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/__tests__/workspace-reap.test.ts",
@@ -125,19 +138,19 @@
     "recordedAt": "2026-07-28T08:02:25.990Z"
   },
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T17:12:09.706Z",
+  "updated": "2026-07-28T17:19:02.658Z",
   "pipeline": {
     "issueId": "PAN-3049",
-    "reviewStatus": "passed",
+    "reviewStatus": "blocked",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:02:29.164Z",
-    "updatedAt": "2026-07-28T17:12:06.425Z",
-    "reviewNotes": "Dispatch failed: Role run agent-pan-3049-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-28T17:19:01.789Z",
+    "reviewNotes": "Doctor treats support containers as canonical health and can recommend stopping the only serving stack",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "All 4 ACs met. AC1: declaredComposeFileProjectName parses top-level name: (stack-health.ts:52-57), verified against real MYN workspaces which declare 'name: myn-feature-min-XXX' at col 0. AC2: requireComposeProjectNameForWorkspace throws naming workspacePath + composeFilePath + both dev-script paths (stack-health.ts:135-137). AC3: both variants return overdeck-feature-<issue> when composeFilePath is null (lines 119, 134). AC4: assertDeclaredNameMatchesFeatureFolder reuses the exact 'Refusing workspace rebuild:' message for both sources (lines 59-70); dev-script rethrow guard preserved at line 91. COMPOSE_FILE_CANDIDATES and findDevcontainerComposeFile match rebuild-stack.ts:43-58 exactly, so no directory-scope drift. Tests cover all four plus dev-script-wins precedence.",
@@ -218,9 +231,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3482972,
-            "output": 235541,
-            "cacheRead": 31506432,
+            "input": 4311706,
+            "output": 287321,
+            "cacheRead": 38622208,
             "cacheWrite": 0
           }
         },
@@ -241,9 +254,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 3482972,
-          "output": 235541,
-          "cacheRead": 31506432,
+          "input": 4311706,
+          "output": 287321,
+          "cacheRead": 38622208,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -254,8 +267,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 93.5918892,
-        "pricingAsOf": "2026-07-28T17:12:09.702Z"
+        "usd": 102.8468472,
+        "pricingAsOf": "2026-07-28T17:19:01.847Z"
       }
     },
     "merges": [
