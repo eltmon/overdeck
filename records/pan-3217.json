@@ -23,10 +23,10 @@
       "src/lib/pipeline-membership-gather.ts",
       "tests/unit/lib/pipeline-membership-gather.test.ts"
     ],
-    "recordedAt": "2026-07-28T08:49:28.640Z"
+    "recordedAt": "2026-07-28T09:10:19.628Z"
   },
   "created": "2026-07-28T06:36:21.767Z",
-  "updated": "2026-07-28T09:10:14.997Z",
+  "updated": "2026-07-28T09:10:19.629Z",
   "pipeline": {
     "issueId": "PAN-3217",
     "reviewStatus": "passed",
