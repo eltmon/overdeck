@@ -4,7 +4,7 @@
     "created": "2026-07-28T06:50:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3212: Resume-contract delivery presses Enter into the session-resume gate, silently choosing \"Resume from summary\" over the operator's \"as-is\"",
-    "updated": "2026-07-28T16:24:41.583Z"
+    "updated": "2026-07-28T16:24:43.820Z"
   },
   "plan": {
     "id": "pan-3212",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "c2e3b4aa-25af-4d9f-9ddf-8702c95152d5",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-07-28T06:50:00.000Z",
-    "updated": "2026-07-28T16:24:41.583Z",
+    "updated": "2026-07-28T16:24:43.820Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3212",
