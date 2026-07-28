@@ -2657,13 +2657,8 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...livenessActions);
   for (const a of livenessActions) addLog('action', a, state.patrolCycle);
 
-  const orphanProposedActions = await reconcileOrphanProposedSpecs();
-  actions.push(...orphanProposedActions);
-  for (const a of orphanProposedActions) addLog('action', a, state.patrolCycle);
-
-  const pendingPromotionActions = await reconcilePendingPromotions();
-  actions.push(...pendingPromotionActions);
-  for (const a of pendingPromotionActions) addLog('action', a, state.patrolCycle);
+  for (const a of await reconcileOrphanProposedSpecs()) { actions.push(a); addLog('action', a, state.patrolCycle); }
+  for (const a of await reconcilePendingPromotions()) { actions.push(a); addLog('action', a, state.patrolCycle); }
 
   const closedIssueAgentActions = await reconcileClosedIssueAgents();
   actions.push(...closedIssueAgentActions);
