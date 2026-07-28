@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-28T20:31:41.051Z",
+  "updated": "2026-07-28T20:35:26.653Z",
   "pipeline": {
     "issueId": "PAN-3242",
     "reviewStatus": "pending",
@@ -72,16 +72,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "posture-control": {
-        "writerId": "agent-pan-3242",
-        "agentId": "agent-pan-3242",
-        "pid": 3623281,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:31:41.051Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3242",
@@ -92,6 +84,16 @@
         "itemId": "save-state-map",
         "outcome": "completed",
         "releasedAt": "2026-07-28T20:31:24.583Z"
+      },
+      {
+        "writerId": "agent-pan-3242",
+        "agentId": "agent-pan-3242",
+        "pid": 3623281,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:31:41.051Z",
+        "itemId": "posture-control",
+        "outcome": "completed",
+        "releasedAt": "2026-07-28T20:35:26.653Z"
       }
     ]
   },
@@ -101,6 +103,10 @@
     "save-state-map.save-state-map.ac2": "completed",
     "save-state-map.save-state-map.ac3": "completed",
     "save-state-map.save-state-map.ac4": "completed",
-    "posture-control": "running"
+    "posture-control": "completed",
+    "posture-control.posture-control.ac1": "completed",
+    "posture-control.posture-control.ac2": "completed",
+    "posture-control.posture-control.ac3": "completed",
+    "posture-control.posture-control.ac4": "completed"
   }
 }
