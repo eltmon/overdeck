@@ -20,7 +20,8 @@ import { promisify } from 'util'
 import { exec } from 'child_process'
 import { Effect } from 'effect'
 import { FsError } from './errors.js'
-import { getAgentRuntimeState, getAgentDir, getAgentStateSync } from './agents.js'
+import { getAgentDir, getAgentStateSync } from './agents/agent-state.js'
+import { getAgentRuntimeState } from './agents/runtime-state.js'
 import {
   detectAwaitingInputForAgent,
   normalizeAwaitingInputPrompt,
