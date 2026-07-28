@@ -160,10 +160,10 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T10:50:19.917Z",
+  "updated": "2026-07-28T11:13:45.912Z",
   "pipeline": {
     "issueId": "PAN-3092",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -171,8 +171,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T10:50:19.909Z",
-    "reviewNotes": "The idempotent activity API is bypassed by the production Deacon HTTP client, which cannot query duplicates and reports local enqueue as durable; restart repeats and failed writes are suppressed.",
+    "updatedAt": "2026-07-28T11:13:45.705Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issue: replaced the racy check-then-append with a transactional EventStore.appendOnce backed by an event_idempotency PRIMARY KEY (claim + insert in one transaction, publishes only on append, throws when it does not commit); exposed it as POST /api/internal/events/append-once and gave the Deacon client an appendOnce that awaits the settled server outcome instead of queueing; ActivityEmitOutcome gains 'unconfirmed' so a best-effort hand-off is never reported as success. Tests run against the real event store and the real client transport. Correcting my earlier claim: the Deacon is a child process (startDeaconChild spawns deacon.js), so the HTTP client was the production path all along.",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
     "reviewedAtCommit": "4db74b5910033b9d19d1f4b3f99dea7fbf1a2225",
@@ -248,9 +248,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 7475320,
-            "output": 291953,
-            "cacheRead": 51737088,
+            "input": 7519487,
+            "output": 309360,
+            "cacheRead": 53198848,
             "cacheWrite": 0
           }
         }
@@ -263,15 +263,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 7475320,
-          "output": 291953,
-          "cacheRead": 51737088,
+          "input": 7519487,
+          "output": 309360,
+          "cacheRead": 53198848,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 72.0218533,
-        "pricingAsOf": "2026-07-28T10:50:19.914Z"
+        "usd": 73.4957783,
+        "pricingAsOf": "2026-07-28T11:13:45.778Z"
       }
     },
     "merges": [
