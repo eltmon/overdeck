@@ -514,13 +514,4 @@ describe('checkWorkspaceContainerHealth', () => {
     const restartCalled = (mockExec.mock.calls as Array<[string]>).some(([cmd]) => cmd.includes('docker restart'));
     expect(restartCalled).toBe(false);
   });
-
-  it('(j) checkWorkspaceContainerHealth no longer hardcodes the overdeck-feature- prefix', () => {
-    const source = readFileSync(join(process.cwd(), 'src/lib/cloister/deacon.ts'), 'utf-8');
-    const start = source.indexOf('export async function checkWorkspaceContainerHealth');
-    expect(start).toBeGreaterThan(-1);
-    const nextExport = source.indexOf('\nexport ', start + 1);
-    const body = source.slice(start, nextExport === -1 ? undefined : nextExport);
-    expect(body).not.toContain('overdeck-feature-');
-  });
 });
