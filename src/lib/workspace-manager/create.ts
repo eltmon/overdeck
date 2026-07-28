@@ -33,6 +33,8 @@ import {
   validateFeatureName,
 } from './worktree-ops.js';
 import type { WorkspaceCreateOptions, WorkspaceCreateResult } from './types.js';
+import { getProjectByPath, getWorkspaceForIssue } from '../workspaces/resolver.js';
+import { createWorkspace } from '../workspaces/writer.js';
 import {
   createWorkspacePlaceholdersSync as createPlaceholders,
   sanitizeComposeFileSync,
@@ -197,6 +199,30 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
   if (dryRun) {
     result.steps.push('[DRY RUN] Would create workspace at: ' + workspacePath);
     return result;
+  }
+
+  // PAN-1990: create the kind='issue' workspace row before any git worktree
+  // operation. Idempotent (getWorkspaceForIssue check) and non-fatal — if the
+  // project row hasn't been seeded yet (dashboard boot hasn't run against this
+  // project), skip silently; the next boot-seeding backfill picks up the
+  // worktree directory retroactively via its own idempotent scan.
+  const issueId = featureName.toUpperCase();
+  if (!getWorkspaceForIssue(issueId)) {
+    const project = getProjectByPath(projectConfig.path);
+    if (project) {
+      try {
+        createWorkspace({
+          projectId: project.id,
+          kind: 'issue',
+          name: featureFolder,
+          path: workspacePath,
+          branchName: `feature/${featureName}`,
+          issueId,
+        });
+      } catch (err) {
+        console.warn(`[workspaces] failed to create workspace row for ${issueId}:`, err);
+      }
+    }
   }
 
   // A failed auto-plan/start can leave only orchestration metadata at the
