@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T04:43:34.296Z",
-  "updated": "2026-07-28T06:40:16.895Z",
+  "updated": "2026-07-28T06:40:20.293Z",
   "pipeline": {
     "issueId": "PAN-3216",
     "reviewStatus": "pending",
@@ -75,5 +75,18 @@
     "narrow-troubled-filter.narrow-troubled-filter.ac2": "completed",
     "narrow-troubled-filter.narrow-troubled-filter.ac3": "completed",
     "narrow-troubled-filter.narrow-troubled-filter.ac4": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/lib/briefing-assembler.ts",
+      "tests/unit/lib/briefing-assembler.test.ts"
+    ],
+    "actualChangedFiles": [
+      "src/lib/briefing-assembler.ts",
+      "tests/unit/lib/briefing-assembler.test.ts"
+    ],
+    "recordedAt": "2026-07-28T06:40:20.292Z"
   }
 }
