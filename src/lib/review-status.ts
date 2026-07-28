@@ -25,6 +25,7 @@ import {
   type BlockerReason, type ReviewStatus, type StatusHistoryEntry,
 } from './review-status-reconcile.js';
 import { isReviewRequestStale, needsReviewDispatch } from './review-dispatch-decision.js';
+import { REVIEW_STATUS_HISTORY_LIMIT } from './review-status-reconcile.js';
 import { resolveJournalReconciledReviewStatusSync } from './review-status-read.js';
 import { capturePipelineStageForIssue } from './telemetry/pipeline.js';
 import type { ReviewStatusUpdate } from './workspace-anchor-drift.js';
@@ -247,7 +248,7 @@ export function setReviewStatusSync(
     merged.reviewRequestedAt = undefined;
   }
 
-  // Track status transitions in history (last 10 entries)
+  // Track status transitions in history (bounded tail — PAN-3253)
   const history = [...(status.history || [])];
   const now = new Date().toISOString();
   if (update.reviewStatus && update.reviewStatus !== status.reviewStatus) {
@@ -265,7 +266,7 @@ export function setReviewStatusSync(
   if (update.releaseStatus && update.releaseStatus !== status.releaseStatus) {
     history.push({ type: 'release', status: update.releaseStatus, timestamp: now, notes: update.releaseNotes });
   }
-  while (history.length > 10) history.shift();
+  while (history.length > REVIEW_STATUS_HISTORY_LIMIT) history.shift();
 
   // PAN-1650: readyForMerge is EVENT-DRIVEN — derived from the gate state on every
   // write, so it flips the instant review+test+verification pass instead of waiting

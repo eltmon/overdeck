@@ -9,6 +9,7 @@
 import { Data, Effect } from 'effect';
 import { getDatabase } from './index.js';
 import type { BlockerReason, ReviewStatus, StatusHistoryEntry } from '../review-status.js';
+import { REVIEW_STATUS_HISTORY_LIMIT } from '../review-status-reconcile.js';
 import { normalizeReviewStatusSync } from '../review-status-normalize.js';
 
 /**
@@ -322,7 +323,10 @@ export function getAllReviewStatusesFromDb(): Record<string, ReviewStatus> {
 
   const result: Record<string, ReviewStatus> = {};
   for (const row of rows) {
-    result[row.issue_id] = rowToReviewStatus(row, historyByIssue.get(row.issue_id) ?? []);
+    result[row.issue_id] = rowToReviewStatus(
+      row,
+      (historyByIssue.get(row.issue_id) ?? []).slice(-REVIEW_STATUS_HISTORY_LIMIT),
+    );
   }
 
   return result;
@@ -363,7 +367,10 @@ export function getReviewStatusesFromDb(issueIds: string[]): Record<string, Revi
 
   const result: Record<string, ReviewStatus> = {};
   for (const row of rows) {
-    result[row.issue_id] = rowToReviewStatus(row, historyByIssue.get(row.issue_id) ?? []);
+    result[row.issue_id] = rowToReviewStatus(
+      row,
+      (historyByIssue.get(row.issue_id) ?? []).slice(-REVIEW_STATUS_HISTORY_LIMIT),
+    );
   }
 
   return result;
@@ -375,12 +382,14 @@ export function getReviewStatusesFromDb(issueIds: string[]): Record<string, Revi
 function getHistoryFromDb(issueId: string): StatusHistoryEntry[] {
   const db = getDatabase();
   const normalizedId = issueId.toUpperCase();
-  const rows = db.prepare(`
+  // PAN-3253: hydrate only the bounded tail — the table keeps the full record.
+  const rows = (db.prepare(`
     SELECT type, status, timestamp, notes
     FROM status_history
     WHERE issue_id = ?
-    ORDER BY timestamp ASC
-  `).all(normalizedId) as Array<{ type: string; status: string; timestamp: string; notes: string | null }>;
+    ORDER BY timestamp DESC
+    LIMIT ${REVIEW_STATUS_HISTORY_LIMIT}
+  `).all(normalizedId) as Array<{ type: string; status: string; timestamp: string; notes: string | null }>).reverse();
 
   return rows.map(r => ({
     type: r.type as 'review' | 'test' | 'merge' | 'inspect' | 'uat',
