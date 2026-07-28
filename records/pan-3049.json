@@ -12,6 +12,11 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-5",
       "timestamp": "2026-07-28T07:52:28.184Z"
+    },
+    {
+      "timestamp": "2026-07-28T08:02:30.854Z",
+      "reason": "end",
+      "note": "Fixed lint: removed a source-text-reading test (readFileSync on deacon.ts asserting an absent literal string) that tripped scripts/lint-source-introspection.sh as a new unbaselined offender. The same claim is already proven behaviorally by two adjacent tests in the same file. Full npm run lint now passes clean end to end; typecheck clean."
     }
   ],
   "feedback": [],
@@ -75,7 +80,7 @@
     "recordedAt": "2026-07-28T08:02:25.990Z"
   },
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T08:02:29.740Z",
+  "updated": "2026-07-28T08:02:30.854Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
