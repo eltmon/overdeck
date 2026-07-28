@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T07:17:19.778Z",
+  "updated": "2026-07-28T07:27:33.853Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "doctor-duplicate-stack-check": {
-        "writerId": "agent-pan-3049",
-        "agentId": "agent-pan-3049",
-        "pid": 4183146,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T07:17:19.778Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -166,6 +158,17 @@
         "outcome": "completed",
         "reason": "Replaced the hardcoded WORKSPACE_PROJECT_PREFIX ('overdeck-feature-') gate in workspace-reap.ts's docker ps filter, per-container candidacy check, and issue-id extraction with the existing inferIssueIdFromStackContainerName resolver applied to the compose-project label and container name. Any resolvable feature-<issue> token is now a candidate regardless of declared prefix. Extended src/cli/commands/__tests__/workspace-reap.test.ts with 3 new tests covering both ACs plus the no-token exclusion case (5 total tests pass). Typecheck/lint clean.",
         "releasedAt": "2026-07-28T07:17:11.325Z"
+      },
+      {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 4183146,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T07:17:19.778Z",
+        "itemId": "doctor-duplicate-stack-check",
+        "outcome": "completed",
+        "reason": "Added a read-only pan doctor check (checkDuplicateComposeStacks / diagnoseDuplicateComposeStacks) that groups running containers by issue via inferIssueIdFromStackContainerName and flags issues whose running stack doesn't match its canonical compose-project name, with distinct guidance for the duplicate case (>=2 projects) vs the invisible-single-non-canonical-stack case (1 project, wrong name). First pass added this inline to doctor.ts, which pushed it to 1102 lines and tripped the 1000-line file-size ceiling on push; extracted it to a new src/cli/commands/doctor-duplicate-stacks.ts module (same pattern as doctor-inotify.ts) in a follow-up commit, landing doctor.ts at exactly 1000 lines. Also exported defaultWorkspacePath from stack-health.ts (was internal-only) since the check needs it — outside this item's declared files_scope but a minimal, safe one-line change. 5 new tests pass; full doctor+cli+workspace test suite (604 tests) unaffected; typecheck/lint clean.",
+        "releasedAt": "2026-07-28T07:27:33.853Z"
       }
     ],
     "statusReasons": {
@@ -196,6 +199,10 @@
       "workspace-reap-prefix-agnostic": {
         "reason": "Replaced the hardcoded WORKSPACE_PROJECT_PREFIX ('overdeck-feature-') gate in workspace-reap.ts's docker ps filter, per-container candidacy check, and issue-id extraction with the existing inferIssueIdFromStackContainerName resolver applied to the compose-project label and container name. Any resolvable feature-<issue> token is now a candidate regardless of declared prefix. Extended src/cli/commands/__tests__/workspace-reap.test.ts with 3 new tests covering both ACs plus the no-token exclusion case (5 total tests pass). Typecheck/lint clean.",
         "updatedAt": "2026-07-28T07:17:11.325Z"
+      },
+      "doctor-duplicate-stack-check": {
+        "reason": "Added a read-only pan doctor check (checkDuplicateComposeStacks / diagnoseDuplicateComposeStacks) that groups running containers by issue via inferIssueIdFromStackContainerName and flags issues whose running stack doesn't match its canonical compose-project name, with distinct guidance for the duplicate case (>=2 projects) vs the invisible-single-non-canonical-stack case (1 project, wrong name). First pass added this inline to doctor.ts, which pushed it to 1102 lines and tripped the 1000-line file-size ceiling on push; extracted it to a new src/cli/commands/doctor-duplicate-stacks.ts module (same pattern as doctor-inotify.ts) in a follow-up commit, landing doctor.ts at exactly 1000 lines. Also exported defaultWorkspacePath from stack-health.ts (was internal-only) since the check needs it — outside this item's declared files_scope but a minimal, safe one-line change. 5 new tests pass; full doctor+cli+workspace test suite (604 tests) unaffected; typecheck/lint clean.",
+        "updatedAt": "2026-07-28T07:27:33.853Z"
       }
     }
   },
@@ -225,6 +232,9 @@
     "workspace-reap-prefix-agnostic": "completed",
     "workspace-reap-prefix-agnostic.workspace-reap-prefix-agnostic.ac1": "completed",
     "workspace-reap-prefix-agnostic.workspace-reap-prefix-agnostic.ac2": "completed",
-    "doctor-duplicate-stack-check": "running"
+    "doctor-duplicate-stack-check": "completed",
+    "doctor-duplicate-stack-check.doctor-duplicate-stack-check.ac1": "completed",
+    "doctor-duplicate-stack-check.doctor-duplicate-stack-check.ac2": "completed",
+    "doctor-duplicate-stack-check.doctor-duplicate-stack-check.ac3": "completed"
   }
 }
