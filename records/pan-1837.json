@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T19:43:40.776Z",
+  "updated": "2026-07-28T19:49:39.774Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "wi8a-wire-resolver": {
-        "writerId": "agent-pan-1837",
-        "agentId": "agent-pan-1837",
-        "pid": 1889877,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T19:43:40.776Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -177,6 +169,17 @@
         "outcome": "completed",
         "reason": "Added an optional harness param to getProviderEnvSync, skipping ANTHROPIC_BASE_URL/ANTHROPIC_AUTH_TOKEN/KIMI_API_KEY for {kimi, kimi-code} while preserving byte-identical output for every existing caller (harness omitted, or any other harness). Belt-and-suspenders with wi6's unsetProviderEnv:true. 76/76 tests pass across the two verify_commands files. Deviation: getProviderEnvForModel/spawn.ts do not yet thread harness through to this function, so the real pan start path doesn't benefit yet -- deferred alongside the kimi-code spawn.ts wiring noted on wi5, both to land before wi14 end-to-end verification.",
         "releasedAt": "2026-07-28T19:43:27.375Z"
+      },
+      {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 1889877,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T19:43:40.776Z",
+        "itemId": "wi8a-wire-resolver",
+        "outcome": "completed",
+        "reason": "Added resolveKimiWirePath to jsonl-resolver.ts, delegating to wi5 findKimiWirePath/kimiSessionsRoot (mirrors the codex findRolloutPath reuse pattern): fast path via captured kimi-session-id, fallback to newest session dir under the workDirKey bucket. Wired kimi-code into resolveAgentHarness's trusted list and stale-default correction chain, and the kimi-wire-jsonl dispatch branch in resolveJsonlPath. Added kimiHomeOverride test hook. Extended jsonl-resolver.test.ts with all 3 ACs plus a no-bucket null case; 53/53 tests pass, no other harness path changed.",
+        "releasedAt": "2026-07-28T19:49:39.774Z"
       }
     ],
     "statusReasons": {
@@ -211,6 +214,10 @@
       "wi7a-provider-env-gate": {
         "reason": "Added an optional harness param to getProviderEnvSync, skipping ANTHROPIC_BASE_URL/ANTHROPIC_AUTH_TOKEN/KIMI_API_KEY for {kimi, kimi-code} while preserving byte-identical output for every existing caller (harness omitted, or any other harness). Belt-and-suspenders with wi6's unsetProviderEnv:true. 76/76 tests pass across the two verify_commands files. Deviation: getProviderEnvForModel/spawn.ts do not yet thread harness through to this function, so the real pan start path doesn't benefit yet -- deferred alongside the kimi-code spawn.ts wiring noted on wi5, both to land before wi14 end-to-end verification.",
         "updatedAt": "2026-07-28T19:43:27.375Z"
+      },
+      "wi8a-wire-resolver": {
+        "reason": "Added resolveKimiWirePath to jsonl-resolver.ts, delegating to wi5 findKimiWirePath/kimiSessionsRoot (mirrors the codex findRolloutPath reuse pattern): fast path via captured kimi-session-id, fallback to newest session dir under the workDirKey bucket. Wired kimi-code into resolveAgentHarness's trusted list and stale-default correction chain, and the kimi-wire-jsonl dispatch branch in resolveJsonlPath. Added kimiHomeOverride test hook. Extended jsonl-resolver.test.ts with all 3 ACs plus a no-bucket null case; 53/53 tests pass, no other harness path changed.",
+        "updatedAt": "2026-07-28T19:49:39.774Z"
       }
     }
   },
@@ -252,6 +259,9 @@
     "wi7a-provider-env-gate.wi7a-provider-env-gate.ac1": "completed",
     "wi7a-provider-env-gate.wi7a-provider-env-gate.ac2": "completed",
     "wi7a-provider-env-gate.wi7a-provider-env-gate.ac3": "completed",
-    "wi8a-wire-resolver": "running"
+    "wi8a-wire-resolver": "completed",
+    "wi8a-wire-resolver.wi8a-wire-resolver.ac1": "completed",
+    "wi8a-wire-resolver.wi8a-wire-resolver.ac2": "completed",
+    "wi8a-wire-resolver.wi8a-wire-resolver.ac3": "completed"
   }
 }
