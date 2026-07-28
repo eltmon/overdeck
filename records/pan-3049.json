@@ -70,7 +70,7 @@
     "recordedAt": "2026-07-28T07:46:15.165Z"
   },
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T07:46:24.657Z",
+  "updated": "2026-07-28T07:46:26.729Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -80,7 +80,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T07:46:22.974Z",
+    "updatedAt": "2026-07-28T07:46:26.386Z",
     "inspectNotes": "All 4 ACs met. AC1: declaredComposeFileProjectName parses top-level name: (stack-health.ts:52-57), verified against real MYN workspaces which declare 'name: myn-feature-min-XXX' at col 0. AC2: requireComposeProjectNameForWorkspace throws naming workspacePath + composeFilePath + both dev-script paths (stack-health.ts:135-137). AC3: both variants return overdeck-feature-<issue> when composeFilePath is null (lines 119, 134). AC4: assertDeclaredNameMatchesFeatureFolder reuses the exact 'Refusing workspace rebuild:' message for both sources (lines 59-70); dev-script rethrow guard preserved at line 91. COMPOSE_FILE_CANDIDATES and findDevcontainerComposeFile match rebuild-stack.ts:43-58 exactly, so no directory-scope drift. Tests cover all four plus dev-script-wins precedence.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3223",
     "reviewRequestedAt": "2026-07-28T07:46:17.901Z",
@@ -180,7 +180,7 @@
       },
       "costAtCloseOut": {
         "usd": 24.3906972,
-        "pricingAsOf": "2026-07-28T07:46:24.654Z"
+        "pricingAsOf": "2026-07-28T07:46:26.408Z"
       }
     },
     "merges": [
