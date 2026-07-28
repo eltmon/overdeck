@@ -54,15 +54,7 @@
       "timestamp": "2026-07-28T09:39:42.023Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T09:39:42Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3049\n\n# Self-Review — PAN-3049 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED\n\nThe follow-up commit fixes the command-injection path, the multi-segment idle-reaper match, and the Deacon query regression. Two blockers remain: the running-foreign-stack protection is fail-open, and doctor still offers a teardown command before the canonical stack is known healthy.\n\n## Context\n\n- Manifest: `.pan/review/agent-pan-3049-review-c7a85a66/context.json`\n- Branch: `feature/pan-3049`\n- HEAD reviewed: `c7a85a665c290b1092da01a1abe1dfeaf390dc96`\n- Prior reviewed HEAD: `633b8bec55270f16715519995ba08e7f0945a624`\n- Cycle: 2\n- PR: `#3223`\n- Focused verification: 6 test files / 58 tests passed.\n- CI observed before verdict: build, guard, lint, prompt trailer, flake lane, clean-install smoke, and CodeRabbit passed; the main test job was still running.\n\n## Blocking Findings\n\n### ⊗ [requirements/correctness] The foreign-stack protection still fails open when ownership or liveness is unknown — `src/lib/workspace/rebuild-stack.ts:192`, `src/lib/workspace/rebuild-stack.ts:243`\n\n**Evidence tier:** Tier 1 — static.\n\n**Requirement:** NonGoal 1 forbids stopping or removing any running foreign-prefixed stack from code. Reconciliation must remain an operator action guided by doctor.\n\n**Changed code and failure paths:**\n\n1. The pre-render resolver uses `tryComposeProjectNameForWorkspace(...) ?? overdeck-feature-*`. `tryComposeProjectNameForWorkspace` returns `null` for conflicting or invalid declarations, so a malformed/mismatched declaration is converted into the overdeck guess. If an existing compose file is present, lines 196–202 immediately run `down` under that guessed project before any liveness check. The pre-PR strict resolver threw on a conflicting declaration instead of guessing.\n2. The new post-render guard calls `collectDockerContainerLifecycleSnapshot`, whose error channel is converted to an empty array in `stack-health.ts:378-410`. A Docker timeout/error is therefore indistinguishable from “no matching containers,” and the code proceeds to `docker compose ... down` at lines 255–259. The predicate also treats states such as `restarting` or `paused` as non-running, even though those are live stacks that must not be automatically removed.\n\n**Runtime impact:** A transient Docker-list failure, a restarting foreign stack, or an invalid current declaration can still lead rebuild/Deacon recovery to stop a live stack without operator ownership confirmation. The added happy-path test proves that a row with `state: running` is preserved, but it does not cover these fail-open cases.\n\n**Fix:** Treat unknown/conflicting resolution and liveness-probe failure as “leave untouched.” Only remove a foreign project after a successful probe positively proves its matching containers are in terminal non-running states; the simpler compliant path is to omit foreign-project `compose down` entirely and rely on the existing stale-container cleanup, which already skips live containers.\n\n### ! [requirements/correctness] Doctor still recommends teardown when the canonical project is merely present, not healthy — `src/cli/commands/doctor-duplicate-stacks.ts:89`\n\n**Scope:** `in_pr_scope` — FR-9 requires safe remediation guidance.\n\n**Evidence tier:** Tier 2 — command reproduction.\n\n**Changed code:** The fix gates down commands on `runningProjects.includes(canonical)`, which proves only that at least one container from that compose project is running. It does not prove that the canonical API/server/frontend stack is healthy or serving the agent.\n\n**Reproduction:** With only `myn-feature-min-901-init-1` running under the canonical project and a complete `overdeck-feature-min-901` stack running beside it, `diagnoseDuplicateComposeStacks` emits an immediate `docker compose -p \"overdeck-feature-min-901\" down` command. Stopping that foreign stack can remove the only working API/UI while the canonical stack is still initializing or broken.\n\n**Runtime impact:** The doctor check can guide the operator into taking down the stack currently serving the live agent, despite the acceptance criterion and non-goal requiring safe, ownership-aware reconciliation.\n\n**Fix:** Emit a down command only after a real canonical stack-health check passes. If health is unavailable or unhealthy, retain rebuild/diagnosis-only guidance and require doctor to be rerun after the canonical stack is healthy.\n\n## Non-blocking Findings\n\nNone.\n\n## Prior Findings Rechecked\n\n- **Command injection:** Fixed. Declared project names are grammar-validated, and `stopWorkspaceDockerPromise` passes names and compose paths through `execFile` argv entries.\n- **Unresolved canonical doctor case:** Fixed. Doctor emits no down command when canonical resolution fails or the canonical project is absent.\n- **Multi-segment prefix matching:** Fixed. The UI suffix regex now handles hyphenated and underscore-containing prefixes, with regression tests.\n- **Deacon exited-container scan:** Fixed. Docker-side `name=feature-` filtering restores bounded prefix-independent discovery.\n\n## Requirements Coverage\n\n| Requirement | Status | Evidence |\n| --- | --- | --- |\n| FR-1 / FR-2 / NFR-3 canonical and strict resolver | Implemented | `src/lib/workspace/stack-health.ts` |\n| FR-3 rebuild resolves after render without unsafe reconciliation | Partial / blocking | Fail-open teardown paths above |\n| FR-4 stop Docker through resolver | Implemented | `src/lib/workspace-manager/docker.ts` |\n| FR-5 Deacon prefix-independent frontend/server sweep | Implemented | `src/lib/cloister/deacon.ts` |\n| FR-6 prefix-independent UI reaper | Implemented | `src/lib/cloister/idle-stack-reaper.ts` |\n| FR-7 actual remaining-network warning | Implemented | `src/lib/close-out.ts` |\n| FR-8 prefix-independent workspace reap | Implemented | `src/cli/commands/workspace-reap.ts` |\n| FR-9 duplicate-stack doctor with safe guidance | Partial / blocking | Health is not established before down guidance |\n| FR-10 Overdeck compose declaration | Implemented | `infra/.devcontainer-template/docker-compose.devcontainer.yml.template` |\n| NFR-1 naming-contract documentation | Implemented | `docs/WORKSPACE-CONTAINERS.md` |\n\n## Clean Areas Checked\n\n- Security: no remaining injection path found in the newly changed compose-name flow.\n- Performance: no remaining blocker or advisory after restoring Docker-side filtering.\n- Service-scope constraints remain intact: the crash sweep and 10-minute UI tier still target only `frontend|server`; API, dev, Postgres, and Redis were not added.\n- Existing stacks and containers are not renamed or migrated by the change.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3049/.pan/review/agent-pan-3049-review-c7a85a66/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3049 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/__tests__/workspace-reap.test.ts",
@@ -123,10 +115,10 @@
     "recordedAt": "2026-07-28T08:02:25.990Z"
   },
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T10:01:16.405Z",
+  "updated": "2026-07-28T10:01:41.631Z",
   "pipeline": {
     "issueId": "PAN-3049",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -134,13 +126,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:02:29.164Z",
-    "updatedAt": "2026-07-28T10:01:14.846Z",
+    "updatedAt": "2026-07-28T10:01:41.615Z",
     "reviewNotes": "Verification infrastructure error: Verification worker 588215 exited before writing a result",
     "inspectNotes": "All 4 ACs met. AC1: declaredComposeFileProjectName parses top-level name: (stack-health.ts:52-57), verified against real MYN workspaces which declare 'name: myn-feature-min-XXX' at col 0. AC2: requireComposeProjectNameForWorkspace throws naming workspacePath + composeFilePath + both dev-script paths (stack-health.ts:135-137). AC3: both variants return overdeck-feature-<issue> when composeFilePath is null (lines 119, 134). AC4: assertDeclaredNameMatchesFeatureFolder reuses the exact 'Refusing workspace rebuild:' message for both sources (lines 59-70); dev-script rethrow guard preserved at line 91. COMPOSE_FILE_CANDIDATES and findDevcontainerComposeFile match rebuild-stack.ts:43-58 exactly, so no directory-scope drift. Tests cover all four plus dev-script-wins precedence.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3223",
     "reviewedAtCommit": "c7a85a665c290b1092da01a1abe1dfeaf390dc96",
     "lastVerifiedCommit": "633b8bec55270f16715519995ba08e7f0945a624",
-    "reviewSpawnedAt": "2026-07-28T09:32:42.006Z",
+    "reviewSpawnedAt": "2026-07-28T10:01:41.614Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/cli/commands/__tests__/workspace-reap.test.ts",
@@ -222,10 +214,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 947,
-            "output": 239825,
-            "cacheRead": 202250932,
-            "cacheWrite": 3896552
+            "input": 951,
+            "output": 240098,
+            "cacheRead": 203692872,
+            "cacheWrite": 3897006
           }
         }
       },
@@ -243,15 +235,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 947,
-          "output": 239825,
-          "cacheRead": 202250932,
-          "cacheWrite": 3896552
+          "input": 951,
+          "output": 240098,
+          "cacheRead": 203692872,
+          "cacheWrite": 3897006
         }
       },
       "costAtCloseOut": {
-        "usd": 85.5642912,
-        "pricingAsOf": "2026-07-28T10:01:16.403Z"
+        "usd": 85.8565522,
+        "pricingAsOf": "2026-07-28T10:01:41.621Z"
       }
     },
     "merges": [
