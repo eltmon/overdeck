@@ -67,7 +67,7 @@
     "recordedAt": "2026-07-28T16:44:14.261Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T17:04:47.517Z",
+  "updated": "2026-07-28T17:04:53.130Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "blocked",
@@ -77,9 +77,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T16:44:36.232Z",
-    "updatedAt": "2026-07-28T17:04:46.938Z",
+    "updatedAt": "2026-07-28T17:04:53.124Z",
     "reviewNotes": "The keyed menu abort is acknowledged as failed instead of retried, and invalidation failure can retry with a stale target and submit an empty line.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
+    "reviewedAtCommit": "c644b617682a67f0afce3069793ee112e10ec4a7",
     "lastVerifiedCommit": "aeeb4e52141c6723b3fecaebae95872197109986",
     "reviewSpawnedAt": "2026-07-28T16:58:39.449Z",
     "scopeDrift": {
@@ -136,7 +137,7 @@
       },
       "costAtCloseOut": {
         "usd": 45.00984,
-        "pricingAsOf": "2026-07-28T17:04:46.958Z"
+        "pricingAsOf": "2026-07-28T17:04:53.128Z"
       }
     },
     "merges": [
