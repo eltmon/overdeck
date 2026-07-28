@@ -87,4 +87,6 @@ export interface WorkspaceDockerTeardownResult {
   networkRemoved: boolean;
   /** Human-readable log of teardown steps taken */
   steps: string[];
+  /** Devnet network names still present after teardown, if any (PAN-3049). */
+  remainingNetworks?: string[];
 }

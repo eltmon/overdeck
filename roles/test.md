@@ -77,6 +77,10 @@ Never start, stop, kill, or restart the host-level Overdeck dashboard, superviso
    - `OVERDECK_SPECIALIST_RESULT: test-agent passed`
    - `OVERDECK_SPECIALIST_RESULT: test-agent failed`
 
+**Signal once (PAN-3092).** One POST attempt is enough. If it fails, `.pan/test/result.json`
+is the durable verdict and the deacon recovers from it — do NOT retry the POST in a loop.
+Emit the sentinel and stop; repeated signals add lock pressure and burn tokens for nothing.
+
 ## TLDR: prefer code summaries over full reads
 
 When reading test fixtures, helpers, or app source to diagnose a failure, use TLDR MCP tools instead of full `Read` if `<workspace>/.venv` exists:

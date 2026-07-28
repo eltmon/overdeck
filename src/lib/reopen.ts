@@ -62,6 +62,7 @@ export interface ReopenOptions {
   setReviewStatusSync(issueId, {
     reviewStatus: 'pending',
     testStatus: 'pending',
+    verificationStatus: 'pending',
     mergeStatus: 'pending',
     reviewNotes: `Reopened${options.reason ? `: ${options.reason}` : ''}`,
     testNotes: undefined,
