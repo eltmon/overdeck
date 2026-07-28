@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T20:24:14.681Z",
+  "updated": "2026-07-28T20:28:53.639Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -86,18 +86,25 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "issue-view-awaiting-fields": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3232",
         "agentId": "agent-pan-3232",
         "pid": 3281719,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:24:14.681Z"
+        "claimedAt": "2026-07-28T20:24:14.681Z",
+        "itemId": "issue-view-awaiting-fields",
+        "outcome": "completed",
+        "releasedAt": "2026-07-28T20:28:53.639Z"
       }
-    }
+    ]
   },
   "statusOverrides": {
-    "issue-view-awaiting-fields": "running"
+    "issue-view-awaiting-fields": "completed",
+    "issue-view-awaiting-fields.issue-view-awaiting-fields.ac1": "completed",
+    "issue-view-awaiting-fields.issue-view-awaiting-fields.ac2": "completed",
+    "issue-view-awaiting-fields.issue-view-awaiting-fields.ac3": "completed"
   }
 }
