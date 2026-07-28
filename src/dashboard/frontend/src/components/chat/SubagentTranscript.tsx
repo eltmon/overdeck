@@ -3,6 +3,7 @@ import type { Conversation } from '../CommandDeck/ConversationList';
 import { MessagesTimeline } from './MessagesTimeline';
 import type { SubagentSummary } from './chat-types';
 import { useSubagentTranscript } from './useConversationMessagesStream';
+import styles from '../CommandDeck/styles/command-deck.module.css';
 
 interface SubagentTranscriptProps {
   conversation: Conversation;
@@ -21,7 +22,7 @@ export function SubagentTranscript({ conversation, subagent, resolvedTheme, onBa
   const transcript = useSubagentTranscript(conversation, subagent.agentId);
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+    <div className={`${styles.subagentTranscript} flex min-h-0 min-w-0 flex-1 flex-col`}>
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
         <button
           type="button"
@@ -35,7 +36,10 @@ export function SubagentTranscript({ conversation, subagent, resolvedTheme, onBa
           {subagent.agentType} <span className="text-muted-foreground">· {subagent.description}</span>
         </span>
       </header>
-      <div className="min-h-0 min-w-0 flex-1">
+      {/* MessagesTimeline sizes itself with `flex: 1`, so this wrapper must be a
+          flex column — a plain block gives it no height and it renders clipped
+          instead of scrollable (no scrolling, no auto-scroll, no Bottom button). */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {transcript.isLoading ? (
           <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
             <Loader2 size={14} className="animate-spin text-primary" />
