@@ -10,6 +10,7 @@ import {
   syncAuthCommand,
 } from './workspace-remote.js';
 import { workspaceMainCommand, workspaceNewCommand } from './workspace-scratch.js';
+import { workspaceActivateCommand, workspaceArchiveCommand, workspaceGetCommand } from './workspace-lifecycle.js';
 
 export { destroyCommand } from './workspace-list.js';
 
@@ -61,6 +62,8 @@ export function registerWorkspaceCommands(program: Command): void {
     .description('List all workspaces')
     .option('--json', 'Output as JSON')
     .option('--all', 'List workspaces across all registered projects')
+    .option('--kind <kind>', 'Filter by workspace kind (main|issue|scratch), reading through the resolver')
+    .option('--archived', 'Include archived workspaces (only applies with --kind)')
     .action(listCommand);
 
   workspace
@@ -68,6 +71,7 @@ export function registerWorkspaceCommands(program: Command): void {
     .description('Destroy workspace')
     .option('--force', 'Force removal even with uncommitted changes')
     .option('--project <path>', 'Explicit project path (overrides registry)')
+    .option('--purge-memory', 'Also permanently delete the workspace\'s memory home (irreversible)')
     .action(destroyCommand);
 
   workspace
@@ -83,6 +87,21 @@ export function registerWorkspaceCommands(program: Command): void {
     .description('Resolve or create the project\'s singleton main workspace')
     .option('--project <key>', 'Registered project key (defaults to the sole project, or the one resolved from cwd)')
     .action(workspaceMainCommand);
+
+  workspace
+    .command('get <ws>')
+    .description('Show a workspace row by id')
+    .action(workspaceGetCommand);
+
+  workspace
+    .command('activate <ws>')
+    .description('Touch a workspace\'s last-accessed time and print its layout hint')
+    .action(workspaceActivateCommand);
+
+  workspace
+    .command('archive <ws>')
+    .description('Archive a workspace (reversible; refuses kind=main)')
+    .action(workspaceArchiveCommand);
 
   // Re-render `<workspace>/.devcontainer/` from the project's compose
   // template. Idempotent. The single source of truth for how the

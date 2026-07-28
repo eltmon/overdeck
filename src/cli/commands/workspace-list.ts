@@ -2,7 +2,7 @@ import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
 import { exec } from 'child_process';
-import { existsSync } from 'fs';
+import { existsSync, rmSync } from 'fs';
 import { basename, join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
@@ -17,15 +17,60 @@ import { loadWorkspaceMetadataSync } from '../../lib/remote/workspace-metadata.j
 import { removeWorkspace as removeWorkspaceFromConfig } from '../../lib/workspace-manager.js';
 import { listWorktrees, removeWorktree, type WorktreeInfo } from '../../lib/worktree.js';
 import { destroyRemoteWorkspace } from './workspace-remote.js';
+import { resolveMemoryRoot } from '../../lib/memory/paths.js';
+import { getWorkspaceForIssue, listWorkspaces } from '../../lib/workspaces/resolver.js';
+import type { WorkspaceKind } from '../../lib/workspaces/types.js';
+import { deleteWorkspace } from '../../lib/workspaces/writer.js';
 
 const execAsync = promisify(exec);
 
 interface ListOptions {
   json?: boolean;
   all?: boolean;
+  kind?: WorkspaceKind;
+  archived?: boolean;
 }
 
+/** PAN-1990: --kind reads through the resolver instead of scanning worktree directories. */
+function listByKind(options: ListOptions & { kind: WorkspaceKind }): void {
+  const projects = options.all ? listProjectsSync().map((p) => p.key) : undefined;
+  const rows = projects
+    ? projects.flatMap((projectId) => listWorkspaces({ projectId, kind: options.kind, includeArchived: options.archived }))
+    : listWorkspaces({ kind: options.kind, includeArchived: options.archived });
+
+  if (options.json) {
+    console.log(JSON.stringify(rows, null, 2));
+    return;
+  }
+
+  if (rows.length === 0) {
+    console.log(chalk.dim(`No ${options.kind} workspaces found.`));
+    return;
+  }
+
+  console.log(chalk.bold(`\n${options.kind} workspaces\n`));
+  for (const row of rows) {
+    const archivedTag = row.isArchived ? chalk.yellow(' (archived)') : '';
+    console.log(`${chalk.cyan(row.name)}${archivedTag}`);
+    console.log(`  project:      ${row.projectId}`);
+    console.log(`  branch:       ${row.branchName ?? chalk.dim('(none)')}`);
+    console.log(`  lastAccessed: ${new Date(row.lastAccessedAt).toISOString()}`);
+    console.log('');
+  }
+}
+
+const VALID_WORKSPACE_KINDS: readonly WorkspaceKind[] = ['main', 'issue', 'scratch'];
+
 export async function listCommand(options: ListOptions): Promise<void> {
+  if (options.kind) {
+    if (!VALID_WORKSPACE_KINDS.includes(options.kind)) {
+      console.error(chalk.red(`✗ Invalid --kind '${options.kind}'. Expected one of: ${VALID_WORKSPACE_KINDS.join(', ')}`));
+      return exitCli(1);
+    }
+    listByKind(options as ListOptions & { kind: WorkspaceKind });
+    return;
+  }
+
   const projects = listProjectsSync();
 
   // If we have registered projects and --all is specified, list across all projects
@@ -159,6 +204,25 @@ export async function listCommand(options: ListOptions): Promise<void> {
 interface DestroyOptions {
   force?: boolean;
   project?: string;
+  purgeMemory?: boolean;
+}
+
+/**
+ * PAN-1990: archive (never delete) the issue's workspace row after a
+ * successful destroy, mirroring the writer's deleteWorkspace semantics for
+ * non-main workspaces (deleteWorkspace refuses kind='main' itself, but the
+ * caller checks first so the refusal happens BEFORE any destructive action,
+ * not after). --purge-memory additionally removes the memory home —
+ * irreversible, opt-in only.
+ */
+function finalizeWorkspaceRowDestroy(issueIdUpper: string, purgeMemory: boolean | undefined): void {
+  const row = getWorkspaceForIssue(issueIdUpper);
+  if (!row) return;
+  const memoryRoot = purgeMemory ? join(resolveMemoryRoot(row.projectId), row.id) : null;
+  deleteWorkspace(row.id);
+  if (memoryRoot && existsSync(memoryRoot)) {
+    rmSync(memoryRoot, { recursive: true, force: true });
+  }
 }
 
 export async function destroyCommand(issueId: string, options: DestroyOptions): Promise<void> {
@@ -167,11 +231,24 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
   try {
     const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
     const folderName = `feature-${normalizedId}`;
+    const issueIdUpper = normalizedId.toUpperCase();
+
+    // getWorkspaceForIssue only matches kind='issue' rows, so a defensive,
+    // kind-agnostic check is needed here: a kind='main' row is never expected
+    // to carry an issueId (pan workspace main never sets one), but nothing
+    // stops one from existing, and this guard must catch it if it ever does.
+    const mainRowWithThisIssueId = listWorkspaces({ kind: 'main', includeArchived: true })
+      .find((ws) => ws.issueId === issueIdUpper);
+    if (mainRowWithThisIssueId) {
+      spinner.fail(`Refusing to destroy the main workspace for project '${mainRowWithThisIssueId.projectId}'`);
+      return exitCli(1);
+    }
 
     // Check if this is a remote workspace
     const metadata = loadWorkspaceMetadataSync(normalizedId);
     if (metadata && metadata.location === 'remote') {
       await destroyRemoteWorkspace(issueId, normalizedId, metadata, spinner, options);
+      finalizeWorkspaceRowDestroy(issueIdUpper, options.purgeMemory);
       return;
     }
 
@@ -194,6 +271,7 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
         for (const step of result.steps) {
           console.log(`  ${chalk.green('✓')} ${step}`);
         }
+        finalizeWorkspaceRowDestroy(issueIdUpper, options.purgeMemory);
       } else {
         spinner.fail('Workspace destruction failed');
         for (const error of result.errors) {
@@ -221,6 +299,7 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
         }
 
         spinner.succeed('Workspace destroyed via custom command!');
+        finalizeWorkspaceRowDestroy(issueIdUpper, options.purgeMemory);
         return;
       } catch (error: any) {
         spinner.fail(`Custom remove command failed: ${error.message}`);
@@ -262,6 +341,7 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
     );
 
     spinner.succeed(`Workspace destroyed: ${folderName}`);
+    finalizeWorkspaceRowDestroy(issueIdUpper, options.purgeMemory);
   } catch (error: any) {
     spinner.fail(error.message);
     if (!options.force) {

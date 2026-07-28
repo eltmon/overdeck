@@ -107,3 +107,158 @@ describe('pan workspace main (PAN-1990)', () => {
     expect(row?.isGitRepository).toBe(true);
   });
 });
+
+describe('pan workspace list --kind/--archived (PAN-1990)', () => {
+  it('returns only matching rows read through the resolver', async () => {
+    const { createWorkspace, upsertProjectFromConfig } = await import('../../../src/lib/workspaces/writer.js');
+    upsertProjectFromConfig('test-project', { name: 'Test Project', path: projectRoot });
+    const scratchId = createWorkspace({ projectId: 'test-project', kind: 'scratch', name: 'scratch-a', path: join(projectRoot, 'a') });
+    const issueId = createWorkspace({ projectId: 'test-project', kind: 'issue', name: 'feature-pan-1', path: join(projectRoot, 'b'), issueId: 'PAN-1' });
+    const { archiveWorkspace } = await import('../../../src/lib/workspaces/writer.js');
+    archiveWorkspace(scratchId);
+
+    const { listCommand } = await import('../../../src/cli/commands/workspace-list.js');
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await listCommand({ kind: 'scratch' as any });
+    expect(logSpy.mock.calls.flat().join('\n')).not.toContain('scratch-a'); // archived, excluded by default
+
+    logSpy.mockClear();
+    await listCommand({ kind: 'scratch' as any, archived: true });
+    expect(logSpy.mock.calls.flat().join('\n')).toContain('scratch-a');
+
+    logSpy.mockClear();
+    await listCommand({ kind: 'issue' as any });
+    expect(logSpy.mock.calls.flat().join('\n')).toContain('feature-pan-1');
+    expect(logSpy.mock.calls.flat().join('\n')).not.toContain('scratch-a');
+
+    logSpy.mockRestore();
+    expect(issueId).toBeDefined();
+  });
+});
+
+describe('pan workspace destroy (PAN-1990)', () => {
+  it('refuses to destroy a kind=main workspace', async () => {
+    const { createWorkspace, upsertProjectFromConfig } = await import('../../../src/lib/workspaces/writer.js');
+    upsertProjectFromConfig('test-project', { name: 'Test Project', path: projectRoot });
+    const id = createWorkspace({ projectId: 'test-project', kind: 'main', name: 'main', path: projectRoot, issueId: 'PAN-9030' });
+
+    const exitError = new Error('process exited');
+    const { destroyCommand } = await import('../../../src/cli/commands/workspace-list.js');
+    vi.spyOn(process, 'exit').mockImplementation(() => { throw exitError; });
+
+    try {
+      await expect(destroyCommand('pan-9030', {})).rejects.toThrow(exitError);
+    } finally {
+      vi.restoreAllMocks();
+    }
+
+    // getWorkspaceForIssue is kind='issue'-only by design, so it can't see this
+    // main row — check by id (still present, unaffected by the refusal) instead.
+    const { getWorkspaceById } = await import('../../../src/lib/workspaces/resolver.js');
+    expect(getWorkspaceById(id)).not.toBeNull();
+  });
+
+  it('deletes the workspace row; --purge-memory additionally removes the memory home', async () => {
+    const { mkdirSync: mkdirSyncReal, writeFileSync } = await import('node:fs');
+    const { createWorkspace, upsertProjectFromConfig } = await import('../../../src/lib/workspaces/writer.js');
+    const { getWorkspaceForIssue } = await import('../../../src/lib/workspaces/resolver.js');
+    const { resolveMemoryRoot } = await import('../../../src/lib/memory/paths.js');
+
+    upsertProjectFromConfig('test-project', { name: 'Test Project', path: projectRoot });
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-9031');
+    mkdirSyncReal(workspacePath, { recursive: true });
+    const workspaceId = createWorkspace({
+      projectId: 'test-project', kind: 'issue', name: 'feature-pan-9031', path: workspacePath, issueId: 'PAN-9031',
+    });
+
+    const memoryHome = join(resolveMemoryRoot('test-project'), workspaceId);
+    mkdirSyncReal(memoryHome, { recursive: true });
+    writeFileSync(join(memoryHome, 'status.json'), '{}', 'utf-8');
+
+    const { Effect } = await import('effect');
+    const worktreeModule = await import('../../../src/lib/worktree.js');
+    vi.spyOn(worktreeModule, 'removeWorktree').mockReturnValue(Effect.succeed(undefined));
+
+    const { destroyCommand } = await import('../../../src/cli/commands/workspace-list.js');
+    await destroyCommand('pan-9031', { project: projectRoot });
+    vi.restoreAllMocks();
+
+    expect(getWorkspaceForIssue('PAN-9031')).toBeNull();
+    const { existsSync: existsSyncReal } = await import('node:fs');
+    expect(existsSyncReal(memoryHome)).toBe(true); // preserved without --purge-memory
+  });
+
+  it('--purge-memory additionally removes the memory home', async () => {
+    const { mkdirSync: mkdirSyncReal, writeFileSync, existsSync: existsSyncReal } = await import('node:fs');
+    const { createWorkspace, upsertProjectFromConfig } = await import('../../../src/lib/workspaces/writer.js');
+    const { getWorkspaceForIssue } = await import('../../../src/lib/workspaces/resolver.js');
+    const { resolveMemoryRoot } = await import('../../../src/lib/memory/paths.js');
+    const { Effect } = await import('effect');
+    const worktreeModule = await import('../../../src/lib/worktree.js');
+
+    upsertProjectFromConfig('test-project', { name: 'Test Project', path: projectRoot });
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-9032');
+    mkdirSyncReal(workspacePath, { recursive: true });
+    const workspaceId = createWorkspace({
+      projectId: 'test-project', kind: 'issue', name: 'feature-pan-9032', path: workspacePath, issueId: 'PAN-9032',
+    });
+
+    const memoryHome = join(resolveMemoryRoot('test-project'), workspaceId);
+    mkdirSyncReal(memoryHome, { recursive: true });
+    writeFileSync(join(memoryHome, 'status.json'), '{}', 'utf-8');
+
+    vi.spyOn(worktreeModule, 'removeWorktree').mockReturnValue(Effect.succeed(undefined));
+
+    const { destroyCommand } = await import('../../../src/cli/commands/workspace-list.js');
+    await destroyCommand('pan-9032', { project: projectRoot, purgeMemory: true });
+    vi.restoreAllMocks();
+
+    expect(getWorkspaceForIssue('PAN-9032')).toBeNull();
+    expect(existsSyncReal(memoryHome)).toBe(false);
+  });
+});
+
+describe('pan workspace get/activate/archive (PAN-1990)', () => {
+  it('get prints the row; activate touches lastAccessedAt; archive marks is_archived=1 and the row survives', async () => {
+    const { createWorkspace, upsertProjectFromConfig } = await import('../../../src/lib/workspaces/writer.js');
+    const { getWorkspaceById } = await import('../../../src/lib/workspaces/resolver.js');
+    const { workspaceActivateCommand, workspaceArchiveCommand, workspaceGetCommand } = await import('../../../src/cli/commands/workspace-lifecycle.js');
+
+    upsertProjectFromConfig('test-project', { name: 'Test Project', path: projectRoot });
+    const id = createWorkspace({ projectId: 'test-project', kind: 'scratch', name: 'lifecycle-notes', path: join(projectRoot, 'notes') });
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    await workspaceGetCommand(id);
+    expect(logSpy.mock.calls.flat().join('\n')).toContain('lifecycle-notes');
+    logSpy.mockRestore();
+
+    const before = getWorkspaceById(id)!.lastAccessedAt;
+    await workspaceActivateCommand(id);
+    expect(getWorkspaceById(id)!.lastAccessedAt).toBeGreaterThanOrEqual(before);
+
+    await workspaceArchiveCommand(id);
+    const row = getWorkspaceById(id);
+    expect(row?.isArchived).toBe(true);
+    expect(row).not.toBeNull(); // reversible — row survives
+  });
+
+  it('archive refuses a kind=main workspace', async () => {
+    const { createWorkspace, upsertProjectFromConfig } = await import('../../../src/lib/workspaces/writer.js');
+    const { workspaceArchiveCommand } = await import('../../../src/cli/commands/workspace-lifecycle.js');
+
+    upsertProjectFromConfig('test-project', { name: 'Test Project', path: projectRoot });
+    const id = createWorkspace({ projectId: 'test-project', kind: 'main', name: 'main', path: projectRoot });
+
+    const exitError = new Error('process exited');
+    vi.spyOn(process, 'exit').mockImplementation(() => { throw exitError; });
+    try {
+      await expect(workspaceArchiveCommand(id)).rejects.toThrow(exitError);
+    } finally {
+      vi.restoreAllMocks();
+    }
+
+    const { getWorkspaceById } = await import('../../../src/lib/workspaces/resolver.js');
+    expect(getWorkspaceById(id)?.isArchived).toBe(false);
+  });
+});
