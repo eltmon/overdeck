@@ -2,7 +2,7 @@
   "issueId": "PAN-3025",
   "schemaVersion": 2,
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T04:02:43.803Z",
+  "updated": "2026-07-28T04:02:44.925Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3025: Durable pipeline journal omits verificationStatus — DoD verification row false-MISSes whenever live status is cleared (post-close-out, DB rebuild)",
       "timestamp": "2026-07-28T04:02:43.803Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
