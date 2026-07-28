@@ -50,8 +50,10 @@ import {
   resolveAgentHarness,
   resolveClaudeSessionId,
   resolveCodexRolloutPath,
+  resolveKimiWirePath,
   resolvePiSessionPath,
 } from '../../dashboard/server/routes/jsonl-resolver.js';
+import { parseKimiConversationMessages } from '../../dashboard/server/services/kimi-conversation-parser.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import { claudeConversationPaneChoice, type PendingPaneChoice } from './conversation-pane-choice.js';
 
@@ -153,6 +155,13 @@ export async function resolveSessionFile(conv: Conversation): Promise<string | n
     if (codexPath) return codexPath;
     // Fall through if codex path not found — same stale-harness recovery.
   }
+  // Native kimi-code conversations write wire.jsonl under Kimi's own
+  // ~/.kimi-code/sessions/<workDirKey>/<sessionId>/agents/main/ tree.
+  if (getHarnessBehavior(conv.harness).transcriptKind === 'kimi-wire-jsonl') {
+    const kimiPath = await resolveKimiWirePath(conv.tmuxSession);
+    if (kimiPath) return kimiPath;
+    // Fall through if wire.jsonl not found — same stale-harness recovery.
+  }
   // claude-code: prefer the launcher's pinned live session id, then the recorded
   // canonical id. Do not guess from JSONL mtime; compaction can make old files
   // newer than the terminal's current transcript.
@@ -248,6 +257,11 @@ function isCodexSessionFile(sessionFile: string): boolean {
   return sessionFile.includes('/codex-home/sessions/') || /\/rollout-[^/]+\.jsonl$/.test(sessionFile);
 }
 
+/** Native Kimi Code CLI's own wire.jsonl, under .../agents/main/wire.jsonl. */
+function isKimiWireSessionFile(sessionFile: string): boolean {
+  return sessionFile.endsWith('/agents/main/wire.jsonl');
+}
+
 export async function getCachedMessages(
   sessionFile: string,
   isSpecialist: boolean,
@@ -265,6 +279,8 @@ export async function getCachedMessages(
     parsed = await parseCodexConversationMessages(sessionFile);
   } else if (isOhmypiSessionFile(sessionFile)) {
     parsed = await parseOhmypiConversationMessages(sessionFile);
+  } else if (isKimiWireSessionFile(sessionFile)) {
+    parsed = await parseKimiConversationMessages(sessionFile);
   } else if (isPiSessionFile(sessionFile)) {
     parsed = await parsePiConversationMessages(sessionFile);
   } else if (isSpecialist) {
@@ -534,7 +550,8 @@ async function resolveSpecialistSessionFile(name: string): Promise<string | null
       agentHarness !== 'claude-code' &&
       agentHarness !== 'codex' &&
       agentHarness !== 'ohmypi' &&
-      agentHarness !== 'pi'
+      agentHarness !== 'pi' &&
+      agentHarness !== 'kimi-code'
     ) {
       return null;
     }
@@ -550,6 +567,12 @@ async function resolveSpecialistSessionFile(name: string): Promise<string | null
       if (piSession) {
         setSpecialistSessionCache(name, piSession);
         return piSession;
+      }
+    } else if (agentBehavior.transcriptKind === 'kimi-wire-jsonl') {
+      const wirePath = await resolveKimiWirePath(name);
+      if (wirePath) {
+        setSpecialistSessionCache(name, wirePath);
+        return wirePath;
       }
     }
   } catch {
