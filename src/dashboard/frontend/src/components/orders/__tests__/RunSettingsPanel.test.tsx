@@ -264,6 +264,57 @@ describe('RunSettingsPanel', () => {
     expect(screen.getByText(/Lane B ignores this — it is always one item at a time, in order\./)).toBeInTheDocument();
   });
 
+  it('shows an inline error for a non-markdown path and never calls onChange', async () => {
+    const onChange = vi.fn(async () => {});
+    render(<RunSettingsPanel
+      settings={{ laneAConcurrency: 2, posture: 'open' }}
+      onChange={onChange}
+    />);
+
+    fireEvent.change(screen.getByLabelText('Brief overlay'), { target: { value: 'notes.txt' } });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(550);
+    });
+
+    expect(screen.getByText('Not a markdown file — expected a repo-relative .md path.')).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('saves a valid markdown path and shows the success status', async () => {
+    const onChange = vi.fn(async () => {});
+    render(<RunSettingsPanel
+      settings={{ laneAConcurrency: 2, posture: 'open' }}
+      onChange={onChange}
+    />);
+
+    fireEvent.change(screen.getByLabelText('Brief overlay'), { target: { value: 'docs/briefs/x.md' } });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(550);
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ briefOverlay: 'docs/briefs/x.md' });
+    expect(screen.getByText("Appended to every item's kickoff brief.")).toBeInTheDocument();
+  });
+
+  it('persists an explicit clear of a previously set overlay', async () => {
+    const onChange = vi.fn(async () => {});
+    render(<RunSettingsPanel
+      settings={{ laneAConcurrency: 2, posture: 'open', briefOverlay: 'docs/briefs/old.md' }}
+      onChange={onChange}
+    />);
+
+    fireEvent.change(screen.getByLabelText('Brief overlay'), { target: { value: '' } });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(550);
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ briefOverlay: '' });
+    expect(screen.getByText('None — items run with their PRDs alone.')).toBeInTheDocument();
+  });
+
   it('does not render a global saving/error line', () => {
     render(<RunSettingsPanel
       settings={{ laneAConcurrency: 2, posture: 'open' }}

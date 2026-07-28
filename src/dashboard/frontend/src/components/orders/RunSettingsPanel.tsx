@@ -95,6 +95,8 @@ function SaveChip({ save }: { save: SaveState }) {
 const LANE_A_MIN = 1;
 const LANE_A_MAX = 8;
 const LANE_A_DEBOUNCE_MS = 500;
+const BRIEF_DEBOUNCE_MS = 550;
+const BRIEF_MD_PATTERN = /\.md$/i;
 
 export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) {
   const [concurrency, setConcurrency] = useState(settings.laneAConcurrency);
@@ -110,9 +112,18 @@ export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) 
   const savedTimers = useRef<Record<FieldId, ReturnType<typeof setTimeout> | undefined>>({} as never);
   const confirmReasonInputRef = useRef<HTMLInputElement | null>(null);
   const laneDebounceTimer = useRef<ReturnType<typeof setTimeout>>();
+  const briefDebounceTimer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => setConcurrency(settings.laneAConcurrency), [settings.laneAConcurrency]);
   useEffect(() => setBriefOverlay(settings.briefOverlay ?? ''), [settings.briefOverlay]);
+
+  const trimmedBrief = briefOverlay.trim();
+  const briefStatus: { text: string; tone: 'muted' | 'success' | 'error' } =
+    trimmedBrief === ''
+      ? { text: 'None — items run with their PRDs alone.', tone: 'muted' }
+      : BRIEF_MD_PATTERN.test(trimmedBrief)
+        ? { text: "Appended to every item's kickoff brief.", tone: 'success' }
+        : { text: 'Not a markdown file — expected a repo-relative .md path.', tone: 'error' };
 
   useEffect(() => {
     if (pendingTo) confirmReasonInputRef.current?.select();
@@ -132,6 +143,21 @@ export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) 
       },
       () => setSaves((s) => ({ ...s, [field]: { state: 'error', retry: () => runSave(field, patch) } })),
     );
+  };
+
+  const handleBriefChange = (value: string) => {
+    setBriefOverlay(value);
+    clearTimeout(briefDebounceTimer.current);
+    briefDebounceTimer.current = setTimeout(() => {
+      const trimmed = value.trim();
+      const persisted = settings.briefOverlay ?? '';
+      if (trimmed === '') {
+        if (persisted !== '') runSave('brief', { briefOverlay: '' });
+        return;
+      }
+      if (!BRIEF_MD_PATTERN.test(trimmed)) return;
+      if (trimmed !== persisted) runSave('brief', { briefOverlay: trimmed });
+    }, BRIEF_DEBOUNCE_MS);
   };
 
   const adjustConcurrency = (delta: number) => {
@@ -175,19 +201,24 @@ export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) 
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="flex-1 text-muted-foreground">Brief overlay</span>
-          <SaveChip save={saves.brief} />
-          <input
-            aria-label="Brief overlay"
-            value={briefOverlay}
-            onChange={(event) => setBriefOverlay(event.target.value)}
-            onBlur={() => {
-              if (briefOverlay !== (settings.briefOverlay ?? '')) runSave('brief', { briefOverlay });
-            }}
-            placeholder="Optional markdown path"
-            className="min-w-56 rounded-md border border-input bg-background px-2 py-1 font-mono text-[11px] text-foreground"
-          />
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <span className="flex-1 text-muted-foreground">Brief overlay</span>
+            <SaveChip save={saves.brief} />
+            <input
+              aria-label="Brief overlay"
+              value={briefOverlay}
+              onChange={(event) => handleBriefChange(event.target.value)}
+              placeholder="docs/briefs/refactor-p3.md"
+              className="min-w-56 rounded-md border border-input bg-background px-2 py-1 font-mono text-[11px] text-foreground"
+            />
+          </div>
+          <p className="text-[11px] text-muted-foreground">Markdown appended to every item&apos;s kickoff brief for this run.</p>
+          <p
+            className={`text-[11px] ${briefStatus.tone === 'error' ? 'text-destructive' : briefStatus.tone === 'success' ? 'text-success' : 'text-muted-foreground'}`}
+          >
+            {briefStatus.text}
+          </p>
         </div>
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
