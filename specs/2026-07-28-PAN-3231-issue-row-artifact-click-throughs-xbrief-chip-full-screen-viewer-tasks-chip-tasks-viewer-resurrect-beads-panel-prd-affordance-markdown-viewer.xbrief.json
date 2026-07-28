@@ -1,0 +1,757 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T17:16:51Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3231: Issue-row artifact click-throughs: xBRIEF chip → full-screen viewer, tasks chip → tasks viewer (resurrect beads panel), PRD affordance → markdown viewer",
+    "updated": "2026-07-28T17:24:08.165Z"
+  },
+  "plan": {
+    "id": "pan-3231",
+    "title": "Issue-row artifact click-throughs: xBRIEF chip → full-screen viewer, tasks chip → tasks viewer (resurrect beads panel), PRD affordance → markdown viewer",
+    "status": "proposed",
+    "uid": "80489f2b-3f5c-4208-9383-252171741a3b",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-28T17:16:51Z",
+    "updated": "2026-07-28T17:24:08.165Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3231",
+        "label": "PAN-3231",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-3231.md",
+        "label": "PRD draft (workspace; promoted to drafts/ on overdeck-state at finalize)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "xbrief",
+      "prd",
+      "tasks",
+      "viewer"
+    ],
+    "metadata": {
+      "sizeJustification": "PAN-3231 explicitly mandates single-issue delivery: 'Deliver as one feature: chips clickable + full-screen popup + tasks viewer + PRD viewer + mockup step. No partial delivery.' The 7th subsystem over the limit comes from the three viewers necessarily spanning frontend components, the store, one route module, one lib read door, and docs; each slice is still small and the total files (23) stays under the 25-file limit. The frontend file overlaps (store.ts, App.tsx, FeatureItem.tsx) are additive registrations executed serially by one work agent in one workspace.",
+      "canonicalFilename": "2026-07-28-PAN-3231-issue-row-artifact-click-throughs-xbrief-chip-full-screen-viewer-tasks-chip-tasks-viewer-resurrect-beads-panel-prd-affordance-markdown-viewer.xbrief.json"
+    },
+    "narratives": {
+      "Problem": "The issue-row chip strip (ResourceStrip in FeatureItem.tsx) shows that xBRIEF, tasks, and planning artifacts exist, but no chip opens anything. Operators must detour to kanban or the drawer Plan tab to see the plan, there is no tasks click-through from the tree, and the PRD has no affordance at all.",
+      "Proposal": "Make the artifacts clickable through store-driven, globally mounted overlays following the IssueDrawer precedent: (1) xBRIEF chip and the embedded viewers (DrawerPlanPanel, PlanMapCard) open a new full-screen XBriefFullscreen shell reusing the presentational XBriefViewer with its List/DAG/Raw toggle, fed by the canonical useWorkspacePlanQuery hook; the shell layout is operator-approved via interactive HTML mockups before the build. (2) The tasks chip opens the resurrected beads-panel UX (TasksPanel, already xBRIEF-checklist-fed) in a dialog; the legacy self-fetching TasksDialog body with dead beads status vocabulary is replaced by TasksPanel. (3) A new PRD chip appears when a state-plane draft exists (resource discovery gains a 'prd' source via the prd-locations read door) and opens a ChatMarkdown-based viewer fed by a new GET /api/issues/:id/prd endpoint with no continue.json fallback.",
+      "NonGoals": "- No URL deep-linking / router integration for the new overlays\n- No consolidation of the four pre-existing plan query cache keys beyond files already touched; no renaming keys used by untouched components\n- No behavior change to the kanban XBriefDialog entry point\n- No PRD editing — view only\n- No new markdown renderer; no Streamdown imports outside ChatMarkdown.tsx\n- No changes to pan task semantics, the task write door, or xBRIEF statuses\n- No per-mount redesign of the global 'xbrief-viewer-tab' localStorage key\n- No shared generic Dialog primitive refactor across existing hand-rolled overlays"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Full-screen viewer is store-driven state + a global App.tsx mount (IssueDrawer precedent), not a locally hosted dialog",
+        "rationale": "The two openers (tree chip, drawer Plan tab) live in different component trees; store-driven overlay state is the codebase's canonical mechanism (openIssue, store.ts:163-168) and avoids prop drilling."
+      },
+      {
+        "summary": "Chips call useDashboardStore actions directly instead of threading new callbacks through CommandDeck → ProjectNode → FeatureItem",
+        "rationale": "FeatureItem already consumes the store (openIssue at line 1032); prop drilling four levels for three new callbacks adds surface without benefit."
+      },
+      {
+        "summary": "Tasks viewer reuses TasksPanel rather than restoring the pre-PAN-2648 beads components from git history",
+        "rationale": "The beads removal commit renamed BeadsTasksPanel → TasksPanel preserving the UX, and PAN-2696 already rewired it to the xBRIEF checklist (/api/issues/:id/tasks serves the merged view pan task mutates). Resurrection is already done; only the chip wiring is missing."
+      },
+      {
+        "summary": "A dedicated GET /api/issues/:id/prd endpoint is added instead of reusing GET /api/command-deck/planning/:issueId",
+        "rationale": "The planning endpoint substitutes continue.json content when no PRD exists (command-deck.ts:829) and bundles transcripts/notes; a PRD viewer must show honest 404/empty state and stay lightweight. The new route goes through the same prd-locations read door."
+      },
+      {
+        "summary": "ChatMarkdown is the markdown viewer component (not MarkdownModal, not a new renderer)",
+        "rationale": "ChatMarkdown is the canonical dual renderer (react-markdown default, Streamdown behind the experimental setting) with file-link chips and an error boundary; MarkdownModal uses raw ReactMarkdown without those. The issue asked planning to confirm the canonical component — confirmed by code survey."
+      },
+      {
+        "summary": "The mockup approval gate blocks only the xBRIEF full-screen chain (shell, chip click, embedded expand); tasks and PRD items proceed in parallel",
+        "rationale": "The issue's design requirement names only the full-screen xBRIEF viewer. Serializing unrelated slices on an operator response would idle the pipeline without design benefit."
+      },
+      {
+        "summary": "Mockups are produced by the work agent as work item 1 with an AskUserQuestion operator gate, not during auto planning",
+        "rationale": "Auto mode has no operator to review interactively; the AUQ surfaces in the dashboard Decisions queue and mechanically satisfies 'mockups reviewed by the operator before the build'."
+      },
+      {
+        "summary": "The xBRIEF full-screen overlay uses z-[110], above IssueDrawer's z-[100]",
+        "rationale": "The drawer's own expand affordance must layer the viewer on top of the open drawer."
+      }
+    ],
+    "items": [
+      {
+        "id": "mockups",
+        "title": "Interactive full-screen xBRIEF viewer mockups + operator approval gate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:16:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "design",
+          "issueLabel": "pan-3231",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/design/pan-3231-xbrief-fullscreen.html"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -s docs/design/pan-3231-xbrief-fullscreen.html"
+          ],
+          "expected_outputs": [
+            "mockup HTML file exists and is non-empty; operator approval recorded via AskUserQuestion before dependent items start"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Author a self-contained interactive HTML mockup at docs/design/pan-3231-xbrief-fullscreen.html showing the full-screen List view, full-screen DAG view, the List/DAG/Raw toggle, and how item status / acceptance-criteria checks / lane-readiness info read at a glance at full width. Follow design/style-guide/STYLE-GUIDE.md v1.2 (DM Sans, SF Mono for identifiers only, font-medium max, one color signal per row); precedent: docs/design/issue-cockpit-full-width-conversation.html. Then ask the operator for approval via a self-contained AskUserQuestion (state the mockup path, offer approve / request-changes with consequences) and iterate until approved. Record the approval in .overdeck/continue.json decisions and later in the PR description."
+        },
+        "items": [
+          {
+            "id": "mockups.ac1",
+            "title": "Given the mockup file is opened in a browser, it renders both a full-screen List view and a full-screen DAG view with a working toggle between them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mockups.ac2",
+            "title": "The mockup renders item status, AC check marks, and lane/readiness info legible at full width using only STYLE-GUIDE.md tokens (DM Sans prose, SF Mono identifiers, font-medium max, one color signal per row)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mockups.ac3",
+            "title": "When the mockup is committed, the work agent emits an AskUserQuestion that names the mockup path and returns an explicit operator approval before any dependent item is claimed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mockups.ac4",
+            "title": "The recorded approval decision persists in .overdeck/continue.json decisions[] with the operator's chosen option",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xbrief-fullscreen-shell",
+        "title": "Store-driven full-screen xBRIEF viewer shell (XBriefFullscreen)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:16:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3231",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "xbrief-chip-click",
+            "embedded-expand"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/xbrief/XBriefFullscreen.tsx",
+            "src/dashboard/frontend/src/components/xbrief/XBriefFullscreen.test.tsx",
+            "src/dashboard/frontend/src/components/xbrief/XBriefViewer.tsx",
+            "src/dashboard/frontend/src/components/xbrief/index.ts",
+            "src/dashboard/frontend/src/lib/store.ts",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/xbrief/XBriefFullscreen.test.tsx",
+            "npx vitest run src/dashboard/frontend/src/components/xbrief/XBriefViewer.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "XBriefFullscreen.test.tsx passes: dialog role, Escape/scrim close, tabs render",
+            "XBriefViewer.test.tsx passes with the flex-fill DAG pane"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/xbrief/XBriefFullscreen.tsx per the operator-approved mockup: full-viewport overlay (z-[110], scrim, role=dialog, aria-modal, Escape and scrim-click close, focus moves into the dialog) hosting the unchanged XBriefViewer. Add xbriefViewerIssueId: string | null plus openXbriefViewer/closeXbriefViewer actions to src/dashboard/frontend/src/lib/store.ts (pattern: openIssue at store.ts:163-168). Fetch via useWorkspacePlanQuery (CommandDeck/ZoneCOverviewTabs/queries.ts:163-178) — do NOT add a new query key; wire the inspection-policy PATCH as in XBriefDialog.tsx:23-36 but write back into the ['workspace-plan', id] cache. Mount <XBriefFullscreen /> once in App.tsx beside <IssueDrawer /> (App.tsx:870). In XBriefViewer.tsx:87-91 replace the DAG pane's hardcoded height calc(100vh - 280px) with flex-1 min-h-0 (keep minHeight: 400) and verify the three existing mounts (XBriefDialog, XBriefTab, DrawerPlanPanel) still render a visible DAG."
+        },
+        "items": [
+          {
+            "id": "xbrief-fullscreen-shell.ac1",
+            "title": "Given xbriefViewerIssueId is set in the store, the app renders a full-viewport overlay with role=\"dialog\" and aria-modal=\"true\" containing the XBriefViewer with List/DAG/Raw tabs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xbrief-fullscreen-shell.ac2",
+            "title": "When Escape is pressed or the scrim is clicked, the overlay closes (store field returns to null); clicks inside the panel do not close it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xbrief-fullscreen-shell.ac3",
+            "title": "The shell fetches through useWorkspacePlanQuery (['workspace-plan', issueId]) — grep of the new files produces no new query-key string for /api/workspaces/:id/plan",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xbrief-fullscreen-shell.ac4",
+            "title": "The DAG tab renders filling the available shell height (flex-1 min-h-0) in the fullscreen mount, and each of the three pre-existing mounts (XBriefDialog, XBriefTab, DrawerPlanPanel) still renders a visible DAG of at least 400px",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xbrief-fullscreen-shell.ac5",
+            "title": "The fullscreen shell renders the header composition, toggle placement, and status legibility approved in the 'mockups' item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xbrief-chip-click",
+        "title": "xBRIEF chip in ResourceStrip opens the full-screen viewer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:16:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3231",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/ProjectTree"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ProjectTree tests pass including new chip-click assertions"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In FeatureItem.tsx, extend ResourceIcon (lines 113-131) with an optional onActivate callback: when present, render the chip as <button type=\"button\"> with the existing featureResourceChip class, an aria-label naming the artifact, and event.stopPropagation() so the row's own click (issue select) does not fire. In ResourceStrip (lines 133-268), wire the 'vbrief' chip to useDashboardStore's openXbriefViewer(feature.issueId). Chips without onActivate stay non-interactive spans."
+        },
+        "items": [
+          {
+            "id": "xbrief-chip-click.ac1",
+            "title": "When the xBRIEF chip is clicked, openXbriefViewer is called with the row's issue id and the full-screen viewer opens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xbrief-chip-click.ac2",
+            "title": "When the xBRIEF chip is clicked, the issue row is not selected (row onSelect never fires) and the hover popover state stays unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xbrief-chip-click.ac3",
+            "title": "Given a chip without a click action (workspace, branch, tmux, pr, docker), it renders as a non-button span with unchanged markup",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xbrief-chip-click.ac4",
+            "title": "The clickable chip renders with an aria-label and accepts keyboard activation (Enter/Space triggers the same action)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "embedded-expand",
+        "title": "Expand affordances on DrawerPlanPanel and PlanMapCard open the full-screen viewer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T17:16:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3231",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/DrawerSecondaryPanels.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/PlanMapCard.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/frontend/issue-view-no-loss.test.ts",
+            "npx vitest run src/dashboard/frontend/src/components/issue-view/IssueView.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "issue-view no-loss suite passes with unchanged section inventory",
+            "IssueView render test passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an expand affordance reusing IssueViewFullscreenButton (issue-view/IssueView.tsx:48-50, the ⛶ button) with aria-label 'Expand xBRIEF full screen': (1) in DrawerPlanPanel (drawer/DrawerSecondaryPanels.tsx:18-23) at the panel corner, (2) in PlanMapCard (Stage/cockpit/PlanMapCard.tsx:8-18) on the card header. Both call openXbriefViewer(issueId). The affordances render inside the existing sections 'DrawerPlanPanel / XBriefViewer' and 'PlanMapCard' — no inventory or DENSITY_SECTIONS changes; data-section markers stay on the real visible elements. The overlay (z-[110]) must open above the drawer (z-[100])."
+        },
+        "items": [
+          {
+            "id": "embedded-expand.ac1",
+            "title": "When the expand button in the drawer Plan tab is clicked, the full-screen viewer opens above the drawer showing the same issue's plan",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "embedded-expand.ac2",
+            "title": "When the expand button on the cockpit PlanMapCard is clicked, the full-screen viewer opens for that issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "embedded-expand.ac3",
+            "title": "The issue-view no-loss suite passes with the existing 'DrawerPlanPanel / XBriefViewer' and 'PlanMapCard' sections intact and visible",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tasks-viewer",
+        "title": "Tasks chip opens the resurrected beads-panel UX (TasksPanel) in a dialog",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:16:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3231",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/TasksDialog.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/lib/store.ts",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/TasksDialog.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "TasksDialog test passes: xBRIEF statuses bucket correctly, chip click opens dialog"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Add tasksViewerIssueId + openTasksViewer/closeTasksViewer to the dashboard store (same pattern as openXbriefViewer). Rework components/TasksDialog.tsx: keep the exported TasksDialog({ issueId, isOpen, onClose }) contract, but replace the self-fetching body (lines 30-139) and the dead beads-vocabulary TaskItem (lines 141-186, keyed on open/in_progress/closed while the endpoint serves xBRIEF statuses) with the shared TasksPanel (components/TasksPanel.tsx — list/graph toggle, PlanItemDetail, taskStatusBucket), the same composition KanbanBoard/dialogs/TasksDialog.tsx uses; widen the card to max-w-2xl / max-h-[80vh]. The one existing caller (CommandDeck/index.tsx:15 and ~1565) keeps working unchanged. Mount a store-driven host in App.tsx, and wire the 'tasks' chip in ResourceStrip to openTasksViewer(feature.issueId). Data continues to flow from GET /api/issues/:id/tasks (the merged xBRIEF checklist pan task mutates) — no endpoint changes."
+        },
+        "items": [
+          {
+            "id": "tasks-viewer.ac1",
+            "title": "When the tasks chip is clicked, a dialog opens rendering TasksPanel with the issue's xBRIEF items and sub-items and their merged statuses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tasks-viewer.ac2",
+            "title": "Given items with statuses pending/running/completed, TasksPanel renders them bucketed into upcoming/working/done respectively via taskStatusBucket, with no item left unstyled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tasks-viewer.ac3",
+            "title": "The pre-existing CommandDeck TasksDialog caller still opens the dialog with unchanged props and renders the upgraded body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tasks-viewer.ac4",
+            "title": "The dialog preserves TasksPanel's list/graph toggle and per-item detail drill-in",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prd-endpoint",
+        "title": "GET /api/issues/:id/prd through the drafts read door (no continue.json fallback)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:16:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3231",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/prd-locations.ts",
+            "src/lib/overdeck/issue-reads.ts",
+            "src/dashboard/server/routes/issues.ts",
+            "src/dashboard/server/routes/command-deck.ts",
+            "tests/unit/lib/overdeck/issue-prd.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/overdeck/issue-prd.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "issue-prd unit test passes: 200 with content for existing draft, 404 shape when absent, no continue.json fallback"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Extract readPrdContent from src/dashboard/server/routes/command-deck.ts:746-763 into src/lib/prd-locations.ts (export readPrdContent(loc: PrdLocation): Promise<string | null>; handles flat/pan-draft direct read and subdir first-.md-prefer-prd.md) and make command-deck.ts import it — its behavior, including the continue.json fallback at line 829, stays unchanged. Add getIssuePrd(id) to src/lib/overdeck/issue-reads.ts mirroring getIssueTasks (lines 178-240): resolveProjectFromIssueSync → findPrdAnywhereSync(projectPath, id) (prd-locations.ts:105) → readPrdContent. Return 200 { hasPrd: true, content, path, status, format } or 404 { hasPrd: false, error }. Register GET /api/issues/:id/prd in src/dashboard/server/routes/issues.ts following getIssueTasksRoute (lines 659-670) including the parseIssueIdSync 400 guard. Async fs only — no execSync anywhere server-reachable."
+        },
+        "items": [
+          {
+            "id": "prd-endpoint.ac1",
+            "title": "Given a state-plane draft exists for the issue, GET /api/issues/:id/prd returns 200 with the draft's markdown in content plus its path and lifecycle status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prd-endpoint.ac2",
+            "title": "Given no PRD exists anywhere (even when continue.json exists), the endpoint returns 404 with { hasPrd: false } — it never substitutes continue.json content",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prd-endpoint.ac3",
+            "title": "An invalid issue id returns 400 via the parseIssueIdSync guard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prd-endpoint.ac4",
+            "title": "GET /api/command-deck/planning/:issueId returns byte-identical responses before and after the readPrdContent extraction for the same fixtures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prd-resource-signal",
+        "title": "Resource discovery exposes canonical PRD-draft presence ('prd' source + hasPrd)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T17:16:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3231",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/resource-discovery.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/services"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "resource-discovery tests pass including new prd-source assertions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Server: add 'prd' to the ResourceSource union (resource-discovery.ts:43) and hasPrd: boolean to the resource-details interfaces (the block at :59-60 and the DTO around :851). Where the vbrief/tasks sources are attached to an issue (resource-discovery.ts:604-610), also resolve the canonical draft via the async findDraftPrd(projectRoot, issueId) (src/lib/prd-locations.ts:138) and on hit add source 'prd' and hasPrd: true. Frontend: add 'prd' to the ResourceSource union (ProjectNode.tsx:9) and hasPrd to ProjectFeatureResourceDetails (ProjectNode.tsx:11-36). Leave the legacy scanWorkspace .pan/prd.md check (resource-discovery.ts:417) untouched. If discovery batching makes per-issue draft stat calls hot, reuse the existing per-scan caching pattern in the file rather than adding a new cache layer."
+        },
+        "items": [
+          {
+            "id": "prd-resource-signal.ac1",
+            "title": "Given drafts/<ISSUE>.md exists on the state plane, the resource-allocated payload for that issue includes source 'prd' and resourceDetails.hasPrd === true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prd-resource-signal.ac2",
+            "title": "Given no draft exists, the payload omits the 'prd' source and reports hasPrd === false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prd-resource-signal.ac3",
+            "title": "The payload preserves all existing sources (workspace/branch/tmux/vbrief/tasks/pr/docker) unchanged (no-loss)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prd-chip-viewer",
+        "title": "PRD chip in ResourceStrip + ChatMarkdown-based PRD viewer overlay",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:16:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3231",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/PrdViewer.tsx",
+            "src/dashboard/frontend/src/components/PrdViewer.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/lib/store.ts",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/PrdViewer.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "PrdViewer test passes: markdown renders via ChatMarkdown, 404 empty state, Escape closes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Chip: add 'prd' to RESOURCE_ICON_ORDER (FeatureItem.tsx:60, after 'vbrief'), a resourceSummary case (details.hasPrd → { label: 'PRD', detail: 'present' }), and a FileText lucide icon in ResourceIcon (FeatureItem.tsx:118-124); click → openPrdViewer(feature.issueId) using the same onActivate mechanism as the xBRIEF chip. Store: prdViewerIssueId + openPrdViewer/closePrdViewer. New components/PrdViewer.tsx: overlay with the same shell idioms as XBriefFullscreen (role=dialog, aria-modal, z-[110], Escape/scrim close); header 'PRD: <ISSUE-ID>' (SF Mono id) plus the source path; body renders <ChatMarkdown text={content} issueId={issueId} /> in a scrollable column. Data via react-query ['issue-prd', issueId] → GET /api/issues/:id/prd; 404 renders the empty state 'No PRD draft for this issue.' Mount the host in App.tsx. Streamdown must not be imported here — ChatMarkdown owns renderer choice."
+        },
+        "items": [
+          {
+            "id": "prd-chip-viewer.ac1",
+            "title": "Given resourceDetails.hasPrd is true, the chip strip renders a PRD chip; when hasPrd is false the chip is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prd-chip-viewer.ac2",
+            "title": "When the PRD chip is clicked, the viewer overlay opens and renders the endpoint's markdown through ChatMarkdown (headings/lists/code render as rich markdown, not source text)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prd-chip-viewer.ac3",
+            "title": "When the endpoint returns 404, the overlay renders the 'No PRD draft for this issue.' empty state instead of erroring",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prd-chip-viewer.ac4",
+            "title": "When Escape is pressed or the scrim is clicked, the overlay closes; the panel renders with role=dialog and aria-modal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Documentation: viewer entry points and overlay model",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T17:16:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3231",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/XBRIEF.md",
+            "docs/ISSUE-VIEW.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -l 'XBriefFullscreen' docs/XBRIEF.md docs/ISSUE-VIEW.md CLAUDE.md"
+          ],
+          "expected_outputs": [
+            "all three files mention the new full-screen viewer entry points"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "docs/XBRIEF.md 'Dashboard Viewer' section: describe the three entry points (kanban card button → XBriefDialog, issue-row xBRIEF chip → XBriefFullscreen, drawer/cockpit expand affordances → XBriefFullscreen) and the store-driven global-mount overlay model. docs/ISSUE-VIEW.md: note the expand affordances living inside the existing 'DrawerPlanPanel / XBriefViewer' and 'PlanMapCard' sections and that overlays are global mounts, not inventory sections. CLAUDE.md: update the xBRIEF 'Dashboard Viewer' bullet (currently kanban cards + InspectorPanel only) to list the issue-row chips, the tasks viewer, and the PRD viewer."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/XBRIEF.md's Dashboard Viewer section contains all three xBRIEF viewer entry points (kanban dialog, issue-row chip, drawer/cockpit expand) and covers the store-driven overlay mount",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/ISSUE-VIEW.md contains a note that the expand affordances live inside the existing DrawerPlanPanel / PlanMapCard sections and that overlays are global mounts, not sections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "CLAUDE.md's xBRIEF Dashboard Viewer bullet contains the issue-row chip entry points including the tasks and PRD viewers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "mockups",
+        "to": "xbrief-fullscreen-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "xbrief-fullscreen-shell",
+        "to": "xbrief-chip-click",
+        "type": "blocks"
+      },
+      {
+        "from": "xbrief-fullscreen-shell",
+        "to": "embedded-expand",
+        "type": "blocks"
+      },
+      {
+        "from": "prd-endpoint",
+        "to": "prd-chip-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "prd-resource-signal",
+        "to": "prd-chip-viewer",
+        "type": "blocks"
+      },
+      {
+        "from": "xbrief-chip-click",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "embedded-expand",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "tasks-viewer",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "prd-chip-viewer",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
