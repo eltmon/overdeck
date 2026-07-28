@@ -4,6 +4,8 @@
 #   Frontend: https://{{FEATURE_FOLDER}}.overdeck.localhost
 #   API: https://api-{{FEATURE_FOLDER}}.overdeck.localhost
 
+name: overdeck-{{FEATURE_FOLDER}}
+
 services:
   # Combined dev container for VS Code attach
   dev:
