@@ -2,7 +2,7 @@
   "issueId": "PAN-3092",
   "schemaVersion": 2,
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T03:13:30.841Z",
+  "updated": "2026-07-28T03:13:32.052Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3092: Review agent's own record lock blocks its own verdict write: specialists/done collides, fallback is consumed, reviewStatus stuck at reviewing (MIN-902)",
       "timestamp": "2026-07-28T03:13:30.841Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
