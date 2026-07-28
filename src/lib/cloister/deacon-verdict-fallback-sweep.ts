@@ -25,10 +25,47 @@ import { resolveProjectFromIssueSync, getProjectSync } from '../projects.js';
 import { readOwner, recordLockPath } from '../pan-dir/fs-lock.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { findRecoveryTrip, recordRecoveryFailure } from './recovery-trip.js';
-import { emitActivityEntryOnce } from '../activity-logger.js';
+import { emitActivityEntryOnce, type ActivityEmitOutcome } from '../activity-logger.js';
 
 /** How long a fallback may stay undrained before the operator hears about it. */
 export const VERDICT_CONTENTION_SURFACE_MS = 10 * 60 * 1000;
+
+/**
+ * Total time this sweep may spend waiting on warning delivery, across ALL issues.
+ *
+ * Bounding each request alone is not enough: the sweep visits issues serially,
+ * so N stranded fallbacks against a stalled dashboard would cost N × the
+ * per-request deadline — six would consume a whole 60s patrol interval and dozens
+ * would hold it for many minutes, starving every later issue and later patrol
+ * phase while the patrol heartbeat still reported healthy. The systemic
+ * degradation that strands several verdicts at once is exactly the state that
+ * makes every loopback request hit its deadline, so the budget is shared.
+ */
+export const SWEEP_WARNING_BUDGET_MS = 30 * 1000;
+
+/**
+ * Resolve `attempt`, or give up at `deadlineMs` and report `failed`.
+ *
+ * Abandoning a warning is always safe: nothing is marked warned on `failed`, and
+ * a later retry carries the same idempotency key, so a call that lands after we
+ * stopped waiting returns `duplicate` rather than emitting a second warning.
+ */
+async function withWarningDeadline(
+  attempt: Promise<ActivityEmitOutcome>,
+  deadlineMs: number,
+): Promise<ActivityEmitOutcome> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      attempt,
+      new Promise<ActivityEmitOutcome>((resolve) => {
+        timer = setTimeout(() => { resolve('failed'); }, deadlineMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 /**
  * Episodes already warned about in THIS process, keyed by recovery path + issue
@@ -95,6 +132,9 @@ async function lockOwnerDescription(issueId: string): Promise<string> {
  */
 export async function sweepStrandedVerdictFallbacks(now = Date.now()): Promise<string[]> {
   const actions: string[] = [];
+  // Shared across every issue this sweep visits, so warning delivery can never
+  // stretch the patrol past its interval no matter how many verdicts stranded.
+  const warningBudgetEndsAt = Date.now() + SWEEP_WARNING_BUDGET_MS;
   let statuses: Record<string, { mergeStatus?: string; closedOut?: boolean; stuck?: boolean; deaconIgnored?: boolean }>;
   try {
     statuses = loadReviewStatuses();
@@ -174,13 +214,19 @@ export async function sweepStrandedVerdictFallbacks(now = Date.now()): Promise<s
       // actually landed; a failed append is retried on the next patrol instead
       // of being silently suppressed by the in-process set.
       if (!warnedEpisodes.has(episode)) {
-        const outcome = await emitActivityEntryOnce({
-          id: `verdict-fallback:${episode}`,
-          source: 'cloister',
-          level: 'warn',
-          issueId,
-          message,
-        });
+        const remainingBudgetMs = warningBudgetEndsAt - Date.now();
+        const outcome: ActivityEmitOutcome = remainingBudgetMs <= 0
+          ? 'failed'
+          : await withWarningDeadline(
+            emitActivityEntryOnce({
+              id: `verdict-fallback:${episode}`,
+              source: 'cloister',
+              level: 'warn',
+              issueId,
+              message,
+            }),
+            remainingBudgetMs,
+          );
         if (outcome === 'appended' || outcome === 'duplicate') {
           warnedEpisodes.add(episode);
           if (outcome === 'appended') actions.push(summary);

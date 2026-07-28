@@ -8,7 +8,7 @@
  * for a verdict the record lock has kept stuck for ten minutes (MIN-902).
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   loadReviewStatuses: vi.fn(),
@@ -56,7 +56,10 @@ vi.mock('../../../../src/lib/activity-logger.js', () => ({
   emitActivityEntryOnce: mocks.emitActivityEntryOnce,
 }));
 
-import { VERDICT_CONTENTION_SURFACE_MS } from '../../../../src/lib/cloister/deacon-verdict-fallback-sweep.js';
+import {
+  SWEEP_WARNING_BUDGET_MS,
+  VERDICT_CONTENTION_SURFACE_MS,
+} from '../../../../src/lib/cloister/deacon-verdict-fallback-sweep.js';
 
 const SWEEP_MODULE = '../../../../src/lib/cloister/deacon-verdict-fallback-sweep.js';
 
@@ -499,5 +502,82 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     const actions = await sweepStrandedVerdictFallbacks(NOW);
 
     expect(actions).toEqual(['Drained stranded verdict fallback for PAN-2222']);
+  });
+});
+
+/**
+ * PAN-3092: warning delivery is bounded for the SWEEP, not just per request.
+ * Bounding one call still lets N stranded fallbacks cost N × the per-request
+ * deadline, which starves every later issue and later patrol phase while the
+ * patrol heartbeat keeps reporting healthy.
+ */
+describe('sweepStrandedVerdictFallbacks warning budget (PAN-3092)', () => {
+  const ISSUES = ['PAN-1001', 'PAN-1002', 'PAN-1003', 'PAN-1004', 'PAN-1005', 'PAN-1006', 'PAN-1007'];
+  let sweep: (now?: number) => Promise<string[]>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    sweep = await loadSweep();
+    mocks.loadReviewStatuses.mockReturnValue(
+      Object.fromEntries(ISSUES.map((id) => [id, { issueId: id }])),
+    );
+    mocks.readWorkspaceVerdictFallback.mockImplementation(async (issueId: string) => ({
+      issueId,
+      updatedAt: new Date(NOW - (VERDICT_CONTENTION_SURFACE_MS + 60_000)).toISOString(),
+      pipeline: { reviewStatus: 'passed' },
+    }));
+    mocks.drainWorkspaceVerdictFallback.mockResolvedValue(false);
+    mocks.findWorkspaceVerdictConflicts.mockResolvedValue([]);
+    mocks.readOwner.mockResolvedValue({ description: 'pan-cli pid=4242' });
+    mocks.findWorkspacePath.mockImplementation((_p: string, lower: string) => `/project/workspaces/feature-${lower}`);
+    mocks.findRecoveryTrip.mockResolvedValue(undefined);
+    mocks.recordRecoveryFailure.mockResolvedValue({ trip: { tripCount: 1 }, emitNeedsYou: true });
+    // Every warning hangs — the systemic stall this feature exists to report.
+    mocks.emitActivityEntryOnce.mockImplementation(() => new Promise(() => {}));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('returns within one shared budget even when every warning hangs', async () => {
+    const started = Date.now();
+    const pending = sweep(NOW);
+
+    // Advance exactly the shared budget. Seven issues × a 10s per-request
+    // deadline would need 70s; the sweep must not be waiting on any of them.
+    await vi.advanceTimersByTimeAsync(SWEEP_WARNING_BUDGET_MS);
+    const actions = await pending;
+
+    expect(Date.now() - started).toBeLessThanOrEqual(SWEEP_WARNING_BUDGET_MS);
+    // Every issue was still visited and its drain still retried, so later
+    // patrol phases are reachable and no issue was skipped.
+    expect(mocks.drainWorkspaceVerdictFallback).toHaveBeenCalledTimes(ISSUES.length);
+    for (const id of ISSUES) {
+      expect(actions.some((a) => a.includes(`${id}: verdict-fallback warning could not be confirmed`))).toBe(true);
+    }
+  });
+
+  it('stops attempting warnings once the budget is spent rather than starting more', async () => {
+    const pending = sweep(NOW);
+    await vi.advanceTimersByTimeAsync(SWEEP_WARNING_BUDGET_MS);
+    await pending;
+
+    // The first attempt consumes the whole budget, so later issues short-circuit
+    // instead of each opening another doomed request.
+    expect(mocks.emitActivityEntryOnce).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not mark a budget-abandoned episode as warned', async () => {
+    const first = sweep(NOW);
+    await vi.advanceTimersByTimeAsync(SWEEP_WARNING_BUDGET_MS);
+    await first;
+
+    // A later patrol with a responsive dashboard delivers the warning.
+    mocks.emitActivityEntryOnce.mockResolvedValue('appended');
+    const second = await sweep(NOW + 60_000);
+
+    expect(second.some((a) => a.includes('verdict contended'))).toBe(true);
   });
 });

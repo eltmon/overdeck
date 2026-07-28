@@ -155,6 +155,10 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // PAN-1491: existing overdeck.db files created before substrate-bug weights need
   // the new `affected_criteria` column added idempotently.
   runSchemaTopUp(db, 'ALTER TABLE `flywheel_substrate_bugs` ADD COLUMN `affected_criteria` text');
+  // PAN-3092: at-most-once event append. Existing overdeck.db files predate the
+  // table, and the init migration only runs on a fresh database — without this
+  // top-up every append-once call fails while preparing its claim statement.
+  runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `event_idempotency` (`key` text PRIMARY KEY NOT NULL, `sequence` integer NOT NULL, `created_at` integer NOT NULL)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_agent_id` ON `cost_events` (`agent_id`, `ts`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`))');

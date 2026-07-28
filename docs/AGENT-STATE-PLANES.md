@@ -121,7 +121,16 @@ write-recency from verdict-truth:
     read. The patrol awaits this inline, so an accepted-but-hanging connection
     would otherwise stall every later issue and every later patrol phase while
     the patrol heartbeat kept reporting the Deacon healthy. Timing out after a
-    server commit is safe: retrying the same key returns `duplicate`.
+    server commit is safe: retrying the same key returns `duplicate`. The sweep
+    additionally shares a single `SWEEP_WARNING_BUDGET_MS` (30s) across every
+    issue it visits, because a per-request deadline alone still multiplies by the
+    number of stranded fallbacks; once the budget is spent, remaining warnings
+    are abandoned as retryable `failed` while draining continues for every issue.
+
+  The claim table lives in `overdeck.db` — created by
+  `drizzle/overdeck/0000_overdeck_init.sql` on a fresh database and by an
+  idempotent top-up in `ensureRuntimeIndexesSync()` for existing ones, since the
+  init migration short-circuits once `agents` exists.
 
   Idempotency keys age out with the events they guard — `compact()` deletes
   claims past the same 7-day retention, so the table cannot grow forever and an

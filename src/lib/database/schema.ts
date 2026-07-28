@@ -421,17 +421,6 @@ export function initSchema(db: SqliteDatabase): void {
       ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
       WHERE json_type(payload, '$.issueId') = 'text';
 
-    -- PAN-3092: at-most-once event append. The PRIMARY KEY is the uniqueness
-    -- constraint, so the claim and the event insert happen in ONE transaction
-    -- and two concurrent callers cannot both observe absence and append. Kept
-    -- out of the events table deliberately: reusing an activity id to record a
-    -- newer state transition is existing, intended behaviour for other callers.
-    CREATE TABLE IF NOT EXISTS event_idempotency (
-      key        TEXT    PRIMARY KEY,
-      sequence   INTEGER NOT NULL,
-      created_at INTEGER NOT NULL
-    );
-
     -- ===== Agents (PAN-1908: authoritative runtime registry) =====
     CREATE TABLE IF NOT EXISTS agents (
       id            TEXT PRIMARY KEY,

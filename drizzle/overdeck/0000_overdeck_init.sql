@@ -566,3 +566,8 @@ CREATE TABLE `flywheel_substrate_bugs` (
 );--> statement-breakpoint
 CREATE INDEX `idx_fsb_filed_at` ON `flywheel_substrate_bugs` (`filed_at`);--> statement-breakpoint
 CREATE INDEX `idx_fsb_status` ON `flywheel_substrate_bugs` (`status`);--> statement-breakpoint
+CREATE TABLE `event_idempotency` (
+	`key` text PRIMARY KEY NOT NULL,
+	`sequence` integer NOT NULL,
+	`created_at` integer NOT NULL
+);--> statement-breakpoint
