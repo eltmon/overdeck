@@ -29,7 +29,7 @@
     "recordedAt": "2026-07-28T06:40:20.292Z"
   },
   "created": "2026-07-28T04:43:34.296Z",
-  "updated": "2026-07-28T07:08:58.416Z",
+  "updated": "2026-07-28T07:09:04.457Z",
   "pipeline": {
     "issueId": "PAN-3216",
     "reviewStatus": "pending",
@@ -38,9 +38,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T07:07:50.902Z",
+    "panDoneRecoveredAt": "2026-07-28T07:08:58.012Z",
+    "updatedAt": "2026-07-28T07:08:58.407Z",
     "reviewNotes": "Agent re-review request (1/25): Narrowed briefing troubled-agents filter to gate alone; tests pass; GitHub checks passing",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3219",
+    "reviewRequestedAt": "2026-07-28T07:08:58.012Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -53,33 +55,31 @@
         "tests/unit/lib/briefing-assembler.test.ts"
       ],
       "recordedAt": "2026-07-28T06:40:20.292Z"
-    },
-    "reviewRequestedAt": "2026-07-28T07:08:58.012Z",
-    "panDoneRecoveredAt": "2026-07-28T07:08:58.012Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 358,
-            "output": 10078,
-            "cacheRead": 7278019,
-            "cacheWrite": 425772
+            "input": 368,
+            "output": 10322,
+            "cacheRead": 7422164,
+            "cacheWrite": 430801
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 358,
-          "output": 10078,
-          "cacheRead": 7278019,
-          "cacheWrite": 425772
+          "input": 368,
+          "output": 10322,
+          "cacheRead": 7422164,
+          "cacheWrite": 430801
         }
       },
       "costAtCloseOut": {
-        "usd": 1.310763,
-        "pricingAsOf": "2026-07-28T07:07:53.261Z"
+        "usd": 1.332694,
+        "pricingAsOf": "2026-07-28T07:09:04.443Z"
       }
     },
     "merges": [
