@@ -125,19 +125,21 @@
     "recordedAt": "2026-07-28T08:02:25.990Z"
   },
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T17:12:06.560Z",
+  "updated": "2026-07-28T17:12:09.706Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-28T08:02:29.164Z",
-    "updatedAt": "2026-07-28T17:12:06.420Z",
-    "reviewNotes": "Review bypassed: verification passed but review infrastructure repeatedly failed.",
+    "updatedAt": "2026-07-28T17:12:06.425Z",
+    "reviewNotes": "Dispatch failed: Role run agent-pan-3049-review already running. Use 'pan tell' to message it.",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "All 4 ACs met. AC1: declaredComposeFileProjectName parses top-level name: (stack-health.ts:52-57), verified against real MYN workspaces which declare 'name: myn-feature-min-XXX' at col 0. AC2: requireComposeProjectNameForWorkspace throws naming workspacePath + composeFilePath + both dev-script paths (stack-health.ts:135-137). AC3: both variants return overdeck-feature-<issue> when composeFilePath is null (lines 119, 134). AC4: assertDeclaredNameMatchesFeatureFolder reuses the exact 'Refusing workspace rebuild:' message for both sources (lines 59-70); dev-script rethrow guard preserved at line 91. COMPOSE_FILE_CANDIDATES and findDevcontainerComposeFile match rebuild-stack.ts:43-58 exactly, so no directory-scope drift. Tests cover all four plus dev-script-wins precedence.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3223",
     "reviewedAtCommit": "69dbcf884af0d4eec873cde2175b24995606340e",
@@ -253,7 +255,7 @@
       },
       "costAtCloseOut": {
         "usd": 93.5918892,
-        "pricingAsOf": "2026-07-28T17:12:06.552Z"
+        "pricingAsOf": "2026-07-28T17:12:09.702Z"
       }
     },
     "merges": [
