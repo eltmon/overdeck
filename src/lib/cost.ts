@@ -153,6 +153,11 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // $0.30/M cache-hit input. Both aliases share pricing; only context differs.
   { provider: 'custom', model: 'k3', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, currency: 'USD' },
   { provider: 'custom', model: 'k3[1m]', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, currency: 'USD' },
+  // QuantumLlama (synthetic benchmark provider, PAN-3252; benchmarks/specs/quantumllama.md):
+  // ql-reason-70b $8/M in, $24/M out; ql-swift-8b $2/M in, $6/M out; ql-nano-1b $0.40/M in, $1.20/M out.
+  { provider: 'custom', model: 'ql-reason-70b', inputPer1k: 0.008, outputPer1k: 0.024, cacheReadPer1k: 0.0008, cacheWrite5mPer1k: 0.010, currency: 'USD' },
+  { provider: 'custom', model: 'ql-swift-8b', inputPer1k: 0.002, outputPer1k: 0.006, cacheReadPer1k: 0.0002, cacheWrite5mPer1k: 0.0025, currency: 'USD' },
+  { provider: 'custom', model: 'ql-nano-1b', inputPer1k: 0.0004, outputPer1k: 0.0012, cacheReadPer1k: 0.00004, cacheWrite5mPer1k: 0.0005, currency: 'USD' },
 ];
 
 // ============== Cost Calculation ==============
