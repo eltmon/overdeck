@@ -102,7 +102,9 @@ const defaultPostMergeRowDeps: PostMergeRowDeps = {
   readCanonicalState: async ctx => {
     return getAutoCloseOutCanonicalState(ctx.issueId) as Promise<CanonicalState | null>;
   },
-  readMergeStatus: async issueId => (await Effect.runPromise(getReviewStatus(issueId)))?.mergeStatus,
+  // PAN-3025: same live→journal fallback as the verdict rows — after close-out
+  // clears live status, the durable record is the only place mergeStatus survives.
+  readMergeStatus: async issueId => (await loadStatus(issueId, defaultDeps))?.status.mergeStatus,
   listAgents: async () => Effect.runPromise(listRunningAgents()),
 };
 
