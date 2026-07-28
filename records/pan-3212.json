@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T16:44:10.536Z",
+  "updated": "2026-07-28T16:44:14.262Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "pending",
@@ -118,5 +118,28 @@
     "guard-keyed-submit-blocking-menu.guard-keyed-submit-blocking-menu.ac1": "completed",
     "guard-keyed-submit-blocking-menu.guard-keyed-submit-blocking-menu.ac2": "completed",
     "guard-keyed-submit-blocking-menu.guard-keyed-submit-blocking-menu.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "CLAUDE.md",
+      "src/lib/__tests__/tmux-dedup.test.ts",
+      "src/lib/overdeck/conversation-runtime.ts",
+      "src/lib/overdeck/resume-contract-delivery.ts",
+      "src/lib/tmux-dedup.ts",
+      "tests/lib/tmux-send-keys-blocking-menu.test.ts",
+      "tests/unit/lib/overdeck/resume-contract-delivery.test.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "src/lib/__tests__/tmux-dedup.test.ts",
+      "src/lib/overdeck/conversation-runtime.ts",
+      "src/lib/overdeck/resume-contract-delivery.ts",
+      "src/lib/tmux-dedup.ts",
+      "tests/lib/tmux-send-keys-blocking-menu.test.ts",
+      "tests/unit/lib/overdeck/resume-contract-delivery.test.ts"
+    ],
+    "recordedAt": "2026-07-28T16:44:14.261Z"
   }
 }
