@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T19:05:56.125Z",
+  "updated": "2026-07-28T19:06:15.063Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,8 +79,16 @@
     }
   ],
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "wi6-launcher-command": {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 563517,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T19:06:15.063Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -183,6 +191,7 @@
     "wi-fixture": "completed",
     "wi-fixture.wi-fixture.ac1": "completed",
     "wi-fixture.wi-fixture.ac2": "completed",
-    "wi-fixture.wi-fixture.ac3": "completed"
+    "wi-fixture.wi-fixture.ac3": "completed",
+    "wi6-launcher-command": "running"
   }
 }
