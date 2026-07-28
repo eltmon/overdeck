@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T18:07:51.899Z",
+  "updated": "2026-07-28T18:09:33.399Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "flywheel-doctrine": {
-        "writerId": "agent-pan-3228",
-        "agentId": "agent-pan-3228",
-        "pid": 2548070,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T18:07:51.899Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3228",
@@ -172,6 +164,17 @@
         "outcome": "completed",
         "reason": "Added pan answer for listing live pane menus and safely answering on-screen option numbers through signature-verified shared core, with audited CLI registry growth.",
         "releasedAt": "2026-07-28T18:07:33.791Z"
+      },
+      {
+        "writerId": "agent-pan-3228",
+        "agentId": "agent-pan-3228",
+        "pid": 2548070,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T18:07:51.899Z",
+        "itemId": "flywheel-doctrine",
+        "outcome": "completed",
+        "reason": "Defined pending-decision agents as parked-on-operator, required needs-you escalation while the fleet continues, and prohibited --fresh/--force bypasses.",
+        "releasedAt": "2026-07-28T18:09:33.398Z"
       }
     ],
     "statusReasons": {
@@ -202,6 +205,10 @@
       "answer-cli": {
         "reason": "Added pan answer for listing live pane menus and safely answering on-screen option numbers through signature-verified shared core, with audited CLI registry growth.",
         "updatedAt": "2026-07-28T18:07:33.791Z"
+      },
+      "flywheel-doctrine": {
+        "reason": "Defined pending-decision agents as parked-on-operator, required needs-you escalation while the fleet continues, and prohibited --fresh/--force bypasses.",
+        "updatedAt": "2026-07-28T18:09:33.398Z"
       }
     }
   },
@@ -236,6 +243,8 @@
     "answer-cli.answer-cli.ac1": "completed",
     "answer-cli.answer-cli.ac2": "completed",
     "answer-cli.answer-cli.ac3": "completed",
-    "flywheel-doctrine": "running"
+    "flywheel-doctrine": "completed",
+    "flywheel-doctrine.flywheel-doctrine.ac1": "completed",
+    "flywheel-doctrine.flywheel-doctrine.ac2": "completed"
   }
 }
