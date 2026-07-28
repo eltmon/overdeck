@@ -73,7 +73,7 @@
     "recordedAt": "2026-07-28T18:59:19.959Z"
   },
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T19:07:35.519Z",
+  "updated": "2026-07-28T19:07:41.200Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "blocked",
@@ -83,9 +83,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:00:36.689Z",
-    "updatedAt": "2026-07-28T19:07:34.599Z",
+    "updatedAt": "2026-07-28T19:07:41.188Z",
     "reviewNotes": "Auto-synthesis bypasses the state write door, and the path guard misses multiline joins",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3239",
+    "reviewedAtCommit": "ce4feae7b06ca159b5967603f389d4919236fa01",
     "reviewSpawnedAt": "2026-07-28T19:02:19.555Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -171,7 +172,7 @@
       },
       "costAtCloseOut": {
         "usd": 65.276296,
-        "pricingAsOf": "2026-07-28T19:07:34.617Z"
+        "pricingAsOf": "2026-07-28T19:07:41.195Z"
       }
     },
     "merges": [
