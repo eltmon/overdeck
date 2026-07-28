@@ -90,17 +90,17 @@
     "recordedAt": "2026-07-28T18:59:19.959Z"
   },
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T19:50:03.747Z",
+  "updated": "2026-07-28T19:57:54.175Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:00:36.689Z",
-    "updatedAt": "2026-07-28T19:50:03.637Z",
+    "updatedAt": "2026-07-28T19:57:54.018Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: auto-synthesis now uses writeSpecForIssue with a clean-and-pushed state-worktree durability test, and lint-state-paths detects multiline specs/drafts joins with adversarial fixtures.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3239",
     "reviewedAtCommit": "d5a0bf4e352a7a2ccb09b850b195aff8733bc1c9",
@@ -167,10 +167,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 26,
-            "output": 4294,
-            "cacheRead": 1837072,
-            "cacheWrite": 142161
+            "input": 34,
+            "output": 5833,
+            "cacheRead": 2566036,
+            "cacheWrite": 158838
           }
         },
         "work": {
@@ -196,15 +196,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 26,
-          "output": 4294,
-          "cacheRead": 1837072,
-          "cacheWrite": 142161
+          "input": 34,
+          "output": 5833,
+          "cacheRead": 2566036,
+          "cacheWrite": 158838
         }
       },
       "costAtCloseOut": {
-        "usd": 115.913702,
-        "pricingAsOf": "2026-07-28T19:50:03.718Z"
+        "usd": 116.116594,
+        "pricingAsOf": "2026-07-28T19:57:54.152Z"
       }
     },
     "merges": [
