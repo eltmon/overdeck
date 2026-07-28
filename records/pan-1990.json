@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T23:27:55.986Z",
+  "updated": "2026-07-28T23:28:43.001Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -26,15 +26,20 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T22:31:30.959Z",
+    "updatedAt": "2026-07-28T23:28:42.989Z",
     "inspectNotes": "All 5 ACs met and covered: resolver by-id/by-issue/by-cwd-longest-prefix (resolver.test.ts:33,43,93-122), deleteWorkspace nulls conversations.workspace_id preserving the row (writer.ts:133, test:95), refuses kind=main and drops only workspace-scoped pins (writer.ts:129-134, tests:87,114), createWorkspace main-singleton throw (writer.ts:69-71, test:48), addProjectTarget demotes prior primary in a transaction (writer.ts:39-46, test:127). FR-3 guard-workspace-doors.sh is wired into npm run lint, exits 0 on the real repo, and self-tests both directions (21/21 pass). Non-blocking: deleteWorkspace leaves agents.workspace_id dangling (FR-4 only mandates conversations); guard uses bare-word table matching so a table alias or SQL split across template lines could evade it, same limitation as lint-state-writes.sh.",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since 04bcaeb (1 path): package.json",
+        "detectedAt": "2026-07-28T23:28:38.244Z"
+      }
+    ],
     "conflictsSince": {
-      "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
-      "detectedAt": "2026-07-28T19:59:33.733Z",
+      "sha": "04bcaeb9f6b9d766a637e3e18eafcc828b0fbdbf",
+      "detectedAt": "2026-07-28T23:28:38.244Z",
       "paths": [
-        "src/lib/gitlab-merge-requests.ts",
-        "tests/unit/lib/gitlab-merge-requests.test.ts",
-        "tests/unit/lib/pipeline-membership-gather.test.ts"
+        "package.json"
       ]
     }
   },
@@ -51,10 +56,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 684,
-            "output": 211790,
-            "cacheRead": 116053548,
-            "cacheWrite": 1234911
+            "input": 1222,
+            "output": 319527,
+            "cacheRead": 302423300,
+            "cacheWrite": 2219348
           }
         }
       },
@@ -66,22 +71,22 @@
           "cacheWrite": 194048
         },
         "anthropic/claude-sonnet-5": {
-          "input": 684,
-          "output": 211790,
-          "cacheRead": 116053548,
-          "cacheWrite": 1234911
+          "input": 1222,
+          "output": 319527,
+          "cacheRead": 302423300,
+          "cacheWrite": 2219348
         }
       },
       "costAtCloseOut": {
-        "usd": 36.873888,
-        "pricingAsOf": "2026-07-28T22:31:30.972Z"
+        "usd": 77.687392,
+        "pricingAsOf": "2026-07-28T23:28:42.996Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-1990",
