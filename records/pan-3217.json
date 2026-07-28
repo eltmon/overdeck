@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T06:36:21.767Z",
-  "updated": "2026-07-28T08:49:25.281Z",
+  "updated": "2026-07-28T08:49:28.641Z",
   "pipeline": {
     "issueId": "PAN-3217",
     "reviewStatus": "pending",
@@ -93,5 +93,20 @@
     "document-reason-precedence": "completed",
     "document-reason-precedence.document-reason-precedence.ac1": "completed",
     "document-reason-precedence.document-reason-precedence.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/lib/pipeline-membership-gather.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/lib/pipeline-membership-gather.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "recordedAt": "2026-07-28T08:49:28.640Z"
   }
 }
