@@ -4,17 +4,17 @@
     "created": "2026-07-28T21:50:22Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3252: Benchmark: QuantumLlama — PAN-1837 kimi-code e2e verification",
-    "updated": "2026-07-28T21:54:39.642Z"
+    "updated": "2026-07-28T21:55:30.510Z"
   },
   "plan": {
     "id": "pan-3252",
     "title": "Benchmark: QuantumLlama — PAN-1837 kimi-code e2e verification",
-    "status": "proposed",
+    "status": "approved",
     "uid": "3e3a508d-7441-4f7e-8936-bf4b3cb032e7",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-28T21:50:22Z",
-    "updated": "2026-07-28T21:54:39.642Z",
+    "updated": "2026-07-28T21:55:30.510Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3252",
@@ -523,5 +523,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
