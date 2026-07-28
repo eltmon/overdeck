@@ -121,17 +121,17 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T23:53:29.285Z",
+  "updated": "2026-07-28T23:54:23.714Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-28T23:27:36.514Z",
+    "updatedAt": "2026-07-28T23:54:23.683Z",
     "reviewNotes": "Verification infrastructure error: Verification worker 3887838 exited before writing a result",
     "verificationNotes": "Checklist completion check FAILED — 8 incomplete item(s) remain:\n\n  Incomplete plan items (8):\n    - live-tree-delta.live-tree-delta.ac1 The AgentEnrichmentChangedEvent schema accepts payloads both with and without issueId, and decoding a legacy payload without the field returns a valid event (pending)\n    - live-tree-delta.live-tree-delta.ac2 mapEventToDelta returns a pending_input_changed delta carrying awaitingInput, prompt, reason, and kinds for an enrichment event with issueId, and returns null when the payload lacks issueId (pending)\n    - live-tree-delta.live-tree-delta.ac3 applySessionTreeDelta merges the four pending-input fields onto the matched session and clears them when the delta omits them, returning the same tree object when no session matches (pending)\n    - live-tree-delta.live-tree-delta.ac4 The enrichment poller emits issueId on agent.enrichment_changed events for agents with a known issue (pending)\n    - specialist-pending-input.specialist-pending-input.ac1 Session-tree review orchestrator, test, and ship nodes carry the four awaiting-input fields when the agent snapshot reports hasPendingQuestion true (pending)\n    - specialist-pending-input.specialist-pending-input.ac2 buildReviewerNodes returns reviewer nodes that carry the four awaiting-input fields taken from the provided agentSnapshotsById map (pending)\n    - specialist-pending-input.specialist-pending-input.ac3 The activity route emits specialist sections carrying the same four fields for a pending specialist snapshot (pending)\n    - specialist-pending-input.specialist-pending-input.ac4 A specialist node whose agent has no snapshot or no pending question renders with awaitingInput false and produces no prompt, reason, or kinds fields (pending)",
     "conflictsSince": {
@@ -144,7 +144,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewSpawnedAt": "2026-07-28T23:07:42.072Z",
+    "reviewSpawnedAt": "2026-07-28T23:54:23.683Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/FLYWHEEL-STATE.md",
@@ -250,19 +250,19 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1614,
-            "output": 56014,
-            "cacheRead": 37135087,
-            "cacheWrite": 1645812
+            "input": 1619,
+            "output": 56309,
+            "cacheRead": 37302927,
+            "cacheWrite": 1646083
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2048,
-          "output": 83887,
-          "cacheRead": 47256290,
-          "cacheWrite": 1955625
+          "input": 2053,
+          "output": 84182,
+          "cacheRead": 47424130,
+          "cacheWrite": 1955896
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -278,8 +278,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 59.443732,
-        "pricingAsOf": "2026-07-28T23:27:38.190Z"
+        "usd": 59.462335,
+        "pricingAsOf": "2026-07-28T23:54:23.702Z"
       }
     },
     "merges": [
@@ -288,7 +288,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3232",
