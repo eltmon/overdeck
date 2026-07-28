@@ -1,0 +1,480 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T17:14:48Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3229: Planning promotion has no recovery owner: a finalized-but-unpromoted plan stalls forever if the dashboard is down at finalize time (PAN-3212 sat 9.5h)",
+    "updated": "2026-07-28T17:17:16.806Z"
+  },
+  "plan": {
+    "id": "pan-3229",
+    "title": "Pending-promotion marker + deacon recovery owner for finalized-but-unpromoted plans",
+    "status": "proposed",
+    "uid": "cc23cee9-68c7-4bd5-a16d-c1b077721720",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-28T17:14:48Z",
+    "updated": "2026-07-28T17:17:16.806Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3229",
+        "label": "PAN-3229",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3212",
+        "label": "PAN-3212 (incident)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "deacon",
+      "planning",
+      "reliability",
+      "reconciler"
+    ],
+    "narratives": {
+      "Problem": "pan plan finalize retries promotion (POST /api/issues/:id/complete-planning) for only 15s (plan-finalize.ts:366-375). A deploy-window outage outlasts that budget, and no server-side owner scans for the resulting finalized-but-unpromoted state: orphan-proposed-reconciler's entry condition is a spec ALREADY promoted by the very endpoint that failed. PAN-3212 stalled 9.5h until a human ran pan plan done.",
+      "Proposal": "Keep the 15s CLI budget but make recovery server-owned: (1) finalize writes a durable marker <workspace>/.overdeck/pending-promotion.json when retries are exhausted and prints honest 'deferred to deacon' wording; (2) a new deacon patrol reconciler scans all projects' workspaces for markers (plus defensively for markerless proposed workspace specs with no promoted counterpart via findSpecByIssue), re-drives promotion through the normal endpoint with the internal token, clears markers on convergence, and trips needs-you after 5 bounded failures; (3) completePlanningForIssue deletes the marker on every successful promotion path. Full brief: .pan/drafts/PAN-3229.md.",
+      "NonGoals": "- Do NOT fix orphan-proposed-reconciler's legacy .pan/specs path blindness for migrated projects (separately filed issue)\n- Do NOT change the 90s AbortError no-retry behavior in promotePlanning (PAN-2243 rationale stands)\n- Do NOT extend the CLI's 15s retry budget or change the finalize exit-code contract\n- Do NOT add a boot-reconciliation hook or any second trigger path beyond the 60s patrol\n- Do NOT write markers from pan plan done (finalize is the single marker author)\n- Do NOT add dashboard UI surfaces beyond the existing activity feed and needs-you mechanism\n- Do NOT modify planning-agent prompts or ad-hoc health-watcher behavior"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep the 15s promotePlanning retry budget; marker + patrol is the recovery owner (issue offered either/or).",
+        "rationale": "Deploy outages last minutes; any inline budget loses. The deacon only runs while the dashboard is up, so patrol recovery inherently waits out the outage and converges on the first cycle after recovery."
+      },
+      {
+        "summary": "Finalize exit code stays 1 on promotion failure; honesty via wording + promotionDeferred:true in --json.",
+        "rationale": "Exit 0 would silently change the contract for emitAutoPromotePhase consumers and orchestrators. The PAN-3212 harm was silence, not the exit code."
+      },
+      {
+        "summary": "Reconciler omits autoSpawn from the POST body; the persisted auto-spawn-on-finalize stamp decides.",
+        "rationale": "resolveAutoSpawnOnFinalize (planning-promotion.ts:482) already honors the launch-time intent, and explicit autoSpawn:true triggers the origin gate (planning-promotion.ts:493-496) that an internal caller need not enter."
+      },
+      {
+        "summary": "Grace windows: 120s marker age before acting, 5min spec mtime for markerless defensive candidates; needs-you after 5 failed patrol attempts.",
+        "rationale": "Avoids racing the CLI's own 15s retry and freshly-running finalize sessions while keeping worst-case added latency well under one operator-noticeable interval; 5 attempts ≈ 5 minutes of healthy-dashboard failures is genuine dead-end territory."
+      },
+      {
+        "summary": "Promoted-counterpart checks use findSpecByIssue (state-worktree aware), not a raw .pan/specs readdir.",
+        "rationale": "Migrated projects keep specs on overdeck-state; copying the orphan-proposed-reconciler's legacy scan would reproduce the separately-filed blindness in new code."
+      },
+      {
+        "summary": "PENDING_PROMOTION_FILENAME constant lives in src/lib/pan-dir/types.ts.",
+        "rationale": "Both the CLI writer and server/deacon consumers need it; pan-dir/types.ts already exports PAN_SPEC_FILENAME and avoids server code importing a CLI module."
+      }
+    ],
+    "items": [
+      {
+        "id": "marker-write-cli",
+        "title": "Write durable pending-promotion marker and deferred wording in pan plan finalize",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:14:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3229",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pending-promotion-reconciler",
+            "server-marker-cleanup",
+            "convergence-regression-test"
+          ],
+          "files_scope": [
+            "src/cli/commands/plan-finalize.ts",
+            "src/lib/pan-dir/types.ts",
+            ".gitignore",
+            "tests/unit/cli/plan-finalize-pending-promotion.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/plan-finalize-pending-promotion.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "plan-finalize-pending-promotion.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add PENDING_PROMOTION_FILENAME = 'pending-promotion.json' to src/lib/pan-dir/types.ts. In plan-finalize.ts add PendingPromotionMarker type ({version:'1', issueId, canonicalFilename, noPrd, autoSpawnRequested, finalizedAt, lastError, lastAttemptAt, patrolAttempts}) and exported writePendingPromotionMarker(workspacePath, marker) using temp+rename like stampPlanForFinalization. In the !noPromote && !promoted branch (currently lines 343-352), write the marker to <workspacePath>/.overdeck/pending-promotion.json, replace the failure copy with 'Promotion deferred — the dashboard was unreachable. A pending-promotion marker was written; the deacon will complete promotion automatically once the dashboard is healthy. Manual fallback: pan plan done <id>.', and add promotionDeferred:true|false to the --json payload. Exit code stays 1. Add .overdeck/pending-promotion.json to .gitignore next to .overdeck/continue.json (~line 221). Tests use vi.useFakeTimers + advanceTimersByTimeAsync for the 1s/2s/4s/8s backoff. Full schema and before/after copy: .pan/drafts/PAN-3229.md WI-1."
+        },
+        "items": [
+          {
+            "id": "marker-write-cli.ac1",
+            "title": "Given all 5 promotion attempts fail with connection errors under fake timers, finalize creates .overdeck/pending-promotion.json containing issueId, canonicalFilename, noPrd, finalizedAt, lastError, and patrolAttempts: 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "marker-write-cli.ac2",
+            "title": "On deferred promotion, human output contains 'deferred' and names the deacon as the recovery owner, and --json output emits promotionDeferred: true while still exiting 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "marker-write-cli.ac3",
+            "title": "Given --no-promote or a successful promotion, finalize creates no pending-promotion.json file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "marker-write-cli.ac4",
+            "title": "Given a workspace containing a freshly written marker, git status --porcelain produces no output for .overdeck/pending-promotion.json because .gitignore contains the new entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pending-promotion-reconciler",
+        "title": "Add pending-promotion deacon reconciler module with bounded needs-you escalation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:14:48Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3229",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/pending-promotion-reconciler.ts",
+            "src/lib/cloister/__tests__/pending-promotion-reconciler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/pending-promotion-reconciler.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pending-promotion-reconciler.test.ts passes with all scenario cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/pending-promotion-reconciler.ts modeled on orphan-proposed-reconciler.ts (injectable options object: fetch, projects, clock, dashboardOrigin; logReconcilerDiagnostic-style console diagnostics; activity emission only for actioned outcomes). findPendingPromotionCandidates: per project from listProjects, enumerate <projectPath>/workspaces/feature-* dirs (skip -strike suffix), candidate = readable .overdeck/pending-promotion.json marker OR defensively a workspace spec with plan.status==='proposed', parseable issue id, no promoted counterpart via Effect.runPromise(findSpecByIssue(projectPath, issueId)), spec mtime > 5min. reconcilePendingPromotions: skip closed issues (isIssueClosed); if findSpecByIssue finds the promoted spec, delete marker without POSTing; skip candidates younger than 120s; else POST /api/issues/:id/complete-planning at internalDashboardOrigin() with INTERNAL_TOKEN_HEADER and body {noPrd from marker, startedBy:'pending-promotion-reconciler'}. HTTP 200 success without skipped → delete marker + activity entry; 202/inFlight/skipped body → leave marker untouched; failure → rewrite marker with patrolAttempts+1/lastError/lastAttemptAt (creating the marker for markerless candidates), and at patrolAttempts>=5 call recordDeadEndNeedsYou(issueId, 'pending-promotion', finalizedAt, self-contained operator message naming pan plan done <id> as fallback), continuing to retry each cycle. No execSync anywhere. Full behavior table: .pan/drafts/PAN-3229.md WI-2."
+        },
+        "items": [
+          {
+            "id": "pending-promotion-reconciler.ac1",
+            "title": "Given a marker with noPrd:true and a healthy endpoint mock, the reconciler POSTs complete-planning with body noPrd:true and deletes the marker on HTTP 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-promotion-reconciler.ac2",
+            "title": "Given the promoted counterpart already exists via findSpecByIssue, the reconciler deletes the marker and issues no POST; given HTTP 202 or a skipped body, it preserves the marker unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-promotion-reconciler.ac3",
+            "title": "Given a marker younger than 120 seconds or a closed issue or a feature-*-strike directory, the reconciler skips it and returns no action for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-promotion-reconciler.ac4",
+            "title": "Given repeated endpoint failures, the reconciler persists incremented patrolAttempts into the marker and on the 5th failure calls recordDeadEndNeedsYou with recoveryPath 'pending-promotion'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-promotion-reconciler.ac5",
+            "title": "Given a markerless workspace spec with plan.status 'proposed', mtime older than 5 minutes, and no promoted counterpart, the reconciler detects it as a candidate and drives the same POST path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "patrol-wiring",
+        "title": "Wire reconcilePendingPromotions into the deacon runPatrol sequence",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:14:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3229",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "grep -n reconcilePendingPromotions src/lib/cloister/deacon.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grep returns the runPatrol call site"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/deacon.ts runPatrol(), immediately after the reconcileOrphanProposedSpecs block (currently lines 2639-2641), call reconcilePendingPromotions(), push its returned action strings into actions, and addLog('action', a, state.patrolCycle) for each — matching the surrounding reconciler pattern exactly (static import like reconcileOrphanProposedSpecs or dynamic import like stale-task-claims; match the nearest neighbor)."
+        },
+        "items": [
+          {
+            "id": "patrol-wiring.ac1",
+            "title": "When a patrol cycle runs with a pending-promotion candidate present, runPatrol returns a PatrolResult whose actions array contains the action string the reconciler emits, matching the orphan-proposed block's wiring pattern",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-wiring.ac2",
+            "title": "npm run typecheck exits 0 after the wiring change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-marker-cleanup",
+        "title": "completePlanningForIssue deletes the pending-promotion marker on successful promotion",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T17:14:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3229",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/planning-promotion.ts",
+            "src/lib/overdeck/__tests__/planning-promotion-marker-cleanup.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/planning-promotion-marker-cleanup.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "marker-cleanup test passes proving the marker file is removed on success and ENOENT is tolerated",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In completePlanningForIssue (src/lib/overdeck/planning-promotion.ts), after promotion succeeds and before returning the success response, remove join(workspacePath, WORKSPACE_RUNTIME_DIRNAME, PENDING_PROMOTION_FILENAME) — workspacePath is already computed at line 569 — using fs/promises rm with force:true semantics so ENOENT is silent. Log one console line only when a marker file was actually present and removed. If planning-promotion has an existing test file, extend it; otherwise create the named test file with a temp workspace. Place the test wherever the module's existing tests live (adjust files_scope path to match — confidence medium on the exact test location)."
+        },
+        "items": [
+          {
+            "id": "server-marker-cleanup.ac1",
+            "title": "Given a workspace containing .overdeck/pending-promotion.json, a successful completePlanningForIssue run removes the file before returning its success response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-marker-cleanup.ac2",
+            "title": "Given no marker file exists, the success path completes without throwing and logs no marker-removal line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "convergence-regression-test",
+        "title": "Regression test: finalize-with-dashboard-down marker converges in one reconciler pass",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:14:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3229",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/__tests__/pending-promotion-convergence.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/pending-promotion-convergence.test.ts"
+          ],
+          "expected_outputs": [
+            "convergence test passes: one POST issued, marker removed, second pass idempotent"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/__tests__/pending-promotion-convergence.test.ts covering the PAN-3229 incident end-to-end at unit level: (1) drive the exported CLI failure path (promotePlanning with a fetch mock refusing connections, vi.useFakeTimers + advanceTimersByTimeAsync through the 1s/2s/4s/8s backoff) or call writePendingPromotionMarker exactly as that path does, producing a marker in a temp workspace; (2) run reconcilePendingPromotions with an injected fetch returning HTTP 200 success and a clock past the 120s grace. Assert exactly one POST to /api/issues/<id>/complete-planning, the marker file no longer exists, and one action string is returned; (3) a second reconciler pass returns zero actions (idempotent)."
+        },
+        "items": [
+          {
+            "id": "convergence-regression-test.ac1",
+            "title": "The test produces the marker via the same code path the CLI failure branch uses under fake timers, never via hand-rolled JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "convergence-regression-test.ac2",
+            "title": "One reconciler pass against a healthy endpoint mock produces exactly one complete-planning POST and deletes the marker file, so a subsequent existsSync on the marker path returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "convergence-regression-test.ac3",
+            "title": "A second reconciler pass after convergence returns an empty action list, proving idempotence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-recovery-owner",
+        "title": "Document the pending-promotion marker and reconciler in deacon and xBRIEF docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T17:14:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3229",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DEACON-HEALTH-MONITORING.md",
+            "docs/XBRIEF.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n pending-promotion docs/DEACON-HEALTH-MONITORING.md docs/XBRIEF.md"
+          ],
+          "expected_outputs": [
+            "grep returns matches in both docs naming the marker file and the reconciler"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "docs/DEACON-HEALTH-MONITORING.md: add a 'Pending-promotion reconciler' section stating the marker path <workspace>/.overdeck/pending-promotion.json and schema fields, the 60s patrol cadence, the 120s/5min grace windows, the 5-attempt needs-you escalation with pan plan done <id> as the manual fallback, and the PAN-3212/PAN-3229 incident as the rationale. docs/XBRIEF.md: in the lifecycle section, state that a failed promotion at finalize leaves the pending-promotion marker and that the deacon owns convergence, with pan plan done as the manual fallback."
+        },
+        "items": [
+          {
+            "id": "docs-recovery-owner.ac1",
+            "title": "docs/DEACON-HEALTH-MONITORING.md contains a section naming pending-promotion.json, the grace windows, and the 5-attempt needs-you escalation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-recovery-owner.ac2",
+            "title": "docs/XBRIEF.md lifecycle section contains a statement that a failed finalize promotion creates the pending-promotion marker and the deacon converges it, naming pan plan done as the manual fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "marker-write-cli",
+        "to": "pending-promotion-reconciler",
+        "type": "blocks"
+      },
+      {
+        "from": "marker-write-cli",
+        "to": "server-marker-cleanup",
+        "type": "blocks"
+      },
+      {
+        "from": "pending-promotion-reconciler",
+        "to": "patrol-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "pending-promotion-reconciler",
+        "to": "convergence-regression-test",
+        "type": "blocks"
+      },
+      {
+        "from": "marker-write-cli",
+        "to": "convergence-regression-test",
+        "type": "blocks"
+      },
+      {
+        "from": "pending-promotion-reconciler",
+        "to": "docs-recovery-owner",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-28-PAN-3229-pending-promotion-marker-deacon-recovery-owner-for-finalized-but-unpromoted-plans.xbrief.json"
+    }
+  },
+  "status": "proposed"
+}
