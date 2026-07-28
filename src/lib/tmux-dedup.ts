@@ -37,7 +37,8 @@ import { randomUUID } from 'node:crypto';
 import { unlink, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { tmuxExecAsync, validateSessionName } from './tmux.js';
+import { capturePaneText, MessageDeliveryFailed, tmuxExecAsync, validateSessionName } from './tmux.js';
+import { paneHasBlockingChoiceMenu } from './pane-choice-menu.js';
 
 export const DEDUP_KEY_RE = /^[A-Za-z0-9:_-]+$/;
 
@@ -191,6 +192,8 @@ export interface KeyedTmuxDeps {
   readMarkerStrict?: (sessionName: string, option: string) => Promise<string>;
   /** Test seam for target-read failures; production uses the real tmux read. */
   readPaneTarget?: (sessionName: string) => Promise<PaneTarget>;
+  /** Test seam for blocking-menu detection; production captures the real pane. */
+  readPaneText?: (sessionName: string, lines: number) => Promise<string>;
 }
 
 /**
@@ -422,6 +425,17 @@ export async function completeKeyedSubmit(
   // post-submit check below (cycle 10).
   const preTarget = await readTarget(sessionName);
   const pendingBefore = await read(sessionName, pendingOption);
+
+  if (pendingBefore !== '') {
+    const paneSnapshot = await (deps.readPaneText ?? capturePaneText)(sessionName, 90).catch(() => '');
+    if (paneSnapshot && paneHasBlockingChoiceMenu(paneSnapshot)) {
+      throw new MessageDeliveryFailed(
+        `Keyed submit to ${sessionName} aborted: the pane is blocked on a choice menu, so Enter would answer that menu`,
+        sessionName,
+        paneSnapshot,
+      );
+    }
+  }
 
   // PROVISIONAL from birth (cycle 12): the Enter, the POISON breadcrumb, the
   // TERMINAL marker, and the pending clear are ONE server-owned command list,

@@ -2,8 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { MessageDeliveryFailed } from '../tmux.js';
 import { completeKeyedSubmit, KeyedMarkerVerificationError, KeyedSubmitTargetDeadError, sendKeysDedup } from '../tmux-dedup.js';
 
 const socket = `dedup-test-${process.pid}`;
@@ -48,6 +49,44 @@ function occurrences(haystack: string, needle: string): number {
 function typeWithoutSubmit(text: string): void {
   execFileSync('tmux', ['-L', socket, 'send-keys', '-t', session, '-l', text]);
 }
+
+const RESUME_GATE_MENU = [
+  'This session is 4h 5m old and 146.9k tokens.',
+  '',
+  'Resuming the full session will consume a substantial portion of your usage limits. We recommend resuming from a summary.',
+  '',
+  '❯ 1. Resume from summary (recommended)',
+  '  2. Resume full session as-is',
+  "  3. Don't ask me again",
+  '',
+  'Enter to confirm · Esc to cancel',
+].join('\n');
+
+describe('completeKeyedSubmit blocking-menu guard', () => {
+  it('rejects before the atomic Enter and preserves the pending claim', async () => {
+    vi.useFakeTimers();
+    const markers = new Map([
+      ['@overdeck-dedup-pending-test-key-1', 'send-id'],
+      ['@overdeck-dedup-test-key-1', ''],
+    ]);
+
+    try {
+      const completion = completeKeyedSubmit(session, 'test-key-1', {
+        readMarker: (_name, option) => Promise.resolve(markers.get(option) ?? ''),
+        readPaneTarget: () => Promise.resolve({ pid: '123', dead: false }),
+        readPaneText: () => Promise.resolve(RESUME_GATE_MENU),
+      });
+      const rejection = expect(completion).rejects.toThrow(MessageDeliveryFailed);
+      await vi.advanceTimersByTimeAsync(300);
+
+      await rejection;
+      expect(markers.get('@overdeck-dedup-pending-test-key-1')).toBe('send-id');
+      expect(markers.get('@overdeck-dedup-test-key-1')).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
 
 /**
  * Real throwaway tmux server — the dedup record is a pair of tmux session
@@ -97,6 +136,20 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     const second = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
     expect(second).toBe('deduplicated');
     expect(capturePane()).toBe(afterSubmit);
+  });
+
+  it('submits normal composer content when pane capture is busy or unavailable', async () => {
+    expect(await sendKeysDedup(session, 'busy composer delivery', 'busy-key')).toBe('pasted');
+    await completeKeyedSubmit(session, 'busy-key', {
+      readPaneText: () => Promise.resolve('busy composer delivery'),
+    });
+    expect(showOption('@overdeck-dedup-busy-key')).toBe('1');
+
+    expect(await sendKeysDedup(session, 'capture failure delivery', 'capture-failure-key')).toBe('pasted');
+    await completeKeyedSubmit(session, 'capture-failure-key', {
+      readPaneText: () => Promise.reject(new Error('capture unavailable')),
+    });
+    expect(showOption('@overdeck-dedup-capture-failure-key')).toBe('1');
   });
 
   it('completes a crashed attempt from the pending marker WITHOUT pasting a second copy', async () => {
