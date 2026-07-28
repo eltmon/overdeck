@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { Effect } from 'effect';
@@ -19,7 +18,7 @@ const NEEDS_YOU_ATTEMPTS = 5;
 
 type ProjectEntry = { key: string; config: Pick<ProjectConfig, 'name' | 'path'> };
 
-type PendingPromotionMarker = {
+export type PendingPromotionMarker = {
   version: '1';
   issueId: string;
   canonicalFilename: string;
@@ -30,6 +29,12 @@ type PendingPromotionMarker = {
   lastAttemptAt: string;
   patrolAttempts: number;
 };
+
+export interface PendingPromotionMarkerIo {
+  read(path: string, issueId: string): Promise<PendingPromotionMarker | null>;
+  write(path: string, marker: PendingPromotionMarker): Promise<void>;
+  remove(path: string): Promise<void>;
+}
 
 export interface PendingPromotionCandidate {
   projectKey: string;
@@ -57,6 +62,7 @@ export interface PendingPromotionReconcilerOptions {
   isClosed?: (issueId: string) => Promise<boolean>;
   recordNeedsYou?: typeof recordDeadEndNeedsYou;
   emitActivity?: typeof emitActivityEntrySync;
+  markerIo?: PendingPromotionMarkerIo;
 }
 
 function normalizeIssueId(value: unknown): string | null {
@@ -143,12 +149,19 @@ async function writeMarker(path: string, marker: PendingPromotionMarker): Promis
   await rename(tmp, path);
 }
 
+const defaultMarkerIo: PendingPromotionMarkerIo = {
+  read: readMarker,
+  write: writeMarker,
+  remove: (path) => rm(path, { force: true }),
+};
+
 export async function findPendingPromotionCandidates(
   options: PendingPromotionReconcilerOptions = {},
 ): Promise<PendingPromotionCandidate[]> {
   const projects = await loadProjects(options.projects);
   const now = (options.clock ?? (() => new Date()))().getTime();
   const findPromotedSpec = options.findPromotedSpec ?? defaultFindPromotedSpec;
+  const markerIo = options.markerIo ?? defaultMarkerIo;
   const candidates: PendingPromotionCandidate[] = [];
 
   for (const { key, config } of projects) {
@@ -161,7 +174,7 @@ export async function findPendingPromotionCandidates(
 
       const workspacePath = join(workspacesDir, workspace.name);
       const markerPath = markerPathForWorkspace(workspacePath);
-      const marker = existsSync(markerPath) ? await readMarker(markerPath, issueId) : null;
+      const marker = await markerIo.read(markerPath, issueId);
       const specPath = findWorkspaceDraftPlanSync(workspacePath);
       if (!specPath) continue;
 
@@ -193,6 +206,7 @@ export async function findPendingPromotionCandidates(
         continue;
       }
 
+      if (spec.plan.metadata?.promotionIntent === 'manual') continue;
       const specInfo = await stat(specPath).catch(() => null);
       if (!specInfo || now - specInfo.mtimeMs < MARKERLESS_SPEC_GRACE_MS) continue;
       if (await findPromotedSpec(config.path, issueId)) continue;
@@ -254,7 +268,8 @@ export async function reconcilePendingPromotions(
   const isClosed = options.isClosed ?? ((issueId: string) => isIssueClosed(issueId));
   const recordNeedsYou = options.recordNeedsYou ?? recordDeadEndNeedsYou;
   const emitActivity = options.emitActivity ?? emitActivityEntrySync;
-  const candidates = await findPendingPromotionCandidates({ ...options, clock: () => now, findPromotedSpec });
+  const markerIo = options.markerIo ?? defaultMarkerIo;
+  const candidates = await findPendingPromotionCandidates({ ...options, clock: () => now, findPromotedSpec, markerIo });
   const actions: string[] = [];
 
   for (const candidate of candidates) {
@@ -264,7 +279,7 @@ export async function reconcilePendingPromotions(
     }
 
     if (await findPromotedSpec(candidate.projectPath, candidate.issueId)) {
-      await rm(candidate.markerPath, { force: true });
+      await markerIo.remove(candidate.markerPath);
       actions.push(`Cleared resolved pending-promotion marker for ${candidate.issueId}`);
       continue;
     }
@@ -308,7 +323,7 @@ export async function reconcilePendingPromotions(
     }
 
     if (!error && response?.status === 200) {
-      await rm(candidate.markerPath, { force: true });
+      await markerIo.remove(candidate.markerPath);
       const action = `Recovered pending planning promotion for ${candidate.issueId}`;
       actions.push(action);
       emitActivity({
@@ -328,7 +343,7 @@ export async function reconcilePendingPromotions(
 
     const nextAttempts = candidate.patrolAttempts + 1;
     const lastError = error ?? 'complete-planning did not converge';
-    await writeMarker(candidate.markerPath, {
+    await markerIo.write(candidate.markerPath, {
       version: '1',
       issueId: candidate.issueId,
       canonicalFilename: candidate.canonicalFilename,

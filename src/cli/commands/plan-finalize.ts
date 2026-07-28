@@ -274,9 +274,13 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
 
   const autoSpawnOnFinalize = readAutoSpawnOnFinalize(issueId);
 
-  // Stamp plan.status='proposed' and plan.metadata.canonicalFilename onto the
-  // xBRIEF only after beads creation succeeds. Atomic temp+rename.
-  const canonicalFilename = stampPlanForFinalization(planPath, issueId);
+  // Stamp the proposed status, canonical filename, and automatic/manual
+  // promotion intent onto the xBRIEF. Atomic temp+rename.
+  const canonicalFilename = stampPlanForFinalization(
+    planPath,
+    issueId,
+    options.promote === false ? 'manual' : 'automatic',
+  );
   const finalizedAt = new Date().toISOString();
 
   emitActivityEntrySync({
@@ -305,6 +309,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   let workAgentError: string | null = null;
   let workAgentSkipReason: string | null = null;
   let promotionDeferred = false;
+  let promotionMarkerError: string | null = null;
 
   const noPromote = options.promote === false;
   if (!noPromote) {
@@ -328,18 +333,22 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
 
   if (!noPromote && !promoted) {
     const now = new Date().toISOString();
-    writePendingPromotionMarker(workspacePath, {
-      version: '1',
-      issueId,
-      canonicalFilename,
-      noPrd: options.prd === false,
-      autoSpawnRequested: autoSpawnOnFinalize,
-      finalizedAt,
-      lastError: promoteError ?? 'complete-planning failed',
-      lastAttemptAt: now,
-      patrolAttempts: 0,
-    });
-    promotionDeferred = true;
+    try {
+      writePendingPromotionMarker(workspacePath, {
+        version: '1',
+        issueId,
+        canonicalFilename,
+        noPrd: options.prd === false,
+        autoSpawnRequested: autoSpawnOnFinalize,
+        finalizedAt,
+        lastError: promoteError ?? 'complete-planning failed',
+        lastAttemptAt: now,
+        patrolAttempts: 0,
+      });
+      promotionDeferred = true;
+    } catch (error) {
+      promotionMarkerError = error instanceof Error ? error.message : String(error);
+    }
   }
 
   emitAutoPromotePhase(issueId, 'terminal', promoted || noPromote ? 'success' : 'failure', promoted ? 'planning promoted' : noPromote ? 'promotion skipped' : (promoteError ?? 'promotion failed'), {
@@ -358,6 +367,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       workAgentSpawned,
       ...(promoteMessage ? { promoteMessage } : {}),
       ...(promoteError ? { promoteError } : {}),
+      ...(promotionMarkerError ? { promotionMarkerError } : {}),
       ...(workAgentMessage ? { workAgentMessage } : {}),
       ...(workAgentError ? { workAgentError } : {}),
       ...(workAgentSkipReason ? { workAgentSkipReason } : {}),
@@ -383,9 +393,13 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       } else {
         console.log(chalk.dim('Run `pan start ' + issueId + '` or click Start Agent to begin implementation.'));
       }
-    } else {
+    } else if (promotionDeferred) {
       console.log(chalk.yellow('⚠ Promotion deferred — the dashboard did not complete promotion. A pending-promotion marker was written; the deacon will complete promotion automatically once the dashboard is healthy. Manual fallback: pan plan done ' + issueId + '.'));
       if (promoteError) console.log(chalk.dim('  ' + promoteError));
+    } else {
+      console.log(chalk.red('✗ Promotion failed, and the pending-promotion marker could not be written. Automatic recovery is unavailable. Manual fallback: pan plan done ' + issueId + '.'));
+      if (promoteError) console.log(chalk.dim('  Promotion error: ' + promoteError));
+      if (promotionMarkerError) console.log(chalk.dim('  Marker error: ' + promotionMarkerError));
     }
   }
 
@@ -497,7 +511,11 @@ export async function promotePlanning(issueId: string, autoSpawn = false, opts: 
  *
  * Exported for tests.
  */
-export function stampPlanForFinalization(planPath: string, issueId: string): string {
+export function stampPlanForFinalization(
+  planPath: string,
+  issueId: string,
+  promotionIntent: 'automatic' | 'manual' = 'automatic',
+): string {
   const doc: XBriefDocument = readPlanSync(planPath);
   const slugSource = doc.plan.title || doc.plan.id || issueId;
   const slug = slugify(slugSource);
@@ -505,7 +523,7 @@ export function stampPlanForFinalization(planPath: string, issueId: string): str
   const existingFilename = doc.plan.metadata?.canonicalFilename ?? null;
   const canonicalFilename = existingFilename ?? generateXBriefFilename(issueId, slug);
 
-  doc.plan.metadata = { ...(doc.plan.metadata ?? {}), canonicalFilename };
+  doc.plan.metadata = { ...(doc.plan.metadata ?? {}), canonicalFilename, promotionIntent };
 
   const now = new Date().toISOString();
   doc.plan.status = 'proposed';

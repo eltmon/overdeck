@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,6 +15,7 @@ import {
   writePendingPromotionMarker,
   type PendingPromotionMarker,
 } from '../../../src/cli/commands/plan-finalize.js';
+import { reconcilePendingPromotions } from '../../../src/lib/cloister/pending-promotion-reconciler.js';
 import { PENDING_PROMOTION_FILENAME } from '../../../src/lib/pan-dir/types.js';
 
 vi.mock('../../../src/lib/activity-logger.js', () => ({
@@ -25,13 +27,14 @@ const FIXED_NOW = '2026-07-28T18:00:00.000Z';
 const originalOverdeckHome = process.env.OVERDECK_HOME;
 const roots: string[] = [];
 
-function createWorkspace(specDirname: '.overdeck' | '.pan' = '.overdeck'): { root: string; workspacePath: string; markerPath: string } {
+function createWorkspace(specDirname: '.overdeck' | '.pan' = '.overdeck'): { root: string; workspacePath: string; markerPath: string; specPath: string } {
   const root = mkdtempSync(join(tmpdir(), 'plan-finalize-pending-promotion-'));
   roots.push(root);
   const workspacePath = join(root, 'workspaces', 'feature-pan-3229');
   const specDir = join(workspacePath, specDirname);
   mkdirSync(specDir, { recursive: true });
-  writeFileSync(join(specDir, 'spec.vbrief.json'), JSON.stringify({
+  const specPath = join(specDir, 'spec.vbrief.json');
+  writeFileSync(specPath, JSON.stringify({
     xBRIEFInfo: {
       version: '0.8',
       created: '2026-07-28T17:00:00.000Z',
@@ -64,6 +67,7 @@ function createWorkspace(specDirname: '.overdeck' | '.pan' = '.overdeck'): { roo
     root,
     workspacePath,
     markerPath: join(workspacePath, '.overdeck', PENDING_PROMOTION_FILENAME),
+    specPath,
   };
 }
 
@@ -226,6 +230,84 @@ describe('plan finalize pending-promotion marker', () => {
       promoted: false,
       promotionDeferred: false,
     });
+  });
+
+  it('does not reconcile a deliberately unpromoted plan after the markerless grace period', async () => {
+    const skipped = createWorkspace();
+    process.env.OVERDECK_HOME = skipped.root;
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await planFinalizeCommand({
+      workspace: skipped.workspacePath,
+      json: true,
+      prd: false,
+      qualityLint: false,
+      promote: false,
+    });
+    utimesSync(skipped.specPath, new Date(FIXED_NOW), new Date(FIXED_NOW));
+    vi.setSystemTime(new Date('2026-07-28T18:06:00.000Z'));
+
+    expect(await reconcilePendingPromotions({
+      projects: [{ key: 'overdeck', config: { name: 'Overdeck', path: skipped.root } }],
+      clock: () => new Date(),
+      fetch: fetchMock,
+      findPromotedSpec: vi.fn(async () => null),
+      isClosed: vi.fn(async () => false),
+      getInternalToken: () => 'test-token',
+    })).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(JSON.parse(readFileSync(skipped.specPath, 'utf-8'))).toMatchObject({
+      plan: { metadata: { promotionIntent: 'manual' } },
+    });
+  });
+
+  it('reports marker persistence failures through normal JSON and human output', async () => {
+    const jsonWorkspace = createWorkspace();
+    process.env.OVERDECK_HOME = jsonWorkspace.root;
+    mkdirSync(`${jsonWorkspace.markerPath}.tmp`);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')));
+    mockProcessExit();
+    const log = vi.mocked(console.log);
+
+    const jsonFinalize = planFinalizeCommand({
+      workspace: jsonWorkspace.workspacePath,
+      json: true,
+      prd: false,
+      qualityLint: false,
+    }).catch(error => error as Error);
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    expect((await jsonFinalize).message).toBe('EXIT:1');
+    expect(captureJson(log)).toMatchObject({
+      success: false,
+      promoted: false,
+      promotionDeferred: false,
+      promotionMarkerError: expect.any(String),
+    });
+
+    vi.restoreAllMocks();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockProcessExit();
+    const humanWorkspace = createWorkspace();
+    process.env.OVERDECK_HOME = humanWorkspace.root;
+    mkdirSync(`${humanWorkspace.markerPath}.tmp`);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')));
+    const humanLog = vi.mocked(console.log);
+
+    const humanFinalize = planFinalizeCommand({
+      workspace: humanWorkspace.workspacePath,
+      prd: false,
+      qualityLint: false,
+    }).catch(error => error as Error);
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    expect((await humanFinalize).message).toBe('EXIT:1');
+    const output = humanLog.mock.calls.map(args => String(args[0])).join('\n');
+    expect(output).toContain('pending-promotion marker could not be written');
+    expect(output).toContain('Automatic recovery is unavailable');
+    expect(output).toContain('Marker error:');
   });
 
   it('keeps pending-promotion.json out of git status', () => {
