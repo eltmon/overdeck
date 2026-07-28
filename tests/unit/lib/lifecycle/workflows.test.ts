@@ -572,6 +572,29 @@ describe('workflows', () => {
       );
     });
 
+    it('uses the repo target branch for convention-branch ancestry checks', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const verifyStep = await __testInternals.verifyConventionBranchMerged(ctx, {
+        dir: testDir,
+        sourceBranch: 'feature/pan-100',
+        targetBranch: 'master',
+        forge: 'github',
+      });
+
+      expect(verifyStep?.success).toBe(true);
+      expect(mockExecAsync).toHaveBeenCalledWith(
+        'git merge-base --is-ancestor feature/pan-100 master',
+        { cwd: testDir, encoding: 'utf-8' },
+      );
+    });
+
     it('accepts a squash-merged GitHub PR when the branch tip matches the merged PR head', async () => {
       mockExecAsync.mockImplementation(async (command: string) => {
         if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {

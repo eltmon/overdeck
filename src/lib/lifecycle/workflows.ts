@@ -515,11 +515,24 @@ function verifyBranchMerged(ctx: LifecycleContext): Effect.Effect<StepResult> {
   );
 }
 
+interface MergeVerificationRoot {
+  dir: string;
+  sourceBranch: string;
+  targetBranch: string;
+  forge: 'github' | 'gitlab';
+}
+
 export async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-out:verify-merged';
   const issueLower = ctx.issueId.toLowerCase();
   const featureBranchName = `feature/${issueLower}`;
   const strikeBranchName = `strike/${issueLower}`;
+  const defaultRoot: MergeVerificationRoot = {
+    dir: ctx.projectPath,
+    sourceBranch: featureBranchName,
+    targetBranch: 'main',
+    forge: 'github',
+  };
 
   try {
     // Check review-status first — the merge specialist validates before marking merged
@@ -534,10 +547,13 @@ export async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<Ste
       // review-status.json may not exist, continue with git checks
     }
 
-    const featureResult = await verifyConventionBranchMerged(ctx, featureBranchName);
+    const featureResult = await verifyConventionBranchMerged(ctx, defaultRoot);
     if (featureResult?.success) return featureResult;
 
-    const strikeResult = await verifyConventionBranchMerged(ctx, strikeBranchName);
+    const strikeResult = await verifyConventionBranchMerged(ctx, {
+      ...defaultRoot,
+      sourceBranch: strikeBranchName,
+    });
     if (strikeResult?.success && !strikeResult.skipped) {
       return stepOk(step, [
         ...(strikeResult.details ?? []),
@@ -552,32 +568,36 @@ export async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<Ste
   }
 }
 
-async function verifyConventionBranchMerged(ctx: LifecycleContext, branchName: string): Promise<StepResult | null> {
+async function verifyConventionBranchMerged(
+  ctx: LifecycleContext,
+  root: MergeVerificationRoot,
+): Promise<StepResult | null> {
   const step = 'close-out:verify-merged';
+  const branchName = root.sourceBranch;
   const { stdout: branchExists } = await execAsync(
     `git branch --list "${branchName}" 2>/dev/null || true`,
-    { cwd: ctx.projectPath, encoding: 'utf-8' },
+    { cwd: root.dir, encoding: 'utf-8' },
   );
 
   if (branchExists.trim()) {
     // Use merge-base --is-ancestor: checks if the branch tip is reachable from main
     try {
       await execAsync(
-        `git merge-base --is-ancestor ${branchName} main`,
-        { cwd: ctx.projectPath, encoding: 'utf-8' },
+        `git merge-base --is-ancestor ${branchName} ${root.targetBranch}`,
+        { cwd: root.dir, encoding: 'utf-8' },
       );
-      const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+      const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root);
       if (remoteCheck && !remoteCheck.success) return remoteCheck;
       return stepOk(step, ['All commits merged to main', ...(remoteCheck?.details ?? [])]);
     } catch {
       // --is-ancestor fails for squash merges where the branch still exists.
       try {
         const { stdout: codeDiff } = await execAsync(
-          `git diff main...${branchName} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
-          { cwd: ctx.projectPath, encoding: 'utf-8' },
+          `git diff ${root.targetBranch}...${branchName} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
+          { cwd: root.dir, encoding: 'utf-8' },
         );
         if (!codeDiff.trim()) {
-          const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+          const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root);
           if (remoteCheck && !remoteCheck.success) return remoteCheck;
           return stepOk(step, [
             'Code changes squash-merged to main (only planning artifacts remain on branch)',
@@ -588,9 +608,9 @@ async function verifyConventionBranchMerged(ctx: LifecycleContext, branchName: s
         // diff failed — fall through to unmerged report
       }
 
-      const githubMerged = await verifySquashMergedPrByBranch(ctx, branchName, branchName);
+      const githubMerged = await verifySquashMergedPrByBranch(ctx, root, branchName);
       if (githubMerged?.success) {
-        const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+        const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root);
         if (remoteCheck && !remoteCheck.success) return remoteCheck;
         return stepOk(step, [
           ...(githubMerged.details ?? []),
@@ -600,8 +620,8 @@ async function verifyConventionBranchMerged(ctx: LifecycleContext, branchName: s
       if (githubMerged) return githubMerged;
 
       const { stdout: unmerged } = await execAsync(
-        `git log main..${branchName} --oneline 2>/dev/null || true`,
-        { cwd: ctx.projectPath, encoding: 'utf-8' },
+        `git log ${root.targetBranch}..${branchName} --oneline 2>/dev/null || true`,
+        { cwd: root.dir, encoding: 'utf-8' },
       );
       const count = unmerged.trim() ? unmerged.trim().split('\n').length : 0;
 
@@ -609,7 +629,7 @@ async function verifyConventionBranchMerged(ctx: LifecycleContext, branchName: s
         try {
           const { stdout: issueState } = await execAsync(
             `gh issue view ${ctx.github.number} --repo ${ctx.github.owner}/${ctx.github.repo} --json state --jq '.state'`,
-            { cwd: ctx.projectPath, encoding: 'utf-8' },
+            { cwd: root.dir, encoding: 'utf-8' },
           );
           if (issueState.trim().toUpperCase() === 'CLOSED') {
             return stepSkipped(step, [`Issue already closed on GitHub; ${count} unmerged commit(s) remain on ${branchName}`]);
@@ -626,12 +646,12 @@ async function verifyConventionBranchMerged(ctx: LifecycleContext, branchName: s
   // Check remote
   const { stdout: remoteBranch } = await execAsync(
     `git ls-remote --heads origin "${branchName}" 2>/dev/null || true`,
-    { cwd: ctx.projectPath, encoding: 'utf-8' },
+    { cwd: root.dir, encoding: 'utf-8' },
   );
 
   if (remoteBranch.trim()) {
-    await execAsync(`git fetch origin ${branchName}`, { cwd: ctx.projectPath }).catch(() => {});
-    const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+    await execAsync(`git fetch origin ${branchName}`, { cwd: root.dir }).catch(() => {});
+    const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root);
     if (remoteCheck) return remoteCheck;
   }
 
@@ -647,31 +667,32 @@ type GitHubMergedPr = {
 
 async function verifyRemoteBranchIfPresent(
   ctx: LifecycleContext,
-  branchName: string,
+  root: MergeVerificationRoot,
 ): Promise<StepResult | null> {
   const step = 'close-out:verify-merged';
+  const branchName = root.sourceBranch;
   const remoteRef = `origin/${branchName}`;
 
   const { stdout: remoteBranch } = await execAsync(
     `git ls-remote --heads origin "${branchName}" 2>/dev/null || true`,
-    { cwd: ctx.projectPath, encoding: 'utf-8' },
+    { cwd: root.dir, encoding: 'utf-8' },
   );
   if (!remoteBranch.trim()) return null;
 
-  await execAsync(`git fetch origin ${branchName}`, { cwd: ctx.projectPath }).catch(() => {});
+  await execAsync(`git fetch origin ${branchName}`, { cwd: root.dir }).catch(() => {});
 
   try {
     await execAsync(
-      `git merge-base --is-ancestor ${remoteRef} main`,
-      { cwd: ctx.projectPath, encoding: 'utf-8' },
+      `git merge-base --is-ancestor ${remoteRef} ${root.targetBranch}`,
+      { cwd: root.dir, encoding: 'utf-8' },
     );
     return stepOk(step, ['Remote branch fully merged']);
   } catch {
     // Squash-merge detection for remote branch
     try {
       const { stdout: codeDiff } = await execAsync(
-        `git diff main...${remoteRef} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
-        { cwd: ctx.projectPath, encoding: 'utf-8' },
+        `git diff ${root.targetBranch}...${remoteRef} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
+        { cwd: root.dir, encoding: 'utf-8' },
       );
       if (!codeDiff.trim()) {
         return stepOk(step, ['Remote code changes squash-merged to main (only planning artifacts remain on branch)']);
@@ -680,12 +701,12 @@ async function verifyRemoteBranchIfPresent(
       // diff failed — fall through
     }
 
-    const githubMerged = await verifySquashMergedPrByBranch(ctx, branchName, remoteRef);
+    const githubMerged = await verifySquashMergedPrByBranch(ctx, root, remoteRef);
     if (githubMerged) return githubMerged;
 
     const { stdout: remoteUnmerged } = await execAsync(
-      `git log main..${remoteRef} --oneline 2>/dev/null || true`,
-      { cwd: ctx.projectPath, encoding: 'utf-8' },
+      `git log ${root.targetBranch}..${remoteRef} --oneline 2>/dev/null || true`,
+      { cwd: root.dir, encoding: 'utf-8' },
     );
     const count = remoteUnmerged.trim() ? remoteUnmerged.trim().split('\n').length : 0;
 
@@ -693,7 +714,7 @@ async function verifyRemoteBranchIfPresent(
       try {
         const { stdout: issueState } = await execAsync(
           `gh issue view ${ctx.github.number} --repo ${ctx.github.owner}/${ctx.github.repo} --json state --jq '.state'`,
-          { cwd: ctx.projectPath, encoding: 'utf-8' },
+          { cwd: root.dir, encoding: 'utf-8' },
         );
         if (issueState.trim().toUpperCase() === 'CLOSED') {
           return stepSkipped(step, [`Issue already closed on GitHub; ${count} unmerged commit(s) remain on remote ${branchName}`]);
@@ -709,18 +730,19 @@ async function verifyRemoteBranchIfPresent(
 
 async function verifySquashMergedPrByBranch(
   ctx: LifecycleContext,
-  branchName: string,
+  root: MergeVerificationRoot,
   branchRef: string,
 ): Promise<StepResult | null> {
   if (!ctx.github) return null;
 
   const step = 'close-out:verify-merged';
+  const branchName = root.sourceBranch;
   const { owner, repo } = ctx.github;
 
   try {
     const { stdout: prJson } = await execAsync(
       `gh pr list --repo ${owner}/${repo} --state merged --head ${JSON.stringify(branchName)} --json number,mergedAt,headRefOid,url`,
-      { cwd: ctx.projectPath, encoding: 'utf-8' },
+      { cwd: root.dir, encoding: 'utf-8' },
     );
     const prs = JSON.parse(prJson) as GitHubMergedPr[];
     const mergedPr = prs
@@ -735,7 +757,7 @@ async function verifySquashMergedPrByBranch(
 
     const { stdout: tipShaRaw } = await execAsync(
       `git rev-parse ${branchRef} 2>/dev/null`,
-      { cwd: ctx.projectPath, encoding: 'utf-8' },
+      { cwd: root.dir, encoding: 'utf-8' },
     );
     const tipSha = tipShaRaw.trim();
     if (!tipSha) return null;
@@ -752,7 +774,7 @@ async function verifySquashMergedPrByBranch(
     try {
       const { stdout: commitsRaw } = await execAsync(
         `git log --no-merges --format=%H ${mergedPr.headRefOid}..${tipSha}`,
-        { cwd: ctx.projectPath, encoding: 'utf-8' },
+        { cwd: root.dir, encoding: 'utf-8' },
       );
       const commits = commitsRaw.split('\n').map((sha) => sha.trim()).filter(Boolean);
       const unmerged: string[] = [];
@@ -760,7 +782,7 @@ async function verifySquashMergedPrByBranch(
         try {
           await execAsync(
             `git merge-base --is-ancestor ${commit} origin/main`,
-            { cwd: ctx.projectPath, encoding: 'utf-8' },
+            { cwd: root.dir, encoding: 'utf-8' },
           );
         } catch {
           unmerged.push(commit);
@@ -782,7 +804,7 @@ async function verifySquashMergedPrByBranch(
     try {
       const { stdout: deltaRaw } = await execAsync(
         `git diff --name-only ${mergedPr.headRefOid}..${tipSha}`,
-        { cwd: ctx.projectPath, encoding: 'utf-8' },
+        { cwd: root.dir, encoding: 'utf-8' },
       );
       let deltaFiles = deltaRaw.split('\n').map((f) => f.trim()).filter(Boolean);
       let statePlaneOnly = deltaFiles.length > 0 && deltaFiles.every((f) =>
@@ -794,7 +816,7 @@ async function verifySquashMergedPrByBranch(
         // state-plane-only, everything real is already on main.
         const { stdout: uniqueRaw } = await execAsync(
           `git diff --name-only origin/main...${tipSha}`,
-          { cwd: ctx.projectPath, encoding: 'utf-8' },
+          { cwd: root.dir, encoding: 'utf-8' },
         );
         deltaFiles = uniqueRaw.split('\n').map((f) => f.trim()).filter(Boolean);
         statePlaneOnly = deltaFiles.every((f) =>
@@ -943,6 +965,7 @@ async function clearReviewStatusStepImpl(issueId: string): Promise<StepResult> {
 export const __testInternals = {
   completeXBriefStep,
   verifyBranchMerged,
+  verifyConventionBranchMerged,
 };
 
 function resetIssueToCanceled(ctx: LifecycleContext): Effect.Effect<StepResult> {
