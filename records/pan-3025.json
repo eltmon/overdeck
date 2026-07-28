@@ -55,7 +55,7 @@
     "recordedAt": "2026-07-28T07:42:23.831Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T07:42:33.731Z",
+  "updated": "2026-07-28T07:42:37.891Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "pending",
@@ -67,7 +67,7 @@
     "updatedAt": "2026-07-28T07:42:33.658Z",
     "reviewNotes": "Verification failed at test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3221",
-    "reviewRequestedAt": "2026-07-28T07:42:24.626Z",
+    "reviewRequestedAt": "2026-07-28T07:42:37.547Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/__tests__/close-out-terminal.test.ts",
@@ -101,7 +101,8 @@
         "tests/unit/lib/pan-dir/record-close-out.test.ts"
       ],
       "recordedAt": "2026-07-28T07:42:23.831Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-28T07:42:37.547Z"
   },
   "closeOut": {
     "usage": {
