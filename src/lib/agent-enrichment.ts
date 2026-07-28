@@ -58,6 +58,10 @@ export type PendingInputKind =
   // only kind for a question asked in prose, which carries no tool call and no
   // modal, and is therefore invisible to every other detector.
   | 'agentTurnEnded'
+  // PAN-3233 — a question/confirmation/disambiguation prompt detected from the
+  // pane or runtime state, with no structured payload. Answered in the
+  // terminal, not through a dashboard control.
+  | 'paneQuestion'
 
 export interface PendingAskUserQuestionSnapshot {
   toolUseId: string
@@ -114,6 +118,17 @@ export function appendPaneDetectionKind(detection: AwaitingInputDetection | null
   // frozen agent as working. Folding it in once makes the surfaces agree.
   if (detection?.reason === 'tool_permission' && !kinds.includes('permissionRequest')) {
     kinds.push('permissionRequest')
+  }
+  // PAN-3233 — question-family detections previously yielded NO kind, making
+  // the agent invisible to Decisions (kinds.length > 0 gate) and unreapable
+  // (pendingInputCount > 0 gate). Guarded so a JSONL-backed AskUserQuestion is
+  // not double-represented.
+  if (
+    (detection?.reason === 'user_question' || detection?.reason === 'confirmation'
+      || detection?.reason === 'disambiguation' || detection?.reason === 'planning_done')
+    && !kinds.includes('askUserQuestion') && !kinds.includes('paneQuestion')
+  ) {
+    kinds.push('paneQuestion')
   }
 }
 

@@ -132,6 +132,31 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
   })
 })
 
+describe('computeAgentEnrichment paneQuestion kind', () => {
+  const getAgentRuntimeStateMock = vi.mocked(agents.getAgentRuntimeState)
+  const getAgentStateSyncMock = vi.mocked(agents.getAgentStateSync)
+  const detectAwaitingInputForAgentMock = vi.mocked(agentInputDetection.detectAwaitingInputForAgent)
+
+  it('surfaces paneQuestion for a runtime user_question detection', async () => {
+    const agentDir = makeAgentDir('work')
+    const agentId = `agent-test-${Date.now()}`
+    vi.spyOn(agents, 'getAgentDir').mockReturnValue(agentDir)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agents.getAgentStateSync>)
+    getAgentRuntimeStateMock.mockReturnValue(
+      Effect.succeed({ state: 'waiting-on-human', waitingReason: 'user_question', resolution: 'working', resolutionCount: 0 }),
+    )
+    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+
+    const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN))
+
+    expect(enrichment.hasPendingQuestion).toBe(true)
+    expect(enrichment.pendingInputKinds).toEqual(['paneQuestion'])
+    expect(enrichment.pendingInputCount).toBe(1)
+
+    rmSync(agentDir, { recursive: true, force: true })
+  })
+})
+
 /**
  * Regression: the enrichment must never assert "nothing is pending" from a scan
  * it did not perform. An agent blocked on an AskUserQuestion writes nothing to
