@@ -57,6 +57,7 @@ import { issueCommand as startCommand } from './commands/start.js';
 import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
 import { tellCommand } from './commands/tell.js';
+import { answerCommand } from './commands/answer.js';
 import { registerMonitorCommands } from './commands/monitor.js';
 import { killCommand } from './commands/kill.js';
 import { registerResetToPlannedCommand } from './commands/reset-to-planned.js';
@@ -389,6 +390,10 @@ program
   .command('tell <id> <message>')
   .description('Send message to running agent')
   .action(tellCommand);
+program
+  .command('answer <id> [option]')
+  .description('Show a pending pane choice, or answer its numbered option')
+  .action(answerCommand);
 registerMonitorCommands(program);
 program
   .command('kill <id>')
