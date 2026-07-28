@@ -152,8 +152,10 @@ describe('RunSettingsPanel', () => {
       onChange={onChange}
     />);
 
-    fireEvent.change(screen.getByLabelText('Lane A concurrency'), { target: { value: '3' } });
-    fireEvent.blur(screen.getByLabelText('Lane A concurrency'));
+    fireEvent.click(screen.getByRole('button', { name: 'Increase Lane A concurrency' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
 
     expect(screen.getByText('Saving…')).toBeInTheDocument();
 
@@ -178,8 +180,10 @@ describe('RunSettingsPanel', () => {
       onChange={onChange}
     />);
 
-    fireEvent.change(screen.getByLabelText('Lane A concurrency'), { target: { value: '5' } });
-    fireEvent.blur(screen.getByLabelText('Lane A concurrency'));
+    fireEvent.click(screen.getByRole('button', { name: 'Increase Lane A concurrency' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
 
     await act(async () => {
       await Promise.resolve();
@@ -189,7 +193,7 @@ describe('RunSettingsPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
-    expect(onChange).toHaveBeenNthCalledWith(2, { laneAConcurrency: 5 });
+    expect(onChange).toHaveBeenNthCalledWith(2, { laneAConcurrency: 3 });
 
     await act(async () => {
       await Promise.resolve();
@@ -207,13 +211,57 @@ describe('RunSettingsPanel', () => {
 
     expect(screen.getByText('last saved —')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Lane A concurrency'), { target: { value: '4' } });
-    fireEvent.blur(screen.getByLabelText('Lane A concurrency'));
-
+    fireEvent.click(screen.getByRole('button', { name: 'Increase Lane A concurrency' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
     await act(async () => {
       await Promise.resolve();
     });
     expect(screen.getByText('last saved 20:15:42Z')).toBeInTheDocument();
+  });
+
+  it('debounces two rapid increments into a single patch', async () => {
+    const onChange = vi.fn(async () => {});
+    render(<RunSettingsPanel
+      settings={{ laneAConcurrency: 1, posture: 'open' }}
+      onChange={onChange}
+    />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Increase Lane A concurrency' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Increase Lane A concurrency' }));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(onChange).toHaveBeenCalledOnce();
+    expect(onChange).toHaveBeenCalledWith({ laneAConcurrency: 3 });
+  });
+
+  it('disables the decrement button at 1 and the increment button at 8', () => {
+    const { rerender } = render(<RunSettingsPanel
+      settings={{ laneAConcurrency: 1, posture: 'open' }}
+      onChange={vi.fn(async () => {})}
+    />);
+    expect(screen.getByRole('button', { name: 'Decrease Lane A concurrency' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Increase Lane A concurrency' })).toBeEnabled();
+
+    rerender(<RunSettingsPanel
+      settings={{ laneAConcurrency: 8, posture: 'open' }}
+      onChange={vi.fn(async () => {})}
+    />);
+    expect(screen.getByRole('button', { name: 'Increase Lane A concurrency' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Decrease Lane A concurrency' })).toBeEnabled();
+  });
+
+  it('renders the Lane A/Lane B hint copy', () => {
+    render(<RunSettingsPanel
+      settings={{ laneAConcurrency: 2, posture: 'open' }}
+      onChange={vi.fn(async () => {})}
+    />);
+
+    expect(screen.getByText(/Lane B ignores this — it is always one item at a time, in order\./)).toBeInTheDocument();
   });
 
   it('does not render a global saving/error line', () => {

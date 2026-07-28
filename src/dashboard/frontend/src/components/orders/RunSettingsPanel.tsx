@@ -92,8 +92,12 @@ function SaveChip({ save }: { save: SaveState }) {
   return null;
 }
 
+const LANE_A_MIN = 1;
+const LANE_A_MAX = 8;
+const LANE_A_DEBOUNCE_MS = 500;
+
 export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) {
-  const [concurrency, setConcurrency] = useState(String(settings.laneAConcurrency));
+  const [concurrency, setConcurrency] = useState(settings.laneAConcurrency);
   const [briefOverlay, setBriefOverlay] = useState(settings.briefOverlay ?? '');
   const [pendingTo, setPendingTo] = useState<OrderBookPosture | null>(null);
   const [confirmReason, setConfirmReason] = useState('');
@@ -105,8 +109,9 @@ export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) 
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const savedTimers = useRef<Record<FieldId, ReturnType<typeof setTimeout> | undefined>>({} as never);
   const confirmReasonInputRef = useRef<HTMLInputElement | null>(null);
+  const laneDebounceTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  useEffect(() => setConcurrency(String(settings.laneAConcurrency)), [settings.laneAConcurrency]);
+  useEffect(() => setConcurrency(settings.laneAConcurrency), [settings.laneAConcurrency]);
   useEffect(() => setBriefOverlay(settings.briefOverlay ?? ''), [settings.briefOverlay]);
 
   useEffect(() => {
@@ -129,25 +134,46 @@ export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) 
     );
   };
 
+  const adjustConcurrency = (delta: number) => {
+    setConcurrency((current) => {
+      const next = Math.min(LANE_A_MAX, Math.max(LANE_A_MIN, current + delta));
+      clearTimeout(laneDebounceTimer.current);
+      laneDebounceTimer.current = setTimeout(() => runSave('lane', { laneAConcurrency: next }), LANE_A_DEBOUNCE_MS);
+      return next;
+    });
+  };
+
   return (
     <section className="rounded-lg border border-border bg-card p-4" aria-label="Run settings">
       <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Run settings</h2>
       <div className="mt-3 grid gap-3 text-xs">
         <div className="flex items-center gap-3">
-          <span className="flex-1 text-muted-foreground">Lane A concurrency</span>
+          <div className="flex-1">
+            <span className="text-muted-foreground">Lane A concurrency</span>
+            <p className="text-[11px] text-muted-foreground">How many parallel-safe Lane A items may run at once. Lane B ignores this — it is always one item at a time, in order.</p>
+          </div>
           <SaveChip save={saves.lane} />
-          <input
-            aria-label="Lane A concurrency"
-            type="number"
-            min={1}
-            value={concurrency}
-            onChange={(event) => setConcurrency(event.target.value)}
-            onBlur={() => {
-              const value = Number(concurrency);
-              if (Number.isInteger(value) && value > 0 && value !== settings.laneAConcurrency) runSave('lane', { laneAConcurrency: value });
-            }}
-            className="w-16 rounded-md border border-input bg-background px-2 py-1 text-right font-mono text-foreground"
-          />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-label="Decrease Lane A concurrency"
+              disabled={concurrency <= LANE_A_MIN}
+              onClick={() => adjustConcurrency(-1)}
+              className="rounded-md border border-input px-2 py-1 text-foreground disabled:opacity-40"
+            >
+              −
+            </button>
+            <span className="w-4 text-center font-mono tabular-nums text-foreground">{concurrency}</span>
+            <button
+              type="button"
+              aria-label="Increase Lane A concurrency"
+              disabled={concurrency >= LANE_A_MAX}
+              onClick={() => adjustConcurrency(1)}
+              className="rounded-md border border-input px-2 py-1 text-foreground disabled:opacity-40"
+            >
+              +
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <span className="flex-1 text-muted-foreground">Brief overlay</span>
