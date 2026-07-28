@@ -194,17 +194,17 @@
     "recordedAt": "2026-07-28T22:30:42.486Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T22:30:52.178Z",
+  "updated": "2026-07-28T22:31:21.434Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T22:30:51.514Z",
+    "updatedAt": "2026-07-28T22:31:21.402Z",
     "reviewNotes": "Agent re-review request (1/25): Addressed feedback: graceful restart restores the running projection on a late pending-decision refusal; added route-level fake-timer coverage proving stop is not called.",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -330,9 +330,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4358217,
-            "output": 304248,
-            "cacheRead": 187971072,
+            "input": 4365410,
+            "output": 304764,
+            "cacheRead": 188599808,
             "cacheWrite": 0
           }
         }
@@ -345,15 +345,15 @@
           "cacheWrite": 121982
         },
         "openai/gpt-5.6-sol": {
-          "input": 11697630,
-          "output": 574483,
-          "cacheRead": 245893120,
+          "input": 11704823,
+          "output": 574999,
+          "cacheRead": 246521856,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 209.65882200000001,
-        "pricingAsOf": "2026-07-28T22:30:51.525Z"
+        "usd": 210.024635,
+        "pricingAsOf": "2026-07-28T22:31:21.421Z"
       }
     },
     "merges": [
