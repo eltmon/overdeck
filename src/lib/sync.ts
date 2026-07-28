@@ -622,6 +622,9 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     result.errors.push(`codex-global: ${err?.message ?? err}`);
   }
 
+  // PAN-1837 (D6): kimi-code intentionally gets no dedicated global render file here —
+  // it reads the shared AGENTS.md layer natively via ~/.agents/skills discovery, same as acp.
+
   // Clean stale agent instructions in every project; Beads itself remains installed.
   for (const { config } of listProjectsSync()) {
     if (!existsSync(config.path)) continue;

@@ -45,6 +45,15 @@ describe('renderForHarness', () => {
     const c = 'A\n\n{{#harness:ohmypi}}\nohmypi\n{{/harness:ohmypi}}\n\nB';
     expect(renderForHarness(c, 'claude-code')).not.toMatch(/\n{3,}/);
   });
+
+  it('keeps {{#harness:kimi-code}} spans when rendering for kimi-code and drops them for every other harness (PAN-1837 wi9.ac1)', () => {
+    const c = 'A\n{{#harness:kimi-code}}\nkimi-only\n{{/harness:kimi-code}}\nB';
+    expect(renderForHarness(c, 'kimi-code')).toContain('kimi-only');
+    expect(renderForHarness(c, 'claude-code')).not.toContain('kimi-only');
+    expect(renderForHarness(c, 'ohmypi')).not.toContain('kimi-only');
+    expect(renderForHarness(c, 'codex')).not.toContain('kimi-only');
+    expect(renderForHarness(c, 'acp')).not.toContain('kimi-only');
+  });
 });
 
 describe('validateTemplate', () => {
@@ -76,5 +85,11 @@ describe('validateTemplate', () => {
     const v = validateTemplate('{{#harness:codex}}x{{/harness:codex}}');
     expect(v.ok).toBe(true);
     expect(v.issues.some((i) => i.severity === 'warning' && /codex/.test(i.message))).toBe(false);
+  });
+
+  it('does not warn on the kimi-code harness name (PAN-1837 wi9.ac1 — now a known harness)', () => {
+    const v = validateTemplate('{{#harness:kimi-code}}x{{/harness:kimi-code}}');
+    expect(v.ok).toBe(true);
+    expect(v.issues.some((i) => i.severity === 'warning' && /kimi-code/.test(i.message))).toBe(false);
   });
 });
