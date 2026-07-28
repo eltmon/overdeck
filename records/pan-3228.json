@@ -191,7 +191,7 @@
     "recordedAt": "2026-07-28T22:30:42.486Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T22:45:00.457Z",
+  "updated": "2026-07-28T22:45:26.645Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "pending",
@@ -216,7 +216,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3241",
     "reviewedAtCommit": "91c637dfa6d4fe02c4c207ac6aa8c0d1f85ff2cb",
     "lastVerifiedCommit": "91c637dfa6d4fe02c4c207ac6aa8c0d1f85ff2cb",
-    "reviewRequestedAt": "2026-07-28T22:30:43.337Z",
+    "reviewRequestedAt": "2026-07-28T22:45:26.215Z",
     "reviewSpawnedAt": "2026-07-28T22:31:36.079Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -307,7 +307,8 @@
         "tests/unit/lib/cloister/deacon-swarm-recovery.test.ts"
       ],
       "recordedAt": "2026-07-28T22:30:42.486Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-28T22:45:26.215Z"
   },
   "closeOut": {
     "usage": {
