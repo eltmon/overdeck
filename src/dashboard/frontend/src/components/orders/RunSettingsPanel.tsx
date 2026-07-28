@@ -114,6 +114,7 @@ export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) 
   const confirmReasonInputRef = useRef<HTMLInputElement | null>(null);
   const laneDebounceTimer = useRef<ReturnType<typeof setTimeout>>();
   const briefDebounceTimer = useRef<ReturnType<typeof setTimeout>>();
+  const briefCommittedRef = useRef(settings.briefOverlay ?? '');
 
   useEffect(() => setConcurrency(settings.laneAConcurrency), [settings.laneAConcurrency]);
   useEffect(() => setBriefOverlay(settings.briefOverlay ?? ''), [settings.briefOverlay]);
@@ -151,13 +152,18 @@ export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) 
     clearTimeout(briefDebounceTimer.current);
     briefDebounceTimer.current = setTimeout(() => {
       const trimmed = value.trim();
-      const persisted = settings.briefOverlay ?? '';
       if (trimmed === '') {
-        if (persisted !== '') runSave('brief', { briefOverlay: '' });
+        if (briefCommittedRef.current !== '') {
+          briefCommittedRef.current = '';
+          runSave('brief', { briefOverlay: '' });
+        }
         return;
       }
       if (!BRIEF_MD_PATTERN.test(trimmed)) return;
-      if (trimmed !== persisted) runSave('brief', { briefOverlay: trimmed });
+      if (trimmed !== briefCommittedRef.current) {
+        briefCommittedRef.current = trimmed;
+        runSave('brief', { briefOverlay: trimmed });
+      }
     }, BRIEF_DEBOUNCE_MS);
   };
 

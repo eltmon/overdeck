@@ -71,6 +71,42 @@ describe('RunSettingsPanel', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('resets all transaction state when the parent keys the panel by a new book id (no cross-book leakage)', async () => {
+    const onChangeA = vi.fn(async () => {});
+    const { rerender } = render(
+      <RunSettingsPanel key="book-a" settings={{ laneAConcurrency: 2, posture: 'open' }} onChange={onChangeA} />,
+    );
+
+    // Open a Drain confirmation for book A but do not confirm it.
+    fireEvent.click(screen.getByRole('button', { name: 'drain' }));
+    fireEvent.change(screen.getByLabelText('Posture reason'), { target: { value: "Book A's reason" } });
+    expect(screen.getByLabelText('Posture reason')).toBeInTheDocument();
+
+    // Simulate BookStrip switching selectedId — OrderBookPage keys RunSettingsPanel by book id.
+    const onChangeB = vi.fn(async () => {});
+    rerender(
+      <RunSettingsPanel key="book-b" settings={{ laneAConcurrency: 4, posture: 'open' }} onChange={onChangeB} />,
+    );
+
+    // Book B must render fresh: no leftover confirm, and book A's onChange must never fire.
+    expect(screen.queryByLabelText('Posture reason')).not.toBeInTheDocument();
+    expect(onChangeA).not.toHaveBeenCalled();
+
+    // A fresh posture change on book B calls only book B's onChange.
+    fireEvent.click(screen.getByRole('button', { name: 'drain' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to drain' }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(onChangeB).toHaveBeenCalledWith({
+      posture: 'drain',
+      postureReason: 'Operator paused new pickup.',
+    });
+    expect(onChangeA).not.toHaveBeenCalled();
+  });
+
   it('prefills the confirm reason and consequence copy for the clicked target', () => {
     const { rerender } = render(<RunSettingsPanel
       settings={{ laneAConcurrency: 2, posture: 'open' }}
@@ -313,6 +349,36 @@ describe('RunSettingsPanel', () => {
 
     expect(onChange).toHaveBeenCalledWith({ briefOverlay: '' });
     expect(screen.getByText('None — items run with their PRDs alone.')).toBeInTheDocument();
+  });
+
+  it('does not drop a reverted brief-overlay edit made while an earlier save is in flight', async () => {
+    let resolveFirst: () => void = () => {};
+    const onChange = vi.fn()
+      .mockImplementationOnce(() => new Promise<void>((resolve) => { resolveFirst = resolve; }))
+      .mockResolvedValue(undefined);
+    render(<RunSettingsPanel
+      settings={{ laneAConcurrency: 2, posture: 'open', briefOverlay: 'docs/briefs/old.md' }}
+      onChange={onChange}
+    />);
+
+    fireEvent.change(screen.getByLabelText('Brief overlay'), { target: { value: 'docs/briefs/new.md' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(550);
+    });
+    expect(onChange).toHaveBeenNthCalledWith(1, { briefOverlay: 'docs/briefs/new.md' });
+
+    // Revert to the original value before the in-flight save for 'new.md' resolves.
+    fireEvent.change(screen.getByLabelText('Brief overlay'), { target: { value: 'docs/briefs/old.md' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(550);
+    });
+    expect(onChange).toHaveBeenNthCalledWith(2, { briefOverlay: 'docs/briefs/old.md' });
+    expect(onChange).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveFirst();
+      await Promise.resolve();
+    });
   });
 
   it('renders the off-book lock-glyph policy line', () => {
