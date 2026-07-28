@@ -22,6 +22,11 @@
       "reason": "feedback",
       "note": "[2026-07-28T19:07Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-28T19:07:35.518Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-28T19:13Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-28T19:13:42.868Z"
     }
   ],
   "feedback": [
@@ -30,6 +35,13 @@
       "specialist": "review-agent",
       "outcome": "changes-requested",
       "timestamp": "2026-07-28T19:07:35Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3230\n\n# Review — PAN-3230\n\n## Verdict: CHANGES REQUESTED\n\nHEAD reviewed: `ce4feae7b06ca159b5967603f389d4919236fa01`\n\n## Blocking findings\n\n### ! [correctness] Auto-synthesis now writes canonical state outside the spec write door — `src/lib/xbrief/auto-synthesize.ts:148`\n\nFor a migrated project, `projectSpecsDir` is the `overdeck-state` worktree, but lines 148–149 still call bare `mkdir`/`writeFile`. That bypasses `writeSpecForIssue` / `writeSpecDocument`, so the write is neither atomic nor committed and pushed before the short-lived `pan start --auto` process can exit. The write-door implementation explicitly warns that an unflushed spec write strands a dirty state-worktree file (`src/lib/pan-dir/specs.ts:337-344`), and both CLI and dashboard auto-start call this function without a later flush. A process or machine failure before the patrol backstop runs leaves the synthesized plan local-only; a failure during `writeFile` can also leave an unreadable canonical spec. Route this through the canonical spec writer and add a durability assertion that the state worktree is clean after the write.\n\n### ! [requirements] The path lint guard misses multiline hardcoded joins — `scripts/lint-state-paths.sh:25`\n\nFR-8 requires the guard to fail on any non-allowlisted hardcoded `.pan/specs` / `.pan/drafts` join, but the line-oriented grep requires `'.pan', 'specs'` to appear on one physical line. This common formatted form passes with exit 0:\n\n```ts\nconst specsDir = join(\n  projectRoot,\n  '.pan',\n  'specs',\n);\n```\n\nI reproduced that result against the committed script: it printed `state-path lint passed`. This allows the exact regression the guard is meant to prevent. Make the scan formatting-independent and add a multiline fixture test for both `specs` and `drafts`.\n\n## Non-blocking review\n\n- **Security:** No new trust-boundary, injection, credential, or destructive-operation issue was found in the read-path substitutions.\n- **Performance:** The resolver is hoisted outside per-issue loops at the changed flywheel and backlog sites, so the changes do not add repeated marker/config reads inside hot closures.\n- **Requirements:** The reconciler, doctor, flywheel, backlog, and tier-supervisor read paths otherwise use `getProjectPanPaths` as required, and the pickup gate is unchanged.\n\n## Verification performed\n\n- Targeted Vitest run: 4 files, 55 tests passed.\n- `npm run lint:state-paths`: passed on the current tree.\n- Adversarial multiline fixture: incorrectly passed, confirming the second blocker.\n- PR lint/build/guard/smoke checks were green at review time; the main test job was still pending.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3230/.pan/review/agent-pan-3230-review-ce4feae7/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3230 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-28T19:13:42Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-3230\n\n# Review — PAN-3230\n\n## Verdict: CHANGES REQUESTED\n\nHEAD reviewed: `ce4feae7b06ca159b5967603f389d4919236fa01`\n\n## Blocking findings\n\n### ! [correctness] Auto-synthesis now writes canonical state outside the spec write door — `src/lib/xbrief/auto-synthesize.ts:148`\n\nFor a migrated project, `projectSpecsDir` is the `overdeck-state` worktree, but lines 148–149 still call bare `mkdir`/`writeFile`. That bypasses `writeSpecForIssue` / `writeSpecDocument`, so the write is neither atomic nor committed and pushed before the short-lived `pan start --auto` process can exit. The write-door implementation explicitly warns that an unflushed spec write strands a dirty state-worktree file (`src/lib/pan-dir/specs.ts:337-344`), and both CLI and dashboard auto-start call this function without a later flush. A process or machine failure before the patrol backstop runs leaves the synthesized plan local-only; a failure during `writeFile` can also leave an unreadable canonical spec. Route this through the canonical spec writer and add a durability assertion that the state worktree is clean after the write.\n\n### ! [requirements] The path lint guard misses multiline hardcoded joins — `scripts/lint-state-paths.sh:25`\n\nFR-8 requires the guard to fail on any non-allowlisted hardcoded `.pan/specs` / `.pan/drafts` join, but the line-oriented grep requires `'.pan', 'specs'` to appear on one physical line. This common formatted form passes with exit 0:\n\n```ts\nconst specsDir = join(\n  projectRoot,\n  '.pan',\n  'specs',\n);\n```\n\nI reproduced that result against the committed script: it printed `state-path lint passed`. This allows the exact regression the guard is meant to prevent. Make the scan formatting-independent and add a multiline fixture test for both `specs` and `drafts`.\n\n## Non-blocking review\n\n- **Security:** No new trust-boundary, injection, credential, or destructive-operation issue was found in the read-path substitutions.\n- **Performance:** The resolver is hoisted outside per-issue loops at the changed flywheel and backlog sites, so the changes do not add repeated marker/config reads inside hot closures.\n- **Requirements:** The reconciler, doctor, flywheel, backlog, and tier-supervisor read paths otherwise use `getProjectPanPaths` as required, and the pickup gate is unchanged.\n\n## Verification performed\n\n- Targeted Vitest run: 4 files, 55 tests passed.\n- `npm run lint:state-paths`: passed on the current tree.\n- Adversarial multiline fixture: incorrectly passed, confirming the second blocker.\n- PR lint/build/guard/smoke checks were green at review time; the main test job was still pending.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3230/.pan/review/agent-pan-3230-review-ce4feae7/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3230 -m \"Fixed review issues\"`"
     }
   ],
@@ -73,7 +85,7 @@
     "recordedAt": "2026-07-28T18:59:19.959Z"
   },
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T19:13:42.200Z",
+  "updated": "2026-07-28T19:13:42.868Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "blocked",
