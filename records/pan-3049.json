@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T07:33:18.285Z",
+  "updated": "2026-07-28T07:33:27.813Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,8 +79,16 @@
     }
   ],
   "tasks": {
-    "sequence": 18,
-    "claims": {},
+    "sequence": 19,
+    "claims": {
+      "docs-container-naming": {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 483765,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T07:33:27.813Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -253,6 +261,7 @@
     "doctor-duplicate-stack-check.doctor-duplicate-stack-check.ac3": "completed",
     "overdeck-template-compose-name": "completed",
     "overdeck-template-compose-name.overdeck-template-compose-name.ac1": "completed",
-    "overdeck-template-compose-name.overdeck-template-compose-name.ac2": "completed"
+    "overdeck-template-compose-name.overdeck-template-compose-name.ac2": "completed",
+    "docs-container-naming": "running"
   }
 }
