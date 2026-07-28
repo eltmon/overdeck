@@ -7,7 +7,8 @@
  * Data: dashboard store (issues, agents, review status, pending input).
  */
 import { useMemo, useState } from 'react';
-import { useDashboardStore, selectPendingInputSubjects, type PendingInputSubject } from '../../lib/store';
+import { useDashboardStore, type PendingInputSubject } from '../../lib/store';
+import { usePendingInputSubjects } from '../../lib/useDecisions';
 import type { Issue } from '../../types';
 import type { AgentSnapshot } from '@overdeck/contracts';
 import { bucketSimpleHome, deriveSimpleIssue, type SimpleIssueDerivation, type NeedsYouKind } from '../../lib/simple/derive';
@@ -179,7 +180,7 @@ export function SimpleHomePage() {
   const issuesRaw = useDashboardStore((s) => s.issuesRaw);
   const agentsById = useDashboardStore((s) => s.agentsById);
   const reviewByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
-  const pendingSubjects = useDashboardStore(selectPendingInputSubjects);
+  const pendingSubjects = usePendingInputSubjects();
   const openSimpleIssue = useUiMode((s) => s.openSimpleIssue);
 
   const { derivations, buckets, byIdentifier } = useMemo(() => {

@@ -7,7 +7,8 @@
  * issue drawer).
  */
 import { useMemo, useState } from 'react';
-import { useDashboardStore, selectPendingInputSubjects } from '../../lib/store';
+import { useDashboardStore } from '../../lib/store';
+import { usePendingInputSubjects } from '../../lib/useDecisions';
 import type { Issue } from '../../types';
 import type { AgentSnapshot } from '@overdeck/contracts';
 import { bucketSimpleHome, deriveSimpleIssue, type SimpleIssueDerivation, type NeedsYouKind } from '../../lib/simple/derive';
@@ -104,7 +105,7 @@ export function NeedsYouStrip({ onOpenIssue }: { onOpenIssue: (id: string) => vo
   const issuesRaw = useDashboardStore((s) => s.issuesRaw);
   const agentsById = useDashboardStore((s) => s.agentsById);
   const reviewByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
-  const pendingSubjects = useDashboardStore(selectPendingInputSubjects);
+  const pendingSubjects = usePendingInputSubjects();
 
   const { items, questions } = useMemo(() => {
     const issues = (issuesRaw as Issue[]) ?? [];

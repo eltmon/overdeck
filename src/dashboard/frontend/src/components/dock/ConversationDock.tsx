@@ -9,7 +9,8 @@
 import { useMemo, useState } from 'react';
 import { X, MessageSquare } from 'lucide-react';
 import { useConvoDock } from '../../lib/convoDock';
-import { selectPendingInputSubjects, useDashboardStore } from '../../lib/store';
+import { useDashboardStore } from '../../lib/store';
+import { usePendingInputSubjects } from '../../lib/useDecisions';
 import type { Issue } from '../../types';
 import type { Agent } from '../../types';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from '../drawer/DrawerAgentSession';
@@ -57,7 +58,7 @@ function DockPanel({ issueId, needsYou, onClose }: { issueId: string; needsYou: 
 
 export function ConversationDock() {
   const { items, expanded, remove, setExpanded } = useConvoDock();
-  const pendingSubjects = useDashboardStore(selectPendingInputSubjects);
+  const pendingSubjects = usePendingInputSubjects();
   const needsYouIds = useMemo(
     () => new Set((pendingSubjects ?? []).map((s) => s.issueId?.toLowerCase()).filter(Boolean)),
     [pendingSubjects],
