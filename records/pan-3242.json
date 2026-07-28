@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-28T20:38:27.662Z",
+  "updated": "2026-07-28T20:40:48.940Z",
   "pipeline": {
     "issueId": "PAN-3242",
     "reviewStatus": "pending",
@@ -72,16 +72,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "lane-stepper": {
-        "writerId": "agent-pan-3242",
-        "agentId": "agent-pan-3242",
-        "pid": 3963307,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:38:27.662Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3242",
@@ -112,6 +104,16 @@
         "itemId": "posture-attribution",
         "outcome": "completed",
         "releasedAt": "2026-07-28T20:38:03.617Z"
+      },
+      {
+        "writerId": "agent-pan-3242",
+        "agentId": "agent-pan-3242",
+        "pid": 3963307,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:38:27.662Z",
+        "itemId": "lane-stepper",
+        "outcome": "completed",
+        "releasedAt": "2026-07-28T20:40:48.940Z"
       }
     ]
   },
@@ -130,6 +132,9 @@
     "posture-attribution.posture-attribution.ac1": "completed",
     "posture-attribution.posture-attribution.ac2": "completed",
     "posture-attribution.posture-attribution.ac3": "completed",
-    "lane-stepper": "running"
+    "lane-stepper": "completed",
+    "lane-stepper.lane-stepper.ac1": "completed",
+    "lane-stepper.lane-stepper.ac2": "completed",
+    "lane-stepper.lane-stepper.ac3": "completed"
   }
 }
