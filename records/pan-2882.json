@@ -12,6 +12,11 @@
       "reason": "resume",
       "agentModel": "claude-haiku-4-5",
       "timestamp": "2026-07-28T07:08:33.761Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-07-28T07:32:28.834Z"
     }
   ],
   "feedback": [],
@@ -37,7 +42,7 @@
     "recordedAt": "2026-07-28T07:25:54.489Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T07:32:26.196Z",
+  "updated": "2026-07-28T07:32:28.835Z",
   "pipeline": {
     "issueId": "PAN-2882",
     "reviewStatus": "reviewing",
