@@ -110,7 +110,7 @@
     "recordedAt": "2026-07-28T17:49:31.882Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T18:18:15.197Z",
+  "updated": "2026-07-28T18:18:20.636Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "blocked",
@@ -120,7 +120,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:49:41.828Z",
-    "updatedAt": "2026-07-28T18:18:14.264Z",
+    "updatedAt": "2026-07-28T18:18:20.610Z",
     "reviewNotes": "! Scrollback text is accepted as proof that the pending payload is in the active composer — `src/lib/tmux-dedup.ts:187`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
     "reviewedAtCommit": "72d3b812b0d38b8a05441f6dd8f478386595c690",
@@ -191,7 +191,7 @@
       },
       "costAtCloseOut": {
         "usd": 103.847398,
-        "pricingAsOf": "2026-07-28T18:18:14.304Z"
+        "pricingAsOf": "2026-07-28T18:18:20.628Z"
       }
     },
     "merges": [
