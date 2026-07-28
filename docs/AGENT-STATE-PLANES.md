@@ -92,17 +92,24 @@ write-recency from verdict-truth:
   fallback stays undrained past 10 minutes, naming the current lock owner. The
   activity warning is emitted before, and independently of, the recovery-trip
   write: that write goes through the very lock whose contention is being
-  reported, so it is best-effort and retried on later patrols while the
-  operator-visible warning always lands. Once the trip is durably open the sweep
-  skips the write entirely — an open trip's mutator returns the record unchanged
-  but the write door still takes the lock, and a retained conflict is permanent,
-  so that would be a no-op record write every patrol forever on the lock under
-  repair. Dedupe rests on two lock-independent durable facts: the open trip
-  (`findRecoveryTrip()`, a lock-free record read) and the activity entry's
-  episode-derived `id` — the `activity.entry` reducer merges by id, so a repeat
-  refreshes one row instead of adding a second, which covers the case where the
-  trip write never lands at all. The in-process set is only an optimisation and
-  is dropped as soon as either durable plane takes over.
+  reported, so it is best-effort and retried on later patrols. Once the trip is
+  durably open the sweep skips the write entirely — an open trip's mutator
+  returns the record unchanged but the write door still takes the lock, and a
+  retained conflict is permanent, so that would be a no-op record write every
+  patrol forever on the lock under repair.
+
+  The warning goes through `emitActivityEntryOnce()`, keyed by recovery path +
+  issue + fallback generation. That call asks the event store whether the id was
+  already appended (`hasEventWithPayloadId`) and skips the append if so, then
+  awaits durability and reports `appended | duplicate | failed`. A reused id
+  alone would NOT be enough: the `activity.entry` reducer replaces the projected
+  row, but the event is still appended, re-published to every connected client,
+  and re-dated to the front of the feed — a second warning. The sweep marks an
+  episode warned only on `appended`/`duplicate`, so a failed append is retried on
+  the next patrol rather than suppressed; the in-process set is an optimisation,
+  not the dedupe of record. Where the wired store cannot answer the query — the
+  deacon-child HTTP append client — this degrades to at-least-once, on the view
+  that a repeated warning beats a lost one.
 - **A frozen test agent escalates.** A live, idle test session that was already
   nudged and wrote no `.pan/test/result.json` now yields `escalate` from
   `decideUnsignaledTestAction()` instead of being ignored forever; the deacon

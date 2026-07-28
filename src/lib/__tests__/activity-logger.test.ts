@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   emitActivityEntryDurable,
+  emitActivityEntryOnce,
   emitActivityEntrySync,
   emitActivityTtsSync,
   emitDashboardLifecycleSync,
@@ -92,5 +93,90 @@ describe('activity logger', () => {
         issueId: 'PAN-1744',
       },
     });
+  });
+});
+
+/**
+ * PAN-3092: FR-4 wants ONE operator warning per episode. Reusing a payload id
+ * only makes the reducer replace the visible row — the event is still appended
+ * and re-published — so the write door itself has to refuse the second append.
+ */
+describe('emitActivityEntryOnce (PAN-3092)', () => {
+  /** An event log with the same append/query surface as the real store. */
+  function createFakeStore(options: { failAppend?: boolean } = {}) {
+    const events: Array<{ type: string; payload: { id?: string } }> = [];
+    const published: Array<{ type: string }> = [];
+    return {
+      events,
+      published,
+      append: vi.fn(() => 1),
+      appendAsync: vi.fn(async (event: { type: string; payload: { id?: string } }) => {
+        if (options.failAppend) throw new Error('event store unavailable');
+        events.push(event);
+        published.push(event);
+        return events.length;
+      }),
+      hasEventWithPayloadId: vi.fn((type: string, id: string) =>
+        events.some((e) => e.type === type && e.payload?.id === id)),
+    };
+  }
+
+  const warning = {
+    id: 'verdict-fallback:verdict-fallback-contention:PAN-3092:2026-07-28T00:00:00.000Z',
+    source: 'cloister' as const,
+    level: 'warn' as const,
+    message: 'verdict fallback undrained',
+    issueId: 'PAN-3092',
+  };
+
+  afterEach(() => {
+    setActivityEventStoreProvider(null);
+  });
+
+  it('appends once and then refuses to append or publish the same episode again', async () => {
+    const fake = createFakeStore();
+    setActivityEventStoreProvider(() => fake);
+
+    expect(await emitActivityEntryOnce(warning)).toBe('appended');
+    // A "restart" is just another call with no in-memory state behind it.
+    expect(await emitActivityEntryOnce(warning)).toBe('duplicate');
+    expect(await emitActivityEntryOnce(warning)).toBe('duplicate');
+
+    // One durable event, one publication — not three of either.
+    expect(fake.events).toHaveLength(1);
+    expect(fake.published).toHaveLength(1);
+    expect(fake.appendAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports failure instead of swallowing it, so the caller can retry', async () => {
+    const failing = createFakeStore({ failAppend: true });
+    setActivityEventStoreProvider(() => failing);
+
+    expect(await emitActivityEntryOnce(warning)).toBe('failed');
+    expect(failing.events).toHaveLength(0);
+
+    // The retry lands once the store recovers — nothing suppressed it.
+    const healthy = createFakeStore();
+    setActivityEventStoreProvider(() => healthy);
+    expect(await emitActivityEntryOnce(warning)).toBe('appended');
+    expect(healthy.events).toHaveLength(1);
+  });
+
+  it('reports failure when no event store is wired at all', async () => {
+    setActivityEventStoreProvider(null);
+    expect(await emitActivityEntryOnce(warning)).toBe('failed');
+  });
+
+  it('still appends when the store cannot answer the duplicate query (at-least-once)', async () => {
+    // The deacon-child HTTP client can append but not query. Losing the warning
+    // there would be worse than repeating it.
+    const appendOnly = {
+      append: vi.fn(() => 1),
+      appendAsync: vi.fn(async () => 1),
+    };
+    setActivityEventStoreProvider(() => appendOnly);
+
+    expect(await emitActivityEntryOnce(warning)).toBe('appended');
+    expect(appendOnly.appendAsync).toHaveBeenCalledTimes(1);
   });
 });

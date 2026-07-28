@@ -25,21 +25,21 @@ import { resolveProjectFromIssueSync, getProjectSync } from '../projects.js';
 import { readOwner, recordLockPath } from '../pan-dir/fs-lock.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { findRecoveryTrip, recordRecoveryFailure } from './recovery-trip.js';
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntryOnce } from '../activity-logger.js';
 
 /** How long a fallback may stay undrained before the operator hears about it. */
 export const VERDICT_CONTENTION_SURFACE_MS = 10 * 60 * 1000;
 
 /**
- * Episodes warned about whose durable recovery trip is not yet on disk, keyed by
- * recovery path + issue + the fallback's own `updatedAt`.
+ * Episodes already warned about in THIS process, keyed by recovery path + issue
+ * + the fallback's own `updatedAt`.
  *
- * This is only an optimisation, never the dedupe of record: it saves a redundant
- * emit inside one process while the trip write keeps losing the contended lock.
- * Correctness across restarts comes from the two durable planes — the open
- * recovery trip, and the episode-derived activity-entry id. Entries are dropped
- * as soon as either plane takes over, so the set does not grow for the lifetime
- * of the server.
+ * Only an optimisation, never the dedupe of record: it saves re-querying the
+ * event log every patrol. Correctness across restarts comes from the two
+ * durable planes — the open recovery trip, and `emitActivityEntryOnce`'s
+ * event-log check on the episode id. An episode is added here only after the
+ * warning is confirmed durable, so a failed append is retried rather than
+ * suppressed, and entries are dropped once the trip lands.
  */
 const warnedEpisodes = new Set<string>();
 
@@ -167,21 +167,26 @@ export async function sweepStrandedVerdictFallbacks(now = Date.now()): Promise<s
       // lock. Ordering it after would put the only immediate operator signal
       // behind the very lock whose contention it is reporting.
       //
-      // Its id is derived from the episode, not random: `emitActivityEntry`
-      // treats a reused id as a newer state transition of the SAME logical
-      // activity, so this is a durable, lock-independent idempotency key. That
-      // is what keeps one episode to one operator warning even when the trip
-      // write never lands and a dashboard restart wipes the in-process set.
+      // `emitActivityEntryOnce` keys on the episode and checks the event log
+      // before appending, so a restart cannot produce a second warning event —
+      // a reused id alone would still append and re-publish one. It also awaits
+      // durability, so the episode is marked warned only when the warning
+      // actually landed; a failed append is retried on the next patrol instead
+      // of being silently suppressed by the in-process set.
       if (!warnedEpisodes.has(episode)) {
-        warnedEpisodes.add(episode);
-        emitActivityEntrySync({
+        const outcome = await emitActivityEntryOnce({
           id: `verdict-fallback:${episode}`,
           source: 'cloister',
           level: 'warn',
           issueId,
           message,
         });
-        actions.push(summary);
+        if (outcome === 'failed') {
+          actions.push(`${issueId}: verdict-fallback warning could not be recorded — retrying next patrol`);
+        } else {
+          warnedEpisodes.add(episode);
+          if (outcome === 'appended') actions.push(summary);
+        }
       }
 
       // The durable trip is best-effort and retried on later patrols: it writes

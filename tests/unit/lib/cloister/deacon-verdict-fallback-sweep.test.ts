@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   findWorkspaceVerdictConflicts: vi.fn(),
   recordRecoveryFailure: vi.fn(),
   findRecoveryTrip: vi.fn(),
-  emitActivityEntrySync: vi.fn(),
+  emitActivityEntryOnce: vi.fn(),
   readOwner: vi.fn(),
   findWorkspacePath: vi.fn(),
 }));
@@ -53,7 +53,7 @@ vi.mock('../../../../src/lib/cloister/recovery-trip.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/activity-logger.js', () => ({
-  emitActivityEntrySync: mocks.emitActivityEntrySync,
+  emitActivityEntryOnce: mocks.emitActivityEntryOnce,
 }));
 
 import { VERDICT_CONTENTION_SURFACE_MS } from '../../../../src/lib/cloister/deacon-verdict-fallback-sweep.js';
@@ -85,6 +85,12 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
    * dashboard restart leaves the record on disk.
    */
   let durableTrips: Map<string, { open: boolean; tripCount: number }>;
+  /**
+   * The durable activity log, as the event store would hold it. Assertions run
+   * against appended events rather than call counts, because a repeat call that
+   * appends nothing is exactly the behaviour under test.
+   */
+  let activityEvents: Array<{ id: string; message?: string }>;
   // Each test gets its own module instance so the sweep's process-local dedupe
   // set cannot leak between cases — and so "restart" means exactly one thing.
   let sweepStrandedVerdictFallbacks: (now?: number) => Promise<string[]>;
@@ -93,7 +99,14 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     durableTrips = new Map();
+    activityEvents = [];
     sweepStrandedVerdictFallbacks = await loadSweep();
+    // Mirrors emitActivityEntryOnce: append once per id, never twice.
+    mocks.emitActivityEntryOnce.mockImplementation(async (opts: { id: string; message?: string }) => {
+      if (activityEvents.some((e) => e.id === opts.id)) return 'duplicate';
+      activityEvents.push(opts);
+      return 'appended';
+    });
     mocks.loadReviewStatuses.mockReturnValue({ [ISSUE]: { issueId: ISSUE, reviewStatus: 'reviewing' } });
     mocks.readWorkspaceVerdictFallback.mockResolvedValue(null);
     mocks.drainWorkspaceVerdictFallback.mockResolvedValue(true);
@@ -153,8 +166,8 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     expect(second).toEqual([]);
     expect(third).toEqual([]);
 
-    expect(mocks.emitActivityEntrySync).toHaveBeenCalledTimes(1);
-    const entry = mocks.emitActivityEntrySync.mock.calls[0]![0] as Record<string, unknown>;
+    expect(mocks.emitActivityEntryOnce).toHaveBeenCalledTimes(1);
+    const entry = mocks.emitActivityEntryOnce.mock.calls[0]![0] as Record<string, unknown>;
     expect(entry.source).toBe('cloister');
     expect(entry.level).toBe('warn');
     expect(entry.issueId).toBe(ISSUE);
@@ -184,8 +197,8 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     const first = await sweepStrandedVerdictFallbacks(NOW);
     const second = await sweepStrandedVerdictFallbacks(NOW + 60_000);
 
-    expect(mocks.emitActivityEntrySync).toHaveBeenCalledTimes(1);
-    expect(String((mocks.emitActivityEntrySync.mock.calls[0]![0] as Record<string, unknown>).message))
+    expect(mocks.emitActivityEntryOnce).toHaveBeenCalledTimes(1);
+    expect(String((mocks.emitActivityEntryOnce.mock.calls[0]![0] as Record<string, unknown>).message))
       .toContain('record lock is contended');
     // The failed durable trip is reported, not swallowed, and retried next patrol.
     expect(first.some((a) => a.includes('could not be recorded'))).toBe(true);
@@ -215,7 +228,7 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
       await sweepStrandedVerdictFallbacks(NOW);
 
       const message = String(
-        (mocks.emitActivityEntrySync.mock.calls[0]![0] as Record<string, unknown>).message,
+        (mocks.emitActivityEntryOnce.mock.calls[0]![0] as Record<string, unknown>).message,
       );
       expect(message).toContain(gate);
       expect(message).toContain(`"${journalValue}"`);
@@ -239,7 +252,7 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     const actions = await sweepStrandedVerdictFallbacks(NOW);
 
     const message = String(
-      (mocks.emitActivityEntrySync.mock.calls[0]![0] as Record<string, unknown>).message,
+      (mocks.emitActivityEntryOnce.mock.calls[0]![0] as Record<string, unknown>).message,
     );
     // A single-gate command could never settle both — both are named instead.
     expect(message).toContain('2 gates');
@@ -262,7 +275,7 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     await sweepStrandedVerdictFallbacks(NOW);
 
     const message = String(
-      (mocks.emitActivityEntrySync.mock.calls[0]![0] as Record<string, unknown>).message,
+      (mocks.emitActivityEntryOnce.mock.calls[0]![0] as Record<string, unknown>).message,
     );
     expect(message).toContain('do not expect a re-signal of an existing value to clear this');
   });
@@ -282,7 +295,7 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     const actions = await sweepStrandedVerdictFallbacks(NOW);
 
     const message = String(
-      (mocks.emitActivityEntrySync.mock.calls[0]![0] as Record<string, unknown>).message,
+      (mocks.emitActivityEntryOnce.mock.calls[0]![0] as Record<string, unknown>).message,
     );
     // Names the gate and BOTH written values, so the operator can adjudicate.
     expect(message).toContain('reviewStatus');
@@ -313,9 +326,10 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     mocks.recordRecoveryFailure.mockRejectedValue(new Error('record lock is held'));
 
     await sweepStrandedVerdictFallbacks(NOW);
-    expect(mocks.emitActivityEntrySync).toHaveBeenCalledTimes(1);
-    const firstId = (mocks.emitActivityEntrySync.mock.calls[0]![0] as Record<string, unknown>).id;
-    expect(firstId).toBe(`verdict-fallback:verdict-fallback-contention:${ISSUE}:${fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 60_000).updatedAt}`);
+    expect(activityEvents).toHaveLength(1);
+    expect(activityEvents[0]!.id).toBe(
+      `verdict-fallback:verdict-fallback-contention:${ISSUE}:${fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 60_000).updatedAt}`,
+    );
 
     // Dashboard restart: in-process state is gone and no durable trip exists.
     const afterRestart = await loadSweep();
@@ -323,14 +337,31 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
 
     await afterRestart(NOW + 60_000);
 
-    // A second emit happens, but it reuses the SAME id — the activity log treats
-    // that as a further state transition of one logical entry, so the operator
-    // still sees a single warning for this episode rather than a nag loop.
-    const ids = mocks.emitActivityEntrySync.mock.calls.map(
-      (call) => (call[0] as Record<string, unknown>).id,
+    // Still ONE durable activity event for this episode. A reused id alone would
+    // not have been enough — it replaces the projected row but still appends and
+    // re-publishes a second event, which is the repeat warning FR-4 forbids.
+    expect(activityEvents).toHaveLength(1);
+  });
+
+  it('retries the warning on the next patrol when the activity append fails (PAN-3092)', async () => {
+    // The in-process set must not mark an episode warned before the write is
+    // durable, or a transient store failure leaves the operator with nothing
+    // until the next restart.
+    mocks.readWorkspaceVerdictFallback.mockResolvedValue(
+      fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 60_000),
     );
-    expect(new Set(ids).size).toBe(1);
-    expect(ids[1]).toBe(firstId);
+    mocks.drainWorkspaceVerdictFallback.mockResolvedValue(false);
+    mocks.recordRecoveryFailure.mockRejectedValue(new Error('record lock is held'));
+    mocks.emitActivityEntryOnce.mockResolvedValueOnce('failed');
+
+    const first = await sweepStrandedVerdictFallbacks(NOW);
+    expect(activityEvents).toHaveLength(0);
+    expect(first.some((a) => a.includes('could not be recorded'))).toBe(true);
+
+    // Same process, next patrol: the episode was never marked warned, so it retries.
+    const second = await sweepStrandedVerdictFallbacks(NOW + 60_000);
+    expect(activityEvents).toHaveLength(1);
+    expect(second.some((a) => a.includes('verdict contended'))).toBe(true);
   });
 
   it('makes no record write once the episode is durably surfaced (PAN-3092)', async () => {
@@ -350,7 +381,7 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     // Zero additional writes, while the drain is still retried every patrol.
     expect(mocks.recordRecoveryFailure).toHaveBeenCalledTimes(1);
     expect(mocks.drainWorkspaceVerdictFallback).toHaveBeenCalledTimes(3);
-    expect(mocks.emitActivityEntrySync).toHaveBeenCalledTimes(1);
+    expect(mocks.emitActivityEntryOnce).toHaveBeenCalledTimes(1);
   });
 
   it('clears its process-local key once the trip lands, so the durable plane owns dedupe (PAN-3092)', async () => {
@@ -360,14 +391,14 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     mocks.drainWorkspaceVerdictFallback.mockResolvedValue(false);
 
     await sweepStrandedVerdictFallbacks(NOW);
-    expect(mocks.emitActivityEntrySync).toHaveBeenCalledTimes(1);
+    expect(mocks.emitActivityEntryOnce).toHaveBeenCalledTimes(1);
 
     // An operator acknowledges the trip, clearing the durable plane. If the
     // in-process key had been retained, this episode could never warn again.
     durableTrips.clear();
     await sweepStrandedVerdictFallbacks(NOW + 60_000);
 
-    expect(mocks.emitActivityEntrySync).toHaveBeenCalledTimes(2);
+    expect(mocks.emitActivityEntryOnce).toHaveBeenCalledTimes(2);
   });
 
   it('does not repeat the warning after a dashboard restart clears module state (PAN-3092)', async () => {
@@ -377,7 +408,7 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     mocks.drainWorkspaceVerdictFallback.mockResolvedValue(false);
 
     await sweepStrandedVerdictFallbacks(NOW);
-    expect(mocks.emitActivityEntrySync).toHaveBeenCalledTimes(1);
+    expect(mocks.emitActivityEntryOnce).toHaveBeenCalledTimes(1);
 
     // Simulate a dashboard restart: module-local dedupe is gone, but the durable
     // recovery trip written above survives in the per-issue record.
@@ -387,7 +418,7 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     const actions = await afterRestart(NOW + 60_000);
 
     // The durable trip is consulted before warning, so the episode stays quiet.
-    expect(mocks.emitActivityEntrySync).toHaveBeenCalledTimes(1);
+    expect(mocks.emitActivityEntryOnce).toHaveBeenCalledTimes(1);
     expect(actions.some((a) => a.includes('verdict contended'))).toBe(false);
   });
 
@@ -401,7 +432,7 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
 
     expect(actions).toEqual([]);
     expect(mocks.recordRecoveryFailure).not.toHaveBeenCalled();
-    expect(mocks.emitActivityEntrySync).not.toHaveBeenCalled();
+    expect(mocks.emitActivityEntryOnce).not.toHaveBeenCalled();
   });
 
   it('keeps draining stuck and deacon-ignored issues without adding a second voice', async () => {
@@ -419,7 +450,7 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     expect(mocks.drainWorkspaceVerdictFallback).toHaveBeenCalledTimes(2);
     expect(actions).toEqual([]);
     expect(mocks.recordRecoveryFailure).not.toHaveBeenCalled();
-    expect(mocks.emitActivityEntrySync).not.toHaveBeenCalled();
+    expect(mocks.emitActivityEntryOnce).not.toHaveBeenCalled();
   });
 
   it('skips merged and closed-out issues entirely', async () => {

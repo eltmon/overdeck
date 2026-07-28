@@ -55,6 +55,13 @@ export interface EventStore {
   readFrom(fromSequence: number): StoredEvent[];
   /** Return events of a given type, most recent first, capped at limit. */
   queryByType(type: string, limit?: number): StoredEvent[];
+  /**
+   * PAN-3092: has an event of `type` with this `payload.id` already been
+   * appended? Lets a caller make an emit idempotent by its own identity key
+   * instead of relying on projection-time replacement, which still appends a
+   * second event and re-publishes it to every connected client.
+   */
+  hasEventWithPayloadId(type: string, id: string): boolean;
   /** Return the latest event per payload.issueId for a given event type. */
   queryLatestPerIssue(type: string): StoredEvent[];
   /**
@@ -193,6 +200,11 @@ export function createEventStore(db: DbAdapter): EventStore {
   );
   const purgeTypeStmt = db.prepare<void>(
     `DELETE FROM events WHERE type = ?`,
+  );
+  // PAN-3092: idx_events_type keeps this to the one event type, and LIMIT 1
+  // stops at the first match — the id is unique per logical activity.
+  const hasPayloadIdStmt = db.prepare<{ one: number }>(
+    `SELECT 1 AS one FROM events WHERE type = ? AND json_extract(payload, '$.id') = ? LIMIT 1`,
   );
 
   // ─── Async write queue ───────────────────────────────────────────────────────
@@ -352,6 +364,10 @@ export function createEventStore(db: DbAdapter): EventStore {
     return queryLatestPerIssueStmt.all([type]).map(rowToStored);
   }
 
+  function hasEventWithPayloadId(type: string, id: string): boolean {
+    return hasPayloadIdStmt.all([type, id]).length > 0;
+  }
+
   function queryByTypesSince(types: string[], afterSequence: number): StoredEvent[] {
     if (types.length === 0) return [];
     // The IN-list arity varies per call, so this statement is prepared per
@@ -376,6 +392,7 @@ export function createEventStore(db: DbAdapter): EventStore {
     readFrom,
     queryByType,
     queryLatestPerIssue,
+    hasEventWithPayloadId,
     queryByTypesSince,
     subscribe,
     compact,

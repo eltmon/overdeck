@@ -71,6 +71,12 @@ export interface EmitTtsOptions {
 interface ActivityEventStore {
   append(event: Omit<DomainEvent, 'sequence'>): number;
   appendAsync(event: Omit<DomainEvent, 'sequence'>): Promise<number>;
+  /**
+   * PAN-3092: optional. Present on the in-process SQLite store; absent on the
+   * deacon-child HTTP append client, which cannot query. `emitActivityEntryOnce`
+   * degrades to at-least-once when it is missing, and says so.
+   */
+  hasEventWithPayloadId?(type: string, id: string): boolean;
 }
 
 let activityEventStoreProvider: (() => ActivityEventStore) | null = null;
@@ -114,7 +120,11 @@ function appendActivityEvent(event: Omit<DomainEvent, 'sequence'>): void {
  * logical activity.
  */
 export async function emitActivityEntryDurable(options: EmitActivityOptions): Promise<void> {
-  await persistActivityEvent({
+  await persistActivityEvent(buildActivityEntryEvent(options));
+}
+
+function buildActivityEntryEvent(options: EmitActivityOptions): Omit<DomainEvent, 'sequence'> {
+  return {
     type: 'activity.entry' as const,
     timestamp: new Date().toISOString(),
     payload: {
@@ -130,7 +140,41 @@ export async function emitActivityEntryDurable(options: EmitActivityOptions): Pr
       link: options.link,
       desktop: options.desktop,
     },
-  });
+  } as Omit<DomainEvent, 'sequence'>;
+}
+
+/** Outcome of an idempotent activity emit. */
+export type ActivityEmitOutcome = 'appended' | 'duplicate' | 'failed';
+
+/**
+ * PAN-3092: emit an activity entry AT MOST ONCE for a given id, and tell the
+ * caller whether it landed.
+ *
+ * Reusing an id is not enough on its own: the reducer replaces the visible row,
+ * but a second `activity.entry` event is still appended, re-published to every
+ * connected client, and re-dated to the front of the feed — a repeat warning.
+ * This checks the log for that id first and skips the append entirely.
+ *
+ * It also AWAITS durability and reports the outcome, so a caller can mark work
+ * as "surfaced" only when it really was. `emitActivityEntrySync` swallows
+ * failures by design (it runs during early boot); a caller that needs the
+ * warning to be reliable must use this and retry on `'failed'`.
+ *
+ * Degrades to at-least-once when the wired store cannot answer the query (the
+ * deacon-child HTTP client): the append still happens rather than being lost.
+ */
+export async function emitActivityEntryOnce(
+  options: EmitActivityOptions & { id: string },
+): Promise<ActivityEmitOutcome> {
+  const store = getActivityEventStore();
+  if (!store) return 'failed';
+  try {
+    if (store.hasEventWithPayloadId?.('activity.entry', options.id)) return 'duplicate';
+    await persistActivityEvent(buildActivityEntryEvent(options));
+    return 'appended';
+  } catch {
+    return 'failed';
+  }
 }
 
 /**
