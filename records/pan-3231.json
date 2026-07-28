@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-28T23:02:12.462Z",
+  "updated": "2026-07-28T23:17:47.890Z",
   "pipeline": {
     "issueId": "PAN-3231",
     "reviewStatus": "pending",
@@ -88,16 +88,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "prd-chip-viewer": {
-        "writerId": "agent-pan-3231",
-        "agentId": "agent-pan-3231",
-        "pid": 2392585,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T23:02:12.461Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3231",
@@ -142,6 +134,17 @@
         "outcome": "completed",
         "reason": "Added canonical draft discovery to resource allocation, exposed the prd source and hasPrd DTO flag without removing existing sources, updated frontend DTO fallbacks, and added presence/absence tests; typecheck and 25 resource-discovery tests pass.",
         "releasedAt": "2026-07-28T23:01:58.764Z"
+      },
+      {
+        "writerId": "agent-pan-3231",
+        "agentId": "agent-pan-3231",
+        "pid": 2392585,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T23:02:12.461Z",
+        "itemId": "prd-chip-viewer",
+        "outcome": "completed",
+        "reason": "Added the canonical PRD chip signal, store-driven global ChatMarkdown viewer, 404 empty state, accessible close behavior, and focused tests.",
+        "releasedAt": "2026-07-28T23:17:47.890Z"
       }
     ],
     "statusReasons": {
@@ -160,6 +163,10 @@
       "prd-resource-signal": {
         "reason": "Added canonical draft discovery to resource allocation, exposed the prd source and hasPrd DTO flag without removing existing sources, updated frontend DTO fallbacks, and added presence/absence tests; typecheck and 25 resource-discovery tests pass.",
         "updatedAt": "2026-07-28T23:01:58.764Z"
+      },
+      "prd-chip-viewer": {
+        "reason": "Added the canonical PRD chip signal, store-driven global ChatMarkdown viewer, 404 empty state, accessible close behavior, and focused tests.",
+        "updatedAt": "2026-07-28T23:17:47.890Z"
       }
     }
   },
@@ -179,6 +186,10 @@
     "prd-resource-signal.prd-resource-signal.ac1": "completed",
     "prd-resource-signal.prd-resource-signal.ac2": "completed",
     "prd-resource-signal.prd-resource-signal.ac3": "completed",
-    "prd-chip-viewer": "running"
+    "prd-chip-viewer": "completed",
+    "prd-chip-viewer.prd-chip-viewer.ac1": "completed",
+    "prd-chip-viewer.prd-chip-viewer.ac2": "completed",
+    "prd-chip-viewer.prd-chip-viewer.ac3": "completed",
+    "prd-chip-viewer.prd-chip-viewer.ac4": "completed"
   }
 }
