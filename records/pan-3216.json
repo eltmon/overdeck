@@ -29,7 +29,7 @@
     "recordedAt": "2026-07-28T06:40:20.292Z"
   },
   "created": "2026-07-28T04:43:34.296Z",
-  "updated": "2026-07-28T07:07:53.263Z",
+  "updated": "2026-07-28T07:08:58.416Z",
   "pipeline": {
     "issueId": "PAN-3216",
     "reviewStatus": "pending",
@@ -53,7 +53,9 @@
         "tests/unit/lib/briefing-assembler.test.ts"
       ],
       "recordedAt": "2026-07-28T06:40:20.292Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-28T07:08:58.012Z",
+    "panDoneRecoveredAt": "2026-07-28T07:08:58.012Z"
   },
   "closeOut": {
     "usage": {
