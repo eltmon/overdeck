@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T23:01:46.233Z",
+  "updated": "2026-07-28T23:09:39.591Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -93,16 +93,8 @@
     }
   ],
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "conversation-linkage": {
-        "writerId": "agent-pan-1990",
-        "agentId": "agent-pan-1990",
-        "pid": 2363437,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T23:01:46.233Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -174,6 +166,16 @@
         "itemId": "lifecycle-archive",
         "outcome": "completed",
         "releasedAt": "2026-07-28T23:01:32.780Z"
+      },
+      {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 2363437,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T23:01:46.233Z",
+        "itemId": "conversation-linkage",
+        "outcome": "completed",
+        "releasedAt": "2026-07-28T23:09:39.591Z"
       }
     ],
     "statusReasons": {
@@ -211,6 +213,9 @@
     "lifecycle-archive.lifecycle-archive.ac1": "completed",
     "lifecycle-archive.lifecycle-archive.ac2": "completed",
     "lifecycle-archive.lifecycle-archive.ac3": "completed",
-    "conversation-linkage": "running"
+    "conversation-linkage": "completed",
+    "conversation-linkage.conversation-linkage.ac1": "completed",
+    "conversation-linkage.conversation-linkage.ac2": "completed",
+    "conversation-linkage.conversation-linkage.ac3": "completed"
   }
 }
