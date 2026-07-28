@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T17:52:04.432Z",
+  "updated": "2026-07-28T17:52:32.091Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "pending",
@@ -85,8 +85,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "convergence-regression-test": {
+        "writerId": "agent-pan-3229",
+        "agentId": "agent-pan-3229",
+        "pid": 2098931,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:52:32.091Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3229",
@@ -169,6 +177,7 @@
     "patrol-wiring.patrol-wiring.ac2": "completed",
     "server-marker-cleanup": "completed",
     "server-marker-cleanup.server-marker-cleanup.ac1": "completed",
-    "server-marker-cleanup.server-marker-cleanup.ac2": "completed"
+    "server-marker-cleanup.server-marker-cleanup.ac2": "completed",
+    "convergence-regression-test": "running"
   }
 }
