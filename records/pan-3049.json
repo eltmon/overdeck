@@ -113,19 +113,19 @@
     "recordedAt": "2026-07-28T08:02:25.990Z"
   },
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T08:37:05.722Z",
+  "updated": "2026-07-28T09:31:53.028Z",
   "pipeline": {
     "issueId": "PAN-3049",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:02:29.164Z",
-    "updatedAt": "2026-07-28T08:37:05.713Z",
-    "reviewNotes": "Rebuild automatically tears down a running foreign-prefixed stack, violating the explicit must-not constraint",
+    "updatedAt": "2026-07-28T09:31:52.707Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "All 4 ACs met. AC1: declaredComposeFileProjectName parses top-level name: (stack-health.ts:52-57), verified against real MYN workspaces which declare 'name: myn-feature-min-XXX' at col 0. AC2: requireComposeProjectNameForWorkspace throws naming workspacePath + composeFilePath + both dev-script paths (stack-health.ts:135-137). AC3: both variants return overdeck-feature-<issue> when composeFilePath is null (lines 119, 134). AC4: assertDeclaredNameMatchesFeatureFolder reuses the exact 'Refusing workspace rebuild:' message for both sources (lines 59-70); dev-script rethrow guard preserved at line 91. COMPOSE_FILE_CANDIDATES and findDevcontainerComposeFile match rebuild-stack.ts:43-58 exactly, so no directory-scope drift. Tests cover all four plus dev-script-wins precedence.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3223",
     "reviewedAtCommit": "633b8bec55270f16715519995ba08e7f0945a624",
@@ -204,18 +204,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2593365,
-            "output": 143143,
-            "cacheRead": 10647040,
+            "input": 2602043,
+            "output": 143377,
+            "cacheRead": 10994176,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 683,
-            "output": 154163,
-            "cacheRead": 122943132,
-            "cacheWrite": 948101
+            "input": 855,
+            "output": 205200,
+            "cacheRead": 171590675,
+            "cacheWrite": 3143636
           }
         }
       },
@@ -227,21 +227,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 2593365,
-          "output": 143143,
-          "cacheRead": 10647040,
+          "input": 2602043,
+          "output": 143377,
+          "cacheRead": 10994176,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 683,
-          "output": 154163,
-          "cacheRead": 122943132,
-          "cacheWrite": 948101
+          "input": 855,
+          "output": 205200,
+          "cacheRead": 171590675,
+          "cacheWrite": 3143636
         }
       },
       "costAtCloseOut": {
-        "usd": 51.1051412,
-        "pricingAsOf": "2026-07-28T08:37:05.719Z"
+        "usd": 67.0581832,
+        "pricingAsOf": "2026-07-28T09:31:52.860Z"
       }
     },
     "merges": [
