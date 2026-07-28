@@ -112,6 +112,11 @@
       "reason": "feedback",
       "note": "[2026-07-28T11:36Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-28T11:36:09.397Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-28T11:48:42.513Z"
     }
   ],
   "feedback": [],
@@ -172,7 +177,7 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T11:48:41.350Z",
+  "updated": "2026-07-28T11:48:42.533Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "reviewing",
@@ -292,7 +297,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3092",
