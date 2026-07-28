@@ -111,12 +111,37 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(capturePane()).toBe(afterSubmit);
   });
 
+  it('reuses pending text in the live Claude composer layout without re-pasting', async () => {
+    const payload = 'pending wake payload';
+    expect(await sendKeysDedup(session, payload, 'live-layout-key')).toBe('pasted');
+    const repasteSpy = vi.fn(async () => {});
+
+    const phase = await sendKeysDedup(session, payload, 'live-layout-key', 'test', {
+      readPaneViewport: () => Promise.resolve({
+        text: [
+          'older terminal output',
+          '───────────────────────────── agent-pan-3212 ──',
+          `❯ ${payload}`,
+          'Use your Rea5m) o7d 21% (127h45m)',
+          '78% e 2.7k/372.0k  out 113  cost $25.3668',
+          '                              · ← for agents',
+        ].join('\n'),
+        cursorY: 2,
+      }),
+      runTmuxCommand: repasteSpy,
+    });
+
+    expect(phase).toBe('submit-pending');
+    expect(repasteSpy).not.toHaveBeenCalled();
+  });
+
   it('re-pastes after a menu-aborted submit clears without replacing the pane', async () => {
     const payload = 'menu-blocked delivery';
     const paneBefore = await readPaneTargetReal(session);
     expect(await sendKeysDedup(session, payload, 'menu-key')).toBe('pasted');
     const pendingBefore = showOption('@overdeck-dedup-pending-menu-key');
     expect(pendingBefore).not.toBe('');
+    expect(showOption('@overdeck-dedup-payload-unverified-menu-key')).toBe('1');
 
     vi.useFakeTimers();
     try {
@@ -133,6 +158,7 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     expect(showOption('@overdeck-dedup-pending-menu-key')).toBe(pendingBefore);
     expect(showOption('@overdeck-dedup-target-menu-key')).toBe(paneBefore.pid);
     expect(showOption('@overdeck-dedup-menu-key')).toBe('');
+    expect(showOption('@overdeck-dedup-payload-unverified-menu-key')).toBe('1');
 
     // An unreadable viewport is unproven, not evidence that the payload is
     // absent. Recovery must leave the original paste and markers untouched.
@@ -150,13 +176,17 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     execFileSync('tmux', ['-L', socket, 'send-keys', '-t', session, 'C-u']);
     expect((await readPaneTargetReal(session)).pid).toBe(paneBefore.pid);
 
-    const oldPayloadAboveEmptyComposer = [
-      payload,
-      'older terminal output',
-      '─────────────────────────────',
-      '❯ ',
-      '─────────────────────────────',
-    ].join('\n');
+    const oldPayloadAboveEmptyComposer = {
+      text: [
+        payload,
+        'older terminal output',
+        '───────────────────────────── agent-pan-3212 ──',
+        '❯ ',
+        'usage 21% · cost $25.00',
+        '                              · ← for agents',
+      ].join('\n'),
+      cursorY: 3,
+    };
 
     // Fault injection: the first recovery cannot execute its atomic re-paste.
     // The stale matching target remains, but the next retry still cannot reuse
@@ -188,6 +218,7 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
 
     expect(showOption('@overdeck-dedup-menu-key')).toBe('1');
     expect(showOption('@overdeck-dedup-pending-menu-key')).toBe('');
+    expect(showOption('@overdeck-dedup-payload-unverified-menu-key')).toBe('');
   });
 
   it('submits normal composer content when pane capture is busy or unavailable', async () => {
@@ -432,10 +463,12 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     ).rejects.toThrow(KeyedSubmitTargetDeadError);
     expect(showOption('@overdeck-dedup-test-key-1')).toBe('');
     expect(showOption('@overdeck-dedup-pending-test-key-1')).not.toBe('');
-    // The rollback was verified, so the poison breadcrumb was lifted.
+    // The rollback was verified, so the poison breadcrumb was lifted. The
+    // payload-unverified marker also stays clear because Enter may have landed.
     expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('');
+    expect(showOption('@overdeck-dedup-payload-unverified-test-key-1')).toBe('');
 
-    // Recovery completes the preserved claim.
+    // Recovery completes the preserved claim without re-pasting.
     const replay = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
     expect(replay).toBe('submit-pending');
     await completeKeyedSubmit(session, 'test-key-1');
