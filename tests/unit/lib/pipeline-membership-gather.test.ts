@@ -16,6 +16,7 @@ import {
   listIssueStatesBatched,
   listMergedPullRequestHeadsBatched,
   PipelineMembershipUnavailableError,
+  projectRepositories,
   resolveRepositoryDefaultBranch,
   snapshotBranchRefs,
   type PipelineMembershipGatherDeps,
@@ -281,6 +282,56 @@ describe('gatherIssueBranchContainment', () => {
     await expect(gatherIssueBranchContainment(project, 'PAN-3109', run)).rejects.toMatchObject({
       reason: 'repo_unavailable',
       message: expect.stringContaining(project.path),
+    });
+  });
+});
+
+describe('projectRepositories', () => {
+  it('resolves forge for monorepo with gitlab_repo set and no github_repo', () => {
+    const monoGitLabProject: ProjectConfig = {
+      name: 'test',
+      path: '/test',
+      issue_prefix: 'TEST',
+      gitlab_repo: 'test/test',
+    };
+
+    const repos = projectRepositories(monoGitLabProject);
+    expect(repos).toHaveLength(1);
+    expect(repos[0]).toMatchObject({
+      path: '/test',
+      defaultBranch: 'main',
+      forge: 'gitlab',
+    });
+  });
+
+  it('resolves per-repo forge for polyrepo with mixed remotes', () => {
+    const polyrepoProject: ProjectConfig = {
+      name: 'test',
+      path: '/test',
+      issue_prefix: 'TEST',
+      gitlab_repo: 'test/test',
+      workspace: {
+        type: 'polyrepo',
+        repos: [
+          { name: 'fe', path: 'frontend', remote: 'github' },
+          { name: 'api', path: 'api' },
+        ],
+      },
+    };
+
+    const repos = projectRepositories(polyrepoProject);
+    expect(repos).toHaveLength(2);
+    expect(repos[0]).toMatchObject({
+      path: '/test/frontend',
+      defaultBranch: 'main',
+      forge: 'github',
+      repoKey: 'fe',
+    });
+    expect(repos[1]).toMatchObject({
+      path: '/test/api',
+      defaultBranch: 'main',
+      forge: 'gitlab',
+      repoKey: 'api',
     });
   });
 });
