@@ -6,6 +6,7 @@ import { Effect } from 'effect';
 import { generateXBriefFilename } from './lifecycle.js';
 import { serializeXBriefDocument } from './io.js';
 import { FsError } from '../errors.js';
+import { getProjectPanPaths } from '../pan-dir/paths.js';
 import type { XBriefDocument, XBriefSubItem } from './types.js';
 
 export interface AutoSynthesizeIssueInput {
@@ -137,7 +138,7 @@ export function synthesizeMinimalXBrief(issue: AutoSynthesizeIssueInput): XBrief
   const document = synthesizeMinimalXBrief(issue);
   const canonicalFilename = document.plan.metadata?.canonicalFilename as string;
 
-  const projectSpecsDir = join(projectRoot, '.pan', 'specs');
+  const projectSpecsDir = getProjectPanPaths(projectRoot).specsDir;
   const projectSpecPath = join(projectSpecsDir, canonicalFilename);
   const projectDocument: XBriefDocument = {
     ...document,

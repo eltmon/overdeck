@@ -1,14 +1,15 @@
 import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import {
   extractAcceptanceCriteriaFromIssue,
   synthesizeMinimalXBrief,
   writeAutoStartXBrief,
 } from '../auto-synthesize.js';
+import { findPlanSync } from '../io.js';
 
 async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   const dir = await mkdtemp(join(tmpdir(), 'pan-auto-synthesize-'));
@@ -133,6 +134,37 @@ describe('writeAutoStartXBrief', () => {
       expect(projectDoc.vBRIEFInfo).toBeUndefined();
       expect(projectDoc.plan.status).toBe('proposed');
       expect(projectDoc.plan.metadata.canonicalFilename).toBe(result.canonicalFilename);
+    });
+  });
+
+  it('writes migrated project specs to the state worktree where findPlanSync resolves them', async () => {
+    await withTempDir(async (root) => {
+      const previousOverdeckHome = process.env['OVERDECK_HOME'];
+      process.env['OVERDECK_HOME'] = root;
+      try {
+        const projectRoot = join(root, 'project');
+        const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1072');
+        const stateRoot = join(root, 'state', basename(projectRoot));
+        await mkdir(stateRoot, { recursive: true });
+        await writeFile(join(stateRoot, 'migration-complete.json'), JSON.stringify({
+          version: 1,
+          sourceMainSha: 'a'.repeat(40),
+          stateBranchSha: 'b'.repeat(40),
+          completedAt: '2026-07-28T00:00:00.000Z',
+        }));
+
+        const result = await Effect.runPromise(writeAutoStartXBrief(projectRoot, workspacePath, {
+          issueId: 'PAN-1072',
+          title: 'Auto start migrated work agents',
+          body: '- [ ] Start from a migrated project',
+        }));
+
+        expect(result.projectSpecPath).toBe(join(stateRoot, 'specs', result.canonicalFilename));
+        expect(findPlanSync(workspacePath)).toBe(result.projectSpecPath);
+      } finally {
+        if (previousOverdeckHome === undefined) delete process.env['OVERDECK_HOME'];
+        else process.env['OVERDECK_HOME'] = previousOverdeckHome;
+      }
     });
   });
 });
