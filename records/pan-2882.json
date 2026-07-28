@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T06:50:00.222Z",
+  "updated": "2026-07-28T06:53:25.896Z",
   "pipeline": {
     "issueId": "PAN-2882",
     "reviewStatus": "pending",
@@ -47,16 +47,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "merged-mr-oracle": {
-        "writerId": "agent-pan-2882",
-        "agentId": "agent-pan-2882",
-        "pid": 2902761,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T06:50:00.222Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2882",
@@ -90,6 +82,17 @@
         "outcome": "completed",
         "reason": "Wired GitLab open MRs into gather's hasOpenPr lens, updated fork-filter for GitLab support, added tests for open MR behavior",
         "releasedAt": "2026-07-28T06:49:49.874Z"
+      },
+      {
+        "writerId": "agent-pan-2882",
+        "agentId": "agent-pan-2882",
+        "pid": 2902761,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:50:00.222Z",
+        "itemId": "merged-mr-oracle",
+        "outcome": "completed",
+        "reason": "Wired GitLab merged-MR oracle into gather, lifted candidate-heads computation, added polyrepo union support, comprehensive tests for all acceptance criteria",
+        "releasedAt": "2026-07-28T06:53:25.896Z"
       }
     ],
     "statusReasons": {
@@ -104,6 +107,10 @@
       "open-mr-lens": {
         "reason": "Wired GitLab open MRs into gather's hasOpenPr lens, updated fork-filter for GitLab support, added tests for open MR behavior",
         "updatedAt": "2026-07-28T06:49:49.874Z"
+      },
+      "merged-mr-oracle": {
+        "reason": "Wired GitLab merged-MR oracle into gather, lifted candidate-heads computation, added polyrepo union support, comprehensive tests for all acceptance criteria",
+        "updatedAt": "2026-07-28T06:53:25.896Z"
       }
     }
   },
@@ -123,6 +130,11 @@
     "open-mr-lens.open-mr-lens.ac2": "completed",
     "open-mr-lens.open-mr-lens.ac3": "completed",
     "open-mr-lens.open-mr-lens.ac4": "completed",
-    "merged-mr-oracle": "running"
+    "merged-mr-oracle": "completed",
+    "merged-mr-oracle.merged-mr-oracle.ac1": "completed",
+    "merged-mr-oracle.merged-mr-oracle.ac2": "completed",
+    "merged-mr-oracle.merged-mr-oracle.ac3": "completed",
+    "merged-mr-oracle.merged-mr-oracle.ac4": "completed",
+    "merged-mr-oracle.merged-mr-oracle.ac5": "completed"
   }
 }
