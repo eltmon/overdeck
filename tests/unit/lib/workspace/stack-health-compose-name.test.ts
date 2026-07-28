@@ -63,6 +63,26 @@ describe('composeProjectNameForWorkspace — compose `name:` declaration', () =>
     );
   });
 
+  it('refuses a compose file name shaped like a shell command-substitution attempt (PAN-3049 security fix)', () => {
+    const workspacePath = makeWorkspace({
+      composeFile: 'name: $(touch /tmp/pwned)-feature-min-901\nservices:\n  api:\n    image: test\n',
+    });
+
+    expect(() => composeProjectNameForWorkspace(workspacePath, 'MIN-901')).toThrow(
+      'not a valid Docker Compose project name',
+    );
+  });
+
+  it('refuses a dev-script declaration shaped like a shell command-substitution attempt', () => {
+    const workspacePath = makeWorkspace({
+      devScript: 'export COMPOSE_PROJECT_NAME="$(touch /tmp/pwned)-feature-min-901"\n',
+    });
+
+    expect(() => composeProjectNameForWorkspace(workspacePath, 'MIN-901')).toThrow(
+      'not a valid Docker Compose project name',
+    );
+  });
+
   it('falls back to the overdeck prefix when no compose file exists', () => {
     const workspacePath = makeWorkspace({});
 

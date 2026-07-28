@@ -70,12 +70,32 @@ function declaredComposeFileProjectName(content: string, featureFolder: string):
   return raw.includes('${FEATURE_FOLDER}') ? raw.replace('${FEATURE_FOLDER}', featureFolder) : raw;
 }
 
+// Docker Compose project names: lowercase letters, digits, hyphens, and
+// underscores, starting with a letter or digit. A declared name that fails
+// this grammar is refused BEFORE it reaches any consumer — accepting
+// arbitrary content here (e.g. `$(command)-feature-<issue>`) let workspace
+// file content reach a shell command downstream (PAN-3049 review finding).
+const VALID_COMPOSE_PROJECT_NAME_RE = /^[a-z0-9][a-z0-9_-]*$/;
+
+function assertValidComposeProjectNameGrammar(
+  sourcePath: string,
+  declaredKey: string,
+  declared: string,
+): void {
+  if (!VALID_COMPOSE_PROJECT_NAME_RE.test(declared)) {
+    throw new Error(
+      `Refusing workspace rebuild: ${sourcePath} declares ${declaredKey}=${declared}, which is not a valid Docker Compose project name (lowercase letters, digits, hyphens, and underscores only, starting with a letter or digit)`,
+    );
+  }
+}
+
 function assertDeclaredNameMatchesFeatureFolder(
   sourcePath: string,
   declaredKey: string,
   declared: string,
   featureFolder: string,
 ): void {
+  assertValidComposeProjectNameGrammar(sourcePath, declaredKey, declared);
   if (!declared.endsWith(featureFolder)) {
     throw new Error(
       `Refusing workspace rebuild: ${sourcePath} declares ${declaredKey}=${declared}, expected a name ending in ${featureFolder}`,

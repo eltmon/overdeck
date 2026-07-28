@@ -2314,7 +2314,7 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
   try {
     // Find all workspace-related containers that are exited (crashed)
     const { stdout } = await execAsync(
-      'docker ps -a --filter "status=exited" --format "{{.Names}}|{{.Status}}" 2>/dev/null || true',
+      'docker ps -a --filter "status=exited" --filter "name=feature-" --format "{{.Names}}|{{.Status}}" 2>/dev/null || true',
       { encoding: 'utf-8', timeout: 10000 },
     );
     const crashed = stdout.trim().split('\n').filter(Boolean);

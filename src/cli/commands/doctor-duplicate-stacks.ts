@@ -34,6 +34,12 @@ export interface DuplicateStackContainerRow {
   composeProject?: string;
 }
 
+/** Canonical compose project name for an issue, plus where to run compose commands from. */
+export interface CanonicalProjectInfo {
+  project: string | null;
+  workspacePath: string | null;
+}
+
 /**
  * Group running containers by issue (via `inferIssueIdFromStackContainerName`)
  * and flag any issue whose running stack doesn't match its canonical
@@ -45,7 +51,7 @@ export interface DuplicateStackContainerRow {
  */
 export function diagnoseDuplicateComposeStacks(
   containers: DuplicateStackContainerRow[],
-  resolveCanonicalProject: (issueId: string) => string | null,
+  resolveCanonicalProject: (issueId: string) => CanonicalProjectInfo,
 ): CheckResult[] {
   const projectsByIssue = new Map<string, Set<string>>();
   for (const container of containers) {
@@ -62,7 +68,7 @@ export function diagnoseDuplicateComposeStacks(
   const results: CheckResult[] = [];
   for (const issueId of [...projectsByIssue.keys()].sort()) {
     const runningProjects = [...projectsByIssue.get(issueId)!].sort();
-    const canonical = resolveCanonicalProject(issueId);
+    const { project: canonical, workspacePath } = resolveCanonicalProject(issueId);
 
     if (runningProjects.length === 1) {
       // Healthy: the single running stack IS the canonical one. Silent.
@@ -81,27 +87,46 @@ export function diagnoseDuplicateComposeStacks(
     }
 
     // ≥2 distinct running compose projects for the same issue — a duplicate.
+    // Only recommend stopping a project when the canonical one is confirmed
+    // among the running set — otherwise we cannot safely tell which stack is
+    // the real one, and must not point the operator at stopping all of them.
+    const canonicalConfirmedRunning = canonical !== null && runningProjects.includes(canonical);
+    if (!canonicalConfirmedRunning) {
+      results.push({
+        name: `Duplicate Docker stack (${issueId})`,
+        status: 'warn',
+        message: canonical
+          ? `${issueId} has ${runningProjects.length} running compose projects, none matching its canonical name ${canonical}: ${runningProjects.join(', ')}`
+          : `${issueId} has ${runningProjects.length} running compose projects and no resolvable canonical name: ${runningProjects.join(', ')}`,
+        fix: `Run \`pan workspace rebuild ${issueId}\` to bring the canonical stack up, then run \`pan doctor\` again once it is healthy to see which of the running projects is safe to stop.`,
+      });
+      continue;
+    }
+
     const foreign = runningProjects.filter((project) => project !== canonical);
+    const composeDir = workspacePath ? `${workspacePath}/.devcontainer` : null;
     results.push({
       name: `Duplicate Docker stack (${issueId})`,
       status: 'warn',
-      message: canonical
-        ? `${issueId} has ${runningProjects.length} running compose projects (canonical: ${canonical}): ${runningProjects.join(', ')}`
-        : `${issueId} has ${runningProjects.length} running compose projects: ${runningProjects.join(', ')}`,
-      fix: foreign.length > 0
-        ? foreign.map((name) => `foreign stack ${name} is a duplicate: docker compose -p "${name}" down`).join('\n')
-        : undefined,
+      message: `${issueId} has ${runningProjects.length} running compose projects (canonical: ${canonical}): ${runningProjects.join(', ')}`,
+      fix: foreign
+        .map((name) =>
+          composeDir
+            ? `foreign stack ${name} is a duplicate: (cd "${composeDir}" && docker compose -p "${name}" down -v --remove-orphans)`
+            : `foreign stack ${name} is a duplicate: docker compose -p "${name}" down -v --remove-orphans (run from the workspace's .devcontainer directory)`,
+        )
+        .join('\n'),
     });
   }
 
   return results;
 }
 
-function resolveCanonicalComposeProjectForDoctor(issueId: string): string | null {
+function resolveCanonicalComposeProjectForDoctor(issueId: string): CanonicalProjectInfo {
   const resolvedProject = resolveProjectFromIssueSync(issueId);
   const projectConfig = resolvedProject ? getProjectSync(resolvedProject.projectKey) : null;
   const workspacePath = defaultWorkspacePath(issueId, projectConfig);
-  return tryComposeProjectNameForWorkspace(workspacePath, issueId);
+  return { project: tryComposeProjectNameForWorkspace(workspacePath, issueId), workspacePath };
 }
 
 export async function checkDuplicateComposeStacks(): Promise<CheckResult[]> {

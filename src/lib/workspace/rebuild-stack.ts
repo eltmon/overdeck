@@ -236,14 +236,28 @@ export const rebuildWorkspaceStack = (
     // The pre-render name (fallback or a stale declaration) can differ from
     // what the freshly rendered compose file declares — e.g. the workspace
     // previously had no rendered .devcontainer/ and ran under the overdeck-
-    // fallback. Tear down that stale-named stack too so it cannot leak
-    // alongside the correctly-named one (PAN-3049).
+    // fallback. Only reap that stale name when it is confirmed NOT running —
+    // rebuild must never automatically stop a live foreign-prefixed stack
+    // (NonGoal: reconciling a genuinely running duplicate is an
+    // operator/`pan doctor`-guided action, not something code does silently).
     if (preRenderComposeProjectName !== composeProjectName) {
-      progress('Tearing down stale fallback-named stack...');
-      yield* dockerCompose(
-        ['-f', composeFile, '-p', preRenderComposeProjectName, 'down', '-v', '--remove-orphans'],
-        dirname(composeFile),
-      ).pipe(Effect.ignore);
+      const preRenderContainers = yield* collectDockerContainerLifecycleSnapshot();
+      const preRenderStackRunning = preRenderContainers.some(
+        (container) =>
+          container.composeProject === preRenderComposeProjectName &&
+          (container.state?.toLowerCase() === 'running' || /^up\b/i.test(container.status)),
+      );
+      if (preRenderStackRunning) {
+        progress(
+          `Leaving running stack ${preRenderComposeProjectName} untouched — run \`pan doctor\` to reconcile duplicate stacks.`,
+        );
+      } else {
+        progress('Tearing down stale fallback-named stack...');
+        yield* dockerCompose(
+          ['-f', composeFile, '-p', preRenderComposeProjectName, 'down', '-v', '--remove-orphans'],
+          dirname(composeFile),
+        ).pipe(Effect.ignore);
+      }
     }
 
     progress('Ensuring shared docker network...');

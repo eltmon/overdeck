@@ -292,8 +292,15 @@ describe('stopWorkspaceDocker', () => {
     const { stopWorkspaceDocker } = await import('../../src/lib/workspace-manager.js');
     await Effect.runPromise(stopWorkspaceDocker(workspaceDir, 'pan-1140'));
 
-    const composeCall = mockExecAsync.mock.calls.find(([command]) => String(command).startsWith('docker compose'));
-    expect(composeCall?.[0]).toContain('-p "overdeck-feature-pan-1140" down -v --remove-orphans');
+    // PAN-3049 security fix: the compose project name is now passed via
+    // execFile's argv array (cmd='docker', args=[...]), never interpolated
+    // into a shell string, so no declared value can reach a shell.
+    const composeCall = mockExecAsync.mock.calls.find(
+      ([cmd, args]) => cmd === 'docker' && Array.isArray(args) && args.includes('compose'),
+    );
+    expect(composeCall).toBeDefined();
+    const [, args] = composeCall!;
+    expect(args).toEqual(expect.arrayContaining(['-p', 'overdeck-feature-pan-1140', 'down', '-v', '--remove-orphans']));
   });
 
   it('rejects workspace-controlled compose project name mismatches before teardown', async () => {
@@ -310,6 +317,7 @@ describe('stopWorkspaceDocker', () => {
     await expect(Effect.runPromise(stopWorkspaceDocker(workspaceDir, 'pan-1140'))).rejects.toThrow(
       'declares COMPOSE_PROJECT_NAME=victim-project, expected a name ending in feature-pan-1140',
     );
-    expect(mockExecAsync).not.toHaveBeenCalledWith(expect.stringContaining('docker compose'), expect.anything());
+    // The resolver throws before any Docker command is issued at all.
+    expect(mockExecAsync).not.toHaveBeenCalled();
   });
 });

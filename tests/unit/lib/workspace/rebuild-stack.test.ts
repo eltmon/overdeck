@@ -150,6 +150,38 @@ describe('rebuildWorkspaceStack — resolve name after render (PAN-3049)', () =>
     expect(upCalls[0]).toContain('myn-feature-min-901');
   });
 
+  it('leaves a running foreign-prefixed stack untouched instead of stopping it automatically', async () => {
+    const workspacePath = makeWorkspace();
+    setupProject(workspacePath);
+    // No pre-existing .devcontainer — mirrors a spawn-time rebuild where the
+    // fallback-named stack was brought up by another process (e.g.
+    // spawn-prep.ts) before this render ever ran, so it is genuinely live.
+    mocks.ensureDevcontainerSync.mockImplementation(() => {
+      writeComposeFile(workspacePath, 'name: myn-feature-min-901\nservices:\n  api:\n    image: test\n');
+      return { step: { success: true } };
+    });
+    responses['ps -a --format'] = [
+      JSON.stringify({
+        ID: 'abc123',
+        Names: 'overdeck-feature-min-901-api-1',
+        Status: 'Up 5 minutes',
+        State: 'running',
+        Labels: 'com.docker.compose.project=overdeck-feature-min-901',
+      }),
+    ].join('\n');
+
+    const result = await Effect.runPromise(rebuildWorkspaceStack('MIN-901'));
+
+    expect(result.success).toBe(true);
+    // No pre-existing compose file, so there is no pre-render teardown call —
+    // the only down candidate is the post-render stale-name sweep, which must
+    // NOT fire against a stack confirmed running.
+    expect(composeCalls('down')).toHaveLength(0);
+    const upCalls = composeCalls('up');
+    expect(upCalls).toHaveLength(1);
+    expect(upCalls[0]).toContain('myn-feature-min-901');
+  });
+
   it('ac3: fails loudly instead of starting a stack under the fallback when no name is resolvable', async () => {
     const workspacePath = makeWorkspace();
     setupProject(workspacePath);
