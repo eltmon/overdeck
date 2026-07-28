@@ -125,7 +125,7 @@
     "recordedAt": "2026-07-28T17:16:31.850Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T18:12:53.792Z",
+  "updated": "2026-07-28T18:13:10.385Z",
   "pipeline": {
     "issueId": "PAN-2882",
     "reviewStatus": "blocked",
@@ -135,9 +135,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:16:51.273Z",
-    "updatedAt": "2026-07-28T18:12:52.619Z",
+    "updatedAt": "2026-07-28T18:13:10.365Z",
     "reviewNotes": "Cycle-3 tests delete the accepted merged-pagination check and still omit aggregate five-call concurrency coverage",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
+    "reviewedAtCommit": "e38216258512564fa52df36c0ff3f1b67c667fd6",
     "lastVerifiedCommit": "e38216258512564fa52df36c0ff3f1b67c667fd6",
     "reviewSpawnedAt": "2026-07-28T18:04:42.271Z",
     "scopeDrift": {
@@ -204,7 +205,7 @@
       },
       "costAtCloseOut": {
         "usd": 68.609346,
-        "pricingAsOf": "2026-07-28T18:12:52.663Z"
+        "pricingAsOf": "2026-07-28T18:13:10.372Z"
       }
     },
     "merges": [
