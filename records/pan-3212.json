@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T16:33:40.335Z",
+  "updated": "2026-07-28T16:37:22.464Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "guard-keyed-submit-blocking-menu": {
-        "writerId": "agent-pan-3212",
-        "agentId": "agent-pan-3212",
-        "pid": 3860517,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T16:33:40.335Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3212",
@@ -85,6 +77,17 @@
         "outcome": "completed",
         "reason": "Extracted best-effort resume contract delivery behind a gate-aware seam and added four unit tests for gated, clear, capture-failure, and delivery-failure branches.",
         "releasedAt": "2026-07-28T16:33:31.708Z"
+      },
+      {
+        "writerId": "agent-pan-3212",
+        "agentId": "agent-pan-3212",
+        "pid": 3860517,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T16:33:40.335Z",
+        "itemId": "guard-keyed-submit-blocking-menu",
+        "outcome": "completed",
+        "reason": "Guarded keyed tmux submit before its atomic Enter, preserving pending claims on blocking menus; added fail-open busy/capture-failure coverage and documented the shared guard.",
+        "releasedAt": "2026-07-28T16:37:22.464Z"
       }
     ],
     "statusReasons": {
@@ -95,6 +98,10 @@
       "extract-resume-gate-skip-seam": {
         "reason": "Extracted best-effort resume contract delivery behind a gate-aware seam and added four unit tests for gated, clear, capture-failure, and delivery-failure branches.",
         "updatedAt": "2026-07-28T16:33:31.708Z"
+      },
+      "guard-keyed-submit-blocking-menu": {
+        "reason": "Guarded keyed tmux submit before its atomic Enter, preserving pending claims on blocking menus; added fail-open busy/capture-failure coverage and documented the shared guard.",
+        "updatedAt": "2026-07-28T16:37:22.464Z"
       }
     }
   },
@@ -107,6 +114,9 @@
     "extract-resume-gate-skip-seam.extract-resume-gate-skip-seam.ac1": "completed",
     "extract-resume-gate-skip-seam.extract-resume-gate-skip-seam.ac2": "completed",
     "extract-resume-gate-skip-seam.extract-resume-gate-skip-seam.ac3": "completed",
-    "guard-keyed-submit-blocking-menu": "running"
+    "guard-keyed-submit-blocking-menu": "completed",
+    "guard-keyed-submit-blocking-menu.guard-keyed-submit-blocking-menu.ac1": "completed",
+    "guard-keyed-submit-blocking-menu.guard-keyed-submit-blocking-menu.ac2": "completed",
+    "guard-keyed-submit-blocking-menu.guard-keyed-submit-blocking-menu.ac3": "completed"
   }
 }
