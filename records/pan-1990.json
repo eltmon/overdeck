@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T22:41:55.009Z",
+  "updated": "2026-07-28T22:48:05.269Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -93,16 +93,8 @@
     }
   ],
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "pipeline-create-row": {
-        "writerId": "agent-pan-1990",
-        "agentId": "agent-pan-1990",
-        "pid": 1183463,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T22:41:55.009Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -154,6 +146,16 @@
         "itemId": "boot-seeding",
         "outcome": "completed",
         "releasedAt": "2026-07-28T22:41:41.843Z"
+      },
+      {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 1183463,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T22:41:55.009Z",
+        "itemId": "pipeline-create-row",
+        "outcome": "completed",
+        "releasedAt": "2026-07-28T22:48:05.269Z"
       }
     ],
     "statusReasons": {
@@ -183,6 +185,9 @@
     "boot-seeding.boot-seeding.ac1": "completed",
     "boot-seeding.boot-seeding.ac2": "completed",
     "boot-seeding.boot-seeding.ac3": "completed",
-    "pipeline-create-row": "running"
+    "pipeline-create-row": "completed",
+    "pipeline-create-row.pipeline-create-row.ac1": "completed",
+    "pipeline-create-row.pipeline-create-row.ac2": "completed",
+    "pipeline-create-row.pipeline-create-row.ac3": "completed"
   }
 }
