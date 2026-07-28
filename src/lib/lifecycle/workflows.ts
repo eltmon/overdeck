@@ -31,6 +31,7 @@ import { loadCloisterConfig } from '../cloister/config.js';
 import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { getForgeAdapter } from '../forge.js';
+import { resolveProjectReposForIssueSync } from '../project-repos.js';
 import {
   getProjectConfigFromWorkspacePath,
   markRecordPipelineClosedOutSync,
@@ -516,11 +517,26 @@ function verifyBranchMerged(ctx: LifecycleContext): Effect.Effect<StepResult> {
   );
 }
 
-export interface MergeVerificationRoot { dir: string; sourceBranch: string; targetBranch: string; forge: 'github' | 'gitlab' }
+export interface MergeVerificationRoot { repoKey: string; dir: string; sourceBranch: string; targetBranch: string; forge: 'github' | 'gitlab' }
+
+async function verifyRootConventionBranches(ctx: LifecycleContext, root: MergeVerificationRoot, issueLower: string): Promise<StepResult | null> {
+  const featureResult = await verifyConventionBranchMerged(ctx, root);
+  if (featureResult?.success) return featureResult;
+
+  const strikeResult = await verifyConventionBranchMerged(ctx, { ...root, sourceBranch: `strike/${issueLower}` });
+  if (strikeResult?.success && !strikeResult.skipped) {
+    return stepOk('close-out:verify-merged', [
+      ...(strikeResult.details ?? []),
+      `Superseded ${root.sourceBranch} residual: ${featureResult?.error ?? BRANCH_ABSENT_MERGE_ERROR}`,
+    ]);
+  }
+  return featureResult;
+}
+
 export async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-out:verify-merged';
   const issueLower = ctx.issueId.toLowerCase();
-  const defaultRoot: MergeVerificationRoot = { dir: ctx.projectPath, sourceBranch: `feature/${issueLower}`, targetBranch: 'main', forge: 'github' };
+  const defaultRoot: MergeVerificationRoot = { repoKey: issueLower, dir: ctx.projectPath, sourceBranch: `feature/${issueLower}`, targetBranch: 'main', forge: 'github' };
 
   try {
     // Check review-status first — the merge specialist validates before marking merged
@@ -535,18 +551,34 @@ export async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<Ste
       // review-status.json may not exist, continue with git checks
     }
 
-    const featureResult = await verifyConventionBranchMerged(ctx, defaultRoot);
-    if (featureResult?.success) return featureResult;
-
-    const strikeResult = await verifyConventionBranchMerged(ctx, { ...defaultRoot, sourceBranch: `strike/${issueLower}` });
-    if (strikeResult?.success && !strikeResult.skipped) {
-      return stepOk(step, [
-        ...(strikeResult.details ?? []),
-        `Superseded ${defaultRoot.sourceBranch} residual: ${featureResult?.error ?? BRANCH_ABSENT_MERGE_ERROR}`,
-      ]);
+    const resolvedRoots = resolveProjectReposForIssueSync(ctx.issueId)
+      ?.filter((repo) => repo.required)
+      .map((repo): MergeVerificationRoot => ({
+        repoKey: repo.repoKey,
+        dir: repo.repoPath,
+        sourceBranch: repo.sourceBranch,
+        targetBranch: repo.targetBranch,
+        forge: repo.forge,
+      }));
+    const roots = resolvedRoots?.length ? resolvedRoots : [defaultRoot];
+    if (roots.length === 1) {
+      return await verifyRootConventionBranches(ctx, roots[0], issueLower)
+        ?? stepFailed(step, BRANCH_ABSENT_MERGE_ERROR);
     }
 
-    if (featureResult) return featureResult;
+    const results = await Promise.all(roots.map(async (root) => ({
+      root,
+      result: await verifyRootConventionBranches(ctx, root, issueLower),
+    })));
+    const failures = results.filter(({ result }) => result && !result.success);
+    if (failures.length > 0) {
+      return stepFailed(step, failures.map(({ root, result }) => `${root.repoKey}: ${result?.error}`).join('; '));
+    }
+    const successes = results.filter(({ result }) => result?.success);
+    if (successes.length > 0) {
+      return stepOk(step, successes.flatMap(({ root, result }) =>
+        (result?.details ?? []).map((detail) => `${root.repoKey}: ${detail}`)));
+    }
     return stepFailed(step, BRANCH_ABSENT_MERGE_ERROR);
   } catch (err) {
     return stepFailed(step, `Could not verify merge: ${(err as Error).message}`);

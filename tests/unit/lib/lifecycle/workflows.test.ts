@@ -22,6 +22,7 @@ const {
   mockHealUatPromotionVerification,
   mockCapturePipelineStage,
   mockResolvePipelineTelemetryContext,
+  mockResolveProjectReposForIssueSync,
 } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   mockClearReviewStatus: vi.fn(),
@@ -33,6 +34,7 @@ const {
   mockHealUatPromotionVerification: vi.fn(),
   mockCapturePipelineStage: vi.fn(),
   mockResolvePipelineTelemetryContext: vi.fn(async () => null),
+  mockResolveProjectReposForIssueSync: vi.fn(() => null),
 }));
 
 vi.mock('../../../../src/lib/lifecycle/dod-gate.js', () => ({
@@ -107,6 +109,10 @@ vi.mock('../../../../src/lib/lifecycle/orphaned-tasks-sweep.js', () => ({
   sweepOrphanedTasks: mockSweepOrphanedTasks,
 }));
 
+vi.mock('../../../../src/lib/project-repos.js', () => ({
+  resolveProjectReposForIssueSync: mockResolveProjectReposForIssueSync,
+}));
+
 vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({
   resetPostMergeState: mockResetPostMergeState,
 }));
@@ -124,6 +130,7 @@ import {
   deepWipe as deepWipeProgram,
   close as closeProgram,
   resetToTodo as resetToTodoProgram,
+  verifyBranchMergedImpl,
   verifyConventionBranchMerged,
   __testInternals,
 } from '../../../../src/lib/lifecycle/workflows.js';
@@ -189,6 +196,7 @@ describe('workflows', () => {
     mkdirSync(OVERDECK_HOME, { recursive: true });
 
     vi.clearAllMocks();
+    mockResolveProjectReposForIssueSync.mockReturnValue(null);
     mockHealUatPromotionVerification.mockResolvedValue(null);
     mockEvaluateDodGate.mockResolvedValue({
       passed: true,
@@ -556,6 +564,86 @@ describe('workflows', () => {
       expect(verifyStep.error).toBe('Feature branch is absent; positive merge evidence is required');
     });
 
+    it('aggregates merged evidence from required polyrepo roots with repo-qualified details', async () => {
+      const fePath = join(testDir, 'fe');
+      const apiPath = join(testDir, 'api');
+      mockResolveProjectReposForIssueSync.mockReturnValue([
+        { projectKey: 'myn', projectPath: testDir, repoKey: 'fe', repoPath: fePath, forge: 'gitlab', sourceBranch: 'feature/pan-100', targetBranch: 'main', mergeOrder: 0, required: true },
+        { projectKey: 'myn', projectPath: testDir, repoKey: 'api', repoPath: apiPath, forge: 'gitlab', sourceBranch: 'feature/pan-100', targetBranch: 'main', mergeOrder: 1, required: true },
+      ]);
+      mockExecAsync.mockImplementation(async (command: string, options?: { cwd?: string }) => {
+        if (options?.cwd === fePath && command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (options?.cwd === fePath && command === 'git merge-base --is-ancestor feature/pan-100 main') {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (options?.cwd === fePath && command === 'git rev-parse feature/pan-100 2>/dev/null') {
+          return { stdout: 'fe-head\n', stderr: '' };
+        }
+        if (options?.cwd === fePath && command === 'glab mr list --source-branch feature/pan-100 --all --output json') {
+          return {
+            stdout: '[{"iid":75,"web_url":"https://gitlab.com/acme/fe/-/merge_requests/75","state":"merged","source_branch":"feature/pan-100","target_branch":"main","sha":"fe-head"}]',
+            stderr: '',
+          };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const verifyStep = await verifyBranchMergedImpl({ issueId: 'PAN-100', projectPath: testDir });
+
+      expect(verifyStep.success).toBe(true);
+      expect(verifyStep.details).toEqual([
+        'fe: MR !75 is merged and feature/pan-100 matches the merged MR head (https://gitlab.com/acme/fe/-/merge_requests/75)',
+      ]);
+      for (const [, options] of mockExecAsync.mock.calls) {
+        expect([fePath, apiPath]).toContain(options?.cwd);
+        expect(options?.cwd).not.toBe(testDir);
+      }
+    });
+
+    it('names the failing repo when a required polyrepo root has unmerged commits', async () => {
+      const fePath = join(testDir, 'fe');
+      const apiPath = join(testDir, 'api');
+      mockResolveProjectReposForIssueSync.mockReturnValue([
+        { projectKey: 'myn', projectPath: testDir, repoKey: 'fe', repoPath: fePath, forge: 'github', sourceBranch: 'feature/pan-100', targetBranch: 'main', mergeOrder: 0, required: true },
+        { projectKey: 'myn', projectPath: testDir, repoKey: 'api', repoPath: apiPath, forge: 'github', sourceBranch: 'feature/pan-100', targetBranch: 'main', mergeOrder: 1, required: true },
+      ]);
+      mockExecAsync.mockImplementation(async (command: string, options?: { cwd?: string }) => {
+        if (options?.cwd === apiPath && command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (options?.cwd === apiPath && command === 'git merge-base --is-ancestor feature/pan-100 main') {
+          throw new Error('not merged');
+        }
+        if (options?.cwd === apiPath && command.startsWith('git diff main...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/api.ts b/src/api.ts\n', stderr: '' };
+        }
+        if (options?.cwd === apiPath && command === 'git log main..feature/pan-100 --oneline 2>/dev/null || true') {
+          return { stdout: 'api-unmerged\n', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const verifyStep = await verifyBranchMergedImpl({ issueId: 'PAN-100', projectPath: testDir });
+
+      expect(verifyStep.success).toBe(false);
+      expect(verifyStep.error).toBe('api: 1 unmerged commit(s) on feature/pan-100. Merge before closing out.');
+    });
+
+    it('preserves the branch-absence sentinel when all required polyrepo roots are absent', async () => {
+      mockResolveProjectReposForIssueSync.mockReturnValue([
+        { projectKey: 'myn', projectPath: testDir, repoKey: 'fe', repoPath: join(testDir, 'fe'), forge: 'gitlab', sourceBranch: 'feature/pan-100', targetBranch: 'main', mergeOrder: 0, required: true },
+        { projectKey: 'myn', projectPath: testDir, repoKey: 'api', repoPath: join(testDir, 'api'), forge: 'gitlab', sourceBranch: 'feature/pan-100', targetBranch: 'main', mergeOrder: 1, required: true },
+      ]);
+      mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+
+      const verifyStep = await verifyBranchMergedImpl({ issueId: 'PAN-100', projectPath: testDir });
+
+      expect(verifyStep.success).toBe(false);
+      expect(verifyStep.error).toBe('Feature branch is absent; positive merge evidence is required');
+    });
+
     it('does not inspect the strike branch after the feature branch passes', async () => {
       mockExecAsync.mockImplementation(async (command: string) => {
         if (command === 'git branch --list "feature/pan-100" 2>/dev/null || true') {
@@ -583,6 +671,7 @@ describe('workflows', () => {
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const verifyStep = await verifyConventionBranchMerged(ctx, {
+        repoKey: 'overdeck',
         dir: testDir,
         sourceBranch: 'feature/pan-100',
         targetBranch: 'master',
@@ -621,7 +710,7 @@ describe('workflows', () => {
 
       const verifyStep = await verifyConventionBranchMerged(
         { issueId: 'PAN-100', projectPath: testDir },
-        { dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
+        { repoKey: 'fe', dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
       );
 
       expect(verifyStep?.success).toBe(true);
@@ -661,7 +750,7 @@ describe('workflows', () => {
 
       const verifyStep = await verifyConventionBranchMerged(
         { issueId: 'PAN-100', projectPath: testDir },
-        { dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
+        { repoKey: 'fe', dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
       );
 
       expect(verifyStep?.success).toBe(false);
@@ -690,7 +779,7 @@ describe('workflows', () => {
 
       const verifyStep = await verifyConventionBranchMerged(
         { issueId: 'PAN-100', projectPath: testDir },
-        { dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
+        { repoKey: 'fe', dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
       );
 
       expect(verifyStep?.success).toBe(true);
@@ -724,7 +813,7 @@ describe('workflows', () => {
 
       await verifyConventionBranchMerged(
         { issueId: 'PAN-100', projectPath: testDir, github: { owner: 'eltmon', repo: 'overdeck', number: 100 } },
-        { dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
+        { repoKey: 'fe', dir: testDir, sourceBranch: 'feature/pan-100', targetBranch: 'main', forge: 'gitlab' },
       );
 
       expect(mockExecAsync.mock.calls.map(([command]) => command)).not.toEqual(
