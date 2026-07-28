@@ -680,7 +680,15 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   return {
     role,
     hasPendingQuestion,
-    pendingQuestionCount: shouldSuppressPendingInput ? 0 : pendingQuestions.length,
+    // PAN-3233 — pane/runtime blocking detections carry no JSONL AskUserQuestion
+    // entries, so this used to report count 0 even when hasPendingQuestion was
+    // true. Fold them in: JSONL count when present, else 1 for a blocking
+    // detection, else 0 (including when suppressed).
+    pendingQuestionCount: shouldSuppressPendingInput
+      ? 0
+      : pendingQuestions.length > 0
+        ? pendingQuestions.length
+        : (isBlockedOnPendingInput({ hasPendingQuestion, pendingQuestionReason: detection?.reason }) ? 1 : 0),
     pendingQuestionPrompt: shouldSuppressPendingInput ? undefined : detection?.prompt,
     pendingQuestionReason: shouldSuppressPendingInput ? undefined : detection?.reason,
     pendingInputCount: pendingInputKinds.length,

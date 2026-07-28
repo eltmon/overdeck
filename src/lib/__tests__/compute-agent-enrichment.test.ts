@@ -132,6 +132,70 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
   })
 })
 
+describe('computeAgentEnrichment pendingQuestionCount folding', () => {
+  const getAgentRuntimeStateMock = vi.mocked(agents.getAgentRuntimeState)
+  const getAgentStateSyncMock = vi.mocked(agents.getAgentStateSync)
+  const detectAwaitingInputForAgentMock = vi.mocked(agentInputDetection.detectAwaitingInputForAgent)
+
+  it('counts 1 for a blocking pane detection with no JSONL questions', async () => {
+    const agentDir = makeAgentDir('work')
+    const agentId = `agent-test-${Date.now()}`
+    vi.spyOn(agents, 'getAgentDir').mockReturnValue(agentDir)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agents.getAgentStateSync>)
+    getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
+    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed({ reason: 'tool_permission', prompt: 'Allow?' }))
+
+    const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN))
+
+    expect(enrichment.pendingQuestionCount).toBe(1)
+
+    rmSync(agentDir, { recursive: true, force: true })
+  })
+
+  it('counts 0 for the generic other fallback', async () => {
+    const agentDir = makeAgentDir('work')
+    const agentId = `agent-test-${Date.now()}`
+    vi.spyOn(agents, 'getAgentDir').mockReturnValue(agentDir)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agents.getAgentStateSync>)
+    getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'needs_input', resolutionCount: 0 }))
+    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+
+    const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN))
+
+    expect(enrichment.pendingQuestionReason).toBe('other')
+    expect(enrichment.pendingQuestionCount).toBe(0)
+
+    rmSync(agentDir, { recursive: true, force: true })
+  })
+
+  it('reports the JSONL question count unchanged when JSONL questions are pending', async () => {
+    const agentDir = makeAgentDir('work')
+    const agentId = `agent-test-${Date.now()}`
+    vi.spyOn(agents, 'getAgentDir').mockReturnValue(agentDir)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agents.getAgentStateSync>)
+    getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
+    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+    const scanWithQuestion = {
+      ...EMPTY_PENDING_INPUTS_SCAN,
+      askUserQuestions: [
+        {
+          toolId: 'toolu_count_auq',
+          timestamp: '2026-07-28T12:00:00.000Z',
+          questions: [
+            { question: 'Which approach?', header: 'Approach', multiSelect: false, options: [{ label: 'A' }, { label: 'B' }] },
+          ],
+        },
+      ],
+    }
+
+    const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, scanWithQuestion))
+
+    expect(enrichment.pendingQuestionCount).toBe(1)
+
+    rmSync(agentDir, { recursive: true, force: true })
+  })
+})
+
 describe('computeAgentEnrichment paneQuestion kind', () => {
   const getAgentRuntimeStateMock = vi.mocked(agents.getAgentRuntimeState)
   const getAgentStateSyncMock = vi.mocked(agents.getAgentStateSync)
