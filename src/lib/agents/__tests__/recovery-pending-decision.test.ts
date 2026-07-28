@@ -1,5 +1,10 @@
-import { describe, expect, it, vi } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { GRACEFUL_RESTART_GRACE_MS } from '../../graceful-restart.js'
 import { restartAgent } from '../recovery.js'
 
 const agentState = {
@@ -70,5 +75,60 @@ describe('restartAgent pending operator decision gate', () => {
     expect(detectPendingOperatorDecision).not.toHaveBeenCalled()
     expect(result.error).toContain('workspace missing')
     expect(result.code).toBeUndefined()
+  })
+})
+
+describe('restartAgent graceful pending-decision rechecks', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('leaves the session running when a permission decision appears during the grace period', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-restart-gate-'))
+    const pendingDecision = {
+      source: 'pane' as const,
+      reason: 'tool_permission' as const,
+      prompt: 'Allow this command?',
+    }
+    const detectPendingOperatorDecision = vi.fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(pendingDecision)
+    const sendGracefulRestartWarning = vi.fn(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, GRACEFUL_RESTART_GRACE_MS))
+    })
+    const stopAgent = vi.fn(async () => undefined)
+
+    try {
+      const resultPromise = restartAgent('agent-pan-3228', { graceful: true }, {
+        detectPendingOperatorDecision,
+        getAgentStateSync: vi.fn(() => ({ ...agentState, workspace }) as any),
+        logAgentLifecycleSync: vi.fn(),
+        assertWorkspaceStackHealthyForSpawn: vi.fn(async () => undefined),
+        resolveHarness: vi.fn(async () => 'claude-code'),
+        prepareHarnessLaunch: vi.fn(async () => ({ binaryPath: '/usr/bin/claude' })) as any,
+        sessionExists: vi.fn(async () => true),
+        sendGracefulRestartWarning,
+        stopAgent,
+      })
+
+      await vi.advanceTimersByTimeAsync(0)
+      expect(sendGracefulRestartWarning).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(GRACEFUL_RESTART_GRACE_MS)
+
+      await expect(resultPromise).resolves.toMatchObject({
+        success: false,
+        code: 'pending-operator-decision',
+        pendingDecision,
+      })
+      expect(detectPendingOperatorDecision).toHaveBeenCalledTimes(3)
+      expect(stopAgent).not.toHaveBeenCalled()
+    } finally {
+      rmSync(workspace, { recursive: true, force: true })
+    }
   })
 })
