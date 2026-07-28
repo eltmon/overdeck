@@ -11,21 +11,16 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T20:00:05.976Z",
+  "updated": "2026-07-28T20:02:30.575Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T20:00:05.940Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since b9820a5 (3 paths): src/lib/gitlab-merge-requests.ts, tests/unit/lib/gitlab-merge-requests.test.ts, tests/unit/lib/pipeline-membership-gather.test.ts",
-        "detectedAt": "2026-07-28T19:59:33.733Z"
-      }
-    ],
+    "updatedAt": "2026-07-28T20:02:30.546Z",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -58,14 +53,14 @@
       },
       "costAtCloseOut": {
         "usd": 8.993654,
-        "pricingAsOf": "2026-07-28T20:00:05.947Z"
+        "pricingAsOf": "2026-07-28T20:02:30.569Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-fable-5",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3233",
