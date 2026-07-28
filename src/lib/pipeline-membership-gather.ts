@@ -686,12 +686,19 @@ export async function gatherProjectLensSignals(
       if (possibleHeads.some((head) => mergedHeads.has(head))) mergedPrIssues.add(id);
     }
   } else if (gitlabRepos.length > 0) {
-    // Query merged MRs from all GitLab repos and union results
-    const gitlabMergedHeadsByRepo = await Promise.all(
-      gitlabRepos.map((repo) =>
-        withUnavailableReason('forge_unavailable', () => deps.listMergedMergeRequestHeads(repo.path, candidateHeads))),
+    // Query merged MRs from all GitLab repos with global concurrency limit (max 5 parallel queries)
+    const allMergedHeads = await withConcurrencyLimitPromise(
+      gitlabRepos.flatMap((repo) =>
+        candidateHeads.map((head) => async () => {
+          const merged = await withUnavailableReason('forge_unavailable', () =>
+            deps.listMergedMergeRequestHeads(repo.path, [head]),
+          );
+          return merged.length > 0 ? head : null;
+        }),
+      ),
+      5, // Global limit of 5 concurrent glab queries across all repos
     );
-    const mergedHeads = new Set(gitlabMergedHeadsByRepo.flat());
+    const mergedHeads = new Set(allMergedHeads.filter((h) => h !== null));
     for (const id of openCandidates) {
       const possibleHeads = [
         ...(headRefsByIssue.get(id) ?? []),
