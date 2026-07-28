@@ -50,7 +50,7 @@
     "recordedAt": "2026-07-28T20:46:26.914Z"
   },
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T20:54:45.495Z",
+  "updated": "2026-07-28T20:55:27.984Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "pending",
@@ -60,7 +60,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:48:00.219Z",
-    "updatedAt": "2026-07-28T20:54:45.468Z",
+    "updatedAt": "2026-07-28T20:55:25.437Z",
     "reviewNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-28T20:22:39.328Z by deploy-patrol, flywheel-orchestrator, merge-step0). It re-runs automatically after the deploy.",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -144,7 +144,7 @@
       },
       "costAtCloseOut": {
         "usd": 17.108087,
-        "pricingAsOf": "2026-07-28T20:54:45.490Z"
+        "pricingAsOf": "2026-07-28T20:55:27.823Z"
       }
     },
     "merges": [
