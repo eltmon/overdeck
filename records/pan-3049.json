@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T06:45:26.402Z",
+  "updated": "2026-07-28T07:03:50.044Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,14 +79,14 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
+    "sequence": 9,
     "claims": {
-      "rebuild-resolve-after-render": {
+      "idle-reaper-ui-regex-prefix-agnostic": {
         "writerId": "agent-pan-3049",
         "agentId": "agent-pan-3049",
-        "pid": 2496933,
+        "pid": 3687765,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T06:45:26.402Z"
+        "claimedAt": "2026-07-28T07:03:50.044Z"
       }
     },
     "claimHistory": [
@@ -100,12 +100,57 @@
         "outcome": "completed",
         "reason": "Added compose-file name: declaration lookup to composeProjectNameForWorkspace and a new strict requireComposeProjectNameForWorkspace variant that throws instead of falling back when a compose file exists with no resolvable name; added tests/unit/lib/workspace/stack-health-compose-name.test.ts (8 passing tests). All existing rebuild-stack/stack-health tests still pass; typecheck and lint clean.",
         "releasedAt": "2026-07-28T06:43:50.602Z"
+      },
+      {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 2496933,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:45:26.402Z",
+        "itemId": "rebuild-resolve-after-render",
+        "outcome": "completed",
+        "reason": "Moved compose-name resolution in rebuildWorkspaceStack to after ensureDevcontainerSync render, using requireComposeProjectNameForWorkspace (strict) for the bring-up name and tryComposeProjectNameForWorkspace (best-effort) for the pre-render teardown; added a stale-name teardown pass when the two differ. Added tests/unit/lib/workspace/rebuild-stack.test.ts covering all 3 ACs (3 passing tests). Full workspace test suite (56 tests) still green; typecheck and lint clean.",
+        "releasedAt": "2026-07-28T06:53:26.888Z"
+      },
+      {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 3130748,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:53:34.199Z",
+        "itemId": "stop-docker-via-resolver",
+        "outcome": "completed",
+        "reason": "Replaced the hardcoded overdeck- prefix and duplicate dev-script parsing in stopWorkspaceDockerPromise with a call to the canonical composeProjectNameForWorkspace resolver. Mismatch still throws (same protection). Added tests/unit/lib/workspace-manager/docker.test.ts (3 passing tests covering both ACs plus the mismatch-throw case). Existing docker.test.ts (11 tests) and full workspace-manager suite (30 tests) still pass; typecheck/lint clean.",
+        "releasedAt": "2026-07-28T06:57:55.951Z"
+      },
+      {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 3450317,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:58:08.940Z",
+        "itemId": "deacon-crash-sweep-prefix-agnostic",
+        "outcome": "completed",
+        "reason": "Removed the hardcoded overdeck-feature- docker ps filter and widened the container-name regex from overdeck-feature-... to feature-..., so myn-feature-* (and any other declared prefix) crashed containers get the same auto-restart handling. Extended tests/lib/cloister/pan-464-container-health.test.ts (the existing test file for this function) with 3 new tests covering all 3 ACs, rather than creating a new file, per the item's own fallback instruction. Full cloister test suite (1312 tests) still passes; typecheck/lint clean.",
+        "releasedAt": "2026-07-28T07:03:39.036Z"
       }
     ],
     "statusReasons": {
       "resolver-compose-name-strict": {
         "reason": "Added compose-file name: declaration lookup to composeProjectNameForWorkspace and a new strict requireComposeProjectNameForWorkspace variant that throws instead of falling back when a compose file exists with no resolvable name; added tests/unit/lib/workspace/stack-health-compose-name.test.ts (8 passing tests). All existing rebuild-stack/stack-health tests still pass; typecheck and lint clean.",
         "updatedAt": "2026-07-28T06:43:50.602Z"
+      },
+      "rebuild-resolve-after-render": {
+        "reason": "Moved compose-name resolution in rebuildWorkspaceStack to after ensureDevcontainerSync render, using requireComposeProjectNameForWorkspace (strict) for the bring-up name and tryComposeProjectNameForWorkspace (best-effort) for the pre-render teardown; added a stale-name teardown pass when the two differ. Added tests/unit/lib/workspace/rebuild-stack.test.ts covering all 3 ACs (3 passing tests). Full workspace test suite (56 tests) still green; typecheck and lint clean.",
+        "updatedAt": "2026-07-28T06:53:26.888Z"
+      },
+      "stop-docker-via-resolver": {
+        "reason": "Replaced the hardcoded overdeck- prefix and duplicate dev-script parsing in stopWorkspaceDockerPromise with a call to the canonical composeProjectNameForWorkspace resolver. Mismatch still throws (same protection). Added tests/unit/lib/workspace-manager/docker.test.ts (3 passing tests covering both ACs plus the mismatch-throw case). Existing docker.test.ts (11 tests) and full workspace-manager suite (30 tests) still pass; typecheck/lint clean.",
+        "updatedAt": "2026-07-28T06:57:55.951Z"
+      },
+      "deacon-crash-sweep-prefix-agnostic": {
+        "reason": "Removed the hardcoded overdeck-feature- docker ps filter and widened the container-name regex from overdeck-feature-... to feature-..., so myn-feature-* (and any other declared prefix) crashed containers get the same auto-restart handling. Extended tests/lib/cloister/pan-464-container-health.test.ts (the existing test file for this function) with 3 new tests covering all 3 ACs, rather than creating a new file, per the item's own fallback instruction. Full cloister test suite (1312 tests) still passes; typecheck/lint clean.",
+        "updatedAt": "2026-07-28T07:03:39.036Z"
       }
     }
   },
@@ -115,6 +160,17 @@
     "resolver-compose-name-strict.resolver-compose-name-strict.ac2": "completed",
     "resolver-compose-name-strict.resolver-compose-name-strict.ac3": "completed",
     "resolver-compose-name-strict.resolver-compose-name-strict.ac4": "completed",
-    "rebuild-resolve-after-render": "running"
+    "rebuild-resolve-after-render": "completed",
+    "rebuild-resolve-after-render.rebuild-resolve-after-render.ac1": "completed",
+    "rebuild-resolve-after-render.rebuild-resolve-after-render.ac2": "completed",
+    "rebuild-resolve-after-render.rebuild-resolve-after-render.ac3": "completed",
+    "stop-docker-via-resolver": "completed",
+    "stop-docker-via-resolver.stop-docker-via-resolver.ac1": "completed",
+    "stop-docker-via-resolver.stop-docker-via-resolver.ac2": "completed",
+    "deacon-crash-sweep-prefix-agnostic": "completed",
+    "deacon-crash-sweep-prefix-agnostic.deacon-crash-sweep-prefix-agnostic.ac1": "completed",
+    "deacon-crash-sweep-prefix-agnostic.deacon-crash-sweep-prefix-agnostic.ac2": "completed",
+    "deacon-crash-sweep-prefix-agnostic.deacon-crash-sweep-prefix-agnostic.ac3": "completed",
+    "idle-reaper-ui-regex-prefix-agnostic": "running"
   }
 }

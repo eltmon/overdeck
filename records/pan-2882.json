@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T06:44:55.060Z",
+  "updated": "2026-07-28T06:56:13.237Z",
   "pipeline": {
     "issueId": "PAN-2882",
     "reviewStatus": "pending",
@@ -47,16 +47,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "open-mr-lens": {
-        "writerId": "agent-pan-2882",
-        "agentId": "agent-pan-2882",
-        "pid": 2448379,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T06:44:55.059Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2882",
@@ -79,6 +71,39 @@
         "outcome": "completed",
         "reason": "Created gitlab-merge-requests.ts module with injectable runner, TTL caching, pagination support, and comprehensive tests for both open and merged MR queries",
         "releasedAt": "2026-07-28T06:44:46.167Z"
+      },
+      {
+        "writerId": "agent-pan-2882",
+        "agentId": "agent-pan-2882",
+        "pid": 2448379,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:44:55.059Z",
+        "itemId": "open-mr-lens",
+        "outcome": "completed",
+        "reason": "Wired GitLab open MRs into gather's hasOpenPr lens, updated fork-filter for GitLab support, added tests for open MR behavior",
+        "releasedAt": "2026-07-28T06:49:49.874Z"
+      },
+      {
+        "writerId": "agent-pan-2882",
+        "agentId": "agent-pan-2882",
+        "pid": 2902761,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:50:00.222Z",
+        "itemId": "merged-mr-oracle",
+        "outcome": "completed",
+        "reason": "Wired GitLab merged-MR oracle into gather, lifted candidate-heads computation, added polyrepo union support, comprehensive tests for all acceptance criteria",
+        "releasedAt": "2026-07-28T06:53:25.896Z"
+      },
+      {
+        "writerId": "agent-pan-2882",
+        "agentId": "agent-pan-2882",
+        "pid": 3135357,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:53:39.309Z",
+        "itemId": "docs-membership-gitlab",
+        "outcome": "completed",
+        "reason": "Documentation updated: replaced capability-gating sentence with three-tier forge-dependent behavior (GitHub/GraphQL, GitLab/glab, tracker/branch/spec). Added Read-doors sentence about gitlab-merge-requests.ts with 30s TTL and per-head exact queries. Lint self-test passes. Committed to origin/feature-pan-2882.",
+        "releasedAt": "2026-07-28T06:56:13.237Z"
       }
     ],
     "statusReasons": {
@@ -89,6 +114,18 @@
       "gitlab-mr-module": {
         "reason": "Created gitlab-merge-requests.ts module with injectable runner, TTL caching, pagination support, and comprehensive tests for both open and merged MR queries",
         "updatedAt": "2026-07-28T06:44:46.167Z"
+      },
+      "open-mr-lens": {
+        "reason": "Wired GitLab open MRs into gather's hasOpenPr lens, updated fork-filter for GitLab support, added tests for open MR behavior",
+        "updatedAt": "2026-07-28T06:49:49.874Z"
+      },
+      "merged-mr-oracle": {
+        "reason": "Wired GitLab merged-MR oracle into gather, lifted candidate-heads computation, added polyrepo union support, comprehensive tests for all acceptance criteria",
+        "updatedAt": "2026-07-28T06:53:25.896Z"
+      },
+      "docs-membership-gitlab": {
+        "reason": "Documentation updated: replaced capability-gating sentence with three-tier forge-dependent behavior (GitHub/GraphQL, GitLab/glab, tracker/branch/spec). Added Read-doors sentence about gitlab-merge-requests.ts with 30s TTL and per-head exact queries. Lint self-test passes. Committed to origin/feature-pan-2882.",
+        "updatedAt": "2026-07-28T06:56:13.237Z"
       }
     }
   },
@@ -103,6 +140,19 @@
     "gitlab-mr-module.gitlab-mr-module.ac3": "completed",
     "gitlab-mr-module.gitlab-mr-module.ac4": "completed",
     "gitlab-mr-module.gitlab-mr-module.ac5": "completed",
-    "open-mr-lens": "running"
+    "open-mr-lens": "completed",
+    "open-mr-lens.open-mr-lens.ac1": "completed",
+    "open-mr-lens.open-mr-lens.ac2": "completed",
+    "open-mr-lens.open-mr-lens.ac3": "completed",
+    "open-mr-lens.open-mr-lens.ac4": "completed",
+    "merged-mr-oracle": "completed",
+    "merged-mr-oracle.merged-mr-oracle.ac1": "completed",
+    "merged-mr-oracle.merged-mr-oracle.ac2": "completed",
+    "merged-mr-oracle.merged-mr-oracle.ac3": "completed",
+    "merged-mr-oracle.merged-mr-oracle.ac4": "completed",
+    "merged-mr-oracle.merged-mr-oracle.ac5": "completed",
+    "docs-membership-gitlab": "completed",
+    "docs-membership-gitlab.docs-membership-gitlab.ac1": "completed",
+    "docs-membership-gitlab.docs-membership-gitlab.ac2": "completed"
   }
 }

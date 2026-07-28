@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T06:48:23.612Z",
+  "updated": "2026-07-28T06:57:21.668Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
@@ -65,8 +65,16 @@
     }
   ],
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "verdict-write-backoff": {
+        "writerId": "agent-pan-3092",
+        "agentId": "agent-pan-3092",
+        "pid": 3410332,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:57:21.668Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3092",
@@ -78,12 +86,27 @@
         "outcome": "completed",
         "reason": "New pipeline-verdict-merge.ts (mergePipelineVerdictAware + pipelineCoversFallbackVerdicts); pickNewerPipeline delegates; 9 new tests, 4 PAN-2587 cases unmodified and green",
         "releasedAt": "2026-07-28T06:43:08.695Z"
+      },
+      {
+        "writerId": "agent-pan-3092",
+        "agentId": "agent-pan-3092",
+        "pid": 3213658,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:54:32.042Z",
+        "itemId": "drain-content-aware-supersede",
+        "outcome": "completed",
+        "reason": "Drain supersede now requires pipelineCoversFallbackVerdicts; PAN-2989 supersede test split into same-verdict/verdict-free/newer-cycle cases; 32 tests green",
+        "releasedAt": "2026-07-28T06:57:10.692Z"
       }
     ],
     "statusReasons": {
       "verdict-aware-pipeline-merge": {
         "reason": "New pipeline-verdict-merge.ts (mergePipelineVerdictAware + pipelineCoversFallbackVerdicts); pickNewerPipeline delegates; 9 new tests, 4 PAN-2587 cases unmodified and green",
         "updatedAt": "2026-07-28T06:43:08.695Z"
+      },
+      "drain-content-aware-supersede": {
+        "reason": "Drain supersede now requires pipelineCoversFallbackVerdicts; PAN-2989 supersede test split into same-verdict/verdict-free/newer-cycle cases; 32 tests green",
+        "updatedAt": "2026-07-28T06:57:10.692Z"
       }
     }
   },
@@ -92,6 +115,12 @@
     "verdict-aware-pipeline-merge.verdict-aware-pipeline-merge.ac1": "completed",
     "verdict-aware-pipeline-merge.verdict-aware-pipeline-merge.ac2": "completed",
     "verdict-aware-pipeline-merge.verdict-aware-pipeline-merge.ac3": "completed",
-    "verdict-aware-pipeline-merge.verdict-aware-pipeline-merge.ac4": "completed"
+    "verdict-aware-pipeline-merge.verdict-aware-pipeline-merge.ac4": "completed",
+    "drain-content-aware-supersede": "completed",
+    "drain-content-aware-supersede.drain-content-aware-supersede.ac1": "completed",
+    "drain-content-aware-supersede.drain-content-aware-supersede.ac2": "completed",
+    "drain-content-aware-supersede.drain-content-aware-supersede.ac3": "completed",
+    "drain-content-aware-supersede.drain-content-aware-supersede.ac4": "completed",
+    "verdict-write-backoff": "running"
   }
 }
