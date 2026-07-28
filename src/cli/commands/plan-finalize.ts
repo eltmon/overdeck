@@ -1,6 +1,6 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { dirname, join, resolve } from 'path';
 import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync, serializeXBriefDocument } from '../../lib/xbrief/io.js';
@@ -177,6 +177,7 @@ export function writePendingPromotionMarker(
   marker: PendingPromotionMarker,
 ): void {
   const markerPath = join(workspacePath, WORKSPACE_RUNTIME_DIRNAME, PENDING_PROMOTION_FILENAME);
+  mkdirSync(dirname(markerPath), { recursive: true });
   const tmp = markerPath + '.tmp';
   writeFileSync(tmp, JSON.stringify(marker, null, 2) + '\n', 'utf-8');
   renameSync(tmp, markerPath);
@@ -383,7 +384,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
         console.log(chalk.dim('Run `pan start ' + issueId + '` or click Start Agent to begin implementation.'));
       }
     } else {
-      console.log(chalk.yellow('⚠ Promotion deferred — the dashboard was unreachable. A pending-promotion marker was written; the deacon will complete promotion automatically once the dashboard is healthy. Manual fallback: pan plan done ' + issueId + '.'));
+      console.log(chalk.yellow('⚠ Promotion deferred — the dashboard did not complete promotion. A pending-promotion marker was written; the deacon will complete promotion automatically once the dashboard is healthy. Manual fallback: pan plan done ' + issueId + '.'));
       if (promoteError) console.log(chalk.dim('  ' + promoteError));
     }
   }

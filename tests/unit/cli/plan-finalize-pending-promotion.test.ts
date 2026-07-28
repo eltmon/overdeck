@@ -25,13 +25,13 @@ const FIXED_NOW = '2026-07-28T18:00:00.000Z';
 const originalOverdeckHome = process.env.OVERDECK_HOME;
 const roots: string[] = [];
 
-function createWorkspace(): { root: string; workspacePath: string; markerPath: string } {
+function createWorkspace(specDirname: '.overdeck' | '.pan' = '.overdeck'): { root: string; workspacePath: string; markerPath: string } {
   const root = mkdtempSync(join(tmpdir(), 'plan-finalize-pending-promotion-'));
   roots.push(root);
   const workspacePath = join(root, 'workspaces', 'feature-pan-3229');
-  const runtimeDir = join(workspacePath, '.overdeck');
-  mkdirSync(runtimeDir, { recursive: true });
-  writeFileSync(join(runtimeDir, 'spec.vbrief.json'), JSON.stringify({
+  const specDir = join(workspacePath, specDirname);
+  mkdirSync(specDir, { recursive: true });
+  writeFileSync(join(specDir, 'spec.vbrief.json'), JSON.stringify({
     xBRIEFInfo: {
       version: '0.8',
       created: '2026-07-28T17:00:00.000Z',
@@ -63,7 +63,7 @@ function createWorkspace(): { root: string; workspacePath: string; markerPath: s
   return {
     root,
     workspacePath,
-    markerPath: join(runtimeDir, PENDING_PROMOTION_FILENAME),
+    markerPath: join(workspacePath, '.overdeck', PENDING_PROMOTION_FILENAME),
   };
 }
 
@@ -134,6 +134,30 @@ describe('plan finalize pending-promotion marker', () => {
       success: false,
       promoted: false,
       promotionDeferred: true,
+    });
+  });
+
+  it('creates the runtime directory when a legacy workspace only has .pan/spec.vbrief.json', async () => {
+    const { root, workspacePath, markerPath } = createWorkspace('.pan');
+    process.env.OVERDECK_HOME = root;
+    expect(() => readFileSync(markerPath, 'utf-8')).toThrow();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')));
+    mockProcessExit();
+
+    const finalize = planFinalizeCommand({
+      workspace: workspacePath,
+      json: true,
+      prd: false,
+      qualityLint: false,
+    }).catch(error => error as Error);
+
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    expect((await finalize).message).toBe('EXIT:1');
+    expect(JSON.parse(readFileSync(markerPath, 'utf-8'))).toMatchObject({
+      version: '1',
+      issueId: 'PAN-3229',
+      patrolAttempts: 0,
     });
   });
 
