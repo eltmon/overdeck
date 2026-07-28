@@ -7,3 +7,4 @@
 3475 src/lib/cloister/deacon.ts # PAN-3206
 1315 src/lib/tmux.ts # PAN-3212
 1006 src/lib/lifecycle/workflows.ts # PAN-3211
+1452 src/lib/model-capabilities.ts # PAN-3252
