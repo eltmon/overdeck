@@ -70,21 +70,18 @@ export async function listOpenGitLabMergeRequests(
         break; // Empty page signals end of results
       }
 
-      try {
-        const pageRows = JSON.parse(stdout) as GitLabMergeRequestRow[];
-        if (!Array.isArray(pageRows)) break;
-        if (pageRows.length === 0) break;
-
-        rows.push(...pageRows);
-
-        // If we got fewer than 100 rows, we're on the last page
-        if (pageRows.length < 100) break;
-
-        page++;
-      } catch {
-        // Parse error — treat as end of results
-        break;
+      const pageRows = JSON.parse(stdout) as GitLabMergeRequestRow[];
+      if (!Array.isArray(pageRows)) {
+        throw new Error(`Expected array from glab mr list, got ${typeof pageRows}`);
       }
+      if (pageRows.length === 0) break;
+
+      rows.push(...pageRows);
+
+      // If we got fewer than 100 rows, we're on the last page
+      if (pageRows.length < 100) break;
+
+      page++;
     }
 
     return rows;
@@ -111,40 +108,33 @@ export async function listGitLabMergedMergeRequestHeads(
   const results = await withConcurrencyLimitPromise(
     heads.map((head) => async () => {
       const cacheKey = `${repoPath.toLowerCase()}:${head}`;
-      try {
-        const hasMerged = await cachedMergedMergeRequestHeads(cacheKey, async () => {
-          let page = 1;
+      const hasMerged = await cachedMergedMergeRequestHeads(cacheKey, async () => {
+        let page = 1;
 
-          while (true) {
-            const stdout = await runner(
-              ['mr', 'list', '--merged', '--source-branch', head, '--output', 'json', '--per-page', '100', '--page', String(page)],
-              repoPath,
-            );
+        while (true) {
+          const stdout = await runner(
+            ['mr', 'list', '--merged', '--source-branch', head, '--output', 'json', '--per-page', '100', '--page', String(page)],
+            repoPath,
+          );
 
-            if (!stdout.trim()) {
-              return false; // No merged MRs found
-            }
-
-            try {
-              const pageRows = JSON.parse(stdout) as GitLabMergeRequestRow[];
-              if (!Array.isArray(pageRows)) return false;
-              if (pageRows.length > 0) return true; // Found at least one merged MR
-
-              // If we got fewer than 100 rows, we're on the last page with no results
-              if (pageRows.length < 100) return false;
-
-              page++;
-            } catch {
-              return false; // Parse error — no merged MRs found
-            }
+          if (!stdout.trim()) {
+            return false; // No merged MRs found
           }
-        });
-        // Return head if merged, null otherwise
-        return hasMerged ? head : null;
-      } catch {
-        // Error querying — return null (head has no merged MR)
-        return null;
-      }
+
+          const pageRows = JSON.parse(stdout) as GitLabMergeRequestRow[];
+          if (!Array.isArray(pageRows)) {
+            throw new Error(`Expected array from glab mr list, got ${typeof pageRows}`);
+          }
+          if (pageRows.length > 0) return true; // Found at least one merged MR
+
+          // If we got fewer than 100 rows, we're on the last page with no results
+          if (pageRows.length < 100) return false;
+
+          page++;
+        }
+      });
+      // Return head if merged, null otherwise
+      return hasMerged ? head : null;
     }),
     5, // Concurrency limit of 5
   );
