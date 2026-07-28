@@ -6,6 +6,10 @@ import { Effect } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
 import { resolveStaffing } from '../../../../lib/agents/staffing.js';
+import {
+  detectPendingOperatorDecision,
+  type PendingOperatorDecision,
+} from '../../../../lib/agents/pending-decision-gate.js';
 import { findPlanSync, readWorkspacePlanSync } from '../../../../lib/xbrief/io.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from '../../../../lib/agents/tier-table.js';
 import { getDispatchableItems } from '../../../../lib/xbrief/dag.js';
@@ -41,6 +45,15 @@ import {
   readJsonBody,
   spawnPanCommandDetached,
 } from './shared.js';
+
+function pendingDecisionError(
+  agentId: string,
+  issueId: string,
+  decision: PendingOperatorDecision,
+): string {
+  const reason = decision.reason.replaceAll('_', ' ');
+  return `Agent ${agentId} is waiting on an operator decision (${reason}). Answer it with 'pan answer ${issueId}' or open the Decisions panel; pass {force:true} to discard it deliberately.`;
+}
 
 // ─── Route: POST /api/agents/:id/resume ──────────────────────────────────────
 
@@ -166,7 +179,7 @@ export const postAgentRecoverRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
-    const { model } = body as { model?: string };
+    const { model, force = false } = body as { model?: string; force?: boolean };
     let recoveryModel: string | undefined;
     try {
       recoveryModel = normalizeModelOverrideSync(model);
@@ -178,12 +191,25 @@ export const postAgentRecoverRoute = HttpRouter.add(
     if (!stateBeforeRecover) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }
+    if (!force) {
+      const pendingDecision = yield* Effect.promise(() => detectPendingOperatorDecision(id));
+      if (pendingDecision) {
+        return jsonResponse({
+          error: pendingDecisionError(id, stateBeforeRecover.issueId, pendingDecision),
+          code: 'pending-operator-decision',
+          pendingDecision,
+        }, { status: 409 });
+      }
+    }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.recover_requested', {
       model: recoveryModel || undefined,
     }));
 
-    const result = yield* Effect.promise(() => recoverAgent(id, recoveryModel ? { modelOverride: recoveryModel } : undefined));
+    const result = yield* Effect.promise(() => recoverAgent(id, {
+      ...(recoveryModel ? { modelOverride: recoveryModel } : {}),
+      force,
+    }));
     if (!result) {
       const error = `Could not recover agent ${id}`;
       yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.recover_failed', { error }));
@@ -235,11 +261,12 @@ export const postAgentRestartRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
-    const { model, harness, graceful = true, message } = body as {
+    const { model, harness, graceful = true, message, force = false } = body as {
       model?: string;
       harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp';
       graceful?: boolean;
       message?: string;
+      force?: boolean;
     };
     let restartModel: string | undefined;
     try {
@@ -251,6 +278,16 @@ export const postAgentRestartRoute = HttpRouter.add(
     const agentState = yield* getAgentState(id);
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+    if (!force) {
+      const pendingDecision = yield* Effect.promise(() => detectPendingOperatorDecision(id));
+      if (pendingDecision) {
+        return jsonResponse({
+          error: pendingDecisionError(id, agentState.issueId, pendingDecision),
+          code: 'pending-operator-decision',
+          pendingDecision,
+        }, { status: 409 });
+      }
     }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.restart_requested', {
@@ -277,7 +314,7 @@ export const postAgentRestartRoute = HttpRouter.add(
             payload: { agentId: id, issueId: agentState.issueId },
           }));
 
-          const result = await restartAgent(id, { model: restartModel, harness, graceful: true, message });
+          const result = await restartAgent(id, { model: restartModel, harness, graceful: true, message, force });
 
           if (result.success) {
             const updatedState = await Effect.runPromise(getAgentState(id));
@@ -324,7 +361,7 @@ export const postAgentRestartRoute = HttpRouter.add(
     }
 
     // Quick restart — synchronous
-    const result = yield* Effect.promise(() => restartAgent(id, { model: restartModel, harness, graceful: false, message }));
+    const result = yield* Effect.promise(() => restartAgent(id, { model: restartModel, harness, graceful: false, message, force }));
 
     if (result.success) {
       const updatedState = yield* getAgentState(id);
@@ -370,6 +407,13 @@ export const postAgentRestartRoute = HttpRouter.add(
       return jsonResponse({ success: true, restarted: true, agentId: id, model: restartModel || agentState.model });
     }
 
+    if (result.code === 'pending-operator-decision') {
+      return jsonResponse({
+        error: result.error,
+        code: result.code,
+        pendingDecision: result.pendingDecision,
+      }, { status: 409 });
+    }
     return jsonResponse({ error: result.error }, { status: 500 });
   })),
 );
@@ -405,10 +449,11 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
-    const { spawn: spawnFlag, model: rawModel, harness } = body as {
+    const { spawn: spawnFlag, model: rawModel, harness, force = false } = body as {
       spawn?: boolean;
       model?: string;
       harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp';
+      force?: boolean;
     };
     const wantsSpawn = spawnFlag !== false; // default to spawn when omitted (picker path)
 
@@ -432,6 +477,16 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
         error: `${issueId} is already ${issueStage?.replaceAll('_', ' ')}. Reopen the issue before starting fresh work.`,
         issueStage,
       }, { status: 409 });
+    }
+    if (!force) {
+      const pendingDecision = yield* Effect.promise(() => detectPendingOperatorDecision(id));
+      if (pendingDecision) {
+        return jsonResponse({
+          error: pendingDecisionError(id, issueId, pendingDecision),
+          code: 'pending-operator-decision',
+          pendingDecision,
+        }, { status: 409 });
+      }
     }
 
     const lifecycle = yield* getWorkAgentLifecycleState(id);
@@ -578,16 +633,32 @@ export const postAgentsRestartAllRoute = HttpRouter.add(
   'POST',
   '/api/agents/restart-all',
   Effect.gen(function* () {
+    const body = yield* readJsonBody;
+    const { force = false } = body as { force?: boolean };
     return yield* Effect.promise(async () => {
       try {
         const running = (await Effect.runPromise(listRunningAgents())).filter(a => a.tmuxActive);
-        const results: { id: string; issueId: string; model: string; status: string }[] = [];
+        const results: Array<{
+          id: string;
+          issueId: string;
+          model: string;
+          status: string;
+          pendingReason?: string;
+        }> = [];
 
         for (const agent of running) {
           try {
-            const result = await restartAgent(agent.id, { graceful: false });
+            const result = await restartAgent(agent.id, { graceful: false, force });
             if (result.success) {
               results.push({ id: agent.id, issueId: agent.issueId, model: agent.model, status: 'restarted' });
+            } else if (result.code === 'pending-operator-decision') {
+              results.push({
+                id: agent.id,
+                issueId: agent.issueId,
+                model: agent.model,
+                status: 'skipped',
+                pendingReason: result.pendingDecision?.reason,
+              });
             } else {
               results.push({ id: agent.id, issueId: agent.issueId, model: agent.model, status: `failed: ${result.error}` });
             }
@@ -599,8 +670,11 @@ export const postAgentsRestartAllRoute = HttpRouter.add(
         }
 
         const succeeded = results.filter(r => r.status === 'restarted').length;
+        const skipped = results
+          .filter(r => r.status === 'skipped')
+          .map(r => ({ id: r.id, reason: r.pendingReason }));
         console.log(`[agents] Restarted ${succeeded}/${running.length} workspace agents`);
-        return jsonResponse({ restarted: succeeded, total: running.length, results });
+        return jsonResponse({ restarted: succeeded, total: running.length, skipped, results });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to restart agents: ' + msg }, { status: 500 });
@@ -831,7 +905,7 @@ export const postAgentsRestartWithConfigRoute = HttpRouter.add(
   '/api/agents/restart-with-current-config',
   httpHandler(Effect.gen(function* () {
     const body = yield* readJsonBody;
-    const { agentIds } = body as { agentIds?: string[] };
+    const { agentIds, force = false } = body as { agentIds?: string[]; force?: boolean };
 
     if (!agentIds || !Array.isArray(agentIds) || agentIds.length === 0) {
       return jsonResponse({ error: 'agentIds array is required and must not be empty' }, { status: 400 });
@@ -879,6 +953,7 @@ export const postAgentsRestartWithConfigRoute = HttpRouter.add(
           model: newModel,
           harness: newHarness as any,
           graceful: false,
+          force,
         }));
 
         if (restartResult.success) {
@@ -891,7 +966,7 @@ export const postAgentsRestartWithConfigRoute = HttpRouter.add(
         } else {
           results.push({
             id: agentId,
-            status: 'failed',
+            status: restartResult.code === 'pending-operator-decision' ? 'skipped' : 'failed',
             error: restartResult.error,
           });
         }
