@@ -100,10 +100,10 @@
     "recordedAt": "2026-07-28T20:15:30.548Z"
   },
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T22:29:32.293Z",
+  "updated": "2026-07-28T22:29:36.525Z",
   "pipeline": {
     "issueId": "PAN-3229",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -111,8 +111,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:16:31.872Z",
-    "updatedAt": "2026-07-28T22:29:31.268Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
+    "updatedAt": "2026-07-28T22:29:36.512Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-3229-review already running. Use 'pan tell' to message it.",
     "inspectNotes": "All 4 ACs met. Blocking ENOENT fixed: plan-finalize.ts:180 now mkdirSync(dirname(markerPath),{recursive:true}) before the temp write, so the marker lands regardless of whether the workspace has .overdeck/, and the new '.pan-only legacy workspace' regression test in tests/unit/cli/plan-finalize-pending-promotion.test.ts covers it (createWorkspace('.pan') writes only .pan/spec.vbrief.json, asserts no marker pre-run, then asserts the marker after 5 failed attempts). Secondary wording note also addressed at plan-finalize.ts:387 — 'the dashboard did not complete promotion' now covers non-2xx as well as unreachable. AC-1 marker fields + patrolAttempts:0, AC-2 'deferred'/deacon named/promotionDeferred:true/exit 1 at plan-finalize.ts:392, AC-3 !noPromote && !promoted guard, AC-4 .gitignore entry all verified in tree at 5b93276e.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3246",
     "reviewedAtCommit": "db15a4f22f3a2a4edb6bf834336b8de69ec0dab3",
@@ -206,7 +206,7 @@
       },
       "costAtCloseOut": {
         "usd": 137.744474,
-        "pricingAsOf": "2026-07-28T22:29:31.289Z"
+        "pricingAsOf": "2026-07-28T22:29:36.521Z"
       }
     },
     "merges": [
