@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T17:46:57.920Z",
+  "updated": "2026-07-28T17:47:09.196Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "pending",
@@ -85,8 +85,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "server-marker-cleanup": {
+        "writerId": "agent-pan-3229",
+        "agentId": "agent-pan-3229",
+        "pid": 1858167,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:47:09.196Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3229",
@@ -151,6 +159,7 @@
     "pending-promotion-reconciler.pending-promotion-reconciler.ac5": "completed",
     "patrol-wiring": "completed",
     "patrol-wiring.patrol-wiring.ac1": "completed",
-    "patrol-wiring.patrol-wiring.ac2": "completed"
+    "patrol-wiring.patrol-wiring.ac2": "completed",
+    "server-marker-cleanup": "running"
   }
 }
