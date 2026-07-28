@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T07:09:30.939Z",
+  "updated": "2026-07-28T07:15:36.362Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "frozen-agent-escalation": {
-        "writerId": "agent-pan-3092",
-        "agentId": "agent-pan-3092",
-        "pid": 3921536,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T07:09:30.939Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3092",
@@ -108,6 +100,17 @@
         "outcome": "completed",
         "reason": "Terminal-verdict writes retry on a bounded 2.6min exponential schedule (env-tunable) before the fallback; bookkeeping writes stay single-shot; CLI prints the do-not-retry durability message; 5 new tests",
         "releasedAt": "2026-07-28T07:09:20.481Z"
+      },
+      {
+        "writerId": "agent-pan-3092",
+        "agentId": "agent-pan-3092",
+        "pid": 3921536,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T07:09:30.939Z",
+        "itemId": "frozen-agent-escalation",
+        "outcome": "completed",
+        "reason": "decideUnsignaledTestAction returns 'escalate' for live+idle+no-artifact+nudged; deacon emits one needs-you per dispatch generation via recordUnsignaledTestEscalation; no verdict fabrication",
+        "releasedAt": "2026-07-28T07:15:36.362Z"
       }
     ],
     "statusReasons": {
@@ -122,6 +125,10 @@
       "verdict-write-backoff": {
         "reason": "Terminal-verdict writes retry on a bounded 2.6min exponential schedule (env-tunable) before the fallback; bookkeeping writes stay single-shot; CLI prints the do-not-retry durability message; 5 new tests",
         "updatedAt": "2026-07-28T07:09:20.481Z"
+      },
+      "frozen-agent-escalation": {
+        "reason": "decideUnsignaledTestAction returns 'escalate' for live+idle+no-artifact+nudged; deacon emits one needs-you per dispatch generation via recordUnsignaledTestEscalation; no verdict fabrication",
+        "updatedAt": "2026-07-28T07:15:36.362Z"
       }
     }
   },
@@ -141,6 +148,8 @@
     "verdict-write-backoff.verdict-write-backoff.ac2": "completed",
     "verdict-write-backoff.verdict-write-backoff.ac3": "completed",
     "verdict-write-backoff.verdict-write-backoff.ac4": "completed",
-    "frozen-agent-escalation": "running"
+    "frozen-agent-escalation": "completed",
+    "frozen-agent-escalation.frozen-agent-escalation.ac1": "completed",
+    "frozen-agent-escalation.frozen-agent-escalation.ac2": "completed"
   }
 }
