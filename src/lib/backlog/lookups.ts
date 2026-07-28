@@ -1,5 +1,6 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { getProjectPanPaths } from '../pan-dir/paths.js';
 import { getReviewStatusSync } from '../review-status.js';
 import type { ClassifyLookups } from './pickup.js';
 
@@ -36,7 +37,7 @@ export function buildClassifyLookups(
     } catch { /* issue service not ready — treat as no labels */ }
   }
 
-  const specsDir = join(projectRoot, '.pan', 'specs');
+  const specsDir = getProjectPanPaths(projectRoot).specsDir;
   const specIssues = new Set<string>();
   if (existsSync(specsDir)) {
     for (const f of readdirSync(specsDir)) {
