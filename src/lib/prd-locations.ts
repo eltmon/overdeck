@@ -13,6 +13,7 @@
  */
 
 import { existsSync } from 'fs';
+import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
 import {
@@ -32,6 +33,24 @@ export interface PrdLocation {
   path: string;
   format: PrdFormat;
   status: PrdStatus;
+}
+
+/** Read Markdown from any location returned by this module's PRD resolvers. */
+export async function readPrdContent(loc: PrdLocation): Promise<string | null> {
+  if (loc.format === 'flat' || loc.format === 'pan-draft') {
+    return readFile(loc.path, 'utf8').catch(() => null);
+  }
+
+  const files = (await readdir(loc.path).catch(() => [] as string[]))
+    .filter((file) => file.endsWith('.md'))
+    .sort((a, b) => {
+      if (a === 'prd.md') return -1;
+      if (b === 'prd.md') return 1;
+      return a.localeCompare(b);
+    });
+  const firstMarkdown = files[0];
+  if (!firstMarkdown) return null;
+  return readFile(join(loc.path, firstMarkdown), 'utf8').catch(() => null);
 }
 
 const STATUS_DIRS: Record<Exclude<PrdStatus, 'draft'>, string> = {
