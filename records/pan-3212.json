@@ -82,17 +82,14 @@
       "reason": "feedback",
       "note": "[2026-07-28T19:11Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-28T19:11:47.589Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T19:11:47Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3212\n\n# Review — PAN-3212 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED\n\nThe cursor-anchored composer fix now matches the live Claude Code pane and the new marker avoids re-pasting after a known Enter attempt, but the marker is read fail-open and an absent value is overloaded to mean “Enter attempted.” That bypasses payload proof on transient read failures and on pending claims created before this protocol version.\n\n## Context\n\n- Branch: `feature/pan-3212`\n- HEAD reviewed: `d04d8fd58e4d19c9165ab6a90efeee7a7196229a`\n- Previous review HEAD: `2ed6db586f52912214c64dc79ee02efcf7fe2400`\n- Cycle-five feature commit: `88fb87a00c fix(terminal): track unverified keyed payloads`\n- Latest HEAD also merges `origin/main` via `d04d8fd58e`\n- PR: `#3227`\n- Dimensions reviewed: correctness, security, requirements/acceptance criteria, performance\n\n## Convergence Note\n\nThis finding could not have been raised in cycle one: the payload-unverified tmux option and the empty-value fast path were introduced only in cycle five to address the preceding review's live-composer-layout blocker.\n\n## Blocking Findings\n\n### ! An unreadable or legacy payload-state marker bypasses composer verification — `src/lib/tmux-dedup.ts:432`\n\n**Evidence tier:** Tier 1 — static marker-state proof\n\n**Changed code:** `payloadUnverifiedOption` is read through the fail-open `readMarker()` helper, which converts every tmux read failure to `''`. Lines 434–435 then interpret `''` as proof that an Enter attempt already began and immediately return `submit-pending` without checking the composer.\n\n**Problem:** The empty value has three distinct meanings that are not equivalent:\n\n1. The new atomic submit path deliberately cleared the marker because Enter may have landed.\n2. The marker read failed transiently even though the stored value is still `1`.\n3. The pending claim was created by the pre-upgrade protocol, which never wrote this option.\n\nIn cases 2 and 3, a menu may have swallowed the paste while the pending claim and pane PID remain. Recovery sees `''`, skips `pendingPayloadPresence()`, sends a bare Enter after the menu clears, and marks the key terminal. The same fail-open shortcut exists in the post-repaste concurrent-claim branch at lines 463–477.\n\n**Runtime impact:** The original silent-loss path remains reachable during a transient tmux read failure, and any pending marker that survives deployment from the previous protocol version can bypass the new safety proof entirely.\n\n**Fix:** Read this safety-critical option with `readMarkerStrict()` and make the state explicit rather than encoding “Enter attempted” as absence. For example, persist distinct `payload-unverified` and `enter-attempted` values; treat unset as unknown/legacy and route it through a deliberate migration or fail-closed recovery path. Add tests for (a) a selective payload-state read failure while `1` is stored and (b) a legacy pending claim with no payload-state option after a swallowed paste. Neither case may return `submit-pending` or send Enter without positive composer evidence.\n\n## Requirements Coverage\n\n- FR-1 / sendKeys guard tests: implemented and passing.\n- FR-2 / resume-contract delivery seam: implemented and passing.\n- FR-3 / keyed blocking-menu guard: partial. Live-composer detection and unreadable viewport handling are fixed, but payload-state read/migration ambiguity can still authorize an empty submission.\n- The listed non-goals remain respected; no summary-fork, PTY supervisor, post-submit re-Enter, historical JSONL, or terminal-marker transaction behavior outside the keyed pre-submit/recovery protocol was changed.\n\n## Security Review\n\nNo authentication, authorization, injection, secret-handling, path-traversal, or unsafe-deserialization vulnerability was introduced by the cycle-five delta.\n\n## Performance Review\n\nNo blocking performance regression was found. The additional marker operations and cursor-aware viewport capture are bounded and occur only while recovering keyed tmux delivery.\n\n## Non-blocking Findings\n\nThe CodeRabbit helper-extraction suggestion remains a maintainability nit and is not promoted.\n\n## Verification Performed\n\n- `npx vitest run src/lib/__tests__/linear-mcp-auth-wake.test.ts src/lib/__tests__/tmux-dedup.test.ts tests/lib/tmux-send-keys-blocking-menu.test.ts tests/unit/lib/overdeck/resume-contract-delivery.test.ts` — 4 files, 45 tests passed.\n- `npm run typecheck` — passed, including dashboard and frontend type ratchets.\n- `git diff --check origin/main...HEAD` — passed.\n- Pull-request guard and clean-install smoke checks passed; the remaining CI jobs were still pending when reviewed.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3212/.pan/review/agent-pan-3212-review-d04d8fd5/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3212 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-28T19:25:42.060Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/__tests__/linear-mcp-auth-wake.test.ts",
@@ -128,22 +125,22 @@
     "recordedAt": "2026-07-28T17:49:31.882Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T19:25:39.745Z",
+  "updated": "2026-07-28T19:25:42.297Z",
   "pipeline": {
     "issueId": "PAN-3212",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:49:41.828Z",
-    "updatedAt": "2026-07-28T19:25:39.708Z",
+    "updatedAt": "2026-07-28T19:25:40.626Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: cursor-anchored live composer parsing now matches the current Claude pane, and a crash-independent payload-unverified marker limits composer proof to pre-Enter recovery while preserving no-repaste rollback semantics.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
     "reviewedAtCommit": "d04d8fd58e4d19c9165ab6a90efeee7a7196229a",
     "lastVerifiedCommit": "d04d8fd58e4d19c9165ab6a90efeee7a7196229a",
-    "reviewSpawnedAt": "2026-07-28T19:06:22.692Z",
+    "reviewSpawnedAt": "2026-07-28T19:25:40.625Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/__tests__/linear-mcp-auth-wake.test.ts",
@@ -209,7 +206,7 @@
       },
       "costAtCloseOut": {
         "usd": 170.94430499999999,
-        "pricingAsOf": "2026-07-28T19:25:39.740Z"
+        "pricingAsOf": "2026-07-28T19:25:42.293Z"
       }
     },
     "merges": [
