@@ -17,14 +17,7 @@
   "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [
-      "docs/PIPELINE-MEMBERSHIP.md",
-      "src/lib/gitlab-merge-requests.ts",
-      "src/lib/pipeline-membership-gather.ts",
-      "src/lib/project-repos.ts",
-      "tests/unit/lib/gitlab-merge-requests.test.ts",
-      "tests/unit/lib/pipeline-membership-gather.test.ts"
-    ],
+    "declaredScopeUntouched": [],
     "declaredScope": [
       "docs/PIPELINE-MEMBERSHIP.md",
       "src/lib/gitlab-merge-requests.ts",
@@ -33,11 +26,18 @@
       "tests/unit/lib/gitlab-merge-requests.test.ts",
       "tests/unit/lib/pipeline-membership-gather.test.ts"
     ],
-    "actualChangedFiles": [],
-    "recordedAt": "2026-07-28T07:09:47.907Z"
+    "actualChangedFiles": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/lib/gitlab-merge-requests.ts",
+      "src/lib/pipeline-membership-gather.ts",
+      "src/lib/project-repos.ts",
+      "tests/unit/lib/gitlab-merge-requests.test.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "recordedAt": "2026-07-28T07:25:54.489Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T07:25:51.188Z",
+  "updated": "2026-07-28T07:25:54.490Z",
   "pipeline": {
     "issueId": "PAN-2882",
     "reviewStatus": "pending",
