@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T07:27:47.269Z",
+  "updated": "2026-07-28T07:27:50.212Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "pending",
@@ -25,7 +25,41 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T06:35:36.425Z"
+    "updatedAt": "2026-07-28T07:27:50.211Z",
+    "reviewRequestedAt": "2026-07-28T07:27:50.211Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "src/lib/pan-dir/__tests__/records.test.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/DEFINITION-OF-DONE.md",
+        "scripts/file-size-allowlist.txt",
+        "src/lib/lifecycle/dod-gate.ts",
+        "src/lib/lifecycle/workflows.ts",
+        "src/lib/pan-dir/record.ts",
+        "src/lib/reopen.ts",
+        "tests/lib/reopen.test.ts",
+        "tests/unit/lib/lifecycle/dod-gate-journal-fallback.test.ts",
+        "tests/unit/lib/lifecycle/workflows.test.ts",
+        "tests/unit/lib/pan-dir/record-close-out.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/DEFINITION-OF-DONE.md",
+        "scripts/file-size-allowlist.txt",
+        "src/lib/lifecycle/dod-gate.ts",
+        "src/lib/lifecycle/workflows.ts",
+        "src/lib/pan-dir/__tests__/records.test.ts",
+        "src/lib/pan-dir/record.ts",
+        "src/lib/reopen.ts",
+        "tests/lib/reopen.test.ts",
+        "tests/unit/lib/lifecycle/dod-gate-journal-fallback.test.ts",
+        "tests/unit/lib/lifecycle/workflows.test.ts",
+        "tests/unit/lib/pan-dir/record-close-out.test.ts"
+      ],
+      "recordedAt": "2026-07-28T07:27:47.268Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3221"
   },
   "closeOut": {
     "usage": {
