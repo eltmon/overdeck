@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T22:41:41.843Z",
+  "updated": "2026-07-28T22:41:55.009Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -93,8 +93,16 @@
     }
   ],
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "pipeline-create-row": {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 1183463,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T22:41:55.009Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -174,6 +182,7 @@
     "boot-seeding": "completed",
     "boot-seeding.boot-seeding.ac1": "completed",
     "boot-seeding.boot-seeding.ac2": "completed",
-    "boot-seeding.boot-seeding.ac3": "completed"
+    "boot-seeding.boot-seeding.ac3": "completed",
+    "pipeline-create-row": "running"
   }
 }
