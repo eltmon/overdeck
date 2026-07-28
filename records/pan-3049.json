@@ -138,21 +138,22 @@
     "recordedAt": "2026-07-28T08:02:25.990Z"
   },
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T17:43:36.555Z",
+  "updated": "2026-07-28T17:51:16.254Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:02:29.164Z",
-    "updatedAt": "2026-07-28T17:43:34.700Z",
+    "updatedAt": "2026-07-28T17:51:16.197Z",
     "reviewNotes": "Agent re-review request (1/25): Addressed feedback: duplicate-stack doctor now emits diagnosis-only rebuild guidance and never infers a safe teardown from container names; added regression coverage for dev/database/cache-only canonical stacks",
     "inspectNotes": "All 4 ACs met. AC1: declaredComposeFileProjectName parses top-level name: (stack-health.ts:52-57), verified against real MYN workspaces which declare 'name: myn-feature-min-XXX' at col 0. AC2: requireComposeProjectNameForWorkspace throws naming workspacePath + composeFilePath + both dev-script paths (stack-health.ts:135-137). AC3: both variants return overdeck-feature-<issue> when composeFilePath is null (lines 119, 134). AC4: assertDeclaredNameMatchesFeatureFolder reuses the exact 'Refusing workspace rebuild:' message for both sources (lines 59-70); dev-script rethrow guard preserved at line 91. COMPOSE_FILE_CANDIDATES and findDevcontainerComposeFile match rebuild-stack.ts:43-58 exactly, so no directory-scope drift. Tests cover all four plus dev-script-wins precedence.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3223",
+    "lastVerifiedCommit": "f801aaadcc232a434e2cecf7e6cd9ad005a14076",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/cli/commands/__tests__/workspace-reap.test.ts",
@@ -240,9 +241,9 @@
             "cacheWrite": 4645469
           },
           "openai/gpt-5.6-sol": {
-            "input": 379221,
-            "output": 9587,
-            "cacheRead": 7150080,
+            "input": 385667,
+            "output": 10852,
+            "cacheRead": 8161280,
             "cacheWrite": 0
           }
         }
@@ -255,9 +256,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 4697997,
-          "output": 297232,
-          "cacheRead": 46066176,
+          "input": 4704443,
+          "output": 298497,
+          "cacheRead": 47077376,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -268,8 +269,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 115.5774432,
-        "pricingAsOf": "2026-07-28T17:43:36.487Z"
+        "usd": 116.1532232,
+        "pricingAsOf": "2026-07-28T17:51:16.236Z"
       }
     },
     "merges": [
