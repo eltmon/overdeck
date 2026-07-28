@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T18:59:05.249Z",
+  "updated": "2026-07-28T19:05:47.686Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,8 +79,16 @@
     }
   ],
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "wi-fixture": {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 554678,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T19:05:47.686Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -164,6 +172,7 @@
     "wi4-policy-gate.wi4-policy-gate.ac1": "completed",
     "wi4-policy-gate.wi4-policy-gate.ac2": "completed",
     "wi4-policy-gate.wi4-policy-gate.ac3": "completed",
-    "wi4-policy-gate.wi4-policy-gate.ac4": "completed"
+    "wi4-policy-gate.wi4-policy-gate.ac4": "completed",
+    "wi-fixture": "running"
   }
 }
