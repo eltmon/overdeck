@@ -118,7 +118,7 @@
     "recordedAt": "2026-07-28T08:50:14.585Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T09:04:15.772Z",
+  "updated": "2026-07-28T09:04:21.447Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "blocked",
@@ -128,10 +128,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:50:42.357Z",
-    "updatedAt": "2026-07-28T09:04:14.992Z",
+    "updatedAt": "2026-07-28T09:04:21.439Z",
     "reviewNotes": "Row-5 regression tests still accept any result and do not verify the production live-to-journal fallback",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3221",
-    "reviewedAtCommit": "6b218e665a20aeecd3e51dd3a9da4e695b49aa3e",
+    "reviewedAtCommit": "b7d6b3390b56aa3f4d698ee69491cd6fe6af0a52",
     "lastVerifiedCommit": "6b218e665a20aeecd3e51dd3a9da4e695b49aa3e",
     "reviewSpawnedAt": "2026-07-28T08:51:49.529Z",
     "scopeDrift": {
@@ -205,7 +205,7 @@
       },
       "costAtCloseOut": {
         "usd": 30.714194,
-        "pricingAsOf": "2026-07-28T09:04:15.026Z"
+        "pricingAsOf": "2026-07-28T09:04:21.444Z"
       }
     },
     "merges": [
