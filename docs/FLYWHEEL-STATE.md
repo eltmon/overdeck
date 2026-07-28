@@ -8081,3 +8081,23 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 - PAN-3212 reworking its Tier-1 blocker well (+549/-119, ctx 60%); PAN-2882 healthy after `--fresh` (+36/-52). No intervention on either.
 - **RUN TOTALS (RUN-73): 6 close-outs, 5 merges, 7 substrate bugs filed of which 5 merged+deployed+closed, 1 npm break verified fixed.**
 - **LESSON: the most expensive freezes are the ones on the critical path, and they look identical to the harmless ones.** A blocked *work* agent costs its own progress. **A blocked *review* agent costs the merge gate — PAN-3049 was review-ready with clean CI and could not advance, and no dashboard number would ever have said so.** When something that should have moved has not, check what is holding it rather than what it is doing.
+
+## RUN-73 tick 18 (2026-07-28 17:35Z) — a safety guard fired where the hazard was impossible, and cost four review cycles
+- **Menu-freeze sweep across all 12 sessions: ZERO frozen.** Now a standing per-tick check since nothing else detects it (PAN-3234). Cheap, and it took one command.
+- Fleet grew to 12: four new work agents (PAN-3228/3229/3230/3231), `agent-min-911`, and three reviews in flight. Contamination **stable at 8 non-docs for a second tick — not growing.**
+- **PAN-3049 review returned CHANGES REQUESTED on a real finding**: `doctor-duplicate-stacks.ts:106` treats a running `dev`/database/cache container as proof the canonical app is healthy, so **following `pan doctor`'s advertised safe fix can remove the working application and leave only support containers.** The reviewer flagged it as a repeat of the previous cycle's finding.
+- **THE REAL DEFECT was underneath: the feedback never reached the work agent.** `review_status.stuck = 1`, `stuck_reason = feedback_delivery_needs_you`:
+
+  ```
+  connect ECONNREFUSED ~/.overdeck/sockets/pty-agent-pan-3049.sock
+  — the supervisor may have completed the injection; NOT crossing to the tmux tier
+  ```
+
+  The feedback file was on disk the whole time (6,865 bytes). **Only the announcement failed, and the agent sat idle at four review cycles not knowing it had been asked to rework.**
+- **Root-caused it to a misclassification rather than restating the error.** `AmbiguousKeyedDeliveryError` (`delivery.ts:167`) documents its own contract: *"the keyed supervisor request was SENT but NO RESPONSE came back (timeout, reset, dropped connection), so the injection MAY HAVE COMPLETED."* **That reasoning is correct — and does not apply to ECONNREFUSED, where nothing was listening, so nothing was received and nothing could have been injected.** The sibling `SocketPostStatusError` in the same file already draws exactly this line for 502s: *"the host answered, so the outcome is definitive… safe to fall back from."*
+  * **Found why it refuses rather than 404s**: the socket FILE still exists (`srw------- … Jul 28 02:38`), stale from a supervisor that died in the earlier dashboard crash-loop. **A stale unix socket yields ECONNREFUSED, not ENOENT, so the socket-not-found path never runs and delivery lands in the ambiguous branch.**
+  * **The guard protected against a double-injection that was impossible in this error class, and the price was a hard stop** — needs-you raised for something no human input could fix, and the cycle counter climbing toward the PAN-3151 convergence gate for reasons unrelated to the code under review.
+  * **Filed PAN-3236.** Also recorded that **`pan unstick` is referenced in the flywheel role doctrine but does not exist** (`error: unknown command 'unstick'`) — so there is currently no documented way to clear this gate.
+- Recovered with `pan start PAN-3049 --fresh`, which makes the agent re-read `.overdeck/feedback/` from disk.
+- **RUN TOTALS (RUN-73): 6 close-outs, 5 merges, 8 substrate bugs filed of which 5 merged+deployed+closed, 1 npm break verified fixed.**
+- **LESSON: a correct safety guard applied to the wrong error class is indistinguishable from a bug.** Nothing here was carelessly written — the ambiguity guard is right, its doc comment is precise, and its sibling class already draws the exact distinction needed. **The defect is only that one errno was sorted into the wrong bucket, and the visible result was a review cycle counter marching toward a stuck gate.** Reading the class's own documentation is what turned "delivery failed" into a one-line diagnosis.
