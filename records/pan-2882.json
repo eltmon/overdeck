@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-2882",
   "schemaVersion": 2,
-  "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T03:59:46.323Z",
-  "pipeline": {
-    "issueId": "PAN-2882",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-28T03:38:47.524Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,8 +9,33 @@
       "timestamp": "2026-07-28T03:38:47.524Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-28T03:38:47.524Z",
+  "updated": "2026-07-28T06:35:05.364Z",
+  "pipeline": {
+    "issueId": "PAN-2882",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-28T06:35:05.342Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {},
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-07-28T06:35:05.361Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "k3[1m]",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-2882",
