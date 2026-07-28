@@ -16,18 +16,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T17:56:16.623Z",
+  "updated": "2026-07-28T17:56:27.214Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "passed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T17:29:24.815Z",
-    "inspectNotes": "All 4 ACs met: tool_permission returns pane decision with reason; rate_limit/no-detection return null (rate_limit excluded from DESTRUCTIVE_RECOVERY_BLOCKING_REASONS); no-session path skips pane check and returns jsonl-auq on pending AUQ; TmuxError falls back to JSONL, returns null, warns. Verified Effect.runPromise (effect 4.0.0-beta.73) rejects with the raw TmuxError instance, so instanceof fail-open holds on the real (non-injected) path too. 5/5 tests pass."
+    "updatedAt": "2026-07-28T17:56:27.185Z",
+    "inspectNotes": "Inspecting item answer-core"
   },
   "closeOut": {
     "usage": {
@@ -42,9 +42,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 374682,
-            "output": 17412,
-            "cacheRead": 7588352,
+            "input": 792624,
+            "output": 126325,
+            "cacheRead": 62504960,
             "cacheWrite": 0
           }
         }
@@ -57,15 +57,15 @@
           "cacheWrite": 121982
         },
         "openai/gpt-5.6-sol": {
-          "input": 374682,
-          "output": 17412,
-          "cacheRead": 7588352,
+          "input": 792624,
+          "output": 126325,
+          "cacheRead": 62504960,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 17.179568,
-        "pricingAsOf": "2026-07-28T17:29:25.661Z"
+        "usd": 49.994972,
+        "pricingAsOf": "2026-07-28T17:56:27.201Z"
       }
     },
     "merges": [],
