@@ -70,18 +70,19 @@
     "recordedAt": "2026-07-28T20:46:26.914Z"
   },
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T21:23:14.264Z",
+  "updated": "2026-07-28T21:25:47.028Z",
   "pipeline": {
     "issueId": "PAN-3233",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:48:00.219Z",
-    "updatedAt": "2026-07-28T21:23:12.988Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-28T21:25:46.941Z",
+    "reviewNotes": "Approved: prior suppression-scope and paneQuestion blocking-classification findings are fixed with focused regressions",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -92,7 +93,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3247",
-    "reviewedAtCommit": "5510c0bc6fe12742621bbf6982752ed6e1a1fd65",
+    "reviewedAtCommit": "66cb23d0d69083300e7175959f38616b00b19956",
     "reviewSpawnedAt": "2026-07-28T21:23:12.987Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -142,9 +143,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1218384,
-            "output": 89924,
-            "cacheRead": 9533952,
+            "input": 2425258,
+            "output": 109123,
+            "cacheRead": 13910528,
             "cacheWrite": 0
           }
         },
@@ -165,9 +166,9 @@
           "cacheWrite": 181658
         },
         "openai/gpt-5.6-sol": {
-          "input": 1218384,
-          "output": 89924,
-          "cacheRead": 9533952,
+          "input": 2425258,
+          "output": 109123,
+          "cacheRead": 13910528,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -178,8 +179,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 34.812623,
-        "pricingAsOf": "2026-07-28T21:23:12.998Z"
+        "usd": 43.611250999999996,
+        "pricingAsOf": "2026-07-28T21:25:47.006Z"
       }
     },
     "merges": [
@@ -188,7 +189,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3233",
