@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T06:53:26.888Z",
+  "updated": "2026-07-28T06:53:34.199Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,8 +79,16 @@
     }
   ],
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "stop-docker-via-resolver": {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 3130748,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:53:34.199Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -125,6 +133,7 @@
     "rebuild-resolve-after-render": "completed",
     "rebuild-resolve-after-render.rebuild-resolve-after-render.ac1": "completed",
     "rebuild-resolve-after-render.rebuild-resolve-after-render.ac2": "completed",
-    "rebuild-resolve-after-render.rebuild-resolve-after-render.ac3": "completed"
+    "rebuild-resolve-after-render.rebuild-resolve-after-render.ac3": "completed",
+    "stop-docker-via-resolver": "running"
   }
 }
