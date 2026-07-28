@@ -29,15 +29,7 @@
       "timestamp": "2026-07-28T21:10:02.365Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T21:10:02Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3233\n\n# Review — PAN-3233 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED\n\nTwo blocking correctness issues remain. The core enrichment additions are small and security/performance-safe, but the suppression exemption leaks unrelated stale plan state, and the new `paneQuestion` kind is classified as non-blocking by the actual Decisions view.\n\n## Context\n\n- Branch: `feature/pan-3233`\n- PR: `#3247`\n- HEAD reviewed: `5510c0bc6fe12742621bbf6982752ed6e1a1fd65`\n- Manifest: `.pan/review/agent-pan-3233-review-5510c0bc/context.json`\n- Dimensions reviewed: correctness, security, requirements/acceptance criteria, performance\n\n## Blocking Findings\n\n### ! [correctness / requirements] The pane exemption disables suppression for unrelated JSONL plan state — `src/lib/agent-enrichment.ts:645`\n\n**Evidence tier:** Tier 1 — static\n\n**Changed code:** `hasBlockingPaneDetection` makes `shouldSuppressPendingInput` false for the entire enrichment. The same branch then emits scan-derived `exitPlanMode` / `enterPlanMode` kinds at lines 669-670 and exposes `scan.pendingProposedPlan` at line 699.\n\n**Problem:** The requirement and documented invariant say only the fresh blocking pane detection bypasses PAN-1834 suppression; parked-agent JSONL/runtime/turn-end surfaces must remain suppressed while a specialist owns the issue. The implementation uses one global boolean, so a work agent with a stale pending `ExitPlanMode` in its cached scan plus a current `tool_permission` pane prompt emits both `permissionRequest` and `exitPlanMode`, including the stale `pendingProposedPlan` payload.\n\n**Runtime impact:** During review/test, the operator can receive a stale plan-approval decision and modal alongside the legitimate permission prompt. This recreates the parked-agent noise PAN-1834 suppression exists to prevent and contradicts the new invariant in `docs/PENDING-INPUT.md:77-87`.\n\n**Fix:** Keep specialist suppression active for JSONL/runtime/fallback/turn-end fields, then add only the live pane detection's kind, prompt/reason/count, and `needs_input` resolution. Add a regression combining `hasActiveSpecialist=true`, a pending plan scan, and a `tool_permission` pane detection; it must return only `permissionRequest` and no `pendingProposedPlan`.\n\n### ! [correctness] `paneQuestion` is shown as a non-blocking decision — `src/dashboard/frontend/src/lib/pendingInput.ts:21`\n\n**Evidence tier:** Tier 1 — static\n\n**Changed code:** The PR adds the new `paneQuestion` vocabulary and emits it for `user_question`, `confirmation`, `disambiguation`, and `planning_done`, but the downstream blocking vocabulary in `src/dashboard/frontend/src/lib/useDecisions.ts:78-87` does not include it.\n\n**Problem:** `useDecisions()` calls `isBlockingDecision()` for every subject. Because `paneQuestion` is absent from `BLOCKING_KINDS`, an agent frozen on a terminal question gets `blocking: false` even though the new label says “answer the agent” and the Decision contract explicitly says a question halts the turn.\n\n**Runtime impact:** The Decisions panel places these genuinely frozen agents in the lower “Waiting” group, removes the blocking styling, and sorts them behind work that can continue. That weakens the operator signal for the exact 35 invisible/frozen-agent class this change is meant to recover.\n\n**Fix:** Add `paneQuestion` to `BLOCKING_KINDS` and add a focused `isBlockingDecision(['paneQuestion']) === true` regression in `useDecisions.test.ts`.\n\n## Non-blocking Findings\n\n### ~ [requirements/docs] The conversation-inheritance claim is not wired — `docs/PENDING-INPUT.md:23`\n\nThe planning rationale says `conversation-list.ts` and `conversation-reads.ts` inherit `paneQuestion` through `appendPaneDetectionKind`, but repository search shows the helper is called only from agent enrichment. This issue's acceptance criteria are agent-scoped and conversation call-site changes are an explicit non-goal, so this does not block the PR; the documentation should describe `paneQuestion` as agent-enrichment behavior rather than implying the unified conversation path already emits it.\n\n## Clean Areas Checked\n\n- **Security:** No new trust boundary, command construction, unsafe HTML, credential flow, authorization change, or destructive operation was introduced.\n- **Performance:** The new reason checks and small-array membership tests run inside the existing enrichment pass and add no I/O, unbounded work, retained state, or render-loop regression.\n- **Requirements otherwise covered:** The server/frontend kind literals match; `other` remains excluded; suppression clears count/prompt/reason together; blocking detections fold to count 1; Decisions eligibility and reaper eligibility have direct regression coverage; contract schemas remain unchanged; the focused pending-input documentation was added.\n- **Additional changed files:** The subagent transcript flex/CSS changes and their test are internally consistent; the appended flywheel state log is documentation-only.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3233/.pan/review/agent-pan-3233-review-5510c0bc/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3233 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -73,17 +65,17 @@
     "recordedAt": "2026-07-28T20:46:26.914Z"
   },
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T21:21:51.978Z",
+  "updated": "2026-07-28T21:23:13.019Z",
   "pipeline": {
     "issueId": "PAN-3233",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:48:00.219Z",
-    "updatedAt": "2026-07-28T21:21:50.196Z",
+    "updatedAt": "2026-07-28T21:23:12.988Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -96,7 +88,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3247",
     "reviewedAtCommit": "5510c0bc6fe12742621bbf6982752ed6e1a1fd65",
-    "reviewSpawnedAt": "2026-07-28T21:05:23.518Z",
+    "reviewSpawnedAt": "2026-07-28T21:23:12.987Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/FLYWHEEL-STATE.md",
@@ -153,10 +145,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 348,
-            "output": 78604,
-            "cacheRead": 39548172,
-            "cacheWrite": 1281500
+            "input": 358,
+            "output": 79693,
+            "cacheRead": 41235840,
+            "cacheWrite": 1287012
           }
         }
       },
@@ -174,15 +166,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 348,
-          "output": 78604,
-          "cacheRead": 39548172,
-          "cacheWrite": 1281500
+          "input": 358,
+          "output": 79693,
+          "cacheRead": 41235840,
+          "cacheWrite": 1287012
         }
       },
       "costAtCloseOut": {
-        "usd": 34.450399,
-        "pricingAsOf": "2026-07-28T21:21:51.972Z"
+        "usd": 34.812623,
+        "pricingAsOf": "2026-07-28T21:23:12.998Z"
       }
     },
     "merges": [
