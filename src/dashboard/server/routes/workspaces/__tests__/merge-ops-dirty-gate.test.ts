@@ -12,6 +12,15 @@ describe('shouldBlockApproveForDirtyStatus', () => {
     expect(shouldBlockApproveForDirtyStatus(status)).toBe(false);
   });
 
+  it('returns false for Overdeck runtime paths outside the state-plane allowlist (PAN-3245)', () => {
+    const status = [
+      '?? .pan/drafts/min-911.md',
+      '?? .overdeck/continue.json',
+    ].join('\n');
+
+    expect(shouldBlockApproveForDirtyStatus(status)).toBe(false);
+  });
+
   it('returns true when approve sees a dirty source path', () => {
     expect(shouldBlockApproveForDirtyStatus(' M src/foo.ts\n')).toBe(true);
   });

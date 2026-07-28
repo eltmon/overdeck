@@ -138,7 +138,12 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    (the stale-build hijack — PAN-2252/PAN-2280); it never restricted the flywheel, the single
    coordinated deployer. Deploy only through `pan reload` — never use manual `npm run build` plus
    `pan restart` as a deploy path, and never rebuild `dist/` in place without an immediate restart,
-   which wounds the live server.
+   which wounds the live server. Since PAN-3244 the mechanical deploy path (deploy patrol +
+   merge-step0) no longer defers to an active flywheel run, so an auto-deploy — a ~60s dashboard
+   outage — can fire mid-run without you initiating it; the restart lock arbitrates if you deploy
+   at the same moment. Verification is likewise decoupled: supervised verification workers survive
+   dashboard restarts, so neither a queued deploy nor your own `pan reload` pauses or is paused by
+   in-flight verification.
 6. **Never block on the operator.** Do not halt the fleet for planning Q&A, "approach A or B",
    or any decision. Surface it in `openQuestions[]`, pick the most defensible default, act, and
    let the question persist as a non-blocking signal across ticks. An agent holding a pending

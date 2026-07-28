@@ -19,6 +19,15 @@ describe('getDirtyWorkspaceErrorForReviewRequestStatus', () => {
     expect(getDirtyWorkspaceErrorForReviewRequestStatus(status, workspacePath)).toBeNull();
   });
 
+  it('returns null for Overdeck runtime paths outside the state-plane allowlist (PAN-3245)', () => {
+    const status = [
+      '?? .pan/drafts/min-911.md',
+      '?? .overdeck/continue.json',
+    ].join('\n');
+
+    expect(getDirtyWorkspaceErrorForReviewRequestStatus(status, workspacePath)).toBeNull();
+  });
+
   it('returns the dirty workspace error when status contains a source file', () => {
     const status = [
       'MM .pan/records/pan-2167.json',

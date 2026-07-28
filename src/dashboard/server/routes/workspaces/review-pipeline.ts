@@ -23,7 +23,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { parseIssueIdSync, extractPrefixSync, resolveIssueIdSync } from '../../../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import { isStatePlaneOnlyStatus } from '../../../../lib/state-plane.js';
+import { isOverdeckOwnedOnlyStatus } from '../../../../lib/state-plane.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { clearFeedbackDeliveryStuck, getReviewStatusSync, type ReviewStatus } from '../../../../lib/review-status.js';
 import { getReleaseSetSync } from '../../../../lib/release-set.js';
@@ -92,7 +92,7 @@ export function getDirtyWorkspaceErrorForReviewRequestStatus(
 ): string | null {
   // STATE-PLANE-COMMIT-POLICY rules 3/6: pipeline-owned state-plane dirt is
   // not agent work, and the path list must come from src/lib/state-plane.ts.
-  if (!status.trim() || isStatePlaneOnlyStatus(status)) {
+  if (!status.trim() || isOverdeckOwnedOnlyStatus(status)) {
     return null;
   }
 

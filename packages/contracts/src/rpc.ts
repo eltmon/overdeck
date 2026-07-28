@@ -224,11 +224,15 @@ export type ConversationEvent = typeof ConversationEvent.Type
 // ─── Session Tree Delta (PAN-821) ─────────────────────────────────────────────
 
 export const SessionTreeDelta = Schema.Struct({
-  kind: Schema.Literals(['session_added', 'session_removed', 'presence_changed', 'status_changed']),
+  kind: Schema.Literals(['session_added', 'session_removed', 'presence_changed', 'status_changed', 'pending_input_changed']),
   issueId: Schema.String,
   sessionId: Schema.String,
   presence: Schema.optional(SessionNodePresence),
   status: Schema.optional(AgentStatus),
+  awaitingInput: Schema.optional(Schema.Boolean),
+  awaitingInputPrompt: Schema.optional(Schema.String),
+  awaitingInputReason: Schema.optional(Schema.String),
+  pendingInputKinds: Schema.optional(Schema.Array(Schema.String)),
   timestamp: Schema.String,
 })
 export type SessionTreeDelta = typeof SessionTreeDelta.Type
