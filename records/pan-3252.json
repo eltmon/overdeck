@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-28T22:46:21.418Z",
+  "updated": "2026-07-28T22:47:20.931Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "pending",
@@ -66,16 +66,8 @@
     }
   ],
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "ql-docs": {
-        "writerId": "agent-pan-3252",
-        "agentId": "agent-pan-3252",
-        "pid": 1436754,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T22:46:21.418Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3252",
@@ -142,6 +134,17 @@
         "outcome": "completed",
         "reason": "QuantumLlama group in MODELS_BY_PROVIDER (FlaskConical, premium/balanced/fast, 16/4/0.8), exact-match QL name guards in both friendlyModelName copies (exported for tests); new frontend test file, 3 passed, frontend typecheck clean",
         "releasedAt": "2026-07-28T22:46:07.213Z"
+      },
+      {
+        "writerId": "agent-pan-3252",
+        "agentId": "agent-pan-3252",
+        "pid": 1436754,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T22:46:21.418Z",
+        "itemId": "ql-docs",
+        "outcome": "completed",
+        "reason": "QuantumLlama mentioned in harnesses.mdx multi-provider list and env-var sentence, TESTING-PROVIDERS.md table row with benchmark-only note, CONFIGURATION.md and USAGE.md env blocks; grep verified in all files",
+        "releasedAt": "2026-07-28T22:47:20.931Z"
       }
     ],
     "statusReasons": {
@@ -168,6 +171,10 @@
       "ql-dashboard": {
         "reason": "QuantumLlama group in MODELS_BY_PROVIDER (FlaskConical, premium/balanced/fast, 16/4/0.8), exact-match QL name guards in both friendlyModelName copies (exported for tests); new frontend test file, 3 passed, frontend typecheck clean",
         "updatedAt": "2026-07-28T22:46:07.213Z"
+      },
+      "ql-docs": {
+        "reason": "QuantumLlama mentioned in harnesses.mdx multi-provider list and env-var sentence, TESTING-PROVIDERS.md table row with benchmark-only note, CONFIGURATION.md and USAGE.md env blocks; grep verified in all files",
+        "updatedAt": "2026-07-28T22:47:20.931Z"
       }
     }
   },
@@ -197,6 +204,8 @@
     "ql-dashboard.ql-dashboard.ac1": "completed",
     "ql-dashboard.ql-dashboard.ac2": "completed",
     "ql-dashboard.ql-dashboard.ac3": "completed",
-    "ql-docs": "running"
+    "ql-docs": "completed",
+    "ql-docs.ql-docs.ac1": "completed",
+    "ql-docs.ql-docs.ac2": "completed"
   }
 }
