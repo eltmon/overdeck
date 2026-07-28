@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-28T22:25:16.525Z",
+  "updated": "2026-07-28T22:25:43.254Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "pending",
@@ -66,8 +66,16 @@
     }
   ],
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "ql-models-core": {
+        "writerId": "agent-pan-3252",
+        "agentId": "agent-pan-3252",
+        "pid": 581529,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T22:25:43.254Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3252",
@@ -129,6 +137,7 @@
     "ql-pricing.ql-pricing.ac3": "completed",
     "ql-cost-parser": "completed",
     "ql-cost-parser.ql-cost-parser.ac1": "completed",
-    "ql-cost-parser.ql-cost-parser.ac2": "completed"
+    "ql-cost-parser.ql-cost-parser.ac2": "completed",
+    "ql-models-core": "running"
   }
 }
