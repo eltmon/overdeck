@@ -43,7 +43,7 @@
     "recordedAt": "2026-07-28T09:38:47.050Z"
   },
   "created": "2026-07-28T06:35:52.620Z",
-  "updated": "2026-07-28T10:52:18.093Z",
+  "updated": "2026-07-28T10:52:21.799Z",
   "pipeline": {
     "issueId": "PAN-3215",
     "reviewStatus": "passed",
@@ -51,8 +51,8 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-28T10:52:18.014Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-28T10:52:18.040Z",
     "reviewNotes": "Cycle-1 blockers fixed; all requirements covered and focused tests, typecheck, and lint pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3226",
@@ -125,7 +125,7 @@
       },
       "costAtCloseOut": {
         "usd": 87.45069,
-        "pricingAsOf": "2026-07-28T10:52:18.090Z"
+        "pricingAsOf": "2026-07-28T10:52:21.665Z"
       }
     },
     "merges": [
