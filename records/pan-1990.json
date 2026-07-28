@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T23:09:50.378Z",
+  "updated": "2026-07-28T23:15:29.233Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -81,7 +81,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-1990",
