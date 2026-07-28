@@ -132,7 +132,7 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T09:51:14.030Z",
+  "updated": "2026-07-28T09:51:21.705Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "reviewing",
@@ -143,7 +143,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T09:51:12.542Z",
+    "updatedAt": "2026-07-28T09:51:21.426Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: lock-free contention warning ordered before the best-effort recovery trip; per-gate value equality restored with a new conflict predicate that preserves the fallback instead of guessing between two terminal verdicts; uatStatus/uatNotes carried through PanIssuePipelineRecord, projectPipeline, durableSubset and journal enrichment (terminal set corrected to passed/failed); non-blocking escalation-vs-nudge loop closed by tracking escalated dispatch generations.",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
@@ -243,7 +243,7 @@
       },
       "costAtCloseOut": {
         "usd": 50.3799603,
-        "pricingAsOf": "2026-07-28T09:51:12.828Z"
+        "pricingAsOf": "2026-07-28T09:51:21.532Z"
       }
     },
     "merges": [
@@ -252,7 +252,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3092",
