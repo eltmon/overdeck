@@ -14,15 +14,7 @@
       "timestamp": "2026-07-28T10:04:36.449Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T10:04:36Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3215\n\n# Review — PAN-3215 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED\n\nTwo in-scope requirements remain unmet. The GitHub squash-merge verifier still hardcodes `origin/main` after the new repo-root parameterization, and the GitLab path can query the same merged MR twice for one required repo. Security review found no reachable vulnerability in the changed code.\n\n## Context\n\n- Branch: `feature/pan-3215`\n- HEAD reviewed: `50cd213b7b5a05a60886c7842e2b864ce3810b0f`\n- PR: `#3226`\n- Cycle: 1\n- Focused verification: `git diff --check` passed; `npx vitest run tests/unit/lib/lifecycle/workflows.test.ts tests/unit/lib/lifecycle/dod-gate.test.ts` passed 114 tests with 1 skipped. GitHub CI build, lint, test, clean-install smoke, and state-plane guard checks are green.\n\n## Blocking Findings\n\n### ! FR-2 is incomplete for GitHub repositories whose target branch is not `main` — `src/lib/lifecycle/workflows.ts:830`\n\n**Dimensions:** correctness, requirements\n**Evidence tier:** Tier 1 — static\n**Scope:** `in_pr_scope`\n\nThe PR changes `verifySquashMergedPrByBranch` to accept a `MergeVerificationRoot` and run in `root.dir`, but its post-PR containment policies still execute:\n\n```ts\ngit merge-base --is-ancestor ${commit} origin/main\ngit diff --name-only origin/main...${tipSha}\n```\n\nThe same function is now called for roots whose configured `targetBranch` may be `master`, `develop`, or another branch. When a GitHub PR targets such a branch and the local/remote convention ref contains post-PR commits already present on that target, both probes inspect the wrong ref. A missing or unrelated `origin/main` makes the verifier reject safe close-out with “commit(s) after merged PR … not on origin/main” or “does not match the head commit,” even though the work is on the configured target branch. This contradicts FR-2’s requirement that every git probe use each repo’s `targetBranch`; the added `master` test covers only the first ancestry probe and does not exercise these two paths.\n\n**Required fix:** derive the remote target ref from `root.targetBranch` in both probes and update the associated evidence text to name the actual target. Add regression coverage for the post-PR-commit and state-plane-only paths with `targetBranch: 'master'`.\n\n### ! NFR-2’s one-GitLab-lookup-per-repo bound is violated when a squash-merged branch still exists locally and remotely — `src/lib/lifecycle/workflows.ts:607`\n\n**Dimensions:** performance, requirements\n**Evidence tier:** Tier 1 — static\n**Scope:** `in_pr_scope`\n\nOn an exact local MR-head match, `verifyConventionBranchMerged` calls `verifySquashMergedMrByBranch(root, root.sourceBranch)` and then immediately calls `verifyRemoteBranchIfPresent`. For a normal squash-merged branch that still exists on origin, the remote ancestry and three-dot diff checks fail to prove containment, so `verifyRemoteBranchIfPresent` calls `verifySquashMergedMrByBranch(root, remoteRef)` again at line 746. Both helper calls invoke `getForgeAdapter('gitlab').findMergedArtifact`, producing two identical `glab mr list --source-branch … --all --output json` network lookups for the same required repo and potentially duplicate MR evidence in the row details.\n\nThis directly contradicts NFR-2: “GitLab MR lookups run at most once per required repo per merged-row evaluation.” The success test avoids the defect because its default `git ls-remote` mock reports no remote branch.\n\n**Required fix:** perform or cache one merged-MR lookup per root and reuse its artifact when validating local and remote refs, while preserving the remote-tip safety check. Add a test where the same squash-merged branch exists locally and on origin and assert the `glab mr list` command runs exactly once and evidence is emitted once.\n\n## Non-blocking Findings\n\nNone.\n\n## Requirements Coverage\n\n| Requirement | Status | Evidence |\n| --- | --- | --- |\n| FR-1 — exact-head GitLab MR oracle | Implemented | `src/lib/lifecycle/workflows.ts:683-701` and matching/mismatch tests |\n| FR-2 — every polyrepo git probe uses repo path and target branch | Partial, blocking | Most probes use `root.dir`/`root.targetBranch`, but `origin/main` remains at lines 830 and 864 |\n| FR-3 — aggregate required repos with repo-qualified evidence | Implemented | `src/lib/lifecycle/workflows.ts:569-582` and polyrepo tests |\n| FR-4 — branch-absent MR evidence passes row 4 with iid/URL | Implemented | `src/lib/lifecycle/dod-gate.ts:382-435` and injected-dependency test |\n| FR-5 — containment remains the last-resort exclusive evidence marker | Implemented | `src/lib/lifecycle/dod-gate.ts:438-449` regression test |\n| NFR-1 — monorepo GitHub behavior remains covered | Implemented for the default-main path | Existing focused suite passes |\n| NFR-2 — at most one GitLab MR lookup per required repo | Missing, blocking | Local-success path re-enters the oracle through remote verification |\n\n## Security\n\nNo blocking or advisory security finding survived review. The changed code adds shell and forge calls, but their new values come from operator-owned project configuration and normalized issue-derived convention branches; no new remote attacker-controlled path was identified.\n\n## Performance\n\nThe per-root `Promise.all` is bounded by configured required repositories and is appropriate for close-out. The duplicate GitLab lookup described above is the only performance blocker.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3215/.pan/review/agent-pan-3215-review-50cd213b/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3215 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-allowlist.txt"
@@ -46,20 +38,20 @@
     "recordedAt": "2026-07-28T09:38:47.050Z"
   },
   "created": "2026-07-28T06:35:52.620Z",
-  "updated": "2026-07-28T10:38:49.225Z",
+  "updated": "2026-07-28T10:39:41.515Z",
   "pipeline": {
     "issueId": "PAN-3215",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T10:38:47.434Z",
+    "updatedAt": "2026-07-28T10:39:41.474Z",
     "reviewNotes": "Verification infrastructure error: Verification worker 960494 exited before writing a result",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3226",
     "reviewedAtCommit": "50cd213b7b5a05a60886c7842e2b864ce3810b0f",
-    "reviewSpawnedAt": "2026-07-28T09:52:41.379Z",
+    "reviewSpawnedAt": "2026-07-28T10:39:41.473Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt"
@@ -96,24 +88,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1903268,
-            "output": 189586,
-            "cacheRead": 90955264,
+            "input": 1904412,
+            "output": 189744,
+            "cacheRead": 91537920,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2842560,
-          "output": 282500,
-          "cacheRead": 100716544,
+          "input": 2843704,
+          "output": 282658,
+          "cacheRead": 101299200,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 73.046072,
-        "pricingAsOf": "2026-07-28T10:38:49.223Z"
+        "usd": 73.34786,
+        "pricingAsOf": "2026-07-28T10:39:41.497Z"
       }
     },
     "merges": [
