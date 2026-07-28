@@ -85,18 +85,18 @@
     "recordedAt": "2026-07-28T07:25:54.489Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T08:42:26.526Z",
+  "updated": "2026-07-28T08:50:22.846Z",
   "pipeline": {
     "issueId": "PAN-2882",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:26:27.252Z",
-    "updatedAt": "2026-07-28T08:42:26.513Z",
-    "reviewNotes": "Merged-MR glab failures are swallowed, producing false unmerged membership instead of forge_unavailable",
+    "updatedAt": "2026-07-28T08:50:22.537Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: error handling for merged-MR queries, global concurrency limit for polyrepo, proper fake timers and cache isolation in tests",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
     "reviewedAtCommit": "b68a67e56eeca91f055135b583a9ca284a20c748",
     "lastVerifiedCommit": "b68a67e56eeca91f055135b583a9ca284a20c748",
@@ -128,38 +128,38 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2511036,
-            "output": 99766,
-            "cacheRead": 6974464,
+            "input": 2521796,
+            "output": 103394,
+            "cacheRead": 7545856,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1179,
-            "output": 62583,
-            "cacheRead": 28190446,
-            "cacheWrite": 1011048
+            "input": 1366,
+            "output": 76467,
+            "cacheRead": 32356058,
+            "cacheWrite": 1842013
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2511036,
-          "output": 99766,
-          "cacheRead": 6974464,
+          "input": 2521796,
+          "output": 103394,
+          "cacheRead": 7545856,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1179,
-          "output": 62583,
-          "cacheRead": 28190446,
-          "cacheWrite": 1011048
+          "input": 1366,
+          "output": 76467,
+          "cacheRead": 32356058,
+          "cacheWrite": 1842013
         }
       },
       "costAtCloseOut": {
-        "usd": 23.432347,
-        "pricingAsOf": "2026-07-28T08:42:26.520Z"
+        "usd": 25.405558,
+        "pricingAsOf": "2026-07-28T08:50:22.686Z"
       }
     },
     "merges": [
