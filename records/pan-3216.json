@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T04:43:34.296Z",
-  "updated": "2026-07-28T06:34:59.147Z",
+  "updated": "2026-07-28T06:40:00.989Z",
   "pipeline": {
     "issueId": "PAN-3216",
     "reviewStatus": "pending",
@@ -47,18 +47,33 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "narrow-troubled-filter": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3216",
         "agentId": "agent-pan-3216",
         "pid": 1499309,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T06:34:59.147Z"
+        "claimedAt": "2026-07-28T06:34:59.147Z",
+        "itemId": "narrow-troubled-filter",
+        "outcome": "completed",
+        "reason": "Narrowed troubledAgents filter to gate alone; added regression tests; all tests pass",
+        "releasedAt": "2026-07-28T06:40:00.989Z"
+      }
+    ],
+    "statusReasons": {
+      "narrow-troubled-filter": {
+        "reason": "Narrowed troubledAgents filter to gate alone; added regression tests; all tests pass",
+        "updatedAt": "2026-07-28T06:40:00.989Z"
       }
     }
   },
   "statusOverrides": {
-    "narrow-troubled-filter": "running"
+    "narrow-troubled-filter": "completed",
+    "narrow-troubled-filter.narrow-troubled-filter.ac1": "completed",
+    "narrow-troubled-filter.narrow-troubled-filter.ac2": "completed",
+    "narrow-troubled-filter.narrow-troubled-filter.ac3": "completed",
+    "narrow-troubled-filter.narrow-troubled-filter.ac4": "completed"
   }
 }
