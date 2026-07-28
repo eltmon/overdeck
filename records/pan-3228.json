@@ -74,15 +74,7 @@
       "timestamp": "2026-07-28T20:55:30.954Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T19:48:04Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3228\n\n# Review — PAN-3228 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED — swarm needs-you escalation is fixed, but the late-refusal dashboard projection blocker remains\n\n## Context\n- Manifest: `.pan/review/agent-pan-3228-review-7bbd981b/context.json`\n- Branch: `feature/pan-3228`\n- PR: https://github.com/eltmon/overdeck/pull/3241\n- HEAD reviewed: `7bbd981bd9677d75d32c0b3cd6a9a0abd6b7cd3c`\n- Cycle number: 5\n- Prior cycle SHA: `57e909d2bf0ee27c55919290af292bc7f6e81322`\n- Cycle diff: one commit changing `src/lib/cloister/swarm-failed-slot.ts` and `tests/unit/lib/cloister/deacon-swarm-recovery.test.ts`\n- Dimensions reviewed: correctness/logic, security, requirements/acceptance criteria, performance\n- Verification: focused swarm recovery suite passed, 13 tests; cycle diff passes `git diff --check`\n\n## Cycle-5 Finding Disposition\n\n| Prior finding | Disposition at committed HEAD |\n| --- | --- |\n| Pane-choice POST omitted origin/authentication guard | **Fixed in cycle 2.** |\n| Graceful restart could destroy a late decision | **Core fixed in cycle 3; dashboard projection blocker remains unchanged.** |\n| Forced discard was rediscovered from historical workspace JSONLs | **Fixed in cycle 4.** |\n| Failed swarm slot dropped the required needs-you escalation | **Fixed this cycle.** The defer branch records a threshold-1 durable recovery trip, emits one needs-you action, avoids archive/requeue, and acknowledges the decision-specific trip once admission resumes. |\n\n## Blocking Finding\n\n### ! [correctness] A grace-period refusal leaves the live agent permanently projected as stopped — `src/lib/agents/recovery.ts:174`\n**Evidence tier:** Tier 1\n**Changed-code origin:** This defect could not have been raised in cycle 1 because the post-warning early refusal did not exist then. It was introduced by the cycle-3 race fix and identified in that same review cycle; the dashboard caller has not changed since.\n**Problem:** The recovery core correctly returns `pending-operator-decision` without stopping the session when a decision appears during the grace wait. The dashboard caller still emits `agent.stopped` at `src/dashboard/server/routes/agents/lifecycle-restart.ts:311-315` before calling the core and restores `agent.started` only when `result.success` is true.\n**Failure scenario:** The route projects stopped, the live agent reaches a permission prompt during the 60-second grace period, and the core returns the typed refusal without stopping tmux. The route logs the failure but never restores the running projection.\n**Runtime impact:** The harness remains live and operator-owned while the canonical read model says it is stopped. Dashboard controls, enrichment, and autonomous lifecycle logic can then act on false state, recreating the state-plane drift this codebase's write-through projection is meant to prevent.\n**Fix:** Move the stopped/started projection pair to confirmed successful restart, or restore the running projection on the typed refusal. Add a route-level fake-timer regression that drives a late pending decision and proves no stopped projection survives while the session remains running.\n\n## Cycle-Diff Review\n\nThe swarm correction satisfies FR-4:\n\n- `needsYou: true` records a decision-specific trip with threshold 1, so the first blocked patrol produces the escalation.\n- An already-open trip is deduplicated by `recordRecoveryFailure()` and does not emit on every patrol.\n- The slot remains running/in-flight and no branch archive, assignment clear, or task unblock occurs while the decision is pending.\n- Admission acknowledges the exact decision trip before normal requeue, preventing stale needs-you state after the operator resolves the prompt.\n- Existing repeated-failure accounting under `swarm-slot-requeue` remains separate.\n- Dependency seams are test-only substitutions around canonical writers and gates; production still uses the existing doors.\n- No security regression, performance blocker, or non-goal violation was introduced.\n\n## Requirement Coverage\n\n| Requirement | Status at committed HEAD |\n| --- | --- |\n| FR-1 / NFR-2 pending-decision helper | Implemented |\n| FR-2 fresh-start gate and force | Implemented |\n| FR-3 / NFR-1 restart-family gate | Partial — core is safe, dashboard projection remains wrong on late refusal |\n| FR-4 autonomous redrive + needs-you | Implemented, including failed swarm slots |\n| FR-5 shared session pane-choice core | Implemented |\n| FR-6 agent GET/POST pane-choice routes | Implemented and origin-guarded |\n| FR-7 `pan answer` CLI | Implemented |\n| FR-8 flywheel doctrine | Implemented |\n| Documentation | Implemented; the remaining gap is lifecycle projection behavior rather than missing documentation |\n\n## Security and Performance\n- The pane-choice mutation remains origin-guarded; this cycle adds no new HTTP or keystroke surface.\n- Recovery-trip keys contain controlled issue/item/agent identifiers and are written through the canonical record writer.\n- Threshold-1 trip writes occur once per unresolved obligation generation; subsequent patrols reuse the open trip, so the fix does not create an unbounded write loop.\n\n## Non-goal Audit\nAll six must-not constraints remain satisfied: no decision-card UI/read-model plumbing, no supervisor protocol endpoint, no Channels revival, no nudge-path change, no unrelated Decisions indicator fix, and no rate-limit gating or auto-answer behavior.\n\n## Coverage\nCycle 1 reviewed the complete PR across all four dimensions. Cycles 2-5 reviewed each committed correction and rechecked unresolved blockers against committed HEAD. This cycle reviewed both changed files and the canonical recovery-trip semantics; unchanged clean areas from the prior full pass were not re-read.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3228/.pan/review/agent-pan-3228-review-7bbd981b/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3228 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -180,10 +172,10 @@
     "recordedAt": "2026-07-28T19:16:09.927Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T20:55:30.955Z",
+  "updated": "2026-07-28T21:07:11.786Z",
   "pipeline": {
     "issueId": "PAN-3228",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -191,7 +183,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:17:21.407Z",
-    "updatedAt": "2026-07-28T20:26:12.877Z",
+    "updatedAt": "2026-07-28T21:07:11.710Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues and synced latest main",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -205,7 +197,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3241",
     "reviewedAtCommit": "7bbd981bd9677d75d32c0b3cd6a9a0abd6b7cd3c",
     "lastVerifiedCommit": "57e909d2bf0ee27c55919290af292bc7f6e81322",
-    "reviewSpawnedAt": "2026-07-28T19:46:21.661Z"
+    "reviewSpawnedAt": "2026-07-28T21:07:11.708Z"
   },
   "closeOut": {
     "usage": {
@@ -228,9 +220,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3323214,
-            "output": 266480,
-            "cacheRead": 173968896,
+            "input": 3329151,
+            "output": 267401,
+            "cacheRead": 174753792,
             "cacheWrite": 0
           }
         }
@@ -243,15 +235,15 @@
           "cacheWrite": 121982
         },
         "openai/gpt-5.6-sol": {
-          "input": 9974119,
-          "output": 463835,
-          "cacheRead": 210954240,
+          "input": 9980056,
+          "output": 464756,
+          "cacheRead": 211739136,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 180.252387,
-        "pricingAsOf": "2026-07-28T20:26:13.011Z"
+        "usd": 180.70215,
+        "pricingAsOf": "2026-07-28T21:07:11.756Z"
       }
     },
     "merges": [
