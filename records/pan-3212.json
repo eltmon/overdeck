@@ -130,17 +130,17 @@
     "recordedAt": "2026-07-28T17:49:31.882Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T19:45:24.660Z",
+  "updated": "2026-07-28T19:45:31.716Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:49:41.828Z",
-    "updatedAt": "2026-07-28T19:45:23.680Z",
+    "updatedAt": "2026-07-28T19:45:31.705Z",
     "reviewNotes": "All review dimensions pass; explicit strict payload states close the menu-swallow, legacy, read-failure, and rollback recovery gaps.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
@@ -187,9 +187,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5627869,
-            "output": 383664,
-            "cacheRead": 62177792,
+            "input": 5641903,
+            "output": 387618,
+            "cacheRead": 63742976,
             "cacheWrite": 0
           }
         },
@@ -204,15 +204,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 10580524,
-          "output": 795515,
-          "cacheRead": 221783552,
+          "input": 10594558,
+          "output": 799469,
+          "cacheRead": 223348736,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 187.659846,
-        "pricingAsOf": "2026-07-28T19:45:23.743Z"
+        "usd": 188.631228,
+        "pricingAsOf": "2026-07-28T19:45:31.712Z"
       }
     },
     "merges": [
@@ -221,7 +221,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3212",
