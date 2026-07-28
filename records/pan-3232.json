@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T20:42:32.805Z",
+  "updated": "2026-07-28T20:44:14.006Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -86,7 +86,7 @@
     }
   ],
   "tasks": {
-    "sequence": 11,
+    "sequence": 12,
     "claims": {
       "live-tree-delta": {
         "writerId": "agent-pan-3232",
@@ -101,13 +101,6 @@
         "pid": 4168158,
         "host": "eltmon-z790",
         "claimedAt": "2026-07-28T20:41:43.198Z"
-      },
-      "widen-direct-selector-surfaces": {
-        "writerId": "agent-pan-3232",
-        "agentId": "agent-pan-3232",
-        "pid": 14060,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:42:32.804Z"
       }
     },
     "claimHistory": [
@@ -150,6 +143,16 @@
         "itemId": "remove-project-pending-input",
         "outcome": "completed",
         "releasedAt": "2026-07-28T20:42:25.198Z"
+      },
+      {
+        "writerId": "agent-pan-3232",
+        "agentId": "agent-pan-3232",
+        "pid": 14060,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:42:32.804Z",
+        "itemId": "widen-direct-selector-surfaces",
+        "outcome": "completed",
+        "releasedAt": "2026-07-28T20:44:14.006Z"
       }
     ]
   },
@@ -172,6 +175,9 @@
     "remove-project-pending-input": "completed",
     "remove-project-pending-input.remove-project-pending-input.ac1": "completed",
     "remove-project-pending-input.remove-project-pending-input.ac2": "completed",
-    "widen-direct-selector-surfaces": "running"
+    "widen-direct-selector-surfaces": "completed",
+    "widen-direct-selector-surfaces.widen-direct-selector-surfaces.ac1": "completed",
+    "widen-direct-selector-surfaces.widen-direct-selector-surfaces.ac2": "completed",
+    "widen-direct-selector-surfaces.widen-direct-selector-surfaces.ac3": "completed"
   }
 }
