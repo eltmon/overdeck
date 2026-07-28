@@ -112,7 +112,7 @@
     "recordedAt": "2026-07-28T19:16:09.927Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T19:16:18.392Z",
+  "updated": "2026-07-28T19:16:22.458Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "pending",
@@ -122,10 +122,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T19:16:17.705Z",
+    "updatedAt": "2026-07-28T19:16:21.112Z",
     "inspectNotes": "All 3 ACs met. AC1: new src/lib/__tests__/session-pane-choice.test.ts covers 400 bad index, 400 missing signature, 409 menu-gone, 409 menu-changed, 409 delivery-unconfirmed, and 200 {ok,answeredLabel} with Down/Down/Enter keystrokes. AC2: tests/unit/lib/overdeck/conversation-pane-choice.test.ts is untouched by this commit (last touched by PAN-3113 commit 4d65ad1c) and its 12 cases pass through the delegating handler; 47/47 across the 4 pane-choice test files. AC3: captureSessionPaneChoice returns signature/title/options/recommended/selectedIndex and null on no-menu or capture throw. Delegation preserves defaults (conversation still passes tmuxSessionExists; core defaults to capturePaneText + Effect.runPromise(sessionExists)) and the validation ordering (400s before conv lookup).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3241",
-    "reviewRequestedAt": "2026-07-28T19:16:13.100Z",
+    "reviewRequestedAt": "2026-07-28T19:16:20.610Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/FLYWHEEL-STATE.md",
@@ -259,7 +259,7 @@
       },
       "costAtCloseOut": {
         "usd": 86.636349,
-        "pricingAsOf": "2026-07-28T19:16:17.741Z"
+        "pricingAsOf": "2026-07-28T19:16:22.452Z"
       }
     },
     "merges": [
