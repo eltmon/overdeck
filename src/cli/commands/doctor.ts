@@ -6,7 +6,12 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { getAgentSessionsSync, listSessionNamesSync } from '../../lib/tmux.js';
-import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
+import { listProjectsSync, getProjectSync, resolveProjectFromIssueSync, type ProjectConfig } from '../../lib/projects.js';
+import {
+  defaultWorkspacePath,
+  inferIssueIdFromStackContainerName,
+  tryComposeProjectNameForWorkspace,
+} from '../../lib/workspace/stack-health.js';
 import { homedir } from 'os';
 import { isAbsolute, join, resolve } from 'path';
 import {
@@ -249,6 +254,102 @@ function checkComposeLabelDrift(): ComposeDriftEntry[] {
       }
     }
     return drift;
+  } catch {
+    return [];
+  }
+}
+
+export interface DuplicateStackContainerRow {
+  name: string;
+  composeProject?: string;
+}
+
+/**
+ * PAN-3049: diagnose duplicate/mismatched Docker compose stacks per issue —
+ * a workspace declaring `myn-feature-<issue>` but running (also, or only)
+ * under the `overdeck-feature-<issue>` fallback. Read-only: stops nothing
+ * itself, only reports what a human/agent should run.
+ *
+ * `resolveCanonicalProject` is injected so tests can exercise this without
+ * touching Docker or the filesystem; the real doctor check resolves it via
+ * `tryComposeProjectNameForWorkspace` + `defaultWorkspacePath`.
+ */
+export function diagnoseDuplicateComposeStacks(
+  containers: DuplicateStackContainerRow[],
+  resolveCanonicalProject: (issueId: string) => string | null,
+): CheckResult[] {
+  const projectsByIssue = new Map<string, Set<string>>();
+  for (const container of containers) {
+    if (!container.composeProject) continue;
+    const issueId =
+      inferIssueIdFromStackContainerName(container.composeProject) ??
+      inferIssueIdFromStackContainerName(container.name);
+    if (!issueId) continue;
+    const projects = projectsByIssue.get(issueId) ?? new Set<string>();
+    projects.add(container.composeProject);
+    projectsByIssue.set(issueId, projects);
+  }
+
+  const results: CheckResult[] = [];
+  for (const issueId of [...projectsByIssue.keys()].sort()) {
+    const runningProjects = [...projectsByIssue.get(issueId)!].sort();
+    const canonical = resolveCanonicalProject(issueId);
+
+    if (runningProjects.length === 1) {
+      // Healthy: the single running stack IS the canonical one. Silent.
+      if (canonical && runningProjects[0] === canonical) continue;
+      // Unresolvable canonical — nothing to safely compare against. Silent.
+      if (!canonical) continue;
+
+      const onlyName = runningProjects[0];
+      results.push({
+        name: `Duplicate Docker stack (${issueId})`,
+        status: 'warn',
+        message: `${issueId}'s only running stack is ${onlyName}, not its canonical name ${canonical}`,
+        fix: `Stack runs under non-canonical name ${onlyName} and may be serving a live agent — run \`pan workspace rebuild ${issueId}\` and only stop ${onlyName} after the canonical stack is healthy.`,
+      });
+      continue;
+    }
+
+    // ≥2 distinct running compose projects for the same issue — a duplicate.
+    const foreign = runningProjects.filter((project) => project !== canonical);
+    results.push({
+      name: `Duplicate Docker stack (${issueId})`,
+      status: 'warn',
+      message: canonical
+        ? `${issueId} has ${runningProjects.length} running compose projects (canonical: ${canonical}): ${runningProjects.join(', ')}`
+        : `${issueId} has ${runningProjects.length} running compose projects: ${runningProjects.join(', ')}`,
+      fix: foreign.length > 0
+        ? foreign.map((name) => `foreign stack ${name} is a duplicate: docker compose -p "${name}" down`).join('\n')
+        : undefined,
+    });
+  }
+
+  return results;
+}
+
+function resolveCanonicalComposeProjectForDoctor(issueId: string): string | null {
+  const resolvedProject = resolveProjectFromIssueSync(issueId);
+  const projectConfig = resolvedProject ? getProjectSync(resolvedProject.projectKey) : null;
+  const workspacePath = defaultWorkspacePath(issueId, projectConfig);
+  return tryComposeProjectNameForWorkspace(workspacePath, issueId);
+}
+
+export async function checkDuplicateComposeStacks(): Promise<CheckResult[]> {
+  if (!checkCommand('docker')) return [];
+  try {
+    const { stdout } = await execAsync(
+      `docker ps --format '{{.Names}}\t{{.Label "com.docker.compose.project"}}'`,
+    );
+    const containers: DuplicateStackContainerRow[] = stdout
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const [name, composeProject] = line.split('\t');
+        return { name, composeProject: composeProject || undefined };
+      });
+    return diagnoseDuplicateComposeStacks(containers, resolveCanonicalComposeProjectForDoctor);
   } catch {
     return [];
   }
@@ -902,6 +1003,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Check Docker devnet network pool exhaustion (PAN-2510)
   for (const c of await checkDockerBridgeNetworkPool()) checks.push(c);
+
+  // Check for duplicate/mismatched compose stacks per issue (PAN-3049)
+  for (const c of await checkDuplicateComposeStacks()) checks.push(c);
 
   // Check inotify watch budget and persistence (PAN-3063)
   for (const c of await checkInotify()) checks.push(c);

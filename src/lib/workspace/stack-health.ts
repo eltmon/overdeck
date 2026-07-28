@@ -215,7 +215,7 @@ function hasDockerWorkspace(projectConfig: WorkspaceStackProject | null | undefi
   return Boolean(projectConfig?.workspace?.docker?.compose_template);
 }
 
-function defaultWorkspacePath(issueId: string, projectConfig: WorkspaceStackProject | null | undefined): string | null {
+export function defaultWorkspacePath(issueId: string, projectConfig: WorkspaceStackProject | null | undefined): string | null {
   if (!projectConfig?.path) return null;
   return join(
     projectConfig.path,
