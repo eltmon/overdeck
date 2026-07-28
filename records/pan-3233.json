@@ -70,7 +70,7 @@
     "recordedAt": "2026-07-28T20:46:26.914Z"
   },
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T21:42:13.422Z",
+  "updated": "2026-07-28T21:42:17.346Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "passed",
@@ -78,9 +78,9 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:48:00.219Z",
-    "updatedAt": "2026-07-28T21:42:13.149Z",
+    "updatedAt": "2026-07-28T21:42:13.197Z",
     "reviewNotes": "Approved: prior suppression-scope and paneQuestion blocking-classification findings are fixed with focused regressions",
     "testNotes": "Scope: pure backend enrichment-classification fix (agent-enrichment.ts) + frontend label/blocking-kind vocabulary, all 7 xBRIEF ACs unit-test verifiable, no UI/browser ACs -> UAT not required. Gates: npm run typecheck (root+hooks+evals+dashboard+frontend ratchets) all green; npm run lint (eslint + effect/permissions/state-writes/state-paths/overdeck-boundaries/pipeline-membership/skills/slash-commands/prompts/file-size/circular-deps/ratchet-audit/quarantine-audit) all green. npm test: 1268 test files / 11972 tests passed, 3 files/50 tests skipped (pre-existing quarantine, unrelated to this change), 0 failures; frontend suite 3 files/51 tests passed. Explicitly re-ran PAN-3233-scoped files for direct evidence: src/lib/__tests__/agent-enrichment.test.ts + compute-agent-enrichment.test.ts + agent-enrichment-service.test.ts = 3 files/65 tests passed; frontend pendingInput.test.ts + useDecisions.test.ts + store.test.ts + SubagentTranscript.test.tsx = 4 files/68 tests passed. Branch also carries pre-existing out-of-declared-scope flywheel-contamination commits (docs/FLYWHEEL-STATE.md tick, SubagentTranscript.tsx/command-deck.module.css scrolling fix) already assessed and passed by review; not re-litigated here.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -189,7 +189,7 @@
       },
       "costAtCloseOut": {
         "usd": 45.193825,
-        "pricingAsOf": "2026-07-28T21:42:13.359Z"
+        "pricingAsOf": "2026-07-28T21:42:17.337Z"
       }
     },
     "merges": [
