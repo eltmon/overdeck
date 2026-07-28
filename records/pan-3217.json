@@ -26,17 +26,18 @@
     "recordedAt": "2026-07-28T09:10:19.628Z"
   },
   "created": "2026-07-28T06:36:21.767Z",
-  "updated": "2026-07-28T09:34:04.757Z",
+  "updated": "2026-07-28T15:59:05.981Z",
   "pipeline": {
     "issueId": "PAN-3217",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T09:33:42.483Z",
-    "updatedAt": "2026-07-28T09:34:04.683Z",
+    "updatedAt": "2026-07-28T15:59:05.168Z",
     "reviewNotes": "Verification infrastructure error: Verification worker 15189 exited before writing a result",
     "testNotes": "Backend-only fix (pipeline-membership-gather.ts reorder) + docs update; no UI/dashboard surface touched, xBRIEF verify_commands are vitest/typecheck/grep only, so no browser UAT required. Ran: npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts (42/42 passed); npm run typecheck (clean, dashboard/frontend shrink-only ratchets show no new errors); npm run lint (full eslint + all lint:* gates passed, exit 0); npm test full suite (1256 files / 11759 tests passed, 50 skipped, 0 failures on a clean untruncated rerun). An initial full-suite run showed 12 failures, all 'Hook timed out in 5000ms' on setupOverdeckTestDb() in unrelated files (conversations scan/search, cost-reconcile, merge-sync, observability RPC, harness-metadata) while 15 sibling-workspace agents were concurrently running vitest — none of those files touch pipeline-membership-gather.ts, and a clean rerun with no code changes passed all of them, confirming resource-contention flakiness rather than a regression from this change.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -66,9 +67,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 450450,
-            "output": 20729,
-            "cacheRead": 3738112,
+            "input": 661500,
+            "output": 21359,
+            "cacheRead": 4167680,
             "cacheWrite": 0
           }
         },
@@ -82,18 +83,18 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 619,
-            "output": 21310,
-            "cacheRead": 11162419,
-            "cacheWrite": 696173
+            "input": 664,
+            "output": 22895,
+            "cacheRead": 12181987,
+            "cacheWrite": 706530
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 450450,
-          "output": 20729,
-          "cacheRead": 3738112,
+          "input": 661500,
+          "output": 21359,
+          "cacheRead": 4167680,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -103,15 +104,15 @@
           "cacheWrite": 156216
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 619,
-          "output": 21310,
-          "cacheRead": 11162419,
-          "cacheWrite": 696173
+          "input": 664,
+          "output": 22895,
+          "cacheRead": 12181987,
+          "cacheWrite": 706530
         }
       },
       "costAtCloseOut": {
-        "usd": 8.383491,
-        "pricingAsOf": "2026-07-28T09:34:04.739Z"
+        "usd": 9.7953,
+        "pricingAsOf": "2026-07-28T15:59:05.425Z"
       }
     },
     "merges": [
