@@ -26,17 +26,17 @@
     "recordedAt": "2026-07-28T08:49:28.640Z"
   },
   "created": "2026-07-28T06:36:21.767Z",
-  "updated": "2026-07-28T09:01:20.616Z",
+  "updated": "2026-07-28T09:01:27.408Z",
   "pipeline": {
     "issueId": "PAN-3217",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:49:53.504Z",
-    "updatedAt": "2026-07-28T09:01:19.682Z",
+    "updatedAt": "2026-07-28T09:01:27.402Z",
     "reviewNotes": "Approved: tracker-before-prefix precedence is correct, tested, documented, and introduces no blockers.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3225",
@@ -63,9 +63,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 443796,
-            "output": 19135,
-            "cacheRead": 3238400,
+            "input": 450450,
+            "output": 20729,
+            "cacheRead": 3738112,
             "cacheWrite": 0
           }
         },
@@ -80,9 +80,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 443796,
-          "output": 19135,
-          "cacheRead": 3238400,
+          "input": 450450,
+          "output": 20729,
+          "cacheRead": 3738112,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -93,8 +93,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 5.342021,
-        "pricingAsOf": "2026-07-28T09:01:19.734Z"
+        "usd": 5.672967,
+        "pricingAsOf": "2026-07-28T09:01:27.404Z"
       }
     },
     "merges": [
@@ -103,7 +103,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3217",
