@@ -12,20 +12,49 @@
       "timestamp": "2026-07-28T16:24:45.782Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-28T16:44:21.462Z",
+      "reason": "end",
+      "note": "No deviations. Added blocking-menu branch coverage for sendKeys, extracted and tested resume-contract gate handling, and guarded keyed tmux submission before Enter; typecheck, lint, and full tests pass."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "CLAUDE.md",
+      "src/lib/__tests__/tmux-dedup.test.ts",
+      "src/lib/overdeck/conversation-runtime.ts",
+      "src/lib/overdeck/resume-contract-delivery.ts",
+      "src/lib/tmux-dedup.ts",
+      "tests/lib/tmux-send-keys-blocking-menu.test.ts",
+      "tests/unit/lib/overdeck/resume-contract-delivery.test.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "src/lib/__tests__/tmux-dedup.test.ts",
+      "src/lib/overdeck/conversation-runtime.ts",
+      "src/lib/overdeck/resume-contract-delivery.ts",
+      "src/lib/tmux-dedup.ts",
+      "tests/lib/tmux-send-keys-blocking-menu.test.ts",
+      "tests/unit/lib/overdeck/resume-contract-delivery.test.ts"
+    ],
+    "recordedAt": "2026-07-28T16:44:14.261Z"
+  },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T16:44:17.625Z",
+  "updated": "2026-07-28T16:44:21.462Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T16:44:17.624Z",
+    "updatedAt": "2026-07-28T16:44:20.990Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
     "reviewRequestedAt": "2026-07-28T16:44:17.624Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -49,19 +78,36 @@
         "tests/unit/lib/overdeck/resume-contract-delivery.test.ts"
       ],
       "recordedAt": "2026-07-28T16:44:14.261Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3227"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 984272,
+            "output": 47743,
+            "cacheRead": 18263040,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 984272,
+          "output": 47743,
+          "cacheRead": 18263040,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-28T16:24:35.055Z"
+        "usd": 15.48517,
+        "pricingAsOf": "2026-07-28T16:44:21.008Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3227"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -143,28 +189,5 @@
     "guard-keyed-submit-blocking-menu.guard-keyed-submit-blocking-menu.ac1": "completed",
     "guard-keyed-submit-blocking-menu.guard-keyed-submit-blocking-menu.ac2": "completed",
     "guard-keyed-submit-blocking-menu.guard-keyed-submit-blocking-menu.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "CLAUDE.md",
-      "src/lib/__tests__/tmux-dedup.test.ts",
-      "src/lib/overdeck/conversation-runtime.ts",
-      "src/lib/overdeck/resume-contract-delivery.ts",
-      "src/lib/tmux-dedup.ts",
-      "tests/lib/tmux-send-keys-blocking-menu.test.ts",
-      "tests/unit/lib/overdeck/resume-contract-delivery.test.ts"
-    ],
-    "actualChangedFiles": [
-      "CLAUDE.md",
-      "src/lib/__tests__/tmux-dedup.test.ts",
-      "src/lib/overdeck/conversation-runtime.ts",
-      "src/lib/overdeck/resume-contract-delivery.ts",
-      "src/lib/tmux-dedup.ts",
-      "tests/lib/tmux-send-keys-blocking-menu.test.ts",
-      "tests/unit/lib/overdeck/resume-contract-delivery.test.ts"
-    ],
-    "recordedAt": "2026-07-28T16:44:14.261Z"
   }
 }
