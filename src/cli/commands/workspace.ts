@@ -9,6 +9,7 @@ import {
   stopCommand,
   syncAuthCommand,
 } from './workspace-remote.js';
+import { workspaceMainCommand, workspaceNewCommand } from './workspace-scratch.js';
 
 export { destroyCommand } from './workspace-list.js';
 
@@ -68,6 +69,20 @@ export function registerWorkspaceCommands(program: Command): void {
     .option('--force', 'Force removal even with uncommitted changes')
     .option('--project <path>', 'Explicit project path (overrides registry)')
     .action(destroyCommand);
+
+  workspace
+    .command('new <name>')
+    .description('Create a scratch workspace (shared dir by default; --isolated for a git worktree)')
+    .option('--project <key>', 'Registered project key (defaults to the sole project, or the one resolved from cwd)')
+    .option('--isolated', 'Create an isolated git worktree instead of sharing the project directory')
+    .option('--parent-branch <branch>', 'Parent branch for the isolated worktree (default: inferred from the project\'s current branch)')
+    .action(workspaceNewCommand);
+
+  workspace
+    .command('main')
+    .description('Resolve or create the project\'s singleton main workspace')
+    .option('--project <key>', 'Registered project key (defaults to the sole project, or the one resolved from cwd)')
+    .action(workspaceMainCommand);
 
   // Re-render `<workspace>/.devcontainer/` from the project's compose
   // template. Idempotent. The single source of truth for how the
