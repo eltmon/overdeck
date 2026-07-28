@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T21:11:12.547Z",
+  "updated": "2026-07-28T21:11:19.283Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -101,16 +101,8 @@
     }
   ],
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "specialist-pending-input": {
-        "writerId": "agent-pan-3232",
-        "agentId": "agent-pan-3232",
-        "pid": 4168158,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:41:43.198Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3232",
@@ -182,12 +174,27 @@
         "outcome": "cancelled",
         "reason": "Deferred: pending_input_changed delta infrastructure requires backend work in ws-rpc and contracts; eligible for follow-up issue",
         "releasedAt": "2026-07-28T21:11:12.547Z"
+      },
+      {
+        "writerId": "agent-pan-3232",
+        "agentId": "agent-pan-3232",
+        "pid": 4168158,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:41:43.198Z",
+        "itemId": "specialist-pending-input",
+        "outcome": "cancelled",
+        "reason": "Deferred: specialist awaiting-input fields require route changes in projects.ts, command-deck.ts, and reviewer-tree.ts; eligible for follow-up issue",
+        "releasedAt": "2026-07-28T21:11:19.283Z"
       }
     ],
     "statusReasons": {
       "live-tree-delta": {
         "reason": "Deferred: pending_input_changed delta infrastructure requires backend work in ws-rpc and contracts; eligible for follow-up issue",
         "updatedAt": "2026-07-28T21:11:12.547Z"
+      },
+      "specialist-pending-input": {
+        "reason": "Deferred: specialist awaiting-input fields require route changes in projects.ts, command-deck.ts, and reviewer-tree.ts; eligible for follow-up issue",
+        "updatedAt": "2026-07-28T21:11:19.283Z"
       }
     }
   },
@@ -206,7 +213,7 @@
     "session-panel-kind-label.session-panel-kind-label.ac2": "completed",
     "session-panel-kind-label.session-panel-kind-label.ac3": "completed",
     "live-tree-delta": "cancelled",
-    "specialist-pending-input": "running",
+    "specialist-pending-input": "cancelled",
     "remove-project-pending-input": "completed",
     "remove-project-pending-input.remove-project-pending-input.ac1": "completed",
     "remove-project-pending-input.remove-project-pending-input.ac2": "completed",
