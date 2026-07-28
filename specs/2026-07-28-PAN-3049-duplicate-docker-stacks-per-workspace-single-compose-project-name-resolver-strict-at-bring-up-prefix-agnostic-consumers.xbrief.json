@@ -1,0 +1,682 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T03:20:45Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3049: Duplicate Docker stacks per workspace (myn-feature-* beside overdeck-feature-*) double memory and exhausted the host",
+    "updated": "2026-07-28T03:27:53.316Z"
+  },
+  "plan": {
+    "id": "pan-3049",
+    "title": "Duplicate Docker stacks per workspace — single compose-project-name resolver, strict at bring-up, prefix-agnostic consumers",
+    "status": "proposed",
+    "uid": "ca717aaa-c424-4dd0-91b9-88ff7b410fbf",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-28T03:20:45Z",
+    "updated": "2026-07-28T03:27:53.316Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3049",
+        "label": "PAN-3049",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docker",
+      "workspace",
+      "memory",
+      "reaper",
+      "compose-project-name"
+    ],
+    "narratives": {
+      "Problem": "MYN workspaces ran two complete Docker stacks at once (declared myn-feature-* plus fallback overdeck-feature-*), doubling ~2 GB stacks and exhausting host memory. Root causes verified in code: (1) the compose project name is derived independently in stack-health.ts and workspace-manager/docker.ts with a silent overdeck- fallback; (2) rebuildWorkspaceStack resolves the name BEFORE ensureDevcontainerSync renders .devcontainer/, so spawn-time rebuilds (spawn-prep.ts:818) take the fallback and `up -p` overrides the compose file's `name: myn-…`; (3) cleanup machinery hardcodes the overdeck-feature- prefix (idle-stack-reaper.ts:53, deacon.ts:2317/2336, close-out.ts:377, workspace-reap.ts:12) and never reaps myn- stacks.",
+      "Proposal": "Make composeProjectNameForWorkspace the single resolver: extend it to read the compose file's top-level `name:` field, add a strict variant that fails loudly at bring-up when no declared name resolves, resolve after render in rebuildWorkspaceStack (tearing down under both names when they differ), route stopWorkspaceDockerPromise through the resolver without its throw, make every overdeck-feature- hardcoded consumer prefix-agnostic, add `name: overdeck-{{FEATURE_FOLDER}}` to the Overdeck template, and add a read-only pan doctor check that reports duplicate live stacks with safe remediation guidance.",
+      "NonGoals": "- Stopping or removing any RUNNING foreign-prefixed stack from code (operator action, guided by the doctor check)\n- Reconciling the currently duplicated host stacks (MIN-864/MIN-901) — operator action after the fix lands\n- Extending the deacon crash sweep or idle-reaper service sets beyond (frontend|server) to MYN's api/dev/postgres/redis\n- Changing uat-stack.ts's overdeck- prefix for uat-* generation folders (internally consistent; separate concern)\n- Fixing the frontend display-only fallback in uat-action-handlers.ts:17\n- Migrating or renaming any existing stack's containers"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose to fix all three root-cause vectors in one plan (single resolver, resolve-after-render, prefix-agnostic reapers) rather than only the issue's ask #1/#2.",
+        "rationale": "The RUN-73 comment on the issue documents the reaper blindness as 'the other half of the defect'; splitting it would leave exited myn- corpses accumulating and the memory hazard half-fixed."
+      },
+      {
+        "summary": "Strict resolver is opt-in (requireComposeProjectNameForWorkspace) used only at bring-up; lenient resolver keeps the overdeck- fallback for non-docker workspaces.",
+        "rationale": "Health checks run against non-docker and half-provisioned workspaces where throwing would break read-only paths; the silent guess is only dangerous where a stack is created."
+      },
+      {
+        "summary": "Duplicate-stack reconciliation is a read-only doctor check, not automated cleanup.",
+        "rationale": "Issue comments explicitly warn that a foreign-prefixed stack may be the workspace's only stack serving a live agent (MIN-891); code cannot safely decide, so it surfaces and the operator stops."
+      },
+      {
+        "summary": "Kept the (frontend|server) service sets in the crash sweep and idle-reaper UI tier unchanged.",
+        "rationale": "The defect is prefix blindness, not service coverage; widening which services get restarted/reaped for other projects changes behavior beyond this issue's evidence."
+      },
+      {
+        "summary": "Added `name: overdeck-{{FEATURE_FOLDER}}` to the Overdeck compose template as a plan item.",
+        "rationale": "MYN's template is self-describing and Overdeck's is not; the resolver's compose-name parsing (FR-1) only pays off for Overdeck workspaces once the template declares the name."
+      }
+    ],
+    "items": [
+      {
+        "id": "resolver-compose-name-strict",
+        "title": "Extend composeProjectNameForWorkspace to read compose `name:` and add strict variant",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T03:20:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3049",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "rebuild-resolve-after-render",
+            "stop-docker-via-resolver",
+            "doctor-duplicate-stack-check"
+          ],
+          "files_scope": [
+            "src/lib/workspace/stack-health.ts",
+            "tests/unit/lib/workspace/stack-health-compose-name.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace/stack-health-compose-name.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new resolver tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/workspace/stack-health.ts: after the dev-script declaration loop in composeProjectNameForWorkspace (lines 41-56), if no declaration was found, look for the devcontainer compose file (candidates: docker-compose.devcontainer.yml, docker-compose.yml, docker-compose.yaml, compose.yml, compose.yaml under .devcontainer/), parse a top-level `name: <value>` line, and apply the same endsWith(featureFolder) validation as the dev-script path (same 'Refusing workspace rebuild' error shape). Add and export requireComposeProjectNameForWorkspace(workspacePath, issueId): identical resolution, but when a compose file EXISTS and no declared name resolves from either source, throw a descriptive error naming the workspace and both search locations instead of returning the overdeck- fallback. When no compose file exists at all, both variants keep the current fallback (non-docker workspaces). New test file tests/unit/lib/workspace/stack-health-compose-name.test.ts covers: dev-script declaration wins over compose name; compose `name:` used when no dev script; suffix mismatch on compose name throws; strict throws when compose file exists with no declaration; lenient falls back when no compose file exists. Use temp dirs, never real docker."
+        },
+        "items": [
+          {
+            "id": "resolver-compose-name-strict.ac1",
+            "title": "Given a workspace whose compose file declares `name: myn-feature-min-901` and has no dev script, composeProjectNameForWorkspace returns `myn-feature-min-901`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-compose-name-strict.ac2",
+            "title": "Given a compose file exists but neither it nor any dev script declares a name, requireComposeProjectNameForWorkspace throws an error naming the workspace path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-compose-name-strict.ac3",
+            "title": "Given no compose file exists, both resolver variants return the `overdeck-feature-<issue>` fallback without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-compose-name-strict.ac4",
+            "title": "Given a declared name (either source) that does not end in the feature folder, resolution throws the existing 'Refusing workspace rebuild' mismatch error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rebuild-resolve-after-render",
+        "title": "rebuildWorkspaceStack resolves the compose name after rendering and tears down stale-named stacks",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T03:20:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3049",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace/rebuild-stack.ts",
+            "tests/unit/lib/workspace/rebuild-stack.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace/rebuild-stack.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "rebuild tests pass asserting declared-name `up -p`",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/workspace/rebuild-stack.ts: capture the pre-render best-effort name via tryComposeProjectNameForWorkspace BEFORE the teardown at line 187-196 (may be null). Keep the existing pre-render down under that best-effort name (or the fallback when null — current behavior). After ensureDevcontainerSync succeeds (line 203), resolve the bring-up name with requireComposeProjectNameForWorkspace (strict — a freshly rendered workspace must have a declared name; if it doesn't, that is exactly the loud failure PAN-3049 asks for). If the pre-render name is non-null and differs from the post-render name, run `docker compose -p <preRenderName> down -v --remove-orphans` (best-effort, swallowed on error) so a fallback-named stack cannot leak. Use the post-render name for `up -p` (line 225) and for removeStaleIssueContainers (line 234). Tests (mock exec + fs, temp workspace dirs): fresh workspace with no .devcontainer renders myn-declaring dev script → up uses -p myn-feature-<issue>, never overdeck-; pre-existing overdeck-named stack + myn declaration → down runs under both names before up; strict resolver error surfaces as result.success=false with the resolver message."
+        },
+        "items": [
+          {
+            "id": "rebuild-resolve-after-render.ac1",
+            "title": "Given a workspace with no pre-existing .devcontainer and a template declaring myn-, rebuildWorkspaceStack brings the stack up with `-p myn-feature-<issue>`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rebuild-resolve-after-render.ac2",
+            "title": "Given a pre-render name that differs from the post-render declared name, rebuild tears down under BOTH names before `up`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rebuild-resolve-after-render.ac3",
+            "title": "Given a rendered workspace with no resolvable declared name, rebuild returns success=false carrying the strict resolver's error instead of starting a stack under the fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stop-docker-via-resolver",
+        "title": "stopWorkspaceDockerPromise routes through the canonical resolver and drops the hardcoded name + throw",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T03:20:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3049",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/docker.ts",
+            "tests/unit/lib/workspace-manager/docker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace-manager/docker.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "teardown tests pass with myn- declared names",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/workspace-manager/docker.ts stopWorkspaceDockerPromise (lines 71-91): delete the hardcoded `const composeProjectName = `overdeck-${featureFolder}`` and the dev-script re-parse that throws on mismatch; instead `const composeProjectName = composeProjectNameForWorkspace(workspacePath, featureName)` (lenient — teardown must proceed for odd states; import from ../workspace/stack-health.js). Both the compose-file down (line 99) and the orphaned-containers down (line 116) use the resolved name. Note the resolver throws 'Refusing workspace rebuild' on suffix mismatch — let that propagate as today (it protects against tearing down the wrong stack). New tests/unit/lib/workspace-manager/docker.test.ts (mock child_process exec + fs): workspace whose dev script declares myn- → down invoked with `-p myn-feature-<issue>`, no throw; no declaration → falls back to overdeck- as today. Assert the literal `overdeck-` no longer appears as a hardcoded project prefix in docker.ts (teardownWorkspaceDockerByNamePromise's fallback candidate set at line 170 is discovery-based and MAY keep its `overdeck-` entry — that one is a fallback candidate, not a filter)."
+        },
+        "items": [
+          {
+            "id": "stop-docker-via-resolver.ac1",
+            "title": "Given a workspace declaring COMPOSE_PROJECT_NAME=\"myn-${FEATURE_FOLDER}\", stopWorkspaceDockerPromise runs `docker compose … down` with `-p myn-feature-<issue>` and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-docker-via-resolver.ac2",
+            "title": "Given a workspace with no declared name, teardown falls back to `-p overdeck-feature-<issue>` exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-crash-sweep-prefix-agnostic",
+        "title": "Deacon crashed-container sweep matches any compose-project prefix",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T03:20:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3049",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "tests/unit/lib/cloister/check-workspace-container-health.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/check-workspace-container-health.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "crash-sweep tests pass including a myn-feature- case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/deacon.ts checkWorkspaceContainerHealth: line 2317 drop the `--filter \"name=overdeck-feature-\"` from the docker ps (keep status=exited); line 2336 replace `/overdeck-feature-([\\w-]+?)-(frontend|server)-/` with `/feature-([\\w-]+?)-(frontend|server)-/` so any `<prefix>-feature-<issue>-<service>-N` matches. Guard stays: containers without a `feature-<issue>` token (overdeck-traefik, devcontainer-init-*) still skip. Keep the existing (frontend|server) service set, exit-code-0 skip, and backoff logic unchanged. Add/extend unit tests (find the existing test file for checkWorkspaceContainerHealth — create tests/unit/lib/cloister/check-workspace-container-health.test.ts if none): a crashed `myn-feature-min-901-server-1` (non-zero exit) is enumerated and counted exactly like an overdeck- one; `myn-feature-min-901-api-1` does NOT match (service set unchanged); overdeck-traefik does not match."
+        },
+        "items": [
+          {
+            "id": "deacon-crash-sweep-prefix-agnostic.ac1",
+            "title": "Given an exited non-zero `myn-feature-min-901-server-1` container, the sweep enumerates it for restart handling exactly as it does an overdeck-feature- container",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-crash-sweep-prefix-agnostic.ac2",
+            "title": "Given exited `myn-feature-min-901-api-1` and `overdeck-traefik` containers, the sweep skips both (service set and feature-token guard unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-crash-sweep-prefix-agnostic.ac3",
+            "title": "A grep for the literal `overdeck-feature-` over checkWorkspaceContainerHealth in deacon.ts produces no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "idle-reaper-ui-regex-prefix-agnostic",
+        "title": "idle-stack-reaper UI_CONTAINER_RE matches any project prefix",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T03:20:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3049",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/idle-stack-reaper.ts",
+            "tests/unit/lib/cloister/idle-stack-reaper.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/idle-stack-reaper.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "idle-stack-reaper tests pass including a non-overdeck prefix case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/idle-stack-reaper.ts:53 change UI_CONTAINER_RE from `/^overdeck-feature-([a-z0-9]+-\\d+)-(server|frontend)-1$/i` to `/^(?:[a-z0-9]+-)?feature-([a-z0-9]+-\\d+)-(server|frontend)-1$/i`, and update the stale comment above it. Extend tests/unit/lib/cloister/idle-stack-reaper.test.ts: a container named `myn-feature-min-901-server-1` is matched by the 10-minute UI tier; `myn-feature-min-901-dev-1` remains protected by DEV_CONTAINER_RE; unprefixed names without the feature token still don't match."
+        },
+        "items": [
+          {
+            "id": "idle-reaper-ui-regex-prefix-agnostic.ac1",
+            "title": "Given a `myn-feature-min-901-server-1` container, UI_CONTAINER_RE extracts issue min-901 for the UI idle tier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-reaper-ui-regex-prefix-agnostic.ac2",
+            "title": "Given a `myn-feature-min-901-dev-1` container, the full-stack reap excludes it via DEV_CONTAINER_RE and leaves it running",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closeout-warning-actual-networks",
+        "title": "Close-out Docker warning enumerates actual remaining networks regardless of prefix",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T03:20:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3049",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-manager/types.ts",
+            "src/lib/workspace-manager/docker.ts",
+            "src/lib/close-out.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/workspace-manager/docker.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "teardown result carries remainingNetworks"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `remainingNetworks?: string[]` to WorkspaceDockerTeardownResult in src/lib/workspace-manager/types.ts. Populate it in teardownWorkspaceDockerByNamePromise (src/lib/workspace-manager/docker.ts:290-300) with the `remaining` array it already computes. In src/lib/close-out.ts:377 replace the hardcoded message `Warning: Docker network overdeck-feature-${issueLower}_devnet is still present; …` with one that lists the actual remaining networks from the result (fall back to a generic 'one or more workspace devnets' phrasing when the array is absent), keeping the 'closed-issue reaper will retry' suffix."
+        },
+        "items": [
+          {
+            "id": "closeout-warning-actual-networks.ac1",
+            "title": "Given teardown leaves `myn-feature-min-901_devnet` present, the close-out warning message contains that exact network name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-warning-actual-networks.ac2",
+            "title": "Given teardown removes everything, close-out records the 'Docker stack removed' passed step exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-reap-prefix-agnostic",
+        "title": "pan workspace reap discovers candidate projects of any prefix",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T03:20:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3049",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/workspace-reap.ts",
+            "tests/unit/cli/workspace-reap.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/workspace-reap.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reap tests pass grouping myn-feature- containers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/workspace-reap.ts replace the WORKSPACE_PROJECT_PREFIX ('overdeck-feature-') constant and its filter logic with issue-token extraction equivalent to inferIssueIdFromStackContainerName (src/lib/workspace/stack-health.ts:164) applied to container names and/or the com.docker.compose.project label: any project whose name ends in `feature-<issue>` (with any or no prefix) is a reap candidate group. Keep every other candidacy rule (age, exit codes, active-agent protection) unchanged. Add/extend unit tests (tests/unit/cli/workspace-reap.test.ts — create if absent) for candidate grouping: myn-feature-min-864 containers group under issue MIN-864 exactly like overdeck-feature-pan-123 under PAN-123; containers with no feature token (overdeck-traefik) are ignored."
+        },
+        "items": [
+          {
+            "id": "workspace-reap-prefix-agnostic.ac1",
+            "title": "Given exited `myn-feature-min-864-*` containers, workspace-reap lists them as a reap candidate group for MIN-864",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-reap-prefix-agnostic.ac2",
+            "title": "Given a myn-feature group whose issue has a running agent, workspace-reap excludes it from candidates exactly as it excludes an overdeck-feature group with a running agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-duplicate-stack-check",
+        "title": "pan doctor reports duplicate live compose projects per issue with safe remediation guidance",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T03:20:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3049",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor.ts",
+            "tests/unit/cli/doctor-duplicate-stacks.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/doctor-duplicate-stacks.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "doctor duplicate-stack grouping tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a read-only check to src/cli/commands/doctor.ts: list running containers with their com.docker.compose.project labels (`docker ps --format '{{.Names}}\\t{{.Label \"com.docker.compose.project\"}}'`), group by issue via inferIssueIdFromStackContainerName, and flag any issue with ≥2 distinct running compose projects. For each flagged issue resolve the canonical project via tryComposeProjectNameForWorkspace + defaultWorkspacePath (stack-health.ts) and print: the canonical name, each foreign name, and guidance — when the canonical project is running: 'foreign stack <name> is a duplicate: docker compose -p <name> down'; when the foreign-named project is the ONLY one running: 'stack runs under non-canonical name <name> and may be serving a live agent — run `pan workspace rebuild <issue>` and only stop <name> after the canonical stack is healthy'. The check stops nothing itself. Structure the grouping/diagnosis as a pure exported function taking a container list so tests/unit/cli/doctor-duplicate-stacks.test.ts can exercise it without docker."
+        },
+        "items": [
+          {
+            "id": "doctor-duplicate-stack-check.ac1",
+            "title": "Given running containers under both myn-feature-min-901 and overdeck-feature-min-901, the check reports MIN-901 with myn- as canonical and overdeck- as foreign",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-duplicate-stack-check.ac2",
+            "title": "Given only overdeck-feature-min-891 running for a myn-declaring workspace, the check emits the 'only stack, rebuild first' guidance and no down command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-duplicate-stack-check.ac3",
+            "title": "Given one project per issue, the check passes silently (no warnings)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "overdeck-template-compose-name",
+        "title": "Overdeck devcontainer template declares `name: overdeck-{{FEATURE_FOLDER}}`",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-28T03:20:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3049",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "infra/.devcontainer-template/docker-compose.devcontainer.yml.template",
+            "tests/unit/lib/workspace/stack-health-compose-name.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspace/stack-health-compose-name.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "template render test asserts resolver returns overdeck-feature-<issue> from compose name",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `name: overdeck-{{FEATURE_FOLDER}}` as the first line of infra/.devcontainer-template/docker-compose.devcontainer.yml.template (mirroring the MYN template's `name: myn-{{FEATURE_FOLDER}}`). Extend the resolver test suite: render the template through ensureDevcontainerSync into a temp workspace (existing render tests show the pattern) and assert composeProjectNameForWorkspace returns `overdeck-feature-<issue>` from the compose file alone (dev script removed). Confirm the rendered YAML stays valid (docker compose config is NOT run in unit tests — structural assertion on the rendered text is enough)."
+        },
+        "items": [
+          {
+            "id": "overdeck-template-compose-name.ac1",
+            "title": "Given a freshly rendered Overdeck workspace with its dev script removed, composeProjectNameForWorkspace returns `overdeck-feature-<issue>` from the compose `name:` field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overdeck-template-compose-name.ac2",
+            "title": "Given the dev script present, the resolver still prefers the dev-script declaration and both sources agree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-container-naming",
+        "title": "Document the canonical compose-project-name contract in WORKSPACE-CONTAINERS.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T03:20:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3049",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/WORKSPACE-CONTAINERS.md",
+            "src/lib/workspace/stack-health.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "docs/WORKSPACE-CONTAINERS.md contains the naming-contract section",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/WORKSPACE-CONTAINERS.md with a 'Compose project naming' section stating: a workspace's compose project is its DECLARED name (dev-script COMPOSE_PROJECT_NAME or compose `name:` field); composeProjectNameForWorkspace in src/lib/workspace/stack-health.ts is the only resolver and all consumers must route through it; bring-up paths use the strict variant and fail loudly rather than guessing; container/network filters must be prefix-agnostic (feature-<issue> token), never anchored to overdeck-feature-; the pan doctor duplicate-stack check is the supported way to find and reconcile duplicate stacks, and code never stops a running foreign stack. Update the stack-health.ts module/function doc comments where the contract changed."
+        },
+        "items": [
+          {
+            "id": "docs-container-naming.ac1",
+            "title": "docs/WORKSPACE-CONTAINERS.md contains a section naming composeProjectNameForWorkspace as the single resolver and the strict-at-bring-up rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-container-naming.ac2",
+            "title": "The new section contains both the rule that container/network filters must be prefix-agnostic and the rule that code never stops a running foreign stack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "resolver-compose-name-strict",
+        "to": "rebuild-resolve-after-render",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver-compose-name-strict",
+        "to": "stop-docker-via-resolver",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver-compose-name-strict",
+        "to": "doctor-duplicate-stack-check",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver-compose-name-strict",
+        "to": "overdeck-template-compose-name",
+        "type": "blocks"
+      },
+      {
+        "from": "stop-docker-via-resolver",
+        "to": "closeout-warning-actual-networks",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver-compose-name-strict",
+        "to": "docs-container-naming",
+        "type": "blocks"
+      },
+      {
+        "from": "rebuild-resolve-after-render",
+        "to": "docs-container-naming",
+        "type": "informs"
+      },
+      {
+        "from": "doctor-duplicate-stack-check",
+        "to": "docs-container-naming",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-28-PAN-3049-duplicate-docker-stacks-per-workspace-single-compose-project-name-resolver-strict-at-bring-up-prefix-agnostic-consumers.xbrief.json"
+    }
+  },
+  "status": "proposed"
+}
