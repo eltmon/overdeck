@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T17:44:05.570Z",
+  "updated": "2026-07-28T17:52:12.077Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "gate-redrive": {
-        "writerId": "agent-pan-3228",
-        "agentId": "agent-pan-3228",
-        "pid": 1789571,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T17:44:05.569Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3228",
@@ -128,6 +120,17 @@
         "outcome": "completed",
         "reason": "Added typed pending-decision refusal to restartAgent/recoverAgent and force-aware 409/skip behavior across restart, recover, restart-fresh, restart-all, and config-restart routes.",
         "releasedAt": "2026-07-28T17:43:55.138Z"
+      },
+      {
+        "writerId": "agent-pan-3228",
+        "agentId": "agent-pan-3228",
+        "pid": 1789571,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:44:05.569Z",
+        "itemId": "gate-redrive",
+        "outcome": "completed",
+        "reason": "Made agent redrive admission async and pending-decision-aware, parked dead-end agents with durable needs-you guidance, covered deacon/swarm callers, and audited the required deacon size growth.",
+        "releasedAt": "2026-07-28T17:52:12.077Z"
       }
     ],
     "statusReasons": {
@@ -142,6 +145,10 @@
       "gate-restart": {
         "reason": "Added typed pending-decision refusal to restartAgent/recoverAgent and force-aware 409/skip behavior across restart, recover, restart-fresh, restart-all, and config-restart routes.",
         "updatedAt": "2026-07-28T17:43:55.138Z"
+      },
+      "gate-redrive": {
+        "reason": "Made agent redrive admission async and pending-decision-aware, parked dead-end agents with durable needs-you guidance, covered deacon/swarm callers, and audited the required deacon size growth.",
+        "updatedAt": "2026-07-28T17:52:12.077Z"
       }
     }
   },
@@ -160,6 +167,9 @@
     "gate-restart.gate-restart.ac2": "completed",
     "gate-restart.gate-restart.ac3": "completed",
     "gate-restart.gate-restart.ac4": "completed",
-    "gate-redrive": "running"
+    "gate-redrive": "completed",
+    "gate-redrive.gate-redrive.ac1": "completed",
+    "gate-redrive.gate-redrive.ac2": "completed",
+    "gate-redrive.gate-redrive.ac3": "completed"
   }
 }
