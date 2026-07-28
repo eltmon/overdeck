@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T22:43:28.960Z",
+  "updated": "2026-07-28T22:44:32.431Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
     }
   ],
   "tasks": {
-    "sequence": 31,
-    "claims": {
-      "wi14-e2e": {
-        "writerId": "agent-pan-1837",
-        "agentId": "agent-pan-1837",
-        "pid": 1244700,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T22:43:28.960Z"
-      }
-    },
+    "sequence": 32,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -259,6 +251,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-1837 dead)",
         "releasedAt": "2026-07-28T22:05:00.833Z"
+      },
+      {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 1244700,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T22:43:28.960Z",
+        "itemId": "wi14-e2e",
+        "outcome": "completed",
+        "reason": "Live e2e verification of a kimi-code work agent (PAN-3252 throwaway benchmark issue). Found and fixed 3 real defects surfaced only by the live spawn: (1) readinessKind kimi-session-signal had no consumer, so every kickoff timed out after 30s waiting for Claude Code's ready-signal file; (2) getProviderEnvForModel/getProviderExportsForModel never threaded harness through, so wi7a's Anthropic-compat-shim gate was dead code in production and the launcher leaked ANTHROPIC_*/KIMI_API_KEY/CLAUDE_CODE_SUBAGENT_MODEL vars into the native binary's env; (3) start.ts's CLI harness validator hand-maintained its own allowlist that rejected --harness kimi-code outright. After fixes: agent spawned in its own tmux session on the overdeck socket, harness stayed kimi-code throughout with no fallback, kickoff and a mid-session message (inspection verdict) both delivered correctly via the PTY supervisor, and resolveKimiWirePath/parseKimiSessionSync returned correct non-zero cost/token data against the live wire.jsonl. acp/registry/behavior/harness-policy suites green. Benchmark agent left running in background (throwaway, not merged).",
+        "releasedAt": "2026-07-28T22:44:32.431Z"
       }
     ],
     "statusReasons": {
@@ -319,8 +322,8 @@
         "updatedAt": "2026-07-28T20:52:46.642Z"
       },
       "wi14-e2e": {
-        "reason": "stale claim released (agent-pan-1837 dead)",
-        "updatedAt": "2026-07-28T22:05:00.833Z"
+        "reason": "Live e2e verification of a kimi-code work agent (PAN-3252 throwaway benchmark issue). Found and fixed 3 real defects surfaced only by the live spawn: (1) readinessKind kimi-session-signal had no consumer, so every kickoff timed out after 30s waiting for Claude Code's ready-signal file; (2) getProviderEnvForModel/getProviderExportsForModel never threaded harness through, so wi7a's Anthropic-compat-shim gate was dead code in production and the launcher leaked ANTHROPIC_*/KIMI_API_KEY/CLAUDE_CODE_SUBAGENT_MODEL vars into the native binary's env; (3) start.ts's CLI harness validator hand-maintained its own allowlist that rejected --harness kimi-code outright. After fixes: agent spawned in its own tmux session on the overdeck socket, harness stayed kimi-code throughout with no fallback, kickoff and a mid-session message (inspection verdict) both delivered correctly via the PTY supervisor, and resolveKimiWirePath/parseKimiSessionSync returned correct non-zero cost/token data against the live wire.jsonl. acp/registry/behavior/harness-policy suites green. Benchmark agent left running in background (throwaway, not merged).",
+        "updatedAt": "2026-07-28T22:44:32.431Z"
       }
     }
   },
@@ -387,6 +390,10 @@
     "wi12-docs.wi12-docs.ac1": "completed",
     "wi12-docs.wi12-docs.ac2": "completed",
     "wi12-docs.wi12-docs.ac3": "completed",
-    "wi14-e2e": "running"
+    "wi14-e2e": "completed",
+    "wi14-e2e.wi14-e2e.ac1": "completed",
+    "wi14-e2e.wi14-e2e.ac2": "completed",
+    "wi14-e2e.wi14-e2e.ac3": "completed",
+    "wi14-e2e.wi14-e2e.ac4": "completed"
   }
 }
