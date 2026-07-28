@@ -26,7 +26,7 @@
     "recordedAt": "2026-07-28T09:10:19.628Z"
   },
   "created": "2026-07-28T06:36:21.767Z",
-  "updated": "2026-07-28T09:33:42.883Z",
+  "updated": "2026-07-28T09:33:48.911Z",
   "pipeline": {
     "issueId": "PAN-3217",
     "reviewStatus": "pending",
@@ -35,12 +35,14 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T09:33:35.881Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3217-review",
+    "panDoneRecoveredAt": "2026-07-28T09:33:42.483Z",
+    "updatedAt": "2026-07-28T09:33:43.208Z",
+    "reviewNotes": "Verification infrastructure error: Verification worker 15189 exited before writing a result",
     "testNotes": "Backend-only fix (pipeline-membership-gather.ts reorder) + docs update; no UI/dashboard surface touched, xBRIEF verify_commands are vitest/typecheck/grep only, so no browser UAT required. Ran: npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts (42/42 passed); npm run typecheck (clean, dashboard/frontend shrink-only ratchets show no new errors); npm run lint (full eslint + all lint:* gates passed, exit 0); npm test full suite (1256 files / 11759 tests passed, 50 skipped, 0 failures on a clean untruncated rerun). An initial full-suite run showed 12 failures, all 'Hook timed out in 5000ms' on setupOverdeckTestDb() in unrelated files (conversations scan/search, cost-reconcile, merge-sync, observability RPC, harness-metadata) while 15 sibling-workspace agents were concurrently running vitest — none of those files touch pipeline-membership-gather.ts, and a clean rerun with no code changes passed all of them, confirming resource-contention flakiness rather than a regression from this change.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3225",
     "reviewedAtCommit": "91b789bc9d5a8b63280836fe47bd5dfa54ba6c3e",
     "lastVerifiedCommit": "91b789bc9d5a8b63280836fe47bd5dfa54ba6c3e",
+    "reviewRequestedAt": "2026-07-28T09:33:42.483Z",
     "reviewSpawnedAt": "2026-07-28T08:51:41.665Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -56,9 +58,7 @@
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ],
       "recordedAt": "2026-07-28T08:49:28.640Z"
-    },
-    "reviewRequestedAt": "2026-07-28T09:33:42.483Z",
-    "panDoneRecoveredAt": "2026-07-28T09:33:42.483Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -110,7 +110,7 @@
       },
       "costAtCloseOut": {
         "usd": 8.304088,
-        "pricingAsOf": "2026-07-28T09:33:35.908Z"
+        "pricingAsOf": "2026-07-28T09:33:48.908Z"
       }
     },
     "merges": [
