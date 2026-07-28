@@ -2353,7 +2353,7 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
       // Init containers are one-shot by design — they run setup, exit, and stay exited.
       // Restarting them is meaningless and floods agents with bogus "container crashed" alerts.
       // Match only the final Compose feature-<issue>-<service>-<index> suffix; an earlier feature segment may be a decoy.
-      const match = name.match(/feature-([a-z0-9]+-\d+)-(frontend|server)-\d+$/i);
+      const match = name.match(/feature-((?:[a-z]+-\d+)|(?:(?:f|us|de|ta|tc)\d+))-(frontend|server)-\d+$/i);
       if (!match) continue;
 
       // Skip clean shutdowns (exit code 0). Status format: "Exited (N) X minutes ago".

@@ -549,4 +549,35 @@ describe('checkWorkspaceContainerHealth', () => {
       expect.anything(),
     );
   });
+
+  it.each([
+    { issue: 'f29698', service: 'server' },
+    { issue: 'us12345', service: 'frontend' },
+  ])('(l) restarts a crashed Rally $issue $service container and alerts its agent', async ({ issue, service }) => {
+    writeState({ containerRestarts: {} });
+    const container = `rally-feature-${issue}-${service}-1`;
+
+    setupExec({
+      'docker ps -a': { stdout: `${container}|Exited (1) 2 minutes ago\n` },
+      'tmux has-session': { stdout: '' },
+      'docker restart': { stdout: '' },
+      'lsof': { stdout: '' },
+    });
+
+    const actions = await checkWorkspaceContainerHealth();
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain(`Auto-restarted crashed container ${container}`);
+    expect(readState().containerRestarts![container]).toBeDefined();
+    expect(mockExec).toHaveBeenCalledWith(
+      `docker restart ${container}`,
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(mockSendKeysAsync).toHaveBeenCalledWith(
+      `agent-${issue}`,
+      expect.anything(),
+      'deacon:container-restarted',
+    );
+  });
 });
