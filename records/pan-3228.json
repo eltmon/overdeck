@@ -27,6 +27,11 @@
       "reason": "feedback",
       "note": "[2026-07-28T19:32Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-28T19:32:02.435Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-28T19:36:34.930Z"
     }
   ],
   "feedback": [],
@@ -127,10 +132,10 @@
     "recordedAt": "2026-07-28T19:16:09.927Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T19:36:33.716Z",
+  "updated": "2026-07-28T19:36:35.479Z",
   "pipeline": {
     "issueId": "PAN-3228",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -138,11 +143,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:17:21.407Z",
-    "updatedAt": "2026-07-28T19:36:33.268Z",
+    "updatedAt": "2026-07-28T19:36:33.730Z",
     "reviewNotes": "Authentication is fixed, but graceful restart, historical-AUQ force discard, and swarm needs-you gaps remain",
     "inspectNotes": "All 3 ACs met. AC1: new src/lib/__tests__/session-pane-choice.test.ts covers 400 bad index, 400 missing signature, 409 menu-gone, 409 menu-changed, 409 delivery-unconfirmed, and 200 {ok,answeredLabel} with Down/Down/Enter keystrokes. AC2: tests/unit/lib/overdeck/conversation-pane-choice.test.ts is untouched by this commit (last touched by PAN-3113 commit 4d65ad1c) and its 12 cases pass through the delegating handler; 47/47 across the 4 pane-choice test files. AC3: captureSessionPaneChoice returns signature/title/options/recommended/selectedIndex and null on no-menu or capture throw. Delegation preserves defaults (conversation still passes tmuxSessionExists; core defaults to capturePaneText + Effect.runPromise(sessionExists)) and the validation ordering (400s before conv lookup).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3241",
-    "reviewSpawnedAt": "2026-07-28T19:30:21.209Z",
+    "reviewSpawnedAt": "2026-07-28T19:36:33.729Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/FLYWHEEL-STATE.md",
@@ -284,7 +289,7 @@
       },
       "costAtCloseOut": {
         "usd": 126.970244,
-        "pricingAsOf": "2026-07-28T19:36:33.317Z"
+        "pricingAsOf": "2026-07-28T19:36:35.475Z"
       }
     },
     "merges": [
