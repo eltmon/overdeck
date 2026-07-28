@@ -147,10 +147,10 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T10:46:43.224Z",
+  "updated": "2026-07-28T10:50:13.573Z",
   "pipeline": {
     "issueId": "PAN-3092",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -158,8 +158,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T10:46:42.142Z",
-    "reviewNotes": "Verification infrastructure error: Verification worker 1090123 exited before writing a result",
+    "updatedAt": "2026-07-28T10:50:13.536Z",
+    "reviewNotes": "The idempotent activity API is bypassed by the production Deacon HTTP client, which cannot query duplicates and reports local enqueue as durable; restart repeats and failed writes are suppressed.",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
     "reviewedAtCommit": "1bec60c96e1fccf50d3343a2f79799958e70c164",
@@ -235,9 +235,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 7158614,
-            "output": 283790,
-            "cacheRead": 47119360,
+            "input": 7475320,
+            "output": 291953,
+            "cacheRead": 51737088,
             "cacheWrite": 0
           }
         }
@@ -250,15 +250,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 7158614,
-          "output": 283790,
-          "cacheRead": 47119360,
+          "input": 7475320,
+          "output": 291953,
+          "cacheRead": 51737088,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 67.8845693,
-        "pricingAsOf": "2026-07-28T10:46:42.161Z"
+        "usd": 72.0218533,
+        "pricingAsOf": "2026-07-28T10:50:13.556Z"
       }
     },
     "merges": [
@@ -267,7 +267,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3092",
