@@ -29,9 +29,14 @@ const mockGetAgentState = vi.fn().mockReturnValue(null);
 const mockIsIssueClosed = vi.fn();
 const mockMessageAgent = vi.fn();
 const mockSpawnRun = vi.fn();
+const mockRecordRecoveryFailure = vi.fn();
 
 vi.mock('../../../src/lib/cloister/issue-closed.js', () => ({
   isIssueClosed: (...args: unknown[]) => mockIsIssueClosed(...args),
+}));
+
+vi.mock('../../../src/lib/cloister/recovery-trip.js', () => ({
+  recordRecoveryFailure: (...args: unknown[]) => mockRecordRecoveryFailure(...args),
 }));
 
 vi.mock('../../../src/lib/review-status.js', () => ({
@@ -136,6 +141,10 @@ describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () 
     mockMessageAgent.mockReset().mockResolvedValue(undefined);
     mockSpawnRun.mockReset().mockResolvedValue({ id: 'agent-pan-1455-test' });
     mockLoadReviewStatuses.mockReset().mockImplementation(() => currentStatuses);
+    mockRecordRecoveryFailure.mockReset().mockResolvedValue({
+      trip: { issue: '', recoveryPath: '', obligationGeneration: '', tripCount: 1, open: true },
+      emitNeedsYou: true,
+    });
   });
 
   afterEach(() => {
@@ -205,6 +214,57 @@ describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () 
 
     expect(mockMessageAgent).toHaveBeenCalledTimes(1);
     // Critical safety rule (D6): no passed/failed mutation without an artifact.
+    const testStatusMutations = mockSetReviewStatus.mock.calls.filter(
+      ([, update]) => update && (update.testStatus === 'passed' || update.testStatus === 'failed'),
+    );
+    expect(testStatusMutations).toHaveLength(0);
+  });
+
+  it('PAN-3092: alive + idle + NO artifact + already nudged → escalates to needs-you, still no verdict', async () => {
+    // MIN-858: the second pass used to return `none` forever, so a live agent
+    // holding a pane-only verdict stayed invisible for six hours.
+    const projectPath = makeWorkspace('pan-3092'); // no artifact seeded
+    tmpRoots.push(projectPath);
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath });
+    mockSessionExists.mockReturnValue(true);
+    mockIsPaneDead.mockResolvedValue(false);
+    mockGetAgentRuntimeState.mockReturnValue({ state: 'idle', lastActivity: new Date().toISOString() });
+    writeStatusFile({
+      'PAN-3092': {
+        issueId: 'PAN-3092',
+        reviewStatus: 'passed',
+        testStatus: 'testing',
+        history: [{ type: 'test', status: 'testing', timestamp: '2026-07-26T18:00:00.000Z' }],
+      },
+    });
+
+    // First pass nudges (no escalation yet).
+    const firstPass = await checkCompletedButUnsignaledTests();
+    expect(mockMessageAgent).toHaveBeenCalledTimes(1);
+    expect(mockRecordRecoveryFailure).not.toHaveBeenCalled();
+    expect(firstPass.join('\n')).not.toContain('needs-you');
+
+    // Second pass: already nudged, still no artifact → escalate.
+    const secondPass = await checkCompletedButUnsignaledTests();
+
+    expect(mockRecordRecoveryFailure).toHaveBeenCalledTimes(1);
+    const [wsPath, issueId, recoveryPath, generation, threshold] =
+      mockRecordRecoveryFailure.mock.calls[0] as [string, string, string, string, number];
+    expect(wsPath).toContain('feature-pan-3092');
+    expect(issueId).toBe('PAN-3092');
+    expect(recoveryPath).toBe('unsignaled-test-verdict');
+    // Deduped per test dispatch generation, one trip.
+    expect(generation).toBe('2026-07-26T18:00:00.000Z');
+    expect(threshold).toBe(1);
+
+    const escalation = secondPass.find((a) => a.includes('needs-you'));
+    expect(escalation).toBeDefined();
+    expect(escalation).toContain('PAN-3092');
+    expect(escalation).toContain('pan admin specialists done test PAN-3092');
+    expect(escalation).toContain('pan kill PAN-3092');
+
+    // No second nudge, and D6 still holds — no fabricated verdict, ever.
+    expect(mockMessageAgent).toHaveBeenCalledTimes(1);
     const testStatusMutations = mockSetReviewStatus.mock.calls.filter(
       ([, update]) => update && (update.testStatus === 'passed' || update.testStatus === 'failed'),
     );

@@ -198,7 +198,7 @@ import { reapLeftoverPlaywrightBrowsers } from './playwright-mcp-reaper.js';
 import { reapMergedStrikeWorkspaces } from './strike-workspace-reaper.js';
 import { cleanupOrphanedInspectSessions } from './inspect-session-reaper.js';
 import { isIssueClosed } from './issue-closed.js';
-import { decideUnsignaledTestAction, readTestVerdictArtifact } from './test-verdict.js';
+import { decideUnsignaledTestAction, readTestVerdictArtifact, recordUnsignaledTestEscalation } from './test-verdict.js';
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
 
 // ============================================================================
@@ -1470,6 +1470,17 @@ export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
           } catch (err: any) {
             console.error(`[deacon] Failed to nudge ${testSession}:`, err.message);
           }
+          break;
+        }
+        case 'escalate': {
+          // PAN-3092 (MIN-858): alive, idle, already nudged, no artifact — the
+          // verdict exists only in the pane, if at all, and nothing automatic can
+          // reach it. Tell a human once per dispatch generation rather than going
+          // quiet for six hours while every surface reports the agent healthy.
+          const msg = await recordUnsignaledTestEscalation(
+            wsPath, issueId, testSession, lastDispatchAt ?? 'unknown',
+          );
+          if (msg) { actions.push(msg); console.warn(`[deacon] ${msg}`); }
           break;
         }
         case 'wait':

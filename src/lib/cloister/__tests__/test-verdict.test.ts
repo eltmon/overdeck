@@ -140,9 +140,11 @@ describe('test-verdict artifact (PAN-1681)', () => {
         .toEqual({ action: 'nudge-write' });
     });
 
-    it('alive + idle + no artifact + already nudged → none (never guesses)', () => {
+    it('alive + idle + no artifact + already nudged → escalate (PAN-3092, never guesses)', () => {
+      // MIN-858 sat here for six hours: a live agent holding a finished verdict
+      // in its pane only, with `none` making the deacon go quiet forever.
       expect(decideUnsignaledTestAction({ sessionLive: true, idle: true, alreadyNudged: true, artifact: null }))
-        .toEqual({ action: 'none' });
+        .toEqual({ action: 'escalate' });
     });
   });
 });
