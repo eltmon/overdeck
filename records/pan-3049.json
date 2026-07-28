@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T07:46:12.154Z",
+  "updated": "2026-07-28T07:46:15.167Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -272,5 +272,64 @@
     "docs-container-naming": "completed",
     "docs-container-naming.docs-container-naming.ac1": "completed",
     "docs-container-naming.docs-container-naming.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/__tests__/workspace-reap.test.ts",
+      "src/cli/commands/doctor-duplicate-stacks.ts",
+      "src/lib/__tests__/close-out.test.ts",
+      "src/lib/workspace-manager/__tests__/docker.test.ts",
+      "tests/lib/cloister/pan-464-container-health.test.ts",
+      "tests/lib/workspace-manager.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "tests/unit/cli/workspace-reap.test.ts",
+      "tests/unit/lib/cloister/check-workspace-container-health.test.ts"
+    ],
+    "declaredScope": [
+      "docs/WORKSPACE-CONTAINERS.md",
+      "infra/.devcontainer-template/docker-compose.devcontainer.yml.template",
+      "src/cli/commands/doctor.ts",
+      "src/cli/commands/workspace-reap.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/idle-stack-reaper.ts",
+      "src/lib/close-out.ts",
+      "src/lib/workspace-manager/docker.ts",
+      "src/lib/workspace-manager/types.ts",
+      "src/lib/workspace/rebuild-stack.ts",
+      "src/lib/workspace/stack-health.ts",
+      "tests/unit/cli/doctor-duplicate-stacks.test.ts",
+      "tests/unit/cli/workspace-reap.test.ts",
+      "tests/unit/lib/cloister/check-workspace-container-health.test.ts",
+      "tests/unit/lib/cloister/idle-stack-reaper.test.ts",
+      "tests/unit/lib/workspace-manager/docker.test.ts",
+      "tests/unit/lib/workspace/rebuild-stack.test.ts",
+      "tests/unit/lib/workspace/stack-health-compose-name.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/WORKSPACE-CONTAINERS.md",
+      "infra/.devcontainer-template/docker-compose.devcontainer.yml.template",
+      "src/cli/commands/__tests__/workspace-reap.test.ts",
+      "src/cli/commands/doctor-duplicate-stacks.ts",
+      "src/cli/commands/doctor.ts",
+      "src/cli/commands/workspace-reap.ts",
+      "src/lib/__tests__/close-out.test.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/idle-stack-reaper.ts",
+      "src/lib/close-out.ts",
+      "src/lib/workspace-manager/__tests__/docker.test.ts",
+      "src/lib/workspace-manager/docker.ts",
+      "src/lib/workspace-manager/types.ts",
+      "src/lib/workspace/rebuild-stack.ts",
+      "src/lib/workspace/stack-health.ts",
+      "tests/lib/cloister/pan-464-container-health.test.ts",
+      "tests/lib/workspace-manager.test.ts",
+      "tests/unit/cli/doctor-duplicate-stacks.test.ts",
+      "tests/unit/lib/cloister/idle-stack-reaper.test.ts",
+      "tests/unit/lib/workspace-manager/docker.test.ts",
+      "tests/unit/lib/workspace/rebuild-stack.test.ts",
+      "tests/unit/lib/workspace/stack-health-compose-name.test.ts"
+    ],
+    "recordedAt": "2026-07-28T07:46:15.165Z"
   }
 }
