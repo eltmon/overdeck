@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T19:42:53.328Z",
+  "updated": "2026-07-28T19:43:27.375Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "wi7a-provider-env-gate": {
-        "writerId": "agent-pan-1837",
-        "agentId": "agent-pan-1837",
-        "pid": 1860383,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T19:42:53.328Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -166,6 +158,17 @@
         "outcome": "completed",
         "reason": "Implemented src/lib/runtimes/kimi-code.ts (full AgentRuntimeSync contract) modeled on acp.ts and codex.ts: workDirKey derivation verified against installed kimi 0.29.2 and real sessions; spawnAgent uses wi6's launcher plus tmuxCreateSession and polls for a newly-appeared session dir; sendMessage delegates to the existing generic deliverAgentMessage cascade; killAgent mirrors ACPs escalation ladder; getTokenUsage/getSessionCost stub null until wi8b lands (matches ACPs own stub). Registered in runtimes/index.ts. 39/39 tests pass across the three verify_commands files, acp suite unchanged and green (NFR-1). Deviation: spawn.ts per-harness launcher-fields switch has no kimi-code branch yet -- no xBRIEF item claims that wiring; deferred to be wired alongside wi14 end-to-end verification instead of done speculatively now.",
         "releasedAt": "2026-07-28T19:31:27.917Z"
+      },
+      {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 1860383,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T19:42:53.328Z",
+        "itemId": "wi7a-provider-env-gate",
+        "outcome": "completed",
+        "reason": "Added an optional harness param to getProviderEnvSync, skipping ANTHROPIC_BASE_URL/ANTHROPIC_AUTH_TOKEN/KIMI_API_KEY for {kimi, kimi-code} while preserving byte-identical output for every existing caller (harness omitted, or any other harness). Belt-and-suspenders with wi6's unsetProviderEnv:true. 76/76 tests pass across the two verify_commands files. Deviation: getProviderEnvForModel/spawn.ts do not yet thread harness through to this function, so the real pan start path doesn't benefit yet -- deferred alongside the kimi-code spawn.ts wiring noted on wi5, both to land before wi14 end-to-end verification.",
+        "releasedAt": "2026-07-28T19:43:27.375Z"
       }
     ],
     "statusReasons": {
@@ -196,6 +199,10 @@
       "wi5-runtime-adapter": {
         "reason": "Implemented src/lib/runtimes/kimi-code.ts (full AgentRuntimeSync contract) modeled on acp.ts and codex.ts: workDirKey derivation verified against installed kimi 0.29.2 and real sessions; spawnAgent uses wi6's launcher plus tmuxCreateSession and polls for a newly-appeared session dir; sendMessage delegates to the existing generic deliverAgentMessage cascade; killAgent mirrors ACPs escalation ladder; getTokenUsage/getSessionCost stub null until wi8b lands (matches ACPs own stub). Registered in runtimes/index.ts. 39/39 tests pass across the three verify_commands files, acp suite unchanged and green (NFR-1). Deviation: spawn.ts per-harness launcher-fields switch has no kimi-code branch yet -- no xBRIEF item claims that wiring; deferred to be wired alongside wi14 end-to-end verification instead of done speculatively now.",
         "updatedAt": "2026-07-28T19:31:27.917Z"
+      },
+      "wi7a-provider-env-gate": {
+        "reason": "Added an optional harness param to getProviderEnvSync, skipping ANTHROPIC_BASE_URL/ANTHROPIC_AUTH_TOKEN/KIMI_API_KEY for {kimi, kimi-code} while preserving byte-identical output for every existing caller (harness omitted, or any other harness). Belt-and-suspenders with wi6's unsetProviderEnv:true. 76/76 tests pass across the two verify_commands files. Deviation: getProviderEnvForModel/spawn.ts do not yet thread harness through to this function, so the real pan start path doesn't benefit yet -- deferred alongside the kimi-code spawn.ts wiring noted on wi5, both to land before wi14 end-to-end verification.",
+        "updatedAt": "2026-07-28T19:43:27.375Z"
       }
     }
   },
@@ -233,6 +240,9 @@
     "wi5-runtime-adapter.wi5-runtime-adapter.ac3": "completed",
     "wi5-runtime-adapter.wi5-runtime-adapter.ac4": "completed",
     "wi5-runtime-adapter.wi5-runtime-adapter.ac5": "completed",
-    "wi7a-provider-env-gate": "running"
+    "wi7a-provider-env-gate": "completed",
+    "wi7a-provider-env-gate.wi7a-provider-env-gate.ac1": "completed",
+    "wi7a-provider-env-gate.wi7a-provider-env-gate.ac2": "completed",
+    "wi7a-provider-env-gate.wi7a-provider-env-gate.ac3": "completed"
   }
 }
