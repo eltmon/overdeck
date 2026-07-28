@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T19:43:33.837Z",
+  "updated": "2026-07-28T19:43:40.776Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,8 +79,16 @@
     }
   ],
   "tasks": {
-    "sequence": 16,
-    "claims": {},
+    "sequence": 17,
+    "claims": {
+      "wi8a-wire-resolver": {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 1889877,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T19:43:40.776Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -243,6 +251,7 @@
     "wi7a-provider-env-gate": "completed",
     "wi7a-provider-env-gate.wi7a-provider-env-gate.ac1": "completed",
     "wi7a-provider-env-gate.wi7a-provider-env-gate.ac2": "completed",
-    "wi7a-provider-env-gate.wi7a-provider-env-gate.ac3": "completed"
+    "wi7a-provider-env-gate.wi7a-provider-env-gate.ac3": "completed",
+    "wi8a-wire-resolver": "running"
   }
 }
