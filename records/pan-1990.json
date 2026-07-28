@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T21:25:13.867Z",
+  "updated": "2026-07-28T22:05:02.778Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -88,16 +88,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "doors-guard": {
-        "writerId": "agent-pan-1990",
-        "agentId": "agent-pan-1990",
-        "pid": 841241,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T21:05:09.000Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -118,8 +110,25 @@
         "itemId": "workspace-doors",
         "outcome": "completed",
         "releasedAt": "2026-07-28T21:04:53.599Z"
+      },
+      {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 841241,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T21:05:09.000Z",
+        "itemId": "doors-guard",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-1990 dead)",
+        "releasedAt": "2026-07-28T22:05:00.833Z"
       }
-    ]
+    ],
+    "statusReasons": {
+      "doors-guard": {
+        "reason": "stale claim released (agent-pan-1990 dead)",
+        "updatedAt": "2026-07-28T22:05:00.833Z"
+      }
+    }
   },
   "statusOverrides": {
     "schema-v64": "completed",
@@ -133,6 +142,6 @@
     "workspace-doors.workspace-doors.ac3": "completed",
     "workspace-doors.workspace-doors.ac4": "completed",
     "workspace-doors.workspace-doors.ac5": "completed",
-    "doors-guard": "running"
+    "doors-guard": "pending"
   }
 }
