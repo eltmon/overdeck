@@ -2,7 +2,7 @@
   "issueId": "PAN-3230",
   "schemaVersion": 2,
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T17:07:50.465Z",
+  "updated": "2026-07-28T17:07:52.813Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3230: orphan-proposed-reconciler reads legacy <project>/.pan/specs — blind to migrated projects since PAN-2541 (79 proposed specs invisible in the state worktree)",
       "timestamp": "2026-07-28T17:07:50.464Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
