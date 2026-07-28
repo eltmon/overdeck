@@ -4,17 +4,17 @@
     "created": "2026-05-12T03:15:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-608: Integrate Destructive Command Guard (dcg) with configurable settings",
-    "updated": "2026-05-12T03:07:12.521Z"
+    "updated": "2026-07-17T10:56:52.498Z"
   },
   "plan": {
     "id": "pan-608",
     "title": "Integrate Destructive Command Guard (dcg) with configurable settings",
-    "status": "proposed",
+    "status": "cancelled",
     "uid": "84b7ce0a-7d94-4991-bdac-2a7578c4dc22",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-12T03:15:00.000Z",
-    "updated": "2026-05-12T03:07:12.521Z",
+    "updated": "2026-07-17T10:56:52.498Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/608",
@@ -710,5 +710,5 @@
       "canonicalFilename": "2026-05-12-PAN-608-integrate-destructive-command-guard-dcg-with-configurable-settings.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "cancelled"
 }

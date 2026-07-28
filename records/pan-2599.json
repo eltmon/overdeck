@@ -1,0 +1,684 @@
+{
+  "issueId": "PAN-2599",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-22T20:54:17.407Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-22T23:15:04.564Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-22T23:15:28.161Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-22T23:16:52.922Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-22T23:28Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-22T23:28:51.723Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-22T23:28:51.826Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-22T23:28:52.953Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-22T23:43:32.813Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-22T23:51Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-22T23:51:10.226Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-23T00:23:33.348Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-23T00:29:23.475Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-23T00:32Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-23T00:32:08.606Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-23T01:49:32.531Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-23T01:55:13.620Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-23T02:03Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-23T02:03:38.486Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-23T02:20:31.544Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-23T02:27:09.206Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-23T02:31Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-23T02:31:02.980Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-23T02:42:31.928Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-23T02:48:25.200Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-24T17:30:54.570Z"
+    }
+  ],
+  "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".github/workflows/release.yml",
+      "scripts/file-size-baseline.txt",
+      "src/cli/telemetry.ts",
+      "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TelemetrySection.test.tsx",
+      "src/dashboard/frontend/src/components/Settings/settingsPageConstants.ts",
+      "src/dashboard/frontend/src/components/Settings/types.ts",
+      "src/dashboard/frontend/src/recovery.test.ts",
+      "src/dashboard/frontend/src/recovery.tsx",
+      "src/dashboard/server/telemetry.ts",
+      "src/lib/config-yaml/merge.ts",
+      "src/lib/lifecycle/workflows.ts",
+      "src/lib/telemetry/pipeline.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/cli/commands/close.ts",
+      "src/dashboard/frontend/src/components/Settings/SettingsPage.types.ts",
+      "src/dashboard/server/routes/settings.ts"
+    ],
+    "declaredScope": [
+      "CLAUDE.md",
+      "bun.lock",
+      "configuration/telemetry.mdx",
+      "docs.json",
+      "docs/TELEMETRY.md",
+      "package.json",
+      "packages/contracts/src/index.ts",
+      "packages/contracts/src/telemetry.ts",
+      "reference/posthog-agents.mdx",
+      "src/cli/commands/close.ts",
+      "src/cli/commands/release.ts",
+      "src/cli/index.ts",
+      "src/dashboard/frontend/src/App.tsx",
+      "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+      "src/dashboard/frontend/src/components/AutoMergeToggle.tsx",
+      "src/dashboard/frontend/src/components/AwaitingMergePage.tsx",
+      "src/dashboard/frontend/src/components/BulkActionBar.tsx",
+      "src/dashboard/frontend/src/components/CloseOutIssueButton.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/IssueComposer.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/NewProjectModal.tsx",
+      "src/dashboard/frontend/src/components/PlanApprovalDialog.tsx",
+      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+      "src/dashboard/frontend/src/components/Settings/SettingsPage.types.ts",
+      "src/dashboard/frontend/src/components/Settings/sections/TelemetrySection.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/telemetry.test.ts",
+      "src/dashboard/frontend/src/lib/telemetry.ts",
+      "src/dashboard/frontend/src/main.tsx",
+      "src/dashboard/frontend/vite.config.ts",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/routes/settings.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/cloister/verification-runner.ts",
+      "src/lib/config-yaml/defaults.ts",
+      "src/lib/config-yaml/schema.ts",
+      "src/lib/settings-api.ts",
+      "src/lib/telemetry/config.ts",
+      "src/lib/telemetry/install-id.ts",
+      "src/lib/telemetry/service.ts",
+      "tests/unit/cli/release-sourcemaps.test.ts",
+      "tests/unit/cli/telemetry-exit.test.ts",
+      "tests/unit/contracts/telemetry-schema.test.ts",
+      "tests/unit/dashboard/server-boot-telemetry.test.ts",
+      "tests/unit/dashboard/settings-telemetry.test.ts",
+      "tests/unit/lib/telemetry/config.test.ts",
+      "tests/unit/lib/telemetry/flag-door.test.ts",
+      "tests/unit/lib/telemetry/install-id.test.ts",
+      "tests/unit/lib/telemetry/pipeline-events.test.ts",
+      "tests/unit/lib/telemetry/service.test.ts",
+      "tests/unit/telemetry-docs.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".github/workflows/release.yml",
+      "CLAUDE.md",
+      "bun.lock",
+      "configuration/telemetry.mdx",
+      "docs.json",
+      "docs/TELEMETRY.md",
+      "package.json",
+      "packages/contracts/src/index.ts",
+      "packages/contracts/src/telemetry.ts",
+      "reference/posthog-agents.mdx",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/release.ts",
+      "src/cli/index.ts",
+      "src/cli/telemetry.ts",
+      "src/dashboard/frontend/src/App.tsx",
+      "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+      "src/dashboard/frontend/src/components/AutoMergeToggle.tsx",
+      "src/dashboard/frontend/src/components/AwaitingMergePage.tsx",
+      "src/dashboard/frontend/src/components/BulkActionBar.tsx",
+      "src/dashboard/frontend/src/components/CloseOutIssueButton.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/IssueComposer.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/NewProjectModal.tsx",
+      "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
+      "src/dashboard/frontend/src/components/PlanApprovalDialog.tsx",
+      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/TelemetrySection.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TelemetrySection.test.tsx",
+      "src/dashboard/frontend/src/components/Settings/settingsPageConstants.ts",
+      "src/dashboard/frontend/src/components/Settings/types.ts",
+      "src/dashboard/frontend/src/lib/__tests__/telemetry.test.ts",
+      "src/dashboard/frontend/src/lib/telemetry.ts",
+      "src/dashboard/frontend/src/main.tsx",
+      "src/dashboard/frontend/src/recovery.test.ts",
+      "src/dashboard/frontend/src/recovery.tsx",
+      "src/dashboard/frontend/vite.config.ts",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/telemetry.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/cloister/verification-runner.ts",
+      "src/lib/config-yaml/defaults.ts",
+      "src/lib/config-yaml/merge.ts",
+      "src/lib/config-yaml/schema.ts",
+      "src/lib/lifecycle/workflows.ts",
+      "src/lib/settings-api.ts",
+      "src/lib/telemetry/config.ts",
+      "src/lib/telemetry/install-id.ts",
+      "src/lib/telemetry/pipeline.ts",
+      "src/lib/telemetry/service.ts",
+      "tests/unit/cli/release-sourcemaps.test.ts",
+      "tests/unit/cli/telemetry-exit.test.ts",
+      "tests/unit/contracts/telemetry-schema.test.ts",
+      "tests/unit/dashboard/server-boot-telemetry.test.ts",
+      "tests/unit/dashboard/settings-telemetry.test.ts",
+      "tests/unit/lib/telemetry/config.test.ts",
+      "tests/unit/lib/telemetry/flag-door.test.ts",
+      "tests/unit/lib/telemetry/install-id.test.ts",
+      "tests/unit/lib/telemetry/pipeline-events.test.ts",
+      "tests/unit/lib/telemetry/service.test.ts",
+      "tests/unit/telemetry-docs.test.ts"
+    ],
+    "recordedAt": "2026-07-22T23:16:44.964Z"
+  },
+  "created": "2026-07-16T05:02:53.170Z",
+  "updated": "2026-07-24T20:58:06.273Z",
+  "pipeline": {
+    "issueId": "PAN-2599",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "inspectStatus": "passed",
+    "mergeStatus": "merged",
+    "releaseStatus": "skipped",
+    "readyForMerge": false,
+    "panDoneRecoveredAt": "2026-07-22T23:25:31.079Z",
+    "updatedAt": "2026-07-24T20:58:06.258Z",
+    "reviewNotes": "Latest main merge preserves the approved telemetry implementation; full tests, typecheck, and lint pass",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3009",
+    "reviewedAtCommit": "65b2da8a178b584385c0c017401631d40fb3848a",
+    "lastVerifiedCommit": "a6cbfe80c61f82563ad48becc893d6630959c2e0",
+    "reviewSpawnedAt": "2026-07-24T17:30:53.092Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-24T20:58:06.258Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 971595,
+            "output": 2406,
+            "cacheRead": 910208,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 9348849,
+            "output": 10492,
+            "cacheRead": 9026048,
+            "cacheWrite": 0
+          }
+        },
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 6,
+            "output": 10456,
+            "cacheRead": 649747,
+            "cacheWrite": 214045
+          }
+        },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 11379578,
+            "output": 606675,
+            "cacheRead": 178201088,
+            "cacheWrite": 0
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 16,
+            "output": 4241,
+            "cacheRead": 796237,
+            "cacheWrite": 259421
+          }
+        },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 1822,
+            "output": 20304,
+            "cacheRead": 8784331,
+            "cacheWrite": 202010
+          }
+        },
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 12739363,
+            "output": 941932,
+            "cacheRead": 573855232,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 971595,
+          "output": 2406,
+          "cacheRead": 910208,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 33467790,
+          "output": 1559099,
+          "cacheRead": 761082368,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 6,
+          "output": 10456,
+          "cacheRead": 649747,
+          "cacheWrite": 214045
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 1838,
+          "output": 24545,
+          "cacheRead": 9580568,
+          "cacheWrite": 461431
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 556.689855,
+        "pricingAsOf": "2026-07-24T20:07:06.876Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3009"
+    ],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-24T20:58:06.270Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at a6cbfe80c61f82563ad48becc893d6630959c2e0",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #3009 MERGED at 2026-07-24T19:05:58Z",
+          "status": "pass",
+          "mergedAt": "2026-07-24T19:05:58Z",
+          "mergeCommit": "9195cc90d2a2bef14c17fde1e8c627adb7747e57"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "1 check-runs concluded successfully on 9195cc90d2a2bef14c17fde1e8c627adb7747e57",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 72061353 contains merge 9195cc90",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed git worktree; Removed 4 agent state directories; Preserved local branch strike/pan-2599 — not merged to main; Pruned 781 checkpoint ref(s) for agent-pan-2599, planning-pan-2599, strike-pan-2599; No specialist registry entries for PAN-2599"
+        }
+      ],
+      "accepted": []
+    }
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.6-sol",
+  "workModel": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 26,
+    "claims": {},
+    "claimHistory": [
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 878531,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T20:55:24.082Z",
+        "itemId": "telemetry-config",
+        "outcome": "completed",
+        "reason": "Added telemetry.enabled YAML schema and default, normalized merge support, environment opt-out resolver, and unit coverage.",
+        "releasedAt": "2026-07-22T21:00:17.613Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 1038943,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T21:00:32.234Z",
+        "itemId": "install-id",
+        "outcome": "completed",
+        "reason": "Added atomic UUIDv4 install identity persistence under OVERDECK_HOME with mode 0600 and stable-read tests.",
+        "releasedAt": "2026-07-22T21:02:30.859Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 1128699,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T21:02:50.352Z",
+        "itemId": "contracts-schema",
+        "outcome": "completed",
+        "reason": "Added the 15-event telemetry contract, privacy-restricted per-event property types, contract barrel export, and schema drift tests.",
+        "releasedAt": "2026-07-22T21:07:42.869Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 1538950,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T21:14:13.307Z",
+        "itemId": "settings-api",
+        "outcome": "completed",
+        "reason": "Settings GET now reports effective telemetry enablement plus install ID, and generic PUT persistence validates and writes telemetry.enabled while ignoring installId writes.",
+        "releasedAt": "2026-07-22T21:21:25.876Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 1724211,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T21:21:46.151Z",
+        "itemId": "frontend-wrapper",
+        "outcome": "completed",
+        "reason": "Added settings-gated PostHog initialization, typed capture wrappers, anonymous install ID registration, and migrated all event, exception, and recovery telemetry call sites.",
+        "releasedAt": "2026-07-22T21:37:36.376Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 2241897,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T21:37:55.576Z",
+        "itemId": "settings-ui",
+        "outcome": "completed",
+        "reason": "Added a navigable Telemetry settings section with autosaved opt-out switch, truncated install ID, sent/never-sent privacy copy, disabled-state dimming, and config equivalents; verified via tests and an isolated Playwright screenshot.",
+        "releasedAt": "2026-07-22T21:59:16.275Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 2921633,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T21:59:37.035Z",
+        "itemId": "analytics-service",
+        "outcome": "completed",
+        "reason": "Added the lazy posthog-node write door with typed anonymous capture, runtime opt-out guards, server exception autocapture, bounded shutdown, and fake-timer tests; pushed commit 9319a3b5a1.",
+        "releasedAt": "2026-07-22T22:10:57.605Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 3153393,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:15:41.376Z",
+        "itemId": "cli-events",
+        "outcome": "completed",
+        "reason": "Captured typed CLI completion telemetry with allowlisted verbs and bucketed duration, routed every explicit index exit through bounded shutdown, added fake-timer exit-order tests, and pushed e75abdbb83.",
+        "releasedAt": "2026-07-22T22:24:01.203Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 3335369,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:24:15.247Z",
+        "itemId": "server-boot-event",
+        "outcome": "completed",
+        "reason": "Added non-blocking server_boot capture with bucketed project and live-agent counts, isolated failures from boot, passed tests/typecheck/build, runtime-boot-tested a throwaway Node 22 server on port 4321, and pushed b327c3fb32.",
+        "releasedAt": "2026-07-22T22:29:13.112Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 3411974,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:29:26.350Z",
+        "itemId": "pipeline-events",
+        "outcome": "completed",
+        "reason": "Emitted enum-only pipeline_stage_changed events from the idempotent post-merge lifecycle, verification pass owner, and shared close-out workflow; resolved harness/model family without identifiers, passed focused and workflow tests, and pushed 4f51c60621.",
+        "releasedAt": "2026-07-22T22:36:54.942Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 3526848,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:37:08.987Z",
+        "itemId": "sourcemaps-release",
+        "outcome": "completed",
+        "reason": "Enabled hidden Vite sourcemaps, pinned PostHog CLI, added tested skip-with-warning upload command, moved inject/upload into the release workflow after its shipping build, verified 459 maps with zero sourceMappingURL references, and pushed 81dd49a3f2.",
+        "releasedAt": "2026-07-22T22:43:02.485Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 3659940,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:43:16.898Z",
+        "itemId": "flag-door",
+        "outcome": "completed",
+        "reason": "Added AnalyticsService.isFeatureEnabled with explicit local overrides, disabled/offline fallback, anonymous /flags evaluation, and a fake-timer-verified 500ms bound; pushed f64b8b8fdb.",
+        "releasedAt": "2026-07-22T22:46:58.011Z"
+      },
+      {
+        "writerId": "agent-pan-2599",
+        "agentId": "agent-pan-2599",
+        "pid": 3705505,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-22T22:47:09.949Z",
+        "itemId": "telemetry-docs",
+        "outcome": "completed",
+        "reason": "Documented the complete typed event schema, privacy and opt-out controls, install identity, error tracking, flags, hosted MCP and scoped CLI credentials; registered Mintlify pages, added a bidirectional drift test, passed full lint, and pushed 0d19de301f.",
+        "releasedAt": "2026-07-22T22:57:13.170Z"
+      }
+    ],
+    "statusReasons": {
+      "telemetry-config": {
+        "reason": "Added telemetry.enabled YAML schema and default, normalized merge support, environment opt-out resolver, and unit coverage.",
+        "updatedAt": "2026-07-22T21:00:17.613Z"
+      },
+      "install-id": {
+        "reason": "Added atomic UUIDv4 install identity persistence under OVERDECK_HOME with mode 0600 and stable-read tests.",
+        "updatedAt": "2026-07-22T21:02:30.859Z"
+      },
+      "contracts-schema": {
+        "reason": "Added the 15-event telemetry contract, privacy-restricted per-event property types, contract barrel export, and schema drift tests.",
+        "updatedAt": "2026-07-22T21:07:42.869Z"
+      },
+      "settings-api": {
+        "reason": "Settings GET now reports effective telemetry enablement plus install ID, and generic PUT persistence validates and writes telemetry.enabled while ignoring installId writes.",
+        "updatedAt": "2026-07-22T21:21:25.876Z"
+      },
+      "frontend-wrapper": {
+        "reason": "Added settings-gated PostHog initialization, typed capture wrappers, anonymous install ID registration, and migrated all event, exception, and recovery telemetry call sites.",
+        "updatedAt": "2026-07-22T21:37:36.376Z"
+      },
+      "settings-ui": {
+        "reason": "Added a navigable Telemetry settings section with autosaved opt-out switch, truncated install ID, sent/never-sent privacy copy, disabled-state dimming, and config equivalents; verified via tests and an isolated Playwright screenshot.",
+        "updatedAt": "2026-07-22T21:59:16.275Z"
+      },
+      "analytics-service": {
+        "reason": "Added the lazy posthog-node write door with typed anonymous capture, runtime opt-out guards, server exception autocapture, bounded shutdown, and fake-timer tests; pushed commit 9319a3b5a1.",
+        "updatedAt": "2026-07-22T22:10:57.605Z"
+      },
+      "cli-events": {
+        "reason": "Captured typed CLI completion telemetry with allowlisted verbs and bucketed duration, routed every explicit index exit through bounded shutdown, added fake-timer exit-order tests, and pushed e75abdbb83.",
+        "updatedAt": "2026-07-22T22:24:01.203Z"
+      },
+      "server-boot-event": {
+        "reason": "Added non-blocking server_boot capture with bucketed project and live-agent counts, isolated failures from boot, passed tests/typecheck/build, runtime-boot-tested a throwaway Node 22 server on port 4321, and pushed b327c3fb32.",
+        "updatedAt": "2026-07-22T22:29:13.112Z"
+      },
+      "pipeline-events": {
+        "reason": "Emitted enum-only pipeline_stage_changed events from the idempotent post-merge lifecycle, verification pass owner, and shared close-out workflow; resolved harness/model family without identifiers, passed focused and workflow tests, and pushed 4f51c60621.",
+        "updatedAt": "2026-07-22T22:36:54.942Z"
+      },
+      "sourcemaps-release": {
+        "reason": "Enabled hidden Vite sourcemaps, pinned PostHog CLI, added tested skip-with-warning upload command, moved inject/upload into the release workflow after its shipping build, verified 459 maps with zero sourceMappingURL references, and pushed 81dd49a3f2.",
+        "updatedAt": "2026-07-22T22:43:02.485Z"
+      },
+      "flag-door": {
+        "reason": "Added AnalyticsService.isFeatureEnabled with explicit local overrides, disabled/offline fallback, anonymous /flags evaluation, and a fake-timer-verified 500ms bound; pushed f64b8b8fdb.",
+        "updatedAt": "2026-07-22T22:46:58.011Z"
+      },
+      "telemetry-docs": {
+        "reason": "Documented the complete typed event schema, privacy and opt-out controls, install identity, error tracking, flags, hosted MCP and scoped CLI credentials; registered Mintlify pages, added a bidirectional drift test, passed full lint, and pushed 0d19de301f.",
+        "updatedAt": "2026-07-22T22:57:13.170Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "telemetry-config": "completed",
+    "telemetry-config.telemetry-config.ac1": "completed",
+    "telemetry-config.telemetry-config.ac2": "completed",
+    "install-id": "completed",
+    "install-id.install-id.ac1": "completed",
+    "install-id.install-id.ac2": "completed",
+    "contracts-schema": "completed",
+    "contracts-schema.contracts-schema.ac1": "completed",
+    "contracts-schema.contracts-schema.ac2": "completed",
+    "settings-api": "completed",
+    "settings-api.settings-api.ac1": "completed",
+    "settings-api.settings-api.ac2": "completed",
+    "frontend-wrapper": "completed",
+    "frontend-wrapper.frontend-wrapper.ac1": "completed",
+    "frontend-wrapper.frontend-wrapper.ac2": "completed",
+    "settings-ui": "completed",
+    "settings-ui.settings-ui.ac1": "completed",
+    "settings-ui.settings-ui.ac2": "completed",
+    "analytics-service": "completed",
+    "analytics-service.analytics-service.ac1": "completed",
+    "analytics-service.analytics-service.ac2": "completed",
+    "cli-events": "completed",
+    "cli-events.cli-events.ac1": "completed",
+    "cli-events.cli-events.ac2": "completed",
+    "server-boot-event": "completed",
+    "server-boot-event.server-boot-event.ac1": "completed",
+    "server-boot-event.server-boot-event.ac2": "completed",
+    "pipeline-events": "completed",
+    "pipeline-events.pipeline-events.ac1": "completed",
+    "pipeline-events.pipeline-events.ac2": "completed",
+    "sourcemaps-release": "completed",
+    "sourcemaps-release.sourcemaps-release.ac1": "completed",
+    "sourcemaps-release.sourcemaps-release.ac2": "completed",
+    "flag-door": "completed",
+    "flag-door.flag-door.ac1": "completed",
+    "flag-door.flag-door.ac2": "completed",
+    "telemetry-docs": "completed",
+    "telemetry-docs.telemetry-docs.ac1": "completed",
+    "telemetry-docs.telemetry-docs.ac2": "completed"
+  }
+}

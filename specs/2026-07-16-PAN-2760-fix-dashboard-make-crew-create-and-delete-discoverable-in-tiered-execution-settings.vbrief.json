@@ -1,0 +1,320 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-16T02:42:40Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2760: fix(dashboard): make crew create and delete discoverable in Tiered Execution settings",
+    "updated": "2026-07-17T00:32:14.863Z"
+  },
+  "plan": {
+    "id": "pan-2760",
+    "title": "fix(dashboard): make crew create and delete discoverable in Tiered Execution settings",
+    "status": "completed",
+    "uid": "40b13e63-492c-4136-8a84-0284467caf6d",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-16T02:42:40Z",
+    "updated": "2026-07-17T00:32:14.863Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2760",
+        "label": "PAN-2760",
+        "type": "issue"
+      },
+      {
+        "uri": "overdeck-state:drafts/pan-2760.md",
+        "label": "PRD draft",
+        "type": "spec"
+      },
+      {
+        "uri": "overdeck-state:drafts/pan-2760-mockup.html",
+        "label": "Operator-approved interaction mockup",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "settings",
+      "tiered-execution",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "Crew create/update/delete exist in Settings → Tiered Execution but are unfindable: create hides as '+ new crew…' at the bottom of each board dropdown, delete lives inside the expanded CrewRow and can never succeed on a saved crew (every persisted crew owns ≥1 difficulty and the button refuses while any is owned). The empty state teaches the create trick in prose. Inherited from the approved PAN-2684 mockup, which is the spec and currently encodes the bug.",
+      "Proposal": "Operator-approved via interactive mockup (drafts/pan-2760-mockup.html on overdeck-state): (1) '+ Add crew' beside the roster header opens an inline difficulty prompt and reuses the board's create-and-assign path, so a crew never exists without a difficulty and nothing can silently vanish on save; (2) '× remove' on every collapsed row opens a hand-off prompt that reassigns the crew's difficulties to a chosen heir and removes the crew in one write; guards (kind-override, final-difficulty, new last-crew) preserved; (3) hover/focus 'edit' cue makes rows read as expandable; (4) board '+ new crew…' stays; (5) mockup committed to docs/design/mockups/ with a supersession note in the PAN-2684 mockup; (6) docs/TIERED-EXECUTION.md describes the affordances. Full implementation detail in drafts/pan-2760.md (decisions D1-D7, work items W1-W4).",
+      "NonGoals": "- No pan crew CLI verb and no crew-scoped API; crews stay inside the whole-settings blob (GET/PUT /api/settings)\n- No changes to tiered-crews.ts serialization/import semantics, tier-name derivation, or the YAML schema\n- No draft/unassigned-crew state (option 2 rejected in planning); serializeCrews' zero-difficulty drop stays unreachable by construction\n- No changes to supervisor, kind-override add controls, commit feed, escalation, or replay surfaces\n- No rework of the PAN-2684 mockup's interactive JS beyond the one-line supersession note"
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "roster-add-crew",
+        "title": "Add '+ Add crew' roster button with inline difficulty prompt and empty-state create",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T02:42:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2760",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "TieredExecutionSection.test.tsx passes including new cases for roster-prompt create, empty-state first-crew-owns-all, and disabled kind-routed final difficulty",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W1 (drafts/pan-2760.md): extract handleAssignment's 'new' branch (TieredExecutionSection.tsx:183-189) into createCrew(difficulty|null) and the final-difficulty guard (lines 171-177) into finalDifficultyGuard(difficulty). Add addCrewPromptOpen state. Roster header (lines 364-367): shorten hint to 'new crews start on Haiku 4.5, never a frontier model' and add a right-aligned '+ Add crew' button (only when crews.length > 0). When open, render an inline prompt between header and rows: 'The new crew starts on Haiku 4.5. Which difficulty does it take over?' with one button per difficulty (subtext: current owner's crewLabel or 'unassigned'; disabled with the existing guard message when finalDifficultyGuard(difficulty) is non-null) plus cancel. Replace the empty state (lines 380-384) with 'No crews yet — every difficulty needs one before tiered execution can route work.' + '+ Add crew' button calling createCrew(null) + subtext 'Your first crew takes every difficulty; reassign on the board afterwards.' Keep setOpenCrewId(deriveTierName(...)) inside createCrew (hazard H4). Do not modify tiered-crews.ts (hazard H1)."
+        },
+        "items": [
+          {
+            "id": "roster-add-crew.ac1",
+            "title": "Given tiered execution with at least one crew, when the operator clicks '+ Add crew' beside the roster header and picks a difficulty in the prompt, the UI creates a crew with model claude-haiku-4-5, assigns that difficulty to it, and renders its row expanded — without any board dropdown being opened",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roster-add-crew.ac2",
+            "title": "Given zero crews, the empty state renders an '+ Add crew' button that creates a first crew owning all five difficulties with no difficulty prompt, and the old 'Choose \"+ new crew…\" on the board' prose no longer renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roster-add-crew.ac3",
+            "title": "In the difficulty prompt, a difficulty that is the final difficulty of a kind-routed crew renders disabled and shows the existing final-difficulty guard message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roster-add-crew.ac4",
+            "title": "The board's '+ new crew…' option still creates and assigns a crew in one gesture — the existing board-create test continues to pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roster-add-crew.ac5",
+            "title": "The 'frontier models are never the default' test still passes and createCrew reuses DEFAULT_MODEL with no new model literal introduced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "collapsed-row-remove",
+        "title": "Collapsed-row '× remove' with heir hand-off flow and expandability cue",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T02:42:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2760",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "TieredExecutionSection.test.tsx passes including the rewritten hand-off remove test, kind-override guard test, last-crew guard test, and no-toggle-on-remove-click test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W2 (drafts/pan-2760.md): TieredExecutionSection owns removePromptCrewId and removeError state plus handleRequestRemove(crewId) (kind overrides → existing message 'Move or remove these kind overrides before removing this crew.'; sole crew → 'This is the only crew, and every difficulty needs one. Add another crew first — or turn tiered execution off.'; owns difficulties → open heir prompt; owns nothing → remove directly) and handleRemoveWithHeir(crewId, heirId) (reassign each owned difficulty to heir, filter the crew, single writeCrews call). CrewRow: replace onRemove prop with onRequestRemove, delete local removeError state and guard logic (lines 75-79), expanded-body Remove button calls onRequestRemove; add '× remove' button to the collapsed summary (aria-label 'Remove crew <label>', stopPropagation + preventDefault so the row does not toggle — hazard H3); add hover/focus highlight and an 'edit' cue next to the caret (hidden until hover/focus, Tailwind group pattern). Render the error text and the heir prompt ('Removing <label> — give <difficulties> to:' + one button per other crew with blended cost + cancel) as siblings directly beneath the owning row. Rewrite the superseded dead-end-remove test at line 162 (hazard H2); keep line 201's kind-override-only semantics."
+        },
+        "items": [
+          {
+            "id": "collapsed-row-remove.ac1",
+            "title": "A collapsed crew row renders an accessible 'Remove crew <label>' control; clicking it on a crew owning difficulties opens an inline hand-off prompt listing every other crew, and choosing an heir emits a single onSettingsChange whose config no longer contains the crew and has its difficulties owned by the heir",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapsed-row-remove.ac2",
+            "title": "Clicking × remove on a crew holding kind overrides renders 'Move or remove these kind overrides before removing this crew.' and emits no settings change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapsed-row-remove.ac3",
+            "title": "Clicking × remove when only one crew exists renders a message that every difficulty needs a crew and emits no settings change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapsed-row-remove.ac4",
+            "title": "Clicking × remove does not toggle the row open/closed, and the Remove crew button inside the expanded body routes through the same hand-off flow (the old 'Assign these difficulties to another crew before removing it.' dead-end no longer renders anywhere)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapsed-row-remove.ac5",
+            "title": "Hovering or focusing a collapsed row applies a visible background highlight and reveals an 'edit' cue next to the caret",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mockup-spec",
+        "title": "Commit approved PAN-2760 mockup and add supersession note to the PAN-2684 mockup",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T02:42:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "design",
+          "issueLabel": "pan-2760",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/design/mockups/crew-create-delete-pan-2760.html",
+            "docs/design/mockups/tiered-execution-redesign-pan-2684.html"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -s docs/design/mockups/crew-create-delete-pan-2760.html && grep -c 'PAN-2760' docs/design/mockups/tiered-execution-redesign-pan-2684.html"
+          ],
+          "expected_outputs": [
+            "crew-create-delete-pan-2760.html exists and is non-empty; grep prints a count of at least 1 for PAN-2760 in the PAN-2684 mockup"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W3 (drafts/pan-2760.md): copy ${OVERDECK_HOME}/state/panopticon-cli/drafts/pan-2760-mockup.html VERBATIM (it is the operator-approved artifact — do not re-derive or edit) to docs/design/mockups/crew-create-delete-pan-2760.html. In tiered-execution-redesign-pan-2684.html, insert the exact supersession paragraph given in PRD W3 step 2 immediately after the existing .doc-sub paragraph (search anchor: 'Everything in the proposed section is clickable.')."
+        },
+        "items": [
+          {
+            "id": "mockup-spec.ac1",
+            "title": "docs/design/mockups/crew-create-delete-pan-2760.html contains the approved interactive mockup verbatim — diff against drafts/pan-2760-mockup.html on overdeck-state produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mockup-spec.ac2",
+            "title": "tiered-execution-redesign-pan-2684.html renders a doc-sub note stating its crews-roster create/delete affordances are superseded by crew-create-delete-pan-2760.html, and no other part of that file changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-tiered-execution",
+        "title": "Describe the crew create/delete affordances in docs/TIERED-EXECUTION.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T02:42:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2760",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TIERED-EXECUTION.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Add crew' docs/TIERED-EXECUTION.md"
+          ],
+          "expected_outputs": [
+            "grep prints at least one match inside the Settings UI section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W4 (drafts/pan-2760.md): in the Settings UI section (currently lines 64-74), insert a paragraph after line 66 describing the roster '+ Add crew' button with its difficulty prompt (create-and-assign stays one gesture; from empty, the first crew takes every difficulty), the collapsed-row '× remove' with heir hand-off (reassign + remove in one write), and that the board's '+ new crew…' shortcut remains. Update the guards paragraph (line 72) to state removal now performs the reassignment via the hand-off prompt while kind-override and last-crew guards block with their messages. Update the spec-reference sentence (line 70) to name tiered-execution-redesign-pan-2684.html for the overall panel and crew-create-delete-pan-2760.html for crew create/delete interactions."
+        },
+        "items": [
+          {
+            "id": "docs-tiered-execution.ac1",
+            "title": "The Settings UI section of docs/TIERED-EXECUTION.md contains a paragraph covering the roster '+ Add crew' difficulty prompt and the collapsed-row hand-off remove, and grep -n 'Add crew' docs/TIERED-EXECUTION.md returns at least one match inside that section, which also names both mockup files as the interaction reference",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-tiered-execution.ac2",
+            "title": "The guards paragraph states that removal reassigns difficulties via the hand-off prompt and preserves the kind-override and last-crew guard messages verbatim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "roster-add-crew",
+        "to": "collapsed-row-remove",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-16-PAN-2760-fix-dashboard-make-crew-create-and-delete-discoverable-in-tiered-execution-settings.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

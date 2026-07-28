@@ -1,20 +1,20 @@
 {
-  "vBRIEFInfo": {
+  "xBRIEFInfo": {
     "version": "0.6",
     "created": "2026-06-13T14:53:29.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1817: surface tracker-quota exhaustion as a health signal + idle-stack-reaper regression test",
-    "updated": "2026-06-13T14:57:19.465Z"
+    "updated": "2026-07-27T16:46:12.808Z"
   },
   "plan": {
     "id": "pan-1817",
     "title": "Surface tracker-quota exhaustion as a health signal (+ idle-stack-reaper regression test)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "3903d9d8-46b4-4b59-b37d-0f7561e61724",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-06-13T14:53:29.000Z",
-    "updated": "2026-06-13T14:57:19.465Z",
+    "updated": "2026-07-27T16:46:12.808Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1817",
@@ -362,5 +362,5 @@
       "canonicalFilename": "2026-06-13-PAN-1817-surface-tracker-quota-exhaustion-as-a-health-signal-idle-stack-reaper-regression-test.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

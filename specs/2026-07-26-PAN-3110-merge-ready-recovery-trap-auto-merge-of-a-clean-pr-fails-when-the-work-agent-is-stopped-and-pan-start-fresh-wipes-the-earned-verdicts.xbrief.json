@@ -1,0 +1,445 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T10:05:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3110: Merge-ready recovery trap — agent-independent merge executor + HEAD-keyed verdict lifecycle",
+    "updated": "2026-07-26T13:51:46.787Z"
+  },
+  "plan": {
+    "id": "pan-3110",
+    "title": "Merge-ready recovery trap: auto-merge of a CLEAN PR fails when the work agent is stopped, and pan start --fresh wipes the earned verdicts",
+    "status": "completed",
+    "uid": "2aec946e-99b7-4669-93fe-5870410164c2",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-26T10:05:00.000Z",
+    "updated": "2026-07-26T13:51:46.787Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3110",
+        "label": "PAN-3110",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "merge",
+      "auto-merge",
+      "review-status",
+      "flywheel",
+      "recovery"
+    ],
+    "narratives": {
+      "Problem": "Two defects form a circular trap. RC-1: triggerMerge (src/dashboard/server/routes/workspaces/merge-ops.ts:908-991) requires a live work agent to rebase even when the PR is GitHub-CLEAN (the actual merge is always server-side at merge-ops.ts:1144-1157) and never tries the existing server-side rebaseFeatureBranch (src/lib/cloister/merge-rebase.ts); the failure is then made permanent via markFailed (auto-merge-executor.ts:127-133) and mergeStatus:'failed' + readyForMerge:false (merge-ops.ts:994-997), which reviewGatesPassedSync treats as gates-failed so neither the deacon patrol nor boot repair restores merge eligibility. RC-2: spawnAgent calls resetPipelineVerdictsForWorkStartSync (src/lib/review-status.ts:604-649) on EVERY work-role spawn (src/lib/agents/spawn.ts:571-580) with no HEAD comparison, wiping earned review/test/verification verdicts and their commit anchors — so pan start --fresh (or the merge executor's own recovery spawn) destroys merge-readiness for an unchanged HEAD.",
+      "Proposal": "Defect 1: (a) merge GitHub-clean PRs directly with no rebase and no agent; (b) when a rebase is needed, try the deterministic server-side rebaseFeatureBranch first and engage the agent only for conflicts; (c) classify transient failures (agent stopped/unstartable, workspace missing, non-conflict git error) as retryable — write mergeStatus 'queued' (not 'failed'), keep readyForMerge derivable, and have the auto-merge executor requeue with the 60s backoff, bounded by the shared mergeRetryCount/FAILED_MERGE_MAX_RETRIES circuit breaker (blocked, not failed, at the ceiling). Defect 2: guard the work-spawn verdict reset with evaluateWorkspaceAnchorDrift against the stored reviewedAtCommit anchor — 'current' preserves verdicts, 'benign' preserves and refreshes the anchor, 'drifted'/'unreadable'/no-anchor resets exactly as today. Deliberate operator resets stay unconditional.",
+      "NonGoals": "- Loosening auto-merge eligibility (readyForMerge requirement stays)\n- Changing deliberate operator resets (reset-to-planned, review purge/abort, reopen, close-out clearReviewStatus)\n- Origin-branch anchor comparison when the workspace is unreadable\n- Adding a SHA anchor for testStatus\n- Reworking the deacon's 30-minute checkFailedMergeRetry patrol (it stays the backstop)\n- GitLab-forge auto-merge specifics (the retryable contract is forge-agnostic but tests are GitHub-scoped)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "GitHub-clean PRs merge directly without any rebase (D1 in the PRD)",
+        "rationale": "The issue's own fix direction says 'when the PR is CLEAN/MERGEABLE, merge directly (gh-API squash) without involving the work agent'; squash merges keep main linear and the PAN-2487 CI-green skip already covers verification."
+      },
+      {
+        "summary": "Server-side rebaseFeatureBranch ordered BEFORE the agent path (D2)",
+        "rationale": "Deterministic mechanical work should never wait on an LLM session; the /approve route already uses it as fallback (merge-ops.ts:1710-1717), and the agent remains for the one thing git cannot do — conflict resolution."
+      },
+      {
+        "summary": "Retry cap reuses mergeRetryCount / FAILED_MERGE_MAX_RETRIES (D4)",
+        "rationale": "'Never fail permanently on agent stopped' still needs a loop bound; the existing counter and circuit breaker are the codebase's own convention, avoiding a schema migration."
+      },
+      {
+        "summary": "Preservation guard at the spawn.ts call site, not inside the sync reset function (D5)",
+        "rationale": "Anchor evaluation is async git I/O and server-reachable code must not gain sync git calls; reset-to-planned's force:true call site is a deliberate operator reset and stays unconditional."
+      }
+    ],
+    "items": [
+      {
+        "id": "verdict-anchor-guard-on-spawn",
+        "title": "Preserve pipeline verdicts on work-agent spawn when HEAD is unchanged",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T10:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3110",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "auto-merge-executor-requeue"
+          ],
+          "files_scope": [
+            "src/lib/agents/spawn.ts",
+            "src/lib/cloister/verdict-preservation.ts",
+            "src/lib/agents/__tests__/spawn-verdict-preservation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/spawn-verdict-preservation.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "spawn-verdict-preservation.test.ts passes all 5 tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an async guard shouldPreservePipelineVerdicts(issueId, workspacePath) in new src/lib/cloister/verdict-preservation.ts: returns preserve=false unless getReviewStatusSync shows a reviewedAtCommit anchor AND reviewStatus passed/skipped; otherwise evaluates evaluateWorkspaceAnchorDrift(issueId, workspacePath, rehydrateHeadAnchor(status.reviewedAtCommit)) — kind 'current' → preserve; kind 'benign' → preserve + return refreshedAnchor; 'drifted'/'unreadable' → preserve=false with a reason string. In src/lib/agents/spawn.ts (the role === 'work' branch at :571-580), evaluate the guard before calling resetPipelineVerdictsForWorkStartSync: on preserve, skip BOTH the reset and resetPostMergeState, apply refreshedAnchor via setReviewStatusSync when present, and log '[spawn] Preserved pipeline verdicts for <issue> — <reason>'; on !preserve, behave exactly as today. Tests mock getReviewStatusSync + evaluateWorkspaceAnchorDrift (no real git) and cover: current-anchor preservation, benign anchor refresh, drifted reset, unreadable/no-anchor/non-passed reset, and non-work roles never evaluating the guard. See PRD WI-1 for the exact helper shape."
+        },
+        "items": [
+          {
+            "id": "verdict-anchor-guard-on-spawn.ac1",
+            "title": "Given passed verdicts and a 'current' anchor, when a work agent spawns, then the review_status row preserves reviewStatus, testStatus, verificationStatus, readyForMerge, and both anchors, and resetPostMergeState is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-anchor-guard-on-spawn.ac2",
+            "title": "Given a 'benign' anchor drift, the spawn path preserves the verdicts and updates reviewedAtCommit to the current anchor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-anchor-guard-on-spawn.ac3",
+            "title": "Given a 'drifted' anchor, an 'unreadable' anchor, a missing reviewedAtCommit, or reviewStatus not passed/skipped, the spawn path resets the verdicts exactly as today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-anchor-guard-on-spawn.ac4",
+            "title": "A non-work role spawn (review/test/plan) skips the preservation guard and never logs the preservation line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-anchor-guard-on-spawn.ac5",
+            "title": "npm run typecheck exits 0 with no errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "clean-pr-direct-merge",
+        "title": "Merge GitHub-clean PRs directly without rebase or agent",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T10:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3110",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/merge-ops-clean-direct.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__/merge-ops-clean-direct.test.ts",
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-ops-clean-direct.test.ts passes all 4 tests",
+            "existing merge-ops test files stay green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In triggerMerge (src/dashboard/server/routes/workspaces/merge-ops.ts), after the existing pre-merge PR-state check (block ending :905), add an early-out: when prState was fetched and prState.mergeable === true && !prState.checksFailed && !prState.checksPending && prState.mergeableState === 'clean' (lowercase — github-app.ts:542 stores REST mergeable_state) && !prState.draft && !prState.merged, set rebaseResult = { success: true, newHead: prState.headSha }, log '[merge] PR is CLEAN — merging directly without rebase for <issue>', and skip the entire rebase section (:908-992: isBranchAlreadyRebased, ensureAgentReadyForMerge, and the 30-minute poll loop). When prState is unavailable or any condition fails, fall through to the existing logic unchanged. Tests (new merge-ops-clean-direct.test.ts, following existing merge-ops test patterns) mock the PR-state fetch, ensureAgentReadyForMerge, and the forge adapter: clean+no-agent merges without calling ensureAgentReadyForMerge; 'behind' does not take the early-out; checksPending with 'clean' does not take the early-out; PR-state fetch throwing falls back to existing behavior."
+        },
+        "items": [
+          {
+            "id": "clean-pr-direct-merge.ac1",
+            "title": "Given a mergeable PR with mergeableState 'clean' and no live work agent, triggerMerge proceeds to the merge step and never calls ensureAgentReadyForMerge or the rebase poll loop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clean-pr-direct-merge.ac2",
+            "title": "Given mergeableState 'behind' or checksPending true, triggerMerge skips the direct-merge early-out and uses the rebase flow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clean-pr-direct-merge.ac3",
+            "title": "Given the PR-state fetch fails, triggerMerge falls back to the existing rebase flow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clean-pr-direct-merge.ac4",
+            "title": "The existing merge-ops test files under src/dashboard/server/routes/workspaces/__tests__/ complete without failures after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-rebase-fallback-retryable",
+        "title": "Server-side rebase fallback and retryable merge-failure classification in triggerMerge",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T10:05:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3110",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "auto-merge-executor-requeue"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "src/dashboard/server/routes/workspaces/merge-strike.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/merge-ops-server-rebase.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__/merge-ops-server-rebase.test.ts",
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-ops-server-rebase.test.ts passes all 4 tests",
+            "existing merge-ops test files stay green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In triggerMerge's rebase section (merge-ops.ts :908-992), replace the agent-first flow with an escalation ladder: (1) if the workspace directory exists, attempt rebaseFeatureBranch(workspacePath, branchName, targetBranch, issueId) from src/lib/cloister/merge-rebase.js (same import style as :1711); success → rebaseResult = { success: true, newHead }. (2) On a conflict result (conflictFiles non-empty), fall through to the existing agent path (ensureAgentReadyForMerge + poll loop) unchanged. (3) On a non-conflict server-side failure or missing workspace, also fall through to the agent path (the agent may repair the workspace); if the agent path then fails with agent-stopped/agent-unstartable, produce the retryable result. Retryable contract: add retryable?: boolean to TriggerMergeResult in merge-strike.ts (:44-58); every place that today returns 'Work agent … stopped before completing the rebase' (:978-982), 'could not be prepared for merge' (:986-991), or a non-conflict server-side rebase error with no agent available returns { success: false, statusCode: 500, error, retryable: true } and writes setReviewStatus(issueId, { mergeStatus: 'queued', mergeNotes: error }) — NOT mergeStatus 'failed', NOT readyForMerge false. Content failures (CI red :857-863, CONFLICTING PR :872-887, unresolved conflicts after the agent path) keep the existing 'failed' writes. Also add console.warn with the caught error inside isBranchAlreadyRebased's catch (:74-76) so the pre-check failure is visible in logs. Tests (new merge-ops-server-rebase.test.ts): behind branch + stopped agent + no conflicts → server-side rebase used, agent not engaged; conflict result → agent path engaged; agent-stopped end state → retryable:true result and a mergeStatus 'queued' write with readyForMerge untouched; CI-failing PR still returns the existing non-retryable 409."
+        },
+        "items": [
+          {
+            "id": "server-rebase-fallback-retryable.ac1",
+            "title": "Given a behind branch, a stopped work agent, and no conflicts, triggerMerge completes the rebase via rebaseFeatureBranch without engaging any agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-rebase-fallback-retryable.ac2",
+            "title": "Given a server-side rebase conflict result, triggerMerge engages the existing agent path (ensureAgentReadyForMerge)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-rebase-fallback-retryable.ac3",
+            "title": "Given the agent path ends with the agent stopped, triggerMerge returns success:false with retryable:true and writes mergeStatus 'queued' with the reason in mergeNotes, leaving readyForMerge and component verdicts untouched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-rebase-fallback-retryable.ac4",
+            "title": "Given a PR with failing required checks, triggerMerge still rejects with the existing non-retryable 409 and mergeStatus 'failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-rebase-fallback-retryable.ac5",
+            "title": "isBranchAlreadyRebased logs the caught pre-check error via console.warn instead of swallowing it silently",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auto-merge-executor-requeue",
+        "title": "Auto-merge executor requeues retryable failures with circuit-breaker cap",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T10:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3110",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/auto-merge-executor.ts",
+            "src/dashboard/server/services/__tests__/auto-merge-executor.test.ts",
+            "src/lib/cloister/deacon-merge.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/auto-merge-executor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "auto-merge-executor.test.ts passes the 3 new retryable-path tests plus all existing tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In tickAutoMergeExecutor (src/dashboard/server/services/auto-merge-executor.ts :105-135), in the result.success === false branch: when result.retryable === true, read the issue's current mergeRetryCount via the existing review-status read door (getReviewStatusSync); if it is >= FAILED_MERGE_MAX_RETRIES (export the constant from src/lib/cloister/deacon-merge.ts if it is not already exported), call markBlocked(entry.id, reason) with a stand-alone operator-facing message 'Auto-merge for <issue> blocked: <reason> (retried <n> times — fix the underlying cause and re-schedule)' and announce the failure; otherwise increment via setReviewStatusSync(issueId, { mergeRetryCount: count + 1 }), requeue via the existing requeueToPending(entry.id, now + REQUEUE_BACKOFF_MS), and log the requeue. When result.retryable is absent/false, keep the existing markFailed + announce path. Extend src/dashboard/server/services/__tests__/auto-merge-executor.test.ts using its existing deps-injection harness (fake timers per repo rule if the clock matters): retryable below ceiling requeues to pending with a future scheduledMergeAt and increments mergeRetryCount without calling markFailed; retryable at ceiling calls markBlocked with the operator-facing reason and does not requeue; non-retryable failure keeps markFailed."
+        },
+        "items": [
+          {
+            "id": "auto-merge-executor-requeue.ac1",
+            "title": "Given a retryable merge result and mergeRetryCount below the ceiling, the executor requeues the row to pending with a future scheduledMergeAt, increments mergeRetryCount, and does not call markFailed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-merge-executor-requeue.ac2",
+            "title": "Given a retryable merge result and mergeRetryCount at the ceiling, the executor marks the row blocked with a reason that names the retry count and the operator recovery action, and does not requeue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-merge-executor-requeue.ac3",
+            "title": "Given a non-retryable merge failure, the executor keeps the existing markFailed + announce behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-merge-executor-requeue.ac4",
+            "title": "The existing auto-merge-executor test suite exits 0 after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-recovery-docs",
+        "title": "Document the merge-executor escalation ladder and retryable-requeue contract",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T10:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3110",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md",
+            "docs/FLYWHEEL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'server-side rebase' docs/MERGE-WORKFLOW.md",
+            "grep -n 'requeue' docs/FLYWHEEL.md"
+          ],
+          "expected_outputs": [
+            "docs/MERGE-WORKFLOW.md contains the clean-direct → server-side-rebase → agent-conflict escalation ladder and the retryable result contract",
+            "docs/FLYWHEEL.md contains the requeue vs failed vs blocked distinction and the operator recovery step"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/MERGE-WORKFLOW.md's merge-executor section to describe the new escalation ladder (GitHub-clean PRs merge directly with no rebase; otherwise the server-side rebaseFeatureBranch runs first; the work agent is engaged only for conflict resolution) and the retryable result contract (transient failures return retryable:true and write mergeStatus 'queued', keeping readyForMerge derivable). Update docs/FLYWHEEL.md's auto-merge section to describe the three terminal/transient outcomes for a scheduled auto-merge: requeue (retryable, 60s backoff, bounded by the mergeRetryCount/FAILED_MERGE_MAX_RETRIES circuit breaker), failed (content failures — CI red, conflicts, closed/draft PR), and blocked (ceiling reached, with the operator recovery action: fix the cause and re-schedule). Also note the verdict-preservation invariant: work-agent spawns no longer reset earned verdicts while HEAD matches the reviewedAtCommit anchor."
+        },
+        "items": [
+          {
+            "id": "merge-recovery-docs.ac1",
+            "title": "docs/MERGE-WORKFLOW.md contains a section describing the clean-direct → server-side-rebase → agent-conflict escalation ladder and the retryable:true / mergeStatus 'queued' contract",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-recovery-docs.ac2",
+            "title": "docs/FLYWHEEL.md contains the requeue vs failed vs blocked distinction for scheduled auto-merges, including the circuit-breaker ceiling and the operator recovery step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "clean-pr-direct-merge",
+        "to": "server-rebase-fallback-retryable",
+        "type": "blocks"
+      },
+      {
+        "from": "server-rebase-fallback-retryable",
+        "to": "auto-merge-executor-requeue",
+        "type": "blocks"
+      },
+      {
+        "from": "auto-merge-executor-requeue",
+        "to": "merge-recovery-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "verdict-anchor-guard-on-spawn",
+        "to": "merge-recovery-docs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3110-merge-ready-recovery-trap-auto-merge-of-a-clean-pr-fails-when-the-work-agent-is-stopped-and-pan-start-fresh-wipes-the-earned-verdicts.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

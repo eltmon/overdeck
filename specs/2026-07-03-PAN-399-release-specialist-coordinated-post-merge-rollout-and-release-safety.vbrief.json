@@ -4,17 +4,17 @@
     "created": "2026-07-03T15:15:15.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-399: Release specialist — coordinated post-merge rollout and release safety",
-    "updated": "2026-07-11T09:28:39.119Z"
+    "updated": "2026-07-13T03:17:56.886Z"
   },
   "plan": {
     "id": "pan-399",
     "title": "Release specialist — coordinated post-merge rollout and release safety",
-    "status": "running",
+    "status": "completed",
     "uid": "52f0c0f4-6124-46fa-8f51-dceae0dcec38",
     "author": "agent:claude-opus-4-8",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-03T15:15:15.000Z",
-    "updated": "2026-07-11T09:28:39.119Z",
+    "updated": "2026-07-13T03:17:56.886Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/399",
@@ -944,5 +944,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }

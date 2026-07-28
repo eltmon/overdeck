@@ -1,0 +1,110 @@
+{
+  "issueId": "PAN-3068",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-25T13:52:30.138Z",
+  "updated": "2026-07-25T15:20:36.739Z",
+  "pipeline": {
+    "issueId": "PAN-3068",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "releaseStatus": "skipped",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-25T15:20:36.720Z",
+    "testNotes": "Skipped: issue is already merged",
+    "lastVerifiedCommit": "02fba50a2684abc440bf6204e31357c3d3170e49",
+    "strikeLandingState": "landed",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": [],
+    "closedOut": true,
+    "closedOutAt": "2026-07-25T15:20:36.720Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {},
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-07-25T14:18:57.700Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-25T15:20:36.739Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed",
+          "observed": "verificationStatus: passed at 02fba50a2684abc440bf6204e31357c3d3170e49",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #3069 MERGED at 2026-07-25T14:15:10Z",
+          "status": "pass",
+          "mergedAt": "2026-07-25T14:15:10Z",
+          "mergeCommit": "f8892e1dc0e1711b0ab30b0897ff8b3019bf8141"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on f8892e1dc0e1711b0ab30b0897ff8b3019bf8141",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 5b2680a3 contains merge f8892e1d",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 3 agent state directories; Preserved local branch strike/pan-3068 — not merged to main; Pruned 24 checkpoint ref(s) for agent-pan-3068, planning-pan-3068, strike-pan-3068; No specialist registry entries for PAN-3068"
+        }
+      ],
+      "accepted": []
+    }
+  },
+  "harness": "claude-code",
+  "model": "claude-opus-5"
+}

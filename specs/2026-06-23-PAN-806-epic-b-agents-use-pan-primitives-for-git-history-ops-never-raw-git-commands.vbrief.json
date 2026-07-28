@@ -1,20 +1,20 @@
 {
-  "vBRIEFInfo": {
+  "xBRIEFInfo": {
     "version": "0.6",
     "created": "2026-06-23T08:55:20.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-806: Epic B: Agents use pan primitives for git history ops — never raw git commands",
-    "updated": "2026-06-23T09:02:50.649Z"
+    "updated": "2026-07-21T20:34:13.204Z"
   },
   "plan": {
     "id": "pan-806",
     "title": "Epic B: Agents use pan primitives for git history ops — never raw git commands",
-    "status": "proposed",
+    "status": "completed",
     "uid": "545677a9-e305-45b0-8a0c-0a8a135ab50e",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 7,
     "created": "2026-06-23T08:55:20.000Z",
-    "updated": "2026-06-23T09:02:50.649Z",
+    "updated": "2026-07-21T20:34:13.204Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/806",
@@ -308,5 +308,5 @@
       "canonicalFilename": "2026-06-23-PAN-806-epic-b-agents-use-pan-primitives-for-git-history-ops-never-raw-git-commands.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

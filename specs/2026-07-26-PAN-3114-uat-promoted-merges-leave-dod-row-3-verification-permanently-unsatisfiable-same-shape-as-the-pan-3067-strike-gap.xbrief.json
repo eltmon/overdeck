@@ -1,0 +1,349 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T09:45:08.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3114: UAT-promoted merges leave DoD row 3 (verification) permanently unsatisfiable — same shape as the PAN-3067 strike gap",
+    "updated": "2026-07-26T13:54:34.632Z"
+  },
+  "plan": {
+    "id": "pan-3114",
+    "title": "UAT-promoted merges leave DoD row 3 (verification) permanently unsatisfiable — same shape as the PAN-3067 strike gap",
+    "status": "completed",
+    "uid": "59919231-fbac-49c0-b3ee-d04bcb66eeec",
+    "author": "agent:k3[1m]",
+    "sequence": 7,
+    "created": "2026-07-26T09:45:08.000Z",
+    "updated": "2026-07-26T13:54:34.632Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3114",
+        "label": "PAN-3114",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "uat",
+      "definition-of-done",
+      "close-out",
+      "verification"
+    ],
+    "narratives": {
+      "Problem": "Operator promotion of a UAT generation merges the tested batch to main, but members whose branch never got a pre-merge verification-runner run are left with verificationStatus: pending forever. The runner is pre-merge and branch-scoped, so once the batch merges nothing can ever satisfy DoD row 3, and close-out is permanently blocked except by an --accept-verification override on issues that are merged, deployed, and green (observed on PAN-3037, batch uat/pan-cedar-0726). Structurally identical to the PAN-3067 strike gap: a legitimate landing path discards evidence the system already has — with require_uat_before_merge, operator UAT IS the verification step.",
+      "Proposal": "Record the evidence where it exists, mirroring PAN-3067: (1) after promoteUatGeneration successfully promotes a batch, stamp each non-terminal member's verificationStatus 'passed' through the review-status write door with notes naming source uat-promotion, the generation name, and the promote merge SHA (never overwriting terminal verdicts; recording failures never fail the promote); (2) closeOut() gains a visible pre-gate 'dod:uat-promotion-evidence' step that heals members of already-promoted generations so past cases like PAN-3037 close out on recorded evidence; (3) docs name uat-promotion as a row-3 verdict source.",
+      "NonGoals": "- No change to memberEligibility — promotion does not start requiring a passed verification gate\n- No change to the verification runner; it stays pre-merge and branch-scoped\n- No heal for testStatus (row 2) — only the verification row has the gap\n- No change to processResyncReviewStatus's non-mutating contract\n- No retroactive stamping of historical records outside the close-out heal path"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Verdict is 'passed', not 'skipped'",
+        "rationale": "The operator exercised the batch stack and promoted it — real human verification, stronger than the automated gate; 'skipped' would understate recorded evidence. DoD row 3 accepts both."
+      },
+      {
+        "summary": "Heal lives in closeOut() as a pre-gate step, not in pan review resync or the dod-gate checks",
+        "rationale": "processResyncReviewStatus is deliberately non-mutating and dod-gate row checks are read-only; closeOut is the single chokepoint shared by CLI, dashboard, and flywheel auto-close-out, and the heal shows up as a visible ceremony step."
+      },
+      {
+        "summary": "Recorder is an optional injected dep on UatPromoteDeps in a new uat-promote-verification.ts module",
+        "rationale": "Keeps promoteUatGeneration pure/testable, guarantees every promote path records, follows the PAN-3067 ratchet pattern of housing verdict recording in a dedicated module, and existing tests compile unchanged."
+      },
+      {
+        "summary": "lastVerifiedCommit = member.headSha; promote merge SHA goes in verificationNotes",
+        "rationale": "headSha is the commit review anchored and the operator exercised, keeping drift comparisons consistent; the merge SHA in notes preserves main-side traceability."
+      }
+    ],
+    "items": [
+      {
+        "id": "stamp-module",
+        "title": "Create uat-promote-verification module with stamp builder and verdict recorder",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T09:45:08.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3114",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "promote-wiring",
+            "close-out-heal"
+          ],
+          "files_scope": [
+            "src/lib/cloister/uat-promote-verification.ts",
+            "tests/unit/lib/cloister/uat-promote-verification.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/uat-promote-verification.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "uat-promote-verification.test.ts passes (stamp shape, note contents, terminal-verdict preservation, anchor behavior)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/uat-promote-verification.ts exporting buildUatPromotionStamp(current, member, evidence) and recordUatPromotionVerdicts(gen, mergeSha), per PRD WI-1 (.pan/drafts/PAN-3114.md). buildUatPromotionStamp returns {} when current.verificationStatus is 'passed' or 'skipped' (terminal, PAN-3067 precedent), otherwise { verificationStatus: 'passed', verificationNotes: 'uat-promotion: operator UAT of batch <name> promoted to main at <sha9> (PAN-3114)', lastVerifiedCommit: rehydrateHeadAnchor(member.headSha) when headSha non-empty }. recordUatPromotionVerdicts loops gen.members, applies the stamp via getReviewStatusSync/setReviewStatusSync (write door, src/lib/review-status.ts:147), logs each stamped issue, and returns the stamped issue IDs. Write tests/unit/lib/cloister/uat-promote-verification.test.ts covering: stamp shape and note contents, terminal-verdict preservation (passed and skipped), headSha-present/absent anchor behavior, and multi-member recording."
+        },
+        "items": [
+          {
+            "id": "stamp-module.ac1",
+            "title": "Given a member with verificationStatus 'pending', buildUatPromotionStamp returns a 'passed' stamp whose notes contain 'uat-promotion', the generation name, and the 9-char merge SHA",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stamp-module.ac2",
+            "title": "Given a member with verificationStatus 'passed' or 'skipped', buildUatPromotionStamp returns {} and recordUatPromotionVerdicts preserves the existing verdict and notes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stamp-module.ac3",
+            "title": "Given a member with a non-empty headSha, the stamp's lastVerifiedCommit equals rehydrateHeadAnchor(headSha); given an empty headSha, the stamp omits lastVerifiedCommit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stamp-module.ac4",
+            "title": "Given a generation with mixed terminal and non-terminal members, recordUatPromotionVerdicts returns exactly the non-terminal member issue IDs and persists their stamps through setReviewStatusSync",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "promote-wiring",
+        "title": "Record verification verdicts at UAT promote time via injected dep",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T09:45:08.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3114",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/uat-promote.ts",
+            "src/dashboard/server/services/uat-train.ts",
+            "tests/unit/lib/cloister/uat-promote.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/uat-promote.test.ts src/dashboard/server/services/__tests__/uat-train.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "uat-promote.test.ts passes including new recorder-call assertions",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-2. Add optional dep `recordVerification?: (gen: UatGeneration, mergeSha: string) => void` to UatPromoteDeps in src/lib/cloister/uat-promote.ts (after the memberEligibility field, ~line 71). In promoteUatGeneration, immediately after `deps.store.update(gen.name, { status: 'promoted' })` (line 175), call `deps.recordVerification?.(gen, mergeSha)` inside try/catch that logs on error (a recording failure must never change the promote result — the merge has landed). In src/dashboard/server/services/uat-train.ts postUatGenerationPromotePayload (lines 373-388), wire the real recorder: `recordVerification: (gen, mergeSha) => recordUatPromotionVerdicts(gen, mergeSha)` via dynamic import of '../../../lib/cloister/uat-promote-verification.js' (same style as the flywheel-merge-order.js import at line 377). Extend tests/unit/lib/cloister/uat-promote.test.ts: spy dep called with (gen, mergeSha) on success; NOT called on not-found, wrong-status, member-not-ready, stale-base, or merge-failed; a throwing recorder leaves the success result unchanged."
+        },
+        "items": [
+          {
+            "id": "promote-wiring.ac1",
+            "title": "Given a successful promote, the recordVerification dep is invoked once with the generation object and the merge SHA before promoteUatGeneration returns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-wiring.ac2",
+            "title": "Given each failure path (not-found, wrong-status, member-not-ready, stale-base, merge-failed), the recorder is never invoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-wiring.ac3",
+            "title": "Given a recorder that throws, promoteUatGeneration still returns success with the same mergeSha and members",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-wiring.ac4",
+            "title": "Given postUatGenerationPromotePayload, the deps passed to promoteUatGeneration include a recordVerification that delegates to recordUatPromotionVerdicts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "close-out-heal",
+        "title": "Heal past UAT promotions in closeOut before the DoD gate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T09:45:08.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3114",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/uat-promote-verification.ts",
+            "src/lib/lifecycle/workflows.ts",
+            "tests/unit/lib/cloister/uat-promote-verification.test.ts",
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/uat-promote-verification.test.ts tests/unit/lib/lifecycle/workflows.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "heal and workflows tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3. Add healUatPromotionVerification(issueId, deps?) to src/lib/cloister/uat-promote-verification.ts: resolve projectRoot via resolveProjectFromIssueSync; list promoted generations via listUatGenerationsSync({ projectRoot, statuses: ['promoted'] }) (src/lib/overdeck/merge-sync.ts:478); pick the latest by updatedAt containing issueId as a member; if the member's verdict is non-terminal, recover the promote merge SHA best-effort via execFileAsync git log --fixed-strings --grep=\"Merge UAT batch <name>\" --format=%H -1 origin/main (message format from buildPromoteMergeMessage) and stamp via the same buildUatPromotionStamp guard; return { generation, mergeSha? } or null. Wire into closeOut() in src/lib/lifecycle/workflows.ts immediately before the evaluateDodGate call (line 175): push stepOk('dod:uat-promotion-evidence', [...]) naming the generation and short SHA when healed, stepSkipped(...) otherwise; the heal call is wrapped so an error yields the skipped step, never aborts close-out. Tests: heal stamps a pending/missing verdict with evidence, no-ops on terminal verdicts / non-members / unresolvable projects, still stamps when SHA recovery fails (note omits SHA), and closeOut shows the step with row 3 subsequently passing without --accept-verification."
+        },
+        "items": [
+          {
+            "id": "close-out-heal.ac1",
+            "title": "Given an issue that is a member of a promoted generation with verificationStatus 'pending', healUatPromotionVerification records the 'passed' verdict and returns the generation name and recovered merge SHA",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-heal.ac2",
+            "title": "Given an issue with a terminal verdict, no promoted membership, or an unresolvable project, healUatPromotionVerification returns null and writes nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-heal.ac3",
+            "title": "Given merge-SHA recovery fails, the heal still stamps the verdict with notes naming the generation and no SHA",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "close-out-heal.ac4",
+            "title": "Given closeOut runs for a healable issue, the ceremony output includes a passing 'dod:uat-promotion-evidence' step and the DoD verification row passes on the recorded verdict without any --accept-verification flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document uat-promotion as a DoD row 3 verdict source",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T09:45:08.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3114",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DEFINITION-OF-DONE.md",
+            "docs/UAT-BATCH-TRAINS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-doc-drift.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "dod-doc-drift.test.ts passes",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4. In docs/DEFINITION-OF-DONE.md row 3 (line 15), add 'uat-promotion (recorded at batch promotion, PAN-3114)' to the Mechanical owner cell, and add one sentence to the PAN-3067 bullet (lines 43-46) stating that UAT batch promotion records the per-member verdict at promote time and close-out heals members of past promotions. Keep the table shape intact — tests/unit/lib/lifecycle/dod-doc-drift.test.ts drift-locks this table to src/lib/lifecycle/dod.ts. In docs/UAT-BATCH-TRAINS.md (promotion section, near line 110), document that promotion records verificationStatus 'passed' per member with source uat-promotion, that terminal verdicts are preserved, and that close-out heals members of previously promoted generations."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/DEFINITION-OF-DONE.md row 3's Mechanical owner cell contains 'uat-promotion (recorded at batch promotion, PAN-3114)' and the PAN-3067 rules bullet states that promotion records the per-member verdict and close-out heals past promotions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/UAT-BATCH-TRAINS.md states that promotion records per-member verification verdicts, preserves terminal verdicts, and that close-out heals past promotions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "tests/unit/lib/lifecycle/dod-doc-drift.test.ts passes after the doc edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "stamp-module",
+        "to": "promote-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "stamp-module",
+        "to": "close-out-heal",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3114-uat-promoted-merges-leave-dod-row-3-verification-permanently-unsatisfiable-same-shape-as-the-pan-3067-strike-gap.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

@@ -1,24 +1,44 @@
 {
-  "vBRIEFInfo": {
-    "version": "0.5",
-    "created": "2026-06-04T04:53:28Z",
-    "author": "panopticon-cli/0.0.0",
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-17T13:02:00Z",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1610: Consistent issue actions across all surfaces (Command Deck cockpit, Pipeline rows, Board cards, IssueDrawer)",
-    "updated": "2026-06-04T04:56:24.193Z"
+    "updated": "2026-07-17T19:36:28.665Z"
   },
   "plan": {
     "id": "pan-1610",
     "title": "Consistent issue actions across all surfaces (Command Deck cockpit, Pipeline rows, Board cards, IssueDrawer)",
-    "status": "proposed",
-    "uid": "ae2b89a7-aa35-4acb-90c7-86dd80d15d44",
-    "author": "agent:claude-opus-4-8",
-    "sequence": 2,
-    "created": "2026-06-04T04:53:28Z",
-    "updated": "2026-06-04T04:56:24.193Z",
+    "status": "completed",
+    "uid": "da112d50-fa77-4972-90dd-abf194af8a6f",
+    "author": "agent:claude-fable-5",
+    "sequence": 6,
+    "created": "2026-07-17T13:02:00Z",
+    "updated": "2026-07-17T19:36:28.665Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1610",
+        "uri": "https://github.com/eltmon/overdeck/issues/1610",
         "label": "PAN-1610",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-1610.md",
+        "label": "PRD rev 2 (binding)",
+        "type": "doc"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/main/docs/design/mockups/issue-actions-one-registry-pan-1610.html",
+        "label": "Binding mockup",
+        "type": "doc"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2661",
+        "label": "PAN-2661 (registry extraction, merged PR #2832)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2499",
+        "label": "PAN-2499 (IssueView unification, closed)",
         "type": "issue"
       }
     ],
@@ -26,97 +46,307 @@
       "dashboard",
       "frontend",
       "issue-actions",
-      "parity",
-      "refactor"
+      "registry",
+      "parity"
     ],
     "narratives": {
-      "Problem": "After the Command Deck remodel an issue appears on four surfaces — Command Deck cockpit, Pipeline rows, Board (Kanban) cards, and the shared IssueDrawer — but the available action set is not consistent. Investigation shows the shared machinery already exists (lib/issueActions.ts catalog + useIssueActions hook + IssueActionMenu component, rendered on all four surfaces). The inconsistency comes from exactly TWO issue actions that bypass the catalog: `merge` (a standalone MergeButton imported only by DrawerActionBar, so merge is reachable only in the drawer) and `viewVbrief` (a bespoke button on board cards + a cockpit dig tab, absent from pipeline rows and the shared menu). Every other action the issue lists is already catalog-driven and reaches all surfaces. The existing parity test even enshrines the gap by listing Merge and View vBRIEF as 'non-issue-scoped'.",
-      "Proposal": "Close the two catalog gaps so ALL issue actions flow through the single shared source of truth. (1) Promote `merge` to a first-class ISSUE_ACTIONS entry with gating mirroring MergeButton (readyForMerge && mergeStatus!=='merged' && state!=='verifying_on_main'), a dialog-host confirm branch, dynamic label (Merge/Queued/Rebasing/Verifying) and the >2min stuck-merge retry; wire it to the existing POST /api/issues/:id/merge endpoint (no server work). (2) Promote `viewVbrief` (issue plan view) to a catalog entry gated on hasPlan, opening VBriefDialog via the dialog host. (3) Retire the two escape hatches: drop the standalone MergeButton from DrawerActionBar and the bespoke vBRIEF button from KanbanBoard, then delete MergeButton.tsx once unreferenced. (4) Update the parity test to the new contract and ADD a render-level parity assertion proving the same enabled action keys appear on board/pipeline/cockpit/drawer for a ready_to_merge state. (5) Add a human-readable enumeration doc of the full action set and its state gating. Frontend-only; the agent-fleet view (agentScopeOnly) and session-scoped ZONE_B vBRIEF are intentionally untouched."
+      "Problem": "After the Command Deck remodel, an issue appears on several surfaces (cockpit, pipeline rows, board cards, drawer, rail, Zone B) but each surface owns its own action rendering: the cockpit mega menu keeps a bespoke GROUP_ORDER mapping, the board/drawer hybrid toolbar has a flat non-grouped overflow plus a bolted MergeButton, the board hardcodes an Unpause button, the rail passes ad-hoc sessionExtras, and Zone B hardcodes every mutation. What you can do to an issue depends on where you look at it, and nothing stops the surfaces drifting further apart.",
+      "Proposal": "Finish the PAN-2661 registry consolidation per the binding PRD rev 2: extract the grouped menu body from the Radix context-menu chrome into a shared component; give IssueActionMenu declared presentation modes (primary-strip with '⋯ N more' grouped overflow, overflow-only grouped, typed pins including the drawer's pinned MergeButton component slot); promote session/non-issue action metadata into an executable discriminated-union contract and migrate the rail extras and the Zone B strip onto it; converge the cockpit panel on the shared body; then lock it all with a six-surface parity test built on an explicit expectedActions oracle. Surfaces contribute only { mode, pinned?, context }; the registry owns everything else.",
+      "NonGoals": "- No changes to action semantics, endpoints, or server routes for existing ISSUE_ACTIONS entries (PRD D-5)\n- merge is NOT promoted to a registry key and MergeButton is NOT deleted (supersedes the stale 2026-06-04 spec approach)\n- No new issue-scoped actions (no issue-level viewVbrief catalog entry; Zone B viewVbrief stays session-scoped)\n- No dashboard-to-CLI parity work (that axis is PAN-243)\n- No visual restyling beyond the declared presentation modes; style-guide tokens only\n- No new Mintlify page for action menus (none exists today; verified 2026-07-15 — stated, not omitted)\n- No behavior changes to the 'inline' agent-scope mode consumers beyond mode-name compatibility"
     },
     "autoDecisions": [
       {
-        "summary": "Promote issue-scoped `merge` to ISSUE_ACTIONS (overturning the existing parity test's 'non-issue-scoped' classification of Merge).",
-        "rationale": "Merge is the single largest parity gap the issue calls out — reachable only from the drawer. Making it a catalog action is the only way every surface gets it from one source of truth."
+        "summary": "Superseded the 2026-06-04 spec (merge-as-registry-key, delete-MergeButton approach) with a fresh item set.",
+        "rationale": "That spec predates PAN-2499/PAN-2661 and directly contradicts the operator-reviewed PRD rev 2 correction D-3 (merge stays a pinned MergeButton component, not a registry key). No old item survives semantically, so old item IDs were not preserved. The dead agent's 2-line uncommitted diff implementing the old spec must be reverted (recorded as hazard H1)."
       },
       {
-        "summary": "Reproduce MergeButton's full UX inside the catalog action (confirm dialog, dynamic mergeStatus label, >2min stuck-merge retry) rather than shipping a plain safe action.",
-        "rationale": "Users rely on the Queued/Rebasing/Verifying/Retry feedback; a static label would be a UX regression. The dialog-host branch + dynamic view-label pattern already exists for open/tell/inspectBead."
+        "summary": "Split PRD work item 2 (board + drawer) into two vBRIEF items and numbered Zone B migration as its own item.",
+        "rationale": "Decomposition guidance: one focused, independently reviewable change per item. Zone B promotion is required by PRD D-2/FR-1/FR-5 even though the PRD's work-item list does not number it separately."
       },
       {
-        "summary": "Add `viewVbrief` meaning the ISSUE's vBRIEF plan view (VBriefDialog), gated on hasPlan; leave the session-scoped ZONE_B 'View vBRIEF' alone.",
-        "rationale": "The issue asks for issue-action parity; the issue plan is the issue-scoped artifact. The session vBRIEF is agent-session-scoped and correctly outside the issue catalog."
+        "summary": "Covered Pipeline rows via the shared IssueActionMenu 'overflow-only' mode and included them as a sixth render point in the parity test.",
+        "rationale": "The issue title names Pipeline rows as a surface but the PRD's five-surface enumeration omits them; PipelineView.tsx:245 consumes IssueActionMenu mode='overflow-only', so upgrading that mode's overflow to the grouped body converges pipeline rows without editing PipelineView, and the parity test locks it."
       },
       {
-        "summary": "Treat hybrid-vs-overflow-only mode divergence as acceptable layout, not a parity defect; define parity as 'same enabled action set reachable on every surface'.",
-        "rationale": "Every surface's overflow menu already exposes the full enabled set; forcing identical layouts would fight the deliberate density choices per surface."
+        "summary": "Renamed mode 'hybrid' to 'primary-strip' while keeping 'overflow-only' and 'inline'.",
+        "rationale": "PRD D-3 says the hybrid toolbar becomes primary-strip mode; keeping the other mode names avoids touching agent-scope consumers (FleetAgentsView etc.) outside this issue's scope."
       },
       {
-        "summary": "No server/contract changes; confine all work to src/dashboard/frontend/src.",
-        "rationale": "The /api/issues/:id/merge endpoint already exists and MergeButton already posts to it. This is a pure frontend consolidation."
+        "summary": "PAN-2499 inventory/no-loss updates land inside each conversion item's commit rather than batched in the docs item.",
+        "rationale": "The no-loss gate runs per commit; batching relocations at the end would leave intermediate commits red, violating the independently-mergeable rule. The docs item verifies the final relocated-never-removed state."
       }
     ],
     "items": [
       {
-        "id": "catalog-merge-vbrief",
-        "title": "Add `merge` and `viewVbrief` to the shared ISSUE_ACTIONS catalog",
+        "id": "extract-grouped-body",
+        "title": "Extract the grouped menu body from GroupedIssueActionMenu into a menu-primitive-agnostic shared component",
         "status": "pending",
-        "priority": "high",
-        "created": "2026-06-04T04:53:28Z",
+        "priority": "medium",
+        "created": "2026-07-17T13:02:00Z",
         "metadata": {
-          "difficulty": "medium",
+          "difficulty": "complex",
+          "kind": "frontend",
           "issueLabel": "pan-1610",
           "requiresInspection": true,
-          "inspectionDepth": "deep",
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionGroupedBody.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
+            "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/IssueActionMenu src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "GroupedIssueActionMenu.test.tsx and FeatureItem.test.tsx pass; new grouped-body structure test passes"
+          ],
+          "readiness": "ready",
           "foundationFor": [
-            "merge-invocation",
-            "vbrief-invocation",
-            "drawer-drop-mergebutton",
-            "board-drop-vbrief-button",
-            "delete-mergebutton",
-            "update-parity-test",
-            "render-parity-test",
-            "actions-reference-doc"
+            "primary-strip-mode",
+            "convert-cockpit-panel",
+            "convert-board-card-strip",
+            "convert-drawer-strip",
+            "surface-parity-test"
+          ],
+          "traces": [
+            "FR-1"
+          ],
+          "parallelSafeReason": "Wave-0 foundation; sole owner of the IssueActionMenu grouped-body files — register-rail-extras, which later touches the same files, is serialized behind it via a blocks edge."
+        },
+        "narrative": {
+          "Action": "GroupedIssueActionMenu.tsx (origin/main) welds the grouped body — phase-chip header, 'N available · M gated' line, 'For this phase' section, GROUP_ORDER sections, session section, collapsed Danger disclosure, Explain toggle (localStorage key 'overdeck.issueActions.explain') — to Radix ContextMenu primitives from shared/ContextMenu.tsx (ContextMenuContent/Item/DestructiveItem/Label/Separator), which only render inside a Radix ContextMenu root. Extract the body into a new shared component (suggested name IssueActionGroupedBody) that is parametrized over its item primitives (an adapter prop with {Item, DestructiveItem, Label, Separator} implementations, or an equivalent plain-button implementation plus a context-menu adapter) so the identical body renders inside (a) the Radix context menu on the rail, (b) a click-popover (cockpit, later item), and (c) an overflow popover (board/drawer/pipeline, later item). GroupedIssueActionMenu becomes a thin ContextMenu wrapper composing the shared body; the rail's rendered structure must not change. Keep the sessionExtras prop working for now (it is deleted in register-rail-extras). Do NOT touch cockpit/board/drawer in this item."
+        },
+        "items": [
+          {
+            "id": "extract-grouped-body.ac1",
+            "title": "Given the rail issue-row right-click menu, when it opens after the refactor, it renders the same grouped structure (phase chip, availability count, phase/group sections, collapsed Danger, Explain toggle) and FeatureItem.test.tsx passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-grouped-body.ac2",
+            "title": "The shared grouped-body component renders inside a plain non-Radix popover host without error and produces data-issue-action-section markers for each non-empty group, proven by a new structure test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-grouped-body.ac3",
+            "title": "The Explain toggle persists to localStorage key overdeck.issueActions.explain and Danger items stay hidden until the disclosure is toggled, in both context-menu and popover hosts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-grouped-body.ac4",
+            "title": "Within src/dashboard/frontend/src/components/IssueActionMenu/, iteration over GROUP_ORDER exists only in the shared body module (grep returns exactly one file)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "primary-strip-mode",
+        "title": "Rework IssueActionMenu into declared presentation modes: primary-strip with grouped overflow and typed pins",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:02:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-1610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/IssueActionMenu"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "IssueActionMenu.test.tsx passes with the new mode contract"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ],
+          "parallelSafeReason": "Serialized behind extract-grouped-body via a blocks edge; sole owner of IssueActionMenu.tsx in its wave."
+        },
+        "narrative": {
+          "Action": "Per PRD D-3 and the binding mockup (docs/design/mockups/issue-actions-one-registry-pan-1610.html): rename IssueActionMenu mode 'hybrid' to 'primary-strip'. In primary-strip, keep the phase-primary inline buttons and replace the flat OverflowMenu with the shared grouped body (from extract-grouped-body) opened from the overflow trigger, which gains a text label of the form '⋯ N more' (N = number of non-primary actions). In 'overflow-only' mode, render the same grouped body with zero inline primaries — PipelineView.tsx:245 consumes overflow-only unchanged and thereby receives the grouped overflow (do not edit PipelineView.tsx). Keep 'inline' mode and agentScopeOnly behavior untouched. Extend the pin API: pinRight registry-key pins keep working (DrawerActionBar uses pinRight=['viewPr']); add a typed pinned-component slot — e.g. pinned: [{ key: 'merge', render: <component> }] — rendered as a declared component excluded from overflow and from set-parity (D-3 amendment to D-1). Update all mode-name references ('hybrid') across the frontend in this item so typecheck stays green."
+        },
+        "items": [
+          {
+            "id": "primary-strip-mode.ac1",
+            "title": "primary-strip mode renders the phase-primary actions as inline buttons and a '⋯ N more' trigger whose click opens the shared grouped body as the overflow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "primary-strip-mode.ac2",
+            "title": "The pin API accepts registry-key pins (rendered right-aligned from the registry) and typed component pins (rendered via the provided component and excluded from overflow set-parity)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "primary-strip-mode.ac3",
+            "title": "overflow-only mode renders the grouped body with zero inline primaries, so PipelineView rows receive the grouped overflow without any change to PipelineView.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "primary-strip-mode.ac4",
+            "title": "IssueActionMenu.test.tsx proves the overflow contains zero items absent from the registry for the rendered state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-action-contract",
+        "title": "Promote session/non-issue action metadata into an executable contract (one schema, two scopes)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:02:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-1610",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/issueActions.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both issueActions test files pass"
+          ],
+          "readiness": "ready",
+          "foundationFor": [
+            "register-rail-extras",
+            "migrate-zoneb-strip",
+            "surface-parity-test"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ],
+          "parallelSafeReason": "Wave-0 foundation; sole owner of issueActions.ts until its dependents start — both are serialized behind it via blocks edges."
+        },
+        "narrative": {
+          "Action": "Per PRD D-2: extend issueActions.ts so session-scoped and non-issue entries get the full executable shape (availability predicate, invocation, description, kind, confirm spec) via a discriminated union sharing one schema with ISSUE_ACTIONS — discriminated by scope. Reuse the EXISTING union values: NonIssueActionScope ('project' | 'container' | 'session-artifact' | 'agent-state' | 'session') and ownerSurface ('ProjectNode' | 'ContainerNode' | 'FeatureItem' | 'ZoneBActionStrip'); extend those unions if needed, never invent parallel ones. Invocation must accept a surface-provided context object (session id, issue id, and UI callbacks such as onViewTerminal) because several session actions are UI callbacks, not endpoints. This item is schema + entry promotion only — it must be additive: no surface changes consumers yet (rail migrates in register-rail-extras, Zone B in migrate-zoneb-strip). Session-scope keys must remain OUT of the issue-scoped ISSUE_ACTIONS array; the no-actions-lost test premises that separation and must keep enforcing it."
+        },
+        "items": [
+          {
+            "id": "session-action-contract.ac1",
+            "title": "issueActions.ts contains a discriminated-union action schema in which session/non-issue entries carry the executable shape (availability predicate, invocation, description, kind, confirm) alongside ISSUE_ACTIONS — one schema covering two scopes, reusing the existing ownerSurface and scope union values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-action-contract.ac2",
+            "title": "issueActions.no-actions-lost.test.ts passes with its separation premise intact: ZONE_B_SESSION_ACTIONS and PROJECT_TREE_CONTEXT_ACTIONS keys stay absent from ISSUE_ACTIONS proper",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-action-contract.ac3",
+            "title": "npm run typecheck exits with zero errors and every rendered surface preserves its current behavior (the promotion is additive; surfaces migrate in later items)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "convert-board-card-strip",
+        "title": "Convert Kanban board cards to primary-strip mode and migrate the hardcoded Unpause button to the registry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:02:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-1610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/KanbanBoard/cards/KanbanCards.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/KanbanBoard"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "KanbanBoard tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
           ]
         },
         "narrative": {
-          "Action": "In src/dashboard/frontend/src/lib/issueActions.ts add two new keys to the IssueActionKey union: `merge` and `viewVbrief`. Add their ISSUE_ACTIONS entries. `merge`: panVerb 'merge', endpoint '/api/issues/:id/merge', kind 'dialog', group 'review', enabledWhen = readyForMerge===true && reviewStatus.mergeStatus!=='merged' && normalizeCanonicalState(state)!=='verifying_on_main', phasePrimary READY_TO_MERGE (add to PHASE_PRIMARY_KEYS, joining or replacing viewPr as the ready-to-merge primary). `viewVbrief`: panVerb null, endpoint null, kind 'safe' (opens a viewer via dialog host like `open`), group 'artifacts', enabledWhen = state.hasPlan===true, phasePrimary []. Add any IssueActionState fields the merge gating needs that are not already present (mergeStatus/readyForMerge already arrive via reviewStatus; do NOT add redundant fields). This bead is catalog-shape only — invocation wiring is later beads."
+          "Action": "KanbanCards.tsx:850 renders IssueActionMenu mode='hybrid' — switch to the primary-strip declaration from primary-strip-mode. Per PRD D-5 board note: KanbanCards.tsx:615-628 defines a local handleUnpause fetch to POST /api/agents/:id/unpause and renders a hardcoded '▶ Unpause' button (:745-750); delete the local handler/button and route Unpause through the registry 'unpause' entry (same endpoint — behavior-neutral), preserving the success toast and dashboard refresh. NFR-1: the card strip keeps its current width budget — phase primaries plus the overflow trigger only; the overflow absorbs everything else. If any PAN-2499 inventory 'home' for a board section changes, update inventory.ts/densitySections.ts in the same commit."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "catalog-merge-vbrief.ac1",
-            "title": "IssueActionKey union includes 'merge' and 'viewVbrief'",
+            "id": "convert-board-card-strip.ac1",
+            "title": "KanbanCards renders card actions by declaring primary-strip mode; no bespoke overflow markup and no action label string literals remain in KanbanCards.tsx",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "catalog-merge-vbrief.ac2",
-            "title": "ISSUE_ACTIONS contains a `merge` entry whose enabledWhen returns true only when readyForMerge===true AND mergeStatus!=='merged' AND canonical state is not verifying_on_main, and false otherwise (unit test over IssueActionState fixtures)",
+            "id": "convert-board-card-strip.ac2",
+            "title": "When a paused-agent card's Unpause is clicked, it sends the same POST /api/agents/:id/unpause via the registry unpause entry; the local handleUnpause fetch is deleted from KanbanCards.tsx and the success toast plus dashboard refresh are preserved",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "catalog-merge-vbrief.ac3",
-            "title": "ISSUE_ACTIONS contains a `viewVbrief` entry whose enabledWhen returns true iff state.hasPlan===true",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "catalog-merge-vbrief.ac4",
-            "title": "PHASE_PRIMARY_KEYS maps READY_TO_MERGE to include `merge` as a primary action; deriveIssueActionPhase still returns READY_TO_MERGE for a ready-to-merge state",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "catalog-merge-vbrief.ac5",
-            "title": "npm run typecheck and npm run lint pass; no other ISSUE_ACTIONS entries changed beyond the two additions and the phase-map edit",
+            "id": "convert-board-card-strip.ac3",
+            "title": "The card strip renders only phase-primary buttons plus the overflow trigger — no wider inline button set than today — asserted by a structure test",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -125,166 +355,57 @@
         ]
       },
       {
-        "id": "merge-invocation",
-        "title": "Wire `merge` invocation in useIssueActions + dialog host (confirm, dynamic label, stuck retry)",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-04T04:53:28Z",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-1610",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "In useIssueActions.ts and IssueActionMenu.tsx (IssueActionDialogHost), implement merge end to end, porting MergeButton's logic: clicking `merge` opens a confirm dialog ('Merge <id> to main?' with the review/tests-passed message and confirmLabel 'Merge'), then POSTs /api/issues/:id/merge and calls refreshDashboardState. Compute a DYNAMIC label/disabled for the merge view from reviewStatus.mergeStatus: 'Queued' (queued), 'Rebasing…'/'Merging' (merging), 'Verifying…' (verifying), 'Retry Merge' when merging has elapsed >2min (PAN-490 stuck detection via reviewStatus.updatedAt), otherwise 'Merge'. Disable while queued/merging/verifying unless stuck. Add the bodyForAction case if needed (merge needs no body). Route via the existing dialog-host branch pattern (activeDialog.key === 'merge')."
-        },
-        "subItems": [
-          {
-            "id": "merge-invocation.ac1",
-            "title": "Invoking the merge action opens a confirm dialog; confirming POSTs to /api/issues/:id/merge and triggers refreshDashboardState (asserted with a mocked fetch)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "merge-invocation.ac2",
-            "title": "The merge action's rendered label reflects reviewStatus.mergeStatus: Queued/Rebasing/Verifying/Merge, matching the prior MergeButton states",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "merge-invocation.ac3",
-            "title": "After mergeStatus==='merging' for >2min the action shows a 'Retry Merge' affordance and becomes enabled; before 2min it is disabled (test uses vi.useFakeTimers()/vi.setSystemTime — no real wall-clock)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "merge-invocation.ac4",
-            "title": "A failed merge POST surfaces the server error via the alert dialog (mirrors MergeButton error handling)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "vbrief-invocation",
-        "title": "Wire `viewVbrief` to open VBriefDialog via the dialog host",
+        "id": "convert-drawer-strip",
+        "title": "Convert DrawerActionBar to primary-strip with a pinned merge component slot",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-04T04:53:28Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1610",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "In IssueActionDialogHost (IssueActionMenu.tsx), add a branch for activeDialog.key === 'viewVbrief' that renders the existing VBriefDialog (components/vbrief/VBriefDialog.tsx) for the issueId, following the same pattern as the `open` -> IssueOpenInDialog branch. Ensure invoking `viewVbrief` from useIssueActions sets the active dialog. No new endpoint."
-        },
-        "subItems": [
-          {
-            "id": "vbrief-invocation.ac1",
-            "title": "Invoking the viewVbrief action from the shared menu opens VBriefDialog scoped to the issue (asserted via render test)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "vbrief-invocation.ac2",
-            "title": "Closing the dialog (Escape/backdrop) dismisses VBriefDialog without unmounting the menu",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "drawer-drop-mergebutton",
-        "title": "Refactor DrawerActionBar to source merge from the shared menu (remove standalone MergeButton)",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-04T04:53:28Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1610",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "In components/drawer/DrawerActionBar.tsx remove the standalone <MergeButton> and its import. Merge now comes from the shared IssueActionMenu (pin it right alongside viewPr, e.g. pinRight={['merge','viewPr']}, or rely on its READY_TO_MERGE primary placement). Drawer behaviour for a ready-to-merge issue must still show a Merge affordance — now catalog-driven. Update DrawerActionBar.test if it asserts the old MergeButton presence."
-        },
-        "subItems": [
-          {
-            "id": "drawer-drop-mergebutton.ac1",
-            "title": "DrawerActionBar.tsx no longer imports or renders MergeButton",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "drawer-drop-mergebutton.ac2",
-            "title": "For a ready_to_merge issue, the drawer still surfaces a Merge action, now rendered by IssueActionMenu (render test asserts issue-action-merge testid present)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "board-drop-vbrief-button",
-        "title": "Refactor KanbanBoard to source vBRIEF (and merge) from the shared menu (remove bespoke vBRIEF button)",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-04T04:53:28Z",
+        "created": "2026-07-17T13:02:00Z",
         "metadata": {
           "difficulty": "medium",
+          "kind": "frontend",
           "issueLabel": "pan-1610",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/DrawerActionBar.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer src/components/IssueActionMenu"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "drawer and IssueActionMenu tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
         },
         "narrative": {
-          "Action": "In components/KanbanBoard.tsx remove the bespoke vBRIEF button on cards (the action-vbrief-* button) and the onViewVBrief prop chain / setVbriefDialogIssue plumbing that exists solely to drive it. vBRIEF viewing now comes from the shared IssueActionMenu's viewVbrief action (the card already renders IssueActionMenu mode=hybrid). Remove orphaned props/state/imports the change creates. Merge likewise becomes available on board cards automatically via the catalog (no bespoke MergeButton was on cards). Keep VBriefDialog as the renderer opened by the dialog host."
+          "Action": "DrawerActionBar.tsx currently renders IssueActionMenu mode='hybrid' pinRight=['viewPr'] with a MergeButton bolted beside it. Per PRD D-3: declare primary-strip mode with the typed pinned-component slot pinned: [{ key: 'merge', render: MergeButton }] (MergeButton keeps owning readiness/stuck-retry/mutation/confirm — it is NOT deleted and merge is NOT a registry key), and preserve the pinRight=['viewPr'] registry-key pin. Delete the side-by-side MergeButton composition; merge renders via the declaration. Update the PAN-2499 inventory entry for DrawerActionBar in the same commit if its home changes."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "board-drop-vbrief-button.ac1",
-            "title": "KanbanBoard.tsx no longer renders a bespoke vBRIEF button (no data-testid=action-vbrief-*) and the onViewVBrief/setVbriefDialogIssue plumbing that only fed it is removed",
+            "id": "convert-drawer-strip.ac1",
+            "title": "DrawerActionBar declares primary-strip with a pinned merge component slot; MergeButton renders via the pin declaration and the bolted side-by-side composition is deleted",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "board-drop-vbrief-button.ac2",
-            "title": "vBRIEF is still reachable from a board card via the shared menu's viewVbrief action when the issue hasPlan (render test)",
+            "id": "convert-drawer-strip.ac2",
+            "title": "viewPr renders right-pinned via the existing registry-key pin and opens the PR exactly as before",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "board-drop-vbrief-button.ac3",
-            "title": "For a ready_to_merge issue, a board card surfaces the Merge action via the shared menu (render test asserts issue-action-merge testid)",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "board-drop-vbrief-button.ac4",
-            "title": "No orphaned imports/props/state remain; npm run typecheck and npm run lint pass",
+            "id": "convert-drawer-strip.ac3",
+            "title": "DrawerActionBar.tsx contains no action label string literals and no merge layout logic beyond the pin declaration",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -293,109 +414,59 @@
         ]
       },
       {
-        "id": "delete-mergebutton",
-        "title": "Delete the now-unused MergeButton component",
+        "id": "convert-cockpit-panel",
+        "title": "Converge the cockpit ⌘ Actions mega menu on the shared grouped body",
         "status": "pending",
         "priority": "medium",
-        "created": "2026-06-04T04:53:28Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1610",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "Once DrawerActionBar no longer imports MergeButton, delete components/MergeButton.tsx and any MergeButton-specific test. First grep the whole frontend for remaining importers (non-test) and confirm none exist. If a test-only importer remains, update or remove it. Do not delete if any non-test consumer still references it — surface that instead."
-        },
-        "subItems": [
-          {
-            "id": "delete-mergebutton.ac1",
-            "title": "grep for 'MergeButton' across src/dashboard/frontend/src returns no non-test importers before deletion",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "delete-mergebutton.ac2",
-            "title": "components/MergeButton.tsx is deleted; npm run typecheck and npm run lint pass with no dangling imports",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "update-parity-test",
-        "title": "Update action-parity.test.ts to the new contract (merge + viewVbrief are catalog actions)",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-04T04:53:28Z",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-1610",
-          "requiresInspection": false,
-          "inspectionDepth": "fast"
-        },
-        "narrative": {
-          "Action": "In components/CommandDeck/__tests__/action-parity.test.ts: change legacyIssueActionMap entry 'Merge' from null to 'merge'; add a 'View vBRIEF' -> 'viewVbrief' mapping; remove 'Merge' and 'View vBRIEF' from nonIssueScopedActionLabels (keep the genuinely session-scoped entries like Stop session, View terminal, Copy Session ID). Add explicit assertions that ISSUE_ACTIONS contains both new keys. This documents the overturned classification (continue.json D3)."
-        },
-        "subItems": [
-          {
-            "id": "update-parity-test.ac1",
-            "title": "Parity test maps legacy 'Merge' -> 'merge' and 'View vBRIEF' -> 'viewVbrief' and asserts both keys exist in ISSUE_ACTIONS",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          },
-          {
-            "id": "update-parity-test.ac2",
-            "title": "nonIssueScopedActionLabels no longer lists 'Merge' or 'View vBRIEF'; the test file still passes",
-            "status": "pending",
-            "metadata": {
-              "kind": "acceptance_criterion"
-            }
-          }
-        ]
-      },
-      {
-        "id": "render-parity-test",
-        "title": "Add render-level cross-surface parity test for a ready_to_merge issue",
-        "status": "pending",
-        "priority": "high",
-        "created": "2026-06-04T04:53:28Z",
+        "created": "2026-07-17T13:02:00Z",
         "metadata": {
           "difficulty": "medium",
+          "kind": "frontend",
           "issueLabel": "pan-1610",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+            "src/dashboard/frontend/src/components/issue-view/inventory.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx src/components/issue-view"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "IssueMissionControl tests and the issue-view no-loss gate pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
         },
         "narrative": {
-          "Action": "Add a test that renders the shared IssueActionMenu as each of the four surfaces use it — board (hybrid), cockpit/IssueStatusBand (hybrid), pipeline (overflow-only), drawer (hybrid) — for the SAME ready_to_merge IssueActionState (the state where merge + vBRIEF were previously missing on most surfaces). Assert the set of enabled issue-action testids (including issue-action-merge and issue-action-viewVbrief) reachable (inline + opened overflow) is IDENTICAL across the four configurations. This is the regression guard that prevents future surface drift. Use fake timers if the ready_to_merge fixture exercises the stuck-merge clock.",
-          "Notes": "Layout differs by mode but the reachable enabled set must match. FleetAgentsView (agentScopeOnly) is intentionally excluded — it is not one of the four issue surfaces."
+          "Action": "IssueActionMegaMenu (IssueMissionControl.tsx:180-255) builds its own grouped panel: a groups useMemo mapping GROUP_ORDER × ISSUE_ACTIONS to views plus bespoke button rendering. Per PRD D-4: keep the popover chrome (⌘ Actions trigger, backdrop, positioning) but render the shared grouped body (from extract-grouped-body) as the content; delete the bespoke groups useMemo and group mapping. The Danger section thereby adopts the collapsed-disclosure behavior. The existing IssueActionDialogHost wiring stays. Update the PAN-2499 inventory entry for IssueActionMegaMenu in the same commit if its home changes — relocation, never removal."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "render-parity-test.ac1",
-            "title": "Test renders the menu in board(hybrid), cockpit(hybrid), pipeline(overflow-only), drawer(hybrid) configs for one ready_to_merge fixture and asserts identical sets of enabled issue-action keys reachable on each",
+            "id": "convert-cockpit-panel.ac1",
+            "title": "The cockpit ⌘ Actions popover renders the shared grouped body (data-issue-action-section markers present) and the bespoke groups useMemo/GROUP_ORDER mapping is deleted from IssueMissionControl.tsx",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "render-parity-test.ac2",
-            "title": "The asserted set includes issue-action-merge and issue-action-viewVbrief on every surface (proving the closed gaps)",
+            "id": "convert-cockpit-panel.ac2",
+            "title": "The cockpit Danger section renders as the collapsed disclosure and expands on toggle",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "render-parity-test.ac3",
-            "title": "Test passes under the default vitest run (no maxForks=1, fake timers used for any clock-based assertion)",
+            "id": "convert-cockpit-panel.ac3",
+            "title": "IssueMissionControl.test.tsx passes against the shared structure, and any inventory home change lands in the same commit with the no-loss gate passing",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -404,32 +475,253 @@
         ]
       },
       {
-        "id": "actions-reference-doc",
-        "title": "Document the full issue-action set and its state gating",
+        "id": "register-rail-extras",
+        "title": "Register rail session extras as contract entries and delete the sessionExtras plumbing",
         "status": "pending",
-        "priority": "low",
-        "created": "2026-06-04T04:53:28Z",
+        "priority": "medium",
+        "created": "2026-07-17T13:02:00Z",
         "metadata": {
-          "difficulty": "simple",
+          "difficulty": "medium",
+          "kind": "frontend",
           "issueLabel": "pan-1610",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/issueActions.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx src/components/IssueActionMenu",
+            "bash -c \"! git grep -q sessionExtras -- src/dashboard/frontend\""
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "FeatureItem and IssueActionMenu tests pass",
+            "grep for sessionExtras in the frontend returns no matches"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
         },
         "narrative": {
-          "Action": "Add docs/ISSUE-ACTIONS.md enumerating every ISSUE_ACTIONS entry: key, label, panVerb, kind, group, the lifecycle phase(s) it is primary in, and a plain-English statement of its enabledWhen gating. State that all four surfaces (cockpit, pipeline rows, board cards, IssueDrawer) render this set via the shared IssueActionMenu, that parity is enforced by action-parity.test.ts + the render-parity test, and that FleetAgentsView/ZONE_B session actions are intentional exceptions. This satisfies the issue's first scope bullet (enumerate the action set + gating) as a living human-readable contract."
+          "Action": "Per PRD D-2/FR-4: FeatureItem.tsx:659-693 builds ad-hoc sessionExtras (Open State Dir, View JSONL) and passes them into GroupedIssueActionMenu's temporary sessionExtras prop (PAN-2661 plumbing). Register these as executable contract entries (from session-action-contract) with ownerSurface 'FeatureItem' and scope 'session-artifact', with availability predicates encoding today's gating (Open State Dir requires a work session id; View JSONL additionally requires an existing JSONL). The rail renders them via a registry filter over the contract; delete the sessionExtras prop from GroupedIssueActionMenu and all plumbing from FeatureItem."
         },
-        "subItems": [
+        "items": [
           {
-            "id": "actions-reference-doc.ac1",
-            "title": "docs/ISSUE-ACTIONS.md exists and lists every current ISSUE_ACTIONS key (including merge and viewVbrief) with its gating summary and primary phase(s)",
+            "id": "register-rail-extras.ac1",
+            "title": "The rail menu renders Open State Dir and View JSONL from contract entries (ownerSurface FeatureItem, scope session-artifact) selected by a registry filter, and preserves gating: both absent without a work session, View JSONL absent without a JSONL file",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "actions-reference-doc.ac2",
-            "title": "The doc names the four surfaces, the shared IssueActionMenu as the single source, and the two intentional exceptions (FleetAgentsView agentScopeOnly, ZONE_B session vBRIEF)",
+            "id": "register-rail-extras.ac2",
+            "title": "git grep sessionExtras over src/dashboard/frontend returns no matches — the prop and its plumbing are deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-rail-extras.ac3",
+            "title": "FeatureItem.test.tsx exercises the extras via the registry path and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-zoneb-strip",
+        "title": "Migrate Zone B action strip's hardcoded mutations to the executable contract",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:02:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-1610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneBActionStrip.tsx",
+            "src/dashboard/frontend/src/lib/issueActions.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/action-parity.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck src/lib/__tests__/issueActions.no-actions-lost.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "CommandDeck tests and the no-actions-lost suite pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ],
+          "parallelSafeReason": "Serialized behind session-action-contract and register-rail-extras via blocks edges, so it is the sole owner of issueActions.ts and the no-actions-lost test when it runs."
+        },
+        "narrative": {
+          "Action": "Per PRD glossary + D-2: ZONE_B_SESSION_ACTIONS (issueActions.ts:149-155) is metadata-only while ZoneBActionStrip.tsx hardcodes its own mutations (kill/suspend/resume/restart/replay/deep-wipe fetches, confirm dialogs at :131/:146/:173, overflow items at :355-395). Give every Zone B action an executable contract entry (ownerSurface 'ZoneBActionStrip') carrying its label, kind, confirm copy, and invocation; invocations that are UI callbacks (view terminal switching Zone C) take the surface context — do not convert callbacks into endpoints. The strip keeps its compact visual layout (inline stop/terminal/pause-resume + overflow) but renders labels, confirmation flows, and invocations from the contract and defines none of its own — hardcoded behavior preserved verbatim (D-5), including the stop-session confirmation copy, the codex-blocked spawn handling, toasts, and refreshes. Update the no-actions-lost test deliberately: session keys stay OUT of ISSUE_ACTIONS; the executable entries supersede the metadata inventory without dropping any key."
+        },
+        "items": [
+          {
+            "id": "migrate-zoneb-strip.ac1",
+            "title": "Every ZoneBActionStrip action (stop session, view terminal, pause, resume, restart, replay, open state dir, view State.md, view vBRIEF, copy session id, copy tmux command, exports, deep wipe) is defined as an executable contract entry with ownerSurface ZoneBActionStrip, and the strip renders labels/confirm/invocation from those entries while defining none of its own",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-zoneb-strip.ac2",
+            "title": "Zone B preserves behavior verbatim: the stop-session confirm copy, endpoints, toasts, codex-blocked spawn handling, and the view-terminal callback each produce identical observable behavior, and the revised Zone B tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-zoneb-strip.ac3",
+            "title": "issueActions.no-actions-lost.test.ts passes with deliberately revised premises: Zone B keys stay absent from ISSUE_ACTIONS and the executable entries cover every previously inventoried key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "surface-parity-test",
+        "title": "Cross-surface action-parity test built on an explicit per-surface oracle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:02:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-1610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issue-actions-surface-parity.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "issue-actions-surface-parity.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "parallelSafeReason": "Final wave: creates one new test file after every conversion item lands; no shared file mutation with any concurrent item."
+        },
+        "narrative": {
+          "Action": "Per FR-5: create src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx with an explicit oracle function expectedActions(registry, state, surface, context). Surfaces legitimately differ (session extras on rail/Zone B, pinned merge on drawer), so parity means each surface's rendered output ≡ its oracle output — not surface ≡ surface. Render six surfaces: cockpit panel, rail context menu, board card strip, drawer strip, pipeline row overflow (overflow-only mode as consumed by PipelineView), and Zone B strip. Assert by introspecting rendered output: action set identity, enabled/disabled gating identity, danger-last ordering, and zero out-of-registry MENU items (pinned component slots exempt per D-3 but asserted present via the pin declaration). Include negative fixtures proving the comparator detects each drift class. Note the existing issueActions.parity.test.tsx covers the registry↔CLI axis (PAN-243) — leave it in place; this file is the cross-surface axis."
+        },
+        "items": [
+          {
+            "id": "surface-parity-test.ac1",
+            "title": "The new file src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx creates an explicit oracle expectedActions(registry, state, surface, context) and derives every expectation from it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "surface-parity-test.ac2",
+            "title": "For representative states (unplanned, planned, working, paused, ready_to_merge, merged), each of the six surfaces renders an action set identical to its oracle output, including enabled/disabled gating identity and danger-last ordering",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "surface-parity-test.ac3",
+            "title": "Negative fixtures prove sensitivity: the comparator rejects an injected out-of-registry menu item, a gating divergence, a group-order mutation, and a missing session extra",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "surface-parity-test.ac4",
+            "title": "The parity suite renders the drawer's pinned MergeButton via the pin declaration and excludes pinned component slots from menu set parity",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-pointers",
+        "title": "Document the one-registry actions contract and record the inventory relocations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:02:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1610",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md",
+            "docs/design/mockups/issue-actions-grouped-pan-2661.html",
+            "src/dashboard/frontend/src/components/issue-view/inventory.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the issue-view no-loss gate passes"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6: (1) docs/ISSUE-VIEW.md gains a section stating that all issue-action surfaces render from the single registry in src/dashboard/frontend/src/lib/issueActions.ts via declared presentation modes (grouped-panel, grouped-context, primary-strip, overflow-only, pinned slots) and naming issue-actions-surface-parity.test.tsx as the parity gate. (2) Add a one-line pointer in docs/design/mockups/issue-actions-grouped-pan-2661.html to issue-actions-one-registry-pan-1610.html. (3) Verify final inventory state: PAN-2499 inventory entries whose homes changed (IssueActionMegaMenu, FeatureContextMenu, DrawerActionBar) show relocations, never removals. No Mintlify surface documents action menus (verified 2026-07-15) — this is stated here deliberately rather than omitted."
+        },
+        "items": [
+          {
+            "id": "docs-and-pointers.ac1",
+            "title": "docs/ISSUE-VIEW.md contains a section stating that issue actions render from the single registry in issueActions.ts via declared presentation modes, and naming issue-actions-surface-parity.test.tsx as the parity gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-pointers.ac2",
+            "title": "docs/design/mockups/issue-actions-grouped-pan-2661.html contains a one-line pointer to issue-actions-one-registry-pan-1610.html",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-pointers.ac3",
+            "title": "The PAN-2499 inventory shows relocated homes for the affected entries with zero removed sections relative to main, and the no-loss gate passes",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -440,79 +732,84 @@
     ],
     "edges": [
       {
-        "from": "catalog-merge-vbrief",
-        "to": "merge-invocation",
+        "from": "extract-grouped-body",
+        "to": "primary-strip-mode",
         "type": "blocks"
       },
       {
-        "from": "catalog-merge-vbrief",
-        "to": "vbrief-invocation",
+        "from": "extract-grouped-body",
+        "to": "convert-cockpit-panel",
         "type": "blocks"
       },
       {
-        "from": "catalog-merge-vbrief",
-        "to": "drawer-drop-mergebutton",
+        "from": "primary-strip-mode",
+        "to": "convert-board-card-strip",
         "type": "blocks"
       },
       {
-        "from": "catalog-merge-vbrief",
-        "to": "board-drop-vbrief-button",
+        "from": "primary-strip-mode",
+        "to": "convert-drawer-strip",
         "type": "blocks"
       },
       {
-        "from": "catalog-merge-vbrief",
-        "to": "update-parity-test",
+        "from": "session-action-contract",
+        "to": "register-rail-extras",
         "type": "blocks"
       },
       {
-        "from": "merge-invocation",
-        "to": "drawer-drop-mergebutton",
+        "from": "session-action-contract",
+        "to": "migrate-zoneb-strip",
         "type": "blocks"
       },
       {
-        "from": "merge-invocation",
-        "to": "board-drop-vbrief-button",
-        "type": "informs"
-      },
-      {
-        "from": "vbrief-invocation",
-        "to": "board-drop-vbrief-button",
+        "from": "convert-board-card-strip",
+        "to": "surface-parity-test",
         "type": "blocks"
       },
       {
-        "from": "drawer-drop-mergebutton",
-        "to": "delete-mergebutton",
+        "from": "convert-drawer-strip",
+        "to": "surface-parity-test",
         "type": "blocks"
       },
       {
-        "from": "merge-invocation",
-        "to": "render-parity-test",
+        "from": "convert-cockpit-panel",
+        "to": "surface-parity-test",
         "type": "blocks"
       },
       {
-        "from": "vbrief-invocation",
-        "to": "render-parity-test",
+        "from": "register-rail-extras",
+        "to": "surface-parity-test",
         "type": "blocks"
       },
       {
-        "from": "drawer-drop-mergebutton",
-        "to": "render-parity-test",
-        "type": "informs"
+        "from": "migrate-zoneb-strip",
+        "to": "surface-parity-test",
+        "type": "blocks"
       },
       {
-        "from": "board-drop-vbrief-button",
-        "to": "render-parity-test",
-        "type": "informs"
+        "from": "surface-parity-test",
+        "to": "docs-and-pointers",
+        "type": "blocks"
       },
       {
-        "from": "catalog-merge-vbrief",
-        "to": "actions-reference-doc",
-        "type": "informs"
+        "from": "extract-grouped-body",
+        "to": "register-rail-extras",
+        "type": "blocks"
+      },
+      {
+        "from": "register-rail-extras",
+        "to": "migrate-zoneb-strip",
+        "type": "blocks"
+      },
+      {
+        "from": "convert-cockpit-panel",
+        "to": "docs-and-pointers",
+        "type": "blocks"
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-04-PAN-1610-consistent-issue-actions-across-all-surfaces-command-deck-cockpit-pipeline-rows-board-cards-issuedrawer.vbrief.json"
+      "canonicalFilename": "2026-07-17-PAN-1610-consistent-issue-actions-across-all-surfaces-command-deck-cockpit-pipeline-rows-board-cards-issuedrawer.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

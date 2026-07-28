@@ -1,0 +1,141 @@
+{
+  "issueId": "PAN-2898",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-19T03:01:13.924Z",
+  "updated": "2026-07-19T05:25:03.854Z",
+  "pipeline": {
+    "issueId": "PAN-2898",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "releaseStatus": "skipped",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-19T05:25:03.836Z",
+    "testNotes": "Skipped: issue is already merged",
+    "lastVerifiedCommit": "04ea9b7d252b43d2e4a67578d8276890ecbfdc83",
+    "strikeLandingState": "landed",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-19T04:24:32.260Z",
+        "strikeHead": "60a76d75304f31f85d3fd5c13ba391dfec1d72a7",
+        "mainHead": "dd2b8678580ac595ee51a66602f044e2c0e7d35b",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-07-19T04:46:20.281Z",
+        "strikeHead": "81a440c568eb29390defc463aac740b329765288",
+        "mainHead": "70efb37663240e8b0d2ad8291748afdac09baa62",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
+      }
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-07-19T05:25:03.836Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "strike": {
+          "openai/gpt-5.6-sol": {
+            "input": 1559708,
+            "output": 188130,
+            "cacheRead": 89421824,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 1559708,
+          "output": 188130,
+          "cacheRead": 89421824,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 58.153352,
+        "pricingAsOf": "2026-07-19T05:08:15.126Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-19T05:25:03.848Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at 04ea9b7d252b43d2e4a67578d8276890ecbfdc83",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2911 MERGED at 2026-07-19T05:07:17Z",
+          "status": "pass",
+          "mergedAt": "2026-07-19T05:07:17Z",
+          "mergeCommit": "303a0a410849762b411eafb4a9e4982be3ebed3d"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 303a0a410849762b411eafb4a9e4982be3ebed3d",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 303a0a41 contains merge 303a0a41",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 4 agent state directories; Preserved local branch strike/pan-2898 — not merged to main; Preserved remote branch strike/pan-2898 — not merged to main; Pruned 98 checkpoint ref(s) for agent-pan-2898, planning-pan-2898, strike-pan-2898; No specialist registry entries for PAN-2898"
+        }
+      ],
+      "accepted": []
+    }
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.6-sol"
+}

@@ -1,0 +1,394 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-25T23:05:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3083: Passed+ready issues get re-dispatched for review, knocking them out of the ready queue and invalidating UAT generations",
+    "updated": "2026-07-26T00:56:55.265Z"
+  },
+  "plan": {
+    "id": "pan-3083",
+    "title": "Passed+ready issues get re-dispatched for review, knocking them out of the ready queue and invalidating UAT generations",
+    "status": "completed",
+    "uid": "9192640e-e87f-445a-a0e9-c4b76e52fe8d",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-25T23:05:00.000Z",
+    "updated": "2026-07-26T00:56:55.265Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3083",
+        "label": "PAN-3083",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "review-pipeline",
+      "dispatch",
+      "uat-train",
+      "auto-heal"
+    ],
+    "narratives": {
+      "Problem": "needsReviewDispatch (src/lib/review-dispatch-decision.ts:19) never checks reviewStatus === 'passed' or readyForMerge, so a stale durable reviewRequestedAt intent keeps re-dispatching review convoys for issues already passed and queued to merge. Each dispatch knocks the issue out of the ready queue, which invalidates the UAT generation it belongs to (uat-reconciler isStale: 'left the ready queue'), tearing down and rebuilding batches indefinitely while burning a full review convoy per cycle. The regression guard blocks some status writes but not the dispatch — and rejecting the spawn's write also discards the reviewSpawnedAt stamp that would mark the intent serviced, so the loop never converges.",
+      "Proposal": "Three-layer fix per the PRD (.pan/drafts/PAN-3083.md): (1) guard the pure predicate — return false on reviewStatus 'passed'/'skipped' and on readyForMerge, passing readyForMerge from maybeAutoDispatchReviewHostSide; (2) consume the intent — when a terminal review verdict lands in setReviewStatusSync, clear a serviced reviewRequestedAt (requestedAt <= spawnedAt, or spawnedAt absent) so it is removed from both the DB row and the journal record, while preserving an unserviced newer request; (3) let sandboxed verdict writes propagate the clear by adding reviewRequestedAt to FALLBACK_CLEARABLE_FIELDS. Genuine re-review still works because both legitimate paths (pan done on a new commit; operator force re-request) reset reviewStatus to 'pending' before writing a fresh intent. Regression tests lock the predicate, the consumption, the fallback clear, and UAT-generation stability.",
+      "NonGoals": "- No change to the 30s dispatch throttle or dispatchReviewHostSide\n- No weakening or modification of the reviewStatus regression guards (review-status.ts:190-214, review-status-json.ts:61)\n- No root-cause repair of how PAN-3037's stale intent timestamp was produced (PAN-3076 / polyrepo anchor territory)\n- No changes to UAT reconciler invalidation semantics (isStale stays as-is)\n- No polyrepo/composite-anchor changes (PAN-3076, PAN-2948)\n- No fix for the pre-existing mid-review pan-done race (late verdict overwriting a pending reset)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Guard both 'passed' and 'skipped' in the predicate",
+        "rationale": "skipped is the review-mode-none success verdict and advances the lifecycle exactly like passed; a resurrected newer intent would loop identically on it."
+      },
+      {
+        "summary": "Consume the intent conditionally (serviced only: requestedAt <= spawnedAt, or spawnedAt absent), on all terminal verdicts",
+        "rationale": "Preserves a genuinely newer mid-review request from a new commit; when spawnedAt is missing the verdict itself proves the request was serviced. Any terminal verdict (passed/blocked/failed/skipped) services the request that produced its cycle."
+      },
+      {
+        "summary": "No verdict-timestamp parameter added to the predicate",
+        "rationale": "The issue's 'unless a newer request postdates the verdict' clause is satisfied structurally: both genuine re-review paths (pan done new-commit path, operator force) reset reviewStatus to 'pending' before writing a fresh intent, so the passed guard never sees them; keeping the predicate's input surface small keeps it pure."
+      },
+      {
+        "summary": "Add reviewRequestedAt to FALLBACK_CLEARABLE_FIELDS",
+        "rationale": "The workspace verdict fallback drain preserves absent keys unless listed in clearedFields; without this a sandboxed verdict write would resurrect the intent from the record and the loop would persist until a host-side write."
+      },
+      {
+        "summary": "UAT protection is verified at the reconciler level with dependency injection plus the pure predicate, not an end-to-end pipeline test",
+        "rationale": "reconcileUatGenerations takes UatReconcilerDeps, making 'member stays in ready set => generation survives' directly assertable; the dispatch side is locked by the pure predicate test on the exact PAN-3037 field snapshot."
+      }
+    ],
+    "items": [
+      {
+        "id": "guard-dispatch-predicate",
+        "title": "Guard needsReviewDispatch against passed/skipped verdicts and readyForMerge",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T23:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3083",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/review-dispatch-decision.ts",
+            "src/lib/review-status.ts",
+            "tests/unit/lib/review-dispatch-decision.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/review-dispatch-decision.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/review-dispatch-decision.test.ts passes with the PAN-3037 snapshot case asserting no dispatch",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/review-dispatch-decision.ts, add `readyForMerge?: boolean` to the params type and two guards before the timestamp comparison: return false when reviewStatus is 'passed' or 'skipped', and return false when readyForMerge is true (exact before/after snippet in .pan/drafts/PAN-3083.md). Extend the doc comment to state that genuine re-review paths reset reviewStatus to 'pending' first (pan done new-commit path at src/cli/commands/done.ts:780-855; operator force at routes/workspaces/review-pipeline.ts:441-504). In src/lib/review-status.ts:510-515 (maybeAutoDispatchReviewHostSide), add `readyForMerge: status.readyForMerge` to the params passed to needsReviewDispatch. Verify (do not change) that the deacon call site src/lib/cloister/deacon.ts:1174 passes the whole status object and therefore picks up the field structurally. Create tests/unit/lib/review-dispatch-decision.test.ts (no test file exists today) covering: the PAN-3037 snapshot ({reviewStatus:'passed', readyForMerge:true, reviewRequestedAt newer than reviewSpawnedAt}) -> false; {reviewStatus:'skipped'} with newer request -> false; {readyForMerge:true, reviewStatus:'pending'} -> false; {reviewStatus:'pending', reviewRequestedAt newer} -> true; missing reviewSpawnedAt with pending -> true; existing 'reviewing' and 'merged' guards -> false; missing reviewRequestedAt -> false. The function must stay pure (no I/O, no new imports)."
+        },
+        "items": [
+          {
+            "id": "guard-dispatch-predicate.ac1",
+            "title": "Given reviewStatus 'passed', readyForMerge true, and reviewRequestedAt newer than reviewSpawnedAt (the PAN-3037 snapshot), needsReviewDispatch returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-dispatch-predicate.ac2",
+            "title": "Given readyForMerge true with reviewStatus 'pending' and an unserviced request, needsReviewDispatch returns false; given reviewStatus 'skipped' with an unserviced request it also returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-dispatch-predicate.ac3",
+            "title": "Given reviewStatus 'pending', readyForMerge falsy, and reviewRequestedAt newer than reviewSpawnedAt (or no reviewSpawnedAt), needsReviewDispatch returns true — the post-pan-done and post-operator-force shapes still dispatch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-dispatch-predicate.ac4",
+            "title": "maybeAutoDispatchReviewHostSide passes readyForMerge from the status into the predicate (visible in the diff at src/lib/review-status.ts:510-515), and npx vitest run tests/unit/lib/review-dispatch-decision.test.ts exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "consume-intent-on-verdict",
+        "title": "Terminal review verdict consumes a serviced reviewRequestedAt in setReviewStatusSync",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T23:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3083",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/review-status.ts",
+            "tests/unit/lib/review-status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/review-status.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/review-status.test.ts passes including the new consume-on-verdict cases asserting the journal record no longer carries reviewRequestedAt",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/review-status.ts setReviewStatusSync, after the `merged` computation (the spread at :227 and the reviewerVerdicts merge at :232-234) and before history tracking, insert the consumption block from the PRD (.pan/drafts/PAN-3083.md, 'Before/after — intent consumption'): when update.reviewStatus transitions into a terminal verdict ('passed'|'blocked'|'failed'|'skipped', different from the prior status) and merged.reviewRequestedAt is set, clear it when serviced — Date.parse(reviewRequestedAt) <= new Date(reviewSpawnedAt).getTime(), or reviewSpawnedAt absent. Preserve it when the request is newer than the spawn (unserviced mid-review request). The clear must be an explicit assignment on `merged` (spread semantics: explicit undefined overrides), so the cleared value flows through normalizeReviewStatusSync into `updated` and then into updateIssueRecordForReviewStatusSync at :321, removing the field from the journal pipeline record (projectPipeline at src/lib/pan-dir/records.ts:126 writes it verbatim; JSON.stringify drops undefined keys). Tests in tests/unit/lib/review-status.test.ts must assert BOTH the returned status and the journal record's pipeline block lack the field after a serviced clear (hazard H1: enrichReviewNotesFromRecordSync:88 resurrects any journal-side leftover on every read), that an unserviced newer request survives, that a missing reviewSpawnedAt still clears, and that non-verdict updates (e.g. a testStatus-only write) never touch the field."
+        },
+        "items": [
+          {
+            "id": "consume-intent-on-verdict.ac1",
+            "title": "Given a status with reviewRequestedAt <= reviewSpawnedAt, when setReviewStatusSync records reviewStatus 'passed', then the returned status and the journal pipeline record both lack reviewRequestedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consume-intent-on-verdict.ac2",
+            "title": "Given reviewRequestedAt newer than reviewSpawnedAt, when a terminal verdict is recorded, then the returned status preserves reviewRequestedAt unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consume-intent-on-verdict.ac3",
+            "title": "Given reviewRequestedAt set and no reviewSpawnedAt, when a terminal verdict ('blocked' as the test case) is recorded, then the field is cleared — the verdict proves the request was serviced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consume-intent-on-verdict.ac4",
+            "title": "Given a pending reviewRequestedAt, when a non-verdict update (testStatus-only) is written, then reviewRequestedAt survives the write",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fallback-clearable-request",
+        "title": "Add reviewRequestedAt to FALLBACK_CLEARABLE_FIELDS so sandboxed verdict writes propagate the clear",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T23:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3083",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/review-status-record-sync.ts",
+            "tests/unit/lib/overdeck/review-status-record-sync-fallback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/review-status-record-sync-fallback.test.ts tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fallback and drain test files pass, including the new case where a drained fallback removes reviewRequestedAt from the record",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/overdeck/review-status-record-sync.ts:94-97, append 'reviewRequestedAt' to FALLBACK_CLEARABLE_FIELDS (exact before/after in the PRD). No other production change: writeWorkspaceVerdictFallbackSync (:180-182) already lists any clearable field that is undefined on the written status into clearedFields, and the drain honors clearedFields on merge (see the :356 comment). Extend tests/unit/lib/overdeck/review-status-record-sync-fallback.test.ts: (a) a fallback written from a status whose reviewRequestedAt is undefined includes 'reviewRequestedAt' in clearedFields; (b) draining such a fallback removes reviewRequestedAt from the record's pipeline block instead of preserving the prior value; (c) a fallback written from a status that still carries reviewRequestedAt preserves it through the drain. Follow the existing test patterns in that file; if drain-side assertions fit better in review-status-record-sync-drain.test.ts, put them there. Repo rule: any retry/delay in these paths is tested with vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "fallback-clearable-request.ac1",
+            "title": "Given a verdict status with reviewRequestedAt undefined, when the workspace fallback is written, then its clearedFields includes 'reviewRequestedAt'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fallback-clearable-request.ac2",
+            "title": "Given a fallback carrying clearedFields ['reviewRequestedAt'], when it is drained into the record, then the record's pipeline block no longer contains reviewRequestedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fallback-clearable-request.ac3",
+            "title": "Given a fallback whose status still carries reviewRequestedAt, when it is drained, then the record preserves that reviewRequestedAt value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-generation-regression-test",
+        "title": "Regression test: a passed+ready issue with a stale intent does not invalidate its UAT generation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T23:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-3083",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/cloister/uat-reconciler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/uat-reconciler.test.ts"
+          ],
+          "expected_outputs": [
+            "uat-reconciler.test.ts passes with the new PAN-3083 regression cases (no invalidation when the member stays ready; invalidation when it genuinely departs)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a PAN-3083 regression describe-block to tests/unit/lib/cloister/uat-reconciler.test.ts using the existing UatReconcilerDeps injection pattern. Case 1 (the fix): build a status snapshot {reviewStatus:'passed', testStatus:'passed', readyForMerge:true, reviewRequestedAt newer than reviewSpawnedAt}; assert needsReviewDispatch (imported from src/lib/review-dispatch-decision.js) returns false for it; then run reconcileUatGenerations with a getReadySet that still contains the member (unchanged branch/headSha) against a live generation containing that member, and assert the result invalidates nothing and the generation is not marked stale. Case 2 (test sensitivity lock): the same generation with a getReadySet that omits the member IS invalidated with the 'left the ready queue' reason. This pairs the pure dispatch decision with the reconciler behavior to encode the end-to-end claim of the issue: no spurious dispatch => member never leaves the ready set => generation survives."
+        },
+        "items": [
+          {
+            "id": "uat-generation-regression-test.ac1",
+            "title": "Given a live generation whose member has reviewStatus 'passed', testStatus 'passed', readyForMerge true, and a stale newer reviewRequestedAt, when needsReviewDispatch is evaluated and reconcileUatGenerations runs with the member still in the ready set, then the predicate returns false and the reconciler invalidates no generation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-generation-regression-test.ac2",
+            "title": "Given the same generation with the member absent from the ready set, when reconcileUatGenerations runs, then it invalidates the generation with a 'left the ready queue' reason — proving the assertion in ac1 is sensitive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-intent-lifecycle",
+        "title": "Document the reviewRequestedAt lifecycle and dispatch guards in REVIEW-AGENT-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-25T23:05:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3083",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/REVIEW-AGENT-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'PAN-3083' docs/REVIEW-AGENT-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "grep produces at least one match in the durable-intent section describing the written/serviced/consumed/guarded lifecycle"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend the durable review-request intent paragraph in docs/REVIEW-AGENT-ARCHITECTURE.md (around line 64, where reviewRequestedAt is introduced) with the four-stage lifecycle: WRITTEN by pan done before any HTTP progression; SERVICED when dispatch stamps reviewSpawnedAt; CONSUMED when a terminal review verdict lands (setReviewStatusSync clears a serviced intent from status and journal); and GUARDED — needsReviewDispatch never fires while reviewStatus is 'passed'/'skipped' or readyForMerge is true, because genuine re-review paths reset reviewStatus to 'pending' first. Reference PAN-3083 as the incident where an unconsumed intent re-dispatched passed+ready issues and invalidated UAT generations. Match the document's existing tone and formatting; a short paragraph or 4-bullet list, not a new section."
+        },
+        "items": [
+          {
+            "id": "docs-intent-lifecycle.ac1",
+            "title": "The durable-intent section of docs/REVIEW-AGENT-ARCHITECTURE.md contains all four lifecycle stages of reviewRequestedAt (written by pan done, serviced at dispatch, consumed at terminal verdict, guarded against passed/skipped/readyForMerge dispatch)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-intent-lifecycle.ac2",
+            "title": "The doc references PAN-3083 as the incident motivating intent consumption, and grep -n 'PAN-3083' docs/REVIEW-AGENT-ARCHITECTURE.md produces a match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion",
+              "acJustification": "Docs item: two criteria fully cover the added content"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "guard-dispatch-predicate",
+        "to": "consume-intent-on-verdict",
+        "type": "blocks"
+      },
+      {
+        "from": "consume-intent-on-verdict",
+        "to": "fallback-clearable-request",
+        "type": "blocks"
+      },
+      {
+        "from": "guard-dispatch-predicate",
+        "to": "uat-generation-regression-test",
+        "type": "blocks"
+      },
+      {
+        "from": "guard-dispatch-predicate",
+        "to": "docs-intent-lifecycle",
+        "type": "informs"
+      },
+      {
+        "from": "consume-intent-on-verdict",
+        "to": "docs-intent-lifecycle",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-25-PAN-3083-passed-ready-issues-get-re-dispatched-for-review-knocking-them-out-of-the-ready-queue-and-invalidating-uat-generations.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

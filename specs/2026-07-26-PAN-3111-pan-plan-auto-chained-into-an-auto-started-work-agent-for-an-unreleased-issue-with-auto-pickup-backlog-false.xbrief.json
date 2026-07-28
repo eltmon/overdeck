@@ -1,0 +1,547 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T12:49:18Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3111: pan plan --auto chained into an auto-started work agent for an unreleased issue with auto_pickup_backlog=false",
+    "updated": "2026-07-27T12:23:28.076Z"
+  },
+  "plan": {
+    "id": "pan-3111",
+    "title": "pan plan --auto chained into an auto-started work agent for an unreleased issue with auto_pickup_backlog=false",
+    "status": "completed",
+    "uid": "fa57f21e-934b-4eaf-8ae3-14d454844717",
+    "author": "agent:k3[1m]",
+    "sequence": 9,
+    "created": "2026-07-26T12:49:18Z",
+    "updated": "2026-07-27T12:23:28.076Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3111",
+        "label": "PAN-3111",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3111.md",
+        "label": "PRD draft",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "pickup-gate",
+      "cloister",
+      "provenance",
+      "agents"
+    ],
+    "narratives": {
+      "Problem": "complete-planning emits issue.statusChanged(todo) on every planning finalize; the reactive handler calls handleOrphanProposedSpec, which spawns a work agent for any proposed spec with no active agent — never consulting the pickup predicate (ready/released/auto_pickup_backlog/parked/vetoed/objection). Verified 5 instances (PAN-3109/3116/3114/3115, MIN-904): every finalized plan auto-started work despite failing the gate. The reactive work-role dispatch at service-reactive.ts:331 is the same ungated hole. Separately, no spawn path stamps startedBy (field doesn't exist), and flywheelRunId is declared but never assigned to the spawned state, so incidents are unattributable and PAN-1812/memory-governor filters misclassify flywheel agents as operator-started.",
+      "Proposal": "Add src/lib/cloister/autonomous-work-dispatch.ts (gather + pure decide, mirroring autonomous-plan-dispatch.ts) implementing isAutoPickable semantics with the auto-spawn-on-finalize flag as release-equivalent consent, fail-closed on unavailable labels. Wire it into handleOrphanProposedSpec (orphan-proposed-reconciler.ts) and the reactive work dispatch (service-reactive.ts:331); refusals log a diagnostic and record one durable needs-you trip. Then fix provenance: persist flywheelRunId in both spawn state literals, add AgentState.startedBy end-to-end (state.json + agents table started_by column + OVERDECK_AGENT_STARTED_BY env fallback across the detached pan start child), and stamp entry-point tokens at every spawn call site.",
+      "NonGoals": "- Dashboard/UI surfacing of startedBy (data layer only)\n- Rank-ordered pickup in the reconciler (remains a per-issue recovery mechanism, not a sequencer)\n- Gating operator-initiated spawns (pan start, Start Agent button) — operator action is the release\n- Route-level pickup gating on /api/agents (breaks legitimate rebuild-and-start recovery)\n- Changing what complete-planning emits (issue.statusChanged(todo) stays)\n- Migrating the patrol sweep's legacy .pan/specs discovery to findSpecByIssue"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The auto-spawn-on-finalize flag file counts as release-equivalent consent in the gate",
+        "rationale": "Strict isAutoPickable without this exception silently deletes the --auto-start handoff-retry recovery (the reconciler's only legitimate role); the flag is launch-time operator consent, so it satisfies the release clause without weakening the gate for anything else."
+      },
+      {
+        "summary": "Gate the reactive work-role dispatch (service-reactive.ts:331) in addition to the observed reconciler path",
+        "rationale": "Same defect family: boot reconciliation replays in_progress events, so any unreleased issue at in_progress with no live agent auto-starts. The sibling plan-role dispatch already has decideAutonomousPlanDispatch; fixing only the reconciler leaves the bypass one tracker-label away."
+      },
+      {
+        "summary": "Fail closed when tracker labels are unavailable",
+        "rationale": "Mirrors decideAutonomousPlanDispatch: an autonomous spawner that cannot verify parked/vetoed/objection state must not spawn."
+      },
+      {
+        "summary": "Fix the latent flywheelRunId-never-persisted bug in scope",
+        "rationale": "Ask #2 (attributable spawns) cannot hold while the one existing provenance field is never written; the fix is two assignments plus round-trip tests, and it repairs PAN-1812/memory-governor misclassification."
+      },
+      {
+        "summary": "Refusals surface via diagnostics + one durable needs-you trip, not per-attempt activity-feed entries",
+        "rationale": "PAN-1626: per-cycle reconciler chatter flooded the feed; the durable trip is the operator surface."
+      },
+      {
+        "summary": "No pickup gate on the /api/agents route itself",
+        "rationale": "Internal recovery paths (rebuild-and-start for an operator-started but unreleased issue) legitimately pass through it; consent is established at the entry points, not the transport."
+      }
+    ],
+    "items": [
+      {
+        "id": "pickup-gate-predicate",
+        "title": "Add autonomous-work-dispatch pickup-gate predicate module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:49:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3111",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "gate-orphan-proposed-reconciler",
+            "gate-reactive-work-dispatch"
+          ],
+          "files_scope": [
+            "src/lib/cloister/autonomous-work-dispatch.ts",
+            "src/lib/cloister/__tests__/autonomous-work-dispatch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/autonomous-work-dispatch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all decision-matrix tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/autonomous-work-dispatch.ts mirroring src/lib/cloister/autonomous-plan-dispatch.ts: (1) AutonomousWorkDispatchInput { labels: readonly string[] | null; autoPickupBacklog: boolean; activeBookMember: boolean; autoSpawnOnFinalizeConsent: boolean }; (2) AutonomousWorkDispatchDecision = { allow: true } | { allow: false; code: 'not-ready'|'not-released'|'parked'|'vetoed'|'objection'|'epic'|'labels-unavailable'; reason: string } with operator-facing reason sentences in the style of autonomous-plan-dispatch.ts:92-105; (3) decideAutonomousWorkDispatch(input) — pure: labels===null → refuse 'labels-unavailable'; parked (PARKED_LABEL or LEGACY_PARKED_LABELS from src/lib/backlog/pickup.ts) → refuse 'parked'; vetoed → 'vetoed'; objection → 'objection'; epic → 'epic'; ready label absent → 'not-ready'; release satisfied iff released label || autoPickupBacklog || activeBookMember || autoSpawnOnFinalizeConsent else refuse 'not-released'; otherwise allow; (4) gatherAutonomousWorkDispatchInput(issueId) — labels via the SAME lazy require of getSharedIssueService as autonomous-plan-dispatch.ts:48-66 (null on any failure), autoPickupBacklog via isFlywheelAutoPickupBacklog() (src/lib/overdeck/control-settings.ts:554), activeBookMember via activeOrderBookIssues(projectRoot) (src/lib/cloister/flywheel.ts:46; resolve projectRoot via resolveProjectFromIssueSync; empty set on any failure), consent via readAutoSpawnOnFinalizeFlag(issueId) (src/lib/planning/spawn-planning-session.ts:65). Do NOT use buildClassifyLookups — its isInPipeline counts workspace existence and would permanently falsify the gate (hazard H1). Write src/lib/cloister/__tests__/autonomous-work-dispatch.test.ts covering the full decision matrix: each refusal code, the allow case, consent-flag release equivalence, autoPickupBacklog release equivalence, activeBookMember release equivalence, fail-closed null labels."
+        },
+        "items": [
+          {
+            "id": "pickup-gate-predicate.ac1",
+            "title": "decideAutonomousWorkDispatch returns allow only when ready && (released || autoPickupBacklog || activeBookMember || consent) && no parked/vetoed/objection/epic label; the unit test for each clause passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pickup-gate-predicate.ac2",
+            "title": "decideAutonomousWorkDispatch rejects with code 'labels-unavailable' when labels is null, and with the matching code for each blocker label (parked/vetoed/objection/epic/not-ready/not-released)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pickup-gate-predicate.ac3",
+            "title": "gatherAutonomousWorkDispatchInput falls back to safe defaults (null labels, empty book, false consent) when the issue service, order book, or flag file is unavailable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-orphan-proposed-reconciler",
+        "title": "Gate the orphan-proposed reconciler on the pickup predicate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:49:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/orphan-proposed-reconciler.ts",
+            "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all reconciler tests pass including new gate tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/orphan-proposed-reconciler.ts handleOrphanProposedSpec (line 370), immediately after the plan.status !== 'proposed' check (line 424-427) and BEFORE the agent-active checks, evaluate the pickup gate: const gate = await (options.evaluatePickupGate ?? defaultEvaluatePickupGate)(upperIssueId) where defaultEvaluatePickupGate calls gatherAutonomousWorkDispatchInput + decideAutonomousWorkDispatch from the module built in pickup-gate-predicate. On refusal: logReconcilerDiagnostic('spawn-skipped', { issueId: upperIssueId, reason: `pickup-gate:${gate.code}` }); await recordDeadEndNeedsYou(upperIssueId, 'orphan-proposed-pickup-gate', 'proposed', gate.reason) (src/lib/cloister/dead-end-trip.ts:4); return [`Skipped orphan proposed spec ${upperIssueId}: pickup-gate:${gate.code}`]. Do NOT emit a per-attempt activity-feed warning (NFR-2, PAN-1626). Add evaluatePickupGate?: (issueId: string) => Promise<AutonomousWorkDispatchDecision> to HandleOrphanProposedSpecOptions. In src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts, update the existing suite so every test that asserts a spawn injects evaluatePickupGate: async () => ({ allow: true }) (mechanical sweep — the suite currently spawns label-less), and add new tests: unreleased+unready issue → no spawn, needs-you recorded, diagnostic 'pickup-gate:not-ready' or 'pickup-gate:not-released'; released+ready → spawns; auto-spawn-on-finalize consent → spawns; labels-unavailable → refuses. Update the module header comment to state the pickup-gate contract."
+        },
+        "items": [
+          {
+            "id": "gate-orphan-proposed-reconciler.ac1",
+            "title": "Given a proposed spec with no ready/released labels and no consent flag, handleOrphanProposedSpec rejects the spawn, logs reason 'pickup-gate:not-ready', and records a durable needs-you trip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-orphan-proposed-reconciler.ac2",
+            "title": "Given the consent flag present (or released+ready labels, or auto_pickup_backlog on), handleOrphanProposedSpec preserves the existing spawn behavior and posts to /api/agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-orphan-proposed-reconciler.ac3",
+            "title": "The pre-existing reconciler suite passes with evaluatePickupGate stubbed allow-by-default, and no per-attempt activity-feed warning is emitted on gate refusal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-reactive-work-dispatch",
+        "title": "Gate the reactive lifecycle work-role dispatch on the pickup predicate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:49:18Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/service-reactive.ts",
+            "src/lib/cloister/__tests__/reactive-scheduler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/reactive-scheduler.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reactive-scheduler tests pass including new gate tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/service-reactive.ts, before the spawnRun(normalizedIssueId, role, …) call at line 331, add a role === 'work' branch that evaluates gatherAutonomousWorkDispatchInput + decideAutonomousWorkDispatch (same import pattern as the plan-role gate at lines 9-10, 306-320). On refusal mirror the plan-role refusal exactly: console.log, emitActivityEntrySync({ source: 'cloister', level: 'warn', message, issueId }), await recordDeadEndNeedsYou(normalizedIssueId, 'reactive-work-dispatch-pickup-gate', newState, message), return. Do not gate review/test/plan dispatches. Add tests in src/lib/cloister/__tests__/reactive-scheduler.test.ts: in_progress event for an unreleased/unready issue → spawnRun NOT called, needs-you recorded; released+ready (or consent flag) → spawnRun called."
+        },
+        "items": [
+          {
+            "id": "gate-reactive-work-dispatch.ac1",
+            "title": "Given an in_progress issue-state event for an issue failing the pickup predicate, onIssueStateChange rejects the work dispatch, emits one warn activity entry, and records a durable needs-you trip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-reactive-work-dispatch.ac2",
+            "title": "Given the predicate passes (released+ready, auto_pickup_backlog, book member, or consent flag), onIssueStateChange spawns the work role via spawnRun exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "persist-flywheel-run-id",
+        "title": "Persist flywheelRunId onto AgentState in both spawn state literals",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:49:18Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/agents",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent spawn tests pass including new persistence assertions",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/agents/spawn.ts assign flywheelRunId in BOTH AgentState literals: the spawnAgent literal (lines 549-562) and the spawnRun role-run literal (lines 189-204). Use the same resolved value resolveFlywheelSpawnEnv computes (src/lib/agents/spawn-prep.ts:55: options.flywheelRunId ?? getFlywheelActiveRunIdSync(), normalized) so state.json and the launcher env agree; omit the key when no run id resolves (keep the field optional). Verify the existing agents-table write path (src/lib/database/agent-mappers.ts:48 already maps state.flywheelRunId → flywheel_run_id) needs no change. Add a unit test asserting that a spawn with options.flywheelRunId set persists it to the saved state (state.json / saveAgentState payload), and a spawn with none leaves it undefined."
+        },
+        "items": [
+          {
+            "id": "persist-flywheel-run-id.ac1",
+            "title": "A spawnAgent call with flywheelRunId 'RUN-71' persists 'RUN-71' into the saved AgentState (asserted on the saveAgentState payload), and the agents-table row carries flywheel_run_id via the existing mapper",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "persist-flywheel-run-id.ac2",
+            "title": "The spawnRun role-run literal applies the same persistence, and a spawn with no flywheelRunId and no active run leaves the field undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "started-by-field-plumbing",
+        "title": "Add AgentState.startedBy and the agents-table started_by column end-to-end",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:49:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3111",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "started-by-call-sites"
+          ],
+          "files_scope": [
+            "src/lib/agents/agent-state.ts",
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/database/schema.ts",
+            "src/lib/database/agents-db.ts",
+            "src/lib/database/agent-backfill.ts",
+            "src/lib/database/agent-mappers.ts",
+            "src/lib/overdeck/agent-state-sync.ts",
+            "src/lib/overdeck/agents.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/database tests/unit/lib/agents",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "database and agents suites pass including the round-trip test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add startedBy?: string to: AgentState (src/lib/agents/agent-state.ts, next to flywheelRunId at line 116), SpawnOptions and SpawnRunOptions (src/lib/agents/spawn-prep.ts lines 68-101 and 103-136). Stamp it in BOTH spawn.ts state literals as options.startedBy ?? process.env.OVERDECK_AGENT_STARTED_BY ?? (resolvedFlywheelRunId ? `flywheel:${resolvedFlywheelRunId}` : undefined). Add the agents-table column following the existing pattern: tryIdempotentDdl migration 'ALTER TABLE agents ADD COLUMN started_by TEXT' in src/lib/database/schema.ts (pattern at lines 819-831) plus the CREATE TABLE definition (near line 455); add 'started_by' to ALL_COLUMNS (src/lib/database/agents-db.ts:120-135), the Agent interface, agentToParams, and the row mapper (line 103 area); add startedBy: 'started_by' to the backfill column map (src/lib/database/agent-backfill.ts:72); map it in src/lib/database/agent-mappers.ts alongside flywheelRunId (line 48); thread both directions of src/lib/overdeck/agent-state-sync.ts (lines 172 and 226) and the writer at src/lib/overdeck/agents.ts:770 + row interface at :1031/:1098. Add a round-trip test proving saveAgentState → getAgentStateSync and the agents-table row both return startedBy (the write-only-field trap from .pan/context/codebase/concerns.md — flywheelRunId is the cautionary example)."
+        },
+        "items": [
+          {
+            "id": "started-by-field-plumbing.ac1",
+            "title": "A spawn with options.startedBy 'operator:cli:pan-start' persists the token to state.json and the agents-table started_by column, and getAgentStateSync returns it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "started-by-field-plumbing.ac2",
+            "title": "With no explicit token, the stamp falls back to process.env.OVERDECK_AGENT_STARTED_BY, then to 'flywheel:<runId>' when a flywheel run id resolves, and stays undefined otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "started-by-field-plumbing.ac3",
+            "title": "A database opened from an older schema version applies the started_by migration via tryIdempotentDdl without error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "started-by-call-sites",
+        "title": "Stamp startedBy provenance tokens at every spawn entry point",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:49:18Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/spawn.ts",
+            "src/dashboard/server/routes/agents/shared.ts",
+            "src/cli/commands/start.ts",
+            "src/lib/overdeck/planning-promotion.ts",
+            "src/lib/cloister/orphan-proposed-reconciler.ts",
+            "src/lib/cloister/service-reactive.ts",
+            "src/lib/cloister/deacon-auto-resume.ts",
+            "src/lib/cloister/service-crash.ts",
+            "src/lib/cloister/handoff.ts",
+            "src/dashboard/server/routes/workspaces/merge-strike.ts",
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/lib/overdeck/planning-sessions.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/cloister/__tests__ tests/unit/lib/agents"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "cloister and agents suites pass with new provenance assertions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Stamp a provenance token at each spawn entry point (sub-items). Env propagation is the critical piece: the /api/agents route spawns the real agent as a detached `pan start` child via spawnPanCommandDetached (src/dashboard/server/routes/agents/shared.ts:78), so the route must pass OVERDECK_AGENT_STARTED_BY into the child env — add an env field to spawnPanCommandDetached's input and merge it into the spawn options. Planning sessions: spawn-planning-session.ts writes its own state at line 741; add startedBy there from the start-planning request body (planning-sessions.ts) with the same env/derivation fallback."
+        },
+        "items": [
+          {
+            "id": "started-by-call-sites.ac1",
+            "title": "The /api/agents route accepts an optional startedBy body field, defaults to 'operator:dashboard', and the detached pan start child receives it as OVERDECK_AGENT_STARTED_BY in its env (asserted on the spawn args)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "started-by-call-sites.ac2",
+            "title": "pan start (src/cli/commands/start.ts) defaults OVERDECK_AGENT_STARTED_BY to 'operator:cli:pan-start' when unset, preserving any inherited value (e.g. from the route or a flywheel session)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "started-by-call-sites.ac3",
+            "title": "completePlanningAutoSpawn sends startedBy 'planning-auto-handoff' in its POST body; spawnWorkAgentThroughAgentsEndpoint sends 'orphan-proposed-reconciler'; triggerRebuildAndStart sends 'workspace-rebuild-recovery' and the rebuild-and-start route accepts and forwards it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "started-by-call-sites.ac4",
+            "title": "Each internal dispatch records its token at the spawn call: service-reactive 'reactive-lifecycle', deacon auto-resume 'deacon:auto-resume', crash respawn 'deacon:crash-respawn', handoff.ts 'handoff', merge-strike.ts 'merge-strike'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "started-by-call-sites.ac5",
+            "title": "Each planning session persists startedBy ('operator:cli:pan-plan' via CLI body, 'operator:dashboard' via dashboard, flywheel:<runId> via env derivation) in the planning agent's state.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pickup-gate-provenance",
+        "title": "Document the pickup-gate wiring and spawn-provenance fields",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T12:49:18Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FLYWHEEL.md",
+            "docs/AGENT-STATE-PLANES.md",
+            ".pan/context/codebase/concerns.md",
+            "src/lib/cloister/orphan-proposed-reconciler.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "docs/FLYWHEEL.md: state that the orphan-proposed reconciler and the reactive work-role dispatch honor the same pickup predicate as flywheel pickup (ready && planned && (released || auto_pickup_backlog || activeBookMember || consent-flag) && !parked && !vetoed && !objection && !epic), fail closed on unavailable labels, and surface refusals as durable needs-you trips. docs/AGENT-STATE-PLANES.md: document AgentState.startedBy and flywheelRunId (values, who stamps them, the started_by column, the OVERDECK_AGENT_STARTED_BY env propagation across the detached pan start child). .pan/context/codebase/concerns.md: add a sharp-edge note that every new spawn path must stamp startedBy and that flywheelRunId was the write-only-field example (bump the last-verified date). src/lib/cloister/orphan-proposed-reconciler.ts: update the module/function header to state the pickup-gate contract (this file no longer spawns for every proposed spec — only gate-passing or consent-carrying ones)."
+        },
+        "items": [
+          {
+            "id": "docs-pickup-gate-provenance.ac1",
+            "title": "docs/FLYWHEEL.md contains a section stating that the reconciler and reactive work dispatch apply the pickup predicate and naming the consent-flag exception",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pickup-gate-provenance.ac2",
+            "title": "docs/AGENT-STATE-PLANES.md contains documentation for startedBy and flywheelRunId, the started_by column, and the env propagation path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pickup-gate-provenance.ac3",
+            "title": ".pan/context/codebase/concerns.md records the startedBy stamping requirement with an updated last-verified date",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pickup-gate-predicate",
+        "to": "gate-orphan-proposed-reconciler",
+        "type": "blocks"
+      },
+      {
+        "from": "pickup-gate-predicate",
+        "to": "gate-reactive-work-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "started-by-field-plumbing",
+        "to": "started-by-call-sites",
+        "type": "blocks"
+      },
+      {
+        "from": "persist-flywheel-run-id",
+        "to": "started-by-field-plumbing",
+        "type": "suggests"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3111-pan-plan-auto-chained-into-an-auto-started-work-agent-for-an-unreleased-issue-with-auto-pickup-backlog-false.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

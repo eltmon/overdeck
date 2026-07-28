@@ -1,0 +1,112 @@
+{
+  "issueId": "PAN-3101",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-26T03:19:28.348Z",
+  "updated": "2026-07-26T05:45:51.619Z",
+  "pipeline": {
+    "issueId": "PAN-3101",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-26T05:45:51.593Z",
+    "testNotes": "Skipped: issue is already merged",
+    "verificationNotes": "Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)",
+    "strikeReadyHead": "46b7dac03b71df2919c1dca2b2c7054cc4f5ab27",
+    "strikeReadyAt": "2026-07-26T03:46:31.907Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": [],
+    "closedOut": true,
+    "closedOutAt": "2026-07-26T05:45:51.593Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {},
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-07-26T05:44:28.277Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-26T05:45:51.613Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed",
+          "observed": "verificationStatus: skipped (skipped per issue policy; no lastVerifiedCommit recorded)",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #3105 MERGED at 2026-07-26T03:36:57Z",
+          "status": "pass",
+          "mergedAt": "2026-07-26T03:36:57Z",
+          "mergeCommit": "81bced7caeb2e0c365627b55d0ba84fd0eab45a5"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 81bced7caeb2e0c365627b55d0ba84fd0eab45a5",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 98df80a1 contains merge 81bced7c",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 3 agent state directories; Preserved local branch strike/pan-3101 — not merged to main; Preserved remote branch strike/pan-3101 — not merged to main; Pruned 23 checkpoint ref(s) for agent-pan-3101, planning-pan-3101, strike-pan-3101; No specialist registry entries for PAN-3101"
+        }
+      ],
+      "accepted": []
+    }
+  },
+  "harness": "claude-code",
+  "model": "claude-opus-5"
+}

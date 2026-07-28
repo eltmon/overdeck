@@ -1,0 +1,391 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T04:20:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3025: Durable pipeline journal omits verificationStatus — DoD verification row false-MISSes whenever live status is cleared (post-close-out, DB rebuild)",
+    "updated": "2026-07-28T06:35:43.650Z"
+  },
+  "plan": {
+    "id": "pan-3025",
+    "title": "Durable pipeline journal omits verificationStatus — DoD verification row false-MISSes whenever live status is cleared",
+    "status": "running",
+    "uid": "0d9993db-bb04-46fd-b4f1-e536bc0f6295",
+    "author": "agent:k3[1m]",
+    "sequence": 4,
+    "created": "2026-07-28T04:20:00.000Z",
+    "updated": "2026-07-28T06:35:43.650Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3025",
+        "label": "PAN-3025",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dod-gate",
+      "close-out",
+      "pipeline-journal",
+      "durability"
+    ],
+    "narratives": {
+      "Problem": "markRecordPipelineClosedOutSync (src/lib/pan-dir/record.ts:865) deletes pipeline.verificationStatus at close-out step 8, so once live status is cleared (close-out step 9, or any DB rebuild) DoD row 3 can only observe 'missing' from the journal fallback — reproduced on MIN-896 (pass then MISS four minutes later) and PAN-3018. The mirror chain already carries the verdict end-to-end; the terminal write destroys it. Adjacent same-family defects: row 5's default readMergeStatus reads live status only (dod-gate.ts:105), and re-running pan close on a closed-out issue re-evaluates the gate against post-close state instead of short-circuiting.",
+      "Proposal": "Four independent fixes (PRD .pan/drafts/PAN-3025.md): (1) delete the verificationStatus=undefined line from markRecordPipelineClosedOutSync; (2) add verificationStatus:'pending' to reopenWorkspaceState's reset; (3) repoint row 5's default readMergeStatus through the existing loadStatus() live→journal fallback, signature unchanged; (4) add readCompletedCloseOut() helper in dod-gate.ts and a guard at the top of the closeOut() workflow that returns idempotent success (naming closedOutAt) only when pipeline.closedOut === true AND the live row is gone — the two-condition guard preserves the mid-ceremony-abort retry path.",
+      "NonGoals": "- No backfill/repair of historical records that already lost verificationStatus (recoverable from each record's closeOut.dodGate audit)\n- No '(from pipeline journal)' source annotation on row 5's observed string (dep-signature change for marginal gain)\n- No removal of the server route's label-cache idempotency check (issue-close-out.ts) — the workflow guard is the durable backstop underneath\n- No reordering of close-out ceremony steps\n- No changes to checkMergedRow canonical-done semantics (PAN-3188) or any other DoD row\n- No changes to projectPipeline/durableSubset/pipelineToDurableUpdate — already correct"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the destructive terminal write, not the readers",
+        "rationale": "projectPipeline, durableSubset, and pipelineToDurableUpdate already map verificationStatus; records/pan-3018.json proves the verdict existed at close time (closeOut.dodGate shows verification pass) and was deleted by markRecordPipelineClosedOutSync."
+      },
+      {
+        "summary": "Idempotency guard in the closeOut() workflow, not the CLI",
+        "rationale": "One guard covers CLI, dashboard single close-out, and bulk close-out; the server route's label-cache check remains as a fast path above it."
+      },
+      {
+        "summary": "Guard requires closedOut === true AND live status absent",
+        "rationale": "A ceremony aborted between mark-terminal and clear-review-status (recordDodGate failure path) leaves closedOut=true with live status present and must be allowed to complete; live-row absence is the completion witness."
+      },
+      {
+        "summary": "Row 5 dep signature unchanged",
+        "rationale": "Only the default implementation changes to use loadStatus(); the 8 existing injected-dep test call sites keep working, avoiding churn for a diagnostic annotation of marginal value."
+      },
+      {
+        "summary": "Row 5 and re-close idempotency included in scope",
+        "rationale": "The issue's fix item 2 and the MIN-896 comment's row-5 observation are the same defect family (live-only reads vs durable journal); fixing row 3 alone leaves pan close re-runs failing on row 5."
+      },
+      {
+        "summary": "No historical backfill",
+        "rationale": "The idempotent short-circuit makes re-running pan close on pre-fix records a no-op, and verdicts remain recoverable from closeOut.dodGate — a repair sweep is scope creep."
+      }
+    ],
+    "items": [
+      {
+        "id": "preserve-verification-verdict-at-close-out",
+        "title": "Preserve verificationStatus in markRecordPipelineClosedOutSync",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T04:20:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3025",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/record.ts",
+            "tests/unit/lib/pan-dir/record-close-out.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pan-dir/record-close-out.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new test file passes all cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/pan-dir/record.ts, delete the line `record.pipeline.verificationStatus = undefined;` (line 865) from markRecordPipelineClosedOutSync and add a one-line comment that verdict fields are deliberately preserved for the DoD journal fallback (PAN-3025). Create tests/unit/lib/pan-dir/record-close-out.test.ts following the closeout-preserve.test.ts harness (mkdtempSync workspace, getProjectConfigFromWorkspacePath, writeIssueRecordSync to seed a record with pipeline.verificationStatus 'passed' + lastVerifiedCommit, then markRecordPipelineClosedOutSync, then assert via readIssueRecordSync). Mock src/lib/pan-dir/auto-commit.js's queue per record-update-durability-budget.test.ts:28-43 so no background git work fires. record.ts SHRINKS one line — no file-size allowlist change needed."
+        },
+        "items": [
+          {
+            "id": "preserve-verification-verdict-at-close-out.ac1",
+            "title": "After markRecordPipelineClosedOutSync runs on a record seeded with verificationStatus 'passed' and lastVerifiedCommit, readIssueRecordSync returns pipeline.verificationStatus === 'passed' with closedOut === true and closedOutAt set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preserve-verification-verdict-at-close-out.ac2",
+            "title": "The same read-back preserves lastVerifiedCommit unchanged and sets mergeStatus to 'merged'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preserve-verification-verdict-at-close-out.ac3",
+            "title": "npx vitest run tests/unit/lib/pan-dir/record-close-out.test.ts exits 0 and npm run typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reopen-resets-verification-verdict",
+        "title": "Reset verificationStatus to 'pending' in reopenWorkspaceState",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T04:20:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3025",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/reopen.ts",
+            "tests/lib/reopen.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/reopen.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reopen test suite passes including the new case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/reopen.ts (lines 62-79), add `verificationStatus: 'pending',` to the setReviewStatusSync reset call, beside reviewStatus/testStatus/mergeStatus 'pending'. With the close-out fix preserving the journalled verdict, reopen must reset it deterministically rather than relying on undefined projection. Add a case to tests/lib/reopen.test.ts using its in-memory DB fixture (setupOverdeckTestDb): seed a row with verificationStatus 'passed', run reopenWorkspaceState, assert the row's verificationStatus === 'pending' and reviewStatus === 'pending'."
+        },
+        "items": [
+          {
+            "id": "reopen-resets-verification-verdict.ac1",
+            "title": "The setReviewStatusSync call in src/lib/reopen.ts now contains verificationStatus: 'pending' beside the existing review/test/merge resets",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reopen-resets-verification-verdict.ac2",
+            "title": "The new tests/lib/reopen.test.ts case shows a 'passed' verification verdict becomes 'pending' after reopenWorkspaceState runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reopen-resets-verification-verdict.ac3",
+            "title": "npx vitest run tests/lib/reopen.test.ts exits 0 with no previously-passing case broken",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "post-merge-row-journal-fallback",
+        "title": "Give DoD row 5's default readMergeStatus a journal fallback",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T04:20:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3025",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate-journal-fallback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate-journal-fallback.test.ts tests/unit/lib/lifecycle/dod-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new fallback test file passes all three cases",
+            "existing dod-gate.test.ts passes unchanged",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/lifecycle/dod-gate.ts line 105, replace the default `readMergeStatus: async issueId => (await Effect.runPromise(getReviewStatus(issueId)))?.mergeStatus,` with `readMergeStatus: async issueId => (await loadStatus(issueId, defaultDeps))?.status.mergeStatus,` plus a one-line PAN-3025 comment. Dep signature unchanged. Create tests/unit/lib/lifecycle/dod-gate-journal-fallback.test.ts that vi.mocks src/lib/review-status.js (controllable getReviewStatus), src/lib/pan-dir/record.js (spread actual; controllable readIssueRecord), src/lib/cloister/deacon-canonical-state.js (getAutoCloseOutCanonicalState → null), and src/lib/agents.js (listRunningAgents → empty), then calls checkPostMergeRow(ctx, undefined) with DEFAULT deps for three cases: (a) live null + journal mergeStatus 'merged' → pass, observed contains 'mergeStatus: merged'; (b) live null + journal without mergeStatus → miss, observed contains 'mergeStatus: missing'; (c) live row with mergeStatus 'merged' → pass and readIssueRecord not called."
+        },
+        "items": [
+          {
+            "id": "post-merge-row-journal-fallback.ac1",
+            "title": "With live status absent and the journal pipeline holding mergeStatus 'merged', checkPostMergeRow with default deps returns status 'pass' and an observed string containing 'mergeStatus: merged'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-merge-row-journal-fallback.ac2",
+            "title": "With live status absent and the journal lacking mergeStatus, the row returns status 'miss' with 'mergeStatus: missing' in the observed string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-merge-row-journal-fallback.ac3",
+            "title": "With a live row holding mergeStatus 'merged', the row passes without calling readIssueRecord (live-first ordering preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-merge-row-journal-fallback.ac4",
+            "title": "The pre-existing tests/unit/lib/lifecycle/dod-gate.test.ts suite passes unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reclose-idempotent-short-circuit",
+        "title": "Short-circuit closeOut() when the record shows a completed close-out",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T04:20:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3025",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "src/lib/lifecycle/workflows.ts",
+            "scripts/file-size-allowlist.txt",
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/workflows.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "workflows.test.ts passes including the two new cases",
+            "lint-file-size passes with the bumped allowlist row",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an exported helper `readCompletedCloseOut(issueId, projectPath): Promise<string | null>` to src/lib/lifecycle/dod-gate.ts (imports already present): read the issue record; return null unless pipeline.closedOut === true; then return null if getReviewStatus(issueId) yields a live row (mid-ceremony abort must fall through); otherwise return pipeline.closedOutAt ?? 'unknown'. In src/lib/lifecycle/workflows.ts closeOut(), as the first statement inside Effect.gen (before the UAT-evidence step): call the helper; on non-null, push stepSkipped('close-out:idempotent', [`Issue already closed out at <ts> — skipping the Definition-of-Done gate and ceremony`]) and return buildResult immediately. workflows.ts is allowlisted at exactly 1006 lines in scripts/file-size-allowlist.txt — bump its row to the new count (format `<lines> src/lib/lifecycle/workflows.ts # PAN-3025`, replacing the PAN-3211 ref only if the parser rejects two refs; verify with bash scripts/lint-file-size.sh). Extend tests/unit/lib/lifecycle/workflows.test.ts: add controllable readIssueRecord to the pan-dir/record.js mock (lines 96-104) and getReviewStatus to the review-status.js mock (lines 92-94). Cases: (a) closedOut + live null → success, exactly one close-out:idempotent skipped step naming closedOutAt, mockMarkRecordPipelineClosedOutSync and mockClearReviewStatus NOT called; (b) closedOut + live row present → ceremony falls through and the mark-terminal mock IS called; (c) existing close-out tests unchanged."
+        },
+        "items": [
+          {
+            "id": "reclose-idempotent-short-circuit.ac1",
+            "title": "With pipeline.closedOut true and no live review-status row, closeOut() returns success with a single close-out:idempotent skipped step whose details name the original closedOutAt, and neither markRecordPipelineClosedOutSync nor clearReviewStatus is invoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reclose-idempotent-short-circuit.ac2",
+            "title": "With pipeline.closedOut true but a live review-status row present, closeOut() proceeds past the guard and the mark-terminal mock records an invocation during the ceremony",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reclose-idempotent-short-circuit.ac3",
+            "title": "With closedOut unset, npx vitest run tests/unit/lib/lifecycle/workflows.test.ts exits 0 with all pre-existing close-out cases unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reclose-idempotent-short-circuit.ac4",
+            "title": "bash scripts/lint-file-size.sh exits 0 with the workflows.ts allowlist row updated to the new line count referencing PAN-3025",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-dod-journal-durability",
+        "title": "Document verdict durability and idempotent re-close in DEFINITION-OF-DONE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T04:20:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3025",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DEFINITION-OF-DONE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Verdict durability' docs/DEFINITION-OF-DONE.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grep finds the new subsection",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a 'Verdict durability' subsection to docs/DEFINITION-OF-DONE.md after the row table stating three things: (1) rows 1-3 read live status first and fall back to the per-issue record's pipeline block on overdeck-state; (2) close-out's terminal journal write preserves the full verdict triple including verificationStatus, so rows still pass after live status is cleared or the DB is rebuilt; (3) re-running pan close on a fully closed-out issue is an idempotent no-op naming the original closedOutAt — it does not re-evaluate the gate against post-close state. No other doc file describes this behavior; nothing else changes."
+        },
+        "items": [
+          {
+            "id": "docs-dod-journal-durability.ac1",
+            "title": "docs/DEFINITION-OF-DONE.md contains a 'Verdict durability' subsection stating the live→journal fallback, verdict preservation through close-out, and idempotent re-close behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-dod-journal-durability.ac2",
+            "title": "npm run lint exits 0 after the doc edit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "post-merge-row-journal-fallback",
+        "to": "reclose-idempotent-short-circuit",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-28-PAN-3025-durable-pipeline-journal-omits-verificationstatus-dod-verification-row-false-misses-whenever-live-status-is-cleared.xbrief.json"
+    }
+  },
+  "status": "active"
+}

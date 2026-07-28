@@ -1,0 +1,154 @@
+{
+  "issueId": "PAN-2840",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-17T13:17:40.687Z",
+  "updated": "2026-07-27T16:50:49.961Z",
+  "pipeline": {
+    "issueId": "PAN-2840",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "mergeStatus": "merged",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-27T16:50:49.938Z",
+    "verificationNotes": "Checklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.",
+    "mergeNotes": "Post-rebase verification failed at incomplete-plan-items",
+    "strikeReadyHead": "f8b1f3522cdcfe41458877d0235c89672efd77f9",
+    "strikeReadyAt": "2026-07-18T14:17:50.807Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-17T14:12:30.972Z",
+        "strikeHead": "c6bbfbc1f054b6f8be39f39d77b552f6c9d889c8",
+        "mainHead": "e1eda3975dbaae96cac5dc2a3732fccbd720471d",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
+      }
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T16:50:49.938Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "strike": {
+          "openai/gpt-5.6-sol": {
+            "input": 4286101,
+            "output": 587134,
+            "cacheRead": 63793152,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 4286101,
+          "output": 587134,
+          "cacheRead": 63793152,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 70.941101,
+        "pricingAsOf": "2026-07-18T14:17:50.819Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T16:50:49.961Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: missing (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "PR #2845 is squash-merged and strike/pan-2840 matches the merged PR head; PR #2845 is squash-merged and origin/strike/pan-2840 matches the merged PR head; Superseded feature/pan-2840 residual: Feature branch is absent; positive merge evidence is required; PR #2845 MERGED at 2026-07-18T20:46:54Z",
+          "status": "pass",
+          "mergedAt": "2026-07-18T20:46:54Z",
+          "mergeCommit": "0a05cae88c55258d5a0e9264664346482cb74b70"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 0a05cae88c55258d5a0e9264664346482cb74b70",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit d44fa122 contains merge 0a05cae8",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; Preserved local branch strike/pan-2840 — not merged to main; Preserved remote branch strike/pan-2840 — not merged to main; Pruned 0 checkpoint ref(s) for agent-pan-2840, planning-pan-2840, strike-pan-2840; No specialist registry entries for PAN-2840"
+        }
+      ],
+      "accepted": []
+    }
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.6-sol",
+  "recoveryTrips": [
+    {
+      "issue": "PAN-2840",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-17T18:36:04.666Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-17T18:47:07.217Z"
+    },
+    {
+      "issue": "PAN-2840",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-18T14:17:50.807Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-18T14:23:18.444Z"
+    }
+  ]
+}

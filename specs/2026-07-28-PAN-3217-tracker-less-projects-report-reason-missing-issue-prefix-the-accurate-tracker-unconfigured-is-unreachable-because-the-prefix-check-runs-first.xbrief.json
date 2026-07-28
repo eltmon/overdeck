@@ -1,0 +1,180 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T06:45:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3217: Tracker-less projects report reason 'missing_issue_prefix' — the accurate 'tracker_unconfigured' is unreachable because the prefix check runs first",
+    "updated": "2026-07-28T06:48:04.195Z"
+  },
+  "plan": {
+    "id": "pan-3217",
+    "title": "Tracker-less projects report reason 'missing_issue_prefix' — the accurate 'tracker_unconfigured' is unreachable because the prefix check runs first",
+    "status": "proposed",
+    "uid": "2af77419-685a-4e0a-8742-91c47f687773",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-28T06:45:00Z",
+    "updated": "2026-07-28T06:48:04.195Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3217",
+        "label": "PAN-3217",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "pipeline-membership",
+      "bugfix",
+      "error-classification"
+    ],
+    "narratives": {
+      "Problem": "Path-only projects (no tracker fields in projects.yaml) report reason 'missing_issue_prefix' from the membership gather, but the accurate declared reason 'tracker_unconfigured' exists and is unreachable because the issue_prefix guard runs before tracker resolution at both gates in src/lib/pipeline-membership-gather.ts (entry gatherProjectLensSignals lines 503-509 and inner listProjectTrackerIssues lines 200-208). The wrong reason misdirects every Flywheel investigate suggestion toward a fix that would not make the project queryable.",
+      "Proposal": "Reorder only (issue option 1): call resolveProjectTrackerType(project) before the issue_prefix guard in both gatherProjectLensSignals() and listProjectTrackerIssues(), so tracker-less projects throw tracker_unconfigured while tracker-configured-but-prefix-less projects still throw missing_issue_prefix. Add two unit tests (path-only => tracker_unconfigured; gitlab-without-prefix => missing_issue_prefix) and document the precedence in docs/PIPELINE-MEMBERSHIP.md. Full rationale and before/after snippets in the PRD draft (.pan/drafts/PAN-3217.md).",
+      "NonGoals": "- Returning empty membership for tracker-less projects (issue option 2) — deferred; needs an operator policy decision\n- Removing or reconfiguring the papers-please / puzzdom projects.yaml entries — config hygiene, not code\n- Changing MEMBERSHIP_UNAVAILABLE_REASONS vocabulary or the /api/pipeline/membership response shape\n- Modifying resolveProjectTrackerType, getIssuePrefix, or PipelineMembershipUnavailableError\n- Touching other typed-reason classifications (repo_unavailable, forge_unavailable, gather_failed, default_branch_unresolved)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose issue option 1 (reorder checks) over option 2 (empty membership for tracker-less projects)",
+        "rationale": "Option 2 changes unavailable→empty semantics and would silently hide genuine misconfiguration; tracker_unconfigured keeps the blind spot visible with an accurate label. Whether path-only registrations are legitimate is operator policy, not a read-door decision. The issue text itself frames option 1 as 'correct if registering path-only projects is not legitimate', and that legitimacy is undecided."
+      },
+      {
+        "summary": "Reorder at both guard sites, not only the one the issue cites",
+        "rationale": "gatherProjectLensSignals() entry guard (lines 503-509) throws missing_issue_prefix before listProjectTrackerIssues() is ever reached, so fixing only the inner function would leave the bug in place. Reordering both is required for the accurate reason to surface."
+      }
+    ],
+    "items": [
+      {
+        "id": "reorder-tracker-before-prefix",
+        "title": "Resolve tracker type before the issue_prefix guard in both membership gather gates",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T06:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3217",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the new 'classifies a tracker-less project as tracker_unconfigured' test passes",
+            "the new gitlab-without-prefix missing_issue_prefix test passes",
+            "the pre-existing 'classifies a missing GitHub issue prefix' test passes unmodified",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/pipeline-membership-gather.ts: (1) in gatherProjectLensSignals() at line 499, insert `resolveProjectTrackerType(project); // throws tracker_unconfigured when no tracker exists` immediately before the issuePrefix guard at lines 503-509; (2) in listProjectTrackerIssues() at line 199, move the existing `const trackerType = resolveProjectTrackerType(project);` from line 208 to above the issuePrefix guard at lines 200-206. Do not modify resolveProjectTrackerType, getIssuePrefix, or the error class. In tests/unit/lib/pipeline-membership-gather.test.ts, next to the existing 'classifies a missing GitHub issue prefix' test at line 584, add two tests using the existing deps() fixture: (a) a path-only project ({ name, path } only) rejects from gatherProjectLensSignals with { reason: 'tracker_unconfigured', message: expect.stringContaining(project name) }; (b) a project with gitlab_repo set and no issue_prefix rejects with reason 'missing_issue_prefix'. The pre-existing GitHub variant test must pass unmodified — it is the FR-2 regression guard."
+        },
+        "items": [
+          {
+            "id": "reorder-tracker-before-prefix.ac1",
+            "title": "Given a path-only project ({ name, path } with no tracker fields), when gatherProjectLensSignals runs, then it rejects with reason 'tracker_unconfigured' and a message naming the project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reorder-tracker-before-prefix.ac2",
+            "title": "Given a project with gitlab_repo set but no issue_prefix, when gatherProjectLensSignals runs, then it rejects with reason 'missing_issue_prefix' (FR-2 preserved by a new test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reorder-tracker-before-prefix.ac3",
+            "title": "The full tests/unit/lib/pipeline-membership-gather.test.ts suite passes with the pre-existing 'classifies a missing GitHub issue prefix' test unmodified (FR-3 happy path preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reorder-tracker-before-prefix.ac4",
+            "title": "npm run typecheck exits 0 with no errors after the reorder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "document-reason-precedence",
+        "title": "Document the tracker_unconfigured vs missing_issue_prefix precedence in PIPELINE-MEMBERSHIP.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-28T06:45:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3217",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-MEMBERSHIP.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'tracker_unconfigured' docs/PIPELINE-MEMBERSHIP.md"
+          ],
+          "expected_outputs": [
+            "the typed-reasons paragraph near line 48 states that tracker resolution is checked first: no tracker => tracker_unconfigured; tracker present but no issue_prefix => missing_issue_prefix"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/PIPELINE-MEMBERSHIP.md, extend the typed-reasons sentence at line 48 (the one enumerating missing_issue_prefix, repo_unavailable, default_branch_unresolved, forge_unavailable, tracker_unconfigured, gather_failed) with one or two sentences stating the precedence: when several causes apply, tracker resolution is checked first — a project with no tracker reports tracker_unconfigured, while a project with a tracker but no issue_prefix reports missing_issue_prefix. No restructuring of the doc."
+        },
+        "items": [
+          {
+            "id": "document-reason-precedence.ac1",
+            "title": "docs/PIPELINE-MEMBERSHIP.md contains the precedence rule in the typed-reasons paragraph: a project with no tracker reports tracker_unconfigured, while a project with a tracker but no issue_prefix reports missing_issue_prefix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-reason-precedence.ac2",
+            "title": "The typed-reasons paragraph preserves its existing enumeration of all six reasons (missing_issue_prefix, repo_unavailable, default_branch_unresolved, forge_unavailable, tracker_unconfigured, gather_failed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "reorder-tracker-before-prefix",
+        "to": "document-reason-precedence",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-28-PAN-3217-tracker-less-projects-report-reason-missing-issue-prefix-the-accurate-tracker-unconfigured-is-unreachable-because-the-prefix-check-runs-first.xbrief.json"
+    }
+  },
+  "status": "proposed"
+}

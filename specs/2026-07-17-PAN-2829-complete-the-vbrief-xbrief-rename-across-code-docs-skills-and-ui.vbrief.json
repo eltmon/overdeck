@@ -1,0 +1,846 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-17T13:00:24.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2829: Complete the vBRIEF → xBRIEF rename across code, docs, skills, and UI",
+    "updated": "2026-07-19T03:17:11.072Z"
+  },
+  "plan": {
+    "id": "pan-2829",
+    "title": "Complete the vBRIEF → xBRIEF rename across code, docs, skills, and UI",
+    "status": "completed",
+    "uid": "16348049-1142-4625-ae9b-dace022b1548",
+    "author": "agent:claude-fable-5",
+    "sequence": 10,
+    "created": "2026-07-17T13:00:24.000Z",
+    "updated": "2026-07-19T03:17:11.072Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2829",
+        "label": "PAN-2829",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/deftai/xBRIEF/issues/11",
+        "label": "Upstream trademark rename",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "rename",
+      "xbrief",
+      "migration",
+      "docs",
+      "frontend"
+    ],
+    "narratives": {
+      "Problem": "Upstream renamed the spec vBRIEF → xBRIEF at v0.7.0 (UK trademark, deftai/xBRIEF#11). Overdeck already emits xBRIEF v0.8 documents with the xBRIEFInfo on-disk envelope, but internal naming is still almost entirely 'vBRIEF': the src/lib/vbrief/ module (14 files), the canonical vBRIEFInfo TS field (io.ts normalizes xBRIEFInfo → vBRIEFInfo internally), frontend components/vbrief/ and 'vBRIEF' UI copy, the *.vbrief.json extension baked into FILENAME_RE plus ~8 endsWith sites, docs/VBRIEF.md, the write-vbrief skill, role/prompt templates, and 359 spec + 150 continue files on overdeck-state still named *.vbrief.json (312 of the specs still carry the vBRIEFInfo envelope).",
+      "Proposal": "Adopt xBRIEF completely in ordered slices: (1) pure git-mv of src/lib/vbrief → src/lib/xbrief with import updates; (2) flip the canonical envelope field to xBRIEFInfo — serializer always emits xBRIEFInfo, readers accept vBRIEFInfo indefinitely, locked by a legacy fixture test; (3) mechanical XBrief* identifier rename; (4) new files written *.xbrief.json with readers accepting both extensions (continue writer reuses an existing legacy-named file — no duplicates); (5) an idempotent admin migration command (fixture-tested; live run is an explicit post-merge/post-deploy step because pre-deploy renames would be invisible to running old code); (6) frontend dir/component/copy rename; (7) write-xbrief skill + redirect stub; (8) prompt/role/CLI string sweep; (9) docs/XBRIEF.md + Mintlify sweep + migration note; (10) final grep audit producing the per-file justification list required by the issue's AC-1.",
+      "NonGoals": "- Do NOT run the state migration against any live ${OVERDECK_HOME}/state/<project>/ worktree in this branch (post-merge/post-deploy operator step only)\n- Do NOT drop or break reading of legacy vBRIEFInfo envelopes or *.vbrief.json filenames — legacy read-compat is permanent\n- Do NOT rewrite historical artifacts: docs/prds/**, docs/design/**, docs/research/**, .release/**, design/style-guide/mockups/**, changelog entries, closed-issue records\n- Do NOT rename the workspace migration-compat path PAN_SPEC_FILENAME ('spec.vbrief.json') or the legacy root vbrief/{proposed,active,...} lifecycle dirs and their reader findLegacyVBriefByIssue\n- Do NOT rename the pan CLI, the xBRIEF spec version (stays 0.8), or issue/branch/workspace naming conventions\n- Do NOT introduce a third UI term ('Spec') — UI copy standardizes on 'xBRIEF'"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Rename all VBrief* TypeScript identifiers, not only the vBRIEFInfo envelope field.",
+        "rationale": "Issue AC-1 requires `git grep -il vbrief` to return only justified occurrences; hundreds of live identifier hits cannot be justified as legacy-compat read paths, so a partial rename cannot pass the gate."
+      },
+      {
+        "summary": "Serializer always emits the xBRIEFInfo envelope; version-based envelope selection (vBRIEFInfo for < 0.7) is removed; readers accept both keys indefinitely.",
+        "rationale": "Round-trip preservation existed to prevent silent up-conversion; this issue's explicit committed migration supersedes it, and an always-xBRIEFInfo serializer makes the migration idempotent with normal write-door rewrites. State docs are internal — no external consumer depends on the legacy envelope for old versions."
+      },
+      {
+        "summary": "State migration takes the full option — envelope rewrite AND *.vbrief.json → *.xbrief.json renames — shipped as an idempotent admin command; the live run is deferred to post-merge/post-deploy.",
+        "rationale": "Committed renames are reversible via git (the issue names this), and deferring the live run avoids the deploy-order hazard where old deployed code (endsWith '.vbrief.json') cannot see renamed files for ~49 active issues."
+      },
+      {
+        "summary": "UI copy uses 'xBRIEF' wherever it said 'vBRIEF', rather than the issue's alternative neutral 'Spec'.",
+        "rationale": "One consistent term across docs, CLI, and UI; introducing 'Spec' would create a third name for the same artifact and more copy churn."
+      },
+      {
+        "summary": "write-vbrief becomes a compatibility-redirect stub pointing at the renamed write-xbrief skill.",
+        "rationale": "Follows the existing all-up → pan-flywheel redirect precedent in sync-sources/skills/, preserving muscle memory without keeping duplicate content."
+      }
+    ],
+    "items": [
+      {
+        "id": "module-move",
+        "title": "Pure move: src/lib/vbrief → src/lib/xbrief with repo-wide import updates",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T13:00:24.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2829",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vbrief/*.ts",
+            "src/lib/xbrief/*.ts",
+            "src/lib/xbrief/__tests__/*.ts",
+            "tests/unit/lib/vbrief/*.ts",
+            "tests/unit/lib/xbrief/*.ts",
+            "src/lib/pan-dir/*.ts",
+            "src/lib/cloister/*.ts",
+            "src/lib/cloister/__tests__/*.ts",
+            "src/lib/agents/*.ts",
+            "src/lib/agents/__tests__/*.ts",
+            "src/cli/commands/*.ts",
+            "src/cli/commands/admin/*.ts",
+            "src/dashboard/server/routes/*.ts",
+            "src/dashboard/server/services/*.ts",
+            "src/lib/*.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm test",
+            "git grep -l \"lib/vbrief/\" -- 'src' 'tests' | wc -l"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "test suite exits 0 with no new failures",
+            "grep for lib/vbrief/ import specifiers under src/ and tests/ prints 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "git mv src/lib/vbrief src/lib/xbrief; rename src/lib/xbrief/vbrief-index.ts → xbrief-index.ts; git mv tests/unit/lib/vbrief tests/unit/lib/xbrief. Update every import specifier containing 'lib/vbrief/' or './vbrief/' or '../vbrief/' to the xbrief path repo-wide (src/ and tests/). ZERO identifier renames and zero behavior changes in this item — the diff must be a pure move so in-flight branches can rebase mechanically (hazard H3). If lint:file-size flags a moved file, reconcile scripts/file-size-baseline.txt in this same commit (hazard H6; baseline verified to contain no vbrief paths as of 2026-07-17)."
+        },
+        "items": [
+          {
+            "id": "module-move.ac1",
+            "title": "src/lib/xbrief/ contains the moved module, src/lib/vbrief/ no longer exists, and `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "module-move.ac2",
+            "title": "`git grep -l \"lib/vbrief/\" -- 'src' 'tests'` returns no files (every import specifier resolves to lib/xbrief/)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "module-move.ac3",
+            "title": "`npm test` exits 0 with the vbrief unit suites relocated under tests/unit/lib/xbrief/ and src/lib/xbrief/__tests__/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "envelope-canonical",
+        "title": "Flip canonical envelope field to xBRIEFInfo; serializer always emits xBRIEFInfo; legacy read locked by fixture",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T13:00:24.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2829",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "identifier-rename",
+            "extension-convention",
+            "state-migration-cmd"
+          ],
+          "files_scope": [
+            "src/lib/xbrief/types.ts",
+            "src/lib/xbrief/io.ts",
+            "src/lib/xbrief/__tests__/*.ts",
+            "tests/unit/lib/xbrief/*.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/xbrief tests/unit/lib/xbrief"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "xbrief unit suites pass, including a new legacy-envelope fixture test"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/xbrief/types.ts make xBRIEFInfo the canonical required field on the document type (legacy vBRIEFInfo becomes the optional read-compat alias — the inverse of today's types.ts:171-172). In io.ts invert normalizeVBriefEnvelope (io.ts:192-194): a document with vBRIEFInfo and no xBRIEFInfo normalizes to xBRIEFInfo. Rewrite serializeVBriefDocument (io.ts:199-204) to ALWAYS emit the xBRIEFInfo key regardless of version (decision D2 — delete the Number.parseFloat version gate). Update the error messages at io.ts:223-224 and io.ts:493 to keep naming both accepted keys. Add a committed legacy fixture ({ vBRIEFInfo: { version: '0.5', ... }, plan: {...} }) and a test proving it loads and normalizes. Keep the identifier NAMES unchanged in this item (renamed next item) to keep the diff reviewable."
+        },
+        "items": [
+          {
+            "id": "envelope-canonical.ac1",
+            "title": "Given any document version including a 0.5 fixture, serialization emits an xBRIEFInfo top-level key and never emits vBRIEFInfo (unit test asserts on the serialized string)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "envelope-canonical.ac2",
+            "title": "Given a committed legacy fixture file with a vBRIEFInfo envelope, the reader returns a document whose canonical xBRIEFInfo field carries the fixture's info block (test reads the fixture from disk)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "envelope-canonical.ac3",
+            "title": "The reader rejects a document missing both envelope keys with an error message naming both 'xBRIEFInfo' and 'vBRIEFInfo' as accepted keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "envelope-canonical.ac4",
+            "title": "Round-trip read→write of an already-xBRIEFInfo v0.8 document preserves its envelope and content byte-identically apart from key order (test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "identifier-rename",
+        "title": "Mechanical rename of VBrief* identifiers to XBrief* across src/ and tests/",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T13:00:24.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-2829",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/*.ts",
+            "src/lib/xbrief/__tests__/*.ts",
+            "tests/unit/lib/xbrief/*.ts",
+            "src/lib/pan-dir/*.ts",
+            "src/lib/pan-dir/__tests__/*.ts",
+            "src/lib/cloister/*.ts",
+            "src/lib/cloister/__tests__/*.ts",
+            "src/lib/agents/*.ts",
+            "src/lib/agents/__tests__/*.ts",
+            "src/cli/commands/*.ts",
+            "src/cli/commands/admin/*.ts",
+            "src/dashboard/server/routes/*.ts",
+            "src/dashboard/server/services/*.ts",
+            "src/lib/*.ts",
+            "tests/unit/lib/*.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm test",
+            "git grep -cw -e VBrief --or -e Vbrief -- 'src' || true"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "test suite exits 0 with no new failures",
+            "case-sensitive VBrief identifier grep over src/ returns only occurrences inside the documented legacy read-compat lines in src/lib/xbrief/io.ts and types.ts"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Rename exported and internal identifiers matching VBrief/Vbrief to XBrief/Xbrief across src/ and tests/: VBriefDocument→XBriefDocument, VBriefInfo→XBriefInfo, generateVBriefFilename→generateXBriefFilename, parseVBriefFilename→parseXBriefFilename, normalizeVBriefEnvelope→normalizeXBriefEnvelope, serializeVBriefDocument→serializeXBriefDocument, VBriefMergeConflictError→XBriefMergeConflictError, invalidateVBriefIndex→invalidateXBriefIndex, and every other VBrief* symbol surfaced by a case-sensitive grep (components excluded — frontend handled in frontend-rename). Pure rename, no behavior change. The optional legacy vBRIEFInfo document property from envelope-canonical is the only surviving vBRIEF-cased name in src/, and only inside src/lib/xbrief/io.ts and types.ts."
+        },
+        "items": [
+          {
+            "id": "identifier-rename.ac1",
+            "title": "A case-sensitive grep for VBrief identifiers over src/ (excluding src/dashboard/frontend) returns matches only on the legacy read-compat property lines in src/lib/xbrief/io.ts and src/lib/xbrief/types.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "identifier-rename.ac2",
+            "title": "`npm run typecheck` exits 0 after the rename",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "identifier-rename.ac3",
+            "title": "`npm test` exits 0 with no new failures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extension-convention",
+        "title": "New files written *.xbrief.json; every reader accepts both extensions; no duplicate continue files",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T13:00:24.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2829",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/lifecycle.ts",
+            "src/lib/pan-dir/specs.ts",
+            "src/lib/pan-dir/records.ts",
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/sync.ts",
+            "src/lib/cloister/orphan-proposed-reconciler.ts",
+            "src/lib/cloister/verification-runner.ts",
+            "src/lib/xbrief/__tests__/*.ts",
+            "src/lib/pan-dir/__tests__/*.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/xbrief src/lib/pan-dir tests/unit/lib",
+            "npm test"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lifecycle/specs/records suites pass including new both-extension and no-duplicate-continue tests",
+            "full test suite exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/xbrief/lifecycle.ts: generateXBriefFilename (lifecycle.ts:90) emits `...xbrief.json`; FILENAME_RE (lifecycle.ts:30) and parseXBriefFilename accept BOTH `.vbrief.json` and `.xbrief.json` suffixes. Export a shared extension predicate (e.g. isSpecFilename/SPEC_FILE_EXTENSIONS) from lifecycle.ts and replace every endsWith('.vbrief.json') site with it: doctor.ts:580, sync.ts:662/690/714, orphan-proposed-reconciler.ts:112/191, verification-runner.ts:350, and the specs.ts directory scans. In src/lib/pan-dir/records.ts:167 the continue writer must first resolve an existing continue file for the issue under either extension and reuse that exact filename; only when none exists does it create `<issue>.xbrief.json` (hazard H2). In specs.ts findSpecByIssue, when both a .vbrief.json and .xbrief.json spec match one issue, deterministically prefer the .xbrief.json file (hazard H7). writeSpec keeps preserving an existing filename (plan-finalize.ts:463)."
+        },
+        "items": [
+          {
+            "id": "extension-convention.ac1",
+            "title": "generateXBriefFilename produces filenames ending .xbrief.json, and parseXBriefFilename accepts both 2026-05-04-PAN-1-x.vbrief.json and 2026-05-04-PAN-1-x.xbrief.json (unit tests)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extension-convention.ac2",
+            "title": "findSpecByIssue returns specs named with either extension, and prefers the .xbrief.json file when both extensions exist for the same issue (test with both fixtures on disk)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extension-convention.ac3",
+            "title": "Given an existing pan-<n>.vbrief.json continue file, a continue write updates that same file and creates no pan-<n>.xbrief.json duplicate; with no existing file it creates pan-<n>.xbrief.json (tests)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extension-convention.ac4",
+            "title": "Each of doctor, sync, and orphan-proposed-reconciler returns .xbrief.json files from its spec scan via the shared extension predicate (each targeted suite exits 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "state-migration-cmd",
+        "title": "Idempotent admin command migrating a state worktree to xBRIEFInfo envelopes + .xbrief.json names (fixture-tested; NOT run live here)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T13:00:24.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2829",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/admin/state-migrate.ts",
+            "src/cli/commands/admin/*.ts",
+            "src/cli/index.ts",
+            "src/cli/commands/__tests__/*.ts",
+            "sync-sources/skills/pan-admin-config/SKILL.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "admin-command suites pass including migrate/idempotence/dry-run fixture tests",
+            "lint (incl. skills lint) exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an xbrief migration subcommand to the admin state-migrate family (src/cli/commands/admin/state-migrate.ts or a sibling, wired like existing admin verbs). For a given project's state worktree it: (a) rewrites every specs/*.json envelope vBRIEFInfo → xBRIEFInfo (content otherwise preserved; version field untouched), (b) git-mv-renames specs/*.vbrief.json and continues/*.vbrief.json to .xbrief.json (continues are rename-only — they have no envelope), (c) commits once through the state write door with a message naming PAN-2829, (d) is idempotent (second run exits 0 reporting nothing to do), (e) supports --dry-run printing planned changes without touching the worktree. Tests run against a temp fixture state worktree. MUST NOT be executed against any live ${OVERDECK_HOME}/state/* in this branch (hazard H1) — the live run is a documented post-merge/post-deploy operator step."
+        },
+        "items": [
+          {
+            "id": "state-migration-cmd.ac1",
+            "title": "Against a fixture state worktree containing vBRIEFInfo specs and .vbrief.json continues, one invocation renames all files to .xbrief.json, rewrites spec envelopes to xBRIEFInfo, and produces exactly one commit (test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-migration-cmd.ac2",
+            "title": "A second invocation on the migrated fixture exits 0 and reports zero files to migrate, creating no new commit (idempotence test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-migration-cmd.ac3",
+            "title": "--dry-run prints the planned renames/rewrites and preserves the fixture worktree bit-identically (test compares tree before/after)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-migration-cmd.ac4",
+            "title": "After migration, findSpecByIssue returns the migrated fixture spec and the continue reader returns the migrated continue file (round-trip test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-rename",
+        "title": "Frontend: components/vbrief → components/xbrief, XBrief* component names, and xBRIEF UI copy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:00:24.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2829",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "parallelSafeReason": "Touches only src/dashboard/frontend paths, fully disjoint from every backend item's file scope; UI copy and component names have no compile-time coupling to the src/lib rename items.",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/vbrief/*.tsx",
+            "src/dashboard/frontend/src/components/vbrief/*.ts",
+            "src/dashboard/frontend/src/components/xbrief/*.tsx",
+            "src/dashboard/frontend/src/components/xbrief/*.ts",
+            "src/dashboard/frontend/src/components/*.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/*.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/*.ts",
+            "src/dashboard/frontend/src/components/Stage/cockpit/*.tsx",
+            "src/dashboard/frontend/src/components/GodView/TasksKanban.tsx",
+            "src/dashboard/frontend/src/components/backlog/PickupGateControls.tsx",
+            "src/dashboard/frontend/src/hooks/useRestartFromPlan.ts",
+            "src/dashboard/frontend/src/lib/taskStatus.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm test",
+            "grep -rn 'vBRIEF' src/dashboard/frontend/src --include='*.tsx' --include='*.ts' | wc -l"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "frontend test project exits 0 with label assertions updated to xBRIEF",
+            "grep for vBRIEF under src/dashboard/frontend/src prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "git mv src/dashboard/frontend/src/components/vbrief → components/xbrief; rename component files and symbols VBrief* → XBrief* (VBriefViewer→XBriefViewer, VBriefDialog→XBriefDialog, VBriefHeader, VBriefItemCard, VBriefItemList, VBriefNarratives, VBriefReadinessPanel, VBriefReferences, plus DagRenderer/PlanMapViewer internals); update importers. Replace user-visible 'vBRIEF' copy with 'xBRIEF' (decision D4) in the ~20 files surfaced by grep: KanbanBoard.tsx, TasksPanel.tsx, ArtifactLinks.tsx, IssuePolicyStrip.tsx, ResetIssueButton.tsx, RestartFromPlanButton.tsx, RecoverButton.tsx, PlanDialog.tsx, CommandDeck (incl. action-parity test), Stage/cockpit (IssueDigTabs, TasksRail, IssueMissionControl.test), GodView/TasksKanban.tsx, backlog/PickupGateControls.tsx, hooks/useRestartFromPlan.ts, lib/taskStatus.ts, KanbanBoard.test.tsx, VBriefViewer.test.tsx. Follow the pan-style-guide (no new colors/badges — text-only rename). Preserve data-section markers / no-loss audit expectations from docs/ISSUE-VIEW.md — labels change, no affordance disappears."
+        },
+        "items": [
+          {
+            "id": "frontend-rename.ac1",
+            "title": "The dashboard renders 'xBRIEF' where it previously rendered 'vBRIEF' (frontend tests assert the new label text on the kanban card button and viewer dialog)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-rename.ac2",
+            "title": "components/xbrief/ contains the renamed XBrief* exports, components/vbrief/ is gone, and `grep -rn vBRIEF src/dashboard/frontend/src` returns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-rename.ac3",
+            "title": "Frontend typecheck exits 0 and the frontend Vitest project exits 0 with no new failures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-rename",
+        "title": "Rename write-vbrief skill to write-xbrief with a compatibility-redirect stub",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:00:24.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2829",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/write-vbrief/SKILL.md",
+            "sync-sources/skills/write-xbrief/SKILL.md",
+            "scripts/lint-skills.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint including scripts/lint-skills.sh exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "git mv sync-sources/skills/write-vbrief → sync-sources/skills/write-xbrief; update SKILL.md content to xBRIEF naming and .xbrief.json outputs (the workspace working-copy path stays .pan/spec.vbrief.json per decision D7 — say so explicitly in the skill). Create a new sync-sources/skills/write-vbrief stub whose SKILL.md is a compatibility redirect to /write-xbrief, modeled on sync-sources/skills/all-up (redirect to pan-flywheel). Only touch scripts/lint-skills.sh if the skills lint hardcodes the old name; otherwise leave it."
+        },
+        "items": [
+          {
+            "id": "skill-rename.ac1",
+            "title": "sync-sources/skills/write-xbrief/SKILL.md contains xBRIEF-first guidance, shows .xbrief.json spec output, and marks the .pan/spec.vbrief.json workspace path as deliberate legacy compat",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-rename.ac2",
+            "title": "sync-sources/skills/write-vbrief/SKILL.md survives as a stub that redirects invocations to /write-xbrief (mirrors the all-up redirect shape)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-rename.ac3",
+            "title": "`npm run lint` (including scripts/lint-skills.sh) exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prompts-cli-sweep",
+        "title": "Sweep role files, cloister prompt templates, sync-sources agents/rules, and CLI strings to xBRIEF",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:00:24.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2829",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/*.md",
+            "src/lib/cloister/prompts/*.ts",
+            "src/lib/cloister/prompts/*.md",
+            "sync-sources/agents/*.md",
+            "sync-sources/rules/*.md",
+            "src/cli/commands/plan.ts",
+            "src/cli/commands/plan-finalize.ts",
+            "src/cli/commands/start.ts",
+            "src/cli/commands/task.ts",
+            "sync-sources/skills/pan-plan/SKILL.md",
+            "sync-sources/skills/pan-task/SKILL.md",
+            "sync-sources/skills/pan-start/SKILL.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run lint",
+            "npm run typecheck",
+            "git grep -l vBRIEF -- 'roles' 'src/lib/cloister/prompts' 'sync-sources/agents' | wc -l"
+          ],
+          "expected_outputs": [
+            "lint including skills lint exits 0 (wrapper skills match updated --help output)",
+            "typecheck completes without errors",
+            "grep for vBRIEF over roles/, cloister prompts, and sync-sources/agents prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace vBRIEF wording with xBRIEF in the live prompt/instruction surfaces: roles/plan.md, roles/work.md, roles/review*.md, roles/test.md; src/lib/cloister/prompts/* (including the planning orchestration template — fix the OBSERVABLE_TERMS citation to src/lib/xbrief/quality-lint.ts per hazard H4); sync-sources/agents/*; sync-sources/rules/* where they reference vBRIEF as the live term (keep mentions that explain legacy compat, e.g. deep-wipe survival notes may keep the legacy path names they describe). Update CLI help/output strings in plan/plan-finalize/start/task commands and any pan-* wrapper SKILL.md whose text quotes those strings, in the same item so scripts/lint-skills.sh stays green (hazard H5)."
+        },
+        "items": [
+          {
+            "id": "prompts-cli-sweep.ac1",
+            "title": "`git grep -l vBRIEF -- roles src/lib/cloister/prompts sync-sources/agents` returns no files; role prompts instruct agents in xBRIEF terms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prompts-cli-sweep.ac2",
+            "title": "`pan plan --help` prints xBRIEF terminology and `pan task --help` prints xBRIEF terminology (asserted via help-text test or built-CLI grep), and the matching wrapper skills contain the same wording",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prompts-cli-sweep.ac3",
+            "title": "`npm run lint` (incl. skills lint) exits 0 and `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-migration",
+        "title": "docs/XBRIEF.md (+ redirect stub), CLAUDE.md section, Mintlify pages, live docs sweep, migration note",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:00:24.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-2829",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/VBRIEF.md",
+            "docs/XBRIEF.md",
+            "CLAUDE.md",
+            "concepts.mdx",
+            "vision.mdx",
+            "cli/workspace-commands.mdx",
+            "configuration/state-branch.mdx",
+            "features/specialists.mdx",
+            "features/swarm.mdx",
+            "reference/prompts.mdx",
+            "reference/state-model.mdx",
+            "docs/*.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run lint",
+            "git grep -il vbrief -- 'docs' ':!docs/prds' ':!docs/design' ':!docs/research'"
+          ],
+          "expected_outputs": [
+            "lint exits 0",
+            "vbrief grep over live docs/ returns only docs/VBRIEF.md (redirect stub) and migration-note context inside docs/XBRIEF.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "git mv docs/VBRIEF.md → docs/XBRIEF.md and rewrite its content to xBRIEF-first naming; add a '## Migration from vBRIEF' section covering: the permanent legacy read-compat surfaces (vBRIEFInfo envelope, *.vbrief.json extension, PAN_SPEC_FILENAME, root vbrief/ lifecycle dirs), and the exact post-merge/post-deploy procedure for running the state migration command per project (hazard H1 — state the deploy-ordering requirement explicitly). Leave docs/VBRIEF.md as a short redirect stub (pattern: docs/HARNESSES.md redirect). Update the CLAUDE.md 'vBRIEF Plans & Lifecycle' section heading, links, and .vbrief.json mentions to the new convention. Sweep the eight Mintlify pages (concepts.mdx, vision.mdx, cli/workspace-commands.mdx, configuration/state-branch.mdx, features/specialists.mdx, features/swarm.mdx, reference/prompts.mdx, reference/state-model.mdx) and remaining live docs/*.md (docs/ROLES.md, docs/PIPELINE-MEMBERSHIP.md, etc.), excluding historical dirs per decision D6."
+        },
+        "items": [
+          {
+            "id": "docs-migration.ac1",
+            "title": "docs/XBRIEF.md contains the lifecycle content plus a migration note that names the admin migration command and its run-only-after-deploy ordering; docs/VBRIEF.md redirects readers to it as a short stub",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-migration.ac2",
+            "title": "CLAUDE.md's plans/lifecycle section renders xBRIEF terminology and links to docs/XBRIEF.md (no live link to docs/VBRIEF.md remains outside the stub)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-migration.ac3",
+            "title": "`git grep -il vbrief` over the eight named .mdx pages and live docs/*.md returns only the redirect stub and migration-note context",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grep-audit",
+        "title": "Final vbrief grep audit: enumerate and justify every survivor, rename stragglers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:00:24.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2829",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/io.ts",
+            "src/lib/xbrief/types.ts",
+            "src/lib/pan-dir/types.ts",
+            "docs/*.md",
+            "roles/*.md",
+            "sync-sources/rules/*.md"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "git grep -il vbrief -- ':!docs/prds' ':!docs/design' ':!docs/research' ':!.release' ':!design'",
+            "npm run typecheck",
+            "npm run lint",
+            "npm test"
+          ],
+          "expected_outputs": [
+            "the exclusion-filtered grep output exactly matches the justified-survivor list enumerated in the PR description",
+            "typecheck, lint, and full test suite all exit 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ],
+          "acJustification": "Audit item: its two criteria (grep returns exactly the justified list; gates green) fully cover the deliverable; more ACs would duplicate other items' criteria."
+        },
+        "narrative": {
+          "Action": "Run `git grep -il vbrief -- ':!docs/prds' ':!docs/design' ':!docs/research' ':!.release' ':!design'` on the finished branch. Categorize every hit as: (a) legacy-compat read path (io/types compat property, extension predicates, PAN_SPEC_FILENAME, root vbrief/ dirs + findLegacyVBriefByIssue, state-migrate legacy path list), (b) legacy fixture for the compat tests, (c) migration note / redirect stubs (docs/XBRIEF.md note, docs/VBRIEF.md stub, write-vbrief skill stub), or (d) straggler — rename stragglers in this item. Write the final file list with one-line justifications into the PR description (issue AC-1). This item is the no-loss audit gate for the whole rename: run the full quality gates one last time."
+        },
+        "items": [
+          {
+            "id": "grep-audit.ac1",
+            "title": "The exclusion-filtered `git grep -il vbrief` returns exactly the justified-survivor list written into the PR description, every entry categorized as legacy-compat, fixture, or migration-note/stub",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grep-audit.ac2",
+            "title": "`npm run typecheck` exits 0, `npm run lint` exits 0, and `npm test` exits 0 on the completed branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "module-move",
+        "to": "envelope-canonical",
+        "type": "blocks"
+      },
+      {
+        "from": "envelope-canonical",
+        "to": "identifier-rename",
+        "type": "blocks"
+      },
+      {
+        "from": "identifier-rename",
+        "to": "extension-convention",
+        "type": "blocks"
+      },
+      {
+        "from": "extension-convention",
+        "to": "state-migration-cmd",
+        "type": "blocks"
+      },
+      {
+        "from": "identifier-rename",
+        "to": "frontend-rename",
+        "type": "informs"
+      },
+      {
+        "from": "prompts-cli-sweep",
+        "to": "grep-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-migration",
+        "to": "grep-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "skill-rename",
+        "to": "grep-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-rename",
+        "to": "grep-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "state-migration-cmd",
+        "to": "grep-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "extension-convention",
+        "to": "docs-migration",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-17-PAN-2829-complete-the-vbrief-xbrief-rename-across-code-docs-skills-and-ui.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

@@ -1,0 +1,735 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T18:30:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3151: Oversized changes do not converge under review→rework and nothing detects it",
+    "updated": "2026-07-27T16:20:27.861Z"
+  },
+  "plan": {
+    "id": "pan-3151",
+    "title": "Oversized changes do not converge under review→rework and nothing detects it",
+    "status": "completed",
+    "uid": "34352b16-b4f2-4182-b75f-5859bb5d6497",
+    "author": "agent:k3[1m]",
+    "sequence": 5,
+    "created": "2026-07-26T18:30:00.000Z",
+    "updated": "2026-07-27T16:20:27.861Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3151",
+        "label": "PAN-3151",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "review",
+      "cloister",
+      "quality-lint",
+      "observability"
+    ],
+    "narratives": {
+      "Problem": "PAN-3093 (29 files, +5,594/−402) ran five review cycles whose blocking-finding count did not converge (12 → 7 → 5 → 4 → 12), burning ~$98 and ~7 pipeline-hours, and nothing in the pipeline noticed. Planning does not bound the diff an xBRIEF may authorize, the review dispatcher does not treat a non-decreasing finding count as a signal, and the per-cycle trend is invisible unless someone manually diffs synthesis.md files.",
+      "Proposal": "Three mechanisms: (1) record each blocked cycle's blocking-finding count (from synthesis.md '## Blocking Findings' heading count, report-sum fallback) into a persisted reviewCycleHistory at the reconcileJournalIntoCacheSync blocked-transition chokepoint, and when the series shows a reversal at n≥3 or two consecutive non-decreases, mark the issue stuck with reason 'review-not-converging', suppress the automatic rework re-drive, and surface needs-you with the count series; (2) a quality-lint 'projected-surface' error at plan finalize when the files_scope union exceeds 25 files or 6 subsystems without plan.metadata.sizeJustification; (3) render the count series in the dashboard issue view and pan show.",
+      "NonGoals": "- Disrupting PAN-3093 itself — its in-flight cycle finishes; this issue builds the missing gate, not that issue's disposition\n- Changing reviewer prompts or the prompt-level convergence gate in roles/review.md:62 (that gate governs which findings reviewers may report; it cannot stop the loop)\n- New lifecycle states or deacon gates beyond the existing stuck flag\n- New chart components or color semantics in the dashboard\n- Auto-splitting an in-flight non-converging change (the gate stops and surfaces; decomposition is the operator's call)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Hook cycle recording and gate evaluation into reconcileJournalIntoCacheSync's wasBlocked→nowBlocked transition, not the verdict CLI",
+        "rationale": "Every verdict path (pan done, deacon fallback, journal recovery, HTTP route) funnels through this transition — verified the hook at review-status.ts:696 is the only wiring of the feedback delivery. Hooking the CLI would miss journal and recovery paths."
+      },
+      {
+        "summary": "Count blocking findings from synthesis.md first, raw reports only as fallback",
+        "rationale": "The synthesizer deduplicates cross-sub-role findings, and the '## Blocking Findings' heading count reproduces the issue's quoted numbers exactly (verified 12 on PAN-3093 cycle f75a76c4)."
+      },
+      {
+        "summary": "Convergence rule = reversal at n≥3 OR two consecutive non-decreases",
+        "rationale": "The issue says 'fails to decrease across two consecutive cycles'; the reversal clause is needed so PAN-3093's actual signature (strict decrease then 4 → 12) fires at cycle 5 rather than after more wasted cycles."
+      },
+      {
+        "summary": "Gate action reuses the existing stuck flag with reason 'review-not-converging'",
+        "rationale": "All deacon dispatch loops already skip stuck issues and the unstick route is an existing operator escape hatch; a new state would fork every one of those call sites."
+      },
+      {
+        "summary": "Suppress rework re-drive inside deliverReviewVerdictFeedbackPromise as well as at the reconcile hook",
+        "rationale": "The function has direct callers outside reconcile (deacon-review-signals.ts:252, legacy-routes.ts:496, specialists/done.ts:244); the in-function stuck-reason check covers all of them."
+      },
+      {
+        "summary": "Projected-surface thresholds of 25 files / 6 subsystems with sizeJustification escape",
+        "rationale": "PAN-3093 touched 29 files across ~6 subsystems — both dials would have flagged it. A hard error (not warn) because a warn is the 'nobody notices' failure mode this issue is about."
+      }
+    ],
+    "items": [
+      {
+        "id": "shared-findings-parser",
+        "title": "Extract blocking-findings parser into src/lib/review-findings.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T18:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/review-findings.ts",
+            "src/lib/cloister/deacon-review-signals.ts",
+            "tests/unit/lib/review-findings.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/review-findings.test.ts src/lib/cloister/__tests__"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "parser tests pass including pre-existing deacon-review-signals coverage"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Move extractMarkdownSection and findBlockingFindings (src/lib/cloister/deacon-review-signals.ts:25-43) verbatim into a new src/lib/review-findings.ts and export them; add a new pure function countSynthesisBlockingFindings(body: string): number that extracts the '## Blocking Findings' section and counts '^###\\s+' headings (section absent, empty, or 'None' → 0). Update deacon-review-signals.ts to import from the new module so its behavior is unchanged. Add tests/unit/lib/review-findings.test.ts covering: report-format blocking headings ('### !' and '### ⊗'), 'None' findings, missing section, and synthesis-format counts (a 12-heading fixture returns 12). This is a pure move plus one pure function — do not alter parser semantics."
+        },
+        "items": [
+          {
+            "id": "shared-findings-parser.ac1",
+            "title": "Given a reviewer report with two '### !' headings under '## Findings', findBlockingFindings returns both titles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-findings-parser.ac2",
+            "title": "Given a synthesis body with 12 '### [subRole]' headings under '## Blocking Findings', countSynthesisBlockingFindings returns 12; given 'None' it returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-findings-parser.ac3",
+            "title": "typecheck resolves deacon-review-signals.ts against the new module and the existing deacon-review-signals test suite exits 0 unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cycle-counting",
+        "title": "Create review-convergence module: run-dir discovery, cycle counting, pure convergence rule",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T18:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3151",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "reconcile-gate-wiring",
+            "feedback-suppression"
+          ],
+          "files_scope": [
+            "src/lib/cloister/review-convergence.ts",
+            "tests/unit/lib/cloister/review-convergence.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/review-convergence.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "review-convergence tests pass (rule truth table + fixture-based counting)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/review-convergence.ts exporting: (1) interface ReviewCycleEntry { cycle: number; runId: string; atCommit?: string; blockingCount: number; recordedAt: string }; (2) const REVIEW_CONVERGENCE_MIN_CYCLES = 3; (3) findLatestReviewRunDir(workspacePath): string | null — newest 'agent-*-review-*' directory by mtime under <workspace>/.pan/review (PAN_DIRNAME from src/lib/pan-dir/types.ts), falling back to .overdeck/review; (4) countBlockingFindingsForRun(runDir): number | null — synthesis.md heading count via countSynthesisBlockingFindings first, else sum of findBlockingFindings across the run's .md report files (excluding synthesis.md), else null when no artifacts exist; (5) pure evaluateReviewConvergence(counts: number[]): 'converging' | 'not-converging' implementing the D3 rule: not-converging when counts.length ≥ 3 AND (counts[n-1] > counts[n-2], i.e. reversal, OR both of the last two comparisons are non-decreases). Unit tests pin the full truth table: [12,7,5,4,12] fires at append of 12; [12,13] does not fire (n=2); [12,7,5,5,5] fires at the second flat comparison; [5,5,5] fires; strictly decreasing series never fires; empty/short series never fires; fixture dirs cover synthesis-first counting, report-sum fallback, and missing artifacts → null."
+        },
+        "items": [
+          {
+            "id": "cycle-counting.ac1",
+            "title": "Given counts [12,7,5,4,12], evaluateReviewConvergence returns 'not-converging' (reversal at n=5); given [12,13] it returns 'converging'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cycle-counting.ac2",
+            "title": "Given counts [12,7,5,5,5] or [5,5,5], evaluateReviewConvergence returns 'not-converging' (two consecutive non-decreases); given [12,7,5,4,2] it returns 'converging'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cycle-counting.ac3",
+            "title": "Given a fixture run dir whose synthesis.md has 3 blocking headings and reports with different counts, countBlockingFindingsForRun returns 3 (synthesis wins); given a dir with no synthesis it returns the report sum; given an empty dir it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cycle-counting.ac4",
+            "title": "findLatestReviewRunDir returns the newest 'agent-*-review-*' dir by mtime from .pan/review and falls back to .overdeck/review when .pan/review is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cycle-history-persistence",
+        "title": "Persist reviewCycleHistory: schema v62 column, ReviewStatus field, DB mapping, record mirror",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T18:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/database/schema.ts",
+            "src/lib/review-status-reconcile.ts",
+            "src/lib/database/review-status-db.ts",
+            "src/lib/overdeck/review-status-sync.ts",
+            "src/lib/pan-dir/records.ts",
+            "src/lib/pan-dir/record.ts",
+            "src/lib/overdeck/review-status-record-sync.ts",
+            "src/lib/review-status-normalize.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/database src/lib/overdeck/__tests__ src/lib/__tests__/review-status*"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "review_status row round-trips reviewCycleHistory through upsert and read"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add persistence for the per-cycle series through the existing doors only. (1) src/lib/database/schema.ts: bump SCHEMA_VERSION 61 → 62 and add tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN review_cycle_history TEXT'). (2) src/lib/review-status-reconcile.ts: add `reviewCycleHistory?: ReviewCycleEntry[]` to the ReviewStatus interface (import the type from src/lib/cloister/review-convergence.ts). (3) Row mapping both directions in src/lib/database/review-status-db.ts (insert column list ~:44, upsert SET ~:75, row type ~:403, mapper ~:461) and src/lib/overdeck/review-status-sync.ts (:43, :97, :184, :210) — JSON stringify on write, parse on read, undefined when NULL. (4) Record mirror: add reviewCycleHistory alongside reviewerVerdicts in src/lib/pan-dir/records.ts:135, src/lib/pan-dir/record.ts:183, and src/lib/overdeck/review-status-record-sync.ts:126. (5) Check src/lib/review-status-normalize.ts: if the normalizer whitelists fields, pass reviewCycleHistory through. No new direct DB access anywhere — NFR-1."
+        },
+        "items": [
+          {
+            "id": "cycle-history-persistence.ac1",
+            "title": "the v62 idempotent DDL creates the review_cycle_history column on both a fresh and a migrated database",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cycle-history-persistence.ac2",
+            "title": "upsertReviewStatusSync persists a status carrying reviewCycleHistory and the DB read path returns the entries intact; a status without the field returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cycle-history-persistence.ac3",
+            "title": "the per-issue permanent record's pipeline block persists reviewCycleHistory alongside reviewerVerdicts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconcile-gate-wiring",
+        "title": "Wire cycle recording and the convergence gate into the reconcile blocked transition",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T18:30:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3151",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "feedback-suppression",
+            "dashboard-trend-display",
+            "pan-show-trend",
+            "docs-convergence-gate"
+          ],
+          "files_scope": [
+            "src/lib/review-status-reconcile.ts",
+            "tests/unit/lib/review-status-reconcile.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/review-status-reconcile.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "reconcile tests prove gate fires/suppresses correctly and converging series is untouched"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In reconcileJournalIntoCacheSync (src/lib/review-status-reconcile.ts), extend the existing `nowBlocked && !wasBlocked` branch (~:144-148). (1) Resolve the workspace path via resolveProjectFromIssueSync + 'workspaces/feature-<issue-lowercase>' (same pattern as review-verdict-feedback.ts:100-103 — wrapper only, never sub-repos, H1), find the latest review run dir, and count the cycle (cycle-counting item). When the count is null, log a warn and skip recording (FR-2) but deliver feedback as today. (2) Append { cycle: prior+1, runId, atCommit: reviewedAtCommit ?? undefined, blockingCount, recordedAt } to reconciled.reviewCycleHistory, deduping by runId so a sandboxed re-reconcile never double-records (NFR-2), and include the field in the dbUpsert. (3) Evaluate evaluateReviewConvergence on the appended series. On 'not-converging': call markWorkspaceStuck(issueId, 'review-not-converging', { counts }) (src/lib/overdeck/review-status-sync.ts:416), set stuck/stuckReason/stuckAt/stuckDetails on the reconciled object so DB and read model agree (H6), emit an error-level activity entry stating the full count series and 'not converging — consider decomposition (split the remaining work, or unstick to continue)', and SKIP the hooks.deliverReviewVerdictFeedbackHostSide call. On 'converging', call the hook exactly as today (NFR-4). Tests: reversal series marks stuck and hook not invoked; stall series marks stuck; converging series invokes hook and sets no stuck; same-runId re-reconcile appends exactly once; count-null path warns and still invokes the hook."
+        },
+        "items": [
+          {
+            "id": "reconcile-gate-wiring.ac1",
+            "title": "Given a recorded series [12,7,5,4] and a new blocked cycle counted at 12, reconcile marks the issue stuck with reason 'review-not-converging', stuckDetails contains the full series, and the feedback hook is not invoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-gate-wiring.ac2",
+            "title": "Given a recorded series [12,7] and a new blocked cycle counted at 5, reconcile invokes the feedback hook and sets no stuck fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-gate-wiring.ac3",
+            "title": "Reconciling the same blocked verdict twice with the same runId persists exactly one cycle entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-gate-wiring.ac4",
+            "title": "When no review artifacts exist for the workspace, reconcile logs a warn, records no cycle entry, and still invokes the feedback hook",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-gate-wiring.ac5",
+            "title": "When the gate engages, an error-level activity entry contains the count series and the 'consider decomposition' guidance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feedback-suppression",
+        "title": "Suppress rework re-drive in deliverReviewVerdictFeedbackPromise when the gate is engaged",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T18:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/review-verdict-feedback.ts",
+            "tests/unit/lib/cloister/review-verdict-feedback.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/review-verdict-feedback.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "feedback tests prove gated verdicts send no agent message but keep file + PR comment"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In deliverReviewVerdictFeedbackPromise (src/lib/cloister/review-verdict-feedback.ts:97), after existingStatus is loaded (~:104): when existingStatus?.stuckReason === 'review-not-converging', still write the feedback file and post the PR comment (record-keeping), but skip resolveIssueFeedbackTarget/messageAgent entirely; instead call surfaceIssueFeedbackNeedsYou with a message containing the count series from existingStatus.reviewCycleHistory and the guidance 'review loop not converging — consider decomposition, or unstick to continue rework', and return agentMessageSent: false. This covers the direct callers reconcile never sees (deacon-review-signals.ts:252, legacy-routes.ts:496, specialists/done.ts:244). Tests: gated status → no messageAgent call, needs-you surfaced, feedback file written, result.agentMessageSent false; ungated status → unchanged behavior."
+        },
+        "items": [
+          {
+            "id": "feedback-suppression.ac1",
+            "title": "Given review status stuck with reason 'review-not-converging', deliverReviewVerdictFeedback writes the feedback file, posts the PR comment, sends no agent message, and surfaces needs-you with the count series",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-suppression.ac2",
+            "title": "Given a status with any other (or no) stuck reason, deliverReviewVerdictFeedback messages the work agent exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "planning-size-lint",
+        "title": "Add projected-surface quality-lint rule (25 files / 6 subsystems, sizeJustification escape)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T18:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/quality-lint.ts",
+            "tests/unit/lib/xbrief/quality-lint.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/xbrief/quality-lint.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint tests cover over/at-threshold, justification, and cancelled-item exclusion"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/xbrief/quality-lint.ts add lintProjectedSurface(doc): QualityIssue[] and include it in lintPlanQuality (:405). Export consts PROJECTED_SURFACE_MAX_FILES = 25 and PROJECTED_SURFACE_MAX_SUBSYSTEMS = 6. Across non-cancelled items, collect metadata.files_scope entries; strip wildcard tails from globs before bucketing; count each literal entry as one projected file and each distinct first-two-segment path prefix as one subsystem. When files > 25 OR subsystems > 6, and plan.metadata?.sizeJustification is not a non-empty string, emit one plan-level (itemId undefined) error with rule 'projected-surface' whose message states both counts, both thresholds, and: 'split the work into independently shippable sibling issues per the swarm contract, or set plan.metadata.sizeJustification for genuinely inseparable work'. With a non-empty sizeJustification emit nothing. Tests: 26-file plan errors; 25-file plan passes; 7-subsystem plan errors; sizeJustification suppresses; cancelled items' files_scope excluded; --no-quality-lint already skips all lint (verify no plan-finalize.ts change needed)."
+        },
+        "items": [
+          {
+            "id": "planning-size-lint.ac1",
+            "title": "Given a plan whose active items declare 26 distinct files_scope files and no sizeJustification, lintPlanQuality returns a 'projected-surface' error naming the counts and thresholds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-size-lint.ac2",
+            "title": "Given the same plan with a non-empty plan.metadata.sizeJustification, lintPlanQuality returns no 'projected-surface' issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-size-lint.ac3",
+            "title": "Given a plan spanning 7 distinct first-two-segment subsystems, lintPlanQuality returns the 'projected-surface' error; files_scope of cancelled items is excluded from both counts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "planning-prompt-guidance",
+        "title": "Strengthen planning prompt swarm contract with the numeric size thresholds",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T18:30:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/prompts/planning.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors (prompt is embedded at build time)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Amend the swarm-contract paragraph at src/lib/cloister/prompts/planning.md:217 (the 'Prefer splitting a large issue into independently shippable sibling issues' text): add that pan plan finalize quality-lints the projected surface — more than 25 distinct files_scope files or more than 6 subsystems fails finalize — and instruct the planner that a plan approaching those bounds MUST be decomposed into sibling issues at authoring time, with plan.metadata.sizeJustification reserved for genuinely inseparable work. Keep the edit to that paragraph; no other prompt changes."
+        },
+        "items": [
+          {
+            "id": "planning-prompt-guidance.ac1",
+            "title": "the swarm-contract paragraph contains the 25-file and 6-subsystem finalize thresholds and directs the planner to decompose oversized plans into sibling issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-prompt-guidance.ac2",
+            "title": "the swarm-contract paragraph contains plan.metadata.sizeJustification as the recorded escape for genuinely inseparable work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-trend-display",
+        "title": "Project reviewCycleHistory to the dashboard and render the cycle-count trend",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T18:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/read-model.ts",
+            "packages/contracts/src/types.ts",
+            "src/dashboard/frontend/src/components/issue-view/useIssueView.ts",
+            "src/dashboard/frontend/src/components/issue-view/derivations.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "issue view renders the count series for a status fixture with reviewCycleHistory"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Project reviewCycleHistory through the dashboard read model next to stuckReason (src/dashboard/server/read-model.ts:333), extend the contracts type the issue view consumes so the field is typed end-to-end, and render in the issue view's review section a single line 'Review cycles: 12 → 7 → 5 → 4 → 12' when ≥1 cycle is recorded; when stuckReason === 'review-not-converging', show the guidance 'not converging — consider decomposition' beside the existing stuck badge. Follow skills/pan-style-guide: reuse the existing stuck/warn badge — no new color semantics, no new chart component. The exact component file is deliberately left to the implementer's trace of the review section from IssueViewModel; keep the diff confined to the read-model projection, the contracts type, and the one review-section component."
+        },
+        "items": [
+          {
+            "id": "dashboard-trend-display.ac1",
+            "title": "Given an issue whose status contains reviewCycleHistory with counts [12,7,5,4,12], the issue view review section renders 'Review cycles: 12 → 7 → 5 → 4 → 12'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-trend-display.ac2",
+            "title": "Given stuckReason 'review-not-converging', the review section displays the 'consider decomposition' guidance using the existing stuck/warn badge styling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-show-trend",
+        "title": "Print the review cycle-count series in pan show",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-26T18:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/show.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "pan show prints the series for a status fixture with recorded cycles"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/show.ts, next to the existing stuck display (:110-116): when pipelineStatus.reviewCycleHistory has entries, print a line `review cycles  12 → 7 → 5 → 4 → 12 (5 blocked cycles)` mapping each entry's blockingCount in order. Match the file's existing chalk styling for dim labels. No other output changes."
+        },
+        "items": [
+          {
+            "id": "pan-show-trend.ac1",
+            "title": "Given a status with five recorded cycle entries, pan show prints the count series and cycle count on one line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-show-trend.ac2",
+            "title": "Given a status with no recorded cycle entries, pan show produces no review-cycles line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-convergence-gate",
+        "title": "Document the convergence gate and projected-surface lint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T18:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "CLAUDE.md",
+            "docs/XBRIEF.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Three doc edits. (1) docs/REVIEW-AGENT-ARCHITECTURE.md: add a 'Review convergence gate (PAN-3151)' section covering the recorded reviewCycleHistory series, the convergence rule (reversal at n≥3 or two consecutive non-decreases), the stuck + rework-suppression behavior, the unstick escape hatch, and an explicit note distinguishing this mechanical gate from the prompt-level convergence gate in roles/review.md:62. (2) Workspace CLAUDE.md: add a short 'Review Convergence Gate (PAN-3151)' subsection beside 'Verification Gate (PAN-174)' in the same style (what triggers it, what it stops, how to override). (3) docs/XBRIEF.md: document the 'projected-surface' quality-lint rule, its 25-file / 6-subsystem thresholds, and plan.metadata.sizeJustification."
+        },
+        "items": [
+          {
+            "id": "docs-convergence-gate.ac1",
+            "title": "docs/REVIEW-AGENT-ARCHITECTURE.md contains a PAN-3151 section stating the convergence rule, the stuck reason 'review-not-converging', and the unstick override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-convergence-gate.ac2",
+            "title": "CLAUDE.md contains a 'Review Convergence Gate (PAN-3151)' subsection beside the Verification Gate section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-convergence-gate.ac3",
+            "title": "docs/XBRIEF.md contains the projected-surface lint rule description with its 25-file / 6-subsystem thresholds and the sizeJustification escape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "shared-findings-parser",
+        "to": "cycle-counting",
+        "type": "blocks"
+      },
+      {
+        "from": "cycle-counting",
+        "to": "reconcile-gate-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "cycle-history-persistence",
+        "to": "reconcile-gate-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "reconcile-gate-wiring",
+        "to": "feedback-suppression",
+        "type": "blocks"
+      },
+      {
+        "from": "reconcile-gate-wiring",
+        "to": "dashboard-trend-display",
+        "type": "blocks"
+      },
+      {
+        "from": "cycle-history-persistence",
+        "to": "dashboard-trend-display",
+        "type": "blocks"
+      },
+      {
+        "from": "cycle-history-persistence",
+        "to": "pan-show-trend",
+        "type": "blocks"
+      },
+      {
+        "from": "reconcile-gate-wiring",
+        "to": "docs-convergence-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "planning-size-lint",
+        "to": "docs-convergence-gate",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3151-oversized-changes-do-not-converge-under-review-rework-and-nothing-detects-it.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

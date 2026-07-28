@@ -1,0 +1,277 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-25T12:03:05Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3052: Extract applyBootReconciliationDecision out of the deacon-auto-resume god file (boot-dialog honesty fixes already landed in cb39b20958)",
+    "updated": "2026-07-25T21:02:51.204Z"
+  },
+  "plan": {
+    "id": "pan-3052",
+    "title": "Extract applyBootReconciliationDecision out of the deacon-auto-resume god file",
+    "status": "completed",
+    "uid": "ec2c0707-9e45-407d-8a4a-c17a86dd6641",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-25T12:03:05Z",
+    "updated": "2026-07-25T21:02:51.204Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3052",
+        "label": "PAN-3052",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "refactor",
+      "cloister",
+      "god-file",
+      "boot-path"
+    ],
+    "narratives": {
+      "Problem": "src/lib/cloister/deacon-auto-resume.ts sits at 1052 lines against the 1000-line god-file ceiling (scripts/lint-file-size.sh). applyBootReconciliationDecision (~98 lines incl. its private key helper and idempotency set, lines 920-1017 + 57/59-60) is boot-reconciliation logic living in the auto-resume module. The cb39b20958 boot-dialog fix grew the file via an audited baseline edit; that debt is now due.",
+      "Proposal": "Pure, behavior-preserving move of applyBootReconciliationDecision + bootReconciliationDecisionKey + appliedBootReconciliationDecisions + emptyBootReconciliationApplyResult into a new sibling module src/lib/cloister/boot-reconciliation-apply.ts. The new module imports handleAgentStoppedEvent, the exported pacing constants, and AutoResumeNotifierDeps FROM deacon-auto-resume.ts (acyclic: deacon.ts -> boot-reconciliation-apply.ts -> deacon-auto-resume.ts). deacon.ts switches its with-deps import to the new module; its zero-arg wrapper and all route/main.ts callers stay byte-unchanged. Baseline row for deacon-auto-resume.ts is dropped via scripts/lint-file-size.sh --update in the same commit (check mode fails on stale rows otherwise). Runtime boot test of the built dist under Node 22 (throwaway instance) proves the ESM import graph, since Bun-run unit tests tolerate cycles Node rejects.",
+      "NonGoals": "- No behavior change to gates, RESUME_STAGGER_MS/RSS_SETTLE_MS pacing, idempotency-set semantics, or the already-running outcome branch\n- No re-implementation of the cb39b20958 boot-dialog honesty fixes (defects 1-4) — verify, don't rewrite\n- No zombie-AUQ reaping (that is PAN-3055)\n- No further decomposition of deacon-auto-resume.ts or deacon.ts beyond this one function\n- No route/API surface changes; src/dashboard/server/routes/ stays untouched\n- No pan restart of the live dashboard from this workspace (live deploy with --health-timeout 120000 is post-merge DoD)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "New module named src/lib/cloister/boot-reconciliation-apply.ts",
+        "rationale": "Matches the existing sibling family (boot-reconciliation.ts, boot-reconciliation-outcomes.ts, boot-reconciliation-predicates.ts)."
+      },
+      {
+        "summary": "Routes keep importing the zero-arg wrapper from deacon.js; only deacon.ts imports the with-deps implementation from the new module",
+        "rationale": "The issue AC's literal wording ('routes/boot-reconciliation.ts imports it from there') is unimplementable without behavior change: the route calls the zero-arg wrapper, whose deps builder autoResumeNotifierDeps() closes over notifier callbacks private to deacon.ts; importing them into the new module would create the forbidden cycle. The AC's intent — the function no longer lives in deacon-auto-resume.ts — is fully met."
+      },
+      {
+        "summary": "Pacing constants (RESUME_LOAD_FACTOR, RESUME_STAGGER_MS, RSS_SETTLE_MS) stay in deacon-auto-resume.ts and gain export; the new module imports them",
+        "rationale": "They are also used by autoResumeStoppedWorkAgents/recoverOrphanedAgents in deacon-auto-resume.ts; exporting keeps a single source with zero behavior drift."
+      },
+      {
+        "summary": "Boot test = throwaway instance (temp OVERDECK_HOME, PORT=3999, OVERDECK_DISABLE_DEACON=1) of the built dist under Node 22",
+        "rationale": "ESM cycle failures surface at module-load time regardless of runtime flags, so this proves the boot path while honoring the single-deacon invariant and the no-live-boot-hotpatch rule."
+      },
+      {
+        "summary": "Baseline update lands in the same commit as the move",
+        "rationale": "scripts/lint-file-size.sh check mode fails on a stale baseline row once the file shrinks to <=1000 lines, so a move-only commit cannot pass npm run lint; the ratchet must be green from the item's committed tree."
+      }
+    ],
+    "items": [
+      {
+        "id": "extract-apply-module",
+        "title": "Move applyBootReconciliationDecision to boot-reconciliation-apply.ts and drop the baseline row",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T12:03:05Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-3052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/boot-reconciliation-apply.ts",
+            "src/lib/cloister/deacon-auto-resume.ts",
+            "src/lib/cloister/deacon.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/lib/cloister/__tests__/boot-reconciliation.test.ts",
+            "npx vitest run src/lib/cloister/__tests__/deacon-auto-resume.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint prints '✓ file-size guard passed' and '✓ ratchet audit passed' with no baseline increase",
+            "boot-reconciliation.test.ts reports 18 passed with the test file unmodified",
+            "deacon-auto-resume.test.ts suite passes"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Sole wave-0 item — everything else is blocked behind it, so there is no sibling to conflict with; its files_scope overlaps no other item.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Single atomic commit, all steps from PRD work item 1 (.pan/drafts/PAN-3052.md — follow it exactly; every import the new module needs is enumerated there). Move lines 920-1017 plus lines 57 and 59-60 of src/lib/cloister/deacon-auto-resume.ts verbatim into new module src/lib/cloister/boot-reconciliation-apply.ts (with a short header comment referencing PAN-3052). Add `export` to RESUME_LOAD_FACTOR (line 604), RESUME_STAGGER_MS (line 606), RSS_SETTLE_MS (line 611); the new module imports them plus handleAgentStoppedEvent and type AutoResumeNotifierDeps from ./deacon-auto-resume.js. Update deacon.ts line 40 to import applyBootReconciliationDecisionWithDeps + type BootReconciliationApplyResult from ./boot-reconciliation-apply.js (zero-arg wrapper at lines 1767-1769 unchanged). Remove imports orphaned by the move from deacon-auto-resume.ts only after grep proves each unused (getBootReconciliationHeldResumeSet/PendingHoldSet ARE still used — keep them). Run bash scripts/lint-file-size.sh --update; the deacon-auto-resume.ts row must disappear. CRITICAL: deacon-auto-resume.ts must not import from boot-reconciliation-apply.js, and the new module must not import from deacon.js — Node 22 strict ESM rejects cycles Bun tolerates."
+        },
+        "items": [
+          {
+            "id": "extract-apply-module.ac1",
+            "title": "src/lib/cloister/boot-reconciliation-apply.ts exports applyBootReconciliationDecision(deps) and re-exports BootReconciliationApplyResult; git grep applyBootReconciliationDecision in deacon-auto-resume.ts returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-apply-module.ac2",
+            "title": "wc -l src/lib/cloister/deacon-auto-resume.ts reports <= 1000 and scripts/file-size-baseline.txt no longer contains a deacon-auto-resume row; npm run lint prints '✓ file-size guard passed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-apply-module.ac3",
+            "title": "deacon.ts imports the with-deps function and BootReconciliationApplyResult type from ./boot-reconciliation-apply.js while its zero-arg wrapper still returns applyBootReconciliationDecisionWithDeps(autoResumeNotifierDeps()); git diff main -- src/dashboard/server/routes/ produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-apply-module.ac4",
+            "title": "npx vitest run src/lib/cloister/__tests__/boot-reconciliation.test.ts reports 18 passed and git diff main -- that test file produces no output (tests unmodified)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-apply-module.ac5",
+            "title": "grep proves the import graph stays acyclic: boot-reconciliation-apply.ts contains no import from deacon.js, and deacon-auto-resume.ts contains no import from boot-reconciliation-apply.js; appliedBootReconciliationDecisions exists only in the new module",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "boot-test-throwaway",
+        "title": "Runtime-boot-test the built dist under Node 22 as a throwaway instance",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T12:03:05Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "dist/dashboard/server.js"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bun install",
+            "npm run build",
+            "bash -c 'TMP_HOME=$(mktemp -d); OVERDECK_HOME=\"$TMP_HOME\" PORT=3999 OVERDECK_DISABLE_DEACON=1 ~/.config/nvm/versions/node/v22.22.0/bin/node dist/dashboard/server.js & SRV=$!; for i in $(seq 1 120); do curl -fsS http://localhost:3999/api/health >/dev/null 2>&1 && break; sleep 1; done; curl -fsS http://localhost:3999/api/health; RC=$?; kill $SRV; wait $SRV 2>/dev/null; exit $RC'"
+          ],
+          "expected_outputs": [
+            "npm run build completes without errors and produces dist/dashboard/server.js",
+            "GET /api/health on the throwaway instance returns a 200 body containing \"status\":\"ok\" within 120s, with no 'Cannot require() ES Module' cycle error in server output",
+            "the throwaway server process is killed afterwards and nothing remains listening on port 3999"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-2"
+          ],
+          "acJustification": "Verification-only item: the three ACs cover build, boot-to-healthy, and clean teardown; there is no code surface to accept beyond these."
+        },
+        "narrative": {
+          "Action": "This is the mandatory runtime boot test for a boot-path change (typecheck/unit tests do not exercise the Effect Layer bootstrap, and Bun-run tests tolerate ESM cycles that Node 22 rejects at module load). From the workspace root: bun install, npm run build, then boot dist/dashboard/server.js under Node 22.22.0 with a temp OVERDECK_HOME, PORT=3999, and OVERDECK_DISABLE_DEACON=1 (single-deacon invariant — never point a second server at ~/.overdeck). Poll GET http://localhost:3999/api/health for up to 120 seconds until it returns {\"status\":\"ok\",...}. Record the health response and any server stderr in the completion notes, then kill the process and confirm port 3999 is free. Do NOT restart the live dashboard from this workspace; the live pan restart --health-timeout 120000 happens at post-merge deploy."
+        },
+        "items": [
+          {
+            "id": "boot-test-throwaway.ac1",
+            "title": "npm run build exits 0 and produces a fresh dist/dashboard/server.js containing the boot-reconciliation-apply module",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-test-throwaway.ac2",
+            "title": "The throwaway Node 22 instance returns HTTP 200 with \"status\":\"ok\" from GET /api/health within 120s and its output contains no ESM-cycle error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-test-throwaway.ac3",
+            "title": "After the check the throwaway process exits and no process remains listening on port 3999",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-decomp-note",
+        "title": "Record the extraction in docs/codebase-health/B-deacon-decomp.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T12:03:05Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/codebase-health/B-deacon-decomp.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'boot-reconciliation-apply' docs/codebase-health/B-deacon-decomp.md"
+          ],
+          "expected_outputs": [
+            "the doc names boot-reconciliation-apply.ts as the new home of applyBootReconciliationDecision with a PAN-3052 reference"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ],
+          "acJustification": "One-sentence doc addendum; a single observable criterion covers it."
+        },
+        "narrative": {
+          "Action": "docs/codebase-health/B-deacon-decomp.md seam 4 (line 24) enumerates what lives in deacon-auto-resume.ts. Add a short '> Update (PAN-3052):' note under seam 4 stating that applyBootReconciliationDecision, bootReconciliationDecisionKey, and the appliedBootReconciliationDecisions idempotency set were extracted to src/lib/cloister/boot-reconciliation-apply.ts, dropping deacon-auto-resume.ts under the 1000-line ceiling and deleting its scripts/file-size-baseline.txt row. One or two sentences in the doc's existing campaign-brief voice; touch nothing else in the file."
+        },
+        "items": [
+          {
+            "id": "docs-decomp-note.ac1",
+            "title": "B-deacon-decomp.md seam 4 contains an Update note that names src/lib/cloister/boot-reconciliation-apply.ts and PAN-3052 as the new home of applyBootReconciliationDecision and records that the baseline row was dropped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-decomp-note.ac2",
+            "title": "git diff for this item shows changes only in docs/codebase-health/B-deacon-decomp.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-apply-module",
+        "to": "boot-test-throwaway",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-apply-module",
+        "to": "docs-decomp-note",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-25-PAN-3052-extract-applybootreconciliationdecision-out-of-the-deacon-auto-resume-god-file.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

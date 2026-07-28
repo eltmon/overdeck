@@ -84,15 +84,15 @@
     "recordedAt": "2026-07-09T00:19:08.915Z"
   },
   "created": "2026-07-08T23:07:44.941Z",
-  "updated": "2026-07-09T03:37:56.382Z",
+  "updated": "2026-07-27T16:44:34.637Z",
   "pipeline": {
     "issueId": "PAN-2510",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "passed",
-    "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-09T00:31:16.071Z",
+    "updatedAt": "2026-07-27T16:44:34.624Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -145,16 +145,18 @@
         "src/lib/workspace/rebuild-stack.ts"
       ],
       "recordedAt": "2026-07-09T00:19:08.915Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T16:44:34.624Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/gpt-5.5": {
-            "input": 3082931,
-            "output": 9599,
-            "cacheRead": 2675968,
+            "input": 4838579,
+            "output": 12554,
+            "cacheRead": 4401664,
             "cacheWrite": 0
           }
         },
@@ -166,20 +168,28 @@
             "cacheWrite": 308697
           }
         },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 274341,
+            "output": 5571,
+            "cacheRead": 2555904,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1204133,
-            "output": 130461,
-            "cacheRead": 74088704,
+            "input": 1211825,
+            "output": 132225,
+            "cacheRead": 76229376,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.5": {
-          "input": 3082931,
-          "output": 9599,
-          "cacheRead": 2675968,
+          "input": 4838579,
+          "output": 12554,
+          "cacheRead": 4401664,
           "cacheWrite": 0
         },
         "anthropic/claude-opus-4-8": {
@@ -189,21 +199,94 @@
           "cacheWrite": 308697
         },
         "custom/kimi-k2.7-code": {
-          "input": 1204133,
-          "output": 130461,
-          "cacheRead": 74088704,
+          "input": 1486166,
+          "output": 137796,
+          "cacheRead": 78785280,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 27.09757,
-        "pricingAsOf": "2026-07-09T00:31:16.120Z"
+        "usd": 29.388451,
+        "pricingAsOf": "2026-07-20T00:14:22.295Z"
       }
     },
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2517"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T16:44:34.636Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed from pipeline journal",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: missing at b5bb90edeef819449d5ac7500bede19f0c3cd998 (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Feature branch is absent; positive merge evidence is required; PR #2517 MERGED at 2026-07-09T00:44:32Z; durable close-out record contains 1 merge artifact(s)",
+          "status": "pass",
+          "mergedAt": "2026-07-09T00:44:32Z",
+          "mergeCommit": "5485236776a237f2e9cc8c068329f0fb6c6e24be"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "7 check-runs concluded successfully on 5485236776a237f2e9cc8c068329f0fb6c6e24be",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit d44fa122 contains merge 54852367",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; No strike branch strike/pan-2510 found; Pruned 0 checkpoint ref(s) for agent-pan-2510, planning-pan-2510, strike-pan-2510; No specialist registry entries for PAN-2510"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "kimi-k2.7-code",

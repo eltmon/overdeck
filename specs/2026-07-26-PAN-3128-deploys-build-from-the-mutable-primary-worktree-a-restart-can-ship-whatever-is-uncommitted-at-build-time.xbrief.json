@@ -1,0 +1,382 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T12:37:36Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3128: Deploys build from the mutable primary worktree — a restart can ship whatever is uncommitted at build time",
+    "updated": "2026-07-26T20:21:40.396Z"
+  },
+  "plan": {
+    "id": "pan-3128",
+    "title": "Deploys build from the mutable primary worktree — a restart can ship whatever is uncommitted at build time",
+    "status": "completed",
+    "uid": "d95839ed-0d76-4c06-b56a-96ff18b61005",
+    "author": "agent:k3[1m]",
+    "sequence": 7,
+    "created": "2026-07-26T12:37:36Z",
+    "updated": "2026-07-26T20:21:40.396Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3128",
+        "label": "PAN-3128",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "deploy",
+      "dashboard",
+      "flywheel",
+      "dod",
+      "provenance"
+    ],
+    "narratives": {
+      "Problem": "The deploy path builds from whatever the primary worktree contains. buildFromOriginMain (src/cli/commands/reload.ts:173-199) builds in place whenever origin/main is an ancestor of HEAD — which covers HEAD==origin/main with a dirty tree (uncommitted changes ship) and HEAD ahead with local-only commits (buildCommit is a SHA that exists nowhere on the forge). The flywheel's documented deploy (roles/flywheel.md:124-126) is an unguarded npm run build + pan restart in the primary worktree. Consequences (RUN-71 ticks 10/11/14/15): unreviewed merge-machinery edits reached the live server; buildCommit 124eb2e108 made DoD row 7 unsatisfiable for every merged issue (PAN-3119, PAN-3037 stuck); a two-line uncommitted test edit blocked a deploy the operator was waiting on.",
+      "Proposal": "pan reload always builds in a temporary detached worktree checked out at origin/main and swaps dist/ into the primary checkout — the primary tree's state can neither contaminate nor block a deploy (notes are printed when it is dirty or HEAD differs, but the deploy proceeds). The server bundle stamps buildDirty and buildBranch at build time; /api/health exposes them. DoD row 7 misses with explicit reasons (naming pan reload as the remedy) when the live build is dirty or its buildCommit is not an ancestor of origin/main. roles/flywheel.md Mission #5 and the deploy docs name pan reload as the only deploy verb. Full before/after detail in the PRD at .pan/drafts/PAN-3128.md.",
+      "NonGoals": "- Changing the pan dev SIGUSR2 hot-reload path (dev-owned dashboards intentionally run uncommitted code; provenance makes it visible and row 7 misses on it — intended).\n- A refuse-on-dirty preflight in pan restart / pan up (operator dev restarts are legitimate; detection flows through provenance + row 7).\n- Frontend provenance display (StaleBuildChip); the health JSON is the contract.\n- Generalizing beyond origin/main (deploy tooling already hardcodes main).\n- An operator escape hatch to deploy uncommitted code to the production dashboard (that was the defect; pan dev covers iteration).\n- Changing npm run build itself for local dev builds.\n- Any change to src/lib/cloister/deploy-patrol.ts (auto-deploy already spawns pan reload and inherits the fix)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted fix direction 2 (dedicated clean worktree build) as the deploy mechanism; preflight-refuse (direction 1) is subsumed.",
+        "rationale": "The issue comments show the tree was canonical at build time and non-canonical minutes later — a preflight can pass and be stale by the next build. If the deploy never reads the primary tree, there is nothing left for a preflight to refuse."
+      },
+      {
+        "summary": "Removed the in-place fast path entirely with no --build-in-place escape hatch.",
+        "rationale": "The fast path only triggered in the two dangerous states; a clean tree at origin/main produces an identical bundle either way at ~2s extra cost. Deploying uncommitted code to production was never legitimate — pan dev is the iteration surface."
+      },
+      {
+        "summary": "Stamped raw build-time facts (buildDirty, buildBranch) rather than a baked canonical verdict.",
+        "rationale": "Canonicality is a time-sensitive judgment (depends on where origin/main is now) and belongs in consumers, not baked into an immutable artifact."
+      },
+      {
+        "summary": "DoD row 7 misses (not warns) on dirty or non-canonical live builds.",
+        "rationale": "A dirty or local-only live build is exactly the state close-out must not certify; after the reload fix only a deliberate bypass produces it, and the miss names pan reload as the remedy."
+      },
+      {
+        "summary": "Left the pan dev SIGUSR2 path unchanged.",
+        "rationale": "A dev-owned dashboard exists to run uncommitted code; provenance stamping makes such builds visible (buildDirty: true) and row 7 misses on them, which is the intended pressure."
+      }
+    ],
+    "items": [
+      {
+        "id": "build-from-clean-worktree",
+        "title": "pan reload always builds from a detached origin/main worktree",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:37:36Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3128",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "dod-row7-provenance-gate",
+            "deploy-docs-and-flywheel-mission"
+          ],
+          "files_scope": [
+            "src/lib/deploy/build-from-origin.ts",
+            "src/cli/commands/reload.ts",
+            "tests/unit/lib/deploy/build-from-origin.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/deploy/build-from-origin.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all tests in tests/unit/lib/deploy/build-from-origin.test.ts pass, including the never-builds-in-primary-worktree regression test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Extract buildFromOriginMain, swapBuiltDist, runInstallAndBuild, runBunInstall, resolveBunBinary, runBuild, runCommand, runGitAsync, and shellQuote from src/cli/commands/reload.ts (lines 47-199) into a new src/lib/deploy/build-from-origin.ts, exposing buildDashboardFromOriginMain(repoRoot, deps?) with an injectable BuildFromOriginDeps object (pattern: src/lib/deploy/deploy-window.ts:16-39). DELETE the in-place fast path (reload.ts:176-180): there is no merge-base ancestor check anymore. Behavior, in order: (1) git fetch origin main; (2) if the primary working tree is dirty, note() that uncommitted changes are excluded from this deploy; (3) if HEAD != origin/main, note() that only origin/main is being deployed (covers behind/ahead/diverged in one check); (4) git worktree prune + fs.rm the target path, then git worktree add --detach .pan-reload-build-<pid> origin/main; (5) try { bun install + npm run build in the worktree; swapDist into the primary checkout } finally { remove worktree, rm the worktree dir, rm dist.incoming }. In reload.ts, reloadCommand calls buildDashboardFromOriginMain(repoRoot) where it called buildFromOriginMain (reload.ts:295); delete all moved helpers including the now-orphaned runGitExit; keep everything else byte-identical (dev-supervisor SIGUSR2 block, restart lock, agentRestartBlockReason, mtime check, restartDashboard call). Tests (tests/unit/lib/deploy/build-from-origin.test.ts, injected deps, no real git): never-builds-in-primary-worktree regression test (installAndBuild receives the worktree path even when tree clean and HEAD==origin/main); dirty-tree and differing-HEAD notes emitted while the deploy proceeds; installAndBuild rejection → error propagates, swapDist not called, worktree removed, dist.incoming cleanup attempted (NFR-1); swapDist happy path with real fs in os.tmpdir(). See PRD WI-1 for the full deps interface and code shape."
+        },
+        "items": [
+          {
+            "id": "build-from-clean-worktree.ac1",
+            "title": "Given any primary-worktree state (clean, dirty, ahead, behind), when pan reload builds, then bun install and npm run build execute only in the detached origin/main worktree — the injected-deps test proves installAndBuild never receives repoRoot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-from-clean-worktree.ac2",
+            "title": "When the primary tree is dirty or HEAD differs from origin/main, reload prints a note stating those changes are excluded and continues the deploy (does not exit non-zero for that reason)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-from-clean-worktree.ac3",
+            "title": "When the build fails, the command exits non-zero with a message ending in 'old dashboard left running', and the build worktree plus dist.incoming are removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-from-clean-worktree.ac4",
+            "title": "`grep \"merge-base\" src/cli/commands/reload.ts` produces no matches — the in-place fast path is gone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-from-clean-worktree.ac5",
+            "title": "npm run typecheck completes without errors and npx vitest run tests/unit/lib/deploy/build-from-origin.test.ts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stamp-build-provenance",
+        "title": "Stamp buildDirty and buildBranch into the server bundle and expose them on /api/health",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:37:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3128",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/tsdown.config.ts",
+            "src/lib/deploy/build-info.ts",
+            "tests/unit/lib/deploy/build-info.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/deploy/build-info.test.ts",
+            "npm run build:dashboard:server"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all tests in tests/unit/lib/deploy/build-info.test.ts pass",
+            "server bundle builds and grep -c \"buildDirty\" dist/dashboard/server.js is >= 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/tsdown.config.ts (stamp at lines 82-87): extract const repoRoot = resolve(import.meta.dirname, '../../..') and reuse it; after the existing git rev-parse HEAD call, add git status --porcelain → buildDirty = stdout.trim().length > 0, and git rev-parse --abbrev-ref HEAD → buildBranch = branch === 'HEAD' ? null : branch (detached → null). Add __OVERDECK_BUILD_DIRTY__: JSON.stringify(buildDirty) and __OVERDECK_BUILD_BRANCH__: JSON.stringify(buildBranch) to the existing define block. In src/lib/deploy/build-info.ts: declare the two new consts, extend BuildInfo with buildDirty: boolean | null and buildBranch: string | null, and read them with typeof guards (typeof __OVERDECK_BUILD_DIRTY__ === 'boolean' ? ... : null) — typeof on an undeclared identifier yields 'undefined' without throwing, so pre-change bundles report null instead of crashing. Do NOT touch src/dashboard/server/identity.ts or server.ts: getDashboardIdentity() already spreads getBuildInfo(), so /api/health picks the fields up with no route change (assert this as an AC). Tests (tests/unit/lib/deploy/build-info.test.ts): set/delete (globalThis as any).__OVERDECK_BUILD_COMMIT__ / __OVERDECK_BUILD_TIME__ / __OVERDECK_BUILD_DIRTY__ / __OVERDECK_BUILD_BRANCH__ per test; covers defines-absent → all null, dirty=true + branch='main' → stamped values, branch define null → buildBranch null. Exact before/after snippets in PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "stamp-build-provenance.ac1",
+            "title": "getBuildInfo() returns buildDirty: null and buildBranch: null when the compile-time defines are absent, and the stamped values when present — proven by the new unit tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stamp-build-provenance.ac2",
+            "title": "npm run build:dashboard:server succeeds and grep -c \"buildDirty\" dist/dashboard/server.js produces a count >= 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stamp-build-provenance.ac3",
+            "title": "git diff produces no changes to src/dashboard/server/server.ts and src/dashboard/server/identity.ts — /api/health exposes the new fields through the existing getDashboardIdentity() spread",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stamp-build-provenance.ac4",
+            "title": "npm run typecheck exits 0 with the extended four-field BuildInfo interface",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dod-row7-provenance-gate",
+        "title": "DoD row 7 misses loudly on dirty or non-canonical live builds",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:37:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3128",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all tests in tests/unit/lib/lifecycle/dod-gate.test.ts pass, including updated pre-existing commitContains stubs"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In checkDeployRow (src/lib/lifecycle/dod-gate.ts:393), after the existing buildCommit presence check (lines 412-417) and inside the existing try (so git failures fall into the current 'deploy evidence unavailable' catch), add two miss conditions reusing deps.commitContains(repoRoot, x, y) (= git merge-base --is-ancestor x y, dod-gate.ts:155-157): (1) if health.buildDirty === true → result('deploy','miss', 'live build <sha8> was built from a dirty working tree — uncommitted changes may be serving; redeploy canonically with `pan reload`'); (2) if !(await deps.commitContains(repoRoot, buildCommit, 'origin/main')) → result('deploy','miss', 'live build commit <sha8> is not an ancestor of origin/main — the server is running a build of local-only commits; redeploy with `pan reload`'). The existing merge-containment check runs unchanged after these. REQUIRED existing-test update: the stub at tests/unit/lib/lifecycle/dod-gate.test.ts:439-447 (commitContains: async () => false expecting 'does not contain merge') now fails the FIRST (canonicality) call — audit every commitContains stub in the file and make each discriminate on arguments (true for (buildCommit,'origin/main'), per-test value for (mergeCommit, buildCommit)). New tests: buildDirty:true → miss naming 'dirty working tree' and 'pan reload', commitContains never called; clean health + canonicality call false → miss naming 'not an ancestor of origin/main'; health without buildDirty (old server) → results identical to today. Exact snippets in PRD WI-3."
+        },
+        "items": [
+          {
+            "id": "dod-row7-provenance-gate.ac1",
+            "title": "Given a live health payload with buildDirty: true, checkDeployRow returns miss with a reason naming the dirty working tree and pan reload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-row7-provenance-gate.ac2",
+            "title": "Given a clean health payload whose buildCommit is not an ancestor of origin/main, checkDeployRow returns miss with a reason naming 'not an ancestor of origin/main' — distinct from the 'does not contain merge' miss",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-row7-provenance-gate.ac3",
+            "title": "Given a health payload without buildDirty (pre-PAN-3128 server), checkDeployRow produces the same results as before this change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-row7-provenance-gate.ac4",
+            "title": "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts passes, including the updated pre-existing commitContains stubs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deploy-docs-and-flywheel-mission",
+        "title": "Point the flywheel deploy mission and deploy docs at pan reload's clean-worktree guarantee",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T12:37:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3128",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/flywheel.md",
+            "sync-sources/skills/pan-reload/SKILL.md",
+            "docs/OVERDECK_DEV_SOP.md",
+            "docs/DEFINITION-OF-DONE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "grep -n \"npm run build\" roles/flywheel.md"
+          ],
+          "expected_outputs": [
+            "npm run lint (including scripts/lint-skills.sh) passes",
+            "no grep hit in roles/flywheel.md instructs npm run build as the deploy path"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Four exact edits, full before/after text in PRD WI-4. (1) roles/flywheel.md:124-126 — Mission #5 deploy instruction becomes 'run pan reload --health-timeout 180000 from the primary main worktree', stating that pan reload builds from a detached origin/main worktree so uncommitted changes and local-only commits never reach the live server and a dirty primary tree can never block a deploy; the closing 'Deploy from a clean build only' sentence names pan reload as the deploy verb and forbids manual npm run build + pan restart as a deploy path (while keeping the never-in-place-rebuild-without-restart warning). (2) sync-sources/skills/pan-reload/SKILL.md — Command section states the build runs in a temporary detached origin/main worktree, never the primary working tree, with a note printed when uncommitted changes or local-only commits are excluded; do NOT add/remove flags (scripts/lint-skills.sh cross-checks flag mentions against pan reload --help) and do NOT edit .claude/skills/pan-reload/SKILL.md (pan sync target). (3) docs/OVERDECK_DEV_SOP.md:64 'Restart behavior guarantees' — add the detached-worktree/dist-swap guarantee and the buildCommit/buildDirty/buildBranch provenance fields on /api/health. (4) docs/DEFINITION-OF-DONE.md:19 row 7 — extend the evidence column with buildDirty/buildBranch provenance and note the row misses when the live build is dirty or its commit is not an ancestor of origin/main."
+        },
+        "items": [
+          {
+            "id": "deploy-docs-and-flywheel-mission.ac1",
+            "title": "grep -n \"npm run build\" roles/flywheel.md produces no occurrence that instructs it as the deploy path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-docs-and-flywheel-mission.ac2",
+            "title": "roles/flywheel.md Mission #5 contains a deploy instruction that names pan reload as the deploy command and the detached-origin/main-worktree guarantee",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-docs-and-flywheel-mission.ac3",
+            "title": "sync-sources/skills/pan-reload/SKILL.md states the build reads origin/main in a detached worktree, and npm run lint passes (including scripts/lint-skills.sh)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-docs-and-flywheel-mission.ac4",
+            "title": "grep -l buildDirty docs/OVERDECK_DEV_SOP.md docs/DEFINITION-OF-DONE.md produces both file names — both docs carry buildDirty/buildBranch as deploy provenance evidence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "stamp-build-provenance",
+        "to": "dod-row7-provenance-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "build-from-clean-worktree",
+        "to": "deploy-docs-and-flywheel-mission",
+        "type": "blocks"
+      },
+      {
+        "from": "stamp-build-provenance",
+        "to": "deploy-docs-and-flywheel-mission",
+        "type": "blocks"
+      },
+      {
+        "from": "dod-row7-provenance-gate",
+        "to": "deploy-docs-and-flywheel-mission",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3128-deploys-build-from-the-mutable-primary-worktree-a-restart-can-ship-whatever-is-uncommitted-at-build-time.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

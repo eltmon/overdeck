@@ -1,0 +1,602 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T21:09:50.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3162: GitLab-side merges are never observed: MIN-898 merged 3.5h ago still shows as awaiting merge and hangs in 'merging'",
+    "updated": "2026-07-27T01:11:46.899Z"
+  },
+  "plan": {
+    "id": "pan-3162",
+    "title": "Observe GitLab-side merges and reconcile Overdeck merge state",
+    "status": "completed",
+    "uid": "25f997bd-491a-4a1c-bea4-a44f1266692e",
+    "author": "agent:k3[1m]",
+    "sequence": 7,
+    "created": "2026-07-26T21:09:50.000Z",
+    "updated": "2026-07-27T01:11:46.899Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3162",
+        "label": "PAN-3162",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "merge",
+      "gitlab",
+      "polyrepo",
+      "deacon",
+      "reconciliation",
+      "myn"
+    ],
+    "narratives": {
+      "Problem": "Nothing observes forge-side merge state for non-GitHub projects: verifyMergedBeforeLifecycle hard-refuses non-GitHub issues, the deacon's stale-merge reconciler gates on isGitHub, the merging/verifying states have no runtime time bound, and the polyrepo merge-click path re-merges repos already recorded as merged. A GitLab merge — by the pipeline, another actor, or a human in the GitLab UI — leaves review_status and merge_set_repos untouched, so merged work stays on Awaiting Merge, merge clicks hang or fail opaquely, and UAT generations pick up already-merged members. Live verification on 2026-07-26 showed MIN-898 and MIN-858 are partially merged (fe MRs merged on GitLab, api/docs MRs still open), which a correct reconciler must record without terminalizing.",
+      "Proposal": "Make the forge the merge oracle for every forge type through the existing merge-completeness door: (WI-1) per-repo forge refresh + writeback in merge-completeness.ts; (WI-2) a forge-aware branch in the deacon's stale-merge reconciler that terminalizes only on complete-with-positive-evidence; (WI-3) a 30-minute bound on merging/verifying that reconciles against the forge then resets to pending; (WI-4) non-GitHub support in verifyMergedBeforeLifecycle; (WI-5) merge-click path skips forge-merged repos and self-heals fully-merged issues through the existing no-changed-repos success path; (WI-6) propagation proof (eligibility → ready set → generation invalidation) plus the live MIN-898/MIN-858 recovery checkpoint; (WI-7) docs. Full detail in .pan/drafts/PAN-3162.md.",
+      "NonGoals": "- GitLab webhook ingress of any kind\n- GitLab closed-without-merge MR reconciliation (reconcileClosedPrReadyForMerge keeps its GitHub-only scope)\n- Changes to how merges execute (per-repo MR flow, quality gates, rebase)\n- Auto-retry of failed repo merges (MIN-898/MIN-858 api/docs retries stay operator/strike-driven through the normal Merge path)\n- Any change to GitHub-project behavior\n- Manual DB/record backfill for MIN-898/MIN-858 (recovery flows through the deployed reconciler and the normal merge path)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Poll via deacon patrol through assessMergeCompleteness instead of adding GitLab webhook ingress or new forge adapter methods",
+        "rationale": "GitHub's pull_request webhook (webhook-handlers.ts:407-438) has no GitLab counterpart, every other drift reconciliation in this family is a deacon patrol, and merge-completeness.ts is already the forge-aware, polyrepo-aware door used by requireCompletePolyrepoMerge — one read door, no parallel mechanism."
+      },
+      {
+        "summary": "Bound stuck merging/verifying at 30 minutes, not the issue's 'a few minutes'",
+        "rationale": "Polyrepo verification gates legitimately run docker builds for 10-20 minutes inside the verifying window; 30 minutes mirrors the conservatism of existing stuck-state constants (STUCK_ASSEMBLING_MS is 60 min) while still bounding the state."
+      },
+      {
+        "summary": "Restrict forge polling to merge-relevant issues (readyForMerge, merging/verifying/queued/failed, merge-set merging/failed)",
+        "rationale": "Bounds git-fetch and glab API cost per tick across MYN's 6 repos; mid-pipeline issues are where drift does not hurt and they enter the scoped set as soon as they reach a merge-relevant state."
+      },
+      {
+        "summary": "Terminalize only on complete completeness plus at least one artifact-backed 'merged' repo verdict",
+        "rationale": "Branch absence or zero-ahead ('no-changes') is not proof of merge — the existing GitHub reconciler makes the same call at deacon-merge.ts:185-189; positive evidence prevents premature post-merge lifecycle (agent pause, Docker cleanup, close-out)."
+      },
+      {
+        "summary": "Ready-set and generation exclusion is propagation through existing eligibility/isStale machinery, not new train-side filtering",
+        "rationale": "mergeStatus=merged already makes an issue ineligible (review-status.ts:60) and isStale() already invalidates generations whose member left the ready queue (uat-reconciler.ts:149-164); adding forge polling to the train would duplicate the door and cost glab calls per candidate per tick."
+      },
+      {
+        "summary": "Do not terminalize MIN-898/MIN-858 despite the issue text's fix direction 4",
+        "rationale": "Live forge + SQLite evidence (2026-07-26 ~21:00 UTC) shows both are only partially merged (fe MRs merged; api/docs MRs still open); terminalizing them would strand unmerged api/docs work. Correct recovery is per-repo truth writeback plus a self-healing retry of the genuinely unmerged repos."
+      }
+    ],
+    "items": [
+      {
+        "id": "forge-merge-observation-door",
+        "title": "Per-repo forge refresh and writeback in merge-completeness",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T21:09:50.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3162",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "deacon-forge-merge-reconciler",
+            "stuck-merging-bound",
+            "non-github-merge-verification",
+            "merge-click-skips-merged-repos"
+          ],
+          "files_scope": [
+            "src/lib/cloister/merge-completeness.ts",
+            "tests/unit/lib/cloister/merge-completeness.test.ts",
+            "tests/unit/lib/cloister/merge-completeness-forge-error.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/merge-completeness.test.ts tests/unit/lib/cloister/merge-completeness-forge-error.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-completeness suites pass including new forge-refresh cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "wave-0 foundation: touches only merge-completeness.ts and its two test files, which no other plan item modifies; every dependent item sits behind a blocks edge"
+        },
+        "narrative": {
+          "Action": "Extend src/lib/cloister/merge-completeness.ts into the single forge-observation door. (1) Add exported observeForgeMergeState(issueId, labels?): resolve repos via the existing resolveRepos(), run the existing assessRepoMergeCompleteness per repo, and for every repo whose verdict is 'merged' while its merge-set row says otherwise, write merge_status:'merged' plus the discovered artifactUrl through withRepoStateSync/upsertMergeSetSync (the existing merge-set write door in src/lib/merge-set.ts); return { complete, hasPositiveMergedEvidence, repos, mergeSet }. (2) Export hasPositiveMergedEvidence = repos.some(r => r.state === 'merged') semantics for reuse by WI-2/WI-4. (3) Extend reconcileStrandedRepos with a second pass: required, non-skipped repos that already have artifactUrl but sit at pending/failed/merging get a findMergedArtifact check and flip to 'merged' on positive evidence (today it only backfills missing artifact URLs). Fail open on any forge/git error (NFR-2). See PRD WI-1 in .pan/drafts/PAN-3162.md."
+        },
+        "items": [
+          {
+            "id": "forge-merge-observation-door.ac1",
+            "title": "observeForgeMergeState returns complete=true with hasPositiveMergedEvidence=true and persists merge_status='merged' + artifactUrl to merge_set_repos when assessRepoMergeCompleteness reports a merged artifact the row lacks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forge-merge-observation-door.ac2",
+            "title": "observeForgeMergeState writes nothing when every repo verdict is unmerged, no-changes, or unverifiable, and hasPositiveMergedEvidence is false for an all-no-changes result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forge-merge-observation-door.ac3",
+            "title": "reconcileStrandedRepos flips a required repo row from failed (or pending/merging) with an existing artifactUrl to merged when findMergedArtifact proves the merge, and leaves it untouched otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forge-merge-observation-door.ac4",
+            "title": "a forge error inside either function surfaces as an unverifiable blocker reason and produces no merge-set writes (fail-open), covered in merge-completeness-forge-error.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-forge-merge-reconciler",
+        "title": "Forge-aware branch in the deacon stale-merge reconciler",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T21:09:50.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3162",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-merge.ts",
+            "src/lib/cloister/deacon.ts",
+            "tests/unit/lib/cloister/deacon-forge-merge-reconcile.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deacon-forge-merge-reconcile.test.ts tests/unit/lib/cloister/deacon-merge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new forge-reconcile suite passes",
+            "existing deacon-merge suite stays green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/deacon-merge.ts extend reconcileStaleMergeStatus(): keep the GitHub check at lines 209-227 untouched, and when resolveGitHubIssueSync(issueId).isGitHub is false (or the issue has a polyrepo merge set with non-GitHub repos) AND the issue is in the merge-relevant scope guard (readyForMerge true, or merge_status in merging/verifying/queued/failed, or merge-set status merging/failed), call WI-1's observeForgeMergeState. On complete && hasPositiveMergedEvidence, apply the same terminalization the GitHub path applies at lines 249-257 (setReviewStatusSync({ mergeStatus:'merged', mergeStep:'post-merge-cleanup', readyForMerge:false }) + enqueuePostMergeLifecycle) behind the same re-planning deferral (active planning agent or spec draft/proposed, PAN-1994) and closed-out spec guard (completed/cancelled, PAN-1190). Partial completeness writes per-repo truth (via observeForgeMergeState) but never terminalizes. Unverifiable skips the tick with a warning log. Patrol registration in deacon.ts is unchanged (reconcileStaleMergeStatus is already wired at deacon.ts:3053-3056). See PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "deacon-forge-merge-reconciler.ac1",
+            "title": "on the patrol tick the reconciler marks a forge-complete non-GitHub issue mergeStatus='merged' with mergeStep='post-merge-cleanup' and readyForMerge=false, and spawns the post-merge lifecycle enqueue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-forge-merge-reconciler.ac2",
+            "title": "a partially merged issue preserves its non-terminal mergeStatus while the patrol updates the merged repo's merge-set row from the forge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-forge-merge-reconciler.ac3",
+            "title": "the reconciler defers terminalization when a planning agent is running or the spec is draft/proposed, and skips issues whose spec is completed/cancelled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-forge-merge-reconciler.ac4",
+            "title": "issues outside the merge-relevant scope guard are not polled (no observeForgeMergeState call), and an unverifiable verdict produces a warning log and no status writes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-forge-merge-reconciler.ac5",
+            "title": "GitHub-project issues follow the pre-existing path byte-identically: the existing deacon-merge test suite passes unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stuck-merging-bound",
+        "title": "30-minute bound on merging/verifying with forge reconciliation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T21:09:50.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3162",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-merge.ts",
+            "src/lib/cloister/deacon.ts",
+            "tests/unit/lib/cloister/deacon-stuck-merging.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deacon-stuck-merging.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stuck-merging suite passes with fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add reconcileStuckMergingStates() to src/lib/cloister/deacon-merge.ts and wire it into the deacon tick next to reconcileStaleMergeStatus (src/lib/cloister/deacon.ts:3053-3056). For each review row with merge_status 'merging' or 'verifying' whose latest {type:'merge'} history entry (fallback updated_at) is older than STUCK_MERGING_MS = 30*60*1000: reconcile against the forge (WI-1's observeForgeMergeState for non-GitHub; factor the existing GitHub PR check so this patrol and the stale-merge reconciler share it rather than duplicating gh pr list inline). If complete with positive evidence, terminalize per WI-2. Otherwise setReviewStatusSync back to mergeStatus:'pending' with mergeNotes explaining the reset, preserving readyForMerge only when review+test+verification gates pass — the same gate check clearStuckMergeStatuses uses at src/lib/review-status.ts:708-712. Tests must use vi.useFakeTimers(); never real timeouts (repo rule). See PRD WI-3."
+        },
+        "items": [
+          {
+            "id": "stuck-merging-bound.ac1",
+            "title": "the patrol leaves a merging row younger than 30 minutes untouched and records no status write for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stuck-merging-bound.ac2",
+            "title": "a merging row older than 30 minutes whose forge state is complete with positive evidence resolves to mergeStatus='merged' with mergeStep='post-merge-cleanup'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stuck-merging-bound.ac3",
+            "title": "a merging row older than 30 minutes with no forge merge resets to pending with an explanatory mergeNotes, preserving readyForMerge when review+test+verification gates pass and dropping it otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stuck-merging-bound.ac4",
+            "title": "the verifying state is covered by the same bound, and an unverifiable forge verdict produces no status write",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "non-github-merge-verification",
+        "title": "Non-GitHub support in verifyMergedBeforeLifecycle",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T21:09:50.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3162",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/merge-verification.ts",
+            "tests/unit/lib/cloister/merge-verification.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/merge-verification.test.ts tests/unit/lib/cloister/merge-verification-ancestry.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-verification suites pass including non-GitHub cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the hard refusal at src/lib/cloister/merge-verification.ts:210-213 ('Non-GitHub project ... cannot be auto-verified') with a read-only call through the WI-1 door: run assessMergeCompleteness(issueId) (no writeback in this path — it is a pure read for callers) and return merged:true only when complete AND at least one repo verdict is 'merged'; otherwise merged:false with the completeness summary as the reason; on error return merged:false fail-open. Keep the verifiedMergedRepos/verifiedMergedRef fast paths and the entire GitHub branch untouched. This unblinds shouldSkipDispatchAsMerged (merge-verification.ts:297) for MYN, which is consulted by review-agent.ts:332, deacon-review-status.ts:674, and service-reactive.ts:240. See PRD WI-4."
+        },
+        "items": [
+          {
+            "id": "non-github-merge-verification.ac1",
+            "title": "a non-GitHub issue with complete completeness and positive merged evidence returns { merged: true } naming the merged repos",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "non-github-merge-verification.ac2",
+            "title": "a partially merged non-GitHub issue returns { merged: false } with a reason naming the unmerged sibling repos",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "non-github-merge-verification.ac3",
+            "title": "an unverifiable forge verdict returns { merged: false } (fail-open) and shouldSkipDispatchAsMerged correspondingly returns skip:false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "non-github-merge-verification.ac4",
+            "title": "GitHub issues keep the existing PR-oracle behavior: the pre-existing merge-verification suite passes unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-click-skips-merged-repos",
+        "title": "Merge-click polyrepo path skips forge-merged repos",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T21:09:50.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3162",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "src/dashboard/server/routes/__tests__/merge-ops.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/merge-ops.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-ops route suite passes including skip-merged cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/workspaces/merge-ops.ts change the activeRepos filter (lines 533-535) to also exclude repo.mergeStatus === 'merged'. The forge refresh itself happens one call earlier: reconcileStrandedRepos (line 517) gains WI-1's second pass, so pending/failed repo rows that the forge proves merged are flipped before the filter runs. A fully-merged issue then falls into the existing activeRepos.length === 0 success path (lines 537-551) which terminalizes the issue and runs postMergeLifecycle — reuse that path as-is; verify its status writes and lifecycle call fire for this entry. If no merge-ops route test file exists yet, create src/dashboard/server/routes/__tests__/merge-ops.test.ts following the style of the neighboring route suites. See PRD WI-5."
+        },
+        "items": [
+          {
+            "id": "merge-click-skips-merged-repos.ac1",
+            "title": "activeRepos rejects repos whose merge-set row is 'merged' and never calls mergeReviewArtifact for them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-click-skips-merged-repos.ac2",
+            "title": "clicking Merge on a fully-merged polyrepo issue returns the 'No changed repos remain' success response, sets mergeStatus='merged', and runs postMergeLifecycle without any forge merge call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-click-skips-merged-repos.ac3",
+            "title": "clicking Merge on a partially merged issue sends mergeReviewArtifact only to unmerged repos and runs verification gates only for those repos",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ready-set-propagation-and-live-checkpoint",
+        "title": "Ready-set propagation proof and MIN-898/MIN-858 recovery checkpoint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T21:09:50.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3162",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/flywheel-merge-order.test.ts",
+            "tests/unit/lib/cloister/uat-reconciler.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel-merge-order.test.ts tests/unit/lib/cloister/uat-reconciler.test.ts"
+          ],
+          "expected_outputs": [
+            "propagation regression tests pass",
+            "live checkpoint (or dry-run fallback) recorded in the task notes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Two parts. (1) Pin the propagation chain with regression tests: an issue whose review row is mergeStatus='merged' is excluded by listEligibleCandidatesByProject() via mergeGateEligibility (extend tests/unit/lib/flywheel-merge-order.test.ts), and isStale() reports a generation member that left the desired set as 'left the ready queue' (extend the uat-reconciler suite if not already covered — check tests/unit/lib/cloister/ for the existing file name first). (2) Live implementation checkpoint after deploy: observe one deacon tick reconciling MIN-898 and MIN-858 — their fe repo rows confirmed merged from the forge, the issues NOT terminalized (api/docs MRs still open), and no patrol errors in the dashboard log; then hand the api/docs retry for both to the operator or a strike through the normal Merge path, which WI-5 now makes skip the merged fe repo. Fallback if the live checkpoint cannot run in-session: dry-run the reconciler function against both issue ids from a workspace shell and record the output plus the unit tests. See PRD 'Live-state recovery' section."
+        },
+        "items": [
+          {
+            "id": "ready-set-propagation-and-live-checkpoint.ac1",
+            "title": "a regression test shows listEligibleCandidatesByProject excludes an issue whose mergeStatus is 'merged'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ready-set-propagation-and-live-checkpoint.ac2",
+            "title": "a regression test shows isStale marks a generation stale when a member leaves the ready set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ready-set-propagation-and-live-checkpoint.ac3",
+            "title": "the checkpoint records that MIN-898 and MIN-858 are reconciled (fe truth confirmed) without being terminalized, with dashboard-log or dry-run evidence captured in the task notes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-oracle-docs",
+        "title": "Document the forge-neutral merge oracle and new patrols",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T21:09:50.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3162",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md",
+            "docs/RECOVERY-NET.md",
+            "docs/MERGE-TRAIN.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint passes; the three docs render the new oracle/patrol behavior"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Update three docs to match the new behavior. docs/MERGE-WORKFLOW.md: rewrite the 'Single Merge Oracle' section (currently lines 144-156) — the oracle is now the forge adapter's merged review artifact per repo (GitHub PR or GitLab MR) with completeness across required repos and positive-evidence terminalization; delete the sentence 'For non-GitHub projects … the operator confirms manually'; document the 30-minute merging/verifying bound and the skip-merged-repos click behavior. docs/RECOVERY-NET.md: add the forge-merge reconciler and the stuck-merging patrol to the patrol inventory with cadence and fail-open semantics. docs/MERGE-TRAIN.md: one paragraph stating forge-observed merges leave the ready set via eligibility and invalidate live generations through isStale(), with no train-side polling by design. See PRD WI-7."
+        },
+        "items": [
+          {
+            "id": "merge-oracle-docs.ac1",
+            "title": "docs/MERGE-WORKFLOW.md's oracle section now contains forge-neutral per-repo verification semantics and drops the non-GitHub manual-confirmation claim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-oracle-docs.ac2",
+            "title": "docs/RECOVERY-NET.md records both new patrols with their cadence and fail-open behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-oracle-docs.ac3",
+            "title": "docs/MERGE-TRAIN.md records that forge-observed merges exit the ready set via eligibility and invalidate generations via isStale()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "forge-merge-observation-door",
+        "to": "deacon-forge-merge-reconciler",
+        "type": "blocks"
+      },
+      {
+        "from": "forge-merge-observation-door",
+        "to": "stuck-merging-bound",
+        "type": "blocks"
+      },
+      {
+        "from": "forge-merge-observation-door",
+        "to": "non-github-merge-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "forge-merge-observation-door",
+        "to": "merge-click-skips-merged-repos",
+        "type": "blocks"
+      },
+      {
+        "from": "deacon-forge-merge-reconciler",
+        "to": "ready-set-propagation-and-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "stuck-merging-bound",
+        "to": "ready-set-propagation-and-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-click-skips-merged-repos",
+        "to": "ready-set-propagation-and-live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "non-github-merge-verification",
+        "to": "ready-set-propagation-and-live-checkpoint",
+        "type": "informs"
+      },
+      {
+        "from": "deacon-forge-merge-reconciler",
+        "to": "merge-oracle-docs",
+        "type": "informs"
+      },
+      {
+        "from": "deacon-forge-merge-reconciler",
+        "to": "stuck-merging-bound",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3162-observe-gitlab-side-merges-and-reconcile-overdeck-merge-state.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

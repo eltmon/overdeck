@@ -1,0 +1,822 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-18T12:11:59Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2876: Conversation subagent rail: list spawned subagents and open their transcripts",
+    "updated": "2026-07-27T08:25:08.978Z"
+  },
+  "plan": {
+    "id": "pan-2876",
+    "title": "Conversation subagent rail: list spawned subagents and open their transcripts",
+    "status": "completed",
+    "uid": "a7d1d6e5-e2af-4d6f-bc38-9ca64bcad1a6",
+    "author": "agent:claude-fable-5",
+    "sequence": 8,
+    "created": "2026-07-18T12:11:59Z",
+    "updated": "2026-07-27T08:25:08.978Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2876",
+        "label": "PAN-2876",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2876.md",
+        "label": "PRD draft",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "conversation",
+      "subagents",
+      "frontend",
+      "ws-rpc"
+    ],
+    "narratives": {
+      "Problem": "When a dashboard conversation spawns Claude Code subagents via the Agent tool, the transcript shows only the collapsed 'Agent <description>' tool row — the subagent's actual work is invisible. Claude Code writes each subagent's transcript as a standalone JSONL (same schema as the parent) plus an agent-<id>.meta.json under <sessionFile minus .jsonl>/subagents/, so the existing parse/watch/stream pipeline can render them; only discovery, transport plumbing, and a rail UI are missing. Separately, the current harness writes the spawn tool as name 'Agent' but both renderers special-case only 'Task', so Agent rows fall through to a raw JSON dump.",
+      "Proposal": "Server-side: a new async discovery module lists agent-<id>.meta.json entries; the existing pan.subscribeConversationMessages handler emits a new {kind:'subagents'} full-list event (initial + 2 s change-detecting poll, cleared on release) with status derived from the parent parse state's pendingToolUse map, and accepts an optional agentId payload to stream a subagent transcript through the unchanged parseEntireConversation/watchConversation/gateSnapshotEmission flow; REST GET /api/conversations/:name/messages gains ?agentId= and a subagents[] field for ended conversations. Frontend: the conversation body flex row gains a right-side SubagentRail (hidden when empty, ?subagent=<id> URL state) that renders a second read-only MessagesTimeline for the selected subagent; the inline Agent row links to its subagent via the toolUseId ⇔ tool_use block id join; and 'Agent' is handled identically to 'Task' in ToolUseExpanded and summarizeToolInputForWorkLog.",
+      "NonGoals": "- Pi/Codex subagent equivalents (no such file layout; those conversations never emit subagents events and never show the rail)\n- Recursive/tree rails for nested subagents — spawnDepth > 1 renders flat with a depth marker only\n- Any new state plane: no DB columns, no overdeck-state writes, no new resolver domains (JSONL/liveness plane reads only)\n- A second subscription RPC (subscribeConversationSubagents is rejected; the existing subscription is extended)\n- Delta/merge protocol for the subagent list (full-list replace events only)\n- fs.watch on the subagents directory (2 s poll per PRD D-3)\n- Composer/input on the subagent transcript view (read-only)\n- Any write, delete, or truncate touching ~/.claude/projects/** transcripts or meta files"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted all eight PRD design decisions (D-1..D-8) verbatim without re-litigating.",
+        "rationale": "The PRD was authored and verified against the codebase two commits back; every cited file/line reference re-verified in this workspace at adba5b17bb. Auto mode selects documented recommended options."
+      },
+      {
+        "summary": "Split PRD work item 3 into three vBRIEF items: WS agentId transcript branch, WS subagents list emission + poll, REST agentId + subagents in response.",
+        "rationale": "Each is independently reviewable and leaves the tree working alone; one item covering ws-rpc.ts twice plus routes/conversations.ts would need 'and' in its title."
+      },
+      {
+        "summary": "Moved the ConversationResponse.subagents contract extension from PRD WI-3(c) into the contracts item (WI-1).",
+        "rationale": "Keeps all packages/contracts/src/rpc.ts schema changes in a single item so downstream items depend on one contracts build, and the REST item's diff stays confined to the route file."
+      },
+      {
+        "summary": "Only the contracts item carries requiresInspection: true.",
+        "rationale": "It is the one foundation item whose shapes (SubagentSummary, event variant, payload field) every downstream item encodes assumptions about; all other items' interfaces are pinned by exact before/after snippets in the PRD, so inspection there would rubber-stamp."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-subagent-schema",
+        "title": "Contracts: SubagentSummary schema, subagents event variant, optional agentId payload, ConversationResponse.subagents",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-18T12:11:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-2876",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "ws-subagent-transcript-branch",
+            "ws-subagent-list-emission",
+            "rest-subagent-messages",
+            "frontend-cache-hooks",
+            "frontend-subagent-rail"
+          ],
+          "files_scope": [
+            "packages/contracts/src/rpc.ts",
+            "packages/contracts/src/rpc.test.ts",
+            "src/dashboard/frontend/src/components/chat/chat-types.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd packages/contracts && npm run build && cd ../.. && npm run typecheck",
+            "npx vitest run --configLoader runner packages/contracts/src/rpc.test.ts"
+          ],
+          "expected_outputs": [
+            "contracts build and root typecheck complete without errors",
+            "rpc.test.ts passes including the new subagents-event and payload decode cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/rpc.ts add a SubagentSummary Schema.Struct ({agentId, agentType, description, toolUseId, spawnDepth, status: Schema.Literals(['running','done'])}) after WorkLogEntry (~line 172); extend the ConversationEvent union (~lines 191-205) with {kind:'subagents', subagents: Schema.Array(SubagentSummary)}; extend the subscribeConversationMessages payload (~line 390) with agentId: Schema.optional(Schema.String); add subagents?: SubagentSummary[] (Schema.optional) to ConversationResponse (~lines 178-189). Mirror the SubagentSummary type and new event variant in src/dashboard/frontend/src/components/chat/chat-types.ts (ConversationEvent at ~line 77). Rebuild contracts (cd packages/contracts && npm run build) so dependents typecheck; run bun install at the workspace root first if needed — never symlink node_modules."
+        },
+        "items": [
+          {
+            "id": "contracts-subagent-schema.ac1",
+            "title": "Given the new schemas, packages/contracts builds and rpc.test.ts decodes a {kind:'subagents'} event carrying a SubagentSummary array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-subagent-schema.ac2",
+            "title": "rpc.test.ts decodes the subscribeConversationMessages payload both with and without agentId (schema accepts both shapes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-subagent-schema.ac3",
+            "title": "ConversationResponse decodes with an optional subagents array and a legacy response without the field still decodes (preserves backward compatibility)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-subagent-schema.ac4",
+            "title": "npm run typecheck passes with chat-types.ts ConversationEvent extended to include the subagents variant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-subagent-discovery",
+        "title": "Server: subagent discovery module (list metas, resolve transcript path safely)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-18T12:11:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2876",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation/subagents.ts",
+            "tests/unit/dashboard/server/services/conversation/subagents.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/server/services/conversation/subagents.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "subagents.test.ts passes: fixture discovery, absent-dir empty list, traversal-unsafe ids rejected",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/conversation/subagents.ts exporting subagentsDirFor(sessionFile) returning '<sessionFile minus .jsonl>/subagents', async listSubagentMetas(sessionFile) reading agent-<id>.meta.json files via fs/promises readdir/readFile (agentId derived from the filename; fields agentType, description, toolUseId, spawnDepth parsed from JSON; unparseable files skipped with console.warn; meta contents memoized by filename since meta files are write-once, so steady-state polling is readdir + set comparison only; absent or empty dir returns [] without throwing), and subagentTranscriptPath(sessionFile, agentId) returning the agent-<id>.jsonl path only when agentId matches /^[A-Za-z0-9_-]+$/ AND path.resolve confirms the result stays inside the subagents dir, else null. Status is NOT set in this module — the caller owns it (PRD D-4). No sync fs, no execSync (dashboard-server-reachable code). This feature is strictly read-only on ~/.claude/projects/**."
+        },
+        "items": [
+          {
+            "id": "server-subagent-discovery.ac1",
+            "title": "listSubagentMetas returns both fixture subagents with agentId derived from the filename and agentType/description/toolUseId/spawnDepth parsed from each meta file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-subagent-discovery.ac2",
+            "title": "Given an absent or empty subagents directory, listSubagentMetas returns an empty list and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-subagent-discovery.ac3",
+            "title": "Given a corrupt meta file among valid ones, discovery logs a warning, skips it, and returns the remaining entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-subagent-discovery.ac4",
+            "title": "subagentTranscriptPath rejects '../evil', 'a/b', and ids failing the allow-list regex by returning null, and returns a path inside the subagents dir for a valid id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ws-subagent-transcript-branch",
+        "title": "Server WS: agentId payload streams the subagent transcript through the existing snapshot+tail flow",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-18T12:11:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2876",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/ws-rpc.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner tests/unit/dashboard/server"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "server unit suites pass with no new failures"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In the subscribeConversationMessages handler (src/dashboard/server/ws-rpc.ts:877), after sessionFile is resolved (~lines 915-922): when input.agentId is present, replace sessionFile with subagentTranscriptPath(sessionFile, input.agentId); a null result returns conversationDiscoveringStream() (invalid id never reaches a file read). Then fall through to the existing snapshot (parseEntireConversation) + watchConversation flow unchanged, including the gateSnapshotEmission append-only guard (PAN-1642 semantics: a transient shrink must not blank the panel). Subagent streams must not emit {kind:'subagents'} events. Keep the transcriptKind === 'claude-jsonl' gate (~line 901) ahead of the branch."
+        },
+        "items": [
+          {
+            "id": "ws-subagent-transcript-branch.ac1",
+            "title": "Given a valid agentId, the subscription emits a snapshot parsed from agent-<id>.jsonl then live tail events from watchConversation on that file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-subagent-transcript-branch.ac2",
+            "title": "Given an invalid agentId, the stream emits the discovering event and performs no file read outside the subagents directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-subagent-transcript-branch.ac3",
+            "title": "A subagent transcript subscription emits no {kind:'subagents'} events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-subagent-transcript-branch.ac4",
+            "title": "The gateSnapshotEmission guard still applies on subagent streams: a transient file shrink emits no smaller snapshot (append-only view preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ws-subagent-list-emission",
+        "title": "Server WS: emit {kind:'subagents'} list on snapshot and via 2 s change-detecting poll",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-18T12:11:59Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2876",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/ws-rpc.ts",
+            "tests/unit/dashboard/server/routes/conversation-subagent-messages.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/server/routes/conversation-subagent-messages.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the new test file passes, exercising the poll with fake timers only",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In the parent-stream branch of the subscribeConversationMessages handler, inside the existing Effect.acquireRelease acquire (after the initial snapshot offer at ws-rpc.ts:985-994): compute the initial list via listSubagentMetas, stamp each status as 'running' iff its toolUseId is in the parse state's pendingToolUse map else 'done' (PRD D-4/FR-3), and offer {kind:'subagents', subagents} — emit even when the list is empty so a resubscribing client clears stale state. Start a 2000 ms setInterval re-running scan + status stamp, offering only when the serialized list differs from the last emission; clear the interval in the same release that stops watchConversation (leaked intervals per subscription are the hazard). Also re-stamp statuses on each watchConversation delta since pendingToolUse changes arrive there first. Checkpoint CP-1 fallback is decided: if offer ordering relative to the first messages snapshot is awkward, emit the subagents event first — the client handles either order; do not redesign. Emission stays behind the claude-jsonl transcriptKind gate (PRD D-6). Tests MUST use vi.useFakeTimers() + advanceTimersByTimeAsync for the poll — never real waits, never maxForks:1 masking (standing fake-timers rule)."
+        },
+        "items": [
+          {
+            "id": "ws-subagent-list-emission.ac1",
+            "title": "After the initial parent snapshot the stream emits {kind:'subagents'} with statuses stamped 'running' for pending toolUseIds and 'done' otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-subagent-list-emission.ac2",
+            "title": "Given fake timers, advancing 2000 ms after a new meta file appears emits an updated full list, and advancing with no change emits nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-subagent-list-emission.ac3",
+            "title": "Stream release clears the poll interval — advancing timers after unsubscribe emits no further events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-subagent-list-emission.ac4",
+            "title": "An empty subagents directory still produces one {kind:'subagents'} event with an empty list after the snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-subagent-list-emission.ac5",
+            "title": "A non-claude-jsonl (Pi/Codex) subscription emits no subagents events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rest-subagent-messages",
+        "title": "Server REST: ?agentId= transcript fetch and subagents[] in the parent messages response",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-18T12:11:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2876",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversations.ts",
+            "tests/unit/dashboard/server/routes/conversation-subagent-messages.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/server/routes/conversation-subagent-messages.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route tests pass: ?agentId= returns the subagent transcript, bad id returns 400, parent response carries subagents",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In getConversationMessagesRoute (src/dashboard/server/routes/conversations.ts:452): accept an optional ?agentId= query param; resolve it through subagentTranscriptPath and return HTTP 400 when resolution yields null (invalid or traversal-unsafe id — no file read happens); otherwise parse the subagent transcript file instead of the parent. For parent-shaped responses (no agentId), include subagents: listSubagentMetas output with every status 'done' (ended conversations have no pending tool_use) so the rail populates without a live stream. Follow the test pattern of tests/unit/dashboard/server/routes/discovered-sessions-messages.test.ts. Async fs only."
+        },
+        "items": [
+          {
+            "id": "rest-subagent-messages.ac1",
+            "title": "GET /api/conversations/:name/messages?agentId=<valid> returns the parsed subagent transcript",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rest-subagent-messages.ac2",
+            "title": "Given an invalid or traversal-unsafe agentId the route returns 400 and reads no file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rest-subagent-messages.ac3",
+            "title": "The parent-shaped response contains subagents[] with every status 'done'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-cache-hooks",
+        "title": "Frontend: subagents in the messages cache and a useSubagentTranscript hook",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-18T12:11:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2876",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts",
+            "src/dashboard/frontend/src/components/chat/useConversationMessagesStream.test.ts",
+            "src/dashboard/frontend/src/components/chat/chat-types.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/chat/useConversationMessagesStream.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stream hook tests pass including subagents-event replacement and query-key isolation cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/chat/useConversationMessagesStream.ts: add subagents?: SubagentSummary[] to ConversationMessagesCache; in applyConversationMessagesEvent (~line 62) handle kind === 'subagents' by replacing the cached list (full-list replace per PRD D-2) while leaving messages and workLog untouched, and ensure messages events preserve the cached subagents list. Add a useSubagentTranscript(conversation, agentId | null) hook in the same file: when shouldStreamConversationMessages (~line 111) allows streaming, subscribe with {conversationName, agentId} under the distinct query key ['conversation-messages', name, 'subagent', agentId]; when the conversation has ended, one-shot fetch /api/conversations/:name/messages?agentId=. Rely on the existing getTransport().subscribe return (~lines 150-161) for unsubscribe on deselect/unmount."
+        },
+        "items": [
+          {
+            "id": "frontend-cache-hooks.ac1",
+            "title": "applyConversationMessagesEvent replaces the cached subagents list on a subagents event and preserves messages/workLog untouched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-cache-hooks.ac2",
+            "title": "A messages event preserves the previously cached subagents list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-cache-hooks.ac3",
+            "title": "useSubagentTranscript stores subagent data under a query key separate from the parent conversation cache",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-cache-hooks.ac4",
+            "title": "Given an ended conversation the hook falls back to a one-shot ?agentId= fetch, and deselect/unmount closes the live subscription",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-subagent-rail",
+        "title": "Frontend: SubagentRail component in the conversation body with ?subagent= URL state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-18T12:11:59Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2876",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/SubagentRail.tsx",
+            "src/dashboard/frontend/src/components/chat/SubagentRail.test.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/chat/SubagentRail.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "rail component tests pass: hidden when empty, rows render, selection renders the timeline header",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/chat/SubagentRail.tsx and render it in the ConversationPanel body flex row (~lines 994-1058) as a sibling after the DiffPanel block (~lines 1047-1057), only when subagents.length > 0. Collapsed state: a narrow list of rows showing agentType, truncated description, status indicator, and a depth marker when spawnDepth > 1 (flat list regardless of depth per PRD D-7). Selected state (URL param ?subagent=<agentId>, managed like diffOpen's param handling): widen and render the subagent transcript via MessagesTimeline fed by useSubagentTranscript, with a header (agentType · description, close button) and no composer (PRD D-5). Rail and DiffPanel may be open simultaneously; both are min-w-0 flex children so the main column keeps priority. Style per the pan-style-guide skill: no pill badges, color restraint, no green running dots — running uses the work log's existing tone language (var(--primary) accent, muted otherwise)."
+        },
+        "items": [
+          {
+            "id": "frontend-subagent-rail.ac1",
+            "title": "The rail renders nothing when the subagent list is empty (covers Pi/Codex and claude conversations without subagents)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-subagent-rail.ac2",
+            "title": "The rail renders one row per subagent showing agentType, truncated description, status indicator, and a depth marker when spawnDepth > 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-subagent-rail.ac3",
+            "title": "Selecting a row sets ?subagent=<agentId> and renders the subagent transcript via MessagesTimeline with a header and no composer; close clears the param",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-subagent-rail.ac4",
+            "title": "Loading /conv/:id?subagent=<agentId> directly opens the rail with that subagent's transcript panel open (deep link)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-subagent-rail.ac5",
+            "title": "The rail and DiffPanel render simultaneously as min-w-0 flex children and the main column preserves layout priority",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-agent-row-link",
+        "title": "Frontend: 'Open subagent transcript' action in the expanded Agent/Task row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-18T12:11:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2876",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/workLogRows.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "frontend tests pass with no new failures; the link action renders only for rows with a matching subagent",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Thread an optional onOpenSubagent?: (toolUseId: string) => void callback and a toolUseId → subagent lookup from MessagesTimeline props down to ToolUseExpanded (src/dashboard/frontend/src/components/chat/messagesTimeline/workLogRows.tsx:95; same prop-drilling path cwd/issueId already take). In the Task/Agent case (~lines 205-221), when the lookup contains entry.id (WorkLogEntry.id equals the tool_use block id, which equals meta.toolUseId), render an 'Open subagent transcript' action above the prompt that calls onOpenSubagent(entry.id). ConversationPanel supplies the callback and maps toolUseId to the subagent's agentId, setting ?subagent=<agentId>."
+        },
+        "items": [
+          {
+            "id": "frontend-agent-row-link.ac1",
+            "title": "An expanded Agent/Task row whose entry id matches a known subagent toolUseId renders an 'Open subagent transcript' action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-agent-row-link.ac2",
+            "title": "Clicking the action sets ?subagent=<agentId> and opens the matching rail selection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-agent-row-link.ac3",
+            "title": "A row without a matching subagent renders no 'Open subagent transcript' action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-task-tool-parity",
+        "title": "Agent tool-name parity with Task in ToolUseExpanded and summarizeToolInputForWorkLog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-18T12:11:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2876",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/workLogRows.tsx",
+            "src/dashboard/server/services/format-tool-input.ts",
+            "tests/unit/dashboard/server/services/format-tool-input.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/server/services",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "format-tool-input tests pass including the new 'Agent' parity case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a 'case \\'Agent\\':' fallthrough to the existing 'case \\'Task\\': {' in both src/dashboard/frontend/src/components/chat/messagesTimeline/workLogRows.tsx:205 and src/dashboard/server/services/format-tool-input.ts:89 (before: case 'Task': { — after: case 'Task': case 'Agent': {). Input keys (subagent_type, description, prompt) are identical for both tool names per live JSONL verification; make no other rendering change. Extend the format-tool-input unit tests (or add a test alongside if none exists — adjust the test files_scope path to the actual location found at implementation time) asserting summarizeToolInputForWorkLog('Agent', {subagent_type, description}) matches the 'Task' output."
+        },
+        "items": [
+          {
+            "id": "agent-task-tool-parity.ac1",
+            "title": "An 'Agent' tool row's expanded body renders the subagent type + description header with the prompt as markdown, not a raw JSON dump",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-task-tool-parity.ac2",
+            "title": "summarizeToolInputForWorkLog('Agent', {subagent_type, description}) returns the same 'type: description' one-liner as 'Task'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-task-tool-parity.ac3",
+            "title": "Existing 'Task' rendering output survives unchanged and its tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-conversation-subagents",
+        "title": "Docs: developer doc for the subagent data layout/transport and a user-facing Subagents note",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-18T12:11:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2876",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONVERSATION-SUBAGENTS.md",
+            "reference/architecture.mdx",
+            "src/dashboard/server/services/conversation/subagents.ts",
+            "docs/INDEX.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "test -f docs/CONVERSATION-SUBAGENTS.md && grep -q 'subagents' docs/CONVERSATION-SUBAGENTS.md && echo doc-present",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "doc-present printed (the dev doc exists and covers the subagents layout)",
+            "lint completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Create docs/CONVERSATION-SUBAGENTS.md covering: the subagents directory layout (<sessionFile minus .jsonl>/subagents/ with agent-<id>.jsonl + agent-<id>.meta.json and the verified meta shape {agentType, description, toolUseId, spawnDepth}), the toolUseId ⇔ tool_use block id join, the ConversationEvent/RPC extensions, status derivation from pendingToolUse, and the path-safety rules (regex allow-list + resolve prefix check). Update the module header comment of src/dashboard/server/services/conversation/subagents.ts to reference the doc. Add a 'Subagents' subsection to the conversation-panel portion of the user-facing Mintlify docs — decision rule (CP-2): the nearest existing user-facing page documenting the conversation panel, else reference/architecture.mdx; state the chosen page in the PR body. Update docs/INDEX.md if it indexes dev docs (check at implementation time; if it does not, note the skip in the PR body)."
+        },
+        "items": [
+          {
+            "id": "docs-conversation-subagents.ac1",
+            "title": "docs/CONVERSATION-SUBAGENTS.md exists and contains the subagents directory layout, verified meta shape, toolUseId join, event/RPC extensions, status derivation, and path-safety rules",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-conversation-subagents.ac2",
+            "title": "The subagents.ts module header contains a reference to docs/CONVERSATION-SUBAGENTS.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-conversation-subagents.ac3",
+            "title": "The chosen user-facing Mintlify page contains a Subagents subsection describing the rail, and the PR body states which page was chosen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-subagent-schema",
+        "to": "ws-subagent-transcript-branch",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-subagent-schema",
+        "to": "ws-subagent-list-emission",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-subagent-schema",
+        "to": "rest-subagent-messages",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-subagent-schema",
+        "to": "frontend-cache-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "server-subagent-discovery",
+        "to": "ws-subagent-transcript-branch",
+        "type": "blocks"
+      },
+      {
+        "from": "server-subagent-discovery",
+        "to": "ws-subagent-list-emission",
+        "type": "blocks"
+      },
+      {
+        "from": "server-subagent-discovery",
+        "to": "rest-subagent-messages",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-cache-hooks",
+        "to": "frontend-subagent-rail",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-subagent-rail",
+        "to": "frontend-agent-row-link",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-subagent-list-emission",
+        "to": "frontend-subagent-rail",
+        "type": "informs"
+      },
+      {
+        "from": "server-subagent-discovery",
+        "to": "docs-conversation-subagents",
+        "type": "informs"
+      },
+      {
+        "from": "ws-subagent-list-emission",
+        "to": "docs-conversation-subagents",
+        "type": "informs"
+      },
+      {
+        "from": "frontend-subagent-rail",
+        "to": "docs-conversation-subagents",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-18-PAN-2876-conversation-subagent-rail-list-spawned-subagents-and-open-their-transcripts.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

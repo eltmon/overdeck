@@ -1,0 +1,130 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T17:33:47Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3147: Flywheel doctrine: require reading the review verdict for blocked issues — liveness metrics are not correctness",
+    "updated": "2026-07-26T20:21:18.830Z"
+  },
+  "plan": {
+    "id": "pan-3147",
+    "title": "Flywheel doctrine: require reading the review verdict for blocked issues — liveness metrics are not correctness",
+    "status": "completed",
+    "uid": "d8ca2fda-d55b-46c1-bc3c-fa06cd9541c9",
+    "author": "agent:k3[1m]",
+    "sequence": 7,
+    "created": "2026-07-26T17:33:47Z",
+    "updated": "2026-07-26T20:21:18.830Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3147",
+        "label": "PAN-3147",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "doctrine",
+      "prompt",
+      "review"
+    ],
+    "narratives": {
+      "Problem": "On 2026-07-26 the flywheel orchestrator reported PAN-3093 as \"advancing healthily\" for four consecutive ticks on rising cost and output alone, while the issue sat at CHANGES REQUESTED with five blocking findings — including a correctness bug letting a UAT generation promote obsolete feature code. The orchestrator's stall test answers \"is the agent working?\" but was used to answer \"is the work good?\"; the `rev=blocked` pointer was in its own status snapshots the whole time, and a cost drop (fresh session after a review block) was explained away as benign instead of triggering a review read.",
+      "Proposal": "Insert one additive doctrine clause into the Observe step of roles/flywheel.md, immediately after the \"verify agents are ACTUALLY progressing\" paragraph and before `Run skill `pan-agent-activity``, requiring the orchestrator to read `<workspace>/.pan/review/<runId>/synthesis.md` (verdict + blocking findings) for any issue whose review_status is blocked or failed, and to report \"blocked, N findings, converging/not\" — never \"healthy\". Text applied verbatim from the issue body. Commit carries a Prompt-Change: trailer (scripts/check-prompt-change-trailer.sh gate). Edit is strictly additive so tests/unit/prompts/prompt-invariants.test.ts stays green.",
+      "NonGoals": "- No mechanical enforcement (hooks, linters, status-snapshot or read-model code changes) — doctrine-only issue.\n- No changes to the review role, synthesis format, or the `.pan/review/<runId>/` layout.\n- No fix for the PAN-3093 fetchFeatureBranch correctness bug itself (tracked separately).\n- No rewording or removal of any existing line in roles/flywheel.md."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Single-item plan applying the issue body's clause verbatim.",
+        "rationale": "The issue supplies the exact patch text, its location, and its acceptance criteria; decomposition heuristics say absorb trivia rather than inflate task count for a one-clause insert."
+      },
+      {
+        "summary": "Docs requirement satisfied by the same edit (roles/flywheel.md is the doctrine surface).",
+        "rationale": "roles/flywheel.md is the documented flywheel prompt; no Mintlify or docs/ page documents per-tick reporting doctrine, and the finalize docs gate accepts a .md file in an item's files_scope."
+      },
+      {
+        "summary": "No mechanical enforcement in scope.",
+        "rationale": "The issue asks for a doctrine clause in the flywheel prompt and names acceptance only on the file's content; adding hooks or lint rules would be unrequested scope."
+      }
+    ],
+    "items": [
+      {
+        "id": "insert-liveness-doctrine",
+        "title": "Insert the LIVENESS IS NOT CORRECTNESS doctrine clause into roles/flywheel.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T17:33:47Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3147",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/flywheel.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"LIVENESS IS NOT CORRECTNESS\" roles/flywheel.md",
+            "npx vitest run tests/unit/prompts/prompt-invariants.test.ts",
+            "bash scripts/check-prompt-change-trailer.sh"
+          ],
+          "expected_outputs": [
+            "grep returns a line inside the Observe step, positioned before the `Run skill `pan-agent-activity`` mention",
+            "prompt-invariants test suite passes with no failures",
+            "check-prompt-change-trailer.sh exits 0 (Prompt-Change trailer found)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In roles/flywheel.md, find the Observe step paragraph ending `same question, or churn). Run skill `pan-agent-activity`:` (currently around lines 284-287 — locate by anchor text, not line number). Split the paragraph after `churn).` and insert, between that sentence and `Run skill `pan-agent-activity``, the doctrine clause from the PRD (.pan/drafts/PAN-3147.md, Proposal section) VERBATIM: the paragraph beginning `**LIVENESS IS NOT CORRECTNESS — for every issue whose `review_status` is `blocked` or `failed`, READ THE REVIEW VERDICT before you describe it in any report.**` through `...in its own status snapshots the whole time.)`. Match the file's existing 3-space-indented, hard-wrapped paragraph style. Insert a blank line before and after the clause. Change nothing else — every existing line must be preserved (tests/unit/prompts/prompt-invariants.test.ts asserts load-bearing rails in this file). Commit with a commit body containing the trailer `Prompt-Change: require reading the review verdict for blocked/failed issues before reporting them healthy (PAN-3093 miss)` — scripts/check-prompt-change-trailer.sh rejects commits touching roles/*.md without it. Push the feature branch immediately after committing."
+        },
+        "items": [
+          {
+            "id": "insert-liveness-doctrine.ac1",
+            "title": "Given the Observe step of roles/flywheel.md, when the clause text is inspected, then it contains the verbatim LIVENESS IS NOT CORRECTNESS clause — including the PAN-3093 incident citation, the `<workspace>/.pan/review/<runId>/synthesis.md` verdict path, and the prescribed report form `blocked, N findings, converging/not` — positioned immediately after the ACTUALLY-progressing paragraph and before `Run skill `pan-agent-activity``",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "insert-liveness-doctrine.ac2",
+            "title": "Given `git diff origin/main -- roles/flywheel.md`, when the diff is inspected, then it shows only added lines (the clause plus the paragraph split) and preserves every pre-existing line unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "insert-liveness-doctrine.ac3",
+            "title": "Given the feature branch commit, when `bash scripts/check-prompt-change-trailer.sh` runs against origin/main, then it exits 0 because the commit body contains a `Prompt-Change:` trailer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "insert-liveness-doctrine.ac4",
+            "title": "Given the edited file, when `npx vitest run tests/unit/prompts/prompt-invariants.test.ts` runs, then it passes with zero failures, confirming the load-bearing prompt rails survive the edit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3147-flywheel-doctrine-require-reading-the-review-verdict-for-blocked-issues-liveness-metrics-are-not-correctness.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

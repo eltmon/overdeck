@@ -186,12 +186,314 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-12T01:10:34.668Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T10:50:26.197Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T10:50:30.744Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T10:50:30.745Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T10:50:30.754Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T10:50:30.755Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T23:04:45.644Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T05:41:00.889Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T05:41:05.194Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T05:41:05.195Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T05:41:05.195Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-13T05:41:05.199Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-13T05:48Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-13T05:48:02.529Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-13T05:48:02.644Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-13T06:15Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-07-13T06:15:18.607Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-16T07:26:06.217Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-16T07:26:26.602Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:44:20.086Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:44:33.095Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:53:53.606Z"
+    },
+    {
+      "timestamp": "2026-07-16T12:07:30.129Z",
+      "reason": "end",
+      "note": "Deviation: the unsharded npm test command was terminated with SIGTERM 143 during Vitest, so the identical root suite was completed as two shards (9,404 passed, 50 skipped across 1,022 files) and the frontend suite passed 32/32. The required rebase introduced one duplicate no-loss matrix entry, which was removed, and the pre-rebase remote lineage was preserved with an ours-strategy merge to avoid force-pushing. Hazard: Bun reports a pre-existing duplicate @effect/vitest dependency warning. Delivered metric-aware flywheel substrate-bug prioritization with normalized criterion impact, persistence, API/CLI/UI surfaces, orchestration guidance, docs, migrations, and tests. Typecheck and lint pass."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-16T12:08:41.876Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T12:12Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-16T12:12:09.458Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-16T12:13:02.458Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T12:13:04.554Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-16T12:32:05.161Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T12:32:06.990Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T12:32:07.007Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T12:32:07.027Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T12:32:07.046Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T12:34Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T12:34:18.839Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-16T12:51:07.437Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T12:51:09.449Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T12:51:09.461Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T12:51:09.486Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T12:51:09.498Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T13:03Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-07-16T13:03:59.221Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T13:03:59.346Z"
+    },
+    {
+      "timestamp": "2026-07-16T13:05:34.366Z",
+      "reason": "end",
+      "note": "All review findings fixed; exact verification command passes locally (543 backend files, 5021 tests; 89 frontend files, 1036 tests). Resetting repeated frontend verifier hang after backend completed green."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T15:37:03.975Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-16T16:00:21.815Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T16:19:34.479Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T16:27Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-16T16:27:51.238Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T16:27:51.375Z"
+    },
+    {
+      "timestamp": "2026-07-16T17:17:24.318Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T17:20:56.581Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T17:27:48.509Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T17:27:48.520Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T17:27:48.530Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T17:27:48.545Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T17:52Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-16T17:52:40.659Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T18:08:03.549Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T18:27:08.318Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T18:28:05.288Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T18:35:38.571Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T18:35:38.590Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T18:35:38.612Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T18:35:38.646Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-17T00:52:59.514Z"
     }
   ],
   "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
+      "drizzle/overdeck/0000_overdeck_init.sql",
+      "scripts/file-size-baseline.txt",
       "src/dashboard/server/routes/flywheel-substrate-bug-weights.ts",
+      "src/dashboard/server/services/dashboard-db-task.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
+      "src/dashboard/server/services/substrate-bug-poller.ts",
+      "src/lib/database/__tests__/flywheel-substrate-bugs-db.test.ts",
+      "src/lib/database/flywheel-substrate-bugs-db.ts",
+      "src/lib/database/schema.ts",
+      "src/lib/overdeck/__tests__/flywheel-substrate-bugs.test.ts",
+      "src/lib/overdeck/flywheel-substrate-bugs.ts",
+      "src/lib/overdeck/infra.ts",
+      "sync-sources/hooks/record-cost-event.js",
       "tests/unit/lib/overdeck/no-loss-matrix.ts"
     ],
     "declaredScopeUntouched": [],
@@ -217,8 +519,10 @@
     "actualChangedFiles": [
       "docs/FLYWHEEL.md",
       "docs/flywheel-brief.md",
+      "drizzle/overdeck/0000_overdeck_init.sql",
       "packages/contracts/src/flywheel.ts",
       "roles/flywheel.md",
+      "scripts/file-size-baseline.txt",
       "src/cli/commands/__tests__/flywheel.test.ts",
       "src/cli/commands/flywheel-surfaces.ts",
       "src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx",
@@ -226,100 +530,79 @@
       "src/dashboard/server/routes/__tests__/flywheel.test.ts",
       "src/dashboard/server/routes/flywheel-substrate-bug-weights.ts",
       "src/dashboard/server/routes/flywheel.ts",
+      "src/dashboard/server/services/dashboard-db-task.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
+      "src/dashboard/server/services/substrate-bug-poller.ts",
+      "src/lib/database/__tests__/flywheel-substrate-bugs-db.test.ts",
+      "src/lib/database/flywheel-substrate-bugs-db.ts",
+      "src/lib/database/schema.ts",
       "src/lib/overdeck/__tests__/affected-criteria.test.ts",
+      "src/lib/overdeck/__tests__/flywheel-substrate-bugs.test.ts",
       "src/lib/overdeck/__tests__/substrate-bug-weight.test.ts",
       "src/lib/overdeck/__tests__/substrate-bug-weights-service.test.ts",
       "src/lib/overdeck/affected-criteria.ts",
+      "src/lib/overdeck/flywheel-substrate-bugs.ts",
+      "src/lib/overdeck/infra.ts",
       "src/lib/overdeck/substrate-bug-weight.ts",
       "src/lib/overdeck/substrate-bug-weights-service.ts",
+      "sync-sources/hooks/record-cost-event.js",
       "tests/unit/lib/overdeck/no-loss-matrix.ts",
       "vision.mdx"
     ],
-    "recordedAt": "2026-07-11T10:51:47.612Z"
+    "recordedAt": "2026-07-16T17:17:23.591Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-12T01:10:39.813Z",
+  "updated": "2026-07-17T06:17:35.990Z",
   "pipeline": {
     "issueId": "PAN-1491",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "passed",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "inspectStatus": "failed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T01:10:39.675Z",
-    "reviewNotes": "Agent re-review request (6/25): Fixed review issues",
-    "inspectNotes": "Bead b3-weight-fn BLOCKED: commit d813b8b4 does not implement computeSubstrateBugWeight(criteria, stats) at all. The diff only adds optional weight/weightReason fields to the FlywheelSuggestion interface/schema in packages/contracts/src/flywheel.ts:180-190 — no status-multiplier logic, no normalizedDistance calculation, no compound-value field reading (medianMs/p95Ms), no insufficient_data short-circuit, and no reason-string generation exist anywhere in this commit. None of AC1-AC5 can be evaluated because the function under review is absent. This is the same d813b8b4 diff already submitted (and blocked) against bead b2-parse-criteria moments ago — it looks like the wrong commit is being routed to review requests, or the actual b3-weight-fn implementation commit has not landed yet. Required fix: identify and deliver the commit that actually adds computeSubstrateBugWeight, implementing per-criterion status multiplier (red=1.6x per AC1 example: 3*(1+0.6)), a status floor that dominates over raw normalized drift for red vs green (AC2), safe reading of a configured valueField from compound values with graceful fallback to normalizedDistance 0 + floor when the field is absent (AC3), a weight-0 + insufficient-telemetry-reason short circuit when all criteria are insufficient_data (AC4), and a reason string naming the highest-contributing criterion by label/status/value-vs-target (AC5).",
+    "updatedAt": "2026-07-17T06:17:35.970Z",
+    "reviewNotes": "Current-head review approved: all four dimensions complete; no blockers remain after scope, convergence, proportionality, and requirements gates.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "mergeNotes": "PR #1636 was closed without merging — reopen the PR or reset review state to re-queue this issue",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1636",
-    "lastVerifiedCommit": "6da30440b9b92c1ba542121ee1a4039d58473789",
-    "reviewRequestedAt": "2026-07-11T10:51:50.651Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "src/dashboard/server/routes/flywheel-substrate-bug-weights.ts",
-        "tests/unit/lib/overdeck/no-loss-matrix.ts"
-      ],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "docs/FLYWHEEL.md",
-        "docs/flywheel-brief.md",
-        "packages/contracts/src/flywheel.ts",
-        "roles/flywheel.md",
-        "src/cli/commands/__tests__/flywheel.test.ts",
-        "src/cli/commands/flywheel-surfaces.ts",
-        "src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx",
-        "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusDetails.test.tsx",
-        "src/dashboard/server/routes/__tests__/flywheel.test.ts",
-        "src/dashboard/server/routes/flywheel.ts",
-        "src/lib/overdeck/__tests__/affected-criteria.test.ts",
-        "src/lib/overdeck/__tests__/substrate-bug-weight.test.ts",
-        "src/lib/overdeck/__tests__/substrate-bug-weights-service.test.ts",
-        "src/lib/overdeck/affected-criteria.ts",
-        "src/lib/overdeck/substrate-bug-weight.ts",
-        "src/lib/overdeck/substrate-bug-weights-service.ts",
-        "vision.mdx"
-      ],
-      "actualChangedFiles": [
-        "docs/FLYWHEEL.md",
-        "docs/flywheel-brief.md",
-        "packages/contracts/src/flywheel.ts",
-        "roles/flywheel.md",
-        "src/cli/commands/__tests__/flywheel.test.ts",
-        "src/cli/commands/flywheel-surfaces.ts",
-        "src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx",
-        "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusDetails.test.tsx",
-        "src/dashboard/server/routes/__tests__/flywheel.test.ts",
-        "src/dashboard/server/routes/flywheel-substrate-bug-weights.ts",
-        "src/dashboard/server/routes/flywheel.ts",
-        "src/lib/overdeck/__tests__/affected-criteria.test.ts",
-        "src/lib/overdeck/__tests__/substrate-bug-weight.test.ts",
-        "src/lib/overdeck/__tests__/substrate-bug-weights-service.test.ts",
-        "src/lib/overdeck/affected-criteria.ts",
-        "src/lib/overdeck/substrate-bug-weight.ts",
-        "src/lib/overdeck/substrate-bug-weights-service.ts",
-        "tests/unit/lib/overdeck/no-loss-matrix.ts",
-        "vision.mdx"
-      ],
-      "recordedAt": "2026-07-11T10:51:47.612Z"
-    }
+    "reviewedAtCommit": "1196ce677a11fcfea11d410ad3e6269fb4d8948f",
+    "lastVerifiedCommit": "1196ce677a11fcfea11d410ad3e6269fb4d8948f",
+    "reviewSpawnedAt": "2026-07-16T18:28:03.164Z",
+    "strikeRecoveryCount": 0,
+    "closedOut": true,
+    "closedOutAt": "2026-07-17T06:17:35.970Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 990232,
-            "output": 2533,
-            "cacheRead": 554752,
+            "input": 5244652,
+            "output": 11335,
+            "cacheRead": 4321152,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 36181404,
-            "output": 121445,
-            "cacheRead": 33268352,
+            "input": 63626161,
+            "output": 220294,
+            "cacheRead": 57942144,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 52587528,
+            "output": 86205,
+            "cacheRead": 50969600,
             "cacheWrite": 0
           }
         },
         "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 6,
+            "output": 2134,
+            "cacheRead": 629462,
+            "cacheWrite": 2701
+          },
           "anthropic/claude-haiku-4-5-20251001": {
             "input": 126,
             "output": 9951,
@@ -373,6 +656,46 @@
             "cacheWrite": 243872
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 12155581,
+            "output": 277930,
+            "cacheRead": 41505792,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 1265504,
+            "output": 32013,
+            "cacheRead": 7579648,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 793521,
+            "output": 23715,
+            "cacheRead": 5617664,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 695815,
+            "output": 58307,
+            "cacheRead": 6634496,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 1326778,
+            "output": 43911,
+            "cacheRead": 4005888,
+            "cacheWrite": 0
+          }
+        },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
             "input": 22813,
@@ -383,25 +706,43 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2629483,
-            "output": 373225,
-            "cacheRead": 188394496,
+            "input": 2995337,
+            "output": 404018,
+            "cacheRead": 209648384,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 2671033,
+            "output": 169666,
+            "cacheRead": 39779328,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 990232,
-          "output": 2533,
-          "cacheRead": 554752,
+          "input": 5244652,
+          "output": 11335,
+          "cacheRead": 4321152,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 39360542,
-          "output": 162090,
-          "cacheRead": 34832000,
+          "input": 66805299,
+          "output": 260939,
+          "cacheRead": 59505792,
           "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 71495760,
+          "output": 691747,
+          "cacheRead": 156092416,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 6,
+          "output": 2134,
+          "cacheRead": 629462,
+          "cacheWrite": 2701
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 126,
@@ -452,24 +793,97 @@
           "cacheWrite": 256982
         },
         "custom/kimi-k2.7-code": {
-          "input": 2629483,
-          "output": 373225,
-          "cacheRead": 188394496,
+          "input": 2995337,
+          "output": 404018,
+          "cacheRead": 209648384,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 116.372215,
-        "pricingAsOf": "2026-07-12T01:10:39.761Z"
+        "usd": 352.237782,
+        "pricingAsOf": "2026-07-17T05:25:07.327Z"
       }
     },
     "merges": [
       "https://github.com/eltmon/overdeck/pull/1636"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-17T06:17:35.986Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at 1196ce677a11fcfea11d410ad3e6269fb4d8948f",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "PR #2814 is squash-merged and feature/pan-1491 matches the merged PR head; PR #2814 is squash-merged and origin/feature/pan-1491 matches the merged PR head; PR #2814 MERGED at 2026-07-17T01:50:21Z",
+          "status": "pass",
+          "mergedAt": "2026-07-17T01:50:21Z",
+          "mergeCommit": "9e783f4fdf8977be18ec9bae2e3e078336906a2c"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 9e783f4fdf8977be18ec9bae2e3e078336906a2c",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-17T05:24:06.000Z, dist built 2026-07-17T05:23:47.539Z, merge 2026-07-17T01:50:21.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 9 agent state directories; No strike branch strike/pan-1491 found; Pruned 1153 checkpoint ref(s) for agent-pan-1491, planning-pan-1491, strike-pan-1491; No specialist registry entries for PAN-1491"
+        }
+      ],
+      "accepted": []
+    }
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "b8-orchestrator-doc": "completed",
     "b8-orchestrator-doc.ac1": "completed",

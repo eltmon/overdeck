@@ -1,0 +1,176 @@
+{
+  "issueId": "PAN-2879",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-18T13:36:29.113Z",
+  "updated": "2026-07-18T18:01:39.525Z",
+  "pipeline": {
+    "issueId": "PAN-2879",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "releaseStatus": "skipped",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-18T18:01:39.502Z",
+    "testNotes": "Skipped: issue is already merged",
+    "lastVerifiedCommit": "a126ef01335076218dcba9f6a03d373e987d50d9",
+    "strikeLandingState": "landed",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-18T14:45:06.449Z",
+        "strikeHead": "c4e2808fa0a478de6ad633dc66709d41869c3442",
+        "mainHead": "20138f2583ba8ce46f7cbf33743c6f56a71c786f",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-07-18T15:08:25.149Z",
+        "strikeHead": "ae46b21f3c7cb1d7fa351ba24fe7046d14141c56",
+        "mainHead": "20138f2583ba8ce46f7cbf33743c6f56a71c786f",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-07-18T15:26:33.980Z",
+        "strikeHead": "524164b3ae7f4d261726f83c1cf498ed1318a455",
+        "mainHead": "7e8fac9f3411b9f6f187e83cddf17d315177168a",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-07-18T16:01:39.886Z",
+        "strikeHead": "caa83ba09eb87af8636669f1ac5a5a958c2b23cf",
+        "mainHead": "f1aee6f27bae02633256a7c362f0d1f7f4eca302",
+        "outcome": "failed",
+        "detail": "GitHub PR #2881 has failing required checks on HEAD caa83ba0. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/2881 for details."
+      },
+      {
+        "timestamp": "2026-07-18T16:49:11.346Z",
+        "strikeHead": "65b9b083bd42b1c8b9e6125921ab21383af9dc3d",
+        "mainHead": "30d3e8b34c0217e607e3116dcee0e3696aebe802",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-07-18T17:01:41.714Z",
+        "strikeHead": "fcfc01c0e55bbe1070b6f2a613c9e94e8e172008",
+        "mainHead": "30d3e8b34c0217e607e3116dcee0e3696aebe802",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-07-18T17:26:11.566Z",
+        "strikeHead": "a126ef01335076218dcba9f6a03d373e987d50d9",
+        "mainHead": "b0e6065c749688bda01c3259045c71d36d2a5b5f",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
+      }
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-07-18T18:01:39.502Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "strike": {
+          "openai/gpt-5.6-sol": {
+            "input": 3906180,
+            "output": 222883,
+            "cacheRead": 80319488,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 3906180,
+          "output": 222883,
+          "cacheRead": 80319488,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 66.377134,
+        "pricingAsOf": "2026-07-18T17:32:36.725Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-18T18:01:39.513Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at a126ef01335076218dcba9f6a03d373e987d50d9",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2881 MERGED at 2026-07-18T17:31:49Z",
+          "status": "pass",
+          "mergedAt": "2026-07-18T17:31:49Z",
+          "mergeCommit": "413c2ee6410693612b0e9372ff36c976ae862c77"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 413c2ee6410693612b0e9372ff36c976ae862c77",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-18T17:59:58.000Z, dist built 2026-07-18T17:59:34.492Z, merge 2026-07-18T17:31:49.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 4 agent state directories; Preserved local branch strike/pan-2879 — not merged to main; Preserved remote branch strike/pan-2879 — not merged to main; Pruned 217 checkpoint ref(s) for agent-pan-2879, planning-pan-2879, strike-pan-2879; No specialist registry entries for PAN-2879"
+        }
+      ],
+      "accepted": []
+    }
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.6-sol"
+}

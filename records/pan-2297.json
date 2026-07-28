@@ -81,16 +81,17 @@
     "issueId": "PAN-2297",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T03:57:09.409Z",
+    "updatedAt": "2026-07-17T00:33:30.828Z",
     "testNotes": "typecheck passed; lint passed (skills, prompts, file-size, source-introspection, no-coderabbit-merge-gate, circular, ratchet-audit, quarantine-audit); tests passed: file-size-reconcile.test.ts (3/3), uat-promote.test.ts (10/10), uat-promote-baseline.test.ts (1/1 real-git integration reproducing PAN-2296). No browser UAT required — acceptance criteria are backend/git/CI only.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2482",
     "reviewedAtCommit": "272061e8ce421bc5984ef00abbc8501c5ab78341",
     "lastVerifiedCommit": "f10d394daf193102f72494a95069720ae1f3c7ee",
-    "reviewRequestedAt": "2026-07-08T01:32:20.693Z"
+    "reviewRequestedAt": "2026-07-08T01:32:20.693Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-17T00:33:30.828Z"
   },
   "closeOut": {
     "usage": {
@@ -214,12 +215,85 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2482"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-17T00:33:30.849Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at f10d394daf193102f72494a95069720ae1f3c7ee",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2482 MERGED at 2026-07-08T02:41:06Z",
+          "status": "pass",
+          "mergedAt": "2026-07-08T02:41:06Z",
+          "mergeCommit": "4f718933715b3f2ce02f6302201f0f96800dbaab"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: done; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "7 check-runs concluded successfully on 4f718933715b3f2ce02f6302201f0f96800dbaab",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-17T00:31:08.000Z, dist built 2026-07-17T00:28:58.492Z, merge 2026-07-08T02:41:06.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; No strike branch strike/pan-2297 found; Pruned 0 checkpoint ref(s) for agent-pan-2297, planning-pan-2297, strike-pan-2297; No specialist registry entries for PAN-2297"
+        }
+      ],
+      "accepted": []
+    }
   },
   "swarm": {
     "slotAssignments": [],
     "finalizedAt": "2026-07-08T01:15:23.672Z"
   },
   "created": "2026-07-07T23:25:44.874Z",
-  "updated": "2026-07-08T03:57:09.433Z"
+  "updated": "2026-07-17T00:33:30.855Z"
 }

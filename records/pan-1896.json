@@ -1,0 +1,363 @@
+{
+  "issueId": "PAN-1896",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-17T12:22:56.232Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T12:33:54.331Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T12:43:54.747Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T12:53:53.636Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T13:04:20.511Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T13:15:23.653Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T13:26:19.295Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T13:37:14.029Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T13:47:16.390Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T13:56:51.638Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T14:07:49.359Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T14:18:38.364Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T14:29:51.088Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T14:40:46.597Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T14:50:47.034Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T15:02:02.016Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T15:12:50.627Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T15:23:50.081Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T15:34:42.393Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T15:45:43.086Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T15:56:47.726Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T16:07:51.958Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T16:18:30.649Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T16:28:34.641Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T16:39:29.120Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    }
+  ],
+  "feedback": [],
+  "created": "2026-07-17T11:18:25.871Z",
+  "updated": "2026-07-27T16:30:43.013Z",
+  "pipeline": {
+    "issueId": "PAN-1896",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "mergeStatus": "merged",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-27T16:30:42.990Z",
+    "verificationNotes": "Checklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.",
+    "mergeNotes": "Post-rebase verification failed at incomplete-plan-items",
+    "strikeReadyHead": "d7db109e4b89318f526e73e58fa3aa3f2b8bf08c",
+    "strikeReadyAt": "2026-07-18T15:36:02.729Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-17T12:17:23.332Z",
+        "strikeHead": "dea3c2074b865303484eaad5a5b9d288299393df",
+        "mainHead": "34c61be4613b4184b3bf441955ea882bf3f6c131",
+        "outcome": "failed",
+        "detail": "Post-rebase verification failed at incomplete-plan-items"
+      }
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T16:30:42.990Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-opus-4-8": {
+            "input": 19057,
+            "output": 75648,
+            "cacheRead": 9991884,
+            "cacheWrite": 315565
+          }
+        },
+        "strike": {
+          "openai/gpt-5.6-sol": {
+            "input": 3074820,
+            "output": 197974,
+            "cacheRead": 41758208,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-opus-4-8": {
+          "input": 19057,
+          "output": 75648,
+          "cacheRead": 9991884,
+          "cacheWrite": 315565
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 3074820,
+          "output": 197974,
+          "cacheRead": 41758208,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 51.147139,
+        "pricingAsOf": "2026-07-18T15:36:02.751Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T16:30:43.009Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: missing (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "PR #2834 is squash-merged and strike/pan-1896 matches the merged PR head; PR #2834 is squash-merged and origin/strike/pan-1896 matches the merged PR head; Superseded feature/pan-1896 residual: Feature branch is absent; positive merge evidence is required; PR #2834 MERGED at 2026-07-18T15:52:46Z",
+          "status": "pass",
+          "mergedAt": "2026-07-18T15:52:46Z",
+          "mergeCommit": "6e91fda6f6397d4d1ba821f1e214477ac002cb7d"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 6e91fda6f6397d4d1ba821f1e214477ac002cb7d",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit d44fa122 contains merge 6e91fda6",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; Preserved local branch strike/pan-1896 — not merged to main; Preserved remote branch strike/pan-1896 — not merged to main; Pruned 0 checkpoint ref(s) for agent-pan-1896, planning-pan-1896, strike-pan-1896; No specialist registry entries for PAN-1896"
+        }
+      ],
+      "accepted": []
+    }
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 8,
+    "claims": {},
+    "statusReasons": {
+      "codex-mode-enum": {
+        "reason": "Cancelled after current Codex 0.144.4 investigation: native per-command execpolicy rules make a new workspace-net permission mode unnecessary.",
+        "updatedAt": "2026-07-17T12:18:08.736Z"
+      },
+      "codex-init-network": {
+        "reason": "Cancelled after live app-server reproduction: linking the user's native execpolicy rules removes repeated prompts without enabling workspace-wide sandbox networking.",
+        "updatedAt": "2026-07-17T12:18:24.686Z"
+      },
+      "codex-permissions-doc": {
+        "reason": "Documented managed CODEX_HOME rule sharing, narrow execpolicy examples, host-access tradeoffs, and why broad git push or workspace networking remain prompt-gated.",
+        "updatedAt": "2026-07-17T12:18:46.242Z"
+      },
+      "codex-sandbox-resolver": {
+        "reason": "Cancelled after current Codex investigation: native execpolicy rules provide command-scoped authorization, so the proposed workspace-net resolver mapping is obsolete.",
+        "updatedAt": "2026-07-17T12:18:59.425Z"
+      },
+      "codex-settings-ui": {
+        "reason": "Cancelled because no new workspace-net mode is being introduced; existing Codex permission settings remain unchanged.",
+        "updatedAt": "2026-07-17T12:19:02.859Z"
+      },
+      "codex-workagent-wire": {
+        "reason": "Cancelled because the new workspace-net mode is obsolete; work agents inherit native execpolicy rules centrally through initCodexHome instead.",
+        "updatedAt": "2026-07-17T12:19:12.654Z"
+      },
+      "codex-conversation-wire": {
+        "reason": "Cancelled because the new workspace-net mode is obsolete; conversations inherit native execpolicy rules centrally through initCodexHome instead.",
+        "updatedAt": "2026-07-17T12:19:14.940Z"
+      }
+    },
+    "claimHistory": [
+      {
+        "writerId": "strike-pan-1896",
+        "agentId": "strike-pan-1896",
+        "pid": 3641081,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T12:18:43.932Z",
+        "itemId": "codex-permissions-doc",
+        "outcome": "completed",
+        "reason": "Documented managed CODEX_HOME rule sharing, narrow execpolicy examples, host-access tradeoffs, and why broad git push or workspace networking remain prompt-gated.",
+        "releasedAt": "2026-07-17T12:18:46.242Z"
+      }
+    ]
+  },
+  "statusOverrides": {
+    "codex-mode-enum": "cancelled",
+    "codex-init-network": "cancelled",
+    "codex-permissions-doc": "completed",
+    "codex-permissions-doc.codex-permissions-doc.ac1": "completed",
+    "codex-permissions-doc.codex-permissions-doc.ac2": "completed",
+    "codex-permissions-doc.codex-permissions-doc.ac3": "completed",
+    "codex-sandbox-resolver": "cancelled",
+    "codex-settings-ui": "cancelled",
+    "codex-workagent-wire": "cancelled",
+    "codex-conversation-wire": "cancelled"
+  },
+  "workModel": "gpt-5.6-sol",
+  "recoveryTrips": [
+    {
+      "issue": "PAN-1896",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-17T16:39:25.661Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-17T16:50:27.456Z"
+    },
+    {
+      "issue": "PAN-1896",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-18T13:22:31.613Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-18T13:29:28.380Z"
+    },
+    {
+      "issue": "PAN-1896",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-18T15:36:02.730Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-18T15:41:43.740Z"
+    }
+  ]
+}

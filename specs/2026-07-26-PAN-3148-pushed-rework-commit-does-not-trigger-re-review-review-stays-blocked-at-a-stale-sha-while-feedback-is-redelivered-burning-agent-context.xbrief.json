@@ -1,0 +1,485 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T17:50:03Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3148: Pushed rework commit does not trigger re-review: review stays blocked at a stale SHA while feedback is redelivered, burning agent context",
+    "updated": "2026-07-27T00:41:15.754Z"
+  },
+  "plan": {
+    "id": "pan-3148",
+    "title": "Pushed rework commit does not trigger re-review: review stays blocked at a stale SHA while feedback is redelivered, burning agent context",
+    "status": "completed",
+    "uid": "21fab074-007d-4957-9095-804aac68dd96",
+    "author": "agent:k3[1m]",
+    "sequence": 7,
+    "created": "2026-07-26T17:50:03Z",
+    "updated": "2026-07-27T00:41:15.754Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3148",
+        "label": "PAN-3148",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "review-pipeline",
+      "deacon",
+      "feedback-delivery",
+      "flywheel-health"
+    ],
+    "narratives": {
+      "Problem": "On PAN-3093 (2026-07-26) a review convoy blocked at HEAD cd81b757; the work agent fixed the findings, committed, and pushed (a0bd351134), but nothing detected the new HEAD. review_status stayed blocked against the stale SHA, the identical BLOCKED feedback was re-delivered to the agent 3x (context burned to 81%, $60->$85), and the agent idled 'waiting for a new run ID' that could only be minted by the re-review nobody dispatched. `pan review restart` fixed it in one command. Verified root causes: (1) checkPostReviewCommits (src/lib/cloister/deacon.ts:1580) skips non-passed issues, so blocked+drift is never examined; (2) reviewedAtCommit is only snapshotted on passed verdicts (legacy-routes.ts:316, done.ts:159), so blocked verdicts have no anchor to compare; (3) deliverReviewVerdictFeedbackPromise (review-verdict-feedback.ts:146) calls messageAgent without a dedupKey, bypassing the existing exactly-once delivery infrastructure.",
+      "Proposal": "Four changes, one per issue ask: (1) snapshot reviewedAtCommit on blocked verdicts at all three verdict sites, as a second write AFTER the durable verdict + feedback kickoff (preserves PAN-2524); (2) extend checkPostReviewCommits to blocked reviews — on real anchor drift (with a reviewerVerdicts-derived anchor fallback for legacy rows and a two-patrol-tick HEAD-stability debounce), reset review to pending and re-dispatch the convoy, mirroring the proven passed path; (3) pass a dedupKey (review-feedback:<issue>:<sha256(verdict|runId|anchor)[:16]>) through messageAgent's existing keyed-delivery infrastructure, with unkeyed fallback for ACP/Channels targets that cannot enforce keys; (4) thread DeliveryResult.deduplicated into MessageDeliveryOutcome and, on the 2nd suppressed re-delivery for one key, surface one needs-you escalation via surfaceIssueFeedbackNeedsYou. Plus a work-prompt line telling agents that pushed rework while blocked auto-triggers re-review (never wait for a run ID).",
+      "NonGoals": "- Extending drift detection to reviewStatus:'failed' (PAN-794 infra-recovery design space)\n- Persisting feedback-delivery attempt counts to the journal or SQLite (in-memory map is sufficient, D4)\n- Deduplicating the append-only feedback file / feedback[] history (message-level only, D3)\n- Changing `pan review restart`, review convoy prompts, or reviewer sub-role fan-out\n- Any dashboard frontend change\n- Fixing PAN-3147 (orchestrator liveness-vs-verdict read) — separately filed"
+    },
+    "autoDecisions": [
+      {
+        "summary": "D1: Patrol mirrors the passed-path reset + spawnReviewRoleForIssue({force:true}) instead of reusing the `pan review restart` HTTP route",
+        "rationale": "Same proven code path as the passed-case drift handling; no deacon self-call over HTTP."
+      },
+      {
+        "summary": "D2: Two-patrol-tick HEAD-stability debounce before auto-dispatching re-review for a blocked issue",
+        "rationale": "Auto-dispatching on first observed drift could fire while the agent is still mid-rework (agents push per item); requiring ~1-2 min of HEAD stability rescues a finished-and-waiting agent within ~2 minutes while a still-pushing agent keeps resetting the clock."
+      },
+      {
+        "summary": "D3: Dedup at the agent-message level via existing dedupKey infrastructure, not the append-only feedback file",
+        "rationale": "The context damage is the repeated message; tmux markers, the supervisor key store, and keyed mail filenames already provide the needed durability with zero schema changes."
+      },
+      {
+        "summary": "D4: Escalation counter is an in-memory module-level map, not a persisted ReviewStatus field",
+        "rationale": "The observed redelivery loop ran within one host lifetime; persisting would require a ReviewStatus field + SQLite column, disproportionate for a defence-in-depth signal."
+      },
+      {
+        "summary": "D5: Scope is blocked verdicts only; reviewStatus:'failed' untouched",
+        "rationale": "'failed' is the infra-failure path with its own PAN-794 recovery design; mixing it in would be unreviewed scope creep."
+      },
+      {
+        "summary": "D6: Ask #2 handled by the primary fix + work-prompt guidance, not a new status surface",
+        "rationale": "Verified the 'waiting for a new run ID' sentence appears nowhere in src/ — it is agent-derived reasoning, so the durable fix is removing the condition and instructing the agent not to wait."
+      }
+    ],
+    "items": [
+      {
+        "id": "anchor-blocked-verdicts",
+        "title": "Snapshot reviewedAtCommit on blocked review verdicts at all three verdict sites",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T17:50:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3148",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/specialists/done.ts",
+            "src/dashboard/server/routes/specialists/legacy-routes.ts",
+            "src/lib/cloister/deacon-review-signals.ts",
+            "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
+            "tests/cli/commands/specialists/done.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts tests/cli/commands/specialists/done.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both named test files pass including the new blocked-verdict anchor cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. At each of the three blocked-verdict write sites, snapshot the workspace HEAD via snapshotWorkspaceHeadsPromise and record it as reviewedAtCommit in a SECOND setReviewStatusSync call placed AFTER the durable verdict write and feedback-delivery kickoff (PAN-2524 ordering — never fold the anchor into the pre-delivery update). (1) src/cli/commands/specialists/done.ts: after the feedback-delivery block (~line 243), if options.status === 'blocked', best-effort snapshot + setReviewStatusSync(normalizedIssueId, { reviewedAtCommit }); extend the line-126 comment to document the blocked second-write. (2) src/dashboard/server/routes/specialists/legacy-routes.ts: add a sibling to the `specialist === 'review' && status === 'passed'` guard (~line 316) for status === 'blocked', placed after the feedback-delivery block (~line 493), same snapshot body. (3) src/lib/cloister/deacon-review-signals.ts: the fallback synthesis already computes fallbackHead (~line 240); add `...(fallbackHead ? { reviewedAtCommit: fallbackHead } : {})` to the setReviewStatusSync call when synthesis.verdict === 'blocked'. Extend the two named test files with blocked-verdict cases asserting the anchor lands and the write happens after the feedback write (call order)."
+        },
+        "items": [
+          {
+            "id": "anchor-blocked-verdicts.ac1",
+            "title": "Given a blocked verdict via `pan specialists done`, when the command completes, then getReviewStatusSync(issueId).reviewedAtCommit returns the workspace HEAD anchor and the feedback file write precedes the anchor write in call order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anchor-blocked-verdicts.ac2",
+            "title": "Given a blocked verdict via POST /api/specialists/done, when the route completes, then reviewedAtCommit is persisted with the workspace HEAD anchor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anchor-blocked-verdicts.ac3",
+            "title": "Given the deacon fallback synthesis produces a blocked verdict with a computed fallbackHead, when setReviewStatusSync runs, then the update includes reviewedAtCommit: fallbackHead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anchor-blocked-verdicts.ac4",
+            "title": "Given the snapshot probe throws or returns undefined at any site, when the verdict path completes, then the blocked verdict and feedback delivery still succeed with reviewedAtCommit absent (best-effort, no new failure mode)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "blocked-drift-patrol",
+        "title": "Extend checkPostReviewCommits to detect HEAD drift on blocked reviews and re-dispatch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T17:50:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3148",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts tests/lib/cloister/deacon-ci-retry.test.ts tests/integration/post-review-rebase-scenario.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "new patrol test file passes",
+            "existing deacon-ci-retry and post-review-rebase tests stay green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2, decisions D1/D2, hazards H3-H6. In checkPostReviewCommits (src/lib/cloister/deacon.ts:1569): (a) change the gate at line 1580 to also admit status.reviewStatus === 'blocked' (passed/readyForMerge behavior unchanged). (b) Anchor resolution for blocked rows: status.reviewedAtCommit, else if every Object.values(status.reviewerVerdicts ?? {}) has an identical non-empty atCommit use that, else skip with a rate-limited log ('blocked without anchor — cannot detect drift', at most once per issue per patrol-hour). (c) Debounce (blocked only): module-level Map<issueId, anchor>; first drifted observation records the current anchor and skips; second consecutive patrol tick with the SAME current anchor proceeds; any status or anchor change deletes the entry. (d) On confirmed blocked drift: setReviewStatusSync(issueId, { reviewStatus: 'pending', readyForMerge: false, reviewedAtCommit: undefined, reviewRetryCount: 0, recoveryStartedAt: undefined }) — do NOT touch testStatus/testNotes/reviewNotes (H5) — then re-dispatch through the same advancing-slot gate + spawnReviewRoleForIssue({ force: true }) block the passed path uses (deacon.ts:1642-1672), action string: 'Re-dispatched review for <issue>: rework commit after BLOCKED verdict (<old> → <new>)'. (e) Benign drift on a blocked row advances reviewedAtCommit exactly like the passed path. Reuse evaluateWorkspaceAnchorDrift unchanged (polyrepo-safe, NFR-3). Create tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts mirroring tests/lib/cloister/deacon-ci-retry.test.ts structure: drifted blocked → first tick records only, second tick resets + dispatches; benign → anchor advances, no reset; derived anchor from agreeing reviewerVerdicts works; disagreeing verdicts → skip; debounce entry cleared on status change mid-window."
+        },
+        "items": [
+          {
+            "id": "blocked-drift-patrol.ac1",
+            "title": "Given reviewStatus 'blocked' with an anchor, when the workspace HEAD advances with a real tree change and holds for two patrol ticks, then the patrol resets reviewStatus to 'pending' and spawns a review convoy at the new HEAD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocked-drift-patrol.ac2",
+            "title": "Given the same blocked setup with drift observed on only the first patrol tick, when the second tick has not run, then no reset and no dispatch occurs (debounce)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocked-drift-patrol.ac3",
+            "title": "Given a blocked row with a same-tree (benign) HEAD move, when the patrol runs, then reviewedAtCommit advances to the new anchor and reviewStatus stays 'blocked' with no dispatch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocked-drift-patrol.ac4",
+            "title": "Given a blocked row with no reviewedAtCommit but uniform reviewerVerdicts[*].atCommit, when the patrol evaluates drift, then it uses the derived anchor; given disagreeing atCommit values, then it skips the issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocked-drift-patrol.ac5",
+            "title": "Given the blocked-drift reset fires, when setReviewStatusSync is called, then the update preserves testStatus, testNotes, and reviewNotes and resets reviewRetryCount and recoveryStartedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "keyed-feedback-delivery",
+        "title": "Deliver review-verdict feedback with a dedupKey through the existing keyed-delivery infrastructure",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T17:50:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3148",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/review-verdict-feedback.ts",
+            "src/lib/cloister/deacon-review-signals.ts",
+            "tests/unit/lib/cloister/review-verdict-feedback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/review-verdict-feedback.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "review-verdict-feedback tests pass including keyed + ACP-fallback cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3, decision D3, hazard H2. In src/lib/cloister/review-verdict-feedback.ts: add `runId?: string` to DeliverReviewVerdictFeedbackOptions; compute dedupKey = 'review-feedback:' + issueId.toLowerCase() + ':' + createHash('sha256').update([opts.verdict, opts.runId ?? '', existingStatus?.reviewedAtCommit ?? ''].join('|')).digest('hex').slice(0,16) (satisfies DEDUP_KEY_RE in src/lib/tmux-dedup.ts:45); pass { owesRework: true, dedupKey } to messageAgent (line 146). Wrap the messageAgent call: on the 'cannot enforce a dedup key' error thrown for ACP/Channels targets (src/lib/agents/delivery.ts:485-492), retry once unkeyed ({ owesRework: true }) and log the fallback — delivery beats dedup. In src/lib/cloister/deacon-review-signals.ts:252 pass runId: state.reviewRunId in the delivery opts. Extend tests/unit/lib/cloister/review-verdict-feedback.test.ts: messageAgent receives the dedupKey; same verdict+anchor produces the same key across calls, different anchors produce different keys; keyed-throw falls back to unkeyed and still delivers."
+        },
+        "items": [
+          {
+            "id": "keyed-feedback-delivery.ac1",
+            "title": "Given two delivery calls for the same issue, verdict, and anchor, when messageAgent is invoked, then both calls carry the identical dedupKey matching /^[A-Za-z0-9:_-]+$/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyed-feedback-delivery.ac2",
+            "title": "Given delivery calls for the same verdict at different anchors (or different runIds), when keys are computed, then the dedupKeys differ",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyed-feedback-delivery.ac3",
+            "title": "Given messageAgent throws 'cannot enforce a dedup key' (ACP/Channels target), when deliverReviewVerdictFeedbackPromise runs, then it retries unkeyed and the feedback reaches the agent (agentMessageSent true)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "keyed-feedback-delivery.ac4",
+            "title": "Given the deacon fallback synthesis delivers blocked feedback, when it calls deliverReviewVerdictFeedback, then opts include runId: state.reviewRunId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "escalate-suppressed-redelivery",
+        "title": "Escalate to needs-you on the 2nd suppressed (deduplicated) re-delivery for one key",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T17:50:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3148",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/messaging.ts",
+            "src/lib/cloister/review-verdict-feedback.ts",
+            "tests/unit/lib/cloister/review-verdict-feedback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/review-verdict-feedback.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "escalation tests pass: first suppression silent, second escalates once, third does not re-escalate"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, decision D4. In src/lib/agents/messaging.ts: thread the existing DeliveryResult.deduplicated flag into MessageDeliveryOutcome on the live-delivery return paths (the plain keyed path ~line 167 and resumeThenDeliverKeyed ~line 150) as `deduplicated?: boolean`. In src/lib/cloister/review-verdict-feedback.ts: add a module-level Map<string, number> keyed by dedupKey; when the delivery result has deduplicated === true, increment the counter, and at count === 2 call surfaceIssueFeedbackNeedsYou(issueId, 'Review feedback for this verdict was already delivered to the agent; the pipeline re-triggered delivery 3+ times — possible stuck loop. Investigate before the agent context burns.', { specialist: 'review-agent', feedbackPath: fileResult.filePath }) exactly once per key; reset the counter when a delivery for the same key completes non-deduplicated. Tests in tests/unit/lib/cloister/review-verdict-feedback.test.ts: first deduplicated result does not escalate; second escalates once; third does not re-escalate; a fresh (non-deduplicated) delivery resets the count."
+        },
+        "items": [
+          {
+            "id": "escalate-suppressed-redelivery.ac1",
+            "title": "Given a delivery result with deduplicated true, when it is the first suppression for its key, then no needs-you escalation is surfaced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalate-suppressed-redelivery.ac2",
+            "title": "Given a second consecutive deduplicated result for the same key, when the counter reaches 2, then surfaceIssueFeedbackNeedsYou fires exactly once naming the issue and the repeated-delivery loop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalate-suppressed-redelivery.ac3",
+            "title": "Given a third deduplicated result for the same key, when the counter increments again, then no additional escalation fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalate-suppressed-redelivery.ac4",
+            "title": "Given a messageAgent return type, when reading MessageDeliveryOutcome, then it exposes deduplicated?: boolean threaded from DeliveryResult",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "work-prompt-run-id-guidance",
+        "title": "Work prompt: pushed rework while BLOCKED auto-triggers re-review — never wait for a run ID",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T17:50:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3148",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/prompts/work.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "grep -n 'BLOCKED' src/lib/cloister/prompts/work.md"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grep shows the new blocked-rework bullet next to the existing passed-review bullet (~line 374)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5, decision D6 (ask #2 — the 'waiting for a new run ID' standoff is agent-derived reasoning, so instruct the agent directly). In src/lib/cloister/prompts/work.md next to the existing 'If you make commits AFTER review already passed' bullet (~line 374), add in the same style: '**If you push commits while review is BLOCKED:** the pipeline detects the new HEAD within a couple of patrol cycles and re-dispatches review automatically. Never wait for a \"new run ID\" — if your rework is complete and pushed and no review starts, invoke `/rebase-and-submit` (`pan review request {{ISSUE_ID}} -m \"Addressed feedback: <summary>\"`).'"
+        },
+        "items": [
+          {
+            "id": "work-prompt-run-id-guidance.ac1",
+            "title": "Given src/lib/cloister/prompts/work.md, when an agent reads the review-feedback section, then it contains a bullet stating that pushing commits while review is BLOCKED auto-triggers re-review and that waiting for a new run ID is never correct",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-prompt-run-id-guidance.ac2",
+            "title": "Given the new bullet, when the agent needs a fallback, then it names `/rebase-and-submit` / `pan review request {{ISSUE_ID}}` as the manual re-review entry point",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-patrol-and-dedup",
+        "title": "Document blocked-drift patrol and keyed feedback delivery in developer docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T17:50:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3148",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "docs/DEACON-HEALTH-MONITORING.md",
+            "src/lib/cloister/review-verdict-feedback.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "grep -n 'blocked' docs/REVIEW-AGENT-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grep shows the post-review-commit patrol section now covers blocked reviews, the anchor fallback, and the two-tick debounce"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. (1) docs/REVIEW-AGENT-ARCHITECTURE.md: in the section covering checkPostReviewCommits (grep 'post-review commit'), document that the patrol now also covers blocked reviews, the reviewerVerdicts-derived anchor fallback for legacy rows, and the two-tick HEAD-stability debounce. (2) docs/DEACON-HEALTH-MONITORING.md: if it enumerates patrol actions, add the blocked-drift action string ('Re-dispatched review for <issue>: rework commit after BLOCKED verdict (<old> → <new>)'). (3) src/lib/cloister/review-verdict-feedback.ts module header: one paragraph stating delivery is keyed per (issue, verdict, anchor/runId), ACP/Channels fall back unkeyed, and repeated suppression escalates to needs-you."
+        },
+        "items": [
+          {
+            "id": "docs-patrol-and-dedup.ac1",
+            "title": "Given docs/REVIEW-AGENT-ARCHITECTURE.md, when a reader opens the post-review-commit patrol section, then it states the patrol covers blocked reviews, the reviewerVerdicts anchor fallback, and the two-tick debounce",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-patrol-and-dedup.ac2",
+            "title": "Given src/lib/cloister/review-verdict-feedback.ts, when a reader opens the module header, then it states delivery is keyed per (issue, verdict, anchor/runId), names the ACP/Channels unkeyed fallback, and names the needs-you escalation on repeated suppression",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "keyed-feedback-delivery",
+        "to": "escalate-suppressed-redelivery",
+        "type": "blocks"
+      },
+      {
+        "from": "anchor-blocked-verdicts",
+        "to": "blocked-drift-patrol",
+        "type": "informs"
+      },
+      {
+        "from": "blocked-drift-patrol",
+        "to": "work-prompt-run-id-guidance",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3148-pushed-rework-commit-does-not-trigger-re-review-review-stays-blocked-at-a-stale-sha-while-feedback-is-redelivered-burning-agent-context.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

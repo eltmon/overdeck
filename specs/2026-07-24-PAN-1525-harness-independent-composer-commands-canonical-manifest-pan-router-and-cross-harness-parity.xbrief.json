@@ -1,0 +1,1383 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-24T19:13:12Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1525: Harness-independent composer commands: canonical manifest, /pan router, and cross-harness parity",
+    "updated": "2026-07-25T07:11:25.960Z"
+  },
+  "plan": {
+    "id": "pan-1525",
+    "title": "Harness-independent composer commands: canonical manifest, /pan router, and cross-harness parity",
+    "status": "completed",
+    "uid": "7f38acea-f618-4812-9909-a085916d2f11",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-24T19:13:12Z",
+    "updated": "2026-07-25T07:11:25.960Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1525",
+        "label": "PAN-1525",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3021",
+        "label": "PAN-3021 (landed manifest generation)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/3028",
+        "label": "PR #3028",
+        "type": "pr"
+      }
+    ],
+    "tags": [
+      "composer",
+      "slash-commands",
+      "harness-parity",
+      "command-router",
+      "dashboard"
+    ],
+    "narratives": {
+      "Problem": "The dashboard composer's command surface is harness-dependent: typing /pan start PAN-X in a Codex-backed conversation is rejected by Codex's own slash namespace and never reaches Overdeck. Discovery (PAN-3021's generated autocomplete) exists, but there is no /pan router, no execution modes, no safety classes, no structured command results, and no harness-native command modeling. Isolated Codex homes also lack synced skills.",
+      "Proposal": "Extend PAN-3021's build-time introspection with options/aliases and emit one canonical manifest into @overdeck/contracts, shared by server and frontend and drift-gated by lint. Intercept /pan server-side in both the conversation and agent message handlers before compact/attachments/delivery, validate against the manifest plus a hand-written policy overlay (captured/detached/ui/terminal-only x safe/dialog/destructive, fail-closed to terminal-only), execute via spawnPanCli argv subprocesses (bounded capture, activity-tracked detached), enforce nonce-based confirmations, return a typed ComposerCommandResult the composer renders as a system timeline entry, model harness-native commands as per-harness capability data, seed isolated Codex homes with synced skills, and prove it all with a no-loss audit plus a four-harness interception matrix (claude-code, codex, ohmypi, acp).",
+      "NonGoals": "- Executing administrative/destructive CLI commands from the composer beyond the bounded first set (start, plan, show, status, tell, handoff/fork); everything else stays terminal-only\n- Replacing the terminal CLI or dashboard action menus\n- Normalizing native Claude/Codex/ohmypi/acp command syntax into one model\n- Routing /pan through the model as a prompt\n- Copying the whole ~/.codex directory into isolated homes\n- Live external-value autocomplete beyond existing local data\n- Refactoring src/cli/index.ts into an import-safe builder (superseded by adopting PAN-3021's in-process introspection)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted PAN-3021's landed shape (in-process introspection + committed generated module) and retired the PRD's original WI-1 import-safe builder and NFR-6.",
+        "rationale": "The issue's 2026-07-24 revision note mandates adopting PAN-3021's landed artifacts; its shape avoids importing the argv-parsing CLI entrypoint into the dashboard bundle entirely."
+      },
+      {
+        "summary": "Emit the canonical manifest into @overdeck/contracts so server and frontend share one generated source, with a documented two-sibling-modules fallback if build order forces it.",
+        "rationale": "Single-source-of-truth tenet; contracts is the existing shared workspace both sides already import. The fallback is pinned as an implementation checkpoint so no judgment call is needed downstream."
+      },
+      {
+        "summary": "Overdeck autocomplete entries switch insertion from unprefixed 'pan <path>' to '/pan <path> ', with an explicit old-to-new mapping in the no-loss audit.",
+        "rationale": "The deterministic control-plane form is the product of this issue; keeping the menu inserting prompt-lane text would contradict FR-1/FR-2. The audit's deliberate-change mechanism preserves no-loss guarantees."
+      },
+      {
+        "summary": "Execution spawns the bundled CLI via existing spawnPanCli argv arrays; only the detached+activity pattern is extracted downward into src/lib.",
+        "rationale": "spawnPanCli (src/lib/pan-cli-invocation.ts) already provides shell-free argv spawning through the CLI write door, satisfying NFR-1/NFR-2 without new abstractions."
+      },
+      {
+        "summary": "Added acp to the parity matrix as FR-14 alongside claude-code, codex, and ohmypi.",
+        "rationale": "The acp harness landed after the PRD was written; server-side interception precedes delivery so coverage is nearly free, and omitting the fourth harness would silently narrow the issue's harness-independence claim."
+      },
+      {
+        "summary": "Kept the ComposerFooter handoff regex fast-path and added server-side ui-result parity instead of removing the fast-path.",
+        "rationale": "Preserves current zero-latency UX (no-loss) while D4 still makes the server the enforcement boundary for retries and non-dashboard clients."
+      },
+      {
+        "summary": "Confirmations follow the settings.ts reindex-nonce precedent (single-use, expiring, argv-bound) rather than the generic /api/confirmations endpoints.",
+        "rationale": "Command confirmation must bind nonce to target + canonical argv + safety class, which the reindex pattern already demonstrates in-process."
+      }
+    ],
+    "items": [
+      {
+        "id": "introspect-options",
+        "title": "Extend CLI introspection with options and aliases",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/command-introspection.ts",
+            "src/cli/commands/__tests__/command-introspection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/command-introspection.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "command-introspection suite passes with new options/aliases assertions",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend CommandInfo and collectCommandTree (src/cli/command-introspection.ts:1-43) so each visible command also reports options: { flags, description, required, valueHint }[] (from command.options, excluding hidden ones) and aliases: string[] (from command.aliases()). Keep excluding hidden commands and Commander's implicit help. pan admin commands --json (src/cli/commands/admin/index.ts:31-45) needs no signature change — it serializes whatever collectCommandTree returns. Update the existing test to assert options and aliases appear for a command that has them (e.g. admin commands' own --json flag) and that hidden options stay excluded."
+        },
+        "items": [
+          {
+            "id": "introspect-options.ac1",
+            "title": "Given the built CLI, when pan admin commands --json runs, then every visible command entry contains an options array with flags, description, required, and valueHint fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "introspect-options.ac2",
+            "title": "The emitted JSON contains each registered alias for aliased commands and an empty aliases array for commands without aliases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "introspect-options.ac3",
+            "title": "Given hidden commands and hidden options, the emitted tree contains neither",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contracts-manifest",
+        "title": "Generate the canonical composer-command manifest into @overdeck/contracts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-1525",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "frontend-manifest-adapter",
+            "policy-overlay",
+            "command-parser",
+            "api-commands-endpoint",
+            "frontend-command-results"
+          ],
+          "files_scope": [
+            "packages/contracts/src/composer-commands.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "packages/contracts/src/index.ts",
+            "scripts/generate-slash-commands.mjs",
+            "scripts/lint-slash-commands.sh",
+            "docs/COMPOSER-SLASH-COMMANDS.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build:cli",
+            "npm run generate:slash-commands",
+            "bash scripts/lint-slash-commands.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "generator writes packages/contracts/src/composer-commands.generated.ts deterministically (two runs produce identical bytes)",
+            "lint-slash-commands.sh exits 0 on the committed outputs and non-zero when the generated file is hand-edited",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create hand-written packages/contracts/src/composer-commands.ts defining ComposerCommandManifestEntry (id, path: string[], display, description, args, options, aliases, category), ComposerExecutionMode, ComposerSafety, ComposerCommandPolicy, and the ComposerCommandResult union exactly as specified in the PRD (WI-A). Extend scripts/generate-slash-commands.mjs to emit a second deterministic output, packages/contracts/src/composer-commands.generated.ts, exporting COMPOSER_COMMAND_MANIFEST: ComposerCommandManifestEntry[] built from the enriched pan admin commands --json output plus curation categories. Update scripts/lint-slash-commands.sh to drift-gate both generated outputs. Export the new module from packages/contracts/src/index.ts and rebuild contracts. Update the pipeline diagram in docs/COMPOSER-SLASH-COMMANDS.md. Implementation checkpoint (PRD checkpoint 2): if emitting into contracts breaks frontend build order, fall back to two sibling generated modules (src/lib/composer-commands/manifest.generated.ts + the existing frontend module) from the same generator run, both drift-gated, and record the fallback in the commit message and docs. The dashboard server must never import src/cli/index.ts."
+        },
+        "items": [
+          {
+            "id": "contracts-manifest.ac1",
+            "title": "COMPOSER_COMMAND_MANIFEST contains every non-hidden Commander command with its positional args, options, aliases, description, and category; a spot-check test asserts pan start, pan show --cv-era flags, and a nested admin command appear",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-manifest.ac2",
+            "title": "Running the generator twice against the same built CLI produces byte-identical output, and lint-slash-commands.sh rejects a hand-edited generated module with a repair command in its message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-manifest.ac3",
+            "title": "The dashboard server bundle produces no import of src/cli/index.ts; a guard fails when the CLI entrypoint enters the module graph",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-manifest.ac4",
+            "title": "docs/COMPOSER-SLASH-COMMANDS.md shows the updated two-output pipeline including the contracts manifest and its regenerate commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-manifest-adapter",
+        "title": "Derive composer autocomplete from the contracts manifest with /pan inserts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/slashCommands.ts",
+            "src/dashboard/frontend/src/components/chat/slashCommands.generated.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
+            "scripts/generate-slash-commands.mjs",
+            "scripts/lint-slash-commands.sh",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/slashCommands.no-loss.test.ts src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "no-loss suite passes with the old-insert to new-insert mapping table",
+            "lint (including slash-command drift gate and file-size ratchet) exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace GENERATED_SLASH_COMMANDS consumption in slashCommands.ts with an adapter that maps COMPOSER_COMMAND_MANIFEST entries from @overdeck/contracts to SlashCommand entries whose label is '/pan <path>' and whose insert is '/pan <path> ' (trailing space when the command takes args, exact form otherwise, preserving curation insertOverrides semantics). Retire src/dashboard/frontend/src/components/chat/slashCommands.generated.ts and its generator output path. Update slashCommands.no-loss.test.ts via its deliberate-change mechanism: every legacy entry maps to the new /pan-prefixed entry in an explicit mapping table — no entry silently disappears. Keep /handoff in the static list. Do not remove /model, /context, /effort, /cancel yet (native-capabilities owns their move). Reconcile scripts/file-size-baseline.txt for any tracked file that grows."
+        },
+        "items": [
+          {
+            "id": "frontend-manifest-adapter.ac1",
+            "title": "The composer menu renders Overdeck entries derived from the contracts manifest; selecting 'pan start' inserts '/pan start ' into the editor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-manifest-adapter.ac2",
+            "title": "slashCommands.generated.ts no longer exists and no frontend module maintains a second Overdeck command list; the drift gate covers the contracts manifest instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-manifest-adapter.ac3",
+            "title": "The no-loss audit maps every pre-change entry (255 generated + 5 static) to a new entry, preserved alias, or documented exclusion, and fails when an unmapped entry disappears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "policy-overlay",
+        "title": "Add the composer execution/safety policy overlay",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/composer-commands/policy.ts",
+            "src/lib/composer-commands/__tests__/policy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/composer-commands/__tests__/policy.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "policy suite passes including the every-key-resolves assertion",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/composer-commands/policy.ts exporting the ComposerCommandPolicy overlay keyed by canonical command path per PRD D6: start/plan detached+safe, show/status/tell captured+safe, handoff/fork ui+dialog (uiAction set). resolvePolicy(path) returns the overlay entry or the fail-closed default { mode: 'terminal-only', safety: 'safe' }. Add a test asserting every overlay key resolves to exactly one COMPOSER_COMMAND_MANIFEST entry (an overlay key with zero or multiple matches fails) and that an unregistered command resolves to terminal-only."
+        },
+        "items": [
+          {
+            "id": "policy-overlay.ac1",
+            "title": "resolvePolicy returns detached/captured/ui policies for the seven registered commands and terminal-only for any other manifest command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "policy-overlay.ac2",
+            "title": "The overlay-integrity test fails when a policy key does not match exactly one manifest entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "command-parser",
+        "title": "Parse and validate /pan input against the manifest",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/composer-commands/parser.ts",
+            "src/lib/composer-commands/__tests__/parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/composer-commands/__tests__/parser.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "parser suite passes covering accept and reject tables",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/composer-commands/parser.ts: parseOverdeckComposerCommand(message) returns null for any text not starting with '/pan' followed by whitespace or end (so /pan-handoff stays a distinct alias handled by the router). For /pan input it tokenizes (double/single-quoted values, --flag value and --flag=value), resolves the longest matching command path (including aliases) from COMPOSER_COMMAND_MANIFEST, validates required positionals and known flags, and returns { entry, argv } with canonical argv (path tokens + positionals + flags). Errors are typed: unknown-command, missing-argument, unknown-flag, forbidden-token. Reject shell metacharacters (; | & < > ` $( )) anywhere in the input with forbidden-token. Never invoke a shell and never call Commander's parse (no process side effects)."
+        },
+        "items": [
+          {
+            "id": "command-parser.ac1",
+            "title": "'/pan start PAN-42' returns entry path ['start'] and argv ['start','PAN-42']; quoted and --flag=value forms produce the same canonical argv as their unquoted/spaced equivalents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-parser.ac2",
+            "title": "The parser returns typed errors naming the offending token and the expected syntax for unknown commands, missing required positionals, and unknown flags",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-parser.ac3",
+            "title": "The parser rejects input containing shell metacharacters with forbidden-token and spawns no child process",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-parser.ac4",
+            "title": "The parser returns null for ordinary text, unprefixed 'pan start', and '/model' — none are treated as Overdeck commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "router-conversation",
+        "title": "Intercept /pan in the conversation message handler before delivery",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1525",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "router-agent",
+            "executors-captured",
+            "executors-detached",
+            "ui-handoff-result",
+            "confirmations",
+            "frontend-command-results"
+          ],
+          "files_scope": [
+            "src/lib/composer-commands/router.ts",
+            "src/lib/composer-commands/__tests__/router.test.ts",
+            "src/lib/overdeck/conversation-message.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/composer-commands/__tests__/router.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "router suite passes proving interception precedes compact/attachment/delivery",
+            "typecheck and lint (including file-size ratchet) exit 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/composer-commands/router.ts exposing handleComposerCommand({ parsed, target }) which resolves policy and returns a ComposerCommandResult (executors land in later items — until then captured/detached/ui policies may return a typed not-yet-registered terminal-only result, kept internal to this branch). In handleConversationMessage (src/lib/overdeck/conversation-message.ts), immediately after the presence/length validation (lines 400-404) and BEFORE the manual-compact interception (line 406), call parseOverdeckComposerCommand(message); when non-null, return the router's result as the HTTP response and skip compact, attachment extraction, transformMessageForHarness, memory injection, and delivery entirely. Parser errors map to 400/404/422 responses with the typed error and expected syntax in complete sentences. Non-/pan messages must flow through the existing path byte-identically. Reconcile the file-size baseline. This item pins the router API shape all later items build on."
+        },
+        "items": [
+          {
+            "id": "router-conversation.ac1",
+            "title": "Given a conversation on any harness, when the handler receives '/pan status', it returns a ComposerCommandResult and never calls compact interception, transformMessageForHarness, deliverConversationViaControlChannel, or deliverAgentMessage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "router-conversation.ac2",
+            "title": "'/pan bogus' returns a 4xx whose body names the unknown command and how to list commands; the harness transcript receives nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "router-conversation.ac3",
+            "title": "A terminal-only command returns a 422 result stating the command must run in a terminal, naming the exact command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "router-conversation.ac4",
+            "title": "The handler preserves the existing compact/attachment/delivery path for ordinary text and unprefixed 'pan start …' (negative control)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "router-agent",
+        "title": "Route /pan identically on the agent message endpoint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/messaging.ts",
+            "src/dashboard/server/routes/__tests__/agents-messaging.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__ -t 'agent message'",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-message route tests pass proving /pan interception and ordinary-text passthrough",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/agents/messaging.ts, after origin and presence validation (lines 48-56) and before sendAgentMessage/messageAgent (line 60), call the same parseOverdeckComposerCommand + handleComposerCommand pair used by the conversation handler and return its ComposerCommandResult as the response when it matches. The command contract must not depend on composer target: the same input yields the same parsed argv and result on both endpoints. Ordinary text still calls messageAgent(id, message, 'dashboard:user-message') unchanged. If no test file covers this route yet, create one alongside the existing routes __tests__ conventions."
+        },
+        "items": [
+          {
+            "id": "router-agent.ac1",
+            "title": "POST /api/agents/:id/message with '/pan status' returns the same structured result shape as the conversation endpoint and never calls messageAgent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "router-agent.ac2",
+            "title": "The agent endpoint still routes ordinary text to messageAgent with the original message (negative control)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "executors-captured",
+        "title": "Captured executors for show, status, and tell",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/composer-commands/executors.ts",
+            "src/lib/composer-commands/__tests__/executors.test.ts",
+            "src/lib/pan-cli-invocation.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/composer-commands/__tests__/executors.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "executor suite passes covering success, failure, truncation, and timeout kill",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/composer-commands/executors.ts. runCapturedCommand(argv) spawns via spawnPanCli (src/lib/pan-cli-invocation.ts) with an argv array, collects stdout+stderr up to 65536 bytes (then sets truncated: true and stops buffering), applies a 30s timeout that kills the child, and returns { kind: 'captured', status: 'completed' | 'failed', command, output, truncated } where status reflects the exit code and failure output includes stderr. Wire captured policies (show, status, tell) through the router. No shell, no execSync, no env mutation beyond what spawnPanCli does. Timeout tests use Vitest fake timers."
+        },
+        "items": [
+          {
+            "id": "executors-captured.ac1",
+            "title": "'/pan status' spawns the bundled CLI with argv ['status'] (no shell) and returns kind captured with the process output and exit-code-derived status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "executors-captured.ac2",
+            "title": "Output beyond 64 KiB returns truncated: true with the bounded prefix; the response states truncation in a complete sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "executors-captured.ac3",
+            "title": "When a child exceeds the timeout, the executor kills it and returns status failed with a timeout message (fake-timer test, no real waits)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "executors-detached",
+        "title": "Detached executors for start and plan with tracked activities",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/composer-commands/executors.ts",
+            "src/lib/composer-commands/detached.ts",
+            "src/lib/composer-commands/__tests__/detached.test.ts",
+            "src/dashboard/server/routes/agents/shared.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/composer-commands/__tests__/detached.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "detached suite passes proving activity id minting and no flag injection",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Extract the detached-spawn-with-activity-id pattern from spawnPanCommandDetached (src/dashboard/server/routes/agents/shared.ts:68-150) downward into src/lib/composer-commands/detached.ts (or a neutral src/lib module) so routes and the router share one helper; keep the routes' existing behavior by delegating. runDetachedCommand(argv) spawns via spawnPanCli detached with logging, mints an activity id compatible with the existing activity/log pipeline (the 'activity-<timestamp>' pattern plus an appendAgentLifecycleLog-style entry), and returns { kind: 'activity', status: 'accepted', command, activityId, message } where message states what was started and where to watch it, in complete sentences. Wire start and plan through the router. The executor forwards only operator-typed argv — it must never append --model or --harness (provider routing is config-owned)."
+        },
+        "items": [
+          {
+            "id": "executors-detached.ac1",
+            "title": "'/pan start PAN-42' returns status accepted with an activityId and a sentence naming the issue and where progress appears; the child runs detached",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "executors-detached.ac2",
+            "title": "The executor spawns exactly the operator's canonical argv and appends no --model, --harness, or other extra flags (test-asserted)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "executors-detached.ac3",
+            "title": "spawnPanCommandDetached in routes delegates to the extracted helper and its existing route behavior is preserved by tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-handoff-result",
+        "title": "Handoff and fork return ui results through the router",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/composer-commands/router.ts",
+            "src/lib/composer-commands/__tests__/router.test.ts",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/composer-commands/__tests__/router.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/ComposerFooter.test.tsx",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "router ui-result tests pass for all three aliases with focus preserved",
+            "ComposerFooter suite passes with the fast-path intact",
+            "lint exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Server: the router recognizes /pan handoff and /pan fork (plus the standalone aliases /handoff and /pan-handoff, which the router accepts before generic parsing since they lack the '/pan ' prefix shape) and returns { kind: 'ui', status: 'requires_ui', action: 'handoff' | 'fork', args: { focus } } with trailing text preserved as focus. Frontend: keep the existing ComposerFooter regex fast-path (lines 383-407) for zero-latency dialog opening; additionally, when a send response carries a ui result (retry path, race), dispatch the same overdeck:open-fork-modal CustomEvent with the returned args instead of rendering a message. No behavior change for users of the current aliases."
+        },
+        "items": [
+          {
+            "id": "ui-handoff-result.ac1",
+            "title": "Server-side, each of '/handoff make it fast', '/pan-handoff make it fast', and '/pan handoff make it fast' returns a ui result with action handoff and focus 'make it fast', and harness delivery receives nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-handoff-result.ac2",
+            "title": "The ComposerFooter fast-path still opens the handoff dialog locally with focus preserved (existing test stays green)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-handoff-result.ac3",
+            "title": "A send response carrying a ui result dispatches overdeck:open-fork-modal with the server-provided args and renders no agent message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "confirmations",
+        "title": "Nonce-based dialog and typed-destructive confirmation enforcement",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/composer-commands/confirmations.ts",
+            "src/lib/composer-commands/__tests__/confirmations.test.ts",
+            "src/lib/composer-commands/router.ts",
+            "src/lib/composer-commands/policy.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/composer-commands/__tests__/confirmations.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "confirmation suite passes: single-use, expiry via fake timers, argv binding, typed-text mismatch rejection",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/composer-commands/confirmations.ts following the settings.ts reindex-nonce precedent (src/dashboard/server/routes/settings.ts:58-86): randomBytes(24).toString('base64url') nonces in an in-process Map, single-use, 5-minute expiry, each bound to { target (conversation/agent id), canonical argv, safety class }. Router flow: a dialog/destructive command without a valid nonce returns { kind: 'confirmation', status: 'confirmation_required', nonce, consequence, typedText? }; resubmission with the nonce (and, for destructive, the exact typed text from policy) executes; missing, expired, replayed, or argv-mismatched confirmation returns 422 and executes nothing. Since D6 registers no destructive command, add a test-only synthetic destructive policy entry (guarded so it never appears in production discovery) proving the typed path end-to-end. All expiry tests use vi.useFakeTimers() + advanceTimersByTimeAsync — never real waits."
+        },
+        "items": [
+          {
+            "id": "confirmations.ac1",
+            "title": "A dialog command first returns confirmation_required with consequence text in complete sentences; resubmitting with the issued nonce executes exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "confirmations.ac2",
+            "title": "A nonce replayed, expired (advanced past TTL with fake timers), or presented with different argv returns 422 and spawns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "confirmations.ac3",
+            "title": "The synthetic destructive command executes only when the exact typed confirmation text accompanies a valid nonce; any other text is rejected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "native-capabilities",
+        "title": "Model harness-native commands as per-harness capability data",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/harness-behavior.ts",
+            "src/lib/runtimes/claude-code.ts",
+            "src/lib/runtimes/codex.ts",
+            "src/lib/runtimes/ohmypi.ts",
+            "src/lib/runtimes/acp.ts",
+            "src/dashboard/frontend/src/components/chat/slashCommands.ts",
+            "src/lib/runtimes/__tests__/behavior.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/runtimes/__tests__",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "behavior tests pass asserting per-harness native lists",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Add optional nativeCommands: { name, description, insert }[] to HarnessBehavior (packages/contracts/src/harness-behavior.ts:25-45). Populate per harness from verified sources only (PRD implementation checkpoint 1): inspect installed harness versions/docs; where a harness cannot be verified programmatically, ship a static list annotated with a version/date comment. Unknown means empty list (hidden), never optimistic. Move the current global STATIC_SLASH_COMMANDS AI-CLI entries (/model, /context, /effort, /cancel) into the claude-code list if verified there (and any other harness where verified); remove them from the global static list, leaving /handoff dashboard-owned. The composer builds its '<Harness> native' menu group from the active conversation's behavior.nativeCommands."
+        },
+        "items": [
+          {
+            "id": "native-capabilities.ac1",
+            "title": "Each of the four harness behaviors exposes a nativeCommands list (possibly empty) with a source/version annotation; a Claude-only command no longer appears when the active harness is codex, ohmypi, or acp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-capabilities.ac2",
+            "title": "The composer renders native entries under a group labeled with the active harness name and inserts their exact syntax",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "native-capabilities.ac3",
+            "title": "The global static list contains only dashboard-owned entries (/handoff), and the no-loss audit covers the moved AI-CLI entries in their per-harness homes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-commands-endpoint",
+        "title": "Serve the manifest and native commands from GET /api/commands",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/commands.ts",
+            "src/dashboard/server/routes/__tests__/commands.test.ts",
+            "src/dashboard/server/server.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/commands.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "commands route suite passes including completeness and policy-projection assertions",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add src/dashboard/server/routes/commands.ts with GET /api/commands?harness=<runtime> returning { overdeck: manifest entries joined with their resolved policy (mode + safety), native: the requested harness's nativeCommands, harness }. Data comes from static imports of @overdeck/contracts and the policy module — no per-request rebuild, no CLI import, no spawn. Register the route in the dashboard route composition (src/dashboard/server/server.ts) with the same access/origin posture as sibling metadata endpoints. An invalid harness value returns 400 naming the accepted values. Follow PRD implementation checkpoint 4: this route lands with a throwaway built-server boot test before any live restart."
+        },
+        "items": [
+          {
+            "id": "api-commands-endpoint.ac1",
+            "title": "GET /api/commands returns every non-hidden Commander command with args, options, aliases, and resolved mode/safety; a completeness test compares the response against COMPOSER_COMMAND_MANIFEST",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-commands-endpoint.ac2",
+            "title": "harness=codex returns codex's native list and harness=claude-code returns claude-code's; an unknown harness returns 400 listing accepted values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-commands-endpoint.ac3",
+            "title": "The endpoint returns identical payloads for two sequential requests from module state and spawns no process (spy-asserted)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-command-results",
+        "title": "Render structured command results in the composer timeline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/composerStore.ts",
+            "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/composerStore.test.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/composerStore.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "composerStore suite passes covering result rendering and outbox kind preservation",
+            "lint including file-size ratchet exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8",
+            "FR-11",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In composerStore.ts (POST sites at lines 105-117), detect when the response body is a ComposerCommandResult (import the union from @overdeck/contracts). For command results: do not add an optimistic agent-message bubble; render a system-style timeline entry showing the command, its status (accepted/completed/failed/rejected/confirmation_required) in complete sentences, captured output (monospace, truncation notice when truncated: true), and the activity id for detached results. confirmation_required renders a confirm affordance that resubmits with the nonce. Retry outbox entries (failSend line 251, retryFailed lines 441-453) gain a kind field ('command' | 'prompt') so a retried /pan command resubmits through the same endpoint as a command and can never be replayed as a prompt. Ordinary prompt flow, attachments, and optimistic bubbles stay byte-identical (negative-control test)."
+        },
+        "items": [
+          {
+            "id": "frontend-command-results.ac1",
+            "title": "Submitting '/pan status' renders a system-style timeline entry with the captured output and no optimistic agent-message bubble; the transcript shows no /pan text as an agent message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-command-results.ac2",
+            "title": "A detached result renders the accepted sentence with its activity id; a failed result renders the actionable error text from the server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-command-results.ac3",
+            "title": "A failed /pan send persists in the outbox with kind 'command' and its retry sends it as a command, never as a prompt (test asserts the retried POST branch)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-command-results.ac4",
+            "title": "The composer preserves today's optimistic bubble and delivery behavior for ordinary messages (negative control)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-skills-seed",
+        "title": "Seed isolated Codex homes with synced skills",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/codex.ts",
+            "src/lib/runtimes/__tests__/codex.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/runtimes/__tests__/codex.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "codex suite passes covering copy, idempotent re-run, preservation of per-agent skills, and missing-source tolerance",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "In initCodexHome (src/lib/runtimes/codex.ts:308-415), add syncCodexSkillsIntoHome(join(homedir(), '.codex', 'skills'), join(codexHomeDir, 'skills')): create the destination, copy/update each source skill directory idempotently (overwrite managed entries, compare-free recursive copy is acceptable), never delete destination entries absent from the source, never symlink the global home, and never touch auth.json, config.toml, or sessions/. A missing source directory is a silent no-op. Per PRD implementation checkpoint 3, verify the installed Codex version discovers $CODEX_HOME/skills and record the finding in the codex.ts module header; if discovery is unsupported, keep the copy, document the supported location, and note the limitation."
+        },
+        "items": [
+          {
+            "id": "codex-skills-seed.ac1",
+            "title": "A fresh isolated Codex home contains every directory from ~/.codex/skills under <codexHome>/skills while sessions/, auth, and config remain per-agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-skills-seed.ac2",
+            "title": "Re-running initCodexHome preserves a pre-existing per-agent-only skill directory and updates managed ones (idempotent, additive)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-skills-seed.ac3",
+            "title": "When ~/.codex/skills is missing, initCodexHome exits successfully and throws no error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-loss-and-matrix",
+        "title": "No-loss audit and four-harness interception matrix",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/__tests__/composerCommands.no-loss.test.ts",
+            "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
+            "src/lib/composer-commands/__tests__/harness-matrix.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/composer-commands/__tests__/harness-matrix.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__"
+          ],
+          "expected_outputs": [
+            "harness matrix passes for claude-code, codex, ohmypi, and acp with identical argv and zero delivery calls",
+            "no-loss audits pass with every legacy entry accounted for"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-13",
+            "FR-14",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Two suites. (1) composerCommands.no-loss.test.ts freezes the complete pre-change inventory — the 5 static entries, the 255 generated inserts, and the three handoff aliases — and asserts each maps to a generated Overdeck manifest entry, a harness-native capability, a preserved alias, or an explicit exclusion row with a reason; an unmapped disappearance fails. (2) harness-matrix.test.ts drives handleConversationMessage (and the agent endpoint handler) table-driven across harness values claude-code, codex, ohmypi, and acp with '/pan start PAN-999': each row asserts the identical canonical argv and result shape and that deliverConversationViaControlChannel, deliverAgentMessage, and FIFO/sendMessage primitives are never invoked (spies). Negative controls per harness: ordinary text and unprefixed 'pan start PAN-999' still invoke that harness's delivery primitive exactly as today."
+        },
+        "items": [
+          {
+            "id": "no-loss-and-matrix.ac1",
+            "title": "The audit fails when any legacy entry or alias lacks a mapping row, and passes on the completed migration with zero unaccounted entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-and-matrix.ac2",
+            "title": "'/pan start PAN-999' produces identical parsed argv and result across all four harnesses with zero delivery-primitive calls (spy-asserted)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-and-matrix.ac3",
+            "title": "Each harness's delivery primitive receives ordinary text and unprefixed 'pan start …' unchanged (per-harness negative controls)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-playwright",
+        "title": "Playwright spec for the composer command surface",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/composer-commands.spec.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx playwright test tests/composer-commands.spec.ts"
+          ],
+          "expected_outputs": [
+            "composer-commands spec passes headless with an isolated browser instance"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/tests/composer-commands.spec.ts following the conventions of the existing command-deck specs. Cover: (1) typing '/' opens the menu with distinct 'Overdeck' and active-harness-native groups; (2) selecting a pan command inserts the '/pan …' syntax; (3) submitting '/pan status' (against the test server/fixture used by sibling specs) renders a system-style command result entry and no agent message bubble; (4) '/handoff focus text' opens the handoff dialog with the focus preserved. The spec must run in an isolated Playwright browser instance/profile and must not depend on another agent's browser state or logins."
+        },
+        "items": [
+          {
+            "id": "composer-playwright.ac1",
+            "title": "The menu renders Overdeck and harness-native groups; choosing 'pan start' inserts '/pan start ' at the caret",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-playwright.ac2",
+            "title": "Submitting '/pan status' renders a command result entry in the timeline and no optimistic agent bubble",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-playwright.ac3",
+            "title": "'/handoff make tests fast' opens the handoff dialog with focus 'make tests fast'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-three-lanes",
+        "title": "Document the three command lanes and harness differences",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-24T19:13:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1525",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MISSION-CONTROL.md",
+            "configuration/harnesses.mdx",
+            "docs/COMPOSER-SLASH-COMMANDS.md",
+            "src/lib/composer-commands/router.ts",
+            "src/lib/overdeck/conversation-message.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including skills/slash-command drift gates) exits 0 with the doc changes in place"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "docs/MISSION-CONTROL.md gains a 'Composer command lanes' section showing the three lanes with the PRD's example block (/pan start PAN-1987 → Overdeck operator command; /model → harness-native, availability varies; ordinary text → prompt), the captured/detached/ui/terminal-only result meanings, and confirmation behavior for dialog/destructive commands. configuration/harnesses.mdx states that /pan behaves identically under claude-code, codex, ohmypi, and acp, that native slash commands vary per harness and are shown per-harness in the menu, and that isolated Codex homes receive synced skills. docs/COMPOSER-SLASH-COMMANDS.md is updated for the two-output pipeline (done partly in contracts-manifest; this item verifies final accuracy). Module headers in router.ts and the conversation-message.ts interception block explain ordering (validate → /pan route → compact → attachments → delivery) and why."
+        },
+        "items": [
+          {
+            "id": "docs-three-lanes.ac1",
+            "title": "docs/MISSION-CONTROL.md shows the three-lane example block and defines all four result kinds and both confirmation flavors in complete sentences",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-three-lanes.ac2",
+            "title": "configuration/harnesses.mdx shows /pan parity across the four harnesses and no longer implies one uniform slash-command model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-three-lanes.ac3",
+            "title": "The conversation-message.ts interception block contains a header comment stating the routing order and its rationale",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "introspect-options",
+        "to": "contracts-manifest",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-manifest",
+        "to": "frontend-manifest-adapter",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-manifest",
+        "to": "policy-overlay",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-manifest",
+        "to": "command-parser",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-manifest",
+        "to": "native-capabilities",
+        "type": "blocks"
+      },
+      {
+        "from": "policy-overlay",
+        "to": "router-conversation",
+        "type": "blocks"
+      },
+      {
+        "from": "command-parser",
+        "to": "router-conversation",
+        "type": "blocks"
+      },
+      {
+        "from": "router-conversation",
+        "to": "router-agent",
+        "type": "blocks"
+      },
+      {
+        "from": "router-conversation",
+        "to": "executors-captured",
+        "type": "blocks"
+      },
+      {
+        "from": "router-conversation",
+        "to": "executors-detached",
+        "type": "blocks"
+      },
+      {
+        "from": "router-conversation",
+        "to": "ui-handoff-result",
+        "type": "blocks"
+      },
+      {
+        "from": "router-conversation",
+        "to": "confirmations",
+        "type": "blocks"
+      },
+      {
+        "from": "router-conversation",
+        "to": "frontend-command-results",
+        "type": "blocks"
+      },
+      {
+        "from": "policy-overlay",
+        "to": "api-commands-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "native-capabilities",
+        "to": "api-commands-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "router-agent",
+        "to": "no-loss-and-matrix",
+        "type": "blocks"
+      },
+      {
+        "from": "ui-handoff-result",
+        "to": "no-loss-and-matrix",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-manifest-adapter",
+        "to": "no-loss-and-matrix",
+        "type": "blocks"
+      },
+      {
+        "from": "executors-captured",
+        "to": "no-loss-and-matrix",
+        "type": "informs"
+      },
+      {
+        "from": "frontend-command-results",
+        "to": "composer-playwright",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-manifest-adapter",
+        "to": "composer-playwright",
+        "type": "blocks"
+      },
+      {
+        "from": "native-capabilities",
+        "to": "composer-playwright",
+        "type": "informs"
+      },
+      {
+        "from": "api-commands-endpoint",
+        "to": "docs-three-lanes",
+        "type": "informs"
+      },
+      {
+        "from": "confirmations",
+        "to": "docs-three-lanes",
+        "type": "informs"
+      },
+      {
+        "from": "frontend-command-results",
+        "to": "docs-three-lanes",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-24-PAN-1525-harness-independent-composer-commands-canonical-manifest-pan-router-and-cross-harness-parity.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

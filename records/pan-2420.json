@@ -84,15 +84,15 @@
     "recordedAt": "2026-07-07T04:07:12.535Z"
   },
   "created": "2026-07-07T01:06:13.356Z",
-  "updated": "2026-07-07T04:08:08.097Z",
+  "updated": "2026-07-27T16:42:36.232Z",
   "pipeline": {
     "issueId": "PAN-2420",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T04:08:01.784Z",
+    "updatedAt": "2026-07-27T16:42:36.205Z",
     "reviewNotes": "No blocking findings in PR-scoped review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2452",
     "reviewedAtCommit": "91804f9eec60a1749b466d5f6fe015b5da90eec7",
@@ -159,7 +159,9 @@
         "tests/unit/lib/github-app.test.ts"
       ],
       "recordedAt": "2026-07-07T04:07:12.535Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T16:42:36.205Z"
   },
   "closeOut": {
     "usage": {
@@ -182,25 +184,25 @@
         },
         "review": {
           "unknown": {
-            "input": 2082054,
-            "output": 9035,
-            "cacheRead": 1824256,
+            "input": 5283494,
+            "output": 15798,
+            "cacheRead": 4807808,
             "cacheWrite": 0
           }
         },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 609795,
-            "output": 11865,
-            "cacheRead": 3057920,
+            "input": 1131719,
+            "output": 19375,
+            "cacheRead": 6376960,
             "cacheWrite": 0
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 1052155,
-            "output": 212147,
-            "cacheRead": 102613504,
+            "input": 1057969,
+            "output": 213429,
+            "cacheRead": 104738816,
             "cacheWrite": 0
           }
         }
@@ -219,27 +221,100 @@
           "cacheWrite": 576864
         },
         "unknown": {
-          "input": 2082054,
-          "output": 9035,
-          "cacheRead": 1824256,
+          "input": 5283494,
+          "output": 15798,
+          "cacheRead": 4807808,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1661950,
-          "output": 224012,
-          "cacheRead": 105671424,
+          "input": 2189688,
+          "output": 232804,
+          "cacheRead": 111115776,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 37.1445305,
-        "pricingAsOf": "2026-07-07T04:08:01.850Z"
+        "usd": 41.4995855,
+        "pricingAsOf": "2026-07-20T00:05:20.812Z"
       }
     },
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2452"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T16:42:36.225Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: missing (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Feature branch is absent; positive merge evidence is required; PR #2452 MERGED at 2026-07-07T04:18:23Z; durable close-out record contains 1 merge artifact(s)",
+          "status": "pass",
+          "mergedAt": "2026-07-07T04:18:23Z",
+          "mergeCommit": "e9a43d1b6aa3209b1bf1498233c9e7425f592069"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "6 check-runs concluded successfully on e9a43d1b6aa3209b1bf1498233c9e7425f592069",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit d44fa122 contains merge e9a43d1b",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; No strike branch strike/pan-2420 found; Pruned 0 checkpoint ref(s) for agent-pan-2420, planning-pan-2420, strike-pan-2420; No specialist registry entries for PAN-2420"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "kimi-k2.7-code",
@@ -280,5 +355,6 @@
   },
   "swarm": {
     "finalizedAt": "2026-07-07T03:56:58.348Z"
-  }
+  },
+  "reviewMode": "quick"
 }

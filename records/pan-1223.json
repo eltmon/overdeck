@@ -1,0 +1,29 @@
+{
+  "issueId": "PAN-1223",
+  "schemaVersion": 2,
+  "created": "2026-07-15T03:43:14.242Z",
+  "updated": "2026-07-15T03:49:06.642Z",
+  "pipeline": {
+    "issueId": "PAN-1223",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-15T03:43:14.242Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "swarm": {
+    "policy": {
+      "mode": "off"
+    }
+  },
+  "reviewModel": "gpt-5.6-sol",
+  "reviewMode": "full",
+  "workModel": "gpt-5.6-sol"
+}

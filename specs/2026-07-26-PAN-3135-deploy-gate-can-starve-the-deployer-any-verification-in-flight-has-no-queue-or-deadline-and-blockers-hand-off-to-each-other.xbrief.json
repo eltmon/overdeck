@@ -1,0 +1,700 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T12:40:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3135: Deploy gate can starve the deployer: 'any verification in flight' has no queue or deadline, and blockers hand off to each other",
+    "updated": "2026-07-26T19:14:08.712Z"
+  },
+  "plan": {
+    "id": "pan-3135",
+    "title": "Deploy gate can starve the deployer: 'any verification in flight' has no queue or deadline, and blockers hand off to each other",
+    "status": "completed",
+    "uid": "af74f2e3-98ce-449d-b894-cf6cc4841452",
+    "author": "agent:k3[1m]",
+    "sequence": 7,
+    "created": "2026-07-26T12:40:00.000Z",
+    "updated": "2026-07-26T19:14:08.712Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3135",
+        "label": "PAN-3135",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "deploy",
+      "verification",
+      "cloister",
+      "starvation",
+      "queue"
+    ],
+    "narratives": {
+      "Problem": "The deploy gate (getDeployBlockReason, src/lib/deploy/deploy-window.ts:41) refuses any agent-issued dashboard restart while any verification is in flight, and the deploy patrol defers on the same condition. Neither path has a queue or a deadline: the deploy clears only in an accidental fleet-wide idle window, blockers hand off to each other (RUN-71: PAN-1696 then PAN-2997), and the wait is unbounded. On 2026-07-26 this blocked DoD row 7 close-out of three fully-merged issues (PAN-3119, PAN-3037, PAN-3114) while 21 in-flight issues were eligible to enter verification.",
+      "Proposal": "Implement the issue's option 2 + 3 + minimum-viable reporting: (1) a deploy intent queue at ${OVERDECK_HOME}/pending-deploy.json written by the restart gate, the deploy patrol, and merge step 0 whenever a deploy is deferred; (2) a verification admission pause — while the queue exists, runVerificationForIssuePromise returns a new { outcome: 'deferred' } without consuming a cycle or starting a run, so the wait becomes bounded by the longest single in-flight run; (3) the deploy patrol fires the queued deploy at the first clear boundary (debounce + CI green + gate clear), even when auto_deploy is off for explicit requests, and clears the record only when staleness goes fresh; (4) a deadline escalation (deploy.queue_deadline_minutes, default 30) that emits an error activity entry + TTS + one needs-you trip per queue lifetime; (5) refusals and deferrals report queue age and distinct blocker ids with do-not-retry guidance. Re-drive leans on the existing reactive review dispatch (reviewRequestedAt stays set), so deferred issues enter review through the normal verification-first path after the deploy. Full rationale and decisions D1-D8 are in the PRD at .pan/drafts/PAN-3135.md.",
+      "NonGoals": "- Verification checkpoint/resume across a restart (issue option 1) — out of scope; the queue bounds the wait instead.\n- A dashboard UI surface for the deploy queue — out of scope; reporting is via refusal messages, activity entries, TTS, and needs-you trips.\n- Multiple concurrent queued deploys, priorities, or scheduling — the record holds a single intent; later registrations refresh it.\n- Changing the block conditions of getDeployBlockReason itself.\n- Gating operator-issued (non-agent) restarts — they remain ungated.\n- Suppressing or batching reactive re-dispatch retries while a queue is pending (each retry is a cheap no-op defer; see hazard H6).\n- Deleting pending-deploy.json on boot or at reload fire time (clearing is fresh-staleness-only by design)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose issue option 2 (queue + admission pause + drain + auto-fire) plus option 3 (deadline escalation) and the minimum-viable rich reporting; option 1 (resumable verification) deferred as a NonGoal.",
+        "rationale": "The issue lists options in rough preference order but its own comment thread ('Reinforces the ordering... queuing the deploy (option 2) would have fired it during any of the gaps') endorses option 2 as the effective fix; option 1 is a much larger change for marginal benefit once the wait is bounded."
+      },
+      {
+        "summary": "Placed the admission-pause chokepoint inside runVerificationForIssuePromise (+ early exit in runSupervisedVerification) instead of at each dispatch site.",
+        "rationale": "One check covers request-review, the inline route flow, merge-ops, and the worker path; site-by-site gating would leave merge-ops and future callers unguarded."
+      },
+      {
+        "summary": "Added a distinct 'deferred' VerificationRunnerOutcome variant rather than reusing 'skipped' or 'failed'.",
+        "rationale": "'skipped' proceeds to review dispatch without verification (request-review-pipeline.ts:40-41); 'failed' sends bogus feedback to work agents and consumes recovery budget. A new variant makes TypeScript enumerate every handler."
+      },
+      {
+        "summary": "No new re-drive machinery for deferred verifications; deferral leaves reviewRequestedAt set so the existing reactive dispatch retries.",
+        "rationale": "maybeAutoDispatchReviewHostSide (review-status.ts:518) already owns 'verification pending + reviewRequestedAt set' retries; a new patrol or boot hook would duplicate it."
+      },
+      {
+        "summary": "The queue record is cleared only on fresh staleness, not at fire time and not on boot.",
+        "rationale": "Clearing at fire time reopens admissions during the restart window (a verification could start as the server dies); clearing on boot loses the queue when an operator runs pan restart without rebuilding."
+      },
+      {
+        "summary": "Queued deploys fire even when deploy.auto_deploy is false; patrol self-registration still respects auto_deploy.",
+        "rationale": "A queue entry is always an explicit request; if firing respected auto_deploy the queue would never fire and admissions would pause forever — inverted starvation."
+      },
+      {
+        "summary": "Skipped bootstrapping .pan/context/codebase/ in the workspace.",
+        "rationale": "The four map files exist in the primary checkout but are gitignored since the overdeck-state migration (commit cc30721631); writing workspace copies would not propagate. The map was read from the primary checkout and needed no corrections."
+      }
+    ],
+    "items": [
+      {
+        "id": "deploy-queue-module",
+        "title": "Add deploy intent queue module (src/lib/deploy/deploy-queue.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3135",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "deferred-verification-outcome",
+            "restart-gate-queue-registration",
+            "deploy-patrol-queue-integration",
+            "deploy-queue-escalation",
+            "merge-step0-intent-registration"
+          ],
+          "files_scope": [
+            "src/lib/deploy/deploy-queue.ts",
+            "tests/unit/lib/deploy/deploy-queue.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/deploy/deploy-queue.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deploy-queue.test.ts passes all cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/deploy/deploy-queue.ts owning the deploy intent record at `${getOverdeckHome()}/pending-deploy.json`. Export: (1) a `PendingDeploy` type `{ requestedAt: string; requestedBy: string[]; lastReason: string; blockedBy: string[]; deferralCount: number; escalated: boolean }`; (2) `readPendingDeploy(): PendingDeploy | null` — returns null when the file is absent, unparseable, or fails schema shape (never throws); (3) `recordDeployIntent({ requestedBy, reason, blockedBy }): PendingDeploy` — creates the record with `requestedAt: new Date().toISOString()`, `deferralCount: 1`, `escalated: false`; on an existing valid record preserves the original `requestedAt`, unions `requestedBy` and `blockedBy` (dedup, sorted), updates `lastReason`, increments `deferralCount`, preserves `escalated`; on an existing CORRUPT file treats it as absent and overwrites; (4) `clearPendingDeploy(): void` — removes the file, tolerates absence; (5) `markPendingDeployEscalated(): void` — sets `escalated: true` if a record exists. Writes are atomic: write `<path>.<pid>.tmp` then rename, matching writeJsonAtomic in src/lib/cloister/verification-worker-supervisor.ts:84; mkdir the parent with recursive first. Use sync fs (existsSync/readFileSync/writeFileSync/renameSync) — the callers (verification runner, restart gate) are sync-context; match the conventions of verification-worker-supervisor.ts. Inject the home directory via an optional deps/params object (default getOverdeckHome()) so tests can point at a temp dir. Write tests/unit/lib/deploy/deploy-queue.test.ts covering: absent file → null; create-then-read round trip; refresh preserves requestedAt and unions/dedups requestedBy+blockedBy; deferralCount increments; corrupt JSON → read returns null and recordDeployIntent overwrites cleanly; clear removes and tolerates re-clear; markEscalated sets the flag and is a no-op when absent."
+        },
+        "items": [
+          {
+            "id": "deploy-queue-module.ac1",
+            "title": "recordDeployIntent creates ${OVERDECK_HOME}/pending-deploy.json and readPendingDeploy returns a record with the exact requestedAt, requestedBy, blockedBy, deferralCount=1, escalated=false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-queue-module.ac2",
+            "title": "A second recordDeployIntent with a different caller preserves the original requestedAt, produces a sorted union of requestedBy and blockedBy with no duplicates, and increments deferralCount to 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-queue-module.ac3",
+            "title": "readPendingDeploy returns null when the file contains invalid JSON, and recordDeployIntent overwrites the corrupt file with a valid fresh record instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-queue-module.ac4",
+            "title": "clearPendingDeploy removes the file so a subsequent readPendingDeploy returns null, and calling clearPendingDeploy twice does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deferred-verification-outcome",
+        "title": "Add 'deferred' verification outcome and the deploy-queue admission pause",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:40:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3135",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "request-review-deferred-handling",
+            "merge-ops-deferred-handling"
+          ],
+          "files_scope": [
+            "src/lib/cloister/verification-types.ts",
+            "src/lib/cloister/verification-runner.ts",
+            "src/lib/cloister/verification-worker-supervisor.ts",
+            "tests/unit/lib/cloister/verification-runner-deploy-defer.test.ts",
+            "tests/unit/lib/cloister/verification-worker-supervisor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-runner-deploy-defer.test.ts tests/unit/lib/cloister/verification-worker-supervisor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new defer tests pass",
+            "worker-supervisor tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Three edits. (1) src/lib/cloister/verification-types.ts: add `| { outcome: 'deferred'; reason: string }` to VerificationRunnerOutcome. (2) src/lib/cloister/verification-runner.ts: at the top of runVerificationForIssuePromise (currently line 377), immediately after `const currentStatus = getReviewStatusSync(issueId)` and BEFORE skipMergedVerification/circuit-breaker logic and before the `setReviewStatusSync(issueId, { verificationStatus: 'running' })` at line 398, add: if `readPendingDeploy()` (from src/lib/deploy/deploy-queue.ts) returns a record AND `currentStatus?.verificationStatus !== 'running'`, then set `setReviewStatusSync(issueId, { verificationStatus: 'pending', verificationNotes: `Verification deferred: a dashboard deploy is queued (requested ${record.requestedAt} by ${record.requestedBy.join(', ')}). It re-runs automatically after the deploy.` })` and return `{ outcome: 'deferred', reason: <same sentence> }`. Do not increment any cycle count. The `!== 'running'` guard is load-bearing (hazard H4): an in-flight worker re-entering must never self-defer. Inject the queue read via the existing options/deps pattern of the runner if one exists, otherwise import directly and stub the module in tests. (3) src/lib/cloister/verification-worker-supervisor.ts runSupervisedVerification (line 126): AFTER the join-live-worker branch (existing state + alive pid → waitForResult) and BEFORE mkdir/spawn, add the same check returning `{ outcome: 'deferred', reason }` without spawning; an existing live worker must still be joined (drain). New test tests/unit/lib/cloister/verification-runner-deploy-defer.test.ts: with a queue record present, a fresh admission returns deferred, writes verificationStatus 'pending' with the marker note, and does not write 'running'; with verificationStatus already 'running', the same call is not deferred (assert it proceeds past the check, e.g. by stubbing the next step); with no queue record, behavior is unchanged. Extend verification-worker-supervisor.test.ts: queue present + no live worker → deferred without spawn; queue present + live worker → joins the worker. Expect existing runner tests to compile-break on the new union variant where they construct or switch outcomes — update those exhaustively, never with `as` casts."
+        },
+        "items": [
+          {
+            "id": "deferred-verification-outcome.ac1",
+            "title": "With pending-deploy.json present and verificationStatus 'pending', runVerificationForIssue returns { outcome: 'deferred' }, persists verificationStatus 'pending' with a verificationNotes sentence naming the queue requestedAt, and never writes 'running'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferred-verification-outcome.ac2",
+            "title": "With pending-deploy.json present and verificationStatus already 'running', runVerificationForIssue returns a non-'deferred' outcome and continues the in-flight run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferred-verification-outcome.ac3",
+            "title": "runSupervisedVerification with a queue record and no live worker returns deferred without spawning a worker process, and with a live worker still joins it via waitForResult",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deferred-verification-outcome.ac4",
+            "title": "With no pending-deploy.json present, runVerificationForIssue writes verificationStatus 'running' and produces no 'deferred' outcome and no deferral verificationNotes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "request-review-deferred-handling",
+        "title": "Handle 'deferred' in request-review pipeline and review-pipeline route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3135",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/request-review-pipeline.ts",
+            "src/dashboard/server/routes/workspaces/review-pipeline.ts",
+            "tests/unit/lib/cloister/request-review-pipeline.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/request-review-pipeline.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "request-review-pipeline tests pass including new deferred cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "(1) src/lib/cloister/request-review-pipeline.ts: add an optional dep `onVerificationDeferred?: (outcome: Extract<VerificationRunnerOutcome, { outcome: 'deferred' }>) => MaybePromise` to RequestReviewPipelineDeps; in start(), after the failed/error branches, add `if (outcome.outcome === 'deferred') { await deps.onVerificationDeferred?.(outcome); return; }` — critically BEFORE pushBranch/dispatchReview so a deferral never dispatches review. (2) src/dashboard/server/routes/workspaces/review-pipeline.ts: at the requestReviewPipeline.start call (line ~716) supply onVerificationDeferred: log `[request-review] Verification deferred for <issueId>: <reason>` and completePendingOperation(issueId, outcome.reason) — do NOT setReviewStatus to failed, do NOT send agent feedback, do NOT dispatch review (reviewRequestedAt stays set so the reactive re-dispatch retries). In the inline flow (line ~294) add the same branch: deferred → completePendingOperation with the reason and return without flipping reviewStatus. Extend tests/unit/lib/cloister/request-review-pipeline.test.ts: deferred outcome → pushBranch and dispatchReview NOT called, onVerificationDeferred called with the outcome, start() returns true; absent onVerificationDeferred dep → deferred still stops the pipeline without throwing."
+        },
+        "items": [
+          {
+            "id": "request-review-deferred-handling.ac1",
+            "title": "requestReviewPipeline.start with a deferred verify outcome returns without calling pushBranch or dispatchReview, and invokes onVerificationDeferred with the outcome",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "request-review-deferred-handling.ac2",
+            "title": "requestReviewPipeline.start with a deferred outcome and no onVerificationDeferred dep returns without calling pushBranch or dispatchReview and throws nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "request-review-deferred-handling.ac3",
+            "title": "Both route flows complete the pending operation with the deferral reason and leave reviewStatus and verificationStatus pending (no failed flip, no review dispatch) when verification defers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-ops-deferred-handling",
+        "title": "Handle 'deferred' in merge specialist post-rebase verification",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3135",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "tests/unit/lib/cloister/merge-verification.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/merge-verification.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge verification tests pass including the deferred case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/workspaces/merge-ops.ts at the post-rebase verification call (line ~1078-1096), add a branch for `verifyResult.outcome === 'deferred'` before the existing 'failed' branch: appendShipLog(issueId, `Post-rebase verification deferred: ${verifyResult.reason} — merge retries after the deploy.`, 'verifying'), then abort the merge attempt retriably: do NOT setReviewStatus mergeStatus 'failed', do NOT touch readyForMerge, do NOT consume merge retry budget; return the same retriable/error shape the surrounding merge flow uses for a non-terminal abort (follow the existing early-return shape in that function; if the function's contract requires an error return, return an error whose message carries the deferral reason but perform no status mutation). If the test home for this flow is tests/unit/lib/cloister/merge-verification.test.ts extend it there; otherwise create the focused test beside the existing merge-ops tests. Assert: deferred → ship-log line written, mergeStatus unchanged, readyForMerge unchanged."
+        },
+        "items": [
+          {
+            "id": "merge-ops-deferred-handling.ac1",
+            "title": "A deferred post-rebase verification appends a ship-log line containing the deferral reason and returns from the merge attempt without merging",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-ops-deferred-handling.ac2",
+            "title": "A deferred post-rebase verification preserves the prior mergeStatus and readyForMerge values and writes no 'failed' mergeStatus and no retry-counter increment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "restart-gate-queue-registration",
+        "title": "Register deploy intent and enrich refusal in the agent restart gate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3135",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deploy/agent-restart-gate.ts",
+            "tests/unit/lib/deploy/agent-restart-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/deploy/agent-restart-gate.test.ts src/cli/commands/__tests__/restart-agent-gate.test.ts src/cli/commands/__tests__/reload.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "gate tests pass with registration and message assertions",
+            "CLI gate tests still pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/deploy/agent-restart-gate.ts agentRestartBlockReason: when getDeployBlockReason returns a reason (and initiator is set, force false), call recordDeployIntent({ requestedBy: initiator, reason: blockReason, blockedBy }) before building the refusal. blockedBy is the currently-verifying issue list — extract a small exported helper `listVerifyingIssues(loadStatuses?)` from getDeployBlockReason in src/lib/deploy/deploy-window.ts so both the gate and the queue share one derivation (no-loss: getDeployBlockReason keeps its exact current behavior and message). Then enrich the refusal message to stand alone (operator-message rule), e.g.: `Restart refused. The active deployment gate says: \"<reason>\" This deploy has been queued since <requestedAt> (<age> ago); it has been held by <n> distinct verification(s): <ids>. It will fire automatically at the next verification boundary — do not retry or use --force, which would kill a healthy verification mid-run.` Compute age from the record's requestedAt. Keep the early returns (no initiator / force) untouched. Extend tests/unit/lib/deploy/agent-restart-gate.test.ts: refusal registers a queue record with the initiator and verifying ids; message contains the age, blocker count, ids, and the do-not-retry guidance; a second refusal from a different initiator refreshes rather than resets requestedAt; force and missing-initiator paths write no record. Check src/cli/commands/__tests__/restart-agent-gate.test.ts and reload.test.ts — they mock agentRestartBlockReason and should be unaffected; update only if assertions break."
+        },
+        "items": [
+          {
+            "id": "restart-gate-queue-registration.ac1",
+            "title": "A refused agent restart writes pending-deploy.json whose requestedBy contains the initiator and whose blockedBy contains the currently-verifying issue ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restart-gate-queue-registration.ac2",
+            "title": "The refusal message contains the queue age, the count and ids of distinct blockers, and a sentence stating the deploy fires automatically without retry or --force",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restart-gate-queue-registration.ac3",
+            "title": "--force and no-initiator invocations produce no pending-deploy.json file and agentRestartBlockReason returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deploy-patrol-queue-integration",
+        "title": "Fire and clear queued deploys in the deploy patrol (+ queue_deadline_minutes config)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:40:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3135",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deploy-patrol.ts",
+            "src/lib/cloister/config.ts",
+            "tests/unit/lib/cloister/deploy-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deploy-patrol.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deploy-patrol tests pass including queue fire/clear cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/deploy-patrol.ts runDeployPatrol, restructure the middle of the function: (1) After staleness computation, `if (staleness.status === 'fresh') { clearState(); clearPendingDeploy(); return; }` — the queue clears only when a deploy has actually landed (D5). (2) Queue firing must be evaluated BEFORE the `if (!context.config.auto_deploy) return;` early return (currently line 308): read the queue record (inject via DeployPatrolContext, e.g. `readQueue?: () => PendingDeploy | null`, default the real read); if a record exists AND staleness is behind AND the debounce check passes AND CI is green for originMainSha AND getDeployBlockReason() returns null → fire the reload via the existing spawnReload path (same ReloadRequest), emit the same info entry plus a sentence that this was a queued deploy requested by record.requestedBy joined, and do NOT clear the record (it clears on the fresh-staleness pass after the restart). Keep DEPLOY_SPAWN_COOLDOWN_MS applying to queued fires. (3) Patrol self-registration stays behind the auto_deploy flag: when auto_deploy is on and the function reaches the existing blockReason deferral (line ~329-333), call recordDeployIntent({ requestedBy: 'deploy-patrol', reason: blockReason, blockedBy: listVerifyingIssues() }) in addition to emitDeferral. (4) In src/lib/cloister/config.ts add `queue_deadline_minutes: number` to DeployConfig with default 30 in the defaults block (line ~391-394) — consumed by the next item; parse it in loadCloisterConfigSync like the other deploy keys. Extend tests/unit/lib/cloister/deploy-patrol.test.ts using its existing context-injection pattern and fake timers: fresh staleness clears the queue; queued + behind + debounce passed + CI green + gate clear → reload spawned; queued + gate blocked → no spawn; queued + auto_deploy=false → still fires; queued + CI not green → no spawn; auto_deploy on + gate blocked → recordDeployIntent called; fire does not clear the record."
+        },
+        "items": [
+          {
+            "id": "deploy-patrol-queue-integration.ac1",
+            "title": "With a queue record, staleness behind, debounce passed, CI green, and a clear gate, the patrol spawns the reload — including when config auto_deploy is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-patrol-queue-integration.ac2",
+            "title": "With a queue record and the gate still blocked (or CI not green, or debounce active), the patrol spawns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-patrol-queue-integration.ac3",
+            "title": "The patrol clears pending-deploy.json when staleness is fresh, and does NOT clear it at fire time (record survives the restart window)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-patrol-queue-integration.ac4",
+            "title": "With auto_deploy on and the gate blocking an otherwise-eligible deploy, the patrol writes a pending-deploy.json record whose requestedBy contains 'deploy-patrol' and whose blockedBy contains the verifying issue ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-patrol-queue-integration.ac5",
+            "title": "loadCloisterConfigSync exposes deploy.queue_deadline_minutes defaulting to 30 when unset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deploy-queue-escalation",
+        "title": "Deadline escalation for long-queued deploys",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T12:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3135",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deploy-patrol.ts",
+            "tests/unit/lib/cloister/deploy-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deploy-patrol.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "escalation tests pass with fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In runDeployPatrol, after the queue record is read and the gate reports blocked: if `now - Date.parse(record.requestedAt) > config.queue_deadline_minutes * 60_000` AND `record.escalated` is false → (1) emit an activity entry at level 'error' (source 'deploy-script') stating the queued deploy's age, the current block reason, and the distinct blocker ids from the record; (2) emit TTS via emitTts (priority 1) announcing the stuck deploy; (3) take the first currently-verifying issue id (listVerifyingIssues()); if one exists, await recordDeadEndNeedsYou(issueId, 'deploy-queue', record.requestedAt, message) from src/lib/cloister/dead-end-trip.ts — if none exists (non-verification block), skip the trip; (4) call markPendingDeployEscalated() so this fires once per queue lifetime. All effects must be injectable via DeployPatrolContext for tests, matching the existing emitEntry/emitTts pattern. Extend deploy-patrol.test.ts with vi.useFakeTimers: past deadline + blocked → entry + TTS + trip + escalated flag persisted; second past-deadline pass → no further effects; under deadline → nothing; past deadline + gate clear (fire path) → no escalation."
+        },
+        "items": [
+          {
+            "id": "deploy-queue-escalation.ac1",
+            "title": "Past queue_deadline_minutes with the gate blocked, the patrol emits one error-level activity entry naming the queue age and blockers, one TTS utterance, and one needs-you trip anchored to the first verifying issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-queue-escalation.ac2",
+            "title": "A second patrol pass past the deadline with escalated already true emits no further escalation effects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-queue-escalation.ac3",
+            "title": "Under the deadline, or past the deadline with a clear gate, the patrol emits no escalation activity entry, no TTS utterance, and no needs-you trip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-step0-intent-registration",
+        "title": "Register deploy intent when merge step 0 defers a post-merge deploy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T12:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3135",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/merge-agent-step0.ts",
+            "tests/unit/lib/cloister/merge-agent-step0.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/merge-agent-step0.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-agent-step0 tests pass including intent registration",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/merge-agent-step0.ts shouldRestartForPostMerge, in the branch where getBlockReason() returns a reason (line ~30-37), call recordDeployIntent({ requestedBy: 'merge-step0', reason, blockedBy: listVerifyingIssues() }) alongside the existing log line, keeping the return value false and all other behavior unchanged. Keep the function's dependency-injection shape: add an optional `recordIntent` dependency defaulting to the real recordDeployIntent so tests can spy. Extend tests/unit/lib/cloister/merge-agent-step0.test.ts: blocked gate → recordIntent called with 'merge-step0' and the reason; clear gate → not called; fresh staleness → not called."
+        },
+        "items": [
+          {
+            "id": "merge-step0-intent-registration.ac1",
+            "title": "When the deploy gate blocks a post-merge restart, shouldRestartForPostMerge registers deploy intent with requestedBy 'merge-step0' and still returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-step0-intent-registration.ac2",
+            "title": "When the gate is clear or staleness is fresh, no intent is registered and return values are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-deploy-queue",
+        "title": "Document the deploy queue in SOP, DoD, and restart/reload skills",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T12:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3135",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/OVERDECK_DEV_SOP.md",
+            "docs/DEFINITION-OF-DONE.md",
+            "sync-sources/skills/pan-restart/SKILL.md",
+            "sync-sources/skills/pan-reload/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint passes (skills lint cross-checks SKILL.md against CLI help)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the documented surfaces of the changed behavior: (1) docs/OVERDECK_DEV_SOP.md — in the restart/deploy mechanics section, add a short 'Deploy queue' subsection: agent-issued restarts refused by the deploy gate now register a queued deploy at ~/.overdeck/pending-deploy.json; while queued, new verification admissions pause; the deploy patrol fires at the first clear boundary (debounce + CI green + gate clear) even when auto_deploy is off; past deploy.queue_deadline_minutes (default 30) an escalation fires; the file is runtime-plane state cleared when the running build goes fresh. (2) docs/DEFINITION-OF-DONE.md row 7 (line 19): extend the owner column to mention the deploy queue ('staleness-gated Step 0 + Deacon deploy patrol + deploy intent queue (pending-deploy.json)'). (3) sync-sources/skills/pan-restart/SKILL.md lines 37 and 63-66: rewrite the gate paragraph — a refusal now queues the deploy, reports queue age and distinct blockers, and the deploy self-fires; agents should not retry in a loop or reach for --force; --force remains the explicit bypass. (4) sync-sources/skills/pan-reload/SKILL.md — check for the same gate paragraph and apply the same update if present. Do not change CLI flags; skills lint must pass."
+        },
+        "items": [
+          {
+            "id": "docs-deploy-queue.ac1",
+            "title": "docs/OVERDECK_DEV_SOP.md contains a Deploy queue subsection stating the queue file path, the admission pause, the fire conditions, the auto_deploy exemption for queued requests, and the deadline escalation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-deploy-queue.ac2",
+            "title": "docs/DEFINITION-OF-DONE.md row 7's owner column contains the string 'pending-deploy.json'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-deploy-queue.ac3",
+            "title": "sync-sources/skills/pan-restart/SKILL.md (and pan-reload if it documents the gate) contains a sentence stating that a gate refusal queues the deploy, that it self-fires at the next verification boundary, and that agents must not retry-loop or --force past healthy verifications",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "deploy-queue-module",
+        "to": "deferred-verification-outcome",
+        "type": "blocks"
+      },
+      {
+        "from": "deploy-queue-module",
+        "to": "restart-gate-queue-registration",
+        "type": "blocks"
+      },
+      {
+        "from": "deploy-queue-module",
+        "to": "deploy-patrol-queue-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "deploy-queue-module",
+        "to": "merge-step0-intent-registration",
+        "type": "blocks"
+      },
+      {
+        "from": "deferred-verification-outcome",
+        "to": "request-review-deferred-handling",
+        "type": "blocks"
+      },
+      {
+        "from": "deferred-verification-outcome",
+        "to": "merge-ops-deferred-handling",
+        "type": "blocks"
+      },
+      {
+        "from": "deploy-patrol-queue-integration",
+        "to": "deploy-queue-escalation",
+        "type": "blocks"
+      },
+      {
+        "from": "deploy-queue-module",
+        "to": "docs-deploy-queue",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3135-deploy-gate-can-starve-the-deployer-any-verification-in-flight-has-no-queue-or-deadline-and-blockers-hand-off-to-each-other.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

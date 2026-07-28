@@ -1,0 +1,564 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-17T13:47:16.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2842: Issue cockpit: full-width agent conversations — lift tab strip, dissolve Conversation tab, Tasks rail → chip + drawer",
+    "updated": "2026-07-18T18:57:05.772Z"
+  },
+  "plan": {
+    "id": "pan-2842",
+    "title": "Issue cockpit: full-width agent conversations — lift tab strip, dissolve Conversation tab, Tasks rail → chip + drawer",
+    "status": "completed",
+    "uid": "386c446a-d1e1-4016-9a21-206f5ef4e3f8",
+    "author": "agent:claude-fable-5",
+    "sequence": 8,
+    "created": "2026-07-17T13:47:16.000Z",
+    "updated": "2026-07-18T18:57:05.772Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2842",
+        "label": "PAN-2842",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2842.md",
+        "label": "PRD draft",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/main/docs/design/issue-cockpit-full-width-conversation.html",
+        "label": "Operator-approved interactive mockup",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "issue-cockpit",
+      "dashboard",
+      "issue-view"
+    ],
+    "narratives": {
+      "Problem": "Clicking an agent in the issue cockpit squeezes its conversation into the center cell of a three-column grid (agents lane ≤264px | main | tasks 256px), and the 11 detail tabs wrap to two rows inside that same center column. The transcript — the surface operators read most — gets the least width.",
+      "Proposal": "Per the operator-approved mockup and PRD decisions D-1..D-6: lift the Detail Tabs nav out of the center column into one full-width non-wrapping row between the header and the body grid; remove the Conversation tab (clicking an agent in the spine IS the conversation, and the tab's cards relocate into the issue-context body so nothing is lost); replace the 256px Tasks rail with a Tasks chip in the tab band that opens a slide-over drawer rendering the existing TasksRail; make the agent spine collapsible to a 56px icon rail persisted in localStorage; cap the transcript at a centered 980px measure at the cockpit call site. All responsive behavior uses @container queries; no new data paths; the issue-view no-loss gate stays green.",
+      "NonGoals": "- No changes to the outer Command Deck shell (Awareness column, project tree, pane resizing) — already solved, out of scope\n- No rebuild of Review → sub-reviewer convoy nesting — it already exists in AgentsLane.tsx (reviewExpanded)\n- No changes to the rail or console densities of the issue-view kit — cockpit only\n- No modification of the SessionPanel component itself (other consumers exist) — the 980px cap wraps it at the cockpit call site only\n- No new endpoints, polling loops, store slices, query keys, or direct canonical-state access\n- No deletion or rename of any DENSITY_SECTIONS.cockpit / ISSUE_VIEW_INVENTORY section name\n- No viewport media queries — container queries only\n- No hidden data-section marker elements to satisfy the no-loss gate"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted PRD decisions D-1..D-6 verbatim without re-deriving them.",
+        "rationale": "The PRD is operator-approved with an approved interactive mockup as the visual target; every file/anchor citation was re-verified against the workspace at 1e8a7bc6c9."
+      },
+      {
+        "summary": "Chose the mockup's rounded active-pill tab styling (bg-primary/9 text-primary) from D-1's two acceptable options.",
+        "rationale": "When authoritative inputs name acceptable options, auto mode picks the one matching the operator-approved mockup rather than asking."
+      },
+      {
+        "summary": "Kept a 1:1 mapping of vBRIEF items to PRD work items WI-1..WI-7 instead of splitting WI-3 into chip and drawer items.",
+        "rationale": "Removing the Tasks rail column without the chip in the same commit would break the always-green no-loss gate; the slice is genuinely indivisible."
+      },
+      {
+        "summary": "Marked all items after the tab-band lift readiness=sequential.",
+        "rationale": "Five of seven items edit IssueMissionControl.tsx; parallel dispatch would conflict on the same file. Deliberate serialization in PRD work-item order."
+      }
+    ],
+    "items": [
+      {
+        "id": "lift-tab-band",
+        "title": "Lift the Detail Tabs nav into a full-width single-row tab band",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T13:47:16.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2842",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "tasks-chip-drawer",
+            "no-loss-gate"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/cockpitBody.module.css",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "IssueMissionControl.test.tsx passes, including a new assertion that the Detail Tabs nav is not a descendant of <main> and all tab labels render"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D-1/WI-1: move the <nav data-section=\"Detail Tabs\"> block (search `data-section=\"Detail Tabs\"` in IssueMissionControl.tsx) out of <main> so the cockpit wrap's children are <header>, the tab band, then <div className={styles.missionBody}>. Restyle the nav: `flex flex-nowrap gap-1 overflow-x-auto` (drop `flex-wrap`), replace `font-semibold` with `font-medium`, and style the active tab as the mockup's rounded pill (`bg-primary/9 text-primary`). Leave selectTab, tabBadge, and all activeTab logic untouched. Update IssueMissionControl.test.tsx accordingly."
+        },
+        "items": [
+          {
+            "id": "lift-tab-band.ac1",
+            "title": "Given a cockpit pane ≥840px, the Detail Tabs nav renders exactly once as a direct child of the cockpit wrap between the header and the body grid — the component test asserts the nav is NOT a descendant of <main>.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lift-tab-band.ac2",
+            "title": "Given a 500px-wide container, the tab band renders all tabs on a single line (the nav carries flex-nowrap and overflow-x-auto and no flex-wrap), scrolling horizontally instead of wrapping to a second row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lift-tab-band.ac3",
+            "title": "Every remaining tab label renders in the band and each tabBadge count renders next to its tab.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lift-tab-band.ac4",
+            "title": "The moved nav uses font-medium (no font-semibold anywhere in the touched markup) and the active tab renders the rounded-pill classes bg-primary/9 text-primary.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dissolve-conversation-tab",
+        "title": "Dissolve the Conversation tab; relocate its cards into the issue-context body",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T13:47:16.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2842",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx src/components/Stage/cockpit/MissionConversationTab.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors (proves 'conversation' is gone from the MissionTab union with no dangling usages)",
+            "IssueMissionControl.test.tsx and MissionConversationTab.test.tsx pass, including assertions that no Conversation tab renders and the issue-context body shows Overview plus the Launch card"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D-2/WI-2: remove { id: 'conversation', label: 'Conversation' } from TABS, remove 'conversation' from the MissionTab union, and delete the activeTab === 'conversation' branch. Do NOT delete MissionConversationTab: change IssueTreeContextPanel's `if (context === 'issue') return <OverviewTab …>` branch to return OverviewTab followed by MissionConversationTab in the existing spacing container, and drop the now-dead trailing `return <MissionConversationTab …>` fallback. Keep the data-section=\"Conversation / Files / Terminal tabs\" marker on the relocated MissionConversationTab wrapper (the Files/Terminal tab-body markers stay where they are). Grep for any remaining selectTab('conversation') callers and retarget them to openAgentByType('work') with selectTab('overview') fallback — the exact pattern already used in handlePhaseClick."
+        },
+        "items": [
+          {
+            "id": "dissolve-conversation-tab.ac1",
+            "title": "No tab labeled \"Conversation\" renders; 'conversation' is removed from both TABS and the MissionTab union, and typecheck passes with zero remaining 'conversation' MissionTab usages.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dissolve-conversation-tab.ac2",
+            "title": "When a session is selected from the spine, the main column renders the SessionPanel region (data-section=\"SessionPanel\") in the full-width main panel.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dissolve-conversation-tab.ac3",
+            "title": "The issue-context body (after \"Back to issue\") renders the Overview content followed by the MissionConversationTab cards (Launch / Agents / Quick tools / Conversation timeline) — a strict superset of what the Conversation tab showed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dissolve-conversation-tab.ac4",
+            "title": "The relocated MissionConversationTab wrapper preserves a visible data-section=\"Conversation / Files / Terminal tabs\" element even while the Files and Terminal tabs are closed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tasks-chip-drawer",
+        "title": "Replace the Tasks rail column with a tab-band Tasks chip + slide-over drawer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T13:47:16.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2842",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/cockpitBody.module.css",
+            "src/dashboard/frontend/src/components/Stage/cockpit/TasksDrawer.tsx",
+            "src/dashboard/frontend/src/lib/taskStatus.ts",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx src/components/issue-view/TasksSections.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "IssueMissionControl.test.tsx passes: chip shows the done/total rollup, clicking it mounts TasksRail content, and the onOpenFull path switches to the Tasks view; TasksSections.test.tsx stays green"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D-3/WI-3: (1) change the ≥840px grid template in cockpitBody.module.css (search `grid-template-columns: minmax(210px, 264px)`) from three columns to `minmax(210px, 264px) minmax(0, 1fr)` and remove the <div data-section=\"TasksRail / TasksTab\"> grid child that renders TasksRail. (2) Add a right-aligned (margin-left: auto) Tasks chip to the tab band carrying data-section=\"TasksRail / TasksTab\" — a real, always-visible element — showing `done/total` plus a small progress bar, computed from the SAME useQuery data TasksRail already fetches (query key /api/issues/:id/tasks); extract a small shared rollup helper using the existing taskStatusBucket from src/dashboard/frontend/src/lib/taskStatus.ts rather than a second fetch or second bucketing implementation. (3) Add a TasksDrawer component: absolutely-positioned right-anchored panel + scrim inside the cockpit wrap (per the mockup), aria-label=\"Plan progress\", closing on Escape and scrim click, whose body renders <TasksRail issueId={issueId} onOpenFull={() => { closeDrawer(); selectTab('beads') }} /> unchanged. The hidden beads tab and TasksTab are untouched. Style-guide: badge tint 8%/32%, no rounded-full pills, no hardcoded hex."
+        },
+        "items": [
+          {
+            "id": "tasks-chip-drawer.ac1",
+            "title": "At ≥840px container width the body grid renders exactly two columns (spine + main) — the 256px Tasks rail column and its grid child are removed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tasks-chip-drawer.ac2",
+            "title": "The tab band renders an always-visible right-aligned Tasks chip carrying data-section=\"TasksRail / TasksTab\" that shows <done>/<total> derived from the existing tasks query data — no new query key, endpoint, or polling loop is introduced.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tasks-chip-drawer.ac3",
+            "title": "Clicking the chip opens a slide-over drawer that renders the existing TasksRail content unchanged; pressing Escape or clicking the scrim closes it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tasks-chip-drawer.ac4",
+            "title": "Clicking \"Open full\" inside the drawer closes the drawer and switches the cockpit to the full Tasks view (the beads tab renders TasksTab).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tasks-chip-drawer.ac5",
+            "title": "The done/total rollup returns its counts from one shared helper that applies the existing taskStatusBucket; the diff contains no second bucketing implementation and no second fetch.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spine-collapse",
+        "title": "Make the agent spine collapsible to a 56px icon rail",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:47:16.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2842",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/cockpitBody.module.css",
+            "src/dashboard/frontend/src/components/Stage/cockpit/agentsLane.module.css",
+            "src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "component test passes: the toggle flips aria-expanded, persists to localStorage['overdeck.cockpit.spineCollapsed'], and the collapsed state restores on remount"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D-4/WI-4: add a collapse toggle (a real <button> with aria-expanded) to the spine header area — the <aside> wrapper around IssueTreeLane in IssueMissionControl.tsx. Collapsed state adds a conditional .spineCollapsed class on .missionBody; in cockpitBody.module.css add `.missionBody.spineCollapsed { grid-template-columns: 56px minmax(0, 1fr); }` INSIDE the same @container (min-width: 840px) block (container query, never a viewport media query). Collapsed rows render the icon tile only, centered, with name/model/status hidden via CSS rules in agentsLane.module.css under the collapsed class (prefer CSS-class-driven hiding over a new AgentsLane prop to keep the component API stable) and a native title tooltip carrying name + status. Persist the choice as localStorage['overdeck.cockpit.spineCollapsed'], defaulting to expanded."
+        },
+        "items": [
+          {
+            "id": "spine-collapse.ac1",
+            "title": "A <button> with aria-expanded in the spine header toggles the collapsed state; when collapsed the grid's first column renders at 56px via the .spineCollapsed class under @container (min-width: 840px).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spine-collapse.ac2",
+            "title": "Collapsed rows render icon tiles only with a native title tooltip containing the agent name and status, and clicking an icon row still opens that agent's conversation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spine-collapse.ac3",
+            "title": "The collapsed choice persists to localStorage['overdeck.cockpit.spineCollapsed'], restores on remount, and defaults to expanded when the key is absent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "transcript-measure",
+        "title": "Cap the conversation transcript at a centered 980px measure",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:47:16.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2842",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "render test passes asserting the SessionPanel wrapper carries max-w-[980px]"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ],
+          "acJustification": "A one-wrapper change: the two criteria (wrapper classes present, SessionPanel untouched) fully cover the observable behavior."
+        },
+        "narrative": {
+          "Action": "Per PRD D-5/WI-5: in IssueTreeContextPanel (IssueMissionControl.tsx, search `<SessionPanel`), wrap the returned <SessionPanel …> in <div className=\"mx-auto w-full max-w-[980px]\"> (explicit literal Tailwind classes — interpolated strings get purged). Do NOT modify the SessionPanel component itself; it has other consumers."
+        },
+        "items": [
+          {
+            "id": "transcript-measure.ac1",
+            "title": "The SessionPanel render in IssueTreeContextPanel is wrapped in a div carrying mx-auto w-full max-w-[980px], so on a 1600px pane the transcript column renders ≤980px wide and horizontally centered.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-measure.ac2",
+            "title": "SessionPanel.tsx itself has zero changes in the diff — the cap applies only at the cockpit call site.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-loss-gate",
+        "title": "No-loss audit: every cockpit section keeps a real visible data-section home",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T13:47:16.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2842",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+            "src/dashboard/frontend/src/components/issue-view/densitySections.ts",
+            "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts",
+            "src/dashboard/frontend/src/components/issue-view/IssueView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/frontend/issue-view-no-loss.test.ts --configLoader runner",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/IssueView.test.tsx"
+          ],
+          "expected_outputs": [
+            "issue-view-no-loss.test.ts passes",
+            "IssueView.test.tsx suite passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D-6/WI-6: walk all sections in DENSITY_SECTIONS.cockpit and confirm each still has a real, visible data-section element after the preceding items; update `home` paths in inventory.ts for any element that physically moved (Detail Tabs now above the body; TasksRail / TasksTab marker on the chip; Conversation / Files / Terminal tabs marker on the relocated MissionConversationTab wrapper). Never delete or rename an inventory entry; add no hidden markers. Then run both gate suites — the tests, not memory, answer \"is anything lost?\". If a marker turns out to be visible only inside the closed drawer, the stated fallback is the chip-carries-the-marker rule; do not add hidden marker elements."
+        },
+        "items": [
+          {
+            "id": "no-loss-gate.ac1",
+            "title": "Every section name in DENSITY_SECTIONS.cockpit survives unchanged and each renders a real visible data-section element; inventory.ts home paths are updated for moved elements with zero entries deleted or renamed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-gate.ac2",
+            "title": "`npx vitest run tests/unit/dashboard/frontend/issue-view-no-loss.test.ts --configLoader runner` exits green.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-gate.ac3",
+            "title": "The IssueView.test.tsx suite exits green with no hidden data-section markers introduced by this issue's diff.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-cockpit-layout",
+        "title": "Document the new cockpit layout in docs/ISSUE-VIEW.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:47:16.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2842",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"issue-cockpit-full-width-conversation.html\" docs/ISSUE-VIEW.md",
+            "grep -in \"tasks chip\" docs/ISSUE-VIEW.md"
+          ],
+          "expected_outputs": [
+            "grep prints the mockup link line from the new Cockpit layout note",
+            "grep prints the line describing the Tasks chip/drawer"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ],
+          "acJustification": "Docs-only item; the two criteria name the concrete content the doc must now show."
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7: add a short \"Cockpit layout\" note to docs/ISSUE-VIEW.md describing the new shape — full-width tab band above the body, two-column body (collapsible spine + conversation), Tasks chip in the band opening a slide-over drawer, 980px transcript measure — and a one-line pointer to the mockup at docs/design/issue-cockpit-full-width-conversation.html. Check CLAUDE.md's Issue-views paragraph: it currently just points at docs/ISSUE-VIEW.md, so it likely needs no change; only touch it if it contradicts the new shape."
+        },
+        "items": [
+          {
+            "id": "docs-cockpit-layout.ac1",
+            "title": "docs/ISSUE-VIEW.md contains a Cockpit layout note that describes the full-width tab band, the two-column body with collapsible spine, and the Tasks chip + slide-over drawer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-cockpit-layout.ac2",
+            "title": "docs/ISSUE-VIEW.md contains a link to docs/design/issue-cockpit-full-width-conversation.html as the layout's mockup reference.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "lift-tab-band",
+        "to": "tasks-chip-drawer",
+        "type": "blocks"
+      },
+      {
+        "from": "lift-tab-band",
+        "to": "no-loss-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "dissolve-conversation-tab",
+        "to": "no-loss-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "tasks-chip-drawer",
+        "to": "no-loss-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "spine-collapse",
+        "to": "no-loss-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "transcript-measure",
+        "to": "no-loss-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "no-loss-gate",
+        "to": "docs-cockpit-layout",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-17-PAN-2842-issue-cockpit-full-width-agent-conversations-lift-tab-strip-dissolve-conversation-tab-tasks-rail-chip-drawer.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

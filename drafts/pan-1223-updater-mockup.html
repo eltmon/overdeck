@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Overdeck updater — dashboard mockup</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080b10;
+      --surface: #0c1018;
+      --surface-2: #111722;
+      --ink: #e5e7eb;
+      --muted: #9ca3af;
+      --border: rgba(255,255,255,.08);
+      --border-strong: rgba(255,255,255,.14);
+      --primary: oklch(0.588 0.217 264);
+      --primary-soft: color-mix(in srgb, var(--primary) 14%, transparent);
+      --success: #34d399;
+      --warning: #fbbf24;
+      --danger: #f87171;
+      --radius: 10px;
+      --sidebar: 256px;
+      font-family: "DM Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; overflow: hidden; background: var(--bg); color: var(--ink); }
+    button { font: inherit; }
+    button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .app { display: grid; grid-template-columns: var(--sidebar) 1fr; min-height: 100vh; }
+    .sidebar { display: flex; min-width: 0; flex-direction: column; border-right: 1px solid var(--border); background: var(--surface); }
+    .brandbar { display: flex; align-items: center; height: 48px; padding: 0 12px; border-bottom: 1px solid var(--border); }
+    .home-link { display: inline-flex; min-width: 0; align-items: center; gap: 8px; border: 0; background: none; color: var(--ink); padding: 4px 0; cursor: pointer; }
+    .mark { width: 21px; height: 21px; color: var(--primary); flex: 0 0 auto; }
+    .wordmark { font-size: 16px; font-weight: 650; letter-spacing: -.015em; }
+    .version-wrap { position: relative; margin-left: 7px; }
+    .version-button { position: relative; display: inline-flex; align-items: center; gap: 5px; min-height: 24px; border: 0; border-radius: 6px; padding: 3px 6px; color: var(--muted); background: transparent; font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; cursor: pointer; transition: color 160ms ease, background 160ms ease; }
+    .version-button:hover, .version-button[aria-expanded="true"] { color: var(--ink); background: rgba(255,255,255,.07); }
+    .version-button .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+    .tooltip { position: absolute; z-index: 30; left: 0; top: calc(100% + 8px); width: max-content; max-width: 240px; padding: 7px 9px; border-radius: 7px; background: #e5e7eb; color: #111827; font-size: 11px; line-height: 1.35; opacity: 0; pointer-events: none; transform: translateY(-3px); transition: opacity 130ms ease, transform 130ms ease; }
+    .tooltip::before { content: ""; position: absolute; top: -4px; left: 15px; width: 8px; height: 8px; background: #e5e7eb; transform: rotate(45deg); }
+    .version-wrap:hover .tooltip, .version-button:focus-visible + .tooltip { opacity: 1; transform: translateY(0); }
+    .collapse { margin-left: auto; border: 0; border-radius: 6px; padding: 6px 8px; background: transparent; color: var(--muted); cursor: pointer; }
+    .collapse:hover { color: var(--ink); background: rgba(255,255,255,.06); }
+    .nav { flex: 1; overflow: hidden; padding: 10px 8px; }
+    .nav-label { margin: 18px 9px 7px; color: #727987; font-size: 10px; font-weight: 650; }
+    .nav-item { display: flex; align-items: center; gap: 10px; width: 100%; height: 34px; margin-bottom: 2px; border: 0; border-radius: 7px; padding: 0 9px; color: var(--muted); background: transparent; text-align: left; cursor: pointer; }
+    .nav-item:hover { color: var(--ink); background: rgba(255,255,255,.05); }
+    .nav-item.active { color: var(--ink); background: rgba(255,255,255,.08); }
+    .nav-icon { width: 15px; color: #778195; text-align: center; }
+    .project-dot { width: 13px; height: 13px; border-radius: 4px; background: color-mix(in srgb, var(--primary) 45%, transparent); }
+    .sidebar-foot { padding: 10px 12px; border-top: 1px solid var(--border); }
+    .environment { display: inline-flex; border-radius: 5px; padding: 3px 6px; background: rgba(52,211,153,.1); color: var(--success); font-size: 9px; font-weight: 700; letter-spacing: .07em; }
+    .content { min-width: 0; background: var(--bg); }
+    .topbar { height: 48px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--border); padding: 0 14px; }
+    .crumb { font-size: 13px; font-weight: 650; }
+    .search { width: min(440px, 45vw); margin: 0 auto; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; color: #727987; font-size: 12px; }
+    .status { display: flex; align-items: center; gap: 7px; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(52,211,153,.24); border-radius: 999px; padding: 5px 9px; color: var(--success); background: rgba(52,211,153,.08); font-size: 11px; }
+    .pill i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .canvas { padding: 28px; }
+    .page-title { margin: 0 0 4px; font-size: 23px; letter-spacing: -.025em; }
+    .page-copy { margin: 0 0 26px; color: var(--muted); font-size: 13px; }
+    .metric-row { display: flex; gap: 1px; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--border); }
+    .metric { flex: 1; min-width: 150px; padding: 16px; background: var(--surface); }
+    .metric strong { display: block; margin-bottom: 3px; font-size: 18px; font-weight: 650; }
+    .metric span { color: var(--muted); font-size: 11px; }
+    .workspace { margin-top: 20px; border-top: 1px solid var(--border); }
+    .workspace-row { display: grid; grid-template-columns: 1fr 120px 120px 90px; align-items: center; min-height: 54px; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .workspace-row.header { min-height: 38px; color: #727987; font-size: 10px; }
+    .issue { font-weight: 600; }
+    .issue small { display: block; margin-top: 3px; color: var(--muted); font-weight: 400; }
+    .muted { color: var(--muted); }
+
+    .backdrop { position: fixed; inset: 0; z-index: 50; display: none; place-items: center; padding: 24px; background: rgba(0,0,0,.58); backdrop-filter: blur(3px); }
+    .backdrop.open { display: grid; }
+    .dialog { width: min(680px, calc(100vw - 32px)); max-height: min(760px, calc(100vh - 48px)); overflow: hidden; border: 1px solid var(--border-strong); border-radius: 14px; background: var(--surface); box-shadow: 0 8px 24px rgba(0,0,0,.38); }
+    .dialog-head { display: flex; align-items: flex-start; gap: 12px; padding: 20px 22px 17px; border-bottom: 1px solid var(--border); }
+    .update-icon { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; border-radius: 9px; background: var(--primary-soft); color: #9aa8ff; }
+    .dialog-title { margin: 0 0 3px; font-size: 16px; letter-spacing: -.01em; }
+    .dialog-subtitle { margin: 0; color: var(--muted); font-size: 12px; }
+    .close { margin-left: auto; border: 0; border-radius: 6px; padding: 5px 8px; background: transparent; color: var(--muted); cursor: pointer; }
+    .close:hover { color: var(--ink); background: rgba(255,255,255,.06); }
+    .dialog-body { max-height: calc(100vh - 210px); overflow-y: auto; }
+    .version-summary { display: flex; align-items: center; gap: 15px; padding: 18px 22px; background: rgba(255,255,255,.018); }
+    .version-stack span { display: block; color: var(--muted); font-size: 10px; margin-bottom: 3px; }
+    .version-stack strong { font: 650 16px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .arrow { color: #667085; font-size: 17px; }
+    .channel { margin-left: auto; border: 1px solid var(--border); border-radius: 999px; padding: 4px 8px; color: var(--muted); font-size: 10px; }
+    .release { padding: 20px 22px 10px; }
+    .release h3 { margin: 0 0 13px; font-size: 13px; }
+    .release-note { border-top: 1px solid var(--border); padding: 13px 0; }
+    .release-note:first-of-type { border-top: 0; padding-top: 0; }
+    .release-note strong { display: block; margin-bottom: 4px; font-size: 12px; }
+    .release-note p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .release-link { display: inline-flex; margin: 4px 0 4px; color: #9aa8ff; font-size: 11px; text-decoration: none; }
+    .impact { display: flex; gap: 10px; margin: 6px 22px 18px; padding: 12px; border-radius: 9px; background: rgba(255,255,255,.04); color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .impact b { color: var(--ink); }
+    .progress-block { display: none; padding: 18px 22px; }
+    .progress-copy { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 9px; }
+    .progress-copy strong { font-size: 12px; }
+    .progress-copy span { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .track { height: 6px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.08); }
+    .bar { width: 0; height: 100%; border-radius: inherit; background: var(--primary); transition: width 160ms linear; }
+    .state-panel { display: none; padding: 38px 24px 34px; text-align: center; }
+    .state-panel .state-icon { display: grid; place-items: center; width: 44px; height: 44px; margin: 0 auto 13px; border-radius: 50%; background: rgba(52,211,153,.1); color: var(--success); font-size: 21px; }
+    .state-panel.error .state-icon { background: rgba(248,113,113,.1); color: var(--danger); }
+    .state-panel h3 { margin: 0 0 6px; font-size: 15px; }
+    .state-panel p { max-width: 420px; margin: 0 auto; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .dialog-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--border); background: rgba(0,0,0,.08); }
+    .btn { border: 0; border-radius: 8px; min-height: 34px; padding: 0 13px; cursor: pointer; font-size: 12px; font-weight: 650; }
+    .btn.secondary { color: var(--ink); background: rgba(255,255,255,.07); }
+    .btn.secondary:hover { background: rgba(255,255,255,.11); }
+    .btn.primary { color: white; background: var(--primary); }
+    .btn.primary:hover { filter: brightness(1.08); }
+    .btn:disabled { cursor: wait; opacity: .55; }
+    .checking { display: none; align-items: center; gap: 9px; margin-right: auto; color: var(--muted); font-size: 11px; }
+    .spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.18); border-top-color: #9aa8ff; border-radius: 50%; animation: spin .8s linear infinite; }
+    .prototype-controls { position: fixed; right: 16px; bottom: 16px; z-index: 20; display: flex; align-items: center; gap: 5px; padding: 6px; border: 1px solid var(--border-strong); border-radius: 9px; background: var(--surface-2); color: var(--muted); font-size: 10px; }
+    .prototype-controls span { padding: 0 5px; }
+    .prototype-controls button { border: 0; border-radius: 5px; padding: 5px 7px; background: transparent; color: var(--muted); cursor: pointer; font-size: 10px; }
+    .prototype-controls button.active { color: var(--ink); background: rgba(255,255,255,.09); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+    @media (max-width: 760px) {
+      :root { --sidebar: 52px; }
+      .wordmark, .version-wrap, .nav-item span, .nav-label, .sidebar-foot { display: none; }
+      .brandbar { justify-content: center; padding: 0; }
+      .collapse { display: none; }
+      .home-link { justify-content: center; }
+      .nav-item { justify-content: center; padding: 0; }
+      .canvas { padding: 18px; }
+      .status { display: none; }
+      .workspace-row { grid-template-columns: 1fr 90px; }
+      .workspace-row > :nth-child(3), .workspace-row > :nth-child(4) { display: none; }
+      .metric-row { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app" aria-label="Overdeck dashboard updater prototype">
+    <aside class="sidebar">
+      <div class="brandbar">
+        <button class="home-link" type="button" aria-label="Go to Home">
+          <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="16" r="12.5" stroke="currentColor" stroke-width="4"/><circle cx="16" cy="16" r="4.5" fill="currentColor"/><circle cx="26.8" cy="9.2" r="3.4" fill="currentColor"/></svg>
+          <span class="wordmark">Overdeck</span>
+        </button>
+        <div class="version-wrap">
+          <button id="versionButton" class="version-button" type="button" aria-expanded="false" aria-describedby="versionTooltip">
+            <span id="versionDot" class="dot" aria-hidden="true"></span><span id="versionText">v0.45.16</span>
+          </button>
+          <div id="versionTooltip" class="tooltip" role="tooltip">Click to update Overdeck to the latest version.</div>
+        </div>
+        <button class="collapse" type="button" aria-label="Collapse sidebar">‹</button>
+      </div>
+      <nav class="nav" aria-label="Main navigation">
+        <button class="nav-item active"><b class="nav-icon">⌂</b><span>Home</span></button>
+        <button class="nav-item"><b class="nav-icon">↻</b><span>Flywheel</span></button>
+        <div class="nav-label">Projects</div>
+        <button class="nav-item"><i class="project-dot"></i><span>overdeck</span></button>
+        <button class="nav-item"><i class="project-dot" style="background:rgba(52,211,153,.34)"></i><span>auricle</span></button>
+        <div class="nav-label">More</div>
+        <button class="nav-item"><b class="nav-icon">▦</b><span>Backlog</span></button>
+        <button class="nav-item"><b class="nav-icon">⌘</b><span>Command Deck</span></button>
+        <button class="nav-item"><b class="nav-icon">◫</b><span>Resources</span></button>
+        <button class="nav-item"><b class="nav-icon">⚙</b><span>Settings</span></button>
+      </nav>
+      <div class="sidebar-foot"><span class="environment">PROD</span></div>
+    </aside>
+    <section class="content">
+      <header class="topbar">
+        <span class="crumb">All projects</span>
+        <div class="search">⌕&nbsp; Search issues, conversations, commands… <span style="margin-left:auto">/</span></div>
+        <div class="status"><span class="pill"><i></i>4 agents</span><span class="muted">● Healthy</span></div>
+      </header>
+      <div class="canvas">
+        <h1 class="page-title">Good afternoon</h1>
+        <p class="page-copy">Your projects and active work at a glance.</p>
+        <div class="metric-row">
+          <div class="metric"><strong>4</strong><span>Agents running</span></div>
+          <div class="metric"><strong>12</strong><span>Issues in progress</span></div>
+          <div class="metric"><strong>3</strong><span>Awaiting merge</span></div>
+          <div class="metric"><strong>$18.42</strong><span>Cost today</span></div>
+        </div>
+        <div class="workspace">
+          <div class="workspace-row header"><span>Active work</span><span>Stage</span><span>Agent</span><span>Updated</span></div>
+          <div class="workspace-row"><span class="issue">PAN-2631<small>Harden release verification and artifact publishing</small></span><span>Review</span><span class="muted">gpt-5.6</span><span class="muted">now</span></div>
+          <div class="workspace-row"><span class="issue">PAN-2619<small>Conversation search result navigation</small></span><span>Work</span><span class="muted">claude-opus</span><span class="muted">2m</span></div>
+          <div class="workspace-row"><span class="issue">PAN-2608<small>Resource forecasting for parallel agents</small></span><span>Test</span><span class="muted">gpt-5.5</span><span class="muted">8m</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="backdrop" class="backdrop" aria-hidden="true">
+    <section id="dialog" class="dialog" role="dialog" aria-modal="true" aria-labelledby="updateTitle" tabindex="-1">
+      <header class="dialog-head">
+        <div class="update-icon" aria-hidden="true">↑</div>
+        <div><h2 id="updateTitle" class="dialog-title">Overdeck update</h2><p id="dialogSubtitle" class="dialog-subtitle">A newer stable release is available.</p></div>
+        <button id="closeButton" class="close" type="button" aria-label="Close updater">✕</button>
+      </header>
+      <div id="dialogBody" class="dialog-body">
+        <div id="availableContent">
+          <div class="version-summary">
+            <div class="version-stack"><span>Installed</span><strong>0.45.16</strong></div>
+            <div class="arrow">→</div>
+            <div class="version-stack"><span>Available</span><strong>0.46.0</strong></div>
+            <span class="channel">Stable channel</span>
+          </div>
+          <div class="release">
+            <h3>What’s new in 0.46.0</h3>
+            <div class="release-note"><strong>Update from the dashboard</strong><p>Check, download, and apply Overdeck releases from the version control beside the wordmark.</p></div>
+            <div class="release-note"><strong>Clearer restart handoff</strong><p>The updater keeps download progress, release notes, and restart status together so you always know what will happen next.</p></div>
+            <div class="release-note"><strong>Release integrity hardening</strong><p>Desktop packages are verified against the signed updater manifest before installation.</p></div>
+            <a class="release-link" href="https://github.com/eltmon/overdeck/releases" target="_blank" rel="noreferrer">View full release on GitHub ↗</a>
+          </div>
+          <div class="impact"><span aria-hidden="true">ⓘ</span><span><b>Overdeck will restart to finish the update.</b><br />Your four running agent sessions stay active; the dashboard reconnects after restart.</span></div>
+        </div>
+        <div id="progressBlock" class="progress-block">
+          <div class="progress-copy"><strong id="progressTitle">Downloading Overdeck 0.46.0…</strong><span id="progressValue">0% · 0 MB of 144 MB</span></div>
+          <div class="track"><div id="progressBar" class="bar"></div></div>
+          <p style="margin:12px 0 0;color:var(--muted);font-size:11px;line-height:1.5">You can keep working while the update downloads. Overdeck will not restart until you choose Restart Overdeck.</p>
+        </div>
+        <div id="statePanel" class="state-panel"><div class="state-icon">✓</div><h3 id="stateTitle">You’re up to date</h3><p id="stateCopy">Overdeck 0.45.16 is the latest stable release. Checked just now.</p></div>
+      </div>
+      <footer class="dialog-foot">
+        <div id="checking" class="checking"><span class="spinner"></span>Checking the stable channel…</div>
+        <button id="laterButton" class="btn secondary" type="button">Later</button>
+        <button id="primaryButton" class="btn primary" type="button">Update Overdeck</button>
+      </footer>
+    </section>
+  </div>
+
+  <div class="prototype-controls" aria-label="Prototype state controls"><span>Prototype state</span><button data-mode="available" class="active">Update available</button><button data-mode="current">Up to date</button><button data-mode="error">Error</button></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const backdrop = $('backdrop');
+    const dialog = $('dialog');
+    const versionButton = $('versionButton');
+    const availableContent = $('availableContent');
+    const progressBlock = $('progressBlock');
+    const statePanel = $('statePanel');
+    const checking = $('checking');
+    const laterButton = $('laterButton');
+    const primaryButton = $('primaryButton');
+    let mode = 'available';
+    let state = 'idle';
+    let timer;
+
+    function setOpen(open) {
+      backdrop.classList.toggle('open', open);
+      backdrop.setAttribute('aria-hidden', String(!open));
+      versionButton.setAttribute('aria-expanded', String(open));
+      if (open) dialog.focus(); else versionButton.focus();
+    }
+    function resetPanels() {
+      availableContent.style.display = 'none';
+      progressBlock.style.display = 'none';
+      statePanel.style.display = 'none';
+      statePanel.classList.remove('error');
+      checking.style.display = 'none';
+      laterButton.style.display = '';
+      primaryButton.style.display = '';
+      primaryButton.disabled = false;
+    }
+    function showChecking() {
+      clearInterval(timer);
+      state = 'checking'; resetPanels(); setOpen(true);
+      $('dialogSubtitle').textContent = 'Checking for the latest release…';
+      checking.style.display = 'flex';
+      primaryButton.style.display = 'none';
+      laterButton.textContent = 'Cancel';
+      setTimeout(() => mode === 'available' ? showAvailable() : mode === 'current' ? showCurrent() : showError(), 700);
+    }
+    function showAvailable() {
+      state = 'available'; resetPanels();
+      availableContent.style.display = 'block';
+      $('dialogSubtitle').textContent = 'A newer stable release is available.';
+      laterButton.textContent = 'Later'; primaryButton.textContent = 'Update Overdeck';
+    }
+    function showCurrent() {
+      state = 'current'; resetPanels(); statePanel.style.display = 'block';
+      $('dialogSubtitle').textContent = 'Update check complete.';
+      $('stateTitle').textContent = 'You’re up to date';
+      $('stateCopy').textContent = 'Overdeck 0.45.16 is the latest stable release. Checked just now.';
+      statePanel.querySelector('.state-icon').textContent = '✓';
+      laterButton.style.display = 'none'; primaryButton.textContent = 'Done';
+    }
+    function showError() {
+      state = 'error'; resetPanels(); statePanel.style.display = 'block'; statePanel.classList.add('error');
+      $('dialogSubtitle').textContent = 'The update check could not finish.';
+      $('stateTitle').textContent = 'Couldn’t check for updates';
+      $('stateCopy').textContent = 'Overdeck could not reach the release service. Check your connection and try again. Your current installation was not changed.';
+      statePanel.querySelector('.state-icon').textContent = '!';
+      laterButton.textContent = 'Close'; primaryButton.textContent = 'Try again';
+    }
+    function startDownload() {
+      state = 'downloading'; resetPanels(); progressBlock.style.display = 'block';
+      $('dialogSubtitle').textContent = 'Downloading securely in the background.';
+      laterButton.textContent = 'Hide'; primaryButton.textContent = 'Downloading…'; primaryButton.disabled = true;
+      let progress = 0;
+      timer = setInterval(() => {
+        progress = Math.min(100, progress + Math.ceil(Math.random() * 9));
+        $('progressBar').style.width = progress + '%';
+        $('progressValue').textContent = `${progress}% · ${Math.round(144 * progress / 100)} MB of 144 MB`;
+        $('versionText').textContent = progress < 100 ? `Updating ${progress}%` : 'Restart ready';
+        if (progress >= 100) { clearInterval(timer); showReady(); }
+      }, 170);
+    }
+    function showReady() {
+      state = 'ready'; resetPanels(); statePanel.style.display = 'block';
+      $('dialogSubtitle').textContent = 'The update is downloaded and verified.';
+      $('stateTitle').textContent = 'Overdeck 0.46.0 is ready';
+      $('stateCopy').textContent = 'Restart Overdeck to finish installing. Running agent sessions stay active while the dashboard reconnects.';
+      statePanel.querySelector('.state-icon').textContent = '✓';
+      laterButton.textContent = 'Later'; primaryButton.textContent = 'Restart Overdeck';
+      $('versionDot').style.background = 'var(--success)';
+    }
+    function finishRestart() {
+      state = 'current'; $('versionText').textContent = 'v0.46.0'; $('versionDot').style.background = 'var(--success)';
+      $('stateTitle').textContent = 'Overdeck is up to date';
+      $('stateCopy').textContent = 'Version 0.46.0 installed successfully. The dashboard has reconnected.';
+      $('dialogSubtitle').textContent = 'Update complete.';
+      laterButton.style.display = 'none'; primaryButton.textContent = 'Done';
+    }
+    versionButton.addEventListener('click', showChecking);
+    $('closeButton').addEventListener('click', () => setOpen(false));
+    laterButton.addEventListener('click', () => setOpen(false));
+    primaryButton.addEventListener('click', () => {
+      if (state === 'available') startDownload();
+      else if (state === 'error') showChecking();
+      else if (state === 'ready') finishRestart();
+      else if (state === 'current') setOpen(false);
+    });
+    backdrop.addEventListener('mousedown', (e) => { if (e.target === backdrop) setOpen(false); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && backdrop.classList.contains('open')) setOpen(false); });
+    document.querySelectorAll('[data-mode]').forEach((button) => button.addEventListener('click', () => {
+      mode = button.dataset.mode;
+      document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('active', b === button));
+      if (backdrop.classList.contains('open')) showChecking();
+    }));
+    // The standalone mockup opens directly on the update-available state so
+    // loading this HTML file immediately shows the feature being reviewed.
+    showAvailable();
+    setOpen(true);
+  </script>
+</body>
+</html>

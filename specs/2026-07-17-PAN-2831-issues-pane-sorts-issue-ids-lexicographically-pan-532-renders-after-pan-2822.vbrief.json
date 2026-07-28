@@ -1,0 +1,334 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-17T12:57:01.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2831: Issues pane sorts issue IDs lexicographically — PAN-532 renders after PAN-2822",
+    "updated": "2026-07-17T14:44:28.220Z"
+  },
+  "plan": {
+    "id": "pan-2831",
+    "title": "Issues pane sorts issue IDs lexicographically — PAN-532 renders after PAN-2822",
+    "status": "completed",
+    "uid": "8fc92c5a-4c3c-4e77-ba84-c806538be1f7",
+    "author": "agent:claude-fable-5",
+    "sequence": 8,
+    "created": "2026-07-17T12:57:01.000Z",
+    "updated": "2026-07-17T14:44:28.220Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2831",
+        "label": "PAN-2831",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "dashboard",
+      "sorting",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "Issue lists across the dashboard sort issue IDs with plain string comparison (`a.issueId.localeCompare(b.issueId)` or default Array.sort()), so PAN-532 sorts after PAN-2822 because '5' > '2' lexicographically. The operator reads the Issues pane ordering as random. The same flat comparator is duplicated per-surface (Issues pane projectsData, MergePolicySection, useSearch tiebreak, HomePage workspace cards, server routes/projects and resource-discovery), so any per-surface fix would leave the others broken and lets the bug recur.",
+      "Proposal": "Add one shared numeric-aware comparator `compareIssueIds(a: string, b: string): number` in packages/contracts (importable by both the frontend and the dashboard server), implemented with a module-level pinned collator: `new Intl.Collator('en', { numeric: true, sensitivity: 'base' })`. This orders embedded numeric segments by value (PAN-532 < PAN-2822), handles Rally-style ids (F29698), non-numeric suffixes (PAN-532-hotfix after PAN-532), and falls back to sane string order for non-conforming ids — with no hand-rolled parsing. Then replace every issue-id sort call site with the shared comparator: frontend projectsData.ts (the Issues pane), MergePolicySection.tsx, useSearch.ts (score tiebreak only), HomePage.tsx, and server routes/projects.ts + resource-discovery.ts. Surfaces that sort by other keys (priority/recency/name) keep their existing primary sort; only the issue-id comparisons change.",
+      "NonGoals": "- Do NOT change Pipeline view ordering (PipelineView.tsx comparePipelineIssues sorts by priority then updatedAt — no issue-id sort exists there and none is added)\n- Do NOT change agent-id sorting in src/dashboard/frontend/src/lib/workAgents.ts:31 (those are agent ids, not issue ids)\n- Do NOT change the query-key normalization sort in ZoneCOverviewTabs/queries.ts:577 (cache-key determinism only, never rendered)\n- Do NOT change pipeline-run-metrics.ts completedIssueIds sort (stats sample ordering, not a rendered issue list)\n- Do NOT change kanban board ordering (server-ranked, drag semantics)\n- Do NOT reorder projects themselves (project list stays sorted by name)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Comparator lives in packages/contracts (new src/issue-sort.ts, exported from index.ts), not the frontend lib.",
+        "rationale": "The issue offers 'frontend lib (or contracts)'; server-side call sites exist (routes/projects.ts, resource-discovery.ts) and contracts is the only package both the frontend and dashboard server already import, so contracts is the only home that fixes all surfaces with one comparator."
+      },
+      {
+        "summary": "Implement via a pinned Intl.Collator('en', { numeric: true, sensitivity: 'base' }) instead of hand-rolled prefix/number parsing.",
+        "rationale": "Numeric collation compares embedded digit runs by value, covering standard PREFIX-N ids, Rally TYPENUMBER ids, mixed-width numbers, and non-numeric suffixes without a parser; pinning the 'en' locale keeps ordering deterministic across environments. Simplicity-first per Karpathy rules."
+      },
+      {
+        "summary": "Surfaces whose primary sort is not the issue id (priority, recency, project name, score) are left untouched; only issue-id comparisons are swapped.",
+        "rationale": "The acceptance criteria require preserving existing grouping/secondary semantics; changing primary sorts elsewhere would be scope creep."
+      },
+      {
+        "summary": "No documentation item; plan.metadata.docsJustification is set instead.",
+        "rationale": "This is a sort-order bug fix; no Mintlify page, docs/ file, or CLAUDE.md section documents issue-list ordering, so there is no documented surface to update."
+      }
+    ],
+    "metadata": {
+      "docsJustification": "Sort-order bug fix. No documented surface (Mintlify configuration/reference pages, docs/, CLAUDE.md) describes issue-list ordering, so no doc changes are required.",
+      "canonicalFilename": "2026-07-17-PAN-2831-issues-pane-sorts-issue-ids-lexicographically-pan-532-renders-after-pan-2822.vbrief.json"
+    },
+    "items": [
+      {
+        "id": "add-issue-comparator",
+        "title": "Add shared compareIssueIds comparator to packages/contracts with unit tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:57:01.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2831",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "issues-pane-numeric-sort",
+            "frontend-callsites-numeric-sort",
+            "server-callsites-numeric-sort"
+          ],
+          "files_scope": [
+            "packages/contracts/src/issue-sort.ts",
+            "packages/contracts/src/issue-sort.test.ts",
+            "packages/contracts/src/index.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix packages/contracts test -- src/issue-sort.test.ts",
+            "npm --prefix packages/contracts run typecheck"
+          ],
+          "expected_outputs": [
+            "issue-sort.test.ts passes with all cases green",
+            "contracts typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create packages/contracts/src/issue-sort.ts exporting `compareIssueIds(a: string, b: string): number`. Implementation: a module-level `const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });` and `export function compareIssueIds(a: string, b: string): number { return collator.compare(a, b); }` with a doc comment explaining it exists so issue-id sorts are numeric within a prefix (PAN-532 before PAN-2822) and must be used by every surface that sorts issue ids (cites PAN-2831). Re-export it from packages/contracts/src/index.ts alongside the existing exports. Add packages/contracts/src/issue-sort.test.ts (vitest, colocated like artifacts.test.ts) asserting: (1) ['PAN-2822','PAN-806','PAN-538','PAN-532'].sort(compareIssueIds) === ['PAN-532','PAN-538','PAN-806','PAN-2822']; (2) different prefixes group lexicographically (AUR-2 before PAN-1); (3) non-numeric suffix: PAN-532 before PAN-532-hotfix, and PAN-532-hotfix before PAN-538; (4) Rally-style ids sort numerically (F532 before F2822); (5) case-insensitive: pan-5 and PAN-5 compare equal (returns 0). After editing packages/contracts, rebuild it per workspace rules: `cd packages/contracts && npm run build`."
+        },
+        "items": [
+          {
+            "id": "add-issue-comparator.ac1",
+            "title": "Given the list [PAN-2822, PAN-806, PAN-538, PAN-532], when sorted with compareIssueIds, it produces [PAN-532, PAN-538, PAN-806, PAN-2822]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-issue-comparator.ac2",
+            "title": "compareIssueIds returns suffix-aware order: PAN-532 precedes PAN-532-hotfix, which precedes PAN-538, and F532 precedes F2822",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-issue-comparator.ac3",
+            "title": "packages/contracts/src/index.ts exports compareIssueIds so `import { compareIssueIds } from '@overdeck/contracts'` resolves in both frontend and server code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-issue-comparator.ac4",
+            "title": "npm --prefix packages/contracts test -- src/issue-sort.test.ts exits 0 with the new test file listed as passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issues-pane-numeric-sort",
+        "title": "Issues pane: sort features with compareIssueIds in projectsData.groupProjects",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:57:01.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2831",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/CommandDeck/projectsData.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "projectsData.test.ts passes, asserting numeric feature order within a project",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/projectsData.ts line ~67 (`features: [...project.features].sort((a, b) => a.issueId.localeCompare(b.issueId))` inside groupProjects), replace the inline comparator with `compareIssueIds` imported from '@overdeck/contracts', i.e. `.sort((a, b) => compareIssueIds(a.issueId, b.issueId))`. Keep the project-level `.sort((a, b) => a.name.localeCompare(b.name))` unchanged — projects sort by name, only features within a project change. Add a colocated projectsData.test.ts (mirroring pipeline-helpers.test.ts style) exercising groupProjects with features PAN-2822, PAN-532, PAN-806, PAN-538 in one project and asserting the returned features array is in numeric order [PAN-532, PAN-538, PAN-806, PAN-2822], plus asserting projects remain sorted by name."
+        },
+        "items": [
+          {
+            "id": "issues-pane-numeric-sort.ac1",
+            "title": "Given a project whose features are PAN-2822, PAN-532, PAN-806, PAN-538, groupProjects returns its features array in the order PAN-532, PAN-538, PAN-806, PAN-2822 (Issues pane renders rows in that order)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-pane-numeric-sort.ac2",
+            "title": "groupProjects preserves the existing project ordering: projects list remains sorted by name via localeCompare, verified by the new unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-pane-numeric-sort.ac3",
+            "title": "npm --prefix src/dashboard/frontend run test -- src/components/CommandDeck/projectsData.test.ts exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-callsites-numeric-sort",
+        "title": "Swap remaining frontend issue-id sorts to compareIssueIds (MergePolicySection, useSearch, HomePage)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T12:57:01.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2831",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/MergePolicySection.tsx",
+            "src/dashboard/frontend/src/hooks/useSearch.ts",
+            "src/dashboard/frontend/src/pages/HomePage.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix src/dashboard/frontend run test"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "frontend vitest suite passes with no new failures"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Three mechanically identical one-line swaps, each importing compareIssueIds from '@overdeck/contracts': (1) src/dashboard/frontend/src/components/MergePolicySection.tsx line ~51: `.sort((a, b) => a.issueId.localeCompare(b.issueId))` → `.sort((a, b) => compareIssueIds(a.issueId, b.issueId))`. (2) src/dashboard/frontend/src/hooks/useSearch.ts line ~146: inside the scored.sort comparator, keep the score comparison as primary and replace only the tiebreak `return a.issue.identifier.localeCompare(b.issue.identifier)` with `return compareIssueIds(a.issue.identifier, b.issue.identifier)`. (3) src/dashboard/frontend/src/pages/HomePage.tsx line ~529: `[...issueIds].sort()` → `[...issueIds].sort(compareIssueIds)`. Touch nothing else in these files."
+        },
+        "items": [
+          {
+            "id": "frontend-callsites-numeric-sort.ac1",
+            "title": "Given active rows PAN-2822 and PAN-532, MergePolicySection renders PAN-532 before PAN-2822 because the row comparator applies compareIssueIds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-callsites-numeric-sort.ac2",
+            "title": "useSearch preserves score-descending as the primary sort and applies compareIssueIds only as the equal-score tiebreak",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-callsites-numeric-sort.ac3",
+            "title": "HomePage renders workspace cards in numeric issue order: given issue ids PAN-2822 and PAN-532, the card list renders PAN-532 first and no bare default-lexicographic [...issueIds].sort() remains in HomePage.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-callsites-numeric-sort",
+        "title": "Swap server issue-id sorts to compareIssueIds (routes/projects.ts, resource-discovery.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T12:57:01.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2831",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/projects.ts",
+            "src/dashboard/server/services/resource-discovery.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm test"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "root vitest suite passes with no new failures"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Three mechanically identical swaps, importing compareIssueIds from '@overdeck/contracts' (routes/projects.ts already imports from that package; add the named import in resource-discovery.ts): (1) src/dashboard/server/routes/projects.ts line ~659: `features.sort((a, b) => a.issueId.localeCompare(b.issueId))` → `features.sort((a, b) => compareIssueIds(a.issueId, b.issueId))`. (2) src/dashboard/server/services/resource-discovery.ts line ~809: `discoveredIssues.sort((a, b) => a.issueId.localeCompare(b.issueId))` → same swap. (3) resource-discovery.ts line ~930: `features: project.features.sort((a, b) => a.issueId.localeCompare(b.issueId))` → same swap. Touch nothing else in these files."
+        },
+        "items": [
+          {
+            "id": "server-callsites-numeric-sort.ac1",
+            "title": "GET responses built from routes/projects.ts and resource-discovery.ts return feature/issue arrays in numeric id order (PAN-532 precedes PAN-2822), with no remaining `.issueId.localeCompare` in either file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-callsites-numeric-sort.ac2",
+            "title": "npm run typecheck exits 0 after the resource-discovery.ts import addition, producing no type errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-callsites-numeric-sort.ac3",
+            "title": "npm test passes with no new failures relative to main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "add-issue-comparator",
+        "to": "issues-pane-numeric-sort",
+        "type": "blocks"
+      },
+      {
+        "from": "add-issue-comparator",
+        "to": "frontend-callsites-numeric-sort",
+        "type": "blocks"
+      },
+      {
+        "from": "add-issue-comparator",
+        "to": "server-callsites-numeric-sort",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "completed"
+}

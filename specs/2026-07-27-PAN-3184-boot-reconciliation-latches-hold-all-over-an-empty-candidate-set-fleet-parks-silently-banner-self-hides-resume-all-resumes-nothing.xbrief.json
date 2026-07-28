@@ -1,0 +1,605 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-27T04:46:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3184: Boot reconciliation latches hold_all over an empty candidate set — fleet parks silently, banner self-hides, resume_all resumes nothing",
+    "updated": "2026-07-27T08:04:49.773Z"
+  },
+  "plan": {
+    "id": "pan-3184",
+    "title": "Boot reconciliation latches hold_all over an empty candidate set — fleet parks silently, banner self-hides, resume_all resumes nothing",
+    "status": "completed",
+    "uid": "d54a1753-6787-4dd0-806a-ee189b1d0989",
+    "author": "agent:k3[1m]",
+    "sequence": 7,
+    "created": "2026-07-27T04:46:00Z",
+    "updated": "2026-07-27T08:04:49.773Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3184",
+        "label": "PAN-3184",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3183",
+        "label": "PAN-3183 (companion: rogue boot-path batch-stop writer, out of scope)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "boot-reconciliation",
+      "deacon",
+      "auto-resume",
+      "fail-safe",
+      "dashboard"
+    ],
+    "narratives": {
+      "Problem": "After the 2026-07-27 reboot the entire stopped fleet (6 strikes + 1 work agent) silently stayed down with no popup or banner. Verified chain: isBootReconciliationCandidate excluded the whole cohort (strikes by the role!=='work' gate at boot-reconciliation.ts:102, the work agent by the stoppedByUser exclusion at line 104) even though all stops were 39s before the stamp, inside the 240s recency window. The grace timer then latched hold_all unconditionally over the empty set (line 217). The event-path hold (deacon-auto-resume.ts:658) parked every later stopped-agent event — a broader set than candidates. The banner derived its visibility from the empty candidate set and self-hid (BootReconciliationModal.tsx:338). resume_all applied to the empty live candidate list and resumed nothing; even a non-empty list would have refused the cohort (stoppedByUser refusal at deacon-auto-resume.ts:742, role gate at :639).",
+      "Proposal": "Widen candidacy to the recently-stopped cohort (admit role 'strike' via a shared isAutoResumableRole helper; delete the stoppedByUser exclusion — recency is the sole discriminator). Never latch a vacuous hold: empty live candidate set at grace expiry resolves resume_all. Classify the boot: handleShutdownSignal persists dashboard.last_clean_shutdown_at synchronously at entry; expiry over non-empty candidates commits resume_all on a clean boot (marker within 30 min) and hold_all on a crash/unknown boot. Make apply origin-aware: the automatic expiry default filters stoppedByUser candidates out, while an explicit operator resume_all resumes the full held cohort via a new overrideStoppedByUser option on handleAgentStoppedEvent. Serve a live heldCount from GET /api/boot-reconciliation and drive the held banner from it. Amends the resolved 'expiry = Hold' decision in docs/FAILSAFE-CONTROL-ARCHITECTURE.md:85.",
+      "NonGoals": "- Identifying or fixing the 02:52:14Z batch-stop writer (that is PAN-3183)\n- Widening the steady-state patrol (autoResumeStoppedWorkAgents, deacon-auto-resume.ts:866-867) to strikes\n- A server-side dashboard-client gauge / holding the grace window while zero clients are connected (no client count exists; shutdown classification chosen instead)\n- Read-model vs agents-table drift / phantom running agents (PAN-3183)\n- CLI parity pan boot status (PAN-2078)\n- Any change to OVERDECK_NO_RESUME handling or the Freeze control\n- New config keys (classification constants are exported code constants)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "D1: deleted the stoppedByUser candidacy exclusion outright; recency is the sole discriminator between boot-caused and historical deliberate stops",
+        "rationale": "PAN-3183 proved stoppedByUser attribution near boot is written by an untrusted pre-deacon writer; the boot dialog exists to let the operator disposition exactly this cohort, and out-of-window deliberate stops are still excluded by the recency check."
+      },
+      {
+        "summary": "D2: strikes admitted to boot candidacy and the handleAgentStoppedEvent role gate via one isAutoResumableRole helper; steady-state patrol NOT widened",
+        "rationale": "The incident fleet was 6/7 strikes and the operator expected them auto-resumed; resumeAgent is role-agnostic and kickoff delivery already treats work/strike alike. The patrol stays work-only to avoid resurrecting historical stopped strikes outside a boot."
+      },
+      {
+        "summary": "D3: automatic expiry default filters stoppedByUser candidates; explicit operator resume_all overrides via overrideStoppedByUser",
+        "rationale": "Keeps 'pan stop-all-agents' + reboot safe (auto path never resurrects deliberate stops) while making the banner's Resume-all actually reach the incident cohort; an explicit click is an informed override."
+      },
+      {
+        "summary": "D4: clean-vs-crash shutdown classification chosen over the issue's zero-dashboard-clients hold-open alternative",
+        "rationale": "ws-rpc keeps no global dashboard-client count, so 'zero clients' is not implementable without new substrate; a persisted last-clean-shutdown marker written synchronously at handleShutdownSignal entry covers the same operator-latency gap (clean reboot auto-resumes, crash boot holds and shows the banner)."
+      },
+      {
+        "summary": "D5: banner visibility driven by a server-computed live heldCount rather than a client-side filter of data.set",
+        "rationale": "One live definition of 'held' (listBootReconciliationCandidates) feeds the route set, heldCount, and the apply batch, so the banner can never again hide while the hold suppresses resumes."
+      }
+    ],
+    "items": [
+      {
+        "id": "widen-candidacy",
+        "title": "Admit strikes and the in-window stoppedByUser cohort to boot candidacy",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:46:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3184",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "apply-origin-and-override",
+            "heldcount-route",
+            "banner-live-held"
+          ],
+          "files_scope": [
+            "src/lib/cloister/boot-reconciliation.ts",
+            "src/lib/cloister/deacon-auto-resume.ts",
+            "src/lib/cloister/__tests__/boot-reconciliation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/boot-reconciliation.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "boot-reconciliation test suite passes including new strike and stoppedByUser candidacy cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/boot-reconciliation.ts: (1) add and export `isAutoResumableRole(role)` returning true for 'work' and 'strike'; (2) in isBootReconciliationCandidate (line 101) replace the `agent.role !== 'work'` check with `!isAutoResumableRole(agent.role)`; (3) DELETE the stoppedByUser exclusion at line 104 and the now-unused hasCompletionMarker function (lines 64-68) — decision D1: recency (isRecentBootCandidate, line 105) is the sole discriminator. In src/lib/cloister/deacon-auto-resume.ts: replace the role gate at line 639 (`state.role !== 'work'`) with `!isAutoResumableRole(state.role)`, importing the helper from boot-reconciliation.js and keeping the log line's role interpolation. Do NOT widen the patrol query at deacon-auto-resume.ts:866-867 (NonGoal). Tests in src/lib/cloister/__tests__/boot-reconciliation.test.ts (follow the existing vi.hoisted/vi.mock pattern): a stopped strike agent with live workspace and open issue is a candidate; an in-window stoppedByUser work agent is a candidate; the same stoppedByUser agent with a stop older than max-candidate-age is rejected; a paused strike is rejected."
+        },
+        "items": [
+          {
+            "id": "widen-candidacy.ac1",
+            "title": "isBootReconciliationCandidate returns true for a stopped strike agent with a live workspace and non-terminal issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-candidacy.ac2",
+            "title": "isBootReconciliationCandidate returns true for a stopped work agent with stoppedByUser=true stopped inside the boot window, and returns false for the same agent whose newest timestamp is older than bootStartedAt minus max-candidate-age",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-candidacy.ac3",
+            "title": "handleAgentStoppedEvent no longer logs 'role=strike (not work)' for a stopped strike — the role gate accepts work and strike via isAutoResumableRole",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-candidacy.ac4",
+            "title": "npx vitest run src/lib/cloister/__tests__/boot-reconciliation.test.ts exits 0 and npm run typecheck reports no errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vacuous-hold-auto-release",
+        "title": "Resolve resume_all instead of hold_all when the candidate set is empty at grace expiry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:46:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3184",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/boot-reconciliation.ts",
+            "src/lib/cloister/__tests__/boot-reconciliation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/boot-reconciliation.test.ts"
+          ],
+          "expected_outputs": [
+            "new fake-timer test shows expiry over an empty candidate set commits resume_all and logs the vacuous-release line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In armBootReconciliationGraceTimer's expiry callback (src/lib/cloister/boot-reconciliation.ts:214-223): after the `decision !== 'pending'` guard and BEFORE committing any decision, compute `listBootReconciliationCandidateIds().length`; when 0, call setBootReconciliationDecision('resume_all'), log `boot reconciliation grace expired — vacuous hold auto-released (0 candidates)` via logDeaconEventSync, invoke the onGraceExpired hook with the same catch-log pattern as today, and return. Test with vi.useFakeTimers (repo rule — never real setTimeout): stamp a boot with zero candidates, advance past the deadline, assert getBootReconciliationState().decision === 'resume_all' and the vacuous-release log line was emitted."
+        },
+        "items": [
+          {
+            "id": "vacuous-hold-auto-release.ac1",
+            "title": "With zero live candidates at expiry, the committed decision is resume_all (not hold_all) and the deacon log contains 'vacuous hold auto-released'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vacuous-hold-auto-release.ac2",
+            "title": "The new expiry test passes under vi.useFakeTimers/vi.advanceTimersByTime and contains no real setTimeout wait",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "clean-shutdown-marker",
+        "title": "Persist dashboard.last_clean_shutdown_at synchronously at shutdown-signal entry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:46:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3184",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/control-settings.ts",
+            "src/dashboard/server/main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck and lint pass; marker helpers exported from control-settings.ts; marker write is the first statement after the shuttingDown guard in handleShutdownSignal"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/overdeck/control-settings.ts add `export const DASHBOARD_LAST_CLEAN_SHUTDOWN_AT_KEY = 'dashboard.last_clean_shutdown_at';` plus `getLastCleanShutdownAt(): string | null` and `setLastCleanShutdownAt(iso: string): void` built on the existing getSetting/setSetting helpers (NFR-2 — no new store access). In src/dashboard/server/main.ts handleShutdownSignal (line 627): immediately after `shuttingDown = true;` and BEFORE broadcastServerRestarting() and any await (NFR-3), call setLastCleanShutdownAt(new Date().toISOString()) wrapped in try/catch that console.warns on failure (non-fatal). No other reordering of the shutdown sequence."
+        },
+        "items": [
+          {
+            "id": "clean-shutdown-marker.ac1",
+            "title": "setLastCleanShutdownAt persists the ISO string to app_settings through the existing getSetting/setSetting door and getLastCleanShutdownAt returns it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clean-shutdown-marker.ac2",
+            "title": "In handleShutdownSignal the marker write precedes every await and every other statement after the shuttingDown guard, and a marker-write failure is caught and warned, never throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clean-shutdown-marker.ac3",
+            "title": "npm run typecheck passes and npm run lint passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "classified-expiry-default",
+        "title": "Classify the boot: clean shutdown expires to resume_all, crash boot to hold_all",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:46:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3184",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/boot-reconciliation.ts",
+            "src/lib/cloister/__tests__/boot-reconciliation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/boot-reconciliation.test.ts"
+          ],
+          "expected_outputs": [
+            "updated locked test asserts hold_all only in the no-marker (crash) case; new tests assert resume_all with a fresh marker and hold_all with a stale marker"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Depends on vacuous-hold-auto-release and clean-shutdown-marker. In src/lib/cloister/boot-reconciliation.ts: (1) add `export const CLEAN_SHUTDOWN_FRESHNESS_MS = 30 * 60 * 1000;` and `export function isCleanShutdownBoot(now: Date = new Date()): boolean` — true only when getLastCleanShutdownAt() (from control-settings.js) parses and `now.getTime() - Date.parse(marker) <= CLEAN_SHUTDOWN_FRESHNESS_MS`; (2) in the expiry callback, AFTER the vacuous-hold check, commit `isCleanShutdownBoot() ? 'resume_all' : 'hold_all'` and log which classification fired, e.g. `boot reconciliation grace expired — clean shutdown within 30m, decision set to resume_all` or `… — no clean shutdown marker (crash boot), decision set to hold_all`. Tests (fake timers; mock getLastCleanShutdownAt in the existing control-settings vi.mock): UPDATE the locked test 'stamps pending state and flips to hold_all when the grace timer expires' (line ~360) to cover the crash case (marker null); ADD marker-5-min-old + non-empty candidates → resume_all; marker-45-min-old → hold_all. Note: with a non-empty candidate set the expiry path must call the candidate-list function AFTER the vacuous check, so order the tests' mock agents accordingly."
+        },
+        "items": [
+          {
+            "id": "classified-expiry-default.ac1",
+            "title": "With getLastCleanShutdownAt() 5 minutes before boot and a non-empty candidate set, expiry commits resume_all and logs the clean-shutdown classification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classified-expiry-default.ac2",
+            "title": "With no marker (or a marker 45 minutes old) and a non-empty candidate set, expiry commits hold_all and logs the crash-boot classification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classified-expiry-default.ac3",
+            "title": "The pre-existing grace-expiry test covers the no-marker crash case (edited in place, not deleted), and the full boot-reconciliation suite passes under fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "apply-origin-and-override",
+        "title": "Origin-aware apply: auto default skips stoppedByUser, operator resume_all overrides it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:46:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3184",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/boot-reconciliation-apply.ts",
+            "src/lib/cloister/deacon-auto-resume.ts",
+            "src/dashboard/server/routes/boot-reconciliation.ts",
+            "src/dashboard/server/main.ts",
+            "src/lib/cloister/__tests__/boot-reconciliation-apply.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/boot-reconciliation-apply.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new apply test file passes: auto origin drops stoppedByUser candidates, operator origin forwards overrideStoppedByUser:true, hold_all no-ops"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Depends on widen-candidacy. (1) src/lib/cloister/deacon-auto-resume.ts: add `overrideStoppedByUser?: boolean` to HandleAgentStoppedOptions (line ~612); in the deliberate-stop refusal (lines 742-746) skip the refusal when opts.overrideStoppedByUser === true (log `resuming despite stoppedByUser — explicit operator resume_all override`). (2) src/lib/cloister/boot-reconciliation-apply.ts: change the signature to `applyBootReconciliationDecision(deps, opts?: { origin?: 'operator' | 'auto' })` with default origin 'auto'; when auto, filter the candidate list to `agent.stoppedByUser !== true` right after listBootReconciliationCandidates() (line 58) and log how many were filtered; when operator, pass `overrideStoppedByUser: true` in the handleAgentStoppedEvent options (line 103, alongside skipGlobalGates/context). (3) src/dashboard/server/main.ts:799 keeps calling the expiry hook with no opts (auto). (4) src/dashboard/server/routes/boot-reconciliation.ts:144 passes `{ origin: 'operator' }` as the second argument — check the actual first-argument (deps) shape at that call site and preserve it exactly. (5) NEW test file src/lib/cloister/__tests__/boot-reconciliation-apply.test.ts modeled on the vi.hoisted + vi.mock pattern of boot-reconciliation.test.ts: mock boot-reconciliation.js (candidate list), deacon-auto-resume.js (handleAgentStoppedEvent spy), concurrency.js, memory-governor.js, control-settings.js, tmux.js. Cases: auto origin over [stoppedByUser agent, plain agent] calls handleAgentStoppedEvent only for the plain one; operator origin calls it for both with overrideStoppedByUser:true; decision hold_all returns the empty result and never calls handleAgentStoppedEvent."
+        },
+        "items": [
+          {
+            "id": "apply-origin-and-override.ac1",
+            "title": "Auto-origin apply over a candidate list containing a stoppedByUser agent and a plain agent attempts resume only for the plain agent and logs the filtered count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apply-origin-and-override.ac2",
+            "title": "Operator-origin apply sends overrideStoppedByUser:true to handleAgentStoppedEvent for every candidate, and the deliberate-stop refusal respects that flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apply-origin-and-override.ac3",
+            "title": "The decision route passes origin:'operator' and the main.ts grace-expiry hook passes no origin (auto), verified by reading both call sites",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "apply-origin-and-override.ac4",
+            "title": "npx vitest run src/lib/cloister/__tests__/boot-reconciliation-apply.test.ts exits 0 and npm run typecheck reports no errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "heldcount-route",
+        "title": "Serve live heldCount and stoppedByUser rows from GET /api/boot-reconciliation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:46:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-3184",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/boot-reconciliation.ts",
+            "src/dashboard/server/routes/__tests__/boot-reconciliation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/boot-reconciliation.test.ts"
+          ],
+          "expected_outputs": [
+            "route tests pass: heldCount counts live candidates under hold_all, subtracts per_agent resume marks, and rows carry stoppedByUser"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Depends on widen-candidacy (row semantics). In src/dashboard/server/routes/boot-reconciliation.ts GET handler: (1) compute heldCount — state.decision === 'hold_all' → set.length; state.decision === 'per_agent' → count of set rows whose issueId is not marked 'resume' in state.perAgent; otherwise 0 — and include heldCount in the JSON response; (2) toRow gains `stoppedByUser: agent.stoppedByUser === true`; (3) bootReconciliationWhyStopped (line 37): drop the `&& !isBootReconciliationCandidate(agent)` condition so a stoppedByUser row always reads 'stopped by operator' (post-WI-1 those agents ARE candidates and would otherwise misreport 'stopped cleanly'). Update src/dashboard/server/routes/__tests__/boot-reconciliation.test.ts: hold_all with two candidates → heldCount 2; per_agent with one issue marked resume → heldCount 1; decision null/pending → heldCount 0; row exposes stoppedByUser:true and whyStopped 'stopped by operator'."
+        },
+        "items": [
+          {
+            "id": "heldcount-route.ac1",
+            "title": "GET /api/boot-reconciliation under hold_all with two live candidates returns heldCount: 2; under per_agent with one issue marked resume returns heldCount: 1; under pending returns heldCount: 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heldcount-route.ac2",
+            "title": "GET /api/boot-reconciliation returns set rows carrying stoppedByUser:true, and whyStopped shows 'stopped by operator' for a stoppedByUser candidate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heldcount-route.ac3",
+            "title": "npx vitest run src/dashboard/server/routes/__tests__/boot-reconciliation.test.ts exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "banner-live-held",
+        "title": "Render the held banner from live heldCount and default operator-stopped rows to hold",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:46:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3184",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/BootReconciliationModal.tsx",
+            "src/dashboard/frontend/src/components/__tests__/BootReconciliationModal.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/__tests__/BootReconciliationModal.test.tsx"
+          ],
+          "expected_outputs": [
+            "modal tests pass: banner renders under hold_all with heldCount>0, hidden at heldCount 0, stoppedByUser row defaults to hold"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Depends on heldcount-route (consumes the new field). In src/dashboard/frontend/src/components/BootReconciliationModal.tsx: (1) extend the local BootReconciliationState interface (lines ~45-59) with `heldCount?: number` and the BootReconciliationAgent row interface (~32-43) with `stoppedByUser?: boolean`; (2) in the held-banner branch (lines 334-338) replace the `if (heldAgents.length === 0) return null;` guard with `if ((data.heldCount ?? 0) === 0) return null;` — keep using the heldAgents rows for the count/copy rendering, but visibility is decided by the server's live heldCount; (3) in the per-agent default initialization (lines 263-267) map stoppedByUser rows to 'hold' instead of 'resume'. Update src/dashboard/frontend/src/components/__tests__/BootReconciliationModal.test.tsx: banner (data-testid='boot-reconciliation-held-banner') renders under hold_all with heldCount:2; does NOT render when heldCount:0 even though decision is hold_all; a stoppedByUser row's per-agent toggle initializes to hold."
+        },
+        "items": [
+          {
+            "id": "banner-live-held.ac1",
+            "title": "Under hold_all with heldCount: 2 the modal renders data-testid='boot-reconciliation-held-banner'; with heldCount: 0 it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-live-held.ac2",
+            "title": "The per-agent action for a stoppedByUser:true row defaults to 'hold' while plain rows still default to 'resume'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "banner-live-held.ac3",
+            "title": "npx vitest run src/dashboard/frontend/src/components/__tests__/BootReconciliationModal.test.tsx exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-failsafe-amendment",
+        "title": "Amend FAILSAFE-CONTROL-ARCHITECTURE.md expiry decision and config comments",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-27T04:46:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3184",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FAILSAFE-CONTROL-ARCHITECTURE.md",
+            "src/lib/cloister/config.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "docs name the clean/crash/vacuous amendment and cite PAN-3184; typecheck passes after the comment edit"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "(1) docs/FAILSAFE-CONTROL-ARCHITECTURE.md line ~85 (the resolved-decision paragraph beginning 'Resolved: grace defaults to 120s'): amend to record the PAN-3184 change — the expiry action is Hold only on crash/unknown boots (no dashboard.last_clean_shutdown_at marker within CLEAN_SHUTDOWN_FRESHNESS_MS = 30 min) with a non-empty candidate set; clean boots default to Resume; an empty candidate set at expiry always auto-releases to resume_all (vacuous hold never latches). Keep the PAN-3052 sentence about copy never promising auto-resume for crash boots. (2) src/lib/cloister/config.ts line 146 comment on reconciliation_grace_secs: replace 'Boot reconciliation grace window before default resume' with a precise one: 'Boot reconciliation grace window; expiry resumes after a clean shutdown, holds after a crash boot, auto-releases when no candidates'. (3) Verified during planning: no Mintlify page under configuration/ or reference/ mentions boot reconciliation, and no CLAUDE.md/rule section documents the expiry policy — nothing else to update; state this in the commit message."
+        },
+        "items": [
+          {
+            "id": "docs-failsafe-amendment.ac1",
+            "title": "docs/FAILSAFE-CONTROL-ARCHITECTURE.md's resolved-decision paragraph contains the clean/crash/vacuous expiry classification and the string PAN-3184",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-failsafe-amendment.ac2",
+            "title": "The reconciliation_grace_secs comment in src/lib/cloister/config.ts contains the clean-shutdown resume, crash-boot hold, and empty-set auto-release expiry policy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "widen-candidacy",
+        "to": "vacuous-hold-auto-release",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-candidacy",
+        "to": "apply-origin-and-override",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-candidacy",
+        "to": "heldcount-route",
+        "type": "blocks"
+      },
+      {
+        "from": "vacuous-hold-auto-release",
+        "to": "classified-expiry-default",
+        "type": "blocks"
+      },
+      {
+        "from": "clean-shutdown-marker",
+        "to": "classified-expiry-default",
+        "type": "blocks"
+      },
+      {
+        "from": "clean-shutdown-marker",
+        "to": "apply-origin-and-override",
+        "type": "blocks"
+      },
+      {
+        "from": "apply-origin-and-override",
+        "to": "heldcount-route",
+        "type": "blocks"
+      },
+      {
+        "from": "heldcount-route",
+        "to": "banner-live-held",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-candidacy",
+        "to": "docs-failsafe-amendment",
+        "type": "informs"
+      },
+      {
+        "from": "widen-candidacy",
+        "to": "classified-expiry-default",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-27-PAN-3184-boot-reconciliation-latches-hold-all-over-an-empty-candidate-set-fleet-parks-silently-banner-self-hides-resume-all-resumes-nothing.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

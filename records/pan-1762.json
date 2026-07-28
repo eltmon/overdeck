@@ -148,14 +148,14 @@
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T03:00:37.216Z",
+    "updatedAt": "2026-07-27T16:30:01.509Z",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "inspectNotes": "INSPECTION PASSED for bead workspace-qcwbs. Spec fidelity: slot-spawn-tier diff adds optional slot options, derives agent-pan-1762-n, feature/pan-1762/slot-n, and slot workspace paths, preserves default single-agent path, creates slot worktrees, and enforces a registered-slot cap. Constraint compliance: no prohibited swarm runtime/server route restoration, no execSync or sync tmux use, and scope stays within spawn.ts/spawn-prep.ts plus focused unit coverage.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2196",
     "lastVerifiedCommit": "a796e7310c3e8f390e71a4928dd1d93ca1cecdc8",
     "reviewRequestedAt": "2026-06-30T17:28:02.597Z",
     "closedOut": true,
-    "closedOutAt": "2026-07-07T03:00:37.216Z"
+    "closedOutAt": "2026-07-27T16:30:01.509Z"
   },
   "closeOut": {
     "usage": {
@@ -233,10 +233,83 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2196"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T16:30:01.520Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: missing at a796e7310c3e8f390e71a4928dd1d93ca1cecdc8 (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "PR #2196 is squash-merged and feature/pan-1762 matches the merged PR head; PR #2196 is squash-merged and origin/feature/pan-1762 matches the merged PR head; PR #2196 MERGED at 2026-06-30T21:59:16Z",
+          "status": "pass",
+          "mergedAt": "2026-06-30T21:59:16Z",
+          "mergeCommit": "f912279ab463ac16390e3750c6aba7e7282f89fe"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "6 check-runs concluded successfully on f912279ab463ac16390e3750c6aba7e7282f89fe",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit d44fa122 contains merge f912279a",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; No strike branch strike/pan-1762 found; Pruned 0 checkpoint ref(s) for agent-pan-1762, planning-pan-1762, strike-pan-1762; No specialist registry entries for PAN-1762"
+        }
+      ],
+      "accepted": []
+    }
   },
   "created": "2026-06-30T17:39:33.566Z",
-  "updated": "2026-07-08T16:01:27.631Z",
+  "updated": "2026-07-27T16:30:01.521Z",
   "statusOverrides": {
     "foreman-e2e": "completed",
     "foreman-e2e.ac1": "completed",

@@ -1,0 +1,767 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-21T23:30:06Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2997: Surface Linear MCP OAuth as a global intervention and wake blocked agents after re-auth",
+    "updated": "2026-07-26T13:53:03.704Z"
+  },
+  "plan": {
+    "id": "pan-2997",
+    "title": "Surface Linear MCP OAuth as a global intervention and wake blocked agents after re-auth",
+    "status": "completed",
+    "uid": "7cd104b1-1562-4321-a4ce-7e2a2f53c72d",
+    "author": "agent:k3[1m]",
+    "sequence": 9,
+    "created": "2026-07-21T23:30:06Z",
+    "updated": "2026-07-26T13:53:03.704Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2997",
+        "label": "PAN-2997",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/913",
+        "label": "PAN-913 Codex auth detection precedent",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1067",
+        "label": "PAN-1067 Codex banner accuracy precedent",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "linear",
+      "mcp",
+      "oauth",
+      "dashboard",
+      "intervention",
+      "agents"
+    ],
+    "narratives": {
+      "Problem": "When an agent needs the Linear MCP server but its OAuth session is missing or expired, the agent can only emit an authorization URL into its own transcript and block; the operator misses the request and stuck-agent checks report inactivity without the needed action (MIN-852). Overdeck already surfaces GPT/Codex OAuth failures as a prominent top-of-dashboard intervention (#913/#1067); Linear MCP OAuth needs the same treatment plus an automatic wake of blocked agents after re-auth.",
+      "Proposal": "Additive five-piece design (full detail in the PRD draft .pan/drafts/PAN-2997.md): (1) a PostToolUse hook on mcp__linear__.* detects authenticate/auth-error/success from the tool result and reports through the existing heartbeat ingestion; (2) four additive DomainEvent types give durable, restart-safe state; (3) src/lib/linear-mcp-auth.ts folds events into one deduped global intervention lifecycle (latest authUrl + owning agent, per-agent blocked records, 30-min default TTL); (4) a LinearMcpAuthBanner beside CodexAuthBanner shows the intervention with open-URL, paste-callback (localhost fallback), and mark-completed actions; (5) on healthy, a wake processor sends messageAgent resume/re-check messages to every blocked agent once (stopped agents auto-resume or get queued mail), with a boot-time recovery run.",
+      "NonGoals": "- No spawn guardrail (HTTP 429) for Linear MCP auth\n- No settings/provider-page surface (banner only)\n- No probing of Claude Code's internal MCP OAuth token store\n- No transcript/pane prose matching anywhere in the design\n- No auto-start of OAuth before an agent declares a requirement\n- No changes to the Codex auth flow\n- No Linear MCP auth signal for non-claude-code harnesses (pi/codex/acp)\n- No retroactive hook wiring for already-running sessions\n- Overdeck's Linear tracker client (LINEAR_API_KEY) is untouched"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Detect via PostToolUse hook reading the MCP tool result",
+        "rationale": "Only structured signal available on the default claude-code harness; the issue bans prose matching and harness-internal token stores are fragile."
+      },
+      {
+        "summary": "Persist as additive DomainEvents in the existing event store",
+        "rationale": "Restart durability with no migration; matches the two-door tenet and the operator-interventions.ts precedent."
+      },
+      {
+        "summary": "Ingest through the existing heartbeat route via new bodyToEvent kinds",
+        "rationale": "Reuses token auth, Schema validation, and pan_emit_event's offline pending-events.jsonl buffering."
+      },
+      {
+        "summary": "Wake via messageAgent, not raw deliverAgentMessage",
+        "rationale": "messageAgent handles the stopped-agent acceptance case: auto-resume through decideResumeGate or queued mail."
+      },
+      {
+        "summary": "Notify every blocked agent including the completing one",
+        "rationale": "Uniform semantics; the completer may itself be parked waiting for the callback relay."
+      },
+      {
+        "summary": "One global intervention by construction; latest authUrl wins, callbacks relay to the URL-owning agent",
+        "rationale": "The dedup the issue demands; the OAuth state parameter is bound to the agent that produced the URL."
+      },
+      {
+        "summary": "Banner beside CodexAuthBanner, polled via React Query REST",
+        "rationale": "Exactly the #913/#1067 pattern the issue says to reuse; no read-model/Zustand projection needed."
+      },
+      {
+        "summary": "Two completion paths: callback relay and operator mark-completed",
+        "rationale": "Callback relay is the remote localhost fallback; mark-completed covers claude mcp login linear (the actual MIN-852 resolution path), which emits no hook signal."
+      },
+      {
+        "summary": "Default authorization-URL TTL 30 minutes",
+        "rationale": "Linear authorize URLs are short-lived; a fresh required event refreshes and the expired state is explicit in the banner."
+      },
+      {
+        "summary": "No spawn guardrail and no settings-page surface",
+        "rationale": "Not requested by the issue's acceptance criteria; Linear MCP auth failure is discovered at tool-call time."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-linear-mcp-events",
+        "title": "Add four linear_mcp_auth.* DomainEvent schemas to @overdeck/contracts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-21T23:30:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2997",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/events.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd packages/contracts && npm run build",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "contracts package builds without errors",
+            "typecheck completes without errors",
+            "git diff on packages/contracts shows additions only"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/events.ts, add four additive event schemas mirroring OperatorInterventionEvent (:585-595): LinearMcpAuthRequiredEvent (type 'linear_mcp_auth.required', payload { agentId: string, issueId: string|null, authUrl: string|null, expiresAt: string|null }), LinearMcpAuthHealthyEvent (type 'linear_mcp_auth.healthy', payload { agentId, issueId: string|null, source: 'hook'|'operator' }), LinearMcpAuthNotifiedEvent (type 'linear_mcp_auth.notified', payload { agentId, issueId: string|null, outcome: 'delivered'|'queued'|'failed' }), LinearMcpAuthCallbackRelayedEvent (type 'linear_mcp_auth.callback_relayed', payload { agentId, issueId: string|null }). Append all four to the DomainEvent union at :1182. Change nothing else (no-loss audit: diff must show additions only). Then rebuild: cd packages/contracts && npm run build (workspace rule — downstream typecheck resolves the fresh build)."
+        },
+        "items": [
+          {
+            "id": "contracts-linear-mcp-events.ac1",
+            "title": "packages/contracts produces a clean build with all four new event types as members of the DomainEvent union",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-linear-mcp-events.ac2",
+            "title": "git diff on packages/contracts contains only additions — no existing event type, field, or union member is altered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-linear-mcp-events.ac3",
+            "title": "npm run typecheck passes without errors against the rebuilt contracts package",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "linear-mcp-auth-fold",
+        "title": "Create src/lib/linear-mcp-auth.ts read/write door with lifecycle fold and projection",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-21T23:30:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2997",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "linear-mcp-heartbeat-ingestion",
+            "linear-mcp-wake",
+            "linear-mcp-routes",
+            "linear-mcp-banner"
+          ],
+          "files_scope": [
+            "src/lib/linear-mcp-auth.ts",
+            "src/lib/__tests__/linear-mcp-auth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/linear-mcp-auth.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/__tests__/linear-mcp-auth.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/linear-mcp-auth.ts as the single read/write door for the intervention (mirroring src/lib/operator-interventions.ts). Write door: appendLinearMcpAuthEvent helpers using initEventStore().appendAsync. Read door: resolveLinearMcpAuthIntervention(nowIso?) folds queryByType results for the four event types in sequence order into at most one open lifecycle. Fold rules (PRD §Fold): required opens/refreshes the lifecycle and records agents[agentId] = { issueId, declaredAt, expiresAt = payload.expiresAt ?? declaredAt + LINEAR_MCP_AUTH_URL_TTL_MS } and, when authUrl is non-null, authUrl + authUrlAgentId + authUrlExpiresAt; healthy closes the open lifecycle (becomes lastCompleted); notified applies to the open lifecycle if present else to lastCompleted; callback_relayed is informational. Export LINEAR_MCP_AUTH_URL_TTL_MS = 30*60*1000. Projection shape: { status: 'none'|'active'|'expired', authUrl, authUrlAgentId, authUrlExpiresAt, declaredAt, blockedAgents: [{ agentId, issueId, declaredAt, expiresAt, notifiedAt }] }; status is expired when the lifecycle is open and authUrlExpiresAt < now. Also export computeLinearMcpAuthWakeSet() returning lastCompleted agents with notifiedAt == null. Unit tests in src/lib/__tests__/linear-mcp-auth.test.ts MUST use vi.useFakeTimers() + advanceTimersByTimeAsync for expiry (repo rule), and cover: single agent, multiple agents deduped into one lifecycle, latest-authUrl ownership, expiry flip at TTL, notified-after-close applying to lastCompleted, and a second healthy producing an empty wake set."
+        },
+        "items": [
+          {
+            "id": "linear-mcp-auth-fold.ac1",
+            "title": "The fold collapses required events from multiple agents into one open lifecycle whose blockedAgents contains every declaring agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-auth-fold.ac2",
+            "title": "Projection returns expired when authUrlExpiresAt passes (asserted with vi.useFakeTimers) and active again when a fresh required event arrives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-auth-fold.ac3",
+            "title": "Latest non-null authUrl wins and authUrlAgentId tracks the agent that produced it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-auth-fold.ac4",
+            "title": "A notified event arriving after the closing healthy applies to lastCompleted, and a second healthy event yields an empty wake set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "linear-mcp-heartbeat-ingestion",
+        "title": "Add linear_mcp_auth_required/healthy heartbeat kinds to bodyToEvent with issueId enrichment",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-21T23:30:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2997",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/agent-event-utils.ts",
+            "src/dashboard/server/routes/agents/runtime-events.ts",
+            "tests/contracts/heartbeat-ingestion.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/contracts/heartbeat-ingestion.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/contracts/heartbeat-ingestion.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/agent-event-utils.ts (bodyToEvent, :17), add two cases: 'linear_mcp_auth_required' → { type: 'linear_mcp_auth.required', payload: { agentId, issueId: body.issueId ?? null, authUrl: body.authUrl ?? null, expiresAt: body.expiresAt ?? null } } and 'linear_mcp_auth_healthy' → { type: 'linear_mcp_auth.healthy', payload: { agentId, issueId: body.issueId ?? null, source: 'hook' } }. In src/dashboard/server/routes/agents/runtime-events.ts, before bodyToEvent runs for these kinds, enrich the body with the agent's issueId resolved from agent state (the hook only knows its agent id), and extend the kind documentation comment at :44-54. Extend tests/contracts/heartbeat-ingestion.test.ts: both kinds decode and append valid events with issueId attribution; a malformed body is rejected with 400. Token gating is unchanged (validateAgentRuntimeEventAuth already covers the route — assert it still applies)."
+        },
+        "items": [
+          {
+            "id": "linear-mcp-heartbeat-ingestion.ac1",
+            "title": "POST /api/agents/:id/heartbeat with kind linear_mcp_auth_required persists a Schema-valid linear_mcp_auth.required event carrying the resolved issueId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-heartbeat-ingestion.ac2",
+            "title": "kind linear_mcp_auth_healthy persists a linear_mcp_auth.healthy event with source 'hook'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-heartbeat-ingestion.ac3",
+            "title": "The route rejects a malformed body for either new kind with HTTP 400 and persists nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "linear-mcp-wake",
+        "title": "Wake blocked agents on healthy via messageAgent, with reactive trigger and boot recovery",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-21T23:30:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2997",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/linear-mcp-auth.ts",
+            "src/lib/cloister/service-reactive.ts",
+            "src/lib/__tests__/linear-mcp-auth-wake.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/linear-mcp-auth-wake.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/__tests__/linear-mcp-auth-wake.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add processLinearMcpAuthWake() (in src/lib/linear-mcp-auth.ts, or src/lib/linear-mcp-auth-wake.ts if the lib exceeds ~300 lines): compute the wake set via computeLinearMcpAuthWakeSet(); for each agent call messageAgent(agentId, WAKE_COPY, 'linear-mcp-auth-wake') and append a linear_mcp_auth.notified event with outcome delivered/queued/failed (failed when the agent record is gone or messageAgent throws); serialize concurrent runs with the in-flight-guard pattern (src/lib/cloister/in-flight-guard.ts). WAKE_COPY verbatim: 'Linear MCP authentication has been restored — the operator completed OAuth. Re-check access now with one lightweight read (e.g. mcp__linear__list_issues). If it succeeds, resume your canonical task. If it still returns an authentication error, call mcp__linear__authenticate once and wait; do not retry in a loop.' Trigger 1: a linear_mcp_auth.healthy case in handleCloisterDomainEventPromise (src/lib/cloister/service-reactive.ts:393). Trigger 2: one run at server boot, wired next to the existing boot reconciliation in the server startup path (recovers a crash between healthy and notified). NEVER use execSync or raw tmux — messageAgent/deliverAgentMessage only. Tests in src/lib/__tests__/linear-mcp-auth-wake.test.ts (fake timers where delays appear): one blocked agent notified once; multiple blocked agents each notified once; stopped agent routed through messageAgent (auto-resume or mail-queue path); missing agent records outcome failed; a second healthy sends nothing."
+        },
+        "items": [
+          {
+            "id": "linear-mcp-wake.ac1",
+            "title": "On healthy, every agent in the ended lifecycle receives exactly one messageAgent call with the wake copy and a notified event recording the outcome",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-wake.ac2",
+            "title": "messageAgent routes the wake for a stopped blocked agent through its auto-resume or mail-queue path; the wake code never calls tmux directly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-wake.ac3",
+            "title": "An agent whose record no longer exists records a notified event with outcome failed and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-wake.ac4",
+            "title": "A second healthy event (e.g. from a just-woken agent) sends no additional wake messages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-wake.ac5",
+            "title": "Boot-time run of processLinearMcpAuthWake sends any pending wakes recorded before a server restart",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "linear-mcp-routes",
+        "title": "Add operator routes: GET projection, POST callback relay, POST mark-completed",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-21T23:30:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2997",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/linear-mcp-auth.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/dashboard/server/routes/__tests__/linear-mcp-auth.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/linear-mcp-auth.ts and register its layer in src/dashboard/server/server.ts beside codexAuthRouteLayer (:69). GET /api/linear-mcp-auth returns resolveLinearMcpAuthIntervention() with no side effects. POST /api/linear-mcp-auth/callback (origin-validated like the codex routes from PAN-913 hardening) accepts { callbackUrl }; rejects with 400 unless it is an http://localhost or http://127.0.0.1 URL containing code= and state= parameters; rejects with 409 when the projection has no authUrlAgentId; otherwise calls messageAgent(authUrlAgentId, CALLBACK_COPY, 'linear-mcp-auth-callback'), appends linear_mcp_auth.callback_relayed, and returns { success: true, relayedTo }. CALLBACK_COPY verbatim: 'The operator completed the Linear OAuth authorization in their browser. Finish the flow now: call mcp__linear__complete_authentication with callback_url set to exactly this URL: <URL> — then re-check Linear access and resume your canonical task.' POST /api/linear-mcp-auth/complete (origin-validated) appends linear_mcp_auth.healthy with source 'operator' (agentId 'operator', issueId null) and returns { success: true }; the wake rides the reactive path from linear-mcp-wake. Async only — no execSync. Route tests cover: GET projection shape, callback 400 on non-localhost or missing code/state, callback 409 with no URL owner, callback relay via messageAgent otherwise, complete appends an operator-source healthy."
+        },
+        "items": [
+          {
+            "id": "linear-mcp-routes.ac1",
+            "title": "GET /api/linear-mcp-auth returns the projection (status, authUrl, authUrlAgentId, blockedAgents) with no side effects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-routes.ac2",
+            "title": "POST callback rejects a non-localhost URL or one missing code=/state= with 400, and returns 409 when no agent owns an authorization URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-routes.ac3",
+            "title": "POST callback sends the exact callback URL to authUrlAgentId via messageAgent and records a callback_relayed event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-routes.ac4",
+            "title": "POST complete records a linear_mcp_auth.healthy event with source 'operator'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "linear-mcp-hook",
+        "title": "Add linear-mcp-auth-hook PostToolUse script, registration, and contract test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-21T23:30:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2997",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/hooks/linear-mcp-auth-hook*",
+            "src/lib/claude-hooks-registration.ts",
+            "tests/scripts/linear-mcp-auth-hook.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/scripts/linear-mcp-auth-hook.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/scripts/linear-mcp-auth-hook.test.ts passes against the real hook script",
+            "lint completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Create sync-sources/hooks/linear-mcp-auth-hook (bash + jq, structured like sync-sources/hooks/ask-user-question-hook): source pan-hook-lib.sh, pan_resolve_agent_id, set +e, always exit 0. Marker file ${OVERDECK_HOME:-$HOME/.overdeck}/agents/$AGENT_ID/linear-mcp-auth-pending dedups healthy emissions. Logic: mcp__linear__authenticate → extract the first https://linear\\.app/oauth/authorize URL from the tool response and pan_emit_event {kind:'linear_mcp_auth_required', authUrl} (authUrl null when extraction fails), touch marker. mcp__linear__complete_authentication → auth-error markers in the response (requires authentication|not authenticated|unauthorized|401) → emit required with null authUrl; otherwise emit {kind:'linear_mcp_auth_healthy'} and delete the marker. Any other mcp__linear__* tool → auth-error markers → emit required (null authUrl) + touch marker; clean response AND marker exists → emit healthy + delete marker; clean response without marker → emit nothing (no event spam). Register in src/lib/claude-hooks-registration.ts: add 'linear-mcp-auth-hook' to HOOK_SCRIPT_NAMES and { hookType: 'PostToolUse', scriptName: 'linear-mcp-auth-hook', matcher: 'mcp__linear__.*' } to OVERDECK_HOOK_REGISTRATIONS. Contract test tests/scripts/linear-mcp-auth-hook.test.ts mirrors tests/scripts/ask-user-question-hook.test.ts: stub pan-hook-lib.sh recording pan_emit_event bodies, run the real script via spawn with fixture stdin, assert URL extraction, auth-error → required, success-with-marker → healthy + marker deleted, success-without-marker → silence, garbage stdin → exit 0."
+        },
+        "items": [
+          {
+            "id": "linear-mcp-hook.ac1",
+            "title": "Given an mcp__linear__authenticate tool result containing an authorization URL, the hook emits linear_mcp_auth_required with the extracted https://linear.app/oauth/authorize URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-hook.ac2",
+            "title": "Given an auth-error tool result on any mcp__linear__* call, the hook emits linear_mcp_auth_required with a null authUrl",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-hook.ac3",
+            "title": "The hook emits linear_mcp_auth_healthy only when its marker file exists, and deletes the marker on emit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-hook.ac4",
+            "title": "Garbage stdin, missing jq, or any internal error exits 0 silently without emitting anything",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-hook.ac5",
+            "title": "claude-hooks-registration.ts contains the script in HOOK_SCRIPT_NAMES and registers it as PostToolUse with matcher mcp__linear__.*",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "linear-mcp-banner",
+        "title": "Add LinearMcpAuthBanner with status hook and AppChrome mount",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-21T23:30:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2997",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/LinearMcpAuthBanner.tsx",
+            "src/dashboard/frontend/src/components/LinearMcpAuthBanner.test.tsx",
+            "src/dashboard/frontend/src/hooks/useLinearMcpAuthStatus.ts",
+            "src/dashboard/frontend/src/App/AppChrome.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/LinearMcpAuthBanner.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "LinearMcpAuthBanner.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/hooks/useLinearMcpAuthStatus.ts (React Query key ['linear-mcp-auth'], polls GET /api/linear-mcp-auth with refetchInterval 5s while status !== 'none', 30s otherwise — the codex 3s-active/120s-idle shape). Create src/dashboard/frontend/src/components/LinearMcpAuthBanner.tsx and mount it in src/dashboard/frontend/src/App/AppChrome.tsx directly under <CodexAuthBanner /> (:88). Hidden when status === 'none'. Renders per /pan-style-guide (no pill badges, color = signal only): 'Linear authentication required' header; each blocked agent with a link to its issue; an 'Open Linear authorization' anchor (authUrl, target=_blank) naming the owning agent; a callback-URL input + submit posting to /api/linear-mcp-auth/callback with copy covering the remote localhost fallback ('on a remote session the callback page fails to load — copy the URL from the address bar'); a 'Mark completed' button posting to /api/linear-mcp-auth/complete whose copy states blocked agents will be woken to re-check and the banner returns if authentication is still broken; an expired state ('This authorization link expired — it refreshes automatically when a blocked agent generates a fresh one'); a waiting-for-URL state when no agent has produced one. Tests LinearMcpAuthBanner.test.tsx mirror CodexAuthBanner.test.tsx: hidden when none; agents + issue links when active; expired and waiting-for-URL states; callback submit posts the URL; mark-complete posts and shows its consequence copy."
+        },
+        "items": [
+          {
+            "id": "linear-mcp-banner.ac1",
+            "title": "Banner renders nothing when the projection status is none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-banner.ac2",
+            "title": "When active, the banner renders every blocked agent's identity with a link to its issue and an enabled open-authorization action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-banner.ac3",
+            "title": "Submitting the callback field sends the entered URL to /api/linear-mcp-auth/callback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-banner.ac4",
+            "title": "Expired and waiting-for-URL states each displays its distinct operator-facing copy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linear-mcp-banner.ac5",
+            "title": "Mark completed POSTs to /api/linear-mcp-auth/complete and displays the copy stating blocked agents will be woken to re-check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-linear-mcp-guidance",
+        "title": "Document the Linear MCP auth contract in roles/work.md and roles/plan.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-21T23:30:06Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-2997",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/work.md",
+            "roles/plan.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'mcp__linear__authenticate' roles/work.md roles/plan.md"
+          ],
+          "expected_outputs": [
+            "both role files contain the Linear MCP auth contract paragraph"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the same short paragraph to roles/work.md and roles/plan.md (near the tracker/Linear guidance): 'If a Linear MCP tool call fails with an authentication error: call mcp__linear__authenticate ONCE, state the returned authorization URL in one sentence, then stop and wait — Overdeck is notified automatically and will wake you when authentication is restored. Do not retry the tool in a loop and do not improvise other auth commands. When you receive a \"Linear MCP authentication has been restored\" message, re-check with one lightweight Linear read and resume your canonical task.'"
+        },
+        "items": [
+          {
+            "id": "role-linear-mcp-guidance.ac1",
+            "title": "roles/work.md contains the contract paragraph naming mcp__linear__authenticate and the wake message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-linear-mcp-guidance.ac2",
+            "title": "roles/plan.md contains the same contract paragraph",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-linear-mcp-auth",
+        "title": "Write docs/LINEAR-MCP-AUTH.md and link it from docs/CODEX-AUTH.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-21T23:30:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2997",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/LINEAR-MCP-AUTH.md",
+            "docs/CODEX-AUTH.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f docs/LINEAR-MCP-AUTH.md && grep -n 'LINEAR-MCP-AUTH' docs/CODEX-AUTH.md"
+          ],
+          "expected_outputs": [
+            "docs/LINEAR-MCP-AUTH.md exists and documents the flow",
+            "docs/CODEX-AUTH.md links to it"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Create docs/LINEAR-MCP-AUTH.md documenting: the detection hook and its exact emitted kinds/contract (so future copy-edits know it is load-bearing), the four event types and their payloads, the lifecycle fold semantics (one open lifecycle, dedup, expiry TTL, authUrl ownership), the banner states and the two operator completion paths (callback relay including the remote localhost fallback; mark-completed for claude mcp login linear), the wake semantics (messageAgent, once per agent per lifecycle, delivered/queued/failed outcomes, boot recovery), and pointers to the test files. Add a Related-section pointer to it in docs/CODEX-AUTH.md. State behaviors as system properties — never as destructive 'try deleting X' acceptance tests (repo rule)."
+        },
+        "items": [
+          {
+            "id": "docs-linear-mcp-auth.ac1",
+            "title": "docs/LINEAR-MCP-AUTH.md contains sections covering the hook contract, event payloads, fold semantics, banner states, operator flows, and wake semantics",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-linear-mcp-auth.ac2",
+            "title": "docs/CODEX-AUTH.md contains a link to LINEAR-MCP-AUTH.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-linear-mcp-events",
+        "to": "linear-mcp-auth-fold",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-linear-mcp-events",
+        "to": "linear-mcp-heartbeat-ingestion",
+        "type": "blocks"
+      },
+      {
+        "from": "linear-mcp-auth-fold",
+        "to": "linear-mcp-wake",
+        "type": "blocks"
+      },
+      {
+        "from": "linear-mcp-heartbeat-ingestion",
+        "to": "linear-mcp-wake",
+        "type": "blocks"
+      },
+      {
+        "from": "linear-mcp-auth-fold",
+        "to": "linear-mcp-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "linear-mcp-heartbeat-ingestion",
+        "to": "linear-mcp-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "linear-mcp-routes",
+        "to": "linear-mcp-banner",
+        "type": "blocks"
+      },
+      {
+        "from": "linear-mcp-wake",
+        "to": "docs-linear-mcp-auth",
+        "type": "blocks"
+      },
+      {
+        "from": "linear-mcp-routes",
+        "to": "docs-linear-mcp-auth",
+        "type": "blocks"
+      },
+      {
+        "from": "linear-mcp-hook",
+        "to": "docs-linear-mcp-auth",
+        "type": "blocks"
+      },
+      {
+        "from": "linear-mcp-banner",
+        "to": "docs-linear-mcp-auth",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-21-PAN-2997-surface-linear-mcp-oauth-as-a-global-intervention-and-wake-blocked-agents-after-re-auth.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

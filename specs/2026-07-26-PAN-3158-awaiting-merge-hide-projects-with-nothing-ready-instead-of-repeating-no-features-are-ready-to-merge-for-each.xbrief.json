@@ -1,0 +1,331 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T20:25:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3158: Awaiting Merge: hide projects with nothing ready instead of repeating 'No features are ready to merge' for each",
+    "updated": "2026-07-26T21:49:05.952Z"
+  },
+  "plan": {
+    "id": "pan-3158",
+    "title": "Awaiting Merge: hide projects with nothing ready instead of repeating 'No features are ready to merge' for each",
+    "status": "completed",
+    "uid": "09c71259-c515-470e-b64f-0dc7c455298e",
+    "author": "agent:k3[1m]",
+    "sequence": 7,
+    "created": "2026-07-26T20:25:00Z",
+    "updated": "2026-07-26T21:49:05.952Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3158",
+        "label": "PAN-3158",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "dashboard",
+      "merge-train",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "The Awaiting Merge page renders a section for every registered project, so eight idle projects each repeat the identical 'No features are ready to merge' boilerplate, burying the sections that carry real information.",
+      "Proposal": "Add an isIdleSection predicate and a renderedSections filter in MergeTrainView.tsx: idle ENABLED sections are not rendered; disabled ('merge train off') sections always render; when the filter leaves nothing, the page falls through to the existing page-level empty state (with 'Loading the merge train…' during fetch); a quiet footer counts the hidden idle projects. The anyDisabled/nothingAnywhere guard is replaced by this filter (same invariant, encoded structurally), the now-unreachable per-section idle boilerplate branch is removed, and the MergeTrainView tests are updated/extended to anchor the new behavior.",
+      "NonGoals": "- No change to the project filter chips row, its localStorage persistence, or its copy\n- No change to mergeTrainTotals, useMergeTrainData, or the Flywheel rail card (MergeQueueCard.tsx) counts\n- No change to the page-level empty copy text or the disabled-section off-copy text\n- No change to visibleGenerationsOf or generation status handling\n- No server routes, API payloads, or config changes"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Include the optional footer line 'N projects with nothing ready are hidden'.",
+        "rationale": "The issue marks the footer optional but recommends it ('keeps the page honest about what it is not showing'); it costs two lines of JSX and one test assertion."
+      },
+      {
+        "summary": "Replace the anyDisabled/nothingAnywhere collapse guard with the renderedSections filter rather than keeping both.",
+        "rationale": "Two JSX branches with identical copy would be redundant; the filter encodes the same invariant structurally (any disabled row keeps renderedSections non-empty), and the existing all-disabled and mixed tests cover the equivalence."
+      },
+      {
+        "summary": "When the project-filter chips select only idle enabled projects, render the page-level 'No features are ready to merge in any project' copy.",
+        "rationale": "The issue's point 3 explicitly requires falling through to the existing page-level empty state so the page is never blank."
+      },
+      {
+        "summary": "Keep the project filter chips listing every project, idle or not.",
+        "rationale": "The chips are the operator's selection tool; hiding idle projects from them would make an idle project unselectable and contradict the chip-edge fall-through decision."
+      }
+    ],
+    "items": [
+      {
+        "id": "hide-idle-enabled-sections",
+        "title": "Hide idle enabled sections in MergeTrainView via a renderedSections filter",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T20:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3158",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "MergeTrainView.test.tsx suite exits 0 once the companion test item lands"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx: (1) After visibleGenerationsOf (line 156), add `function isIdleSection(section: MergeTrainProjectSection): boolean { return section.queue.length === 0 && visibleGenerationsOf(section).length === 0; }`. (2) After visibleSections (line 267), add `const renderedSections = visibleSections.filter((s) => !s.enabled || !isIdleSection(s));` and `const idleHiddenCount = visibleSections.length - renderedSections.length;`, with a comment stating: idle enabled sections are hidden because the repeated boilerplate is noise; disabled sections are NEVER idle-hidden because 'merge train off' is information, not emptiness. (3) Delete the anyDisabled/nothingAnywhere block (lines 427-438). (4) Restructure the JSX conditional (lines 479-493) to: sections.length === 0 → existing loading/no-projects copy; visibleSections.length === 0 → existing chip-filter copy; renderedSections.length === 0 → `loading ? 'Loading the merge train…' : <existing page-level 'No features are ready to merge in any project. …' copy verbatim>`; otherwise map renderedSections. (5) In the section body, remove the now-unreachable `featureCount === 0 && visibleGenerations.length === 0` boilerplate branch (lines 523-526) so the ternary is `!section.enabled ? off-copy : content`; keep the off-copy verbatim. Full before/after snippets are in the PRD at .pan/drafts/PAN-3158.md §Proposal."
+        },
+        "items": [
+          {
+            "id": "hide-idle-enabled-sections.ac1",
+            "title": "Given an enabled project with empty queue and no visible generations, when another project has ready work, then the idle project's `merge-train-project-<key>` testid is absent from the rendered DOM",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hide-idle-enabled-sections.ac2",
+            "title": "Given a disabled project (idle or not), when the page renders, then its section renders with 'merge train off' and the 'turned off for <name>' copy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hide-idle-enabled-sections.ac3",
+            "title": "Given every registered project is enabled and idle, when loading finishes, then the page renders the page-level 'No features are ready to merge in any project' message and zero project section testids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hide-idle-enabled-sections.ac4",
+            "title": "Given a project with a non-empty queue or a visible generation, then its section renders the same queue count, batch list, and escape-hatch copy as before the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hide-idle-enabled-sections.ac5",
+            "title": "Given the refactor, then MergeTrainView.tsx no longer contains the identifiers anyDisabled or nothingAnywhere, and the renderedSections-empty branch renders 'Loading the merge train…' while loading is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "idle-hidden-footer",
+        "title": "Render a footer counting hidden idle projects",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T20:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3158",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "footer renders '1 project with nothing ready is hidden' in the single-hidden case asserted by the new test"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx, inside the final JSX branch (the one that maps renderedSections, added by hide-idle-enabled-sections), wrap the sections div and a footer in a fragment. After the `<div className=\"space-y-3\">…</div>`, render only when idleHiddenCount > 0: `<p className=\"px-1 pt-1 text-[10.5px] text-muted-foreground\" data-testid=\"merge-train-idle-hidden-note\">{idleHiddenCount} project{idleHiddenCount === 1 ? '' : 's'} with nothing ready {idleHiddenCount === 1 ? 'is' : 'are'} hidden</p>`. The footer does not render in the page-level-empty collapse branch (everything hidden is stated by the collapse itself)."
+        },
+        "items": [
+          {
+            "id": "idle-hidden-footer.ac1",
+            "title": "Given exactly one hidden idle enabled project and at least one rendered section, then the footer renders the text '1 project with nothing ready is hidden' under testid merge-train-idle-hidden-note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-hidden-footer.ac2",
+            "title": "Given two or more hidden idle enabled projects and at least one rendered section, then the footer renders '<N> projects with nothing ready are hidden' with plural forms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-hidden-footer.ac3",
+            "title": "Given the page-level empty collapse (every project idle and enabled), then no merge-train-idle-hidden-note element renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-train-view-tests",
+        "title": "Update and extend MergeTrainView tests for the idle-section filter",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T20:25:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-3158",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx"
+          ],
+          "expected_outputs": [
+            "MergeTrainView.test.tsx suite exits 0",
+            "the page-message-absent assertions at lines 222 and 239 pass unchanged"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/merge-train/__tests__/MergeTrainView.test.tsx (helpers mockFetch/twoProjectResponses/renderView at lines 33-112): (1) UPDATE the test 'keeps a disabled row visible when it is MIXED with idle enabled projects' (line 206): flip line 221 to `expect(screen.queryByTestId('merge-train-project-overdeck')).toBeNull();` and adjust the comment to say the idle enabled section is now hidden while the disabled row stays visible; keep the myn assertions and the line-222 `expect(screen.queryByText(/No features are ready to merge in any project/)).toBeNull()` untouched. (2) ADD 'hides an idle enabled project when another project has ready work': queues = overdeck enabled with PAN_QUEUE, myn enabled with empty queue; generations = overdeck entry with [PAN_READY_GEN] (or reuse the twoProjectResponses shape with myn emptied); assert merge-train-project-myn is absent, merge-train-project-overdeck is present, and the footer testid merge-train-idle-hidden-note contains '1 project with nothing ready is hidden'. (3) ADD 'collapses to the page-level empty state when every project is idle and enabled': two enabled projects with empty queues and no generations; assert the page-level message /No features are ready to merge in any project/ renders, both section testids are absent, and merge-train-idle-hidden-note is absent. Do NOT touch the all-disabled test (line 225) or 'explains an all-empty merge train' (line 243) — both must pass unchanged."
+        },
+        "items": [
+          {
+            "id": "merge-train-view-tests.ac1",
+            "title": "The mixed idle+disabled test asserts the idle enabled section is absent and the disabled section renders, with the line-222 page-message-absent assertion unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-train-view-tests.ac2",
+            "title": "A new test asserts an idle enabled project is hidden while a project with ready work renders, including the singular footer text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-train-view-tests.ac3",
+            "title": "A new test asserts the all-idle-enabled case renders the page-level empty message with no section testids and no footer note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-train-view-tests.ac4",
+            "title": "npx vitest run on MergeTrainView.test.tsx exits 0 with the all-disabled (line 225) and all-empty (line 243) tests passing unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-uat-batch-trains-doc",
+        "title": "Update UAT-BATCH-TRAINS.md multi-project shape for hidden idle sections",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-26T20:25:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3158",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/UAT-BATCH-TRAINS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'hidden' docs/UAT-BATCH-TRAINS.md"
+          ],
+          "expected_outputs": [
+            "grep finds the updated 'Multi-project shape' sentence stating idle enabled projects are hidden"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/UAT-BATCH-TRAINS.md §'Multi-project shape' (lines 288-290), the sentence 'the merge-train view on the Awaiting Merge page renders one section per project with a persisted project filter' is now inaccurate. Update it to state that the view renders one section per project that has ready work or a switched-off train, that idle enabled projects are hidden instead of repeating empty boilerplate, and that a footer line counts the hidden projects. Keep the surrounding paragraph (per-project generations, Flywheel rail card as second viewer, per-project enablement) untouched."
+        },
+        "items": [
+          {
+            "id": "update-uat-batch-trains-doc.ac1",
+            "title": "grep -n 'hidden' docs/UAT-BATCH-TRAINS.md produces a match inside §'Multi-project shape' on a sentence saying idle enabled projects are hidden and counted in a footer line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-uat-batch-trains-doc.ac2",
+            "title": "The 'Multi-project shape' paragraph preserves its statements that disabled ('merge train off') projects always render and that the Flywheel rail card is a second viewer of the same component",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "hide-idle-enabled-sections",
+        "to": "idle-hidden-footer",
+        "type": "blocks"
+      },
+      {
+        "from": "hide-idle-enabled-sections",
+        "to": "merge-train-view-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "idle-hidden-footer",
+        "to": "merge-train-view-tests",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3158-awaiting-merge-hide-projects-with-nothing-ready-instead-of-repeating-no-features-are-ready-to-merge-for-each.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

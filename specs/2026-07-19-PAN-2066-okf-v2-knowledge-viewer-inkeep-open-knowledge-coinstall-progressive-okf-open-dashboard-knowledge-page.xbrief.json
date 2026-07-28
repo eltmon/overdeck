@@ -1,0 +1,871 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-19T20:22:40Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2066: OKF v2 — knowledge viewer: inkeep open-knowledge coinstall (progressive), /okf open, dashboard Knowledge page",
+    "updated": "2026-07-21T14:04:47.481Z"
+  },
+  "plan": {
+    "id": "pan-2066",
+    "title": "OKF v2 — knowledge viewer: inkeep open-knowledge coinstall (progressive), /okf open, dashboard Knowledge page",
+    "status": "completed",
+    "uid": "ae378cd3-9c4e-4042-b6d1-a97a21c53cd4",
+    "author": "agent:claude-fable-5",
+    "sequence": 5,
+    "created": "2026-07-19T20:22:40Z",
+    "updated": "2026-07-21T14:04:47.481Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2066",
+        "label": "PAN-2066",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2066.md",
+        "label": "PRD",
+        "type": "doc"
+      },
+      {
+        "uri": "https://github.com/inkeep/open-knowledge",
+        "label": "inkeep/open-knowledge (GPL-3.0)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "okf",
+      "knowledge",
+      "dashboard",
+      "cli",
+      "progressive-install"
+    ],
+    "narratives": {
+      "Problem": "OKF v1 (#2468) shipped the /okf skill and a PR-gated knowledge bundle, but there is no GUI: no graph wiki-link viewer, no WYSIWYG browsing, and the old 'MCP read server' deferred item is unaddressed. inkeep/open-knowledge is exactly the right shape (editor + graph viewer + MCP over markdown-with-frontmatter folders) but is GPL-3.0 and must stay at arm's length from MIT @overdeck/*.",
+      "Proposal": "Adopt @inkeep/open-knowledge as a separately-installed global binary (`ok`), never imported. Progressive install via ensureOpenKnowledge() in src/lib/installers/open-knowledge.ts (ensureOllama/ensureMnemos pattern, injectable seams, Node-24 diagnosis). New `pan knowledge open` + `/okf open` resolve the bundle via the canonical resolveKnowledgeBundleRoot() read door, ensure the binary, and start/reuse a local `ok start` server. The dashboard gains a Knowledge tab whose server owns the ok subprocess lifecycle (lazy spawn, health, reuse, shutdown kill) and reverse-proxies it (HTTP+WS) under /knowledge-viewer/* for same-origin embedding at https://overdeck.localhost, with graceful states for no-bundle / not-installed / starting / embedded / embed-blocked. A round-trip spike gates only the edit-in-viewer posture: if frontmatter round-trips lossily, the page ships read-only. MCP wiring via `ok init` is documented, opt-in, never automated.",
+      "NonGoals": "- No eager install: pan install only mentions the viewer, never installs @inkeep/open-knowledge\n- No import/require/bundling of @inkeep/open-knowledge anywhere in @overdeck/* (GPL isolation; subprocess + HTTP only)\n- No Node upgrade automation: Node 24 is ok's requirement; detect and report only, dashboard stays Node 22\n- No lease-based concurrent write mode (deferred item #3 — successor issue)\n- No LLM semantic auditor in the merge gate (deferred item #5 — successor issue; the conformance gate stays deterministic Python)\n- No bespoke viz.html graph visualizer (retired in favor of open-knowledge's viewer)\n- No automatic MCP registration by Overdeck (documented opt-in via ok init only)\n- No second bundle resolver: all resolution goes through resolveKnowledgeBundleRoot()\n- No degradation of any existing dashboard surface when the binary/bundle is absent or the user opts out\n- No auto-discovery via projects.yaml, post-merge auto-sync, knowledge-health surface, or pan sync distribution (tracked separately once this lands)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Reused the canonical PRD on overdeck-state instead of authoring a new one.",
+        "rationale": "It is 2 days old, written as an executable implementation brief, and every file reference re-verified clean against HEAD 9e8c19eddc."
+      },
+      {
+        "summary": "Placed ensureOpenKnowledge() in src/lib/installers/open-knowledge.ts instead of the PRD's src/lib/open-knowledge.ts.",
+        "rationale": "The src/lib/installers/ convention (ensureMnemos) postdates the PRD and src/cli/commands/knowledge.ts already imports from it; contract and tests from WI-2 are unchanged."
+      },
+      {
+        "summary": "The installer module also exports the shared `ok start` launcher used by both the CLI verb and the dashboard viewer service.",
+        "rationale": "One launch path avoids duplicate spawn/health logic and keeps flag-spelling fixes (hazard H2) in one place."
+      },
+      {
+        "summary": "The pan knowledge open CLI change updates sync-sources/skills/pan-knowledge/SKILL.md in the same commit.",
+        "rationale": "The wrapper skill exists (PRD predates it) and scripts/lint-skills.sh fails CI on drift; the skills convention requires same-commit updates."
+      },
+      {
+        "summary": "Auto-install defaults ON for explicit user gestures (/okf open, pan knowledge open, dashboard Install button) and OFF unattended.",
+        "rationale": "PRD Decision 3 states exactly this; both surfaces are explicit gestures, and unattended flows must never trigger a global npm install."
+      },
+      {
+        "summary": "The round-trip spike runs first as a work item with its verdict posted to PAN-2066 and recorded in continue.json, gating only page copy.",
+        "rationale": "PRD WI-1/FR-6 define the fallback (read-only posture) so lossiness never blocks the integration; no code diff exists to inspect, so no inspection gate."
+      },
+      {
+        "summary": "The docs item creates docs/ACKNOWLEDGEMENTS.md for the open-knowledge credit.",
+        "rationale": "No acknowledgements doc exists yet (PAN-1474 unshipped); creating it is the smallest change that satisfies the PRD's credit requirement."
+      }
+    ],
+    "items": [
+      {
+        "id": "roundtrip-spike",
+        "title": "Round-trip verification spike: does open-knowledge preserve frontmatter losslessly?",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-19T20:22:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "spike",
+          "issueLabel": "pan-2066",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".overdeck/continue.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh issue view 2066 --comments | grep -iE 'round-?trip'"
+          ],
+          "expected_outputs": [
+            "PAN-2066 carries a comment stating the lossless/lossy verdict with git diff evidence"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ],
+          "acJustification": "Manual spike whose only outputs are the issue comment and the recorded posture decision; two ACs cover both."
+        },
+        "narrative": {
+          "Action": "Install @inkeep/open-knowledge manually (npm install -g), open a scratch git copy of ../overdeck-knowledge with `ok start`, edit one concept file in the UI, save, and inspect `git diff`. Check: YAML frontmatter key order and unknown keys preserved; index.md and log.md untouched; no trailing-whitespace/EOL churn. Also capture `ok --help` output for the launcher flags (hazard H2). Post the verdict with diff evidence as a comment on PAN-2066. Record the resulting Knowledge-page posture (editable vs read-only) as a decision in .overdeck/continue.json. Fallback per FR-6: lossy ⇒ the Knowledge page ships read-only ('view and search; edit via /okf author'); the integration proceeds either way."
+        },
+        "items": [
+          {
+            "id": "roundtrip-spike.ac1",
+            "title": "Given a scratch copy of the knowledge bundle, when one concept is edited and saved in the open-knowledge UI, the agent posts a PAN-2066 comment that states the lossless/lossy verdict and includes the git diff evidence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "roundtrip-spike.ac2",
+            "title": "The chosen Knowledge-page posture (editable if lossless, read-only if lossy) persists as a new decision entry in .overdeck/continue.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ensure-open-knowledge",
+        "title": "ensureOpenKnowledge() progressive installer with Node-24 diagnosis",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-19T20:22:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2066",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "knowledge-open-cli",
+            "viewer-service",
+            "viewer-routes-proxy"
+          ],
+          "files_scope": [
+            "src/lib/installers/open-knowledge.ts",
+            "src/lib/installers/__tests__/open-knowledge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/installers/__tests__/open-knowledge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "open-knowledge installer tests pass with zero real-timer waits (fake timers only)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "New file src/lib/installers/open-knowledge.ts modeled on src/lib/ollama.ts and src/lib/installers/mnemos.ts: EnsureOpenKnowledgeOptions with injectable runCommand, installOpenKnowledge (default: `npm install -g @inkeep/open-knowledge`), maxHealthAttempts, retryDelayMs, sleep. Health = `ok --version` exits 0. On install/launch failure run `node --version`; if major < 24 the error message must read: `open-knowledge requires Node 24+; found <v>. Install Node 24+ or run '/okf open --no-install' after installing manually.` Never a silent fallback. Also export a startOpenKnowledgeServer(bundlePath, opts) launcher helper (async spawn, injectable, port probing per PRD Decision 2 — verify actual `ok start` flags from the spike's `ok --help` capture) for reuse by the CLI verb and the dashboard service. Tests mirror src/lib/__tests__/ollama.test.ts with vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "ensure-open-knowledge.ac1",
+            "title": "When `ok --version` exits 0, ensureOpenKnowledge returns status already-installed and never invokes the installer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-open-knowledge.ac2",
+            "title": "When the binary is missing and autoInstall is true, ensureOpenKnowledge runs `npm install -g @inkeep/open-knowledge` and returns installed after the binary health-checks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-open-knowledge.ac3",
+            "title": "When the binary is missing and autoInstall is false, ensureOpenKnowledge rejects with an error naming the manual install command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-open-knowledge.ac4",
+            "title": "When installation fails under Node < 24, the error message states 'open-knowledge requires Node 24+; found <v>' with the detected version and the --no-install hint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "knowledge-open-cli",
+        "title": "pan knowledge open subcommand (+ wrapper skill, + pan install pointer)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-19T20:22:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2066",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/knowledge.ts",
+            "src/cli/commands/__tests__/knowledge.test.ts",
+            "src/cli/commands/install.ts",
+            "sync-sources/skills/pan-knowledge/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/knowledge.test.ts",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "knowledge command tests pass including the open subcommand cases (injected ensure/start fns)",
+            "skills lint passes against the updated pan-knowledge SKILL.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend configureKnowledgeCommand in src/cli/commands/knowledge.ts with an `open` subcommand: resolve the bundle via the canonical resolver path (projects.yaml knowledge_repo, then .okf.yml — the existing resolveKnowledgeBundlePath in this file already does this; keep one path), call ensureOpenKnowledge({ autoInstall: !flags.noInstall }), start or reuse the viewer via the shared launcher from src/lib/installers/open-knowledge.ts, print the URL, and open the browser unless --no-browser. --no-install with no binary present exits non-zero with the manual-install hint. Add the one-line pointer to `pan install` summary output in src/cli/commands/install.ts: knowledge viewer installs on first use via `pan knowledge open`. Update sync-sources/skills/pan-knowledge/SKILL.md for the new subcommand IN THE SAME COMMIT (scripts/lint-skills.sh). CLI unit tests inject ensure/start functions — no real installs or spawns."
+        },
+        "items": [
+          {
+            "id": "knowledge-open-cli.ac1",
+            "title": "Given this repo's .okf.yml, `pan knowledge open` resolves ../overdeck-knowledge, ensures the binary, starts or reuses an ok server, and prints its URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-open-cli.ac2",
+            "title": "On a machine without the ok binary, `pan knowledge open --no-install` exits non-zero with the manual-install hint instead of installing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-open-cli.ac3",
+            "title": "`pan install` prints a one-line pointer that the knowledge viewer installs on first use via pan knowledge open, and installs nothing eagerly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-open-cli.ac4",
+            "title": "The same commit updates sync-sources/skills/pan-knowledge/SKILL.md so scripts/lint-skills.sh passes with the new subcommand documented",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "okf-open-skill",
+        "title": "/okf open verb documentation in the okf skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-19T20:22:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2066",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/okf/SKILL.md",
+            "sync-sources/skills/okf/docs/USAGE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "skills lint passes with the okf skill documenting the open verb"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ],
+          "acJustification": "Docs-only surface with two files; two ACs pin the required content of each."
+        },
+        "narrative": {
+          "Action": "Add an `## /okf open` section to sync-sources/skills/okf/SKILL.md documenting: bundle resolution from .okf.yml, delegation to `pan knowledge open`, the --no-install opt-out, and that the verb shells out to the separately-installed, separately-licensed (GPL-3.0) `ok` binary — never imported. Update sync-sources/skills/okf/docs/USAGE.md so the verb table/workflow includes open. selftest.sh untouched (the viewer is not part of conformance)."
+        },
+        "items": [
+          {
+            "id": "okf-open-skill.ac1",
+            "title": "SKILL.md renders an /okf open section stating bundle resolution, the --no-install opt-out, and the separately-licensed ok binary boundary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "okf-open-skill.ac2",
+            "title": "USAGE.md contains the open verb alongside the existing verbs with its one-line purpose",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-service",
+        "title": "Dashboard viewer lifecycle service (spawn / health / reuse / shutdown kill)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-19T20:22:40Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2066",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "viewer-routes-proxy",
+            "knowledge-page-embed"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/knowledge-viewer.ts",
+            "tests/unit/dashboard/server/services/knowledge-viewer.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/knowledge-viewer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "knowledge-viewer service tests pass with fake timers for all health-poll delays",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "New isolated service file plus its own new test file; no file overlaps with any sibling wave item."
+        },
+        "narrative": {
+          "Action": "New src/dashboard/server/services/knowledge-viewer.ts: getOrStartViewer(projectKey) → { port, url }. Resolves the bundle via the canonical resolver, spawns `ok start` through the shared launcher from src/lib/installers/open-knowledge.ts (async spawn only — no execSync), health-polls the port with awaited setTimeout sleeps, tracks one process per project in a module map, reuses a healthy process on subsequent calls, and registers cleanup on the server shutdown path (the handleShutdownSignal flow in src/dashboard/server/ws-terminal.ts / server.ts) so dashboard exit kills the subprocess. Absent binary or absent bundle returns a typed status instead of throwing (NFR-4). Unit tests inject spawn/health/sleep; vi.useFakeTimers() for every delay."
+        },
+        "items": [
+          {
+            "id": "viewer-service.ac1",
+            "title": "getOrStartViewer spawns ok start for the resolved bundle via async spawn and returns port and url once the health check passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-service.ac2",
+            "title": "Given a healthy running viewer, a second getOrStartViewer call returns the same port without spawning a second process — exactly one ok process per project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-service.ac3",
+            "title": "The registered shutdown cleanup kills the ok subprocess, leaving no orphan process after the dashboard exits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-service.ac4",
+            "title": "Spawn failure or health-poll timeout rejects with an actionable error instead of hanging; absent binary or bundle returns a typed not-available status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-routes-proxy",
+        "title": "Knowledge-viewer API routes + same-origin reverse proxy (HTTP + WS)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-19T20:22:40Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-2066",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/knowledge-viewer.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/dashboard/server/routes/knowledge-viewer.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/knowledge-viewer.test.ts",
+            "npm run typecheck",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "route tests pass for status/install/start endpoints",
+            "typecheck completes without errors",
+            "server build succeeds (boot-path change must be runtime-boot-tested before live restart)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "New route module and new test file; the only shared file (server.ts route composition) is touched by no other item in the plan."
+        },
+        "narrative": {
+          "Action": "New route module src/dashboard/server/routes/knowledge-viewer.ts composed in server.ts: GET /api/knowledge-viewer/status (reports installed / bundle-configured / running truthfully for every combination, never throws for absent pieces), POST /api/knowledge-viewer/install (invokes ensureOpenKnowledge with autoInstall: true — explicit user gesture), POST /api/knowledge-viewer/start (delegates to viewer-service, returns the proxied URL). Reverse proxy for /knowledge-viewer/* → the ok server: HTTP via async request piping, WebSocket via the upgrade-event pattern of ws-terminal.ts (monkey-patched upgrade listener that passes non-matching paths through). No execSync. This touches the server boot path — per repo rule, boot-test the built dist in a throwaway instance before any live restart; never hot-patch."
+        },
+        "items": [
+          {
+            "id": "viewer-routes-proxy.ac1",
+            "title": "GET /api/knowledge-viewer/status returns truthful installed/bundle/running state for each combination (no bundle, not installed, installed idle, running) without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-routes-proxy.ac2",
+            "title": "POST /api/knowledge-viewer/install invokes ensureOpenKnowledge with autoInstall and returns success or the actionable failure message (including the Node-24 diagnosis)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-routes-proxy.ac3",
+            "title": "POST /api/knowledge-viewer/start starts or reuses the viewer and returns its /knowledge-viewer/ proxied URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-routes-proxy.ac4",
+            "title": "The server routes /knowledge-viewer/* requests (HTTP and WebSocket upgrades) to the ok server so the viewer UI renders same-origin at the dashboard URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "knowledge-page-states",
+        "title": "Knowledge tab + page with no-bundle / not-installed / starting states",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-19T20:22:40Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2066",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/routes.ts",
+            "src/dashboard/frontend/src/components/Header.tsx",
+            "src/dashboard/frontend/src/components/knowledge/KnowledgePage.tsx",
+            "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm test -- KnowledgePage"
+          ],
+          "expected_outputs": [
+            "KnowledgePage component tests pass for the no-bundle, not-installed, install-in-progress, and starting states with a mocked status endpoint",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "New component/test files plus tab-registration edits no other item touches; the only overlapping item (knowledge-page-embed) is serialized behind this via a blocks edge."
+        },
+        "narrative": {
+          "Action": "Register the tab: add `knowledge: '/knowledge'` to TAB_PATHS in src/dashboard/frontend/src/App/routes.ts, extend the Tab union in src/dashboard/frontend/src/components/Header.tsx, and add the nav entry per the existing tab pattern. New src/dashboard/frontend/src/components/knowledge/KnowledgePage.tsx: React Query against GET /api/knowledge-viewer/status, rendering (a) no-bundle empty state pointing at /okf init; (b) not-installed state with an Install button that POSTs /api/knowledge-viewer/install and shows progress until status flips; (c) starting spinner that transitions when status reports running. Page copy follows the roundtrip-spike posture decision from continue.json (read-only labeling if lossy). Follow /pan-style-guide: no decorative color, badge formula for status, no pill badges. The embedded-viewer and embed-blocked states land in knowledge-page-embed."
+        },
+        "items": [
+          {
+            "id": "knowledge-page-states.ac1",
+            "title": "The dashboard renders a Knowledge tab at /knowledge (TAB_PATHS + Tab type + nav entry) and all existing tabs still resolve unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-page-states.ac2",
+            "title": "When status reports no bundle configured, the page renders an empty state pointing at /okf init",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-page-states.ac3",
+            "title": "When status reports not-installed, the page renders an Install button that POSTs /api/knowledge-viewer/install and shows progress until status flips",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-page-states.ac4",
+            "title": "When status reports starting, the page renders a progress state that transitions once status reports running",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-page-states.ac5",
+            "title": "The page shows editable-posture copy when the recorded round-trip verdict is lossless, and shows the read-only copy ('view and search; edit via /okf author') when lossy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "knowledge-page-embed",
+        "title": "Embedded viewer iframe + embed-blocked fallback + Playwright self-verification",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-19T20:22:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2066",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/knowledge/KnowledgePage.tsx",
+            "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm test -- KnowledgePage"
+          ],
+          "expected_outputs": [
+            "KnowledgePage tests pass including the embedded and embed-blocked states",
+            "Playwright screenshots of all five page states captured in an isolated browser instance and inspected by the agent"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend KnowledgePage.tsx with the final two states: (d) running → `<iframe src=\"/knowledge-viewer/\">` hosting the proxied viewer; (e) embed-blocked → fallback card with an external 'Open viewer' link. Implementation checkpoint (PRD Decision 1): if ok's UI sends X-Frame-Options / CSP frame-ancestors that refuse framing even same-origin via the proxy, make the open-in-new-tab card the primary affordance and note the finding on PAN-2066. Detect frame refusal (iframe load failure / CSP error) rather than assuming success. Verify rendering yourself: Playwright screenshots of all five states against the running dashboard, in an isolated browser instance/profile (never a shared session), inspected by the agent — do not ask the operator to eyeball (repo rule)."
+        },
+        "items": [
+          {
+            "id": "knowledge-page-embed.ac1",
+            "title": "When status reports running and framing is allowed, the page renders an iframe at /knowledge-viewer/ that displays the open-knowledge UI same-origin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-page-embed.ac2",
+            "title": "When the viewer refuses framing, the page falls back to a card with an external open-in-new-tab link (and the finding is noted on PAN-2066 if this path is taken)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-page-embed.ac3",
+            "title": "Playwright, in an isolated browser instance, produces screenshots covering all five page states rendered per the style guide, and the agent inspects them itself",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-wiring-docs",
+        "title": "MCP wiring documentation (ok init, opt-in)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-19T20:22:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2066",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/okf/references/overdeck.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "skills lint passes with the MCP wiring reference in place"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "acJustification": "Single reference doc; two ACs pin the registration content and the opt-in boundary."
+        },
+        "narrative": {
+          "Action": "Document (never automate) `ok init`-based MCP registration in sync-sources/skills/okf/references/overdeck.md: how a user opts in to registering open-knowledge's MCP server for Claude Code, Codex, and Cursor so harness agents get agentic search over the bundle; frame it as the recommended satisfaction of the old '#4 MCP read server' deferred item. State explicitly that Overdeck never runs the registration automatically."
+        },
+        "items": [
+          {
+            "id": "mcp-wiring-docs.ac1",
+            "title": "references/overdeck.md contains the ok init MCP registration steps for Claude Code, Codex, and Cursor, framed as satisfying the old MCP-read-server deferred item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-wiring-docs.ac2",
+            "title": "The doc contains an explicit opt-in boundary: Overdeck never performs MCP registration automatically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-docs",
+        "title": "User-facing docs: knowledge.mdx, OKF-LANDSCAPE, CLAUDE.md, acknowledgements",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-19T20:22:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2066",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/OKF-LANDSCAPE.md",
+            "configuration/knowledge.mdx",
+            "CLAUDE.md",
+            "docs/ACKNOWLEDGEMENTS.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint passes with the four doc files added/updated"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Four doc surfaces, named per the PRD's required documentation item: (1) docs/OKF-LANDSCAPE.md §2 — update the viewer paragraph from 'filed, not built' to the shipped state; (2) new Mintlify page configuration/knowledge.mdx (none exists — verified) covering the Knowledge tab, progressive install, /okf open, the read-only-vs-edit posture per the roundtrip-spike verdict, and the GPL note; (3) CLAUDE.md knowledge-bundle note — add one line for the Knowledge tab; (4) create docs/ACKNOWLEDGEMENTS.md crediting @inkeep/open-knowledge (GPL-3.0, invoked as a separate program, never imported) — no acknowledgements doc exists yet (PAN-1474 unshipped); if PAN-1474's file lands first, put the credit there instead. Name every file in the PR description with its change summarized."
+        },
+        "items": [
+          {
+            "id": "viewer-docs.ac1",
+            "title": "docs/OKF-LANDSCAPE.md §2 shows the shipped open-knowledge viewer (Knowledge tab, /okf open) instead of 'filed, not built'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-docs.ac2",
+            "title": "configuration/knowledge.mdx renders the Knowledge tab, progressive install, /okf open, the posture per the spike verdict, and the GPL boundary note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-docs.ac3",
+            "title": "CLAUDE.md's knowledge-bundle note contains a one-line mention of the dashboard Knowledge tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-docs.ac4",
+            "title": "docs/ACKNOWLEDGEMENTS.md contains a credit for @inkeep/open-knowledge as GPL-3.0 software invoked as a separate program",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closeout-successor",
+        "title": "Close-out bookkeeping: FR-mapping comment + successor issue for deferred #3/#5",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-19T20:22:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2066",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".overdeck/continue.json"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "gh issue view 2066 --comments | grep -iE 'deferred|successor|lease|auditor'"
+          ],
+          "expected_outputs": [
+            "PAN-2066 carries the mapping comment and it references the filed successor issue number"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ],
+          "acJustification": "Tracker bookkeeping with no code diff; two ACs cover the comment and the successor issue."
+        },
+        "narrative": {
+          "Action": "Post a comment on PAN-2066 mapping shipped work to the original five deferred capabilities: #2 graph visualizer → Knowledge page (knowledge-page-states/embed); #4 MCP read server → ok init wiring docs (mcp-wiring-docs); #1 hybrid search → shipped in v1 (#2468), viewer adds a second surface; #3 lease-based concurrent writes and #5 LLM semantic auditor → still deferred. File one fresh, smaller successor issue covering #3 (ref: supachai-j okf-lease.py) and #5 (ref: theesfeld okf-auditor.md) and reference its number in the comment, so PAN-2066 can close against the viewer scope. Record the successor issue id in .overdeck/continue.json. Do not close PAN-2066 yourself — close-out is pipeline-owned."
+        },
+        "items": [
+          {
+            "id": "closeout-successor.ac1",
+            "title": "A PAN-2066 comment contains the mapping of each of the five original deferred capabilities to shipped work or explicit continued deferral",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-successor.ac2",
+            "title": "A successor issue covering lease-based writes and the LLM semantic auditor is filed, and the mapping comment contains its issue number",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "roundtrip-spike",
+        "to": "knowledge-page-states",
+        "type": "blocks"
+      },
+      {
+        "from": "roundtrip-spike",
+        "to": "ensure-open-knowledge",
+        "type": "informs"
+      },
+      {
+        "from": "ensure-open-knowledge",
+        "to": "knowledge-open-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "ensure-open-knowledge",
+        "to": "viewer-service",
+        "type": "blocks"
+      },
+      {
+        "from": "ensure-open-knowledge",
+        "to": "viewer-routes-proxy",
+        "type": "blocks"
+      },
+      {
+        "from": "knowledge-open-cli",
+        "to": "okf-open-skill",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-service",
+        "to": "viewer-routes-proxy",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-routes-proxy",
+        "to": "knowledge-page-states",
+        "type": "blocks"
+      },
+      {
+        "from": "knowledge-page-states",
+        "to": "knowledge-page-embed",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-routes-proxy",
+        "to": "knowledge-page-embed",
+        "type": "blocks"
+      },
+      {
+        "from": "roundtrip-spike",
+        "to": "viewer-docs",
+        "type": "informs"
+      },
+      {
+        "from": "knowledge-page-embed",
+        "to": "viewer-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "okf-open-skill",
+        "to": "viewer-docs",
+        "type": "informs"
+      },
+      {
+        "from": "viewer-docs",
+        "to": "closeout-successor",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-wiring-docs",
+        "to": "closeout-successor",
+        "type": "blocks"
+      },
+      {
+        "from": "roundtrip-spike",
+        "to": "closeout-successor",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-19-PAN-2066-okf-v2-knowledge-viewer-inkeep-open-knowledge-coinstall-progressive-okf-open-dashboard-knowledge-page.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

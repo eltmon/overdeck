@@ -1,0 +1,1360 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-18T01:17:43.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2858: Support Agent Client Protocol (ACP) harness — port t3code's effect-acp layer; first agent: Kimi Code CLI",
+    "updated": "2026-07-21T10:06:44.215Z"
+  },
+  "plan": {
+    "id": "pan-2858",
+    "title": "Support Agent Client Protocol (ACP) harness — port t3code's effect-acp layer; first agent: Kimi Code CLI",
+    "status": "completed",
+    "uid": "8258cc1a-38a5-40c8-bc35-4f4e1873939a",
+    "author": "agent:claude-fable-5",
+    "sequence": 5,
+    "created": "2026-07-18T01:17:43.000Z",
+    "updated": "2026-07-21T10:06:44.215Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2858",
+        "label": "PAN-2858",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/pingdotgg/t3code/tree/5ca32661b7dc8d512305c3bb9237d994a41a1af5",
+        "label": "t3code upstream @ pinned SHA",
+        "type": "reference"
+      },
+      {
+        "uri": "https://agentclientprotocol.com",
+        "label": "Agent Client Protocol",
+        "type": "reference"
+      }
+    ],
+    "tags": [
+      "harness",
+      "acp",
+      "kimi",
+      "effect",
+      "runtime",
+      "vendoring"
+    ],
+    "narratives": {
+      "Problem": "Overdeck has no way to run ACP-speaking agent CLIs (Kimi Code, Cursor, Grok, Gemini). Each new harness today costs a bespoke runtime adapter. ACP is a standard JSON-RPC-over-stdio protocol; one client implementation unlocks every ACP CLI, the same leverage codex app-server (PAN-2597) gave the GPT family. Kimi Code CLI (`kimi acp`) is the first target and positions us for Kimi K3 on Kimi's own agent loop.",
+      "Proposal": "Vendor t3code's self-contained `packages/effect-acp` (Effect implementation of ACP; depends only on `effect`, verified compatible with our 4.0.0-beta.73) as a Bun workspace package with MIT attribution and upstream layout preserved for cheap future diffs. Port t3code's AcpRuntimeModel + AcpSessionRuntime into src/lib/acp/ with two trivial shims. Build a persistent per-agent ACP host process (tsdown entry `acp-host`, modeled on codex-app-server-host) that spawns the agent CLI, renders updates to the tmux pane, writes a transcript JSONL, and exposes a per-agent unix socket + token. Register a generic `acp` harness through the contracts behavior matrix and every validator site; wire launcher/spawn, a delivery tier in deliverAgentMessage, harness policy/resolve, config, transcript discovery, and frontend feed rendering. Kimi support module spawns `kimi acp` with an auth preflight. Docs + an opt-in real-binary probe test close it out.",
+      "NonGoals": "- No interactive permission prompting (AUQ integration); v1 implements acp.permissionMode 'auto' only — follow-up issue\n- No cost/token-usage parsing for ACP sessions; adapter reports none — follow-up issue\n- No Cursor/Grok/Gemini support modules; Kimi only in this issue\n- No Effect upgrade to 4.0.0-beta.78; no repo-wide dependency churn\n- No change to the kimi provider's built-in defaultHarness (stays claude-code; ACP is opt-in via providerHarnesses.kimi)\n- No Docker-workspace ACP wiring (same exclusion as the PTY supervisor)\n- No fs/* or terminal/* client capabilities advertised to the agent in v1 (capabilities stay off, matching upstream defaults)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Vendor effect-acp as Bun workspace package packages/effect-acp, not src/lib/acp/vendor/",
+        "rationale": "Preserves upstream import specifiers (effect-acp/client) and file layout 1:1 for cheap future diffs — the issue's stated goal — and escapes the src/-only file-size ratchet (schema.gen.ts is 10,375 lines vs the 1000-line ceiling). The issue offered either location; this one is strictly less invasive."
+      },
+      {
+        "summary": "Generic 'acp' harness value with per-provider support modules; not a 'kimi-code' harness",
+        "rationale": "The issue names this as the preferred option ('acp with a per-provider spawn command'); one client for every ACP CLI is the entire leverage, and t3code's ~100-line Cursor/Grok modules prove the per-agent surface is tiny."
+      },
+      {
+        "summary": "Persistent transport = per-agent host process (node dist/acp-host.js) mirroring codex app-server-host, with delivery-by-socket from day one",
+        "rationale": "Codex (PAN-2597) is the proven in-repo template: tmux-visible host, sockets/<kind>-<id>.sock + 0600 token, satisfies the no-one-shot-agents invariant; ACP sessions resume via session/load. Avoids codex's legacy dual one-shot/persistent split by making the socket path primary."
+      },
+      {
+        "summary": "Effect stays at 4.0.0-beta.73; adapt beta.78 drift inside the vendored package, documented in VENDORING.md",
+        "rationale": "Verified all required unstable APIs (effect/Stdio, unstable/process/ChildProcess*, unstable/rpc/*) exist in beta.73; a repo-wide Effect bump for one feature is disproportionate risk to the dashboard."
+      },
+      {
+        "summary": "Kimi ACP routing is opt-in (providerHarnesses.kimi: acp); built-in kimi defaultHarness stays claude-code",
+        "rationale": "The operator deliberately routes kimi via claude-code + coding endpoint today; harness routing is config-owned and defaults must not silently reroute live agents."
+      },
+      {
+        "summary": "Permissions v1 = acp.permissionMode 'auto' only: pick the most permissive allow option from params.options at runtime; decline + log when none exists",
+        "rationale": "Matches t3code's outcome-mapping semantics while acknowledging optionIds are agent-specific (Cursor's allow-always/allow-once/reject-once are not universal); interactive prompting needs AUQ pipeline work that is separable and non-blocking for pipeline agents."
+      },
+      {
+        "summary": "Kimi support module starts from Cursor's shape (no runtime wrapper), spawn = kimi acp",
+        "rationale": "Grok's shape exists only because xAI signals prompt completion out-of-band; Cursor's is the standard-conformant baseline. Kimi docs specify `kimi acp` as the ACP entry point."
+      },
+      {
+        "summary": "Vendored tests keep upstream colocated src/*.test.ts layout; vitest include gains packages/effect-acp/src/**/*.test.ts",
+        "rationale": "Moving tests would break the 1:1 upstream mapping; a one-line include-glob addition is the smaller change."
+      }
+    ],
+    "items": [
+      {
+        "id": "vendor-effect-acp",
+        "title": "Vendor t3code packages/effect-acp as a Bun workspace package with MIT attribution",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-2858",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "parallelSafeReason": "Creates a new isolated package directory; the only existing files touched are two additive config lines (workspaces list, vitest include glob), so no other item's files overlap.",
+          "files_scope": [
+            "packages/effect-acp/src/*.ts",
+            "packages/effect-acp/src/_internal/*.ts",
+            "packages/effect-acp/src/_generated/*.ts",
+            "packages/effect-acp/test/fixtures/acp-mock-peer.ts",
+            "packages/effect-acp/test/examples/cursor-acp-client.example.ts",
+            "packages/effect-acp/scripts/generate.ts",
+            "packages/effect-acp/package.json",
+            "packages/effect-acp/tsconfig.json",
+            "packages/effect-acp/LICENSE*",
+            "packages/effect-acp/VENDORING.md",
+            "package.json",
+            "vitest.config.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bun install",
+            "npx tsc --noEmit -p packages/effect-acp/tsconfig.json",
+            "npx vitest run --configLoader runner packages/effect-acp"
+          ],
+          "expected_outputs": [
+            "typecheck of packages/effect-acp completes without errors",
+            "vendored effect-acp unit tests (client, protocol, agent, errors, stdio) pass under root vitest"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Copy packages/effect-acp/** verbatim from /home/eltmon/Projects/t3code at origin/main commit 5ca32661b7dc8d512305c3bb9237d994a41a1af5 (use `git -C /home/eltmon/Projects/t3code show origin/main:<path>` — the local working tree is BEHIND; never copy from it directly). Preserve the exact src/ file layout and package name `effect-acp` (private: true). Set dependencies.effect to \"catalog:\" (Overdeck's root package.json catalog pins effect 4.0.0-beta.73). Add packages/effect-acp to the workspaces list in root package.json. Add a tsconfig.json for the package (upstream's uses tsgo; adapt to plain tsc strict settings matching packages/contracts). Add `packages/effect-acp/src/**/*.test.ts` to the defaultInclude arrays in vitest.config.ts (both branches, ~line 15-17). Create packages/effect-acp/LICENSE with the MIT text and `Copyright (c) 2026 T3 Tools Inc.` from upstream root LICENSE, and packages/effect-acp/VENDORING.md recording: upstream repo URL, pinned SHA 5ca32661b7dc8d512305c3bb9237d994a41a1af5, the date, and a running list of every local edit made for Effect beta.73 drift (upstream targets beta.78 and patches it; if an API is missing in beta.73, adapt the call site minimally and log the edit — if a drift is a hard behavioral blocker, stop and surface rather than upgrading Effect). Drop upstream's scripts/generate.ts devDependency needs (@effect/openapi-generator) — keep the script file for future regeneration but do not add its devDeps."
+        },
+        "items": [
+          {
+            "id": "vendor-effect-acp.ac1",
+            "title": "Given a clean bun install, `npx tsc --noEmit -p packages/effect-acp/tsconfig.json` completes without errors against effect 4.0.0-beta.73",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-effect-acp.ac2",
+            "title": "`npx vitest run packages/effect-acp` runs the vendored client/protocol/agent/errors/stdio suites and every suite passes, including the mock-peer subprocess cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-effect-acp.ac3",
+            "title": "packages/effect-acp/LICENSE contains the MIT license text with 'Copyright (c) 2026 T3 Tools Inc.'; VENDORING.md records the upstream SHA 5ca32661b7dc8d512305c3bb9237d994a41a1af5 and enumerates every file edited for beta.73 drift (empty list allowed if none)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vendor-effect-acp.ac4",
+            "title": "The vendored src/ tree preserves upstream file names and relative layout, so a file-to-file diff against upstream produces only the drift edits documented in VENDORING.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "port-acp-runtime-model",
+        "title": "Port AcpRuntimeModel to src/lib/acp/runtime-model.ts with t3code shims removed",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2858",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/runtime-model.ts",
+            "src/lib/acp/__tests__/runtime-model.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner src/lib/acp/__tests__/runtime-model.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ported runtime-model tests pass (tool-call merge, permission parse, session-mode parse, replay detection, config-option helpers)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Port apps/server/src/provider/acp/AcpRuntimeModel.ts (582 lines, read via `git -C /home/eltmon/Projects/t3code show origin/main:apps/server/src/provider/acp/AcpRuntimeModel.ts`) to src/lib/acp/runtime-model.ts. Two shims: (1) replace the `deriveToolActivityPresentation` import from @t3tools/shared/toolActivity with a local minimal presentation helper (title/summary passthrough — cosmetic only); (2) drop the type-only ToolLifecycleItemType import from @t3tools/contracts, declaring the narrow local type union it needs. Keep exported names identical to upstream (makeToolCallState, mergeToolCallState, parsePermissionRequest, parseSessionModeState, parseSessionUpdateEvent, sessionUpdateIsReplay, SessionLoadGate, waitForSessionLoadReplayIdle, syntheticLoadSessionResponseFromInitialize, defaultSessionLoadTimeout, defaultSessionLoadReplayIdleGap, …) so session-runtime ports cleanly. Port AcpRuntimeModel.test.ts (377 lines upstream) into src/lib/acp/__tests__/runtime-model.test.ts, adjusting imports; any test touching waitForSessionLoadReplayIdle timing MUST use vi.useFakeTimers()/advanceTimersByTimeAsync per the repo fake-timers rule."
+        },
+        "items": [
+          {
+            "id": "port-acp-runtime-model.ac1",
+            "title": "src/lib/acp/runtime-model.ts preserves the upstream public export surface and contains zero @t3tools imports (only effect, effect-acp, and local files)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-acp-runtime-model.ac2",
+            "title": "The ported runtime-model suite passes, covering tool-call state merge, permission-request parsing, session/update event reduction, and replay detection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-acp-runtime-model.ac3",
+            "title": "Replay-idle-gate tests advance time with fake timers only and the suite passes in under 5 seconds of wall clock (no real 2s/90s waits)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "port-acp-session-runtime",
+        "title": "Port AcpSessionRuntime to src/lib/acp/session-runtime.ts under the 1000-line ceiling",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-2858",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "acp-session-runtime-tests",
+            "acp-host",
+            "kimi-acp-support",
+            "acp-permissions"
+          ],
+          "files_scope": [
+            "src/lib/acp/session-runtime.ts",
+            "src/lib/acp/session-events.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint-file-size reports no new file over the 1000-line ceiling"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Port apps/server/src/provider/acp/AcpSessionRuntime.ts (1005 lines upstream) to src/lib/acp/session-runtime.ts. One shim: replace `resolveSpawnCommand` from @t3tools/shared/shell with a local passthrough `(command, args) => ({ command, args: [...args], shell: false })` (Windows .cmd resolution is out of scope — Overdeck agents run on Linux). Keep the service tag, options shape (spawn, authMethodId, resumeSessionId, clientCapabilities, mcpServers, optional requestLogger/protocolLogging), and full service surface (start, prompt, cancel, getEvents, drainEvents, setMode/setConfigOption/setModel/setSessionModel, handle* passthroughs, request/notify escape hatch) aligned with upstream so future diffs apply. The upstream file is 1005 lines and scripts/lint-file-size.sh caps NEW src/ files at 1000: split the session/update event reducer (handleSessionUpdate, ensureActiveAssistantSegment/closeActiveAssistantSegment, tool-call emit gating, assistant-segment id generation) into src/lib/acp/session-events.ts. Preserve the start-state machine (NotStarted/Starting/Started with deferred), the prompt semaphore + active-fiber interrupt semantics, and the session/load replay-idle gate wiring from runtime-model. Omit AcpNativeLogging (the logger options stay optional and default off)."
+        },
+        "items": [
+          {
+            "id": "port-acp-session-runtime.ac1",
+            "title": "src/lib/acp/session-runtime.ts preserves the upstream make/layer options shape and service surface, and contains zero @t3tools imports (only effect, effect-acp, and src/lib/acp/*)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-acp-session-runtime.ac2",
+            "title": "When start() is called concurrently, callers share one in-flight initialization deferred; when a start fails, the state resets so a retry re-runs initialize/authenticate/session-new",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-acp-session-runtime.ac3",
+            "title": "With resumeSessionId set, start() issues session/load instead of session/new and resolves via the replay-idle gate when the load RPC stalls, producing the synthetic LoadSessionResponse from the initialize result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-acp-session-runtime.ac4",
+            "title": "prompt() serializes concurrent calls through the semaphore, and cancel() interrupts the active prompt fiber so prompt() returns stopReason 'cancelled' instead of a failed effect",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "port-acp-session-runtime.ac5",
+            "title": "Every new file in src/lib/acp/ stays under 1000 lines so bash scripts/lint-file-size.sh exits 0 with no new-file violation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-session-runtime-tests",
+        "title": "Session-runtime unit tests via ported mock-peer fixture and in-memory stdio",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2858",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/__tests__/session-runtime.test.ts",
+            "src/lib/acp/__tests__/fixtures/acp-mock-peer.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/acp/__tests__/session-runtime.test.ts"
+          ],
+          "expected_outputs": [
+            "session-runtime tests pass covering lifecycle, resume gate, cancel, crash mapping"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Port t3code's test/fixtures/acp-mock-peer.ts pattern into src/lib/acp/__tests__/fixtures/acp-mock-peer.ts: a standalone program using the vendored AcpAgent.layerStdio() to impersonate an ACP CLI over its own stdio (handleInitialize/handleAuthenticate/handleCreateSession/handlePrompt exercising sessionUpdate + requestPermission on the reverse channel), with env flags for malformed-output and exit-immediately crash simulation (upstream: ACP_MOCK_MALFORMED_OUTPUT, ACP_MOCK_EXIT_IMMEDIATELY_CODE). Write src/lib/acp/__tests__/session-runtime.test.ts (upstream has NO AcpSessionRuntime.test — author fresh, borrowing assertions from upstream's AcpJsonRpcConnection.test.ts): cover (1) happy-path start→prompt→session/update event stream→end_turn; (2) resume path where replay updates are swallowed and the idle gate resolves — fake timers ONLY (vi.useFakeTimers + advanceTimersByTimeAsync for the 2s idle gap / 90s timeout), per the repo fake-timers rule; (3) cancel during prompt yields stopReason cancelled; (4) agent process exit mid-session surfaces AcpProcessExitedError to pending calls. Use in-memory stdio (vendored makeInMemoryStdio) for deterministic cases and the mock-peer subprocess for one end-to-end spawn case."
+        },
+        "items": [
+          {
+            "id": "acp-session-runtime-tests.ac1",
+            "title": "A mock-peer subprocess test drives start→prompt end-to-end and the runtime emits the parsed session/update events followed by stopReason end_turn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-session-runtime-tests.ac2",
+            "title": "A fake-timers resume test proves replayed session/update notifications are swallowed during session/load and the gate resolves after the idle gap without real waiting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-session-runtime-tests.ac3",
+            "title": "A crash test proves agent process exit fails pending prompt calls with AcpProcessExitedError carrying the exit code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-harness-types-behavior",
+        "title": "Register 'acp' in the Harness union, behavior matrix, and every validator site",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2858",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "acp-runtime-adapter",
+            "acp-launcher-spawn",
+            "acp-delivery-tier",
+            "acp-policy-resolve",
+            "acp-config",
+            "acp-transcript-discovery",
+            "acp-frontend-feed"
+          ],
+          "files_scope": [
+            "packages/contracts/src/types.ts",
+            "packages/contracts/src/harness-behavior.ts",
+            "src/lib/runtimes/types.ts",
+            "src/lib/config-yaml/roles.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/settings-api.ts",
+            "src/lib/artifacts/lifecycle.ts",
+            "src/lib/agents/tier-table.ts",
+            "src/lib/conversations/harness-discovery.ts",
+            "src/lib/context-layers/harness.ts",
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/lib/cloister/flywheel.ts",
+            "src/lib/overdeck/cost.ts",
+            "src/lib/overdeck/conversation-archive.ts",
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/harness-skill-sync.ts",
+            "packages/contracts/src/types.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd packages/contracts && npm run build",
+            "npm run typecheck",
+            "npx vitest run --configLoader runner src/lib/__tests__/harness.test.ts packages/contracts/src/types.test.ts"
+          ],
+          "expected_outputs": [
+            "contracts package builds without errors",
+            "typecheck completes without errors",
+            "harness and contracts type tests pass with the new 'acp' value accepted"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add 'acp' to the canonical Harness union and KNOWN_HARNESSES in packages/contracts/src/types.ts:70-72. In packages/contracts/src/harness-behavior.ts add new kind values — launchCommandKind 'acp-host', deliveryKind following the codex app-server pattern, transcriptKind 'acp-jsonl', sessionIdSource 'acp-session-id', contextLayerKind reusing the claude markers is NOT correct: use a neutral 'acp' marker — plus feedKind 'acp', processNames ['acp-host', 'kimi'], supportsConversationStreaming true; register ACP_BEHAVIOR in BEHAVIORS and getHarnessBehavior. Then sweep every string-literal validator to accept 'acp': src/lib/runtimes/types.ts:44 RuntimeName; src/lib/config-yaml/roles.ts:288; src/lib/config-yaml/merge.ts:54; src/lib/settings-api.ts:485 and :1118; src/lib/launcher-generator.ts:13 LauncherHarness (type only here — command builder is item acp-launcher-spawn); src/lib/artifacts/lifecycle.ts:210; src/lib/agents/tier-table.ts:226 isHarness; src/lib/conversations/harness-discovery.ts:12 DiscoveredHarness (type only); src/lib/context-layers/harness.ts:27,37; src/lib/planning/spawn-planning-session.ts:407; src/lib/cloister/flywheel.ts:45; src/lib/overdeck/cost.ts:511,600,657,951; src/lib/overdeck/conversation-archive.ts:116; src/lib/overdeck/conversations.ts:858 normalizeHarness; src/lib/harness-skill-sync.ts:15 SKILL_SYNC_HARNESSES (decide: ACP agents get skills synced like codex — include 'acp'). Line numbers verified 2026-07-18 but may drift — grep for the neighboring codex literal in each file. Extend existing tests (harness.test.ts, types.test.ts, normalize-harness.test.ts) with 'acp' cases. This item is types/matrix/validators ONLY — no behavior wiring."
+        },
+        "items": [
+          {
+            "id": "acp-harness-types-behavior.ac1",
+            "title": "getHarness('acp') returns 'acp' and normalizeHarness preserves it (no fallback to claude-code), proven by extended unit tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-harness-types-behavior.ac2",
+            "title": "getHarnessBehavior('acp') returns ACP_BEHAVIOR with launchCommandKind, transcriptKind, feedKind, and processNames distinct from every existing harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-harness-types-behavior.ac3",
+            "title": "Grepping the repo for the pre-change three-harness literal unions ('claude-code' | 'ohmypi' | 'codex') returns zero remaining validator sites that reject 'acp'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-harness-types-behavior.ac4",
+            "title": "After the sweep, npm run typecheck passes and the contracts build produces its dist output without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-host",
+        "title": "Persistent ACP host process: socket + token delivery, pane rendering, transcript JSONL",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-2858",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "acp-runtime-adapter",
+            "acp-delivery-tier",
+            "acp-permissions",
+            "acp-transcript-discovery"
+          ],
+          "files_scope": [
+            "src/lib/acp/host.ts",
+            "src/lib/acp/host-render.ts",
+            "src/lib/acp/transcript.ts",
+            "tsdown.config.ts",
+            "src/lib/acp/__tests__/host.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "npx vitest run --configLoader runner src/lib/acp/__tests__/host.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "build produces dist/acp-host.js",
+            "host tests pass (socket auth, prompt forwarding, transcript writes)",
+            "no file-size ceiling violation"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/acp/host.ts modeled closely on src/lib/codex/app-server-host.ts (read it first — it is the contract): a long-lived Node process the tmux session runs. main() parses --agent <id> --provider <name> --workspace <dir> [--resume <sessionId>] [--model <id>]. It resolves the provider's ACP support module (v1: kimi from src/lib/acp/kimi.ts via a small registry), builds the AcpSessionRuntime with the spawn input, registers handleSessionUpdate and handleRequestPermission BEFORE start() (effect-acp buffers notifications until a handler exists — ordering is load-bearing), then start()s. Delivery surface: bind unix socket ${OVERDECK_HOME}/sockets/acp-<id>.sock, write a bearer token file ${OVERDECK_HOME}/agents/<id>/acp-token at mode 0600, accept authenticated POST {op:'message', content} → forward to session/prompt (queue if a prompt is active — prompts are semaphore-serialized in the runtime), POST {op:'interrupt'} → cancel(). Mirror app-server-host's token verification header and socket cleanup on exit. Rendering: src/lib/acp/host-render.ts turns the parsed event stream into readable pane output (assistant text deltas, tool-call lines, plan updates) written to stdout — operator-visible via tmux. Transcript: src/lib/acp/transcript.ts appends ndjson entries (role, content, toolCalls, sessionId, timestamps) to ${OVERDECK_HOME}/agents/<id>/acp-session.jsonl including delivered orchestrator messages (transcript echo). Persist the ACP sessionId to ${OVERDECK_HOME}/agents/<id>/acp-session-id for resume. Auth preflight: if authenticate fails with auth-required, print the remediation ('run `kimi` in a terminal, then /login') to the pane and exit non-zero — never retry-loop. Add tsdown.config.ts entry 'acp-host': 'src/lib/acp/host.ts' beside the codex-app-server-host entry (line 17). All child-process and socket code is async-only (no execSync — server-reachable rule). Unit tests: socket rejects a wrong token with 401; accepted message reaches a stubbed runtime prompt and is echoed to the transcript; transcript JSONL lines parse."
+        },
+        "items": [
+          {
+            "id": "acp-host.ac1",
+            "title": "npm run build emits dist/acp-host.js and running it with --agent under a stub support module binds sockets/acp-<id>.sock and writes a 0600 token file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-host.ac2",
+            "title": "A POST with the bearer token and {op:'message'} forwards the content to session/prompt and appends both the delivered message and the assistant reply to acp-session.jsonl; a wrong token receives 401 and forwards nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-host.ac3",
+            "title": "When a session/update arrives during initialization, the host captures it into the event stream rather than dropping it, because handlers register before start() — proven by a unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-host.ac4",
+            "title": "When authenticate fails with an auth-required error the host prints remediation naming `kimi` + /login to stdout and exits non-zero without retrying",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-host.ac5",
+            "title": "The ACP sessionId persists to agents/<id>/acp-session-id and a restart with --resume issues session/load with that id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-runtime-adapter",
+        "title": "Runtime adapter src/lib/runtimes/acp.ts + registry dispatch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2858",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/acp.ts",
+            "src/lib/runtimes/index.ts",
+            "src/lib/runtimes/__tests__/acp.test.ts",
+            "src/lib/runtimes/__tests__/registry-dispatch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner src/lib/runtimes/__tests__/acp.test.ts src/lib/runtimes/__tests__/registry-dispatch.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "acp adapter tests and registry dispatch test (with new acp case) pass"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/runtimes/acp.ts implementing AgentRuntimeSync (src/lib/runtimes/types.ts:145) modeled on CodexRuntimeSync (src/lib/runtimes/codex.ts:590) but WITHOUT any one-shot path: name 'acp'; getSessionPath → ${OVERDECK_HOME}/agents/<id>/acp-session.jsonl; getLastActivity/getHeartbeat → transcript mtime (tier-2 style; no notify heartbeat in v1); getTokenUsage/getSessionCost → empty/undefined (decision D7 — no cost in v1); sendMessage → POST to sockets/acp-<id>.sock with the token (reuse the socket-client helper shape from delivery.ts's app-server tier, factored so both call one client function in src/lib/acp/host-client.ts if cleaner); killAgent → SIGTERM→SIGKILL ladder on the tmux session plus socket {op:'interrupt'} first, never deleting the transcript; spawnAgent → tmuxCreateSession(agentId, workspace, `node dist/acp-host.js --agent … --provider … --workspace …`, {OVERDECK_AGENT_ID}) and wait for the session-id file; listSessions/isRunning → tmuxSessionExists. Register in src/lib/runtimes/index.ts: import createAcpRuntimeSync and add the dispatch branch in getRuntimeForAgent (pattern at :96-97). Extend registry-dispatch.test.ts with the acp case and add acp.test.ts unit tests with mocked fs/tmux."
+        },
+        "items": [
+          {
+            "id": "acp-runtime-adapter.ac1",
+            "title": "getRuntimeForAgent returns the acp runtime for an agent whose state carries harness 'acp', proven by the extended registry-dispatch test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-runtime-adapter.ac2",
+            "title": "spawnAgent creates a tmux session running dist/acp-host.js with OVERDECK_AGENT_ID exported, and isRunning reflects tmux session existence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-runtime-adapter.ac3",
+            "title": "sendMessage posts to the per-agent acp socket with the bearer token and returns failure (not a throw) when the socket is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-runtime-adapter.ac4",
+            "title": "killAgent terminates the session via the signal ladder and preserves acp-session.jsonl on disk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-launcher-spawn",
+        "title": "Launcher and spawn wiring: acp command builder, launcher fields, spawn branches",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2858",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "src/lib/agents/runtime-command.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner src/lib/__tests__/launcher-generator.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "launcher-generator tests pass including a new acp command-generation case"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Wire the 'acp' harness through the spawn path, following the codex app-server shape end to end. src/lib/launcher-generator.ts: buildCommand (:418) gains a branch on the new launchCommandKind 'acp-host' emitting `node dist/acp-host.js --agent <id> --provider <provider> --workspace <dir> [--resume <sessionId>] [--model <model>]` (mirror computeCodexCommandTokens' app-server branch at :758-769); env section exports OVERDECK_AGENT_ID and applies PROVIDER_ENV_UNSETS (:407-416) so kimi's ANTHROPIC_* claude-code env never leaks into the ACP child. src/lib/agents/runtime-command.ts: add getAcpLauncherFields(agentId, model, workspace, role) returning {harness:'acp', acpProvider, acpSessionIdPath, …} (pattern: getCodexLauncherFields at :215); wire contextLayerKind handling in claudeSystemPromptFiles' branch structure (:86) — v1: ACP agents receive role instructions via the spawn prompt delivered over session/prompt, not a context file, so the branch returns no files. src/lib/agents/spawn.ts: add the acp branch to the prompt-delivery-mode selection (:211-213) — initial prompt is delivered via the acp socket after the host reports ready (session-id file exists), mirroring how codex app-server receives its first turn; add acpLauncherFields injection beside codexLauncherFields (:252-257) and the readiness-wait branch (:414). Add a launcher-generator test asserting the generated script for harness acp contains the dist/acp-host.js invocation and the env unsets."
+        },
+        "items": [
+          {
+            "id": "acp-launcher-spawn.ac1",
+            "title": "The generated launcher script for an acp-harness agent contains the node dist/acp-host.js invocation with agent/provider/workspace args and exports OVERDECK_AGENT_ID",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-launcher-spawn.ac2",
+            "title": "The launcher applies PROVIDER_ENV_UNSETS so ANTHROPIC_BASE_URL/ANTHROPIC_API_KEY from the kimi claude-code route never reach the ACP child environment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-launcher-spawn.ac3",
+            "title": "spawn.ts sends the initial role prompt through the acp socket after the host readiness signal instead of pasting into tmux",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-delivery-tier",
+        "title": "deliverAgentMessage ACP tier with transcript echo",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2858",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/delivery.ts",
+            "src/lib/agents/messaging.ts",
+            "src/lib/overdeck/conversation-delivery.ts",
+            "src/lib/agents/__tests__/delivery.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner src/lib/agents/__tests__"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "delivery tests pass including new acp-tier cases (success, wrong-token fallthrough, absent-socket fallthrough)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend src/lib/agents/delivery.ts: add 'acp' to the DeliveryResult.path union (:33) and insert an ACP tier in deliverAgentMessage (:193) at the same rank as the app-server tier (before supervisor): probe ${OVERDECK_HOME}/sockets/acp-<id>.sock via existsSync, read the token from agents/<id>/acp-token, POST {op:'message', content, meta} over the unix socket, return {path:'acp'} on 2xx. On ANY failure (connect refused — stale socket from a crashed host, 401, timeout) fall through to the next tier exactly like the app-server tier does (hazard H8). The host owns transcript echo (item acp-host) so delivery does not write the transcript itself — assert in tests that a delivered message appears in the host's transcript via the host test double. Method selection: in src/lib/agents/messaging.ts (expectedHarness :350) and src/lib/overdeck/conversation-delivery.ts (:286) return 'auto' for harness 'acp' so the socket tier is tried (mirror the codex app-server condition). pan tell then works unchanged for ACP agents through deliverAgentMessage."
+        },
+        "items": [
+          {
+            "id": "acp-delivery-tier.ac1",
+            "title": "deliverAgentMessage returns path 'acp' when the acp socket accepts the authenticated POST, and the message text appears in the agent transcript JSONL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-delivery-tier.ac2",
+            "title": "With an absent or dead acp socket, delivery falls back to the supervisor/channels/tmux tiers instead of failing the delivery outright",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-delivery-tier.ac3",
+            "title": "Method selection resolves to 'auto' for acp-harness agents in both messaging.ts and conversation-delivery.ts, proven by unit tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "kimi-acp-support",
+        "title": "Kimi support module: spawn input, auth method, prerequisite probe",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2858",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/kimi.ts",
+            "src/lib/acp/providers.ts",
+            "src/lib/system-prerequisites.ts",
+            "src/lib/acp/__tests__/kimi.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner src/lib/acp/__tests__/kimi.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "kimi support tests pass (spawn input shape, auth method selection)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/acp/kimi.ts modeled on t3code's CursorAcpSupport.ts (the non-wrapped shape — decision D8): buildKimiAcpSpawnInput returns {command: kimiSettings?.binaryPath || 'kimi', args: ['acp'], cwd, env} (per Kimi Code CLI docs the ACP entry point is `kimi acp`); resolveKimiAuthMethodId inspects the initialize result's advertised authMethods at runtime and prefers the cached-credential method (kimi stores OAuth credentials from a prior /login in ~/.kimi-code) — do NOT hardcode an id before initialize reveals the options; makeKimiAcpRuntime builds AcpSessionRuntime.layer with a provided ChildProcessSpawner. Create src/lib/acp/providers.ts: a tiny registry mapping provider name → support module ({kimi: …} in v1) used by the host's --provider flag; unknown provider → clear error listing supported providers. Add a kimi entry to the system-prerequisites probe list (src/lib/system-prerequisites.ts:157, pattern of the codex entry: binary 'kimi', install hint pointing at the Kimi Code CLI install docs). Unit-test the spawn-input shape and the auth-method selection against fixture initialize results (one with cached creds available, one with none)."
+        },
+        "items": [
+          {
+            "id": "kimi-acp-support.ac1",
+            "title": "buildKimiAcpSpawnInput produces command 'kimi' args ['acp'] with binaryPath override support, proven by unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kimi-acp-support.ac2",
+            "title": "Auth-method selection picks from the initialize result's advertised methods at runtime and returns a descriptive error naming `kimi` + /login when no usable method exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kimi-acp-support.ac3",
+            "title": "The acp provider registry resolves 'kimi' and rejects unknown providers with an error listing supported ones",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kimi-acp-support.ac4",
+            "title": "The system-prerequisites probe returns present/absent for the kimi binary with an install hint, following the existing codex probe shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-policy-resolve",
+        "title": "Harness policy branch and provider-aware binary availability for acp",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2858",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/harness-policy.ts",
+            "src/lib/harness-policy-decisions.ts",
+            "src/lib/harness-resolve.ts",
+            "src/lib/__tests__/harness-policy.test.ts",
+            "src/lib/__tests__/harness-resolve.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/__tests__/harness-policy.test.ts src/lib/__tests__/harness-resolve.test.ts"
+          ],
+          "expected_outputs": [
+            "policy and resolve tests pass with acp cases (allowed verdict, binary availability, no silent fallback)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "src/lib/harness-policy.ts canUseHarnessSync (:72): add an `if (harness === 'acp')` branch returning ALLOWED after the model-auth check — no ToS block applies (the ohmypi Anthropic+subscription block is ohmypi-specific). src/lib/harness-policy-decisions.ts (:49): add the precomputed acp row. src/lib/harness-resolve.ts: BINARY_BY_HARNESS (:10-13) maps harness→binary but ACP's binary is provider-dependent; for v1 map acp→'kimi' with a code comment stating the constraint (kimi is the only ACP provider; generalize to a per-provider lookup through src/lib/acp/providers.ts when a second ACP provider lands) — or if the provider is available at the call site of hasHarnessBinary, resolve through the registry now; prefer the registry if the plumbing is a one-liner. Preserve the PAN-1871 no-silent-fallback behavior: when providerHarnesses.kimi is 'acp' and the kimi binary is missing, resolution must fail loudly, not fall back to claude-code. Extend both test files with acp cases."
+        },
+        "items": [
+          {
+            "id": "acp-policy-resolve.ac1",
+            "title": "canUseHarnessSync('acp', …) returns an allowed verdict for kimi models under both api-key and oauth auth modes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-policy-resolve.ac2",
+            "title": "With providerHarnesses.kimi set to acp and the kimi binary absent, resolveHarness fails with a descriptive error instead of falling back to claude-code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-policy-resolve.ac3",
+            "title": "With the kimi binary present, resolveHarness returns 'acp' for a kimi-provider spawn when configured",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-config",
+        "title": "Config: acp block (permissionMode) in schema, merge, defaults",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2858",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/__tests__/merge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner src/lib/config-yaml"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "config-yaml tests pass including acp block merge/default cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an `acp` config block following the codex block's shape exactly (schema.ts raw :589-591, resolved :887-889, defaults defaults.ts:229-231, merge merge.ts:205-207): v1 fields `permissionMode?: 'auto'` (only value; the literal union leaves room for 'prompt' later — document in a comment that 'prompt' is reserved for the AUQ follow-up) and optional `kimi?: { binaryPath?: string }` for binary override. Default: permissionMode 'auto'. Do NOT add a providerHarnesses change — that map is already generic over RuntimeName and item acp-harness-types-behavior widens the type. Do NOT touch PROVIDERS.kimi.defaultHarness (decision D5/hazard H7). Extend merge tests with the acp block override case (user config overrides default, partial merge keeps defaults)."
+        },
+        "items": [
+          {
+            "id": "acp-config.ac1",
+            "title": "config.yaml with acp.permissionMode 'auto' and acp.kimi.binaryPath parses, merges over defaults, and resolves in the typed config, proven by merge tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-config.ac2",
+            "title": "An absent acp block resolves to the default permissionMode 'auto' without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-config.ac3",
+            "title": "providerHarnesses accepts 'acp' as a value for the kimi provider and PROVIDERS.kimi.defaultHarness remains 'claude-code' (asserted by a test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-permissions",
+        "title": "session/request_permission auto-mode outcome mapping in the host",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2858",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/permissions.ts",
+            "src/lib/acp/host.ts",
+            "src/lib/acp/__tests__/permissions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/acp/__tests__/permissions.test.ts"
+          ],
+          "expected_outputs": [
+            "permission mapping tests pass (allow-option selection, decline fallback, cancelled short-circuit)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/acp/permissions.ts: selectAutoPermissionOutcome(params) inspects params.options (each {optionId, name, kind}) and returns the selected outcome per t3code's semantics generalized to agent-specific ids (hazard H4): prefer the option whose kind/name indicates session-scoped allow (t3code: 'allow-always' / acceptForSession), else single allow ('allow-once' / accept), else return a decline-style option; when no allow or reject option exists return null. Match on ACP option `kind` first (the schema defines allow/reject kinds), falling back to name/id heuristics only when kind is absent. Wire into the host's handleRequestPermission (registered in item acp-host): permissionMode 'auto' → respond {outcome:{outcome:'selected', optionId}} with the chosen id, logging the request + choice to the transcript; null selection → respond with the reject-style option (or {outcome:{outcome:'cancelled'}} if none) and log a warning to the pane. Unit-test with Cursor-style ids (allow-always/allow-once/reject-once), kind-only options with unfamiliar ids, and an options-less request."
+        },
+        "items": [
+          {
+            "id": "acp-permissions.ac1",
+            "title": "Given Cursor-style options the selector returns allow-always for session-scoped auto-approval, and given kind-tagged options with unfamiliar ids it selects by kind not id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-permissions.ac2",
+            "title": "When no allow option exists the host responds with the reject option (or cancelled when option-less) and emits a pane-visible warning line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-permissions.ac3",
+            "title": "The host records every permission request and its outcome in the transcript JSONL with the option ids offered and chosen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-transcript-discovery",
+        "title": "Conversation discovery + metadata parsing for acp transcripts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2858",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversations/harness-discovery.ts",
+            "src/lib/conversations/harness-metadata.ts",
+            "src/lib/conversations/scanner.ts",
+            "src/lib/conversations/__tests__/harness-discovery.test.ts",
+            "src/lib/conversations/__tests__/harness-metadata.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner src/lib/conversations"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "conversation discovery/metadata tests pass with acp fixture transcripts"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Make acp sessions discoverable by the dashboard conversation surfaces. src/lib/conversations/harness-discovery.ts: add an acp discovery source to discoverySources[] (:28, codex pattern at :45-48) scanning ${OVERDECK_HOME}/agents/<id>/acp-session.jsonl (per-agent-dir collection already exists via collectAgentDirFiles :128 — extend it to include the acp transcript name). src/lib/conversations/harness-metadata.ts: add parseAcpSessionMetadata reading the first/last transcript lines for sessionId, model, timestamps, message count (mirror parseCodexSessionMetadata's shape). src/lib/conversations/scanner.ts: add the acp branch to the per-harness parse dispatch (:82-97). Write fixture transcripts (a small acp-session.jsonl in the test fixtures dir) and unit tests proving an acp transcript is discovered, attributed harness 'acp', and yields correct metadata. The transcript line schema is defined by item acp-host's transcript.ts — import its types rather than re-declaring."
+        },
+        "items": [
+          {
+            "id": "acp-transcript-discovery.ac1",
+            "title": "When the discovery scan runs over a fixture agent dir containing acp-session.jsonl, it returns a session attributed harness 'acp'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-transcript-discovery.ac2",
+            "title": "parseAcpSessionMetadata returns sessionId, timestamps, and message count from the fixture transcript",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-transcript-discovery.ac3",
+            "title": "The scanner's per-harness dispatch produces a conversation row for the acp fixture without disturbing existing harness parse tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-frontend-feed",
+        "title": "Frontend conversation feed renders acp sessions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2858",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/sessionFeed/useConversationFeed.ts",
+            "src/dashboard/frontend/src/components/sessionFeed/ConversationFeedCard.tsx",
+            "src/dashboard/frontend/src/components/sessionFeed/__tests__/useConversationFeed.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- sessionFeed"
+          ],
+          "expected_outputs": [
+            "typecheck (including typecheck:dashboard) completes without errors",
+            "sessionFeed tests pass with an acp harness case"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "src/dashboard/frontend/src/components/sessionFeed/useConversationFeed.ts: add 'acp' to the harness union (:17) and map it in mapHarnessToAgent (:78) via getHarnessBehavior('acp').feedKind. Render the 'acp' feedKind in the feed components: the transcript entries are role/content ndjson (defined by acp-host's transcript.ts), so the closest existing rendering path is the codex feed — reuse its card rendering with an 'acp'/'kimi' agent label rather than building a new card type. Follow the pan-style-guide color law (running is not green; no new decorative colors). Add a hook test case asserting an acp conversation maps to the acp feed kind and renders without throwing."
+        },
+        "items": [
+          {
+            "id": "acp-frontend-feed.ac1",
+            "title": "An acp-harness conversation renders in the session feed with assistant text and tool-call lines visible (no blank card, no crash)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-frontend-feed.ac2",
+            "title": "mapHarnessToAgent resolves 'acp' through getHarnessBehavior feedKind, proven by a hook unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-docs",
+        "title": "Docs: harnesses.mdx ACP section, harness-landscape update, CLAUDE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2858",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "reference/harness-landscape.mdx",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:prompts"
+          ],
+          "expected_outputs": [
+            "prompt/docs lint passes; the three files contain the new ACP/Kimi sections"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "configuration/harnesses.mdx: add ACP to the supported-harnesses table (:24) and a section after Codex (:50) covering: what ACP is (one paragraph, link agentclientprotocol.com), Kimi Code CLI as the first agent, install + the mandatory one-time `kimi` /login before ACP use (auth caveat), opt-in routing via `providerHarnesses.kimi: acp`, the acp config block (permissionMode 'auto'), the persistent acp-host transport (runtime-adapter pointer like the codex section's :64), and troubleshooting (auth-required exit, prerequisite probe). reference/harness-landscape.mdx: move/annotate the ACP-capable CLIs (Kimi, Cursor, Grok, Gemini) noting Overdeck now speaks ACP natively and Kimi is wired. CLAUDE.md Harnesses paragraph: extend the three-harness sentence to four, one sentence on acp + the vendored effect-acp package + kimi-first. State what each doc now says in the diff — this item's ACs are about content present, not 'docs updated'."
+        },
+        "items": [
+          {
+            "id": "acp-docs.ac1",
+            "title": "configuration/harnesses.mdx contains an ACP section documenting kimi /login preflight, providerHarnesses.kimi: acp routing, and the acp.permissionMode config key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-docs.ac2",
+            "title": "reference/harness-landscape.mdx marks Kimi Code CLI as wired via the native ACP harness and lists Cursor/Grok/Gemini as ACP-reachable next",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-docs.ac3",
+            "title": "CLAUDE.md's Harnesses section contains acp as the fourth harness with the vendored packages/effect-acp pointer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "kimi-acp-probe-e2e",
+        "title": "Opt-in real-binary Kimi probe test proving the end-to-end prompt round-trip",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-18T01:17:43.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2858",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/__tests__/kimi-probe.slow.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "KIMI_ACP_PROBE=1 VITEST_INCLUDE_SLOW=1 npx vitest run --configLoader runner src/lib/acp/__tests__/kimi-probe.slow.test.ts"
+          ],
+          "expected_outputs": [
+            "with an authenticated local kimi binary, the probe passes: initialize → session/new → session/prompt returns an assistant reply and end_turn; without KIMI_ACP_PROBE=1 the suite skips"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Author src/lib/acp/__tests__/kimi-probe.slow.test.ts on t3code's CliProbe pattern (GrokAcpCliProbe.test.ts / CursorAcpCliProbe.test.ts, gated by env): when KIMI_ACP_PROBE=1 and the kimi binary is present and authenticated, build the real runtime via makeKimiAcpRuntime, start(), send a trivial prompt ('reply with the single word pong'), and assert an assistant text event arrives and the prompt resolves with stopReason end_turn; then assert the sessionId is non-empty (resume handle exists). Skip (it.skipIf) when the env flag is absent so CI and the default suite never spawn the real binary. The .slow.test.ts suffix keeps it out of the default run per vitest.config.ts's exclude (:52). This is the mechanical half of the issue's 'work agent runs end-to-end through the pipeline' AC; the full pipeline UAT (pan start a test issue with providerHarnesses.kimi: acp) is executed by the test role per the plan's verification notes in continue.json — the probe proves the transport layer against the real agent."
+        },
+        "items": [
+          {
+            "id": "kimi-acp-probe-e2e.ac1",
+            "title": "With KIMI_ACP_PROBE=1 and an authenticated kimi binary, the probe completes initialize → session/new → session/prompt and receives assistant text with stopReason end_turn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kimi-acp-probe-e2e.ac2",
+            "title": "Without KIMI_ACP_PROBE=1 the default vitest run marks the probe as skipped, never failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kimi-acp-probe-e2e.ac3",
+            "title": "After start the probe receives a non-empty ACP sessionId, establishing that the resume handle for session/load exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "vendor-effect-acp",
+        "to": "port-acp-runtime-model",
+        "type": "blocks"
+      },
+      {
+        "from": "vendor-effect-acp",
+        "to": "port-acp-session-runtime",
+        "type": "blocks"
+      },
+      {
+        "from": "port-acp-runtime-model",
+        "to": "port-acp-session-runtime",
+        "type": "blocks"
+      },
+      {
+        "from": "port-acp-session-runtime",
+        "to": "acp-session-runtime-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "port-acp-session-runtime",
+        "to": "acp-host",
+        "type": "blocks"
+      },
+      {
+        "from": "port-acp-session-runtime",
+        "to": "kimi-acp-support",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-harness-types-behavior",
+        "to": "acp-runtime-adapter",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-harness-types-behavior",
+        "to": "acp-launcher-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-harness-types-behavior",
+        "to": "acp-delivery-tier",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-harness-types-behavior",
+        "to": "acp-policy-resolve",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-harness-types-behavior",
+        "to": "acp-config",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-harness-types-behavior",
+        "to": "acp-transcript-discovery",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-harness-types-behavior",
+        "to": "acp-frontend-feed",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-host",
+        "to": "acp-runtime-adapter",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-host",
+        "to": "acp-delivery-tier",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-host",
+        "to": "acp-permissions",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-host",
+        "to": "acp-transcript-discovery",
+        "type": "blocks"
+      },
+      {
+        "from": "kimi-acp-support",
+        "to": "acp-host",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-runtime-adapter",
+        "to": "acp-launcher-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-launcher-spawn",
+        "to": "kimi-acp-probe-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-delivery-tier",
+        "to": "kimi-acp-probe-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "kimi-acp-support",
+        "to": "kimi-acp-probe-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-config",
+        "to": "acp-docs",
+        "type": "informs"
+      },
+      {
+        "from": "kimi-acp-support",
+        "to": "acp-docs",
+        "type": "informs"
+      },
+      {
+        "from": "acp-transcript-discovery",
+        "to": "acp-frontend-feed",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-18-PAN-2858-support-agent-client-protocol-acp-harness-port-t3code-s-effect-acp-layer-first-agent-kimi-code-cli.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

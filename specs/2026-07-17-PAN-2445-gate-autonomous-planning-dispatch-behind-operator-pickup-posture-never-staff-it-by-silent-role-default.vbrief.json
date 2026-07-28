@@ -1,0 +1,358 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-17T13:10:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2445: bug(cloister): deacon lifecycle patrol auto-dispatches PLANNING for stale 'planning'-state issues — off-book, and staffed from roles.plan (= Fable) when no model is recorded",
+    "updated": "2026-07-17T17:39:44.700Z"
+  },
+  "plan": {
+    "id": "pan-2445",
+    "title": "Gate autonomous planning dispatch behind operator pickup posture; never staff it by silent role default",
+    "status": "completed",
+    "uid": "2267dac7-bfe8-4b93-aa54-aa668639fa1d",
+    "author": "agent:claude-fable-5",
+    "sequence": 8,
+    "created": "2026-07-17T13:10:00.000Z",
+    "updated": "2026-07-17T17:39:44.700Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2445",
+        "label": "PAN-2445",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2445.md",
+        "label": "PRD draft (overdeck-state)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "deacon",
+      "planning",
+      "model-routing",
+      "safety"
+    ],
+    "narratives": {
+      "Problem": "The reactive lifecycle scheduler (src/lib/cloister/service-reactive.ts:304-307) autonomously dispatches the plan role via spawnRun(issueId, 'plan') whenever an issue's lifecycle state lands on in_planning (tracker statusChanged events, issue.transitioned, boot-reconciliation replay). It ignores the operator's pickup posture (auto_pickup_backlog flag + released label), and because it passes no model, determineModel resolves roles.plan → workhorse:expensive — the most expensive model, silently. Per the operator's 2026-07-07 comment this is preventive policy hardening (the original incident attribution was withdrawn): (1) autonomous planning dispatch must respect the pickup posture; (2) no autonomous path may silently staff workhorses.expensive — it requires a recorded model or an explicitly designated autonomous model, else surfaces needs-you.",
+      "Proposal": "Add a pure decision module src/lib/cloister/autonomous-plan-dispatch.ts: posture gate (allow iff auto_pickup_backlog OR 'released' label, and no parked/vetoed/objection label; fail closed when labels are unavailable) followed by staffing resolution (recorded model from prior plan-role agent state → new roles.plan.autonomousModel config → refuse). Wire it into the reactive scheduler's plan branch only: refusal emits an activity warn entry plus a durable needs-you trip via recordDeadEndNeedsYou(issueId, 'autonomous-plan-dispatch', ...); allowance passes the concrete resolved model to spawnRun. Add the optional camelCase config field roles.plan.autonomousModel (scalar ModelRef, workhorse refs dereferenced via derefWorkhorse, fail-loud validation, NO default). Regression-test the decision matrix and the wiring.",
+      "NonGoals": "- Gating operator-initiated planning paths (pan plan CLI, dashboard start-planning route, pan start auto-plan via agent-spawner.startPlanning) — an operator is in the loop there and roles.plan routing stays as-is\n- Gating autonomous work/review/test dispatch staffing (out of scope; file separately if wanted)\n- Order-book sequence-membership checks beyond the released/auto-pickup posture — 'released' (PAN-2059) is the operator's per-issue go signal; sequence rank is a priority concern, not a permission concern\n- Dashboard Settings UI for autonomousModel (config.yaml only in this issue)\n- Changes to deacon-auto-resume planning-session recovery (it resumes existing sessions, never spawns fresh)\n- Blocking workhorse:expensive as an explicit autonomousModel value — the rule is no SILENT expensive staffing, not no expensive staffing"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose the config-plus-recorded-model staffing option over the recorded-model-only option the issue offered as an alternative: precedence is recorded model → roles.plan.autonomousModel → refuse + needs-you.",
+        "rationale": "Superset of both options in the issue body: preserves warm-continuation behavior for issues that already ran planning (recorded model was operator-sanctioned at first spawn), gives the operator one explicit knob for fresh autonomous dispatch, and refuses loudly when neither exists — satisfying the no-hardcoded-fallback rule."
+      },
+      {
+        "summary": "Posture predicate mirrors only the released/auto-pickup/parked/vetoed/objection parts of isAutoPickable, not ready/planned/inPipeline/epic.",
+        "rationale": "Those four gate WORK pickup of planned backlog items; an issue stuck in 'planning' state is definitionally in-pipeline and unplanned, so copying them would make autonomous planning dispatch permanently impossible rather than operator-gated."
+      },
+      {
+        "summary": "Fail closed (refuse with 'labels-unavailable') when issue labels cannot be read, even with auto_pickup_backlog ON.",
+        "rationale": "Blanket release satisfies 'released' but parked/vetoed/objection cannot be verified without labels; refusing is the safe posture for an autonomous spawn, the needs-you trip makes it visible, and the next domain event retries naturally."
+      },
+      {
+        "summary": "Config key is camelCase roles.plan.autonomousModel rather than the issue's snake_case roles.plan.autonomous_model spelling.",
+        "rationale": "RoleConfig YAML keys are camelCase in this codebase (minAgents, maxAgents, reReviewScope); following the existing convention beats matching the issue text's informal spelling."
+      },
+      {
+        "summary": "Gate wires only into service-reactive.ts's plan dispatch branch.",
+        "rationale": "Verified it is the single autonomous fresh-planning spawn path: spawnPlanningSession callers are operator-initiated, and deacon-auto-resume explicitly excludes planning agents from resumable roles (isResumableRole, deacon-auto-resume.ts:204)."
+      }
+    ],
+    "items": [
+      {
+        "id": "gate-module",
+        "title": "Pure autonomous-plan-dispatch decision module with unit test matrix",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2445",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wire-reactive-gate"
+          ],
+          "files_scope": [
+            "src/lib/cloister/autonomous-plan-dispatch.ts",
+            "src/lib/cloister/__tests__/autonomous-plan-dispatch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/autonomous-plan-dispatch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "autonomous-plan-dispatch.test.ts passes with the full posture/staffing matrix",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/autonomous-plan-dispatch.ts exporting decideAutonomousPlanDispatch(input) per PRD FR-1/D2-D4: input { autoPickupBacklog: boolean; labels: readonly string[] | null; recordedModel?: string; autonomousModel?: string; workhorses: NormalizedConfig['workhorses'] } → { allow: true; model: string; modelSource: 'recorded' | 'autonomousModel' } | { allow: false; code: 'not-released' | 'parked' | 'vetoed' | 'objection' | 'labels-unavailable' | 'no-autonomous-model'; reason: string }. Posture first (labels null → labels-unavailable; parked/legacy-parked/vetoed/objection labels → their code even when released; else released label or autoPickupBacklog required → not-released), then staffing (recordedModel wins; else derefWorkhorse(autonomousModel, { workhorses }, 'roles.plan.autonomousModel') in try/catch — failure or absence → no-autonomous-model). Label matching case-insensitive; import RELEASED_LABEL/PARKED_LABEL/LEGACY_PARKED_LABELS/VETOED_LABEL/OBJECTION_LABEL from src/lib/backlog/pickup.ts, never re-declare strings. reason strings must be operator-standalone sentences naming the levers (release the issue, enable auto-pickup, set roles.plan.autonomousModel, or run pan plan manually). Write the unit matrix test file covering every branch listed in PRD W1.",
+          "Verification": "Run the named vitest file and typecheck."
+        },
+        "items": [
+          {
+            "id": "gate-module.ac1",
+            "title": "Given autoPickupBacklog=false and labels without 'released', decideAutonomousPlanDispatch returns allow:false with code 'not-released' (test asserts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-module.ac2",
+            "title": "Given a parked, vetoed, or objection label, the function returns allow:false with the matching code even when 'released' is present and autoPickupBacklog is true (test asserts all three)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-module.ac3",
+            "title": "Given labels === null, the function returns allow:false with code 'labels-unavailable' even when autoPickupBacklog=true (test asserts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-module.ac4",
+            "title": "Given posture allows and recordedModel='gpt-5.5', the function returns allow:true with model 'gpt-5.5' and modelSource 'recorded', ignoring autonomousModel (test asserts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-module.ac5",
+            "title": "Given posture allows, no recordedModel, and autonomousModel='workhorse:cheap', the function returns the dereferenced concrete model id from workhorses.cheap; with autonomousModel absent it returns allow:false code 'no-autonomous-model' (test asserts both)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-autonomous-model",
+        "title": "Add roles.plan.autonomousModel config field with fail-loud validation and no default",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2445",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/roles.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/__tests__/planning-config.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/config-yaml/__tests__/planning-config.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "planning-config tests pass including the new autonomousModel cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add optional autonomousModel?: RoleModelRef (scalar only — reject arrays/percent distributions) to RoleConfig in src/lib/config-yaml/schema.ts (~line 366, beside reReviewScope/minAgents). In src/lib/config-yaml/roles.ts extend the existing per-role validation block (~line 294 where reReviewScope/minAgents are validated) to validate autonomousModel when present: must be a string, must dereference via derefWorkhorse (dangling workhorse slot or malformed ref → throw an Error whose message names roles.<role>.autonomousModel). DEFAULT_ROLES must gain NO autonomousModel entry (DEFAULT_ROLES.plan stays { model: 'workhorse:expensive' }). Inspect src/lib/config-yaml/merge.ts: if role configs merge field-by-field, carry autonomousModel through; if they spread whole objects, no change needed — state which in the commit message. Add tests to src/lib/config-yaml/__tests__/planning-config.test.ts: set value round-trips through load/normalize; unset stays undefined with no default injected; workhorse:nonexistent fails load with an error naming the key; an array value fails load.",
+          "Verification": "Run the named vitest file and typecheck."
+        },
+        "items": [
+          {
+            "id": "config-autonomous-model.ac1",
+            "title": "Given a config.yaml with roles.plan.autonomousModel: 'workhorse:cheap', load accepts it and the normalized config returns 'workhorse:cheap' for roles.plan.autonomousModel (test asserts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-autonomous-model.ac2",
+            "title": "A config.yaml with roles.plan.autonomousModel: 'workhorse:nonexistent' rejects at load with an error message containing 'roles.plan.autonomousModel' (test asserts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-autonomous-model.ac3",
+            "title": "With the field unset, the normalized config returns undefined for roles.plan.autonomousModel and DEFAULT_ROLES.plan contains no autonomousModel key (test asserts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-reactive-gate",
+        "title": "Wire posture gate + staffing into the reactive scheduler's plan dispatch with needs-you refusal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2445",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/service-reactive.ts",
+            "src/lib/cloister/autonomous-plan-dispatch.ts",
+            "src/lib/cloister/__tests__/reactive-scheduler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/reactive-scheduler.test.ts",
+            "npx vitest run src/lib/cloister/__tests__/autonomous-plan-dispatch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reactive-scheduler tests pass including four new wiring cases (refusal no-spawn + needs-you, autonomousModel spawn, recorded-model spawn, work-role unchanged)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add gatherAutonomousPlanDispatchInput(issueId) to src/lib/cloister/autonomous-plan-dispatch.ts: autoPickupBacklog via isFlywheelAutoPickupBacklog() (src/lib/database/app-settings.ts); labels via the issue-service singleton using the SAME lazy require() + try/catch pattern as buildClassifyLookups (src/lib/backlog/lookups.ts:25 — never a static import, that creates the lib→dashboard layering edge), returning null when unavailable; recordedModel from getAgentState('agent-<lower>-plan')?.model then getAgentState('planning-<lower>')?.model (both naming schemes are live per .pan/context/codebase/concerns.md); autonomousModel and workhorses from loadConfigSync().config. In src/lib/cloister/service-reactive.ts onIssueStateChangePromise, change ONLY the final spawnRun block (currently lines 304-307): when role === 'plan', call the decision; on allow:false → console.log, emitActivityEntrySync({ source: 'cloister', level: 'warn', message, issueId }), await recordDeadEndNeedsYou(normalizedIssueId, 'autonomous-plan-dispatch', newState, message) from ./dead-end-trip.js (mirror deacon.ts:1927 usage), and return WITHOUT spawning; on allow:true → spawnRun(normalizedIssueId, 'plan', { prompt: buildReactiveRolePrompt(...), model: decision.model }). The message must state, in complete sentences, that autonomous planning dispatch for <issue> was refused, why (the decision reason), and the operator levers. Work-role dispatch keeps the existing no-model spawnRun call unchanged. Extend the existing vi.mock harness in reactive-scheduler.test.ts (add module-scope mocks for app-settings, dead-end-trip, config load, and the issue-service label source; reset in beforeEach like the existing mocks) with the four wiring cases named in expected_outputs. No execSync and no sync tmux primitives anywhere in the new code.",
+          "Verification": "Run both named vitest files and typecheck."
+        },
+        "items": [
+          {
+            "id": "wire-reactive-gate.ac1",
+            "title": "Given an in_planning event with auto-pickup off and no released label, spawnRun is never called and recordDeadEndNeedsYou is called with recoveryPath 'autonomous-plan-dispatch' plus a warn activity entry is emitted (test asserts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-reactive-gate.ac2",
+            "title": "Given posture allows and roles.plan.autonomousModel is configured with no recorded model, spawnRun receives options.model equal to the dereferenced concrete model id (test asserts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-reactive-gate.ac3",
+            "title": "Given a prior plan-role agent state recording a model, spawnRun receives that recorded model and the config autonomousModel is not used (test asserts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-reactive-gate.ac4",
+            "title": "Given an in_progress event, the work role still dispatches via spawnRun without a model option, byte-identical to current behavior (regression test asserts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-autonomous-plan",
+        "title": "Document autonomous planning gate and roles.plan.autonomousModel in MODEL-CALLS.md and FLYWHEEL.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2445",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MODEL-CALLS.md",
+            "docs/FLYWHEEL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'autonomousModel' docs/MODEL-CALLS.md docs/FLYWHEEL.md"
+          ],
+          "expected_outputs": [
+            "grep shows autonomousModel documented in both files"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "docs/MODEL-CALLS.md section A: update the plan-role row/notes to state that autonomous (reactive-scheduler) planning dispatch resolves recorded model → roles.plan.autonomousModel → refuses with a needs-you trip, and never falls through to roles.plan; operator-initiated planning (pan plan, dashboard, pan start auto-plan) still resolves roles.plan. docs/FLYWHEEL.md: in the auto-pickup/posture discussion, add that with auto_pickup_backlog off, a stale in_planning issue gets no autonomous planning spawn and instead surfaces as a needs-you trip, and name the two operator levers: the released label (or auto-pickup) for permission, and roles.plan.autonomousModel for staffing.",
+          "Verification": "grep for autonomousModel in both files; review content by diff."
+        },
+        "items": [
+          {
+            "id": "docs-autonomous-plan.ac1",
+            "title": "docs/MODEL-CALLS.md section A states the autonomous planning resolution chain (recorded → autonomousModel → needs-you refusal, never roles.plan) and distinguishes operator-initiated planning (diff shows the added text)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-autonomous-plan.ac2",
+            "title": "docs/FLYWHEEL.md states that with auto_pickup_backlog off a stale in_planning issue produces no autonomous planning spawn and surfaces a needs-you trip, naming the released label and roles.plan.autonomousModel levers (diff shows the added text)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion",
+              "acJustification": "Docs item with two target files; one criterion per file covers the full scope."
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "gate-module",
+        "to": "wire-reactive-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "config-autonomous-model",
+        "to": "wire-reactive-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-reactive-gate",
+        "to": "docs-autonomous-plan",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-17-PAN-2445-gate-autonomous-planning-dispatch-behind-operator-pickup-posture-never-staff-it-by-silent-role-default.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

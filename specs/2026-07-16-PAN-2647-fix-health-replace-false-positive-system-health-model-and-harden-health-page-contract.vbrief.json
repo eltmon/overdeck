@@ -1,0 +1,1523 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-16T20:43:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2647: fix(health): replace false-positive system health model and harden Health page contract",
+    "updated": "2026-07-17T11:23:24.921Z"
+  },
+  "plan": {
+    "id": "pan-2647",
+    "title": "fix(health): replace false-positive system health model and harden Health page contract",
+    "status": "completed",
+    "uid": "1541cd11-79b2-4392-a24e-99307dcfada8",
+    "author": "agent:claude-fable-5",
+    "sequence": 9,
+    "created": "2026-07-16T20:43:04Z",
+    "updated": "2026-07-17T11:23:24.921Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2647",
+        "label": "PAN-2647",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2647.md",
+        "label": "Implementation PRD",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "health",
+      "dashboard",
+      "contracts",
+      "false-positive",
+      "no-loss"
+    ],
+    "narratives": {
+      "Problem": "The dashboard has multiple incompatible health models that report healthy or intentionally idle states as degraded: historical swap occupancy directly drives warning/critical severity, the first sample bypasses hysteresis, reasons and severity can contradict each other, every 30-minute-idle live session is called 'stuck', error/stale agents inflate spawn capacity counts, the server emits agent status 'wedged' that the frontend cannot render (page crash), leaked-specialist detection consumes an always-empty array, and route failures become HTTP 200 empty 'healthy' results. First-time users on healthy machines see everything red.",
+      "Proposal": "Lower the implementation PRD (drafts/pan-2647.md on overdeck-state) into one canonical, platform-aware health model: a runtime-validated SystemHealthSnapshot V2 contract in packages/contracts with four separate domains (host pressure, spawn admission, agent runtime, service availability); Linux/macOS platform collectors using current-pressure signals (PSI, swap-activity deltas, memory_pressure -Q, real CPU deltas) with per-signal unavailability; atomic three-sample hysteresis with a neutral 'measuring' cold start; lifecycle-aware agent health through the canonical agent resolver; all routes/UI/spawn-gate/events projecting from the one accepted snapshot; an explicit no-loss audit; Playwright + throwaway Node 22 boot verification; and documentation of signal semantics.",
+      "NonGoals": "- Redesign the entire Resources page or Command Deck\n- Change the memory governor's configured soft/hard/recovery reserves or its shedding policy\n- Add destructive automatic cleanup from the health UI\n- Windows-native support; unsupported platforms return explicit unavailable signals\n- Treat cost, disk capacity, Docker stack health, model-provider health, or tracker availability as host memory pressure\n- Remove pan doctor or its diagnostic checks\n- Remove legacy summary/route fields in this issue (compatibility cycle retained; removal is a follow-up)\n- Restart or hot-patch the live dashboard during implementation"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Kept one vBRIEF for this issue instead of splitting into sibling issues.",
+        "rationale": "Every slice depends on the shared V2 contract and the final no-loss matrix gates the whole refactor; sibling issues would leave main in mixed-model states between merges and the PRD is written as one coherent no-loss replacement."
+      },
+      {
+        "summary": "PRD checkpoint 1 (macOS fixture capture) resolved via sanitized fixtures with fail-closed parsing; no live macOS capture.",
+        "rationale": "This environment is Linux-only. The PRD's stated fallback applies: accept both verified memory_pressure -Q output shapes as fixtures, and any unrecognized output parses to explicit 'unavailable' rather than guessed values."
+      },
+      {
+        "summary": "Existing PAN_HEALTH_* environment overrides are retained, parsed through the single finite-number validator, and surfaced in the snapshot.",
+        "rationale": "PRD section 2 says 'Environment overrides, if retained' — retaining them matches the no-loss posture; deprecated swap/overcommit thresholds stay readable but inert per the compatibility decision."
+      },
+      {
+        "summary": "Removal of the duplicate frontend SystemHealthSnapshot interface happens in the frontend-hook migration task, not the contract task.",
+        "rationale": "Each task must leave the tree typechecking; deleting the frontend interface before frontend imports migrate would break the build mid-plan."
+      },
+      {
+        "summary": "requiresInspection set on exactly two foundations: the shared contract (deep) and the agent-health classifier (fast).",
+        "rationale": "The contract is the cross-cutting schema every downstream task encodes assumptions about; the classification order determines route, guardrail, and UI behavior. All other tasks are leaves whose defects surface at typecheck/review."
+      }
+    ],
+    "items": [
+      {
+        "id": "contract-v2",
+        "title": "Add shared SystemHealthSnapshot V2 contract with compatibility projector",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-2647",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "evaluate-pure",
+            "sampler-hysteresis",
+            "agent-health-classify",
+            "routes-health-unify",
+            "resources-projectors",
+            "frontend-hook",
+            "pill-repair",
+            "health-page-repair"
+          ],
+          "files_scope": [
+            "packages/contracts/src/system-health.ts",
+            "packages/contracts/src/system-health.test.ts",
+            "packages/contracts/src/system-health-compatibility.test.ts",
+            "packages/contracts/src/index.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npx vitest run --configLoader runner packages/contracts/src/system-health.test.ts packages/contracts/src/system-health-compatibility.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "contracts build completes without errors",
+            "system-health.test.ts and system-health-compatibility.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-17",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Create packages/contracts/src/system-health.ts per the PRD 'Shared contract' section: HealthState literal ('measuring'|'healthy'|'warning'|'critical'|'unavailable'), HealthReason struct (stable code, domain, severity, message, optional metric/observed/threshold), SystemHealthSnapshot with version 2, overall state, updatedAt, nextPollMs, host domain (state/platform/reasons/metrics), admission domain (open|soft|blocked|unavailable, availableMemoryBytes, admittedWorkAgentCount, reasons), agents array (exhaustive AgentHealthSnapshot statuses: healthy, idle, waiting, warning, stalled, wedged, dead, unavailable), services array (running, not_configured, degraded, stopped, unavailable), topConsumers, and a LegacySystemHealthSummary compatibility projection. Write a pure legacy-summary projector that maps a V2 snapshot to every existing summary field. Export from packages/contracts/src/index.ts. Unknown enum values must decode to explicit unavailable entries, not throw."
+        },
+        "items": [
+          {
+            "id": "contract-v2.ac1",
+            "title": "Given a valid V2 snapshot object, When decoded with the exported schema, Then decoding returns typed host/admission/agents/services domains and preserves all fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-v2.ac2",
+            "title": "Given a snapshot containing an unknown agent status or overall state value, When decoded, Then the decoder returns an explicit unavailable entry for that element and never throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-v2.ac3",
+            "title": "Given a V2 snapshot, When the legacy-summary projector runs, Then it produces every field the current summary exposes (cpu, load, memory totals, swap totals/percent, committed diagnostic, process counts, webhook state) — the compatibility test pins each field by name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-v2.ac4",
+            "title": "Given the contracts package build, When npm run build:contracts runs, Then the new module compiles and index.ts exports the health schemas for both server and frontend imports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-resolve",
+        "title": "Read health thresholds through the canonical resolved config loader",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/system-health-service.ts",
+            "src/lib/system-health/config.ts",
+            "src/lib/system-health/__tests__/config.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/system-health/__tests__/config.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "config.test.ts passes including invalid/reversed threshold normalization cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Delete the health service's raw regex parsing of config.yaml and duplicate default constants. Read resolved resource settings from the canonical loader (loadConfigSync().config.resources). Add one threshold-normalization function that validates finite, nonnegative, correctly ordered values exactly once; invalid or reversed values log a single warning and fall back to named defaults. Retain existing PAN_HEALTH_* env overrides, parsed through the same finite-number validator, and surface effective values in the snapshot metrics. Deprecated swapUsedWarningPercent/swapUsedCriticalPercent and overcommit thresholds remain readable but must no longer feed severity (enforced later by evaluate-pure; here they are only resolved and surfaced)."
+        },
+        "items": [
+          {
+            "id": "config-resolve.ac1",
+            "title": "Given the dashboard service source, When searched for raw config.yaml regex parsing, Then no regex-based config read remains — all resource settings resolve through the canonical loader",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-resolve.ac2",
+            "title": "Given a config with reversed (warning > critical) or non-finite threshold values, When thresholds are resolved, Then normalization applies named defaults, logs exactly once, and returns ordered finite values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-resolve.ac3",
+            "title": "Given a valid operator-configured reserve value, When thresholds are resolved, Then the operator value is preserved unchanged and surfaced in the effective-threshold output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "collector-linux",
+        "title": "Create collector interface and Linux platform collector with fixture-driven parsers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/system-health/types.ts",
+            "src/lib/system-health/collector.ts",
+            "src/lib/system-health/linux.ts",
+            "src/lib/system-health/__tests__/linux.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/system-health/__tests__/linux.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "linux.test.ts passes: healthy-historical-swap, active-swapping, PSI elevated/full, malformed/missing PSI, zero swap, CPU delta cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/system-health/types.ts with the HostHealthCollector interface ({ platform: 'linux'|'darwin'|'unsupported', sample(previous?) }) and HostMetricSample types carrying per-signal availability. Implement linux.ts: MemAvailable + total from /proc/meminfo; CPU utilization as delta of aggregate /proc/stat counters; current memory pressure from /proc/pressure/memory some.avg10/full.avg10 when present; swap activity as delta/time of /proc/vmstat pswpin+pswpout; swap occupancy, load averages, Committed_AS, and CommitLimit as diagnostic-only fields. All file/process reads go behind injectable async adapters; parsers are pure functions over fixture strings. Missing or malformed signals (e.g. no PSI in a container) yield explicit per-signal 'unavailable', never zero. collector.ts selects the platform adapter and returns an 'unsupported' collector elsewhere. Named default pressure-band constants live in this module per the PRD. Build the parent-to-children process index once per refresh for memory attribution (NFR-5)."
+        },
+        "items": [
+          {
+            "id": "collector-linux.ac1",
+            "title": "Given fixtures for a healthy host with 50% historical swap occupancy and quiet PSI/swap-activity deltas, When sampled, Then the sample reports no current-pressure signal elevated and swap occupancy appears only as a diagnostic field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collector-linux.ac2",
+            "title": "Given fixtures with elevated memory.some/full avg10 or sustained pswpin/pswpout deltas, When sampled, Then the sample exposes those as current-pressure signals with observed values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collector-linux.ac3",
+            "title": "Given missing or malformed /proc/pressure content, When sampled, Then the PSI signal is marked unavailable (not zero) and remaining signals still populate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collector-linux.ac4",
+            "title": "Given two consecutive /proc/stat fixtures, When sampled with a previous sample, Then cpuPercent derives from counter deltas and load average is exposed only as a diagnostic field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collector-linux.ac5",
+            "title": "Given the new module, When searched, Then no execSync/spawnSync or direct fs.readFileSync in server-reachable paths exists — all adapters are async and injectable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "collector-darwin",
+        "title": "Create macOS platform collector with fail-closed fixture-driven parsers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/system-health/darwin.ts",
+            "src/lib/system-health/__tests__/darwin.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/system-health/__tests__/darwin.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "darwin.test.ts passes: healthy historical swap, pressure warning/critical, CPU deltas, malformed output, unavailable command cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement darwin.ts behind the same HostHealthCollector interface: RAM/current pressure parsed from `memory_pressure -Q` (accept both verified output shapes via sanitized fixtures; unrecognized output returns unavailable — PRD checkpoint 1 fallback, no live macOS capture available in this environment); vm_stat totals retained as diagnostics/fallback; CPU utilization from os.cpus()[].times deltas (NOT load average); swap activity from vm_stat Swapins/Swapouts deltas when available; `sysctl vm.swapusage` remains occupancy-only diagnostic. If memory_pressure or a delta signal is unavailable, mark that signal unavailable and let admission fall back to available-memory only — never substitute zero. All subprocess calls use bounded-timeout async exec behind injectable adapters."
+        },
+        "items": [
+          {
+            "id": "collector-darwin.ac1",
+            "title": "Given memory_pressure -Q fixtures showing free percentage above thresholds plus nonzero vm.swapusage occupancy, When sampled, Then no current-pressure signal is elevated and occupancy appears only as diagnostic",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collector-darwin.ac2",
+            "title": "Given memory_pressure fixtures at <=10% and <=5% free, When sampled, Then the sample exposes warning-band and critical-band pressure observations respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collector-darwin.ac3",
+            "title": "Given malformed or unrecognized memory_pressure/vm_stat output, When parsed, Then the affected signal returns explicit unavailable and no fabricated numeric value enters the sample",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collector-darwin.ac4",
+            "title": "Given two os.cpus() time snapshots, When sampled with a previous sample, Then cpuPercent derives from time deltas and one-minute load never populates cpuPercent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "evaluate-pure",
+        "title": "Implement pure host-pressure evaluation with structured reason codes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/system-health/evaluate.ts",
+            "src/lib/system-health/__tests__/evaluate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/system-health/__tests__/evaluate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "evaluate.test.ts passes threshold-boundary and diagnostic-only swap/commit cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement evaluateHostPressure(sample, resolvedThresholds) in src/lib/system-health/evaluate.ts as a pure function producing a raw assessment: HealthState plus structured HealthReason entries (stable codes, domain, severity, observed/threshold values). Encode the PRD default bands: Linux warning when memory.some.avg10 >= 5 or swap activity >= 64 MiB/min while MemAvailable is below the warning reserve; Linux critical when memory.full.avg10 >= 1 or swap activity >= 256 MiB/min while below the critical reserve; macOS warning/critical at <=10%/<=5% memory_pressure free. Available-memory reserve crossings feed the admission domain; they raise host severity only when corroborated by a current-pressure signal. Historical swap occupancy and Committed_AS/CommitLimit never produce a reason with severity above info. On a platform with no current-pressure signal, host state is 'unavailable' while admission reports honestly."
+        },
+        "items": [
+          {
+            "id": "evaluate-pure.ac1",
+            "title": "Given abundant MemAvailable with 50% swap occupancy and quiet pressure signals, When evaluated, Then the assessment returns healthy with no warning/critical reason and swap occupancy appears only in diagnostics",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evaluate-pure.ac2",
+            "title": "Given samples exactly at each PRD band boundary (some.avg10=5, full.avg10=1, 64/256 MiB/min swap activity, 10%/5% macOS free), When evaluated, Then each boundary produces its documented severity with a stable reason code carrying observed and threshold values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evaluate-pure.ac3",
+            "title": "Given low available memory but no elevated current-pressure signal, When evaluated, Then the admission domain reports the reserve crossing while host severity stays below warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evaluate-pure.ac4",
+            "title": "Given a sample whose current-pressure signals are all unavailable, When evaluated, Then host state is unavailable (not healthy, not critical) and admission still reports from available memory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sampler-hysteresis",
+        "title": "Implement singleton sampler and atomic three-sample hysteresis state machine",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/system-health/sampler.ts",
+            "src/lib/system-health/__tests__/sampler.test.ts",
+            "src/dashboard/server/services/system-health-service.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/system-health/__tests__/sampler.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sampler.test.ts passes cold-measuring, escalation/recovery, atomicity, invalid-sample, single-flight, and poll-interval cases using fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-15",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement transitionAcceptedAssessment(previous, raw) as a pure state machine: three consecutive samples in a new band are required for both escalation and recovery; the accepted result publishes state, structured reasons, and metrics atomically from the same accepted evaluation; missing/invalid samples do not count toward a transition and cannot clear the previous accepted state (freshness is annotated instead). Implement the singleton sampler in sampler.ts: on first request return a valid 'measuring' snapshot and start warm-up (three samples one second apart), then the configured poll interval; concurrent readers share one sampler (single-flight). Wire system-health-service.ts to consume the accepted assessment, removing the first-sample hysteresis bypass and the severity-only hysteresis. Emit a versioned transition only when the accepted state changes. ALL timing tests use vi.useFakeTimers() + vi.advanceTimersByTimeAsync() — real waits are forbidden by repo rule."
+        },
+        "items": [
+          {
+            "id": "sampler-hysteresis.ac1",
+            "title": "Given a fresh service, When the first health request arrives, Then it returns a valid snapshot with state 'measuring' and starts exactly one sampler regardless of concurrent callers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sampler-hysteresis.ac2",
+            "title": "Given three consecutive samples in a higher band (advanced via fake timers), When the third is accepted, Then state, reasons, and metrics all change together in one accepted assessment — no intermediate mixed publication",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sampler-hysteresis.ac3",
+            "title": "Given an accepted warning state and two recovery samples followed by an invalid sample, When evaluated, Then the accepted state remains warning — invalid samples neither count toward nor clear a transition",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sampler-hysteresis.ac4",
+            "title": "Given an accepted state change, When the transition publishes, Then exactly one versioned transition event with accepted reason codes is emitted, and unchanged accepted states emit none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sampler-hysteresis.ac5",
+            "title": "Given the sampler test file, When inspected and run, Then every delay uses fake timers and the suite completes without any real sleep",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-health-classify",
+        "title": "Implement lifecycle-aware agent-health classification as a pure function",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2647",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "health-agents-route",
+            "admitted-count",
+            "specialist-lifecycle",
+            "health-page-repair"
+          ],
+          "files_scope": [
+            "src/lib/agents/health.ts",
+            "src/lib/agents/__tests__/agent-health.test.ts",
+            "src/dashboard/lib/health-filtering.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/agents/__tests__/agent-health.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-health.test.ts passes every classification state and boundary case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "FR-12",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Check first whether a canonical agent-health module already exists under src/lib/agents/ (PRD WI-4 says 'new or extend after checking ownership'). Implement the PRD Product-decision-4 classification order as a pure function over (persisted agent state, canonical runtime state, live tmux session set, review-status lifecycle, now): 1) resolver-corrupt/unreadable => unavailable with structured reason; 2) context saturated => wedged; 3) running/starting without tmux past the existing five-minute startup grace => dead; 4) work agent with kickoffDelivered === false past grace => stalled; 5) runtime waiting-on-human => waiting regardless of inactivity; 6) runtime idle/suspended including terminal-verdict advancing sessions => idle (plus lifecycle 'warm' when the canonical review-status classifier says warm); 7) runtime active => warning after 15 min without effective activity, stalled after 30; 8) otherwise healthy while live, idle when persisted but intentionally inactive. Expose real lastActivityAt; preserve consecutiveFailures, killCount, and contextPercent including 0 (no 0=>null coercion). Retire the inactivity-only 'stuck' logic in health-filtering.ts in favor of this function. Beware the known circular-ESM neighborhood around health-filtering.ts — keep the new module cycle-free (continue.json H5)."
+        },
+        "items": [
+          {
+            "id": "agent-health-classify.ac1",
+            "title": "Given an idle, suspended, waiting-on-human, or warm terminal-verdict session inactive for over 30 minutes, When classified, Then the result is idle/waiting (never stalled or stuck) — intentional inactivity is not failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-health-classify.ac2",
+            "title": "Given a running-status agent with no tmux session past the five-minute startup grace, When classified, Then the result is dead; within grace, starting agents classify as healthy/starting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-health-classify.ac3",
+            "title": "Given an active-runtime agent with no effective activity, When classified at 15 and 30 minutes, Then it returns warning then stalled at those boundaries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-health-classify.ac4",
+            "title": "Given a corrupt/unreadable persisted state via the resolver, When classified, Then the result is unavailable with a structured reason code, not an omitted or healthy entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-health-classify.ac5",
+            "title": "Given an agent with contextPercent 0 and a real lastActivityAt, When its health snapshot is produced, Then contextPercent remains 0 (not null) and lastActivityAt reflects the actual activity timestamp, with consecutiveFailures and killCount preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "health-agents-route",
+        "title": "Rebuild /api/health/agents on the canonical resolver with explicit failure semantics",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc/health.ts",
+            "tests/dashboard/health-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/dashboard/health-api.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "health-api.test.ts passes corrupt/unavailable, zero-context, real-activity-timestamp, and warm/waiting cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-12",
+            "FR-13",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Retire the direct ~/.overdeck/agents directory scan in /api/health/agents. The route projects from the V2 agent-health array built by the classifier task: read agents through the canonical resolver, fetch the tmux session set once per request, and return the classified snapshots. Remove fabricated lastPing (new Date() at request time) in favor of lastActivityAt. Whole-request failures (resolver unavailable, read-model error) return a structured unavailable body with a non-2xx status — never HTTP 200 []. Per-agent corruption returns that agent as an unavailable entry within a 200 response."
+        },
+        "items": [
+          {
+            "id": "health-agents-route.ac1",
+            "title": "Given the route implementation, When inspected/tested, Then no direct filesystem scan of agent directories remains — agents load through the canonical resolver",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-agents-route.ac2",
+            "title": "Given a whole-request resolver failure, When GET /api/health/agents runs, Then it returns a non-2xx status with a structured unavailable body instead of HTTP 200 with an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-agents-route.ac3",
+            "title": "Given one corrupt agent state among healthy agents, When the route responds, Then the corrupt agent appears as an unavailable entry with a reason code and other agents render normally",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-agents-route.ac4",
+            "title": "Given a responding agent, When the route serializes it, Then the payload carries real lastActivityAt (no request-time lastPing) and preserves contextPercent 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "admitted-count",
+        "title": "Compute admittedWorkAgentCount and use it for spawn capacity guardrails",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/system-health-service.ts",
+            "src/dashboard/server/routes/agents/shared.ts",
+            "src/dashboard/server/routes/agents/spawn.ts",
+            "src/dashboard/server/routes/__tests__/agents-guardrails.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/dashboard/server/routes/__tests__/agents-guardrails.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agents-guardrails.test.ts passes error/stale-start exclusion and live-count cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the status!=='stopped' collection filter feeding workAgentCount. admittedWorkAgentCount includes ONLY: role 'work' with a live tmux session, or role 'work' with status 'starting' begun less than five minutes ago. It excludes error, dead/stale-starting, stopped, warm advancing sessions, plan, conversation, and specialist roles. The spawn capacity warning/block in routes/agents/shared.ts and spawn.ts consumes this field; no UI-derived count controls admission. Do NOT touch the memory governor's reserves or shedding policy (explicit non-goal) — only the agent-count input changes. The count is exposed in the snapshot's admission domain."
+        },
+        "items": [
+          {
+            "id": "admitted-count.ac1",
+            "title": "Given error-status agents and starting agents older than five minutes with no tmux session, When capacity is computed, Then none of them count toward admittedWorkAgentCount and spawning proceeds unblocked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admitted-count.ac2",
+            "title": "Given live work agents plus a fresh (<5 min) starting work agent, When capacity is computed, Then exactly those agents count and the configured ceiling still warns/blocks at its documented values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admitted-count.ac3",
+            "title": "Given warm advancing sessions, plan sessions, and conversations, When capacity is computed, Then they are excluded from admittedWorkAgentCount",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "admitted-count.ac4",
+            "title": "Given the memory-governor module, When the diff for this item is reviewed, Then its reserve thresholds and shedding policy are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "specialist-lifecycle",
+        "title": "Replace dead leaked-specialist detection with canonical lifecycle annotations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/system-health-service.ts",
+            "src/lib/cloister/review-status-source.ts",
+            "src/lib/agents/health.ts",
+            "src/lib/agents/__tests__/specialist-lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/agents/__tests__/specialist-lifecycle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "specialist-lifecycle.test.ts passes active/warm/orphaned/unknown classification cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD checkpoint 2 first: locate the existing canonical functions that classify terminal-verdict warm sessions and merged/orphan advancing sessions (advancing-session lifecycle code around review-status). Reuse them; if importing would create an ESM cycle, MOVE the pure classifier into a cycle-free module — never duplicate the logic. Then delete the leakedSpecialists derivation that consumes DashboardSnapshot.specialists (always [] from the read model — the feature is unreachable with real data). Annotate specialist/advancing sessions in the V2 snapshot with lifecycle 'active' | 'warm' | 'orphaned' | 'unknown' sourced from canonical agent + review status. Do not infer leaks from missing parent work agents."
+        },
+        "items": [
+          {
+            "id": "specialist-lifecycle.ac1",
+            "title": "Given a terminal-verdict warm review session, When annotated, Then its lifecycle is 'warm' via the same classifier the advancing-session lifecycle code uses — no second warm definition exists in the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialist-lifecycle.ac2",
+            "title": "Given a canonically orphaned advancing session, When annotated, Then its lifecycle is 'orphaned' and it is the only category surfaced as reclaimable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialist-lifecycle.ac3",
+            "title": "Given the service source, When searched, Then no code path consumes DashboardSnapshot.specialists for leak detection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "routes-health-unify",
+        "title": "Delegate health and God View routes plus transition events to the accepted snapshot",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc/health.ts",
+            "src/dashboard/server/services/system-health-service.ts",
+            "src/dashboard/server/services/domain-services.ts",
+            "tests/dashboard/health-api.test.ts",
+            "src/dashboard/server/services/__tests__/system-health-service-classify.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/dashboard/health-api.test.ts src/dashboard/server/services/__tests__/system-health-service-classify.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route contract tests pass for success, partial-signal failure, and whole-snapshot failure",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "FR-15",
+            "NFR-3",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "GET /api/system/health and GET /api/godview/system-health become thin projectors over the one accepted V2 snapshot (schema-decoded at the route boundary before returning HTTP). Whole-snapshot failures return a structured unavailable body with non-2xx; partial signal failures stay 200 with explicit per-domain availability. The legacy summary remains as the compatibility projection from contract-v2. Canonical agent state feeds the collector inside the service rather than an optional call argument, so cached snapshots cannot silently drop caller context. The system.health_severity_changed event is versioned to carry accepted reason codes and timestamps; the old event type is retained or explicitly versioned per the no-loss inventory."
+        },
+        "items": [
+          {
+            "id": "routes-health-unify.ac1",
+            "title": "Given a healthy accepted snapshot, When /api/system/health and /api/godview/system-health respond, Then both payloads decode against the shared contract and agree on state, reasons, and metrics",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-health-unify.ac2",
+            "title": "Given a whole-snapshot production failure, When the routes respond, Then they return non-2xx with a structured unavailable body — never 200 with fabricated healthy data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-health-unify.ac3",
+            "title": "Given one unavailable signal within an otherwise valid sample, When the route responds, Then it returns 200 with that domain/signal explicitly marked unavailable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-health-unify.ac4",
+            "title": "Given an accepted state transition, When the event publishes, Then the versioned payload carries accepted reason codes and timestamps and the legacy event shape remains available per the compatibility decision",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resources-projectors",
+        "title": "Project Resources host vitals and spawn gate from the accepted snapshot",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/resources/host-vitals.ts",
+            "src/dashboard/server/routes/resources/spawn-gate.ts",
+            "tests/unit/dashboard/routes/resources-host-vitals.test.ts",
+            "tests/unit/dashboard/routes/resources-spawn-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/routes/resources-host-vitals.test.ts tests/unit/dashboard/routes/resources-spawn-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resources-host-vitals.test.ts parity cases pass; resources-spawn-gate.test.ts admission-separation cases pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-15",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the independent Resources host-vitals collection (currently os.freemem() fallback with swap hardcoded to zero) with a projector from the accepted host metrics, so Resources and the header can never disagree. The spawn-gate route projects the admission domain (open/soft/blocked/unavailable with reasons and admittedWorkAgentCount) and keeps enforcing admission decisions; admission soft/blocked is presented as capacity/headroom and never flips a healthy host to warning/critical. The relationship between governor reserves and the HTTP predicate stays explicit per the existing memory-governor comparison comments — do not fork those threshold comparisons."
+        },
+        "items": [
+          {
+            "id": "resources-projectors.ac1",
+            "title": "Given an accepted snapshot, When Resources host vitals respond, Then memory/swap/CPU values equal the snapshot's host metrics — the zero-swap os.freemem() fallback path is gone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resources-projectors.ac2",
+            "title": "Given admission state soft or blocked with a healthy host, When the spawn gate and overall state respond, Then admission reports soft/blocked while overall host health remains healthy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resources-projectors.ac3",
+            "title": "Given the spawn gate projector, When a spawn request exceeds admission limits, Then the gate still blocks/warns with structured reasons — display health never silently disables enforcement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-hook",
+        "title": "Migrate useSystemHealth to the shared contract with server-driven polling",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/hooks/useSystemHealth.ts",
+            "src/dashboard/frontend/src/types.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix src/dashboard/frontend run test -- src/hooks"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors with the duplicate local health interfaces removed",
+            "frontend hook tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-16",
+            "FR-17",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "fetchSystemHealth()/useSystemHealth decode responses with Schema.decodeUnknown from the shared contract; decoding failures produce an explicit unavailable snapshot object the UI can render (never a throw). Delete the hand-written duplicate SystemHealthSnapshot/AgentHealth interfaces from src/dashboard/frontend/src/types.ts once all imports use @overdeck/contracts, adding 'wedged' and every other server status via the contract's exhaustive union. Polling: refetch every second only while state is 'measuring'; otherwise honor the snapshot's nextPollMs."
+        },
+        "items": [
+          {
+            "id": "frontend-hook.ac1",
+            "title": "Given a server response with an unknown future status value, When decoded in the fetcher, Then the hook returns an explicit unavailable representation and the consuming components render without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-hook.ac2",
+            "title": "Given frontend/src/types.ts after migration, When searched, Then no local duplicate SystemHealthSnapshot or AgentHealth declaration remains — all health types import from @overdeck/contracts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-hook.ac3",
+            "title": "Given a measuring snapshot then a healthy snapshot with nextPollMs, When the hook polls (fake timers), Then it refetches at one second while measuring and switches to nextPollMs afterward",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pill-repair",
+        "title": "Repair the SystemHealthPill: structured reasons, honest icons, accessible popover",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/SystemHealthPill.tsx",
+            "src/dashboard/frontend/src/components/SystemHealthPill.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/SystemHealthPill.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SystemHealthPill.test.tsx passes every overall state, measuring polling, keyboard/focus/dismissal, and reduced-motion cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "FR-19",
+            "FR-20",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "The pill selects its primary label by stable structured reason codes — delete the regex over English reason strings. Render all five overall states with the PRD's domain-specific copy ('Healthy · 41 GB available', 'Measuring system health…', 'Healthy · spawn headroom tight', 'Health unavailable · Retry'). Healthy/measuring use neutral/positive icons — never AlertTriangle; critical pulsing gets a reduced-motion-safe alternative (honor prefers-reduced-motion). The popover gains dialog semantics: aria-expanded/aria-controls on the trigger, Escape and outside-click dismissal, focus restoration to the trigger on close, accessible names for every status, and containment within a 320px viewport. Preserve topConsumers Kill/Remove actions with confirmation and post-action invalidation. Follow the pan-style-guide color-signal semantics (no decorative color, running is not green)."
+        },
+        "items": [
+          {
+            "id": "pill-repair.ac1",
+            "title": "Given each overall state (measuring, healthy, warning, critical, unavailable), When the pill renders, Then each shows its distinct documented copy and icon, and healthy/measuring never render an alert-triangle icon",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pill-repair.ac2",
+            "title": "Given a snapshot with structured reasons, When the primary label is chosen, Then selection keys on reason codes — the component contains no regex/string-match over reason message text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pill-repair.ac3",
+            "title": "Given an open popover, When Escape or an outside click occurs, Then it closes and focus returns to the trigger; the trigger exposes aria-expanded and aria-controls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pill-repair.ac4",
+            "title": "Given prefers-reduced-motion, When the state is critical, Then the pill conveys criticality without pulsing animation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pill-repair.ac5",
+            "title": "Given a top consumer, When Kill/Remove is clicked, Then the existing confirmation dialog appears and a confirmed action refreshes the snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "health-page-repair",
+        "title": "Repair the Health page: exhaustive statuses, zero-agent rendering, neutral optional services",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/HealthDashboard.tsx",
+            "src/dashboard/frontend/src/components/HealthDashboard.test.tsx",
+            "src/dashboard/frontend/src/components/TldrServiceStatus.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/DeaconStatus.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/HealthDashboard.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "HealthDashboard.test.tsx passes zero-agent, wedged, warm-idle, optional-service, unavailable, and unknown-state fallback cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17",
+            "FR-18",
+            "FR-19",
+            "NFR-7",
+            "NFR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "STATUS_CONFIG becomes exhaustive over the contract's agent statuses (healthy, idle, waiting, warning, stalled, wedged, dead, unavailable) with an unknown-value fallback rendering as unavailable — a server status must never dereference undefined.icon. Remove the early return when zero agents exist: host, Deacon, and TLDR sections always render, followed by a neutral zero-agent empty state. Summary cards cover idle/waiting/warning/stalled/wedged/dead/unavailable without implying idle is bad. TldrServiceStatus renders 'TLDR · Not configured (optional)' with a neutral icon (no failure X). The leaked-only filter becomes 'Reclaimable sessions' (canonically orphaned only); warm sessions are labeled 'Warm · reusable' and never described as leaks. All Kill/Remove confirmations and post-action invalidation are preserved."
+        },
+        "items": [
+          {
+            "id": "health-page-repair.ac1",
+            "title": "Given an agent with status wedged (and any unknown future status), When the page renders, Then it renders a labeled row/card without throwing — unknown values fall back to unavailable presentation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-page-repair.ac2",
+            "title": "Given zero agents, When the page renders, Then host status, Deacon, and TLDR sections render with a neutral empty state for agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-page-repair.ac3",
+            "title": "Given TLDR not configured, When its status renders, Then it shows neutral 'Not configured (optional)' presentation without a failure icon",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-page-repair.ac4",
+            "title": "Given warm and orphaned sessions, When the sessions filter renders, Then only canonically orphaned sessions appear under 'Reclaimable sessions' and warm ones are labeled 'Warm · reusable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-page-repair.ac5",
+            "title": "Given summary cards, When agent statuses include idle, waiting, stalled, wedged, dead, and unavailable, Then each status appears in a card with a distinct accessible name and idle/waiting are presented as non-error states",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-loss-audit",
+        "title": "Encode and enforce the no-loss matrix for every legacy health surface",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/dashboard/system-health-no-loss.test.ts",
+            "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/system-health-no-loss.test.ts",
+            "npm --prefix src/dashboard/frontend run test -- src/components/system-health-ui-no-loss.test.tsx"
+          ],
+          "expected_outputs": [
+            "system-health-no-loss.test.ts fails when any inventory row lacks a V2 home or explicit retirement, and currently passes",
+            "system-health-ui-no-loss.test.tsx passes for every UI affordance row"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-21",
+            "NFR-6",
+            "NFR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Encode every row of the PRD 'No-loss inventory' table (header pill metric, CPU/load, memory totals, swap fields, committed diagnostic, memory attributions, role counts, webhook state, Kill/Remove actions, leaked-focus supersession, transition event, /api/system/health, /api/godview/system-health, /api/health/agents, Resources host vitals, spawn gate, capacity guardrail, summary cards, Deacon/TLDR sections, pan doctor) as matrix entries following the existing tests/unit/lib/overdeck/no-loss-matrix.ts pattern. Each row asserts a V2 home or an explicit retirement assertion (the leaked-only filter is the one deliberate supersession). Assert legacy compatibility fields and route projections remain during the cycle, and that historical swap occupancy and virtual commitment remain visible diagnostics that cannot change accepted severity."
+        },
+        "items": [
+          {
+            "id": "no-loss-audit.ac1",
+            "title": "Given the encoded inventory, When any row lacks both a V2 home and an explicit retirement assertion, Then the matrix test fails naming the row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac2",
+            "title": "Given the compatibility cycle, When legacy summary fields and route projections are checked, Then every legacy field remains present in responses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac3",
+            "title": "Given a snapshot with high historical swap and high Committed_AS but quiet pressure, When severity is computed, Then the audit asserts both values render as diagnostics while accepted severity stays healthy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "playwright-boot",
+        "title": "Add Playwright regression specs and a throwaway Node 22 boot verification",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/system-health-pill.spec.ts",
+            "src/dashboard/frontend/tests/health-page.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "npx playwright test src/dashboard/frontend/tests/system-health-pill.spec.ts src/dashboard/frontend/tests/health-page.spec.ts"
+          ],
+          "expected_outputs": [
+            "both Playwright specs pass against a throwaway fixture-driven dashboard instance",
+            "throwaway Node 22 dashboard boot serves all health routes without error before any live restart"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-22",
+            "NFR-7",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Playwright scenarios per PRD WI-8: first-run measuring→healthy, healthy host with historical swap occupancy, zero agents, optional not-configured services, wedged agent, unavailable route, and 320px viewport. Verify status by role/accessible name, never color alone. Capture light/dark and narrow screenshots and inspect the PNGs during implementation (self-verify rule — do not ask the operator to eyeball). Run against a throwaway fixture-driven dashboard instance with an isolated browser profile; never the live operator dashboard. PRD checkpoint 4: build and boot a throwaway dashboard under Node 22 (node dist/dashboard/server.js on a spare port) and query /api/system/health, /api/godview/system-health, /api/health/agents, and the Resources routes before considering the work complete — typecheck green is not boot evidence. Never restart the live server as part of this item."
+        },
+        "items": [
+          {
+            "id": "playwright-boot.ac1",
+            "title": "Given a fixture host with abundant RAM and 50% historical swap, When the dashboard first loads, Then the pill renders measuring then healthy and the run's inspected screenshots contain no warning/critical presentation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-boot.ac2",
+            "title": "Given zero agents and TLDR unconfigured, When the Health page loads, Then host/Deacon/TLDR sections render with neutral optional presentation, verified by accessible role/name queries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-boot.ac3",
+            "title": "Given a wedged agent fixture and a forced unavailable health route, When the pages load, Then both states render labeled UI without a client-side exception",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-boot.ac4",
+            "title": "Given a built dist, When a throwaway Node 22 dashboard boots on a spare port, Then all health routes respond and the boot log shows no module-cycle or layer errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "playwright-boot.ac5",
+            "title": "Given a 320px viewport, When the pill popover opens, Then its content stays within the viewport and remains dismissible",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-semantics",
+        "title": "Document health domains, platform signals, and admission-versus-diagnostics semantics",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T20:43:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-2647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/RESOURCE-GOVERNOR.md",
+            "docs/ROLES.md",
+            "docs/API-SURFACE.md",
+            "docs/USAGE.md",
+            "reference/troubleshooting.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -rn 'Swap usage is high' docs/ reference/ src/ --include='*.md' --include='*.mdx' || true",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "no doc or code claims swap percentage directly means pressure (grep returns no product-surface hits)",
+            "lint completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-7",
+            "FR-8",
+            "FR-18",
+            "FR-19"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-9: docs/RESOURCE-GOVERNOR.md explains the four health domains, the overall-state derivation, and how admission reserves relate to (but differ from) governor reserves; document Linux/macOS signal sources, diagnostic-only swap/commit values, measuring/unavailable fallbacks, and unsupported-platform behavior; document warm/idle/waiting agent semantics and Reclaimable sessions; document configuration keys, normalization behavior, and default pressure bands; update docs/API-SURFACE.md field tables with V2 routes and compatibility/deprecation notes naming the follow-up removal condition (PRD checkpoint 3); update reference/troubleshooting.mdx to distinguish pan doctor diagnostics from live dashboard health; add inline module headers for collectors/sampler/contract. Remove any remaining claim that swap percentage directly means pressure."
+        },
+        "items": [
+          {
+            "id": "docs-semantics.ac1",
+            "title": "Given the updated docs, When RESOURCE-GOVERNOR.md is read, Then it states the four domains, the overall derivation rules, and the explicit relationship between admission reserves and governor reserves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-semantics.ac2",
+            "title": "Given the docs tree, When searched for the claim that swap occupancy means current pressure, Then no such statement remains and the diagnostic-only semantics are stated instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-semantics.ac3",
+            "title": "Given API-SURFACE.md, When its health tables are read, Then they list the V2 routes, compatibility projections, and a named removal condition for deprecated fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contract-v2",
+        "to": "evaluate-pure",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-v2",
+        "to": "agent-health-classify",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-v2",
+        "to": "routes-health-unify",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-v2",
+        "to": "frontend-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "config-resolve",
+        "to": "evaluate-pure",
+        "type": "blocks"
+      },
+      {
+        "from": "collector-linux",
+        "to": "collector-darwin",
+        "type": "blocks"
+      },
+      {
+        "from": "collector-linux",
+        "to": "evaluate-pure",
+        "type": "blocks"
+      },
+      {
+        "from": "evaluate-pure",
+        "to": "sampler-hysteresis",
+        "type": "blocks"
+      },
+      {
+        "from": "sampler-hysteresis",
+        "to": "routes-health-unify",
+        "type": "blocks"
+      },
+      {
+        "from": "sampler-hysteresis",
+        "to": "resources-projectors",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-health-classify",
+        "to": "health-agents-route",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-health-classify",
+        "to": "admitted-count",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-health-classify",
+        "to": "specialist-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "admitted-count",
+        "to": "resources-projectors",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-hook",
+        "to": "pill-repair",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-hook",
+        "to": "health-page-repair",
+        "type": "blocks"
+      },
+      {
+        "from": "health-agents-route",
+        "to": "health-page-repair",
+        "type": "blocks"
+      },
+      {
+        "from": "specialist-lifecycle",
+        "to": "health-page-repair",
+        "type": "informs"
+      },
+      {
+        "from": "routes-health-unify",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "resources-projectors",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "pill-repair",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "health-page-repair",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "specialist-lifecycle",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "pill-repair",
+        "to": "playwright-boot",
+        "type": "blocks"
+      },
+      {
+        "from": "health-page-repair",
+        "to": "playwright-boot",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-health-unify",
+        "to": "playwright-boot",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-health-unify",
+        "to": "docs-semantics",
+        "type": "blocks"
+      },
+      {
+        "from": "health-page-repair",
+        "to": "docs-semantics",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-16-PAN-2647-fix-health-replace-false-positive-system-health-model-and-harden-health-page-contract.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

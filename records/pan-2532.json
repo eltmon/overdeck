@@ -1,0 +1,312 @@
+{
+  "issueId": "PAN-2532",
+  "schemaVersion": 2,
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: No new test required by the approved vBRIEF; existing ProjectOverview coverage at faffae87a4820e393df079e855bbd8cf184971ad asserts pipeline title, stuck-reason subline, cost, and session count, and all 24 tests pass.",
+      "recordedAt": "2026-07-16T06:53:33.346Z"
+    }
+  ],
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-16T06:53:41.103Z",
+      "reason": "end",
+      "note": "Deviation: removed a stale planning-era .pan/records/pan-2532.json artifact from the code branch because the migrated-state push guard correctly rejected it. Test addition waived per the approved vBRIEF because existing coverage at faffae87a4820e393df079e855bbd8cf184971ad exercises the preserved row content. No skipped work or remaining hazards. Delivered the four-column PipelineRow title-first layout with inline status metadata; typecheck, lint, focused tests, and full suite pass.\n\nTest gate waived: No new test required by the approved vBRIEF; existing ProjectOverview coverage at faffae87a4820e393df079e855bbd8cf184971ad asserts pipeline title, stuck-reason subline, cost, and session count, and all 24 tests pass."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T06:57:11.243Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T06:57:11.254Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T06:57:11.284Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T06:57:11.296Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:00:15.710Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:00:17.473Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:00:17.488Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:00:17.498Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:00:17.520Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:33:49.458Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:33:51.421Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:33:51.433Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:33:51.444Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:33:51.454Z"
+    }
+  ],
+  "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/dashboard/frontend/src/components/CommandDeck/PipelineRow.tsx"
+    ],
+    "actualChangedFiles": [
+      "src/dashboard/frontend/src/components/CommandDeck/PipelineRow.tsx"
+    ],
+    "recordedAt": "2026-07-16T06:53:38.538Z"
+  },
+  "created": "2026-07-16T05:46:43.959Z",
+  "updated": "2026-07-16T15:38:46.282Z",
+  "pipeline": {
+    "issueId": "PAN-2532",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-16T15:38:46.241Z",
+    "testNotes": "Gates run in workspace (HEAD cc9a3a6a5f): npm run typecheck (pass, incl. dashboard-types guard), npm run lint (pass, exit 0), npm test (full suite: 1015 files/9374 tests passed, 3/50 skipped) and cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/ProjectOverview.test.tsx (24/24 passed). Matches Cloister's own verification-latest.json (typecheck/frontend-typecheck/lint/build/server-bundle/test all passed at lastVerifiedCommit=cc9a3a6a5f). Diff of PipelineRow.tsx verified line-by-line against vBRIEF item widen-title-grid: gridTemplateColumns is exactly '78px 1fr 74px 34px' with the old 200px status column removed (ac1); title stays a full-width truncating span (ac2); metadata line is one flex row (mt-[3px] flex min-w-0 items-center gap-1.5 overflow-hidden) holding the shrink-0 status chip plus a single truncate span rendering [sublineFor(entry), whoLineFor(entry)].filter(Boolean).join(' · ') (ac3); .filter(Boolean) guards the null whoLineFor case so no dangling separator, cost/session column and avatar column untouched (ac4). UAT: built and ran the dashboard from this workspace (docker compose stack overdeck-feature-pan-2532-{frontend,server,dev}, Vite HMR on the bind-mounted workspace source) at https://feature-pan-2532.overdeck.localhost, confirmed by traefik router API since the checked-in docker-compose.devcontainer.yml host-rule comments are stale. Found and fixed an unrelated container-hygiene gap (container's shared node_modules volume was missing posthog-js, added to package.json in a prior commit already on this branch, before this container's last install) via bun install + frontend container restart -- this only touched the throwaway workspace container, not code/config/tests. App then loaded cleanly with no PAN-2532-related console errors. Could not populate a live PipelineRow with real long-title data in this isolated container: it starts with zero registered projects/agents by design (no Deacon, no host state mount), and adding a project hit a pre-existing, unrelated origin-mismatch bug in this workspace's docker-compose.devcontainer.yml (OVERDECK_TRUSTED_ORIGINS/labels still say feature-pan-2532.pan.localhost while traefik's live rule is feature-pan-2532.overdeck.localhost, so authenticated API calls 401/403) -- fixing that requires editing configuration, which is outside this test role's boundaries and unrelated to the PAN-2532 diff. No acceptance criteria, issue body, or vBRIEF verify_commands call for browser UAT; the vBRIEF's own required checks (typecheck, lint, ProjectOverview.test.tsx) are exactly what ran and passed. Verdict: PASSED on gate results plus verified spec-conformant diff; recommend filing the docker-compose origin-mismatch as a separate follow-up issue since it will block future UAT-required workspace tests.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2782",
+    "reviewedAtCommit": "2cc83ac13cc6637f35d3b0257ff2a2f5b304fc96",
+    "reviewRequestedAt": "2026-07-16T07:33:42.967Z",
+    "reviewSpawnedAt": "2026-07-16T07:33:48.299Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "src/dashboard/frontend/src/components/CommandDeck/PipelineRow.tsx"
+      ],
+      "actualChangedFiles": [
+        "src/dashboard/frontend/src/components/CommandDeck/PipelineRow.tsx"
+      ],
+      "recordedAt": "2026-07-16T06:53:38.538Z"
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-16T15:38:46.241Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 668943,
+            "output": 2608,
+            "cacheRead": 579840,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 12713263,
+            "output": 28942,
+            "cacheRead": 12077056,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 14950,
+            "output": 10786,
+            "cacheRead": 1275662,
+            "cacheWrite": 106834
+          }
+        },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 481,
+            "output": 30465,
+            "cacheRead": 10716002,
+            "cacheWrite": 201747
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 668943,
+          "output": 2608,
+          "cacheRead": 579840,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 12713263,
+          "output": 28942,
+          "cacheRead": 12077056,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 14950,
+          "output": 10786,
+          "cacheRead": 1275662,
+          "cacheWrite": 106834
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 481,
+          "output": 30465,
+          "cacheRead": 10716002,
+          "cacheWrite": 201747
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 14.690953,
+        "pricingAsOf": "2026-07-16T08:47:45.330Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2782"
+    ],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-16T15:38:46.281Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-verification",
+            "by": "flywheel-orchestrator",
+            "at": "2026-07-16T15:38:34.585Z"
+          }
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2782 MERGED at 2026-07-16T08:47:39Z",
+          "status": "pass",
+          "mergedAt": "2026-07-16T08:47:39Z",
+          "mergeCommit": "a8a588be18d9188f4cc8fc11a1c92784ad781993"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: in_progress; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on a8a588be18d9188f4cc8fc11a1c92784ad781993",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-16T14:53:33.000Z, dist built 2026-07-16T11:43:20.890Z, merge 2026-07-16T08:47:39.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Removed 8 agent state directories; No strike branch strike/pan-2532 found; Pruned 8 checkpoint ref(s) for agent-pan-2532, planning-pan-2532, strike-pan-2532; No specialist registry entries for PAN-2532"
+        }
+      ],
+      "accepted": [
+        "verification"
+      ]
+    }
+  },
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
+        "writerId": "agent-pan-2532",
+        "agentId": "agent-pan-2532",
+        "pid": 2481381,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:43:54.266Z",
+        "itemId": "widen-title-grid",
+        "outcome": "completed",
+        "reason": "Collapsed PipelineRow to the specified four-column title-first layout; merged chip, subline, and model metadata beneath the title; preserved cost and avatar columns; typecheck, lint, focused tests, and full suite pass.",
+        "releasedAt": "2026-07-16T06:52:45.544Z"
+      }
+    ],
+    "statusReasons": {
+      "widen-title-grid": {
+        "reason": "Collapsed PipelineRow to the specified four-column title-first layout; merged chip, subline, and model metadata beneath the title; preserved cost and avatar columns; typecheck, lint, focused tests, and full suite pass.",
+        "updatedAt": "2026-07-16T06:52:45.544Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "widen-title-grid": "completed",
+    "widen-title-grid.widen-title-grid.ac1": "completed",
+    "widen-title-grid.widen-title-grid.ac2": "completed",
+    "widen-title-grid.widen-title-grid.ac3": "completed",
+    "widen-title-grid.widen-title-grid.ac4": "completed",
+    "widen-title-grid.widen-title-grid.ac5": "completed"
+  }
+}

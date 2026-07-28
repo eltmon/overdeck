@@ -1,0 +1,639 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-25T20:56:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2467: Multi-repo merge train merges only one repo, strands sibling repos' branches (MIN-857 api half never merged)",
+    "updated": "2026-07-26T00:56:05.405Z"
+  },
+  "plan": {
+    "id": "pan-2467",
+    "title": "Multi-repo merge train merges only one repo, strands sibling repos' branches (MIN-857 api half never merged)",
+    "status": "completed",
+    "uid": "66e0ce90-035d-4aa0-b020-20fce1c3b938",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-25T20:56:00.000Z",
+    "updated": "2026-07-26T00:56:05.405Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2467",
+        "label": "PAN-2467",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3040",
+        "label": "PAN-3040 (campaign sibling: pan strike)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1696",
+        "label": "PAN-1696 (campaign sibling: UAT merge train)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "polyrepo",
+      "merge-train",
+      "pipeline-correctness"
+    ],
+    "narratives": {
+      "Problem": "The issue-level 'merged' decision is single-PR everywhere. The coordinated polyrepo merge (merge-ops.ts:518) silently filters out required repos that have commits but no MR (artifactUrl absent), merges the remaining repos, and flips the issue to merged — the exact MIN-857 mechanism where the api repo's feature/min-857 branch (2 UAT-critical commits, no MR) was stranded while the frontend merge marked the issue done. verifyMergedBeforeLifecycle checks one PR in one repo, and the forge-merge route counts artifact-less repos as merged. MergeSetRepoState.required is written but read by zero decisions; nothing aggregates 'all required repos merged'.",
+      "Proposal": "Add assessMergeCompleteness in a new src/lib/cloister/merge-completeness.ts: enumerate repos through the MergeSet/project-repos door, classify each required repo as merged | no-changes | unmerged | unverifiable using a squash-safe evidence rule (git commits-ahead on origin/source vs origin/target in the primary checkout, plus a new forge findMergedArtifact lookup on both GitHub and GitLab adapters), fail closed on unverifiable. Wire it as a pre-flight gate in the coordinated polyrepo merge (with discoverArtifact self-heal before blocking), into verifyMergedBeforeLifecycle for multi-repo merge sets so every postMergeLifecycle entry path is guarded, and into the forge-merge route. Surface blocks as a new 'unmerged_sibling_repo' blocker type in MERGE_BLOCKER_TYPES. Guard test proves a polyrepo issue with one stranded required repo never reaches mergeStatus 'merged'.",
+      "NonGoals": "- Do not touch pan sync-main (PAN-3037), pan strike / merge-strike.ts (PAN-3040), or the UAT batch train (PAN-1696) — campaign siblings own those surfaces\n- Do not change auto-merge-eligibility.ts / flywheel auto-merge gating\n- Do not change verifyMergedBeforeLifecycle's pre-existing non-GitHub early return for single-repo projects\n- Do not build a new repo resolver or add workspaceConfig.type === 'polyrepo' conditionals at call sites — the project-repos door is the only enumeration path\n- Do not fix review-artifacts.ts MR-creation retry behavior (upstream of the gate; gate must handle its output instead)\n- Do not touch the PAN-328 postMergeLifecycle idempotency guard machinery\n- Do not add per-repo UI to the dashboard beyond the existing merge-blockers surface"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Evidence rule: git commits-ahead PLUS forge merged-artifact lookup, not git alone.",
+        "rationale": "Squash merges leave branch commits permanently unreachable from target; git-only evidence would false-report unmerged forever. Forge-only evidence cannot detect the no-MR stranding case."
+      },
+      {
+        "summary": "Unverifiable repo state fails closed (blocks the train with a reason).",
+        "rationale": "Silent partial delivery is the incident class this issue exists to eliminate; a retryable block with an actionable reason is strictly better than shipping half a feature."
+      },
+      {
+        "summary": "Gate placement: merge-ops coordinated-merge pre-flight + verifyMergedBeforeLifecycle chokepoint only.",
+        "rationale": "Every postMergeLifecycle caller funnels through the chokepoint; merge-ops is the GitLab-polyrepo path MIN-857 actually took. Strike/UAT/auto-merge surfaces belong to campaign siblings PAN-3040/PAN-1696."
+      },
+      {
+        "summary": "Self-heal missing artifactUrl via discoverArtifact before blocking.",
+        "rationale": "An artifact that exists but was never recorded (creation race) is recoverable without operator action; blocking on it would be a false positive."
+      },
+      {
+        "summary": "New 'unmerged_sibling_repo' blocker type instead of overloading 'not_mergeable'.",
+        "rationale": "The flywheel and operator need to see which repo is stranded without reading logs; a named type keeps the merge-blockers payload actionable."
+      },
+      {
+        "summary": "GitLab merged-MR lookup uses `glab mr list --source-branch <b> --all --output json` with client-side state === 'merged' filtering if the merged filter flag cannot be confirmed via --help.",
+        "rationale": "The default glab mr list shows open MRs only; client-side filtering on the returned state field is flag-agnostic and robust across glab versions."
+      }
+    ],
+    "items": [
+      {
+        "id": "forge-merged-artifact",
+        "title": "Add findMergedArtifact to both forge adapters",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T20:56:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2467",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/forge.ts",
+            "tests/unit/lib/forge-merged-artifact.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/forge-merged-artifact.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "forge-merged-artifact.test.ts passes for both adapters",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `findMergedArtifact(input: DiscoverArtifactInput): Promise<CreateReviewArtifactResult | null>` to the ForgeAdapter interface (src/lib/forge.ts:95) and implement it on both adapters. GitHub: mirror getExistingGitHubArtifact (forge.ts:133) — app path uses listPullRequestsForHead(owner, repo, branch, 'all') filtered by pr.merged || pr.mergedAt || pr.mergeCommit (same predicate as merged-pr-verification.ts:32); CLI fallback uses `gh pr list --state merged --head <branch> --json url,number,mergedAt`. GitLab: mirror getExistingGitLabArtifact (forge.ts:167); checkpoint — verify a merged filter flag with `glab mr list --help`, decided fallback is `glab mr list --source-branch <b> --all --output json` with client-side filter on state === 'merged'. Return { forge, created: false, url, id }. Async exec only (server-reachable; no execSync). Unit tests mock exec/API for both adapters."
+        },
+        "items": [
+          {
+            "id": "forge-merged-artifact.ac1",
+            "title": "Given a branch with a merged PR/MR, findMergedArtifact returns the artifact's url and id on both the GitHub and GitLab adapters (mocked exec/API)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forge-merged-artifact.ac2",
+            "title": "Given a branch with only an open (unmerged) artifact or no artifact, findMergedArtifact returns null on both adapters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forge-merged-artifact.ac3",
+            "title": "The GitLab implementation accepts MRs whose returned state field equals 'merged' and rejects state 'opened'/'closed', so squash-merged GitLab branches resolve as merged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "completeness-assessor",
+        "title": "Create merge-completeness assessor module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T20:56:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2467",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "chokepoint-gate",
+            "coordinated-merge-gate",
+            "forge-merge-honesty",
+            "guard-test"
+          ],
+          "files_scope": [
+            "src/lib/cloister/merge-completeness.ts",
+            "tests/unit/lib/cloister/merge-completeness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/merge-completeness.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-completeness.test.ts passes all five classification scenarios",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Creates only a new module and a new test file; no shared-file contention with any sibling item once forge-merged-artifact has landed",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/merge-completeness.ts exporting assessMergeCompleteness(issueId, labels?) -> { complete, repos: [{ repoKey, state: 'merged'|'no-changes'|'unmerged'|'unverifiable', aheadCount, artifactUrl?, reason }], summary }. Enumerate repos via ensureMergeSetForIssueSync (door; falls back to resolveProjectReposForIssueSync only if the set cannot be built). Per required repo, in the PRIMARY checkout (ResolvedProjectRepo.repoPath — workspaces may be torn down): `git fetch origin <sourceBranch> <targetBranch>` tolerating a missing source branch, then `git rev-list --count origin/<targetBranch>..origin/<sourceBranch>`. aheadCount 0 or branch absent -> 'no-changes'. aheadCount > 0 -> getForgeAdapter(repo.forge).findMergedArtifact; found -> 'merged'; absent -> 'unmerged' with reason naming repoKey, aheadCount, branches. Any exec/forge error -> 'unverifiable' (fail closed). required === false repos recorded as 'no-changes' (readonly). complete = every repo 'merged' or 'no-changes'. All subprocess calls async (no execSync). Tests inject mocked exec + adapters: all-merged, one stranded, squash-merged-with-merged-MR, fetch-failure -> unverifiable -> complete false, monorepo single-entry set. Inspection: the result shape and classification semantics are consumed by four downstream items."
+        },
+        "items": [
+          {
+            "id": "completeness-assessor.ac1",
+            "title": "Given a polyrepo set with one required repo 2 commits ahead and no merged artifact, assessMergeCompleteness returns complete false and that repo's entry has state 'unmerged' with a reason naming the repoKey and count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "completeness-assessor.ac2",
+            "title": "Given a repo whose branch is commits-ahead but has a merged artifact (squash merge), the assessor returns state 'merged' for it and complete true when siblings are clean",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "completeness-assessor.ac3",
+            "title": "Given a git fetch or forge error for any repo, the assessor returns state 'unverifiable' for that repo and complete false (fails closed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "completeness-assessor.ac4",
+            "title": "Given a monorepo project (single synthetic repo entry) or an absent source branch, the assessor returns complete true with states 'merged' or 'no-changes' and never throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "completeness-assessor.ac5",
+            "title": "The module enumerates repos only through ensureMergeSetForIssueSync/resolveProjectReposForIssueSync and contains no execSync call and no workspaceConfig.type conditional (verifiable by reading the diff)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "chokepoint-gate",
+        "title": "Wire completeness into verifyMergedBeforeLifecycle",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T20:56:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2467",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/merged-pr-verification.ts",
+            "tests/unit/lib/cloister/merge-verification.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/merge-verification.test.ts tests/unit/lib/cloister/in-flight-guard.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-verification.test.ts passes including new polyrepo cases",
+            "in-flight-guard.test.ts still passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In verifyMergedBeforeLifecycle (src/lib/cloister/merged-pr-verification.ts:13), after the existing single-PR verification finds a merged PR (both the app-API return at :33-35 and the gh-CLI return at :52-54), and only when getMergeSetSync(issueId)?.repos.length > 1: call assessMergeCompleteness(issueId). If incomplete, return { merged: false, reason: 'sibling repo(s) unmerged: ' + summary } instead of merged true. Monorepo behavior stays byte-identical (assessor not invoked). The non-GitHub early return at :24-26 is untouched. Do not modify postMergeLifecycle's PAN-328 idempotency machinery. Extend tests/unit/lib/cloister/merge-verification.test.ts: stranded-sibling polyrepo -> merged false naming the repo; all-merged polyrepo -> merged true; monorepo -> assessor spy not called."
+        },
+        "items": [
+          {
+            "id": "chokepoint-gate.ac1",
+            "title": "Given a multi-repo merge set with a stranded sibling, verifyMergedBeforeLifecycle returns merged false with a reason naming the unmerged repo even though the tracker repo's PR is merged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chokepoint-gate.ac2",
+            "title": "Given a multi-repo merge set whose repos are all merged or change-free, verifyMergedBeforeLifecycle returns merged true exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chokepoint-gate.ac3",
+            "title": "Given a monorepo issue, the assessor is never invoked (spy) and existing merge-verification and in-flight-guard tests pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "coordinated-merge-gate",
+        "title": "Block coordinated polyrepo merge on stranded required repos",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T20:56:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2467",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "src/lib/cloister/merge-completeness.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint including lint:file-size passes (merge-ops.ts at or below baseline, or audited baseline bump in same commit)",
+            "existing merge-ops route tests pass"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In the coordinated polyrepo merge path (src/dashboard/server/routes/workspaces/merge-ops.ts, between building mergeSet at :510 and the merge loop): compute stranded = mergeSet.repos.filter(r => r.required && r.mergeStatus !== 'skipped' && !r.artifactUrl). For each stranded repo: (1) self-heal via getForgeAdapter(repo.forge).discoverArtifact — if found, record via withRepoArtifactUrlSync + upsertMergeSetSync so the repo joins activeRepos; (2) otherwise classify with the assessor's per-repo logic (export a reconcileStrandedRepos(mergeSet) helper from merge-completeness.ts so merge-ops gains only a short call-and-branch block — the file is baselined at 1923 lines and may not grow; if it still nets above baseline, bump scripts/file-size-baseline.txt in the SAME commit with a PAN-2467 audit reference): 'no-changes' -> withRepoStateSync mergeStatus 'skipped'; 'unmerged'/'unverifiable' -> set MergeSet status 'failed', setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: <repo-naming reason>, blockerReasons: [{ type: 'unmerged_sibling_repo', summary: <reason> }] }) following the shape at merge-ops.ts:844-856, completePendingOperation(issueId, error), return { success: false, statusCode: 409 }. The merged flip at :757-768 must be reachable only when every required repo is merged or genuinely change-free."
+        },
+        "items": [
+          {
+            "id": "coordinated-merge-gate.ac1",
+            "title": "Given a required repo with commits ahead and no discoverable artifact, the coordinated merge returns success false with statusCode 409, sets review_status mergeStatus 'failed', and never fires postMergeLifecycle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "coordinated-merge-gate.ac2",
+            "title": "Given a stranded repo whose artifact exists on the forge but was unrecorded, discoverArtifact self-heals the artifactUrl and the repo is merged as part of activeRepos",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "coordinated-merge-gate.ac3",
+            "title": "Given a required repo with zero commits ahead and no artifact, the gate records mergeStatus 'skipped' and the coordinated merge proceeds to merged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "coordinated-merge-gate.ac4",
+            "title": "A blocked merge records a blockerReasons entry of type 'unmerged_sibling_repo' whose summary contains the stranded repo's repoKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "coordinated-merge-gate.ac5",
+            "title": "npm run lint passes with merge-ops.ts at or below its file-size baseline, or the same commit carries the audited baseline edit referencing PAN-2467",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "forge-merge-honesty",
+        "title": "forge-merge route: stop counting artifact-less repos as merged",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T20:56:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2467",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "src/lib/cloister/merge-completeness.ts",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint including lint:file-size passes under the same baseline discipline as the coordinated-merge item"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In POST /api/issues/:id/forge-merge (merge-ops.ts:1373-1456): where artifact discovery finds nothing (:1409-1416, currently mergeStatus 'skipped' + merged: true), classify the repo with the assessor's per-repo logic. 'no-changes' -> keep skipped + merged true (correct for change-free repos). Commits ahead -> push { repo, merged: false, message: <reason naming repo and count> } and set mergeStatus 'blocked'. allMerged at :1456 then correctly reports false and the route does not fire postMergeLifecycle. Same file-size-baseline discipline as the coordinated-merge item."
+        },
+        "items": [
+          {
+            "id": "forge-merge-honesty.ac1",
+            "title": "Given a repo with commits ahead and no discoverable artifact, forge-merge's per-repo result reports merged false with a reason and the repo's mergeStatus becomes 'blocked'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forge-merge-honesty.ac2",
+            "title": "Given all repos merged or change-free, forge-merge reports allMerged true and fires postMergeLifecycle exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forge-merge-honesty.ac3",
+            "title": "Given any repo blocked, the route returns allMerged false and never invokes postMergeLifecycle (spy or call-log evidence)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "blocker-surface",
+        "title": "Add unmerged_sibling_repo to MERGE_BLOCKER_TYPES",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T20:56:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2467",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/merge-blockers.ts",
+            "tests/unit/lib/cloister/merge-blockers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/merge-blockers.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-blockers.test.ts passes with the new type included in the payload",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Add 'unmerged_sibling_repo' to the MERGE_BLOCKER_TYPES set (src/lib/cloister/merge-blockers.ts:14) and extend the doc comment to describe it (repo stranded with unmerged commits and no merged artifact). Create or extend tests/unit/lib/cloister/merge-blockers.test.ts: a review_status row with reviewStatus 'passed', mergeStatus not 'merged', and an unmerged_sibling_repo blocker reason appears in getMergeBlockersPayload(); reasons of unlisted types remain filtered out. This makes the block visible on the dashboard merge-blockers surface and `pan flywheel merge-blockers` without any route changes."
+        },
+        "items": [
+          {
+            "id": "blocker-surface.ac1",
+            "title": "getMergeBlockersPayload() returns an entry whose reasons include type 'unmerged_sibling_repo' for a passed-review unmerged issue carrying that blocker reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocker-surface.ac2",
+            "title": "getMergeBlockersPayload() rejects blocker reasons whose type is outside MERGE_BLOCKER_TYPES and returns only listed types (existing filtering intact)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "guard-test",
+        "title": "Guard test: stranded sibling never reaches merged",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T20:56:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2467",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts"
+          ],
+          "expected_outputs": [
+            "both guard scenarios pass: blocked-when-stranded and proceeds-when-change-free"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/workspaces/__tests__/merge-ops-polyrepo-completeness.test.ts following the DI/mocking pattern of merge-ops-dirty-gate.test.ts. Scenario 1 (the issue's mandated guard): polyrepo MergeSet where repo A has mergeStatus 'pending' with artifactUrl and repo B is required with no artifactUrl, mocked classification 'unmerged' (2 commits ahead, discoverArtifact returns null). Assert the coordinated merge returns success false; review_status mergeStatus is 'failed' and never 'merged'; MergeSet status is 'failed'; error and blocker reason name repo B; postMergeLifecycle spy not called. Scenario 2: repo B change-free -> merge proceeds and the set flips to merged. No real timers or real subprocesses — mock exec; use vi.useFakeTimers if any delay path is exercised (repo rule)."
+        },
+        "items": [
+          {
+            "id": "guard-test.ac1",
+            "title": "Given repo B required, artifact-less, and 2 commits ahead, the coordinated merge test asserts the issue's mergeStatus is 'failed' and postMergeLifecycle is never invoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-test.ac2",
+            "title": "In scenario 1 the failure error and the blockerReasons summary each contains repo B's repoKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-test.ac3",
+            "title": "Given repo B change-free, the merge proceeds and the MergeSet status becomes 'merged' (no false blocking)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-completeness-gate",
+        "title": "Document the completeness gate and recovery path",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T20:56:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2467",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-TRAIN.md",
+            "docs/MERGE-WORKFLOW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint passes; both docs contain a section on the per-repo completeness gate"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ],
+          "acJustification": "Docs item: two observable content criteria cover both files; more would be padding."
+        },
+        "narrative": {
+          "Action": "Update docs/MERGE-TRAIN.md with the engine-side gate: where the completeness check runs (coordinated merge pre-flight + verifyMergedBeforeLifecycle), the squash-safe evidence rule (commits-ahead + merged-artifact), the fail-closed unverifiable policy, and the MIN-857 incident as the motivating case. Update docs/MERGE-WORKFLOW.md with the operator-facing side: what the 'unmerged_sibling_repo' blocker means, where it surfaces (dashboard merge blockers, `pan flywheel merge-blockers`), and the recovery path (create/merge the missing MR in the stranded repo, or mark the repo readonly in projects.yaml workspace.repos if it genuinely should not merge)."
+        },
+        "items": [
+          {
+            "id": "docs-completeness-gate.ac1",
+            "title": "docs/MERGE-TRAIN.md contains a completeness-gate section stating the evidence rule and fail-closed policy and naming both gate locations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-completeness-gate.ac2",
+            "title": "docs/MERGE-WORKFLOW.md contains a section on the unmerged_sibling_repo blocker that shows where it surfaces and the two recovery actions (merge the stranded repo's MR, or mark the repo readonly)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "forge-merged-artifact",
+        "to": "completeness-assessor",
+        "type": "blocks"
+      },
+      {
+        "from": "completeness-assessor",
+        "to": "chokepoint-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "completeness-assessor",
+        "to": "coordinated-merge-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "completeness-assessor",
+        "to": "forge-merge-honesty",
+        "type": "blocks"
+      },
+      {
+        "from": "coordinated-merge-gate",
+        "to": "guard-test",
+        "type": "blocks"
+      },
+      {
+        "from": "coordinated-merge-gate",
+        "to": "forge-merge-honesty",
+        "type": "blocks"
+      },
+      {
+        "from": "blocker-surface",
+        "to": "coordinated-merge-gate",
+        "type": "informs"
+      },
+      {
+        "from": "coordinated-merge-gate",
+        "to": "docs-completeness-gate",
+        "type": "informs"
+      },
+      {
+        "from": "chokepoint-gate",
+        "to": "docs-completeness-gate",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-25-PAN-2467-multi-repo-merge-train-merges-only-one-repo-strands-sibling-repos-branches-min-857-api-half-never-merged.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

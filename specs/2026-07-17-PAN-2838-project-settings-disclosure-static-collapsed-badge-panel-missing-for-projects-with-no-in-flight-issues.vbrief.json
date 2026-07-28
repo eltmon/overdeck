@@ -1,0 +1,529 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-17T12:45:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2838: Project settings disclosure: static 'collapsed' badge + panel missing for projects with no in-flight issues",
+    "updated": "2026-07-24T20:58:11.503Z"
+  },
+  "plan": {
+    "id": "pan-2838",
+    "title": "Project settings disclosure: static 'collapsed' badge + panel missing for projects with no in-flight issues",
+    "status": "completed",
+    "uid": "a57cbd13-b0ca-4cd8-948c-2fbdec32f8ae",
+    "author": "agent:claude-fable-5",
+    "sequence": 6,
+    "created": "2026-07-17T12:45:00.000Z",
+    "updated": "2026-07-24T20:58:11.503Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2838",
+        "label": "PAN-2838",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2838.md",
+        "label": "PRD draft",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "cockpit",
+      "project-settings"
+    ],
+    "narratives": {
+      "Problem": "The cockpit Project settings disclosure (ProjectOverview.tsx:398-406) hardcodes badges={['collapsed']} — an open panel still shows a pill reading 'collapsed', and the collapsed row communicates nothing about the actual auto-merge/swarm values. Separately, the disclosure only renders inside the cockpit branch of ProjectHome (features.length > 0), so a registered project with zero in-flight pipeline issues (e.g. Mind Your Now) has no dashboard surface at all to view or change its project-scoped auto-merge default or swarm policy, even though the /api/projects/:key/auto-merge-default and /api/projects/:key/swarm-policy endpoints work fine.",
+      "Proposal": "Extract ProjectSettingsSection + ProjectDisclosure into a shared ProjectSettingsDisclosure component (CommandDeck/ProjectSettingsDisclosure.tsx). Replace the static badge with a pure-CSS rotating chevron (Tailwind group/group-open:rotate-90) and render the current setting values as plain muted text in the collapsed summary, read from the same react-query keys the panel already uses. Render the shared component from both the cockpit (unchanged position) and the sparse fallback branch of ProjectHome, gated on projectKey truthiness (the settings routes are exact-key lookups via getProjectSync). Cover with component tests for the affordance/summary and ProjectHome tests for the sparse path; update docs/SWARM-POLICY.md and configuration/auto-merge.mdx.",
+      "NonGoals": "- No server/route changes: the settings endpoints keep their exact-projects.yaml-key lookup; no name-or-key resolution is added.\n- No redesign of the settings controls themselves: the auto-merge segmented control, swarm select, and helper copy stay as-is (AC-4 no-loss).\n- No ProjectReleasePanel, hero metrics, or other cockpit content added to the sparse fallback — only the Project settings disclosure.\n- No settings surface for the 'No project' bucket (it has no projects.yaml key).\n- No changes to per-issue swarm/auto-merge overrides or Issue Detail surfaces."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Hoist the settings disclosure into a shared component consumed by both ProjectOverview and ProjectHome's sparse branch, instead of duplicating the JSX in the sparse branch.",
+        "rationale": "The issue offered both directions; duplication would drift the two copies. A single component file is the smallest no-drift shape and keeps the cockpit position unchanged."
+      },
+      {
+        "summary": "Gate the sparse-branch settings on projectKey truthiness, not `projectKey ?? projectName` as the issue sketched.",
+        "rationale": "The settings routes call getProjectSync(key) (src/lib/projects.ts:580-583), an exact projects.yaml-key lookup — a display-name fallback would 404 and break saves. The release route the issue cited explicitly accepts name-or-key; the settings routes do not. projectKey is threaded from selectedRegisteredProject?.key (CommandDeck/index.tsx:1449) and is present for every registered project even with zero features, so AC-3 still holds."
+      },
+      {
+        "summary": "Render collapsed-summary values from the same react-query keys via a lightweight inner component instead of lifting the queries.",
+        "rationale": "The issue offered both; identical query keys share one cache entry (no extra fetch), and this avoids threading data props through the disclosure wrapper — the smaller diff."
+      },
+      {
+        "summary": "Chevron affordance implemented as pure CSS: <details class='group'> + ChevronRight with 'transition-transform group-open:rotate-90' (Tailwind 3.4).",
+        "rationale": "The issue explicitly asked for a chevron that rotates with details[open] via pure CSS, no state; Tailwind's group-open variant does exactly this and the file already mixes Tailwind classes with inline styles (ProjectOverview.tsx:288)."
+      },
+      {
+        "summary": "Summary values are plain --muted-foreground text, no pill badges, no decorative color.",
+        "rationale": "design/style-guide/STYLE-GUIDE.md forbids pill badges and decorative color; color is signal-only and static setting values are not live signals."
+      }
+    ],
+    "items": [
+      {
+        "id": "extract-settings-disclosure",
+        "title": "Extract ProjectSettingsSection + ProjectDisclosure into shared ProjectSettingsDisclosure.tsx",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2838",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "disclosure-chevron",
+            "summary-values",
+            "sparse-settings-render"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/ProjectOverview.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ProjectOverview.test.tsx suite passes unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PURE MOVE, no behavior change. Create src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx. Move ProjectSettingsSection (currently ProjectOverview.tsx:222-291) and ProjectDisclosure (currently ProjectOverview.tsx:544-609) into it verbatim, keeping query keys ['project-auto-merge-default', projectKey] and ['project-swarm-policy', projectKey] and their queryFns byte-identical (H1: ProjectOverview.test.tsx's strict fetch mock must keep matching). Export one composed component: `export function ProjectSettingsDisclosure({ projectKey }: { projectKey: string })` that renders <ProjectDisclosure title=\"Project settings\" summary=\"Auto-merge default and project-level merge policy\" badges={['collapsed']}><ProjectSettingsSection projectKey={projectKey} /></ProjectDisclosure> — exactly what ProjectOverview.tsx:399-405 renders today (the stale badge is removed by the next item, not this one). ProjectSettingsSection and ProjectDisclosure stay module-private (not exported). In ProjectOverview.tsx, replace the inline block at lines 398-406 with {projectKey && <ProjectSettingsDisclosure projectKey={projectKey} />}, import it, and delete the moved code plus now-unused imports that this move orphans (useMutation/useQueryClient remain used by HeroBillboard — verify before removing anything). Do not reformat or improve surrounding code."
+        },
+        "items": [
+          {
+            "id": "extract-settings-disclosure.ac1",
+            "title": "Given the cockpit of a project with features, when the HOME tab renders, then the Project settings disclosure renders with identical DOM to before the move (title, summary text, badge, segmented control, swarm select, helper copy all present)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-settings-disclosure.ac2",
+            "title": "The existing ProjectOverview.test.tsx suite passes without modifying its fetch mocks, proving no new or changed network requests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-settings-disclosure.ac3",
+            "title": "ProjectOverview.tsx no longer defines ProjectSettingsSection or ProjectDisclosure (grep returns no definitions there) and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "disclosure-chevron",
+        "title": "Replace static 'collapsed' badge with a pure-CSS rotating chevron",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2838",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "grep -rn \"'collapsed'\" src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx; test $? -eq 1"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grep finds no 'collapsed' literal in either file (exit 1)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In ProjectSettingsDisclosure.tsx only. Remove badges={['collapsed']} from the ProjectSettingsDisclosure composition, and remove the now-unused badges prop and its rendering span from ProjectDisclosure (no other consumer exists — settings is the sole caller). Add className=\"group\" to the <details> element (keep its existing inline styles). Inside the <summary>, before the title span, render <ChevronRight size={14} className=\"shrink-0 text-muted-foreground transition-transform group-open:rotate-90\" aria-hidden=\"true\" /> imported from 'lucide-react'. Tailwind 3.4's group-open variant rotates it when the details element carries the open attribute — no React state, no onToggle handler. Keep the summary's cursor/grid layout working (the chevron joins the left cell's flex row)."
+        },
+        "items": [
+          {
+            "id": "disclosure-chevron.ac1",
+            "title": "Given the disclosure is closed, when it renders, then a chevron icon renders in the summary row and no element contains the text 'collapsed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disclosure-chevron.ac2",
+            "title": "Given the details element has the open attribute, then the chevron carries the group-open:rotate-90 class under a group-classed details ancestor, so CSS rotates it 90° without any React state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disclosure-chevron.ac3",
+            "title": "ProjectDisclosure no longer accepts or renders a badges prop; typecheck exits 0 proving no caller still passes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "summary-values",
+        "title": "Show current auto-merge default and swarm mode in the collapsed summary row",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2838",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In ProjectSettingsDisclosure.tsx only. Add a module-private ProjectSettingsSummary({ projectKey }) component that calls useQuery with EXACTLY the same query keys and queryFns as ProjectSettingsSection: ['project-auto-merge-default', projectKey] and ['project-swarm-policy', projectKey] (identical keys share one react-query cache entry — no extra fetch; H1). It renders plain text, fontSize 12, color var(--muted-foreground), no border, no border-radius pill, no decorative color (style guide: color is signal-only; font-medium weight): first the auto-merge label mapped as 'auto'→'⚡ Auto', 'hold'→'🔒 Hold for UAT', null/undefined→'Global default'; then a middot separator; then the swarm mode mapped as configured.mode 'off'/'auto'/'always'→'Swarm off'/'Swarm auto'/'Swarm always', absent→'Swarm inherit'. Replace the static summary description text ('Auto-merge default and project-level merge policy') in the ProjectSettingsDisclosure composition with <ProjectSettingsSummary projectKey={projectKey} /> — change ProjectDisclosure's summary prop type from string to ReactNode to accept it. While data is loading, render nothing (empty summary values), not placeholders."
+        },
+        "items": [
+          {
+            "id": "summary-values.ac1",
+            "title": "Given the project auto-merge default is 'hold' and swarm mode is 'auto', when the disclosure renders collapsed, then the summary row displays '🔒 Hold for UAT' and 'Swarm auto' without expanding",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-values.ac2",
+            "title": "Given neither setting is configured, when the disclosure renders collapsed, then the summary row displays 'Global default' and 'Swarm inherit'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-values.ac3",
+            "title": "The summary values render as plain muted-foreground text with no border-radius pill styling and no signal colors, and the component produces no fetches beyond the two existing settings endpoints (strict fetch mock's assertNoUnexpectedRequests exits clean)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sparse-settings-render",
+        "title": "Render Project settings in ProjectHome's sparse fallback for registered projects",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2838",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/ProjectHome.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "existing ProjectHome.test.tsx suite passes unchanged"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Stage/ProjectHome.tsx, sparse fallback branch only (the return at lines 200-238; the cockpit branch at 132-198 is untouched). Import ProjectSettingsDisclosure from '../CommandDeck/ProjectSettingsDisclosure'. Pass a new detail prop to the sparse HomePane: detail={projectKey ? <ProjectSettingsDisclosure projectKey={projectKey} /> : undefined}. HomePane already declares an optional detail slot rendered between actionDock and timeline (HomePane/index.tsx SECTIONS order), so no HomePane changes are needed. GATE ON projectKey TRUTHINESS — do NOT fall back to projectName: the settings routes resolve via getProjectSync(key) (src/lib/projects.ts:580-583), an exact projects.yaml-key lookup, so a display-name fallback would 404 and break saves (decision D2). The 'No project' bucket has no key and correctly shows no settings."
+        },
+        "items": [
+          {
+            "id": "sparse-settings-render.ac1",
+            "title": "Given a registered project with zero in-flight features (features=[] or undefined) and a projectKey, when its HOME tab renders, then the Project settings disclosure renders and expanding it shows the auto-merge segmented control and swarm select, both wired to the same project-scoped endpoints",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sparse-settings-render.ac2",
+            "title": "Given no projectKey (e.g. the 'No project' deck), when the sparse HOME renders, then no Project settings disclosure and no settings network requests are produced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sparse-settings-render.ac3",
+            "title": "Given a project with active features, when the HOME tab renders, then the cockpit branch renders exactly as before (settings disclosure still inside ProjectOverview; no duplicate disclosure)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "disclosure-tests",
+        "title": "Component tests for the disclosure affordance, summary values, and no-loss panel content",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T12:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2838",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx"
+          ],
+          "expected_outputs": [
+            "new ProjectSettingsDisclosure.test.tsx suite passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "New file src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectSettingsDisclosure.test.tsx. Copy the setup idiom from the sibling ProjectOverview.test.tsx: installStrictFetchMock handling GET/POST /api/projects/<key>/auto-merge-default and /api/projects/<key>/swarm-policy, a render() wrapper providing QueryClientProvider with retry:false, afterEach cleanup + assertNoUnexpectedRequests. HAZARD H2: jsdom does not reliably toggle <details> on summary click — assert the affordance structurally (details element has class 'group'; chevron svg has class 'group-open:rotate-90'), and drive open state by setting the open attribute, not by click. Tests: (1) renders no text 'collapsed' anywhere; (2) chevron present with rotation classes under the group details; (3) summary shows mapped values from fetched data (e.g. value:'hold' → '🔒 Hold for UAT', swarm mode 'auto' → 'Swarm auto'); (4) unconfigured → 'Global default' and 'Swarm inherit'; (5) no-loss: expanded content contains the three-option segmented control (⚡ Auto / 🔒 Hold for UAT / Global default buttons), the 'Project swarm policy' select, and both helper-copy strings; (6) clicking a segment POSTs to /api/projects/<key>/auto-merge-default with the chosen value."
+        },
+        "items": [
+          {
+            "id": "disclosure-tests.ac1",
+            "title": "A test renders the disclosure and asserts queryByText(/collapsed/i) returns null while the chevron element with group-open:rotate-90 is present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disclosure-tests.ac2",
+            "title": "Tests assert the collapsed summary renders '🔒 Hold for UAT'/'Swarm auto' for configured values and 'Global default'/'Swarm inherit' for unconfigured, driven by mocked endpoint responses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disclosure-tests.ac3",
+            "title": "A no-loss test asserts the expanded panel still renders the 3-button auto-merge segmented control, the swarm policy select, and both helper-copy lines, and that clicking '⚡ Auto' produces a POST with body value:'auto'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disclosure-tests.ac4",
+            "title": "The suite's strict fetch mock verifies no requests beyond the two settings endpoints fire (assertNoUnexpectedRequests passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sparse-fallback-tests",
+        "title": "ProjectHome tests for the sparse-fallback settings path",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T12:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2838",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/ProjectHome.test.tsx"
+          ],
+          "expected_outputs": [
+            "ProjectHome.test.tsx suite passes including the new sparse-settings tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx. HAZARD H3: existing tests render without a QueryClientProvider and pass no projectKey — leave them untouched. Add two tests: (1) render ProjectHome with projectName='Mind Your Now', projectKey='myn', features undefined (sparse branch), wrapped in a QueryClientProvider (retry:false) with fetch mocked for GET /api/projects/myn/auto-merge-default and /api/projects/myn/swarm-policy; assert the 'Project settings' disclosure text is present. (2) render without projectKey (sparse branch) and assert queryByText('Project settings') is null and fetch was never called with a /api/projects/ settings URL. Use the file's existing api() helper for StageApi."
+        },
+        "items": [
+          {
+            "id": "sparse-fallback-tests.ac1",
+            "title": "Given projectKey='myn' and no features, when ProjectHome renders, then the test finds the 'Project settings' disclosure in the sparse layout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sparse-fallback-tests.ac2",
+            "title": "Given no projectKey and no features, when ProjectHome renders, then 'Project settings' is absent and no settings endpoint fetch occurs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sparse-fallback-tests.ac3",
+            "title": "The vitest run of ProjectHome.test.tsx exits 0 while every pre-existing test case in the file remains unmodified in the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-update",
+        "title": "Document the always-available project settings surface",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T12:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2838",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SWARM-POLICY.md",
+            "configuration/auto-merge.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'HOME' docs/SWARM-POLICY.md configuration/auto-merge.mdx"
+          ],
+          "expected_outputs": [
+            "both docs mention the project HOME tab Project settings panel"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Two small doc edits. (1) docs/SWARM-POLICY.md: the bullet 'Project values are edited in the project's overview settings and stored in ~/.overdeck/projects.yaml.' becomes a sentence stating project values are edited in the Project settings panel on the project's HOME tab — available for every registered project, including those with no in-flight pipeline issues — and stored in ~/.overdeck/projects.yaml. (2) configuration/auto-merge.mdx: add a short 'Per-project default' section documenting that each registered project's HOME tab carries a Project settings panel with the auto-merge default (⚡ Auto / 🔒 Hold for UAT / Global default), that the collapsed row shows the current values at a glance, that it applies to issues without an explicit per-issue setting, and that it is stored via POST /api/projects/:key/auto-merge-default in ~/.overdeck/projects.yaml. Match each file's existing voice; no other content changes."
+        },
+        "items": [
+          {
+            "id": "docs-update.ac1",
+            "title": "docs/SWARM-POLICY.md contains a sentence saying the project-level swarm value is edited on the project HOME tab's Project settings panel, available even for projects with no in-flight issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac2",
+            "title": "configuration/auto-merge.mdx contains a per-project default section naming the panel location, the three values, and the projects.yaml storage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-settings-disclosure",
+        "to": "disclosure-chevron",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-settings-disclosure",
+        "to": "summary-values",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-settings-disclosure",
+        "to": "sparse-settings-render",
+        "type": "blocks"
+      },
+      {
+        "from": "disclosure-chevron",
+        "to": "summary-values",
+        "type": "blocks"
+      },
+      {
+        "from": "disclosure-chevron",
+        "to": "disclosure-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "summary-values",
+        "to": "disclosure-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "sparse-settings-render",
+        "to": "sparse-fallback-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "sparse-settings-render",
+        "to": "docs-update",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-17-PAN-2838-project-settings-disclosure-static-collapsed-badge-panel-missing-for-projects-with-no-in-flight-issues.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

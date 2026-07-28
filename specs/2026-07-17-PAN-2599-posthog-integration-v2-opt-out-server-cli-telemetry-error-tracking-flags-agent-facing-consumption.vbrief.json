@@ -1,0 +1,836 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-17T07:13:19-04:00",
+    "author": "overdeck/dev",
+    "description": "Plan for PAN-2599: PostHog v2 — opt-out, server/CLI telemetry, error tracking, flags, agent-facing docs",
+    "updated": "2026-07-24T20:57:30.831Z"
+  },
+  "plan": {
+    "id": "pan-2599",
+    "title": "PostHog integration v2: opt-out, server/CLI telemetry, error tracking, flags, agent-facing consumption",
+    "status": "completed",
+    "uid": "c58a207a-54ca-4bac-8fc6-fe4887c5a5b8",
+    "author": "agent:claude-fable-5",
+    "sequence": 8,
+    "created": "2026-07-17T07:13:19-04:00",
+    "updated": "2026-07-24T20:57:30.831Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2599",
+        "label": "PAN-2599",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2599.md",
+        "label": "PRD v2",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2599-mockup.html",
+        "label": "Settings mockup",
+        "type": "design"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/2776",
+        "label": "v1 frontend PR (shipped)",
+        "type": "pr"
+      }
+    ],
+    "tags": [
+      "telemetry",
+      "posthog",
+      "privacy",
+      "dashboard",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "PR #2776 shipped posthog-js in the dashboard frontend with no opt-out: posthog.init runs unconditionally in every production build, nothing reads OVERDECK_TELEMETRY, and there is no server/CLI telemetry, no documented event schema, and no sourcemap upload for error tracking. The PAN-2599 v1 privacy model (opt-out, install UUID, documented schema) is unimplemented.",
+      "Proposal": "Per PRD v2 (drafts/pan-2599.md on overdeck-state): add a runtime opt-out resolved server-side (config.yaml telemetry.enabled, env OVERDECK_TELEMETRY=0 wins) and delivered via GET /api/settings; gate the frontend by never calling posthog.init when disabled, behind a single wrapper module; add a Settings > Telemetry UI section per the mockup; add a posthog-node-backed AnalyticsService (single write door) for server + CLI events with a random install UUID as distinct_id and $process_person_profile:false; enable exception autocapture both sides plus hidden sourcemaps uploaded during release when POSTHOG_CLI_API_KEY is set; add a minimal feature-flag read door (config > flag > fallback); type the event schema in @overdeck/contracts and mirror it in docs/TELEMETRY.md with a drift-lint test; document agent-facing PostHog consumption (hosted MCP, posthog-cli).",
+      "NonGoals": "- LLM/AI-observability capture (owner: PAN-2443)\n- Session replay (too invasive for a dev tool)\n- Surveys, experiments, or wiring any real feature to a flag\n- Pulling HogQL aggregates into the dashboard metrics page (#750 stays local-data-first)\n- First-run telemetry notice (operator decision 2026-07-14 stands)\n- Reading ~/.codex/, ~/.claude*, or any other tool's credential files for identity\n- Raw hand-rolled $exception events (PostHog forbids; SDK paths only)"
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "telemetry-config",
+        "title": "Config: telemetry.enabled block, defaults, and resolveTelemetryEnabled() with OVERDECK_TELEMETRY override",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T07:13:19-04:00",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/telemetry/config.ts",
+            "tests/unit/lib/telemetry/config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/telemetry/config.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0",
+            "config.test.ts passes: default true, config false wins, env OVERDECK_TELEMETRY=0 beats config-enabled"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add TelemetryConfig { enabled?: boolean } to YamlConfig in src/lib/config-yaml/schema.ts (near experimental at line ~560), seed default enabled:true in defaults.ts, and create src/lib/telemetry/config.ts exporting resolveTelemetryEnabled(): boolean — env OVERDECK_TELEMETRY of '0'/'false' forces false, otherwise loadConfigSync().config.telemetry?.enabled !== false. PRD WI-1 has the exact snippet."
+        },
+        "items": [
+          {
+            "id": "telemetry-config.ac1",
+            "title": "Given no config and no env, When resolveTelemetryEnabled() runs, Then it returns true; Given telemetry.enabled:false OR OVERDECK_TELEMETRY=0, Then it returns false — asserted by config.test.ts passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-config.ac2",
+            "title": "Given a config.yaml with no telemetry block at all, When the config loads, Then defaults seed enabled:true and npm run typecheck exits 0 — asserted by config.test.ts and the typecheck command passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "install-id",
+        "title": "Install ID: getOrCreateInstallId() persisting a UUIDv4 at ${OVERDECK_HOME}/telemetry-id",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T07:13:19-04:00",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/telemetry/install-id.ts",
+            "tests/unit/lib/telemetry/install-id.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/telemetry/install-id.test.ts",
+            "git grep -n \"\\.codex\\|\\.claude\\.json\" src/lib/telemetry/ || true"
+          ],
+          "expected_outputs": [
+            "install-id.test.ts passes: file created once with UUIDv4, mode 0600, stable across calls, honors OVERDECK_HOME",
+            "grep for other tools' credential paths under src/lib/telemetry/ prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/telemetry/install-id.ts: read ${OVERDECK_HOME}/telemetry-id if present, else write crypto.randomUUID() with mode 0600 and return it. No path outside OVERDECK_HOME may be touched (PRD D3 explicitly rejects reading other tools' credential files)."
+        },
+        "items": [
+          {
+            "id": "install-id.ac1",
+            "title": "Given a fresh OVERDECK_HOME, When getOrCreateInstallId() is called twice, Then the same UUIDv4 is returned and the file exists with mode 0600 — asserted by install-id.test.ts passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-id.ac2",
+            "title": "When grepping src/lib/telemetry/ for .codex or .claude.json, Then the grep prints zero matches (no credential-file reads) — asserted by the verify grep command producing empty output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contracts-schema",
+        "title": "Typed telemetry event schema in @overdeck/contracts (packages/contracts/src/telemetry.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T07:13:19-04:00",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2599",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "frontend-wrapper",
+            "analytics-service",
+            "telemetry-docs"
+          ],
+          "files_scope": [
+            "packages/contracts/src/telemetry.ts",
+            "packages/contracts/src/index.ts",
+            "tests/unit/contracts/telemetry-schema.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd packages/contracts && npm run build",
+            "npm run typecheck",
+            "npx vitest run tests/unit/contracts/telemetry-schema.test.ts"
+          ],
+          "expected_outputs": [
+            "contracts build exits 0",
+            "telemetry-schema.test.ts passes: every event property type is an enum union, boolean, or bucketed number — no free-form strings"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create packages/contracts/src/telemetry.ts exporting TelemetryEventName (union of the 12 shipped frontend events: dashboard_tab_viewed, agent_spawned, project_created, issue_merged, force_merge_triggered, issue_closed_out, bulk_close_out_initiated, auto_merge_toggled, conversation_forked, plan_approved, plan_changes_requested, agent_question_answered — plus the 3 new backend events: server_boot, cli_command_run, pipeline_stage_changed) and per-event property interfaces restricted to enums, booleans, and bucketed numbers. Export from the contracts barrel and rebuild contracts. Add the NFR-1 property-shape test."
+        },
+        "items": [
+          {
+            "id": "contracts-schema.ac1",
+            "title": "Given the contracts package built, When tests run, Then telemetry-schema.test.ts passes and TelemetryEventName exports all 15 event names — asserted by the named vitest file passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-schema.ac2",
+            "title": "Given the barrel export added, When cd packages/contracts && npm run build and npm run typecheck run, Then both exit 0 (schema importable from server and frontend tsconfigs)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-api",
+        "title": "Settings API round-trips telemetry state: GET returns { enabled, installId }, PUT persists enabled",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T07:13:19-04:00",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-api.ts",
+            "src/dashboard/server/routes/settings.ts",
+            "tests/unit/dashboard/settings-telemetry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/settings-telemetry.test.ts"
+          ],
+          "expected_outputs": [
+            "settings-telemetry.test.ts passes: GET /api/settings payload contains telemetry.enabled and telemetry.installId; PUT with telemetry.enabled:false persists to config"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend the settings DTO in src/lib/settings-api.ts (follow the toApiTtsConfig pattern at ~line 327) with a telemetry block: enabled from resolveTelemetryEnabled(), installId (read-only) from getOrCreateInstallId(). Extend the PUT handler in src/dashboard/server/routes/settings.ts (routes registered at lines 6-11) to persist telemetry.enabled to config.yaml. env-forced-off state must surface as enabled:false in GET."
+        },
+        "items": [
+          {
+            "id": "settings-api.ac1",
+            "title": "Given telemetry.enabled unset, When GET /api/settings is called, Then the response JSON contains telemetry.enabled=true and a UUID installId; When PUT sets enabled:false, Then a subsequent GET returns enabled:false — asserted by settings-telemetry.test.ts passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api.ac2",
+            "title": "Given OVERDECK_TELEMETRY=0 in the server env while config says enabled:true, When GET /api/settings is called, Then the response reports telemetry.enabled=false (env wins) — asserted by settings-telemetry.test.ts passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-wrapper",
+        "title": "Frontend: runtime-gated telemetry wrapper; migrate all 15 posthog call sites; no direct posthog-js imports outside the wrapper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T07:13:19-04:00",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/telemetry.ts",
+            "src/dashboard/frontend/src/main.tsx",
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+            "src/dashboard/frontend/src/components/CloseOutIssueButton.tsx",
+            "src/dashboard/frontend/src/components/AwaitingMergePage.tsx",
+            "src/dashboard/frontend/src/components/PlanApprovalDialog.tsx",
+            "src/dashboard/frontend/src/components/BulkActionBar.tsx",
+            "src/dashboard/frontend/src/components/AutoMergeToggle.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/IssueComposer.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/NewProjectModal.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/telemetry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm test",
+            "bash -c \"cd src/dashboard/frontend && ! git grep -l \\\"from 'posthog-js'\\\" src | grep -v lib/telemetry.ts\""
+          ],
+          "expected_outputs": [
+            "telemetry wrapper unit test passes: capture() before init is a no-op; disabled settings response means posthog.init is never invoked (mocked)",
+            "grep for posthog-js imports outside lib/telemetry.ts prints nothing (command exits 0)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/lib/telemetry.ts per the PRD WI-4 snippet: initTelemetry() fetches /api/settings, returns without calling posthog.init when telemetry.enabled===false (zero network guarantee — init is what contacts /flags), else inits with person_profiles:'identified_only' and capture_exceptions:true, and registers install_id as a super property. Export capture(event: TelemetryEventName, props) and captureException() that no-op before init and under import.meta.env.MODE==='test'. Replace the unconditional posthog.init in main.tsx:10-13 with void initTelemetry(). Migrate the 15 call sites enumerated in the PRD's Verified-current-state list to the wrapper."
+        },
+        "items": [
+          {
+            "id": "frontend-wrapper.ac1",
+            "title": "Given a mocked /api/settings returning enabled:false, When the app boots, Then posthog.init is never called — asserted by telemetry.test.ts passing with a module mock",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-wrapper.ac2",
+            "title": "Given the migration is complete, When grepping the frontend for \"from 'posthog-js'\", Then only lib/telemetry.ts matches — asserted by the verify grep command exiting 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-ui",
+        "title": "Settings > Telemetry section per mockup (toggle, sent/never-sent lists, config equivalents)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T07:13:19-04:00",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/TelemetrySection.tsx",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.types.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm test"
+          ],
+          "expected_outputs": [
+            "typecheck exits 0 and frontend tests pass with the new section registered"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create TelemetrySection.tsx cloned from the ExperimentalSection.tsx:104-111 switch pattern (role=switch button, aria-checked, autosave via the existing useAutosavePipeline hook) and register it in SettingsPage.tsx. Content and copy follow drafts/pan-2599-mockup.html on overdeck-state: 'Share anonymous usage data' switch, status line with truncated install id, What's-sent / Never-sent lists (dim sent-list when off), config.yaml + OVERDECK_TELEMETRY equivalents, note that changes apply on next dashboard load. Follow the pan style guide: no pill badges, color restraint, primary hue only on the switch."
+        },
+        "items": [
+          {
+            "id": "settings-ui.ac1",
+            "title": "Given the Settings page renders, When the operator toggles the Telemetry switch, Then PUT /api/settings is issued with telemetry.enabled flipped and the status line updates — verified in browser (Playwright screenshot) matching the mockup layout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui.ac2",
+            "title": "Given telemetry off, When the section renders, Then the What's-sent list is visibly dimmed, the switch has role=switch with aria-checked=false, and the config.yaml/OVERDECK_TELEMETRY equivalents are shown — verified by Playwright screenshot and npm run typecheck exiting 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "analytics-service",
+        "title": "AnalyticsService: posthog-node wrapper (single write door) with enabled/test gating, install-UUID identity, bounded shutdown flush",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T07:13:19-04:00",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-2599",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "cli-events",
+            "server-boot-event",
+            "pipeline-events",
+            "flag-door"
+          ],
+          "files_scope": [
+            "src/lib/telemetry/service.ts",
+            "package.json",
+            "bun.lock",
+            "tests/unit/lib/telemetry/service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/telemetry/service.test.ts"
+          ],
+          "expected_outputs": [
+            "service.test.ts passes with fake timers: capture buffers and flushes on shutdown() within the 2s cap; disabled resolver means the posthog-node constructor is never invoked (module mock)"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Touches only new files (src/lib/telemetry/service.ts + its test) plus a package.json dep add; no overlap with wave peers settings-api or telemetry-docs. The flag-door overlap on service.ts is serialized by an explicit blocks edge.",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "bun add posthog-node at the repo root. Create src/lib/telemetry/service.ts per PRD WI-6/D2: lazily-constructed client; every method no-ops (client never constructed) when resolveTelemetryEnabled() is false or process.env.VITEST/NODE_ENV==='test'; capture(event, props) stamps distinct_id=getOrCreateInstallId(), $process_person_profile:false, platform, arch, overdeckVersion, clientType ('cli'|'server'); shutdown() races client.shutdown() against a 2s timeout; server construction passes enableExceptionAutocapture:true. Event names typed from @overdeck/contracts. This is the single write door — no other module may import posthog-node or POST to PostHog. Tests MUST use vi.useFakeTimers()+advanceTimersByTimeAsync (repo rule), never real sleeps."
+        },
+        "items": [
+          {
+            "id": "analytics-service.ac1",
+            "title": "Given telemetry disabled, When capture() and shutdown() are called, Then the posthog-node constructor is never invoked and no network mock is hit — asserted by service.test.ts passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "analytics-service.ac2",
+            "title": "Given telemetry enabled with a mocked client, When shutdown() is called with a hung flush, Then it resolves within the 2s fake-timer cap — asserted by service.test.ts passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-events",
+        "title": "CLI: cli_command_run event + bounded flush before every process.exit path",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T07:13:19-04:00",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "tests/unit/cli/telemetry-exit.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/telemetry-exit.test.ts"
+          ],
+          "expected_outputs": [
+            "telemetry-exit.test.ts passes: the exit helper awaits shutdown() (fake timers) before exiting; disabled telemetry adds no await"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/index.ts (commander program at line 164): wrap command dispatch to capture cli_command_run { verb: top-level command name, ok: boolean, durationMs: bucketed } via AnalyticsService, and add one exit helper that awaits the bounded shutdown() flush, used at the existing process.exit sites (lines ~410, 415, 857, 867, 1030, 1097) so each site stays a one-line change. Sync overhead when enabled must stay ≤10ms (fire-and-forget capture; only exit awaits flush)."
+        },
+        "items": [
+          {
+            "id": "cli-events.ac1",
+            "title": "Given a completed CLI command with telemetry enabled (mocked service), When the process exits through the helper, Then cli_command_run was captured with verb/ok/bucketed duration and shutdown() was awaited — asserted by telemetry-exit.test.ts passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-events.ac2",
+            "title": "Given telemetry disabled, When a CLI command runs and exits, Then zero capture calls occur and the exit helper resolves immediately (no flush await) — asserted by telemetry-exit.test.ts passing with fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-boot-event",
+        "title": "Server: initialize AnalyticsService at boot and emit server_boot with bucketed counts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T07:13:19-04:00",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/main.ts",
+            "tests/unit/dashboard/server-boot-telemetry.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server-boot-telemetry.test.ts",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "server-boot-telemetry.test.ts passes: server_boot captured with bucketed projectCount/activeAgentCount; boot does not await telemetry",
+            "npm run build exits 0 (boot-path change must be runtime-boot-tested before live restart — repo rule)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/main.ts boot path (after config load, near the runServer wiring at ~line 798): initialize AnalyticsService and fire-and-forget a server_boot event carrying bucketed projectCount and activeAgentCount (buckets: 0, 1-2, 3-5, 6-10, 11+). Boot must never block or fail on telemetry. NOTE (repo rule): this is a boot-path change — runtime-boot-test on a throwaway instance before any live restart, and use pan restart --health-timeout 120000."
+        },
+        "items": [
+          {
+            "id": "server-boot-event.ac1",
+            "title": "Given the server boots with telemetry enabled (mocked service), When boot completes, Then exactly one server_boot event was captured with bucketed counts and boot latency is unaffected — asserted by server-boot-telemetry.test.ts passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-boot-event.ac2",
+            "title": "Given the telemetry service throws during capture (mocked failure), When the server boots, Then boot still completes successfully — asserted by server-boot-telemetry.test.ts passing and npm run build exiting 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-events",
+        "title": "Pipeline funnel: pipeline_stage_changed at merge, verification, and close-out transition owners",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T07:13:19-04:00",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/merge-agent.ts",
+            "src/lib/cloister/verification-runner.ts",
+            "src/cli/commands/close.ts",
+            "tests/unit/lib/telemetry/pipeline-events.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/telemetry/pipeline-events.test.ts"
+          ],
+          "expected_outputs": [
+            "pipeline-events.test.ts passes: merged/verification_passed/closed_out stages captured with harness+model enums and no issue ids, titles, or paths in properties"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Emit pipeline_stage_changed { stage, harness, model } from the single-owner transition points: postMergeLifecycle() in src/lib/cloister/merge-agent.ts (stage=merged), runVerificationForIssue() in src/lib/cloister/verification-runner.ts (stage=verification_passed on pass), and the pan close flow (stage=closed_out; locate via the close command implementation — search 'closeOut'). IMPLEMENTATION CHECKPOINT (from PRD WI-6): confirm each function is the sole transition owner before emitting; if a transition has multiple owners, emit only from the server-side write door for that state and note the gap in docs/TELEMETRY.md. Properties are enums only — never issue ids, titles, repo names, or paths."
+        },
+        "items": [
+          {
+            "id": "pipeline-events.ac1",
+            "title": "Given a mocked merge/verification/close-out flow, When each transition fires, Then exactly one pipeline_stage_changed per transition is captured and a property-shape assertion finds no string outside the declared enums — asserted by pipeline-events.test.ts passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-events.ac2",
+            "title": "Given telemetry disabled, When the same transitions fire, Then zero events are captured and the flows complete unchanged — asserted by pipeline-events.test.ts passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sourcemaps-release",
+        "title": "Hidden sourcemaps in frontend build + posthog-cli upload step in release (skip-with-warning without key)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T07:13:19-04:00",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/vite.config.ts",
+            "src/cli/commands/release.ts",
+            "tests/unit/cli/release-sourcemaps.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/release-sourcemaps.test.ts",
+            "npm run build:dashboard:frontend"
+          ],
+          "expected_outputs": [
+            "release-sourcemaps.test.ts passes: without POSTHOG_CLI_API_KEY the step logs a skip warning and the release proceeds (no network)",
+            "frontend build exits 0 and dist/dashboard/public contains .map files not referenced by the served bundles"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Add sourcemap:'hidden' to the build block of src/dashboard/frontend/vite.config.ts (lines 79-82). In src/cli/commands/release.ts preflight (after runStreaming('npm run build', ...) at line 369): build the frontend (npm run build:dashboard:frontend), then if POSTHOG_CLI_API_KEY is set run npx @posthog/cli sourcemap inject + upload --directory dist/dashboard/public --release-version <version>; else log a warning and continue. IMPLEMENTATION CHECKPOINT (PRD WI-7): verify whether .github/workflows/release.yml or npm prepack rebuilds the frontend after preflight — if so, move inject/upload there so uploaded maps match the shipped bundle; fallback is the preflight location. Never commit .map files."
+        },
+        "items": [
+          {
+            "id": "sourcemaps-release.ac1",
+            "title": "Given no POSTHOG_CLI_API_KEY in env, When the release sourcemap step runs, Then it prints a skip warning and exits 0 without any network call — asserted by release-sourcemaps.test.ts passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sourcemaps-release.ac2",
+            "title": "Given the frontend built with sourcemap:'hidden', When inspecting dist/dashboard/public, Then .map files exist and grepping the emitted .js bundles for sourceMappingURL prints zero matches — asserted by npm run build:dashboard:frontend exiting 0 and the grep producing empty output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flag-door",
+        "title": "Feature-flag read door: isFeatureEnabled(flag, fallback) with config > flag > fallback and 500ms timeout",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-17T07:13:19-04:00",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-2599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/telemetry/service.ts",
+            "tests/unit/lib/telemetry/flag-door.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/telemetry/flag-door.test.ts"
+          ],
+          "expected_outputs": [
+            "flag-door.test.ts passes with fake timers: timeout returns fallback; disabled telemetry returns fallback without constructing the client; explicit config value beats the flag"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Add isFeatureEnabled(flag: string, fallback: boolean): Promise<boolean> to AnalyticsService per PRD D5/WI-8: posthog-node flag evaluation via the public /flags endpoint with the project key, raced against a 500ms timeout that resolves to fallback; disabled telemetry or offline resolves fallback; an explicit config override always wins. No production flag adoption in this issue. Fake-timer tests only (repo rule)."
+        },
+        "items": [
+          {
+            "id": "flag-door.ac1",
+            "title": "Given a hung flag evaluation, When isFeatureEnabled('x', true) is awaited, Then it resolves true at the 500ms fake-timer mark; Given telemetry disabled, Then it resolves the fallback with the client never constructed — asserted by flag-door.test.ts passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flag-door.ac2",
+            "title": "Given an explicit config override for the flag's feature, When isFeatureEnabled runs, Then the config value is returned and no flag network evaluation occurs — asserted by flag-door.test.ts passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "telemetry-docs",
+        "title": "Docs: docs/TELEMETRY.md + schema drift-lint test, Mintlify telemetry + posthog-agents pages, CLAUDE.md pointer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T07:13:19-04:00",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-2599",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TELEMETRY.md",
+            "tests/unit/telemetry-docs.test.ts",
+            "configuration/telemetry.mdx",
+            "reference/posthog-agents.mdx",
+            "docs.json",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/telemetry-docs.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "telemetry-docs.test.ts passes: every TelemetryEventName from @overdeck/contracts appears in docs/TELEMETRY.md and vice versa",
+            "lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Write docs/TELEMETRY.md enumerating every event + property, the three opt-out surfaces (Settings toggle, config.yaml, OVERDECK_TELEMETRY=0 with env-wins), and the install-id location. Add tests/unit/telemetry-docs.test.ts diffing TELEMETRY.md event names against the contracts exports (fails on drift). Add Mintlify pages: configuration/telemetry.mdx (what/why/opt-out per mockup) and reference/posthog-agents.mdx (hosted MCP https://mcp.posthog.com/mcp, posthog-cli api, personal-key scoping per PRD D7); register both in docs.json navigation. Add a short Telemetry section to project CLAUDE.md pointing at docs/TELEMETRY.md and the single-write-door rule."
+        },
+        "items": [
+          {
+            "id": "telemetry-docs.ac1",
+            "title": "Given the contracts schema, When telemetry-docs.test.ts runs, Then it passes proving docs/TELEMETRY.md and TelemetryEventName are in sync; configuration/telemetry.mdx and reference/posthog-agents.mdx exist and are registered in docs.json — asserted by the test and lint exiting 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-docs.ac2",
+            "title": "Given an event name present in contracts but deliberately removed from TELEMETRY.md (negative case inside the test), When the drift check runs, Then it reports the missing event (drift is provably caught) — asserted by telemetry-docs.test.ts passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-schema",
+        "to": "frontend-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-schema",
+        "to": "analytics-service",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-schema",
+        "to": "telemetry-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "telemetry-config",
+        "to": "settings-api",
+        "type": "blocks"
+      },
+      {
+        "from": "telemetry-config",
+        "to": "analytics-service",
+        "type": "blocks"
+      },
+      {
+        "from": "install-id",
+        "to": "settings-api",
+        "type": "blocks"
+      },
+      {
+        "from": "install-id",
+        "to": "analytics-service",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-api",
+        "to": "frontend-wrapper",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-api",
+        "to": "settings-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "analytics-service",
+        "to": "cli-events",
+        "type": "blocks"
+      },
+      {
+        "from": "analytics-service",
+        "to": "server-boot-event",
+        "type": "blocks"
+      },
+      {
+        "from": "analytics-service",
+        "to": "pipeline-events",
+        "type": "blocks"
+      },
+      {
+        "from": "analytics-service",
+        "to": "flag-door",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-17-PAN-2599-posthog-integration-v2-opt-out-server-cli-telemetry-error-tracking-flags-agent-facing-consumption.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

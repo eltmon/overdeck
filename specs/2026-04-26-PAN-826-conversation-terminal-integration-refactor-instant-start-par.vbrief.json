@@ -3,17 +3,18 @@
     "version": "0.5",
     "created": "2026-04-26T01:33:53Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-826: Conversation/terminal integration refactor — instant-start + parser correctness + tmux delivery verification + thinking-block UX + signature prevention + outbox + favorite-star reposition + T3Code structural alignment"
+    "description": "Plan for PAN-826: Conversation/terminal integration refactor — instant-start + parser correctness + tmux delivery verification + thinking-block UX + signature prevention + outbox + favorite-star reposition + T3Code structural alignment",
+    "updated": "2026-07-17T10:57:22.878Z"
   },
   "plan": {
     "id": "pan-826",
     "title": "Conversation/terminal integration refactor: instant-start + parser correctness + T3Code structural alignment",
-    "status": "approved",
+    "status": "cancelled",
     "uid": "3714243b-00ac-42c3-b8bb-482b2339d320",
     "author": "agent:claude-opus-4-7",
-    "sequence": 1,
+    "sequence": 2,
     "created": "2026-04-26T01:33:53Z",
-    "updated": "2026-04-26T01:33:53Z",
+    "updated": "2026-07-17T10:57:22.878Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/826",
@@ -1506,5 +1507,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "cancelled"
 }

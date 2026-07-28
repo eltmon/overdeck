@@ -1,20 +1,20 @@
 {
-  "vBRIEFInfo": {
+  "xBRIEFInfo": {
     "version": "0.6",
     "created": "2026-06-24T00:59:52.730Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1864: add the missing AC4 regression test for deterministic deacon-side review synthesis (the fix itself already shipped on main)",
-    "updated": "2026-06-24T01:03:50.788Z"
+    "updated": "2026-07-27T16:46:35.446Z"
   },
   "plan": {
     "id": "pan-1864",
     "title": "Regression test for deterministic deacon-side review synthesis (synthesizeReviewFromReports)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "2d71b234-cd29-4838-bb86-bff38132ff43",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-06-24T00:59:52.730Z",
-    "updated": "2026-06-24T01:03:50.788Z",
+    "updated": "2026-07-27T16:46:35.446Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1864",
@@ -114,5 +114,5 @@
       "canonicalFilename": "2026-06-24-PAN-1864-regression-test-for-deterministic-deacon-side-review-synthesis-synthesizereviewfromreports.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

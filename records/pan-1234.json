@@ -1,0 +1,347 @@
+{
+  "issueId": "PAN-1234",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-12T21:47:36.149Z",
+      "reason": "end",
+      "note": "feat(dashboard): PAN-1234 UI/UX polish — Space Grotesk, styleguide tests, g-chords, j/k nav, /issues/:id route, INPUT verb badge"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T21:47:38.310Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-12T21:48Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-07-12T21:48:50.967Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-12T22:22:18.805Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-12T22:35Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-07-12T22:35:03.767Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-12T22:35:27.882Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:40:38.174Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:40:56.944Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:40:56.945Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:40:56.945Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:40:56.946Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:44:37.564Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:44:44.009Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:44:44.010Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:44:44.021Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:44:44.269Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:54:00.464Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:54:05.908Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:54:05.909Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:54:05.910Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T22:54:05.924Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-15T14:52:44.333Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T14:57Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-15T14:57:01.819Z"
+    },
+    {
+      "timestamp": "2026-07-15T15:06:38.295Z",
+      "reason": "end",
+      "note": "No deviations in implementation. Rebased onto current main; full suite reached 9,132 passing with four suite-contention hook timeouts, and all four timed-out files passed on focused rerun (8/8). Typecheck and lint passed. Existing PAN-1234 dashboard UI/UX polish is complete and pushed."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T15:08:37.648Z"
+    },
+    {
+      "timestamp": "2026-07-15T15:13:16.709Z",
+      "reason": "end",
+      "note": "Fixed review and verification findings: canonical direct-route drawer close, exact pending-question contract, computed Space Grotesk browser assertions, required route regression location, and circular dependency lint failure."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-15T15:14:04.198Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T15:15Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-15T15:15:16.371Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-15T15:16:36.839Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T15:16:45.213Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T15:16:45.224Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T15:16:45.234Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T15:16:45.245Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-15T15:25:46.836Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T15:26:05.976Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T15:26:06.001Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T15:26:06.029Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T15:26:06.058Z"
+    }
+  ],
+  "feedback": [],
+  "created": "2026-07-12T20:43:21.494Z",
+  "updated": "2026-07-15T15:51:09.779Z",
+  "pipeline": {
+    "issueId": "PAN-1234",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-15T15:47:27.198Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed lint",
+    "testNotes": "Reconciled from green GitHub Actions CI on 81e24a9e: test (https://github.com/eltmon/overdeck/actions/runs/29427575419/job/87393878280)",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2606",
+    "reviewedAtCommit": "81e24a9e6ca2eef1359f91c20aefe2ebd6e9b5ee",
+    "lastVerifiedCommit": "b51bbe2f5c16b4f6c0521fd7e0a9d4b5610721a6",
+    "reviewRequestedAt": "2026-07-15T15:13:58.776Z",
+    "reviewSpawnedAt": "2026-07-15T15:25:37.144Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-15T15:47:27.198Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 1207065,
+            "output": 3310,
+            "cacheRead": 1084672,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 21599873,
+            "output": 73182,
+            "cacheRead": 19733376,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 31015998,
+            "output": 50639,
+            "cacheRead": 30235392,
+            "cacheWrite": 0
+          }
+        },
+        "work": {
+          "custom/kimi-k2.7-code": {
+            "input": 1575738,
+            "output": 223645,
+            "cacheRead": 127864576,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 1207065,
+          "output": 3310,
+          "cacheRead": 1084672,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 21599873,
+          "output": 73182,
+          "cacheRead": 19733376,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 31015998,
+          "output": 50639,
+          "cacheRead": 30235392,
+          "cacheWrite": 0
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 1575738,
+          "output": 223645,
+          "cacheRead": 127864576,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 68.620341,
+        "pricingAsOf": "2026-07-15T15:35:55.480Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2606"
+    ],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
+  "statusOverrides": {
+    "conformance-test-strengthen": "completed",
+    "conformance-test-strengthen.ac1": "completed",
+    "conformance-test-strengthen.ac2": "completed",
+    "conformance-test-strengthen.ac3": "completed",
+    "conformance-test-strengthen.ac4": "completed",
+    "conformance-test-strengthen.ac5": "completed",
+    "conformance-test-strengthen.ac6": "completed",
+    "kbd-global-chords": "completed",
+    "kbd-global-chords.ac1": "completed",
+    "kbd-global-chords.ac2": "completed",
+    "kbd-global-chords.ac3": "completed",
+    "kbd-global-chords.ac4": "completed",
+    "kbd-global-chords.ac5": "completed",
+    "kbd-global-chords.ac6": "completed",
+    "kbd-global-chords.ac7": "completed",
+    "kbd-global-chords.ac8": "completed",
+    "kbd-board-rows": "completed",
+    "kbd-board-rows.ac1": "completed",
+    "kbd-board-rows.ac2": "completed",
+    "kbd-board-rows.ac3": "completed",
+    "kbd-board-rows.ac4": "completed",
+    "kbd-board-rows.ac5": "completed",
+    "kbd-board-rows.ac6": "completed",
+    "kbd-pipeline-rows": "completed",
+    "kbd-pipeline-rows.ac1": "completed",
+    "kbd-pipeline-rows.ac2": "completed",
+    "kbd-pipeline-rows.ac3": "completed",
+    "kbd-pipeline-rows.ac4": "completed",
+    "kbd-pipeline-rows.ac5": "completed",
+    "kbd-pipeline-rows.ac6": "completed",
+    "route-issues-id": "completed",
+    "route-issues-id.ac1": "completed",
+    "route-issues-id.ac2": "completed",
+    "route-issues-id.ac3": "completed",
+    "route-issues-id.ac4": "completed",
+    "route-issues-id.ac5": "completed",
+    "route-issues-id.ac6": "completed",
+    "badge-input-nonplan": "completed",
+    "badge-input-nonplan.ac1": "completed",
+    "badge-input-nonplan.ac2": "completed",
+    "badge-input-nonplan.ac3": "completed",
+    "badge-input-nonplan.ac4": "completed",
+    "badge-input-nonplan.ac5": "completed",
+    "keyframe-pulse-rename": "completed",
+    "keyframe-pulse-rename.ac1": "completed",
+    "keyframe-pulse-rename.ac2": "completed",
+    "keyframe-pulse-rename.ac3": "completed",
+    "keyframe-pulse-rename.ac4": "completed",
+    "keyframe-pulse-rename.ac5": "completed",
+    "keyframe-pulse-rename.ac6": "completed",
+    "keyframe-pulse-rename.ac7": "completed",
+    "font-grotesk-apply": "completed",
+    "font-grotesk-apply.ac1": "completed",
+    "font-grotesk-apply.ac2": "completed",
+    "font-grotesk-apply.ac3": "completed",
+    "font-grotesk-apply.ac4": "completed",
+    "font-grotesk-apply.ac5": "completed",
+    "font-grotesk-apply.ac6": "completed"
+  }
+}

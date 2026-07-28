@@ -1,0 +1,313 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T13:51:58Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3138: Merge-time Docker cleanup leaves workspace devnet behind — leaked subnets exhaust Docker address pools and block new workspaces",
+    "updated": "2026-07-26T20:22:42.731Z"
+  },
+  "plan": {
+    "id": "pan-3138",
+    "title": "Merge-time Docker cleanup leaves workspace devnet behind — leaked subnets exhaust Docker address pools and block new workspaces",
+    "status": "completed",
+    "uid": "f5bd9a78-c1ed-4774-812f-2e411dfeb87d",
+    "author": "agent:k3[1m]",
+    "sequence": 7,
+    "created": "2026-07-26T13:51:58Z",
+    "updated": "2026-07-26T20:22:42.731Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3138",
+        "label": "PAN-3138",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docker",
+      "merge-lifecycle",
+      "deacon",
+      "workspace",
+      "resource-leak"
+    ],
+    "narratives": {
+      "Problem": "postMergeLifecycle (src/lib/cloister/merge-agent.ts:533-550) only stops workspace Docker containers; it never removes the workspace `_devnet` network. teardownWorkspaceDockerByNamePromise (src/lib/workspace-manager/docker.ts:156) — the idempotent, name-based primitive that removes containers AND the network and disconnects shared sidecars like overdeck-traefik — is only called from close-out (src/lib/close-out.ts:365) and the closed-issue reaper (src/lib/cloister/reap-issue-residue.ts:50, tracker-closed issues only). Every merged issue therefore leaks its _devnet subnet (~31 usable in Docker's default pools) until close-out, which can lag merge by days; on 2026-07-26 five merged-but-not-closed issues exhausted the pool and blocked PAN-3093 workspace prep with 'all predefined address pools have been fully subnetted'.",
+      "Proposal": "Three surgical changes on the existing verified teardown primitive, plus docs: (1) postMergeLifecycle calls teardownWorkspaceDockerByNamePromise(issueLower) at merge time — unconditionally (name-based, works when the workspace dir is gone) and non-fatally; (2) the deacon's reconcileClosedIssueAgents devnet loop treats mergeStatus==='merged' (read via getReviewStatusSync, dynamic import) as Docker-teardown-eligible — network teardown only, no agent kills, no disk/branch reap; (3) rebuildWorkspaceStack treats mergeStatus==='merged' as terminal so patrols cannot recreate a torn-down network before close-out (aligns code with the invariant CLAUDE.md already documents). Full before/after snippets, decisions D1-D4, and hazards H1-H5 are in the PRD at .pan/drafts/PAN-3138.md.",
+      "NonGoals": "- No live pool-fill repro test (destructive to the host; AC3 is met with mocked-Docker unit regression tests — decision D2)\n- No changes to teardownWorkspaceDockerByNamePromise itself — it is already correct, idempotent, and tested\n- No changes to close-out's teardown ownership or the full reapIssueResidue path for closed issues\n- No tracker-API-based merged detection in the patrol (local review-status door only)\n- No rework of Docker default-address-pool sizing or pan doctor thresholds (already covered by PAN-3053)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Implement both issue-proposed fixes (merge-time call + reaper backstop) instead of either/or",
+        "rationale": "The issue says 'alternatively/additionally'; the merge-time call is the root fix and the reaper extension is the straggler backstop, matching the repo's reaper-as-backstop doctrine."
+      },
+      {
+        "summary": "Satisfy issue AC3 with mocked-Docker unit regression tests, not a scripted live pool-fill repro",
+        "rationale": "Filling the host's real Docker address pool is destructive to concurrent workspaces and not CI-safe; the leak was already demonstrated live in the issue, and the regression surface is that both call sites invoke the verified teardown primitive."
+      },
+      {
+        "summary": "Read merged eligibility from getReviewStatusSync via dynamic import",
+        "rationale": "Avoids per-patrol tracker API calls and any static import cycle with review-status.js."
+      },
+      {
+        "summary": "Add the rebuildWorkspaceStack merged-gate hardening (work item 3) beyond the issue's literal ask",
+        "rationale": "CLAUDE.md already claims the rebuild chokepoint no-ops for merged issues but the code only checks tracker-closed; without it a patrol can recreate a network the merge-time teardown just removed. Small, same-guard change; reopen clears mergeStatus."
+      }
+    ],
+    "items": [
+      {
+        "id": "merge-time-network-teardown",
+        "title": "postMergeLifecycle removes the workspace _devnet at merge time",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T13:51:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3138",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/merge-agent.ts",
+            "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "postmerge-cleanup-async.test.ts passes including the new teardown assertions",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/merge-agent.ts step 4 (the Docker cleanup block at lines 533-550), keep the existing stopWorkspaceDocker behavior and ADD a call to teardownWorkspaceDockerByNamePromise(issueLower) via dynamic import from '../workspace-manager/docker.js'. The call MUST be outside the `if (workspacePath)` gate (the primitive is name-based precisely for the workspace-dir-gone case), inside the existing try/catch so failures stay non-fatal (console.warn only; _completedPostMerge must still mark). When teardown.networkRemoved is true, console.log and logActivity('docker_cleanup', ...) the steps, matching the existing logging style. Use the exact before/after shape in the PRD (.pan/drafts/PAN-3138.md, 'Before / after — merge-agent.ts'). Then extend tests/unit/lib/cloister/postmerge-cleanup-async.test.ts: add vi.mock('../../../../src/lib/workspace-manager/docker.js', ...) exposing a teardownWorkspaceDockerByNamePromise spy resolving { networkRemoved: true, steps: ['Removed network'] }; assert it is called with issueId.toLowerCase() (the file's fs.existsSync mock returns false, so this also proves the call is not gated on the workspace dir); add a case where the spy rejects and assert postMergeLifecycle still resolves and still calls mockSetAgentPaused and mockCreateResetMarker. Do not modify teardownWorkspaceDockerByNamePromise or stopWorkspaceDocker."
+        },
+        "items": [
+          {
+            "id": "merge-time-network-teardown.ac1",
+            "title": "Given a merged issue, when postMergeLifecycle completes, then it calls teardownWorkspaceDockerByNamePromise with the lowercase issue id even when the workspace directory does not exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-time-network-teardown.ac2",
+            "title": "Given the teardown call rejects, when postMergeLifecycle runs, then it resolves normally, still pauses agents and creates the memory reset marker, and logs a non-fatal warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-time-network-teardown.ac3",
+            "title": "Given the existing stopWorkspaceDocker block, when the diff is reviewed, then it is preserved unchanged and the new teardown call appears after it, outside the `if (workspacePath)` gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reaper-merged-devnet-teardown",
+        "title": "Deacon reaper tears down devnets of merged-but-not-closed issues (Docker only)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T13:51:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3138",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/closed-issue-reaper.ts",
+            "src/lib/cloister/__tests__/closed-issue-reaper.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/closed-issue-reaper.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "closed-issue-reaper.test.ts passes including the new merged-issue cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/closed-issue-reaper.ts, rework the devnet loop in reconcileClosedIssueAgents (currently lines 224-227): keep the closed-issue path exactly as-is (isClosedIssue → reapResolvedIssueResidue), and add an else branch for not-closed issues that dynamically imports getReviewStatusSync from '../review-status.js' and, when getReviewStatusSync(issueId)?.mergeStatus === 'merged', dynamically imports teardownWorkspaceDockerByNamePromise from '../workspace-manager/docker.js' and calls it with issueId.toLowerCase(). Push a descriptive action string for the removed/still-present/failed outcomes, matching the PRD snippet ('Before / after — closed-issue-reaper.ts'). NEVER call reapIssueResidue, stopAgent, or any tmux/disk/branch step for merged-but-not-closed issues — Docker-network teardown only. No project resolution is needed (teardown is name-based). Wrap the merged branch in try/catch that pushes a failure action string instead of throwing. Then extend src/lib/cloister/__tests__/closed-issue-reaper.test.ts: add vi.mock for '../../review-status.js' (getReviewStatusSync) and '../../workspace-manager/docker.js' (teardownWorkspaceDockerByNamePromise), and add cases: (a) leaked overdeck-feature-pan-5559_devnet + not tracker-closed + mergeStatus 'merged' → teardown called with 'pan-5559', reapIssueResidue NOT called, stopAgent NOT called, actions include the removal message; (b) same devnet + getReviewStatusSync returns null → teardown NOT called, actions empty; (c) existing test 'reaps closed-issue residue discovered from leaked _devnet networks' still passes unchanged."
+        },
+        "items": [
+          {
+            "id": "reaper-merged-devnet-teardown.ac1",
+            "title": "Given a leaked _devnet whose issue is merged but not tracker-closed, when reconcileClosedIssueAgents runs, then it calls teardownWorkspaceDockerByNamePromise with the lowercase issue id and records a removal action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reaper-merged-devnet-teardown.ac2",
+            "title": "Given the same merged-issue devnet, when the patrol runs, then it does NOT call reapIssueResidue, does NOT call stopAgent, and does NOT touch the workspace dir or branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reaper-merged-devnet-teardown.ac3",
+            "title": "Given a leaked devnet whose issue has no review-status row, when the patrol runs, then it skips the issue entirely and returns no actions for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reaper-merged-devnet-teardown.ac4",
+            "title": "Given a leaked devnet whose issue is tracker-closed, when the patrol runs, then the full reapIssueResidue path still fires exactly as before this change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rebuild-gate-merged-terminal",
+        "title": "rebuildWorkspaceStack treats mergeStatus 'merged' as terminal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T13:51:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3138",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace/rebuild-stack.ts",
+            "src/lib/workspace/__tests__/rebuild-stack.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/workspace/__tests__/rebuild-stack.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "rebuild-stack.test.ts passes including the new merged-gate cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/workspace/rebuild-stack.ts, extend the terminal guard inside Effect.gen (currently lines 166-173): in addition to the existing isIssueClosed check, dynamically import getReviewStatusSync from '../review-status.js' and treat getReviewStatusSync(issueId)?.mergeStatus === 'merged' as terminal, returning the same { success: false, error: 'Issue is terminal (closed/merged) — skipping stack rebuild' } shape. Use the PRD snippet ('Before / after — rebuild-stack.ts'). This aligns the code with the invariant the workspace CLAUDE.md already documents ('rebuildWorkspaceStack no-ops for closed/merged issues'); isIssueClosed alone only covers tracker-closed. Reopen clears mergeStatus, so reopened issues rebuild normally. Then extend src/lib/workspace/__tests__/rebuild-stack.test.ts in the 'rebuildWorkspaceStack terminal-state guard (PAN-2510)' describe: add vi.mock for '../../review-status.js'; new cases: (a) isIssueClosed false + mergeStatus 'merged' → result.error contains 'terminal' and no rebuild proceeds; (b) isIssueClosed false + mergeStatus undefined or 'failed' → proceeds past the guard (same assertion style as the existing 'proceeds past the guard' test)."
+        },
+        "items": [
+          {
+            "id": "rebuild-gate-merged-terminal.ac1",
+            "title": "Given an issue with mergeStatus 'merged' that is not tracker-closed, when rebuildWorkspaceStack runs, then it returns the terminal error and performs no compose down/render/up steps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rebuild-gate-merged-terminal.ac2",
+            "title": "Given an issue with mergeStatus unset or 'failed' that is not tracker-closed, when rebuildWorkspaceStack runs, then it proceeds past the terminal guard exactly as before this change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-docker-teardown-lifecycle",
+        "title": "Document merge-time Docker teardown ownership in WORKSPACE-CONTAINERS.md and CLAUDE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T13:51:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3138",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/WORKSPACE-CONTAINERS.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'postMergeLifecycle' docs/WORKSPACE-CONTAINERS.md CLAUDE.md"
+          ],
+          "expected_outputs": [
+            "Both docs state that merge removes the workspace containers AND the _devnet network, with close-out as durable verified owner and the reaper as merged-issue backstop"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Update two doc surfaces to match the new behavior. (1) docs/WORKSPACE-CONTAINERS.md, the teardown-ownership section near line 115 ('Close-out is the durable owner.'): add that postMergeLifecycle now removes the workspace Docker stack AND the overdeck-feature-<issue>_devnet network eagerly at merge time via the same name-based teardown, that close-out remains the durable verified owner, and that the deacon's reaper patrol also tears down devnets of merged-but-not-closed issues as a backstop. (2) Workspace CLAUDE.md, section 'postMergeLifecycle Verify Handoff and Docker Cleanup': change the sentence that says merge 'stops Docker containers and networks' to state that merge-time cleanup now REMOVES containers and the _devnet network (not just stops containers), and that the rebuildWorkspaceStack chokepoint no-ops for closed AND merged issues (it already claims this — the code now matches). Keep the existing 'NEVER remove this cleanup step' warning and the Docker-pool rationale intact. Do not rewrite surrounding sections."
+        },
+        "items": [
+          {
+            "id": "docs-docker-teardown-lifecycle.ac1",
+            "title": "Given the merged implementation, when a reviewer reads docs/WORKSPACE-CONTAINERS.md, then its teardown-ownership section contains the statement that postMergeLifecycle removes the workspace stack and _devnet at merge time and preserves the close-out durable-owner and reaper-backstop roles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-docker-teardown-lifecycle.ac2",
+            "title": "CLAUDE.md's 'postMergeLifecycle Verify Handoff and Docker Cleanup' section states that merge removes containers AND the network and that rebuildWorkspaceStack no-ops for closed and merged issues, and preserves the existing NEVER-remove warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "merge-time-network-teardown",
+        "to": "docs-docker-teardown-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "reaper-merged-devnet-teardown",
+        "to": "docs-docker-teardown-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "rebuild-gate-merged-terminal",
+        "to": "docs-docker-teardown-lifecycle",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3138-merge-time-docker-cleanup-leaves-workspace-devnet-behind-leaked-subnets-exhaust-docker-address-pools-and-block-new-workspaces.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

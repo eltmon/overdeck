@@ -1,0 +1,570 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-25T22:35:11-04:00",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3097: AskUserQuestion dialog: show issue title alongside identifier, and make agent questions self-contained",
+    "updated": "2026-07-26T08:52:54.510Z"
+  },
+  "plan": {
+    "id": "pan-3097",
+    "title": "AskUserQuestion dialog: show issue title alongside identifier, and make agent questions self-contained",
+    "status": "completed",
+    "uid": "15ffc783-d4e6-429b-a43f-122bbb9130b1",
+    "author": "agent:claude-fable-5",
+    "sequence": 9,
+    "created": "2026-07-25T22:35:11-04:00",
+    "updated": "2026-07-26T08:52:54.510Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3097",
+        "label": "PAN-3097",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-3097.md",
+        "label": "PRD draft",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "ask-user-question",
+      "agent-guidance",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "Operators answer AskUserQuestion prompts without the context the agent assumed: the dialog shows only a bare issue identifier ('MIN-663' or the literal 'Unknown'), the Needs-you decision surfaces show either identifier-only or title-only labels, and agents write questions ('Should I go with option B?') that assume the reader has the transcript they cannot see from the dialog.",
+      "Proposal": "Add a shared formatIssueRef helper and an issueTitle field on AskUserQuestionSubject so the dialog, the DecisionsPanel Needs-you list, and the SessionFeedSidebar needs-you rows all render '<issueId> — <issue title>', with titles joined client-side from resolver-fed store issues (no new store/tracker access). Ship self-contained-question guidance as a scope:universal bundled rule (reaching work, plan, and conversation roles on all harnesses via pan sync), reinforced in the planning prompt and plan role, and document the pipeline in docs/ASKUSERQUESTION-DASHBOARD.md.",
+      "NonGoals": "- Rendering a transcript snippet of the agent's most recent message in the dialog (issue marked it optional; needs a transcript read path the dialog lacks)\n- Any new REST endpoint, tracker call, or direct DB/store read for issue titles\n- Changing the meaning or population of the existing subject.title field (agent toast labels depend on it)\n- Editing rendered harness context files (~/.claude/CLAUDE.md managed region, pi-global.md, codex-global.md) — only the sync-sources rule source\n- Changing the AUQ hook's deny/restate contract or its load-bearing REASON string\n- Server-side changes to /api/conversations/pending-input or the agents read model"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Resolve issue titles by client-side join against store issues (selectIssues/issuesRaw) rather than adding a server endpoint.",
+        "rationale": "issuesRaw is already fed by the canonical issues resolver over /ws/rpc; joining in the frontend adds zero new store access and matches the existing pattern at usePendingInputDialogs.ts:144 and SessionFeedSidebar.tsx:201-207."
+      },
+      {
+        "summary": "When a subject is unbound (no issueId), omit the dialog's Issue cell instead of rendering the literal 'Unknown'; when bound but the title does not resolve, show the identifier alone.",
+        "rationale": "The AC forbids an 'Unknown' regression; a cell that says 'Unknown' carries no information, and identifier-alone is the stated fallback for unresolvable titles."
+      },
+      {
+        "summary": "Deliver self-contained-question guidance as a scope:universal bundled rule plus planning-prompt/plan-role reinforcement, rather than editing every role file.",
+        "rationale": "The AC requires the guidance to reach work, plan, and conversation roles; the bundled-rule pipeline is the one mechanical carrier that reaches all three on every harness, and the planning prompt is the heaviest AUQ user."
+      },
+      {
+        "summary": "Keep the agent subject's title field overloaded with the issue title; add issueTitle alongside instead of repurposing it.",
+        "rationale": "Toast and notification labels at usePendingInputDialogs.ts:279,435,443,503,515 read title; a surgical additive field avoids regressing them."
+      }
+    ],
+    "items": [
+      {
+        "id": "issue-ref-helper",
+        "title": "Add formatIssueRef helper with unit tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T22:35:11-04:00",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3097",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/issueLabel.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueLabel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/lib/__tests__/issueLabel.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "issueLabel.test.ts passes with all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/lib/issueLabel.ts exporting formatIssueRef(issueId?: string|null, title?: string|null): string|null per PRD D1/W1: null for empty/whitespace issueId, the trimmed issueId when the title is empty/whitespace, otherwise `${id} — ${title}` with an em dash. Add src/dashboard/frontend/src/lib/__tests__/issueLabel.test.ts covering all input classes."
+        },
+        "items": [
+          {
+            "id": "issue-ref-helper.ac1",
+            "title": "Given issueId 'PAN-1' and title 'Fix widget', formatIssueRef returns 'PAN-1 — Fix widget' (em dash separator)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-ref-helper.ac2",
+            "title": "Given issueId 'PAN-1' and a null, empty, or whitespace-only title, formatIssueRef returns 'PAN-1' alone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-ref-helper.ac3",
+            "title": "Given a null, undefined, or whitespace-only issueId, formatIssueRef returns null regardless of title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-issue-title",
+        "title": "AUQ dialog renders identifier + issue title, no 'Unknown' literal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T22:35:11-04:00",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3097",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/AskUserQuestionDialog.tsx",
+            "src/dashboard/frontend/src/components/__tests__/AskUserQuestionDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/__tests__/AskUserQuestionDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AskUserQuestionDialog.test.tsx passes: bound-with-title, bound-without-title, and unbound cases all render as specified",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W2: add issueTitle?: string|null to AskUserQuestionSubject (AskUserQuestionDialog.tsx:33 area). Header (line 76): displayName becomes formatIssueRef(agent.issueId, agent.issueTitle) ?? (agent.title?.trim() || agent.id). Issue cell (lines 133-136, the block containing {agent.issueId ?? 'Unknown'}): render the cell only when agent.issueId is truthy, with body formatIssueRef(agent.issueId, agent.issueTitle); delete the 'Unknown' literal. Add a component test in the style of DecisionsPanel.test.tsx."
+        },
+        "items": [
+          {
+            "id": "dialog-issue-title.ac1",
+            "title": "Given a subject bound to an issue with a resolved title, the dialog header and Issue cell both render '<issueId> — <title>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-issue-title.ac2",
+            "title": "Given a subject bound to an issue whose title is missing, the Issue cell renders the identifier alone with no em dash and no 'Unknown' text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-issue-title.ac3",
+            "title": "Given a subject with no issueId, the dialog renders no Issue cell and no 'Unknown' text, and the header falls back to the subject title or id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "subject-issue-title-population",
+        "title": "Populate issueTitle at all four subject construction sites",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T22:35:11-04:00",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3097",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix src/dashboard/frontend run test"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "frontend test suite passes with no new failures"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W3: in usePendingInputDialogs.ts, at the agent notification subjects (~line 142), conversation notification subjects (~line 153), agent AUQ subjects (~line 179), and conversation AUQ subjects (~line 188) — search anchor: `title: a.issueId ? (issues.find((i) => i.id === a.issueId)?.title ?? null) : null` — add issueTitle populated by the same issues.find lookup keyed on the subject's issueId. Conversations gain the issue-title lookup for the first time; their title stays the conversation title. Do NOT change the existing agent title population (PRD D2, hazard H3)."
+        },
+        "items": [
+          {
+            "id": "subject-issue-title-population.ac1",
+            "title": "Agent AUQ subjects carry issueTitle equal to the store issue's title when issueId matches, and null otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subject-issue-title-population.ac2",
+            "title": "Conversation AUQ subjects bound to an issue carry issueTitle from the store issue while title preserves the conversation title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "subject-issue-title-population.ac3",
+            "title": "Existing toast/notification label code paths compile unchanged and the frontend suite produces no new failures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "decisions-issue-title",
+        "title": "Needs-you Decisions list shows identifier + title",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T22:35:11-04:00",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3097",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/useDecisions.ts",
+            "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
+            "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
+            "src/dashboard/frontend/src/components/__tests__/DecisionsPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/lib/__tests__/useDecisions.test.ts src/components/__tests__/DecisionsPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useDecisions.test.ts and DecisionsPanel.test.tsx pass with the new identifier+title assertions",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W4/D6: in useDecisions.ts add issueTitle?: string to Decision; build a memoized Map<issueId,title> from useDashboardStore(selectIssues) (same shape as SessionFeedSidebar.tsx:201-207); change the agent-branch label at line 143 (search anchor: `label: s.issueId ?? s.agentId`) to formatIssueRef(s.issueId, map.get(s.issueId)) ?? s.agentId and populate issueTitle; keep the conversation-branch label (line 166, `label: c.title || c.name`) but populate issueTitle. In DecisionsPanel.tsx, for conversation decisions bound to an issue, render a muted formatIssueRef(decision.issueId, decision.issueTitle) span after the label (line 40). Update both test files. usePendingInputSubjects and PendingInputSubject are NOT changed."
+        },
+        "items": [
+          {
+            "id": "decisions-issue-title.ac1",
+            "title": "Given an agent decision whose issueId matches a store issue, useDecisions emits label '<issueId> — <title>' and populates issueTitle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decisions-issue-title.ac2",
+            "title": "Given an agent decision with no matching store issue, useDecisions emits the identifier alone; with no issueId it falls back to the agent id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decisions-issue-title.ac3",
+            "title": "DecisionsPanel renders an issue-bound conversation decision with its conversation title plus the '<issueId> — <title>' reference in the same row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sessionfeed-issue-title",
+        "title": "SessionFeedSidebar needs-you rows show identifier + title",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T22:35:11-04:00",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3097",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/sessionFeed/SessionFeedSidebar.tsx",
+            "src/dashboard/frontend/src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SessionFeedSidebar.test.tsx passes including the new identifier+title row assertion",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W5: replace the label expression at SessionFeedSidebar.tsx:247 (search anchor: `const label = (subject.issueId && titleByIssueId.get(subject.issueId)) || subject.issueId || subject.agentId;`) with formatIssueRef(subject.issueId, subject.issueId ? titleByIssueId.get(subject.issueId) : undefined) ?? subject.agentId. The dedup key at line 248 interpolates label and keeps collapsing identical rows (hazard H2). Extend SessionFeedSidebar.test.tsx to assert an issue-bound needs-you row renders '<id> — <title>' rather than title-only."
+        },
+        "items": [
+          {
+            "id": "sessionfeed-issue-title.ac1",
+            "title": "Given an issue-bound pending-input subject with a resolvable title, the needs-you row label renders '<issueId> — <title>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sessionfeed-issue-title.ac2",
+            "title": "Given a subject with no issueId, the row label falls back to the agent id exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sessionfeed-issue-title.ac3",
+            "title": "Given two subjects surfacing the same pending question, the needs-you list renders exactly one row (dedup preserved after the label change)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auq-self-contained-rule",
+        "title": "Universal bundled rule: self-contained AskUserQuestion prompts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T22:35:11-04:00",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3097",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/rules/ask-user-question-self-contained.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'scope: universal' sync-sources/rules/ask-user-question-self-contained.md",
+            "grep -ci 'consequence' sync-sources/rules/ask-user-question-self-contained.md"
+          ],
+          "expected_outputs": [
+            "grep for 'scope: universal' returns 1",
+            "grep for 'consequence' returns at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W6: create sync-sources/rules/ask-user-question-self-contained.md with scope: universal frontmatter, matching the terse imperative voice of neighboring rules. Body: every AskUserQuestion must stand alone because the operator answers from a dashboard dialog without the transcript — 1-2 sentences of situation, the decision in plain language, and option descriptions that state the consequence of choosing them; include the one-line WHY. Do NOT run pan sync or edit rendered harness context files (hazard H4) — the rule ships with the package and renders on install/sync."
+        },
+        "items": [
+          {
+            "id": "auq-self-contained-rule.ac1",
+            "title": "The new rule file exists with 'scope: universal' frontmatter so pan sync renders it into all three harness context outputs (claude-code, pi, codex), reaching work, plan, and conversation sessions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auq-self-contained-rule.ac2",
+            "title": "grep for 'situation', 'decision', and 'consequence' on the rule file each returns at least one match, and grep for 'transcript' returns the WHY line (operator answers from a dialog without the transcript)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auq-self-contained-rule.ac3",
+            "title": "The commit for this item creates only sync-sources/rules/ask-user-question-self-contained.md — git diff --stat returns no rendered harness context file or other path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "planning-prompt-guidance",
+        "title": "Planning prompt and plan role reinforce self-contained questions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T22:35:11-04:00",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3097",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/prompts/planning.md",
+            "roles/plan.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'self-contained' src/lib/cloister/prompts/planning.md",
+            "grep -c 'self-contained' roles/plan.md"
+          ],
+          "expected_outputs": [
+            "grep on planning.md returns at least 1",
+            "grep on roles/plan.md returns at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W7: (1) in src/lib/cloister/prompts/planning.md, extend the 'Question discipline' paragraph (lines 145-147) after 'recommendation in one sentence in its description.' with: 'Every question must be self-contained: 1-2 sentences of situation, the decision in plain language, and per-option consequences — the operator answers from a dialog without your transcript.' (2) in roles/plan.md line 73, extend item 4 with '; write each question self-contained (situation, decision, option consequences) — the operator answers from a dialog without the transcript'. Surgical edits only; no other prompt content changes."
+        },
+        "items": [
+          {
+            "id": "planning-prompt-guidance.ac1",
+            "title": "grep 'self-contained' on src/lib/cloister/prompts/planning.md returns a match inside the Question-discipline paragraph, and the clause names situation, decision, and per-option consequences",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-prompt-guidance.ac2",
+            "title": "grep 'self-contained' on roles/plan.md returns a match on item 4's line, and git diff --stat returns only planning.md and roles/plan.md for this item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auq-docs-update",
+        "title": "Document identifier+title rendering and the guidance carrier",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T22:35:11-04:00",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3097",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ASKUSERQUESTION-DASHBOARD.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'formatIssueRef' docs/ASKUSERQUESTION-DASHBOARD.md",
+            "grep -c 'ask-user-question-self-contained' docs/ASKUSERQUESTION-DASHBOARD.md"
+          ],
+          "expected_outputs": [
+            "grep for 'formatIssueRef' returns at least 1",
+            "grep for the rule filename returns at least 1"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W8: add a section to docs/ASKUSERQUESTION-DASHBOARD.md stating (a) the AUQ dialog, DecisionsPanel, and SessionFeedSidebar needs-you rows all render '<issueId> — <issue title>' via formatIssueRef in src/dashboard/frontend/src/lib/issueLabel.ts, with titles joined client-side from resolver-fed store issues; (b) unbound subjects omit the Issue cell (the 'Unknown' literal is gone); (c) agents are instructed to write self-contained questions by the universal bundled rule sync-sources/rules/ask-user-question-self-contained.md, reinforced in the planning prompt — the hook fires after the question is written, so the question text itself must carry the context."
+        },
+        "items": [
+          {
+            "id": "auq-docs-update.ac1",
+            "title": "grep 'formatIssueRef' on docs/ASKUSERQUESTION-DASHBOARD.md returns at least one match, and the new section renders the three surfaces (dialog, DecisionsPanel, SessionFeedSidebar) with the resolver-fed store-issues title source",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auq-docs-update.ac2",
+            "title": "grep 'ask-user-question-self-contained' on the doc returns at least one match, and the section states the hook fires after the question is written so the question text itself carries the context",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "issue-ref-helper",
+        "to": "dialog-issue-title",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-ref-helper",
+        "to": "decisions-issue-title",
+        "type": "blocks"
+      },
+      {
+        "from": "issue-ref-helper",
+        "to": "sessionfeed-issue-title",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-issue-title",
+        "to": "subject-issue-title-population",
+        "type": "blocks"
+      },
+      {
+        "from": "auq-self-contained-rule",
+        "to": "auq-docs-update",
+        "type": "informs"
+      },
+      {
+        "from": "dialog-issue-title",
+        "to": "auq-docs-update",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3097-askuserquestion-dialog-show-issue-title-alongside-identifier-and-make-agent-questions-self-contained.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

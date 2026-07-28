@@ -1,0 +1,654 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T12:48:35.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3093: Polyrepo UAT assembly: per-repo generation branches, per-repo base SHAs, all-or-nothing promote (unblocks the MYN train)",
+    "updated": "2026-07-26T20:22:09.254Z"
+  },
+  "plan": {
+    "id": "pan-3093",
+    "title": "Polyrepo UAT assembly: per-repo generation branches, per-repo base SHAs, all-or-nothing promote (unblocks the MYN train)",
+    "status": "completed",
+    "uid": "3ea48430-5aa2-43f3-81b5-b8c03e78a37c",
+    "author": "agent:k3[1m]",
+    "sequence": 5,
+    "created": "2026-07-26T12:48:35.000Z",
+    "updated": "2026-07-26T20:22:09.254Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3093",
+        "label": "PAN-3093",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "uat",
+      "merge-train",
+      "polyrepo",
+      "cloister"
+    ],
+    "narratives": {
+      "Problem": "The UAT batch-train assembly engine is single-repo by construction (one base_sha, one worktree, one branch, one promote merge), so polyrepo projects like mind-your-now (six member repos under a non-git wrapper) can never get a UAT generation. PAN-1696 (PR #3095) shipped a guard in runUatTrainReconcileForProject (src/dashboard/server/services/uat-train.ts:126-131) that skips polyrepo projects; this issue removes that guard by making assembly actually work per repo.",
+      "Proposal": "Extend the subsystem additively along the existing repo-resolver seam: (1) additive schema — uat_generation_repos + uat_generation_member_repos child tables, composite '<repoKey>@<sha>' anchor in base_sha for polyrepo rows; (2) new src/lib/cloister/uat-polyrepo-engine.ts reusing the per-repo GenerationGitDeps contract, one uat/<label>-<codename>-<MMDD> branch per contributing repo, global hold-out by fixpoint re-assembly; (3) polyrepo ready set via project-repos.ts contributions + per-repo changed-file union ordering; (4) reconciler optional composite-anchor deps with exact monorepo fallback; (5) two-phase promote — trial-merge every repo without pushing, then publish in merge order with idempotent resume; (6) per-repo teardown; (7) guard deleted with the routing change; (8) docs. Monorepo engine + its unit tests stay byte-identical. Full design with verified file/line references and before/after detail: .pan/drafts/PAN-3093.md.",
+      "NonGoals": "- Changing monorepo assembly logic, its deps contract, or its unit tests.\n- Automatic rollback (force-push / revert) of a member repo's main after a partial publish — recovery is idempotent resume only.\n- Cross-repo semantic conflict detection beyond per-repo changed-file overlap.\n- Dashboard/frontend rendering changes for per-repo generation detail (payload gains repos additively; presentation is a follow-up).\n- Changing per-issue polyrepo merge (merge-ops.ts) or merge-set semantics.\n- Polyrepo-specific devcontainer templates beyond what ensureDevcontainerSync already renders into the wrapper folder (gaps become a follow-up issue)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Additive schema with two child tables; base_sha stores a composite '<repoKey>@<shortSha>' anchor for polyrepo rows; pre-migration rows synthesize a single repo entry at read time.",
+        "rationale": "Keeps existing rows readable without data migration, keeps baseSha meaningful for staleness comparison, and matches the PAN-2948 composite-anchor precedent already used for polyrepo review anchors (MIN-901)."
+      },
+      {
+        "summary": "New uat-polyrepo-engine.ts sibling module instead of an if(polyrepo) fork inside assembleUatGeneration.",
+        "rationale": "The issue's monorepo-parity AC demands the existing engine unit tests stay green unmodified; a sibling module reusing the same GenerationGitDeps contract per repo guarantees that by construction."
+      },
+      {
+        "summary": "Global hold-out via bounded fixpoint re-assembly (rebuild affected repo branches from base without the held-out feature).",
+        "rationale": "Excising a merged commit from the middle of a branch is fragile; replay is deterministic, reuses the existing merge loop, and terminates because each iteration removes at least one feature."
+      },
+      {
+        "summary": "Two-phase promote: phase A trial-merges all repos without pushing (all-or-nothing decision), phase B publishes in merge order with idempotent resume on partial failure.",
+        "rationale": "It proves the issue's all-or-nothing AC at the decision point while never force-pushing/rewinding a member repo's main (one-way door) when a publish fails partway."
+      },
+      {
+        "summary": "Reconciler generalizes via optional getBaseAnchor/getFeatureAnchor deps with exact fallback to the existing single-SHA deps.",
+        "rationale": "Signatures stay plain strings, so existing reconciler tests keep passing and the polyrepo wiring just supplies composite anchors."
+      },
+      {
+        "summary": "Guard deletion rides in the same item as polyrepo routing in uat-train.ts.",
+        "rationale": "The tree should never contain routing without support or support without routing; the deletion itself is three lines plus a dead class and stale comment."
+      }
+    ],
+    "items": [
+      {
+        "id": "schema-per-repo-generation-tables",
+        "title": "Additive schema: uat_generation_repos + uat_generation_member_repos with types and store I/O",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:48:35.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3093",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "polyrepo-assembly-engine",
+            "two-phase-promote",
+            "per-repo-teardown"
+          ],
+          "files_scope": [
+            "src/lib/database/schema.ts",
+            "src/lib/overdeck/merge-types.ts",
+            "src/lib/overdeck/merge-sync.ts",
+            "src/lib/database/uat-generations-db.ts",
+            "tests/unit/lib/overdeck/uat-generation-repos.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/overdeck/uat-generation-repos.test.ts tests/unit/lib/cloister/uat-generation-engine.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "new schema round-trip tests pass",
+            "existing engine tests pass unmodified"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add uat_generation_repos (uat_name, repo_key, repo_path, branch, base_sha, worktree_path, merge_order, promoted_at INTEGER, PK(uat_name, repo_key)) and uat_generation_member_repos (uat_name, issue_id, repo_key, branch, head_sha, merge_order_in_repo, PK(uat_name, issue_id, repo_key)) via CREATE TABLE IF NOT EXISTS in src/lib/database/schema.ts plus tryIdempotentDdl migration-ladder entries (bump SCHEMA_VERSION). Add UatGenerationRepo and UatGenerationMemberRepo types in src/lib/overdeck/merge-types.ts; extend UatGeneration with repos: UatGenerationRepo[] and UatGenerationMember with optional repos. Extend row mapping and insert/update in src/lib/overdeck/merge-sync.ts to write/read child rows; when no child rows exist (legacy rows), synthesize a single repo entry from base_sha/worktree_path so readers never special-case. Add markUatGenerationRepoPromotedSync(name, repoKey, iso). New test tests/unit/lib/overdeck/uat-generation-repos.test.ts: 2-repo round-trip, legacy-row synthesis, idempotent double migration. See PRD WI-1."
+        },
+        "items": [
+          {
+            "id": "schema-per-repo-generation-tables.ac1",
+            "title": "Given a generation written with two repo rows and two member-repo rows, when read via getUatGenerationSync, then it returns both repos with distinct base SHAs and each member's per-repo branches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-per-repo-generation-tables.ac2",
+            "title": "Given a legacy generation row with no child rows, when read back, then repos contains exactly one entry synthesized from base_sha and worktree_path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-per-repo-generation-tables.ac3",
+            "title": "Given the migration runs twice on the same database, when the second run completes, then it produces no error and no duplicate rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "polyrepo-ready-set",
+        "title": "Polyrepo ready set: per-repo contribution resolution and conflict-aware ordering",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:48:35.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3093",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel-merge-order.ts",
+            "src/lib/cloister/uat-generation-engine.ts",
+            "tests/unit/lib/flywheel-merge-order-polyrepo.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/flywheel-merge-order-polyrepo.test.ts tests/unit/lib/flywheel-merge-order.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "new polyrepo queue tests pass",
+            "existing merge-order tests pass"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add computePolyrepoMergeQueueFromCandidates to src/lib/flywheel-merge-order.ts: per candidate, resolve configured repos (passed in as ResolvedProjectRepo[] per issue), check per-repo feature-branch existence (origin-first, same convention as branchHeadSha in uat-generation-deps.ts) to determine contributions; run changedFilesVsMain per contributing repo against that repo's targetBranch; compute conflict signals over the repo-prefixed union of file sets ('fe:src/x.ts') and order with the existing orderMergeCandidates. Output items carry repoContributions: Array<{ repoKey, repoPath, branch, targetBranch, mergeOrder }>. Add optional repoContributions to ReadyFeature in uat-generation-engine.ts (additive, monorepo omits it). Candidates with zero contributing repos are excluded with a logged reason. New test tests/unit/lib/flywheel-merge-order-polyrepo.test.ts with fake git deps. See PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "polyrepo-ready-set.ac1",
+            "title": "Given a candidate whose feature branch exists in repos A and B but not C, when the polyrepo queue is computed, then the item carries contributions for A and B only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "polyrepo-ready-set.ac2",
+            "title": "Given a candidate with no feature branch in any repo, when the queue is computed, then the candidate is excluded and the reason is logged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "polyrepo-ready-set.ac3",
+            "title": "Given two candidates whose changed-file sets overlap in one repo, when ordered, then each records the other in conflictsWith",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conflict-hook-repo-scope",
+        "title": "Scope the conflict-resolution hook context per repo (optional repoKey)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T12:48:35.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3093",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/uat-generation-engine.ts",
+            "src/lib/cloister/uat-conflict-agent.ts",
+            "tests/unit/lib/cloister/uat-conflict-agent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/uat-conflict-agent.test.ts tests/unit/lib/cloister/uat-generation-engine.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "conflict-agent tests pass with and without repoKey",
+            "existing engine tests pass unmodified"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add optional repoKey?: string to ConflictContext in src/lib/cloister/uat-generation-engine.ts (one field + doc comment — no other engine change). In src/lib/cloister/uat-conflict-agent.ts, buildConflictResolutionPrompt names the repo when repoKey is present and stays byte-identical when absent; log lines include the repo key when present. Extend tests/unit/lib/cloister/uat-conflict-agent.test.ts for both cases. See PRD WI-3."
+        },
+        "items": [
+          {
+            "id": "conflict-hook-repo-scope.ac1",
+            "title": "Given a conflict context with repoKey 'api', when the resolution prompt is built, then it names the api repo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-hook-repo-scope.ac2",
+            "title": "Given a conflict context without repoKey, when the resolution prompt is built, then it is byte-identical to today's prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "polyrepo-assembly-engine",
+        "title": "Polyrepo assembly engine: per-repo branches/worktrees, global hold-out fixpoint, composite base anchor",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:48:35.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-3093",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "reconciler-routing-guard-removal",
+            "two-phase-promote",
+            "per-repo-teardown"
+          ],
+          "files_scope": [
+            "src/lib/cloister/uat-polyrepo-engine.ts",
+            "src/lib/cloister/uat-generation-deps.ts",
+            "tests/unit/lib/cloister/uat-polyrepo-engine.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/uat-polyrepo-engine.test.ts tests/unit/lib/cloister/uat-generation-engine.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "polyrepo engine tests pass with fake per-repo git deps (no live git)",
+            "existing engine tests pass unmodified",
+            "lint passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/uat-polyrepo-engine.ts exporting assemblePolyrepoUatGeneration: name via makeUatCandidateName; contributing repos = union of feature repoContributions (repos no feature touches get no branch and no worktree); per repo (merge_order), createWorktree(name, '<projectRoot>/workspaces/<generationFolder(name)>/<repoKey>') off that repo's target branch, merge features in queue order with the same resolve-or-hold-out logic as the single-repo engine (repoKey passed in ConflictContext). A feature held out in ANY repo is removed from ALL repos and affected repo branches are rebuilt from base by replaying remaining features (bounded fixpoint, max features.length iterations); heldOut records the feature once with the blocking repo named. Generation baseSha = composite '<repoKey>@<shortSha>' anchor in merge_order; store writes include child rows (WI-1). Push each repo's branch; any push failure marks the generation failed (cleanup reaps pushed branches). On success, older ready generations flip to superseded. Extend src/lib/cloister/uat-generation-deps.ts with buildPolyrepoGitDeps(repos) (one buildUatGenerationGitDeps(repo.repoPath) per repo) and listRemoteUatBranchesMulti(repos) (union). New test tests/unit/lib/cloister/uat-polyrepo-engine.test.ts with fake per-repo git deps: happy path, skipped repo, global hold-out with repo-1 rebuild, push failure, zero members. The single-repo engine file gains NOTHING in this item. See PRD WI-4."
+        },
+        "items": [
+          {
+            "id": "polyrepo-assembly-engine.ac1",
+            "title": "Given two features contributing to repos A and B, when assembly runs, then each repo gets a uat/… branch off its own recorded base SHA and the generation row stores the composite anchor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "polyrepo-assembly-engine.ac2",
+            "title": "Given a feature whose merge conflicts in repo B and cannot be resolved, when assembly finishes, then the feature is absent from repo A's merged members and repo B's, and appears once in heldOut naming repo B",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "polyrepo-assembly-engine.ac3",
+            "title": "Given a repo no feature contributes to, when assembly runs, then no worktree or branch is created for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "polyrepo-assembly-engine.ac4",
+            "title": "Given a push failure in repo B after repo A pushed, when assembly finishes, then the generation status is failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconciler-routing-guard-removal",
+        "title": "Reconciler composite anchors, polyrepo service routing, and PAN-1696 guard deletion",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:48:35.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3093",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/uat-reconciler.ts",
+            "src/dashboard/server/services/uat-train.ts",
+            "src/dashboard/server/services/__tests__/uat-train.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/uat-reconciler.test.ts src/dashboard/server/services/__tests__/uat-train.test.ts tests/unit/lib/cloister/uat-generation-engine.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "reconciler tests pass unmodified",
+            "uat-train service tests cover polyrepo routing",
+            "lint passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/uat-reconciler.ts add optional getBaseAnchor(): Promise<string> and getFeatureAnchor(feature: ReadyFeature): Promise<string> deps; route desiredSignature, generationSignature, and liveSignatureMatches through them with exact fallback to getMainHeadSha/getBranchHeadSha when absent (existing reconciler tests must pass unmodified). In src/dashboard/server/services/uat-train.ts: DELETE the polyrepo guard at lines 126-131, the dead PolyrepoAssemblyUnsupported class at lines 87-92, and the stale comment at line 215; in runUatTrainReconcileForProject branch on projectConfig.workspace?.type === 'polyrepo' to use the polyrepo ready set (WI-2), polyrepo assembly (WI-4, resolving repos per candidate via resolveProjectReposFromResolvedIssueSync), and composite anchor deps; monorepo path untouched. Extend src/dashboard/server/services/__tests__/uat-train.test.ts to assert polyrepo routing and guard absence. IMPLEMENTATION CHECKPOINT (post-merge, live): mind-your-now assembles a real generation; the unit tests are the merge gate, live verification follows on the dashboard. See PRD WI-5."
+        },
+        "items": [
+          {
+            "id": "reconciler-routing-guard-removal.ac1",
+            "title": "grep -n 'polyrepo project type not supported' src/dashboard/server/services/uat-train.ts returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-routing-guard-removal.ac2",
+            "title": "Given a polyrepo project config with eligible candidates, when runUatTrainReconcileForProject runs, then the polyrepo assemble function is invoked (asserted via injected fake in the service test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-routing-guard-removal.ac3",
+            "title": "npx vitest run tests/unit/lib/cloister/uat-reconciler.test.ts tests/unit/lib/cloister/uat-generation-engine.test.ts passes with both test files unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "two-phase-promote",
+        "title": "Two-phase polyrepo promote: trial-merge all repos before publishing, idempotent resume",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:48:35.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-3093",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/uat-promote.ts",
+            "tests/unit/lib/cloister/uat-promote-polyrepo.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/uat-promote-polyrepo.test.ts tests/unit/lib/cloister/uat-promote.test.ts tests/unit/lib/cloister/uat-promote-baseline.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "polyrepo promote tests pass including the repo-2-of-3 phase-A failure proof",
+            "existing promote tests pass unmodified"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/uat-promote.ts add a PolyrepoUatPromoteGitDeps keyed by repoKey (trialMerge without push, publishPrepared, targetHeadSha, changedFilesSince, batchChangedFiles per repo) leaving the monorepo deps contract untouched. promoteUatGeneration detects a multi-repo generation (gen.repos.length > 1) and runs: phase A — per repo in merge_order, fetch target branch, per-repo stale-base overlap check (same disjoint-movement rule as lines 133-156), trial-merge the repo's uat branch in a throwaway worktree WITHOUT push; any failure discards all throwaway worktrees and returns failure with the generation still ready (nothing pushed). Phase B — publish each prepared merge in merge_order, recording promoted_at per repo via markUatGenerationRepoPromotedSync; on publish failure return merge-failed naming landed vs pending repos, generation stays ready, and a retry skips repos whose target already contains the merge (idempotent resume; NEVER force-push/rewind main). firePostMerge per member only after ALL repos publish; recordVerification receives per-repo merge SHAs. New test tests/unit/lib/cloister/uat-promote-polyrepo.test.ts: repo 2 of 3 fails phase A → zero repos published; stale-base overlap rejects before any push; publish failure → named landed/pending and resumable; post-merge fires once per member after full publish. See PRD WI-6."
+        },
+        "items": [
+          {
+            "id": "two-phase-promote.ac1",
+            "title": "Given a 3-repo generation whose trial merge fails in repo 2, when promote runs, then no repo is published and the generation remains ready",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "two-phase-promote.ac2",
+            "title": "Given a publish failure after repo 1 of 2 landed, when promote is retried, then repo 1 is skipped and repo 2 publishes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "two-phase-promote.ac3",
+            "title": "Given all repos publish, when promote finishes, then each member issue's post-merge lifecycle fires exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "per-repo-teardown",
+        "title": "Per-repo generation teardown: worktrees, branches, wrapper folder, stack network",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T12:48:35.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3093",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/uat-generation-engine.ts",
+            "src/lib/cloister/uat-generation-deps.ts",
+            "tests/unit/lib/cloister/uat-polyrepo-cleanup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/uat-polyrepo-cleanup.test.ts tests/unit/lib/cloister/uat-generation-engine.test.ts tests/unit/lib/cloister/uat-stack.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "polyrepo cleanup tests pass",
+            "existing engine and stack tests pass unmodified"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend cleanupUatGenerations in src/lib/cloister/uat-generation-engine.ts: generations with repos entries remove each repo's worktree and delete each repo's branch (local + remote) via an optional removeRepoArtifacts?(repo) cleanup dep, then tear down the stack (existing teardownStack hook, unchanged — it keys off gen.worktreePath) and remove the wrapper folder (fs.rm recursive); the synthesized single-repo case falls back to today's removeWorktree/deleteBranch calls so monorepo behavior is identical. Extend src/lib/cloister/uat-generation-deps.ts with buildPolyrepoCleanupGit(repos). Also verify ensureDevcontainerSync renders into the wrapper folder for the stack path (prior art: src/lib/workspace-manager/create.ts polyrepo scaffold); genuine template gaps become a follow-up issue, not scope creep. New test tests/unit/lib/cloister/uat-polyrepo-cleanup.test.ts: 2-repo cleanup removes both worktrees/branches + stack + wrapper folder and sets cleanedAt; one repo's deletion failure leaves cleanedAt unset and logs. Do NOT modify tests/unit/lib/cloister/uat-generation-engine.test.ts. See PRD WI-7."
+        },
+        "items": [
+          {
+            "id": "per-repo-teardown.ac1",
+            "title": "Given a promoted 2-repo generation, when cleanup runs, then both per-repo worktrees, both per-repo branches (local and remote), the stack, and the wrapper folder are removed and cleanedAt is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-repo-teardown.ac2",
+            "title": "Given a branch deletion failure in one repo, when cleanup runs, then cleanedAt remains unset and the error is logged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-polyrepo-uat",
+        "title": "Docs: polyrepo generations in UAT batch-train, merge-train, and user-facing pages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T12:48:35.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3093",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/UAT-BATCH-TRAINS.md",
+            "docs/MERGE-TRAIN.md",
+            "features/merge-batches.mdx",
+            "docs/ORDER-BOOKS.md",
+            ".pan/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'polyrepo' docs/UAT-BATCH-TRAINS.md features/merge-batches.mdx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both docs mention polyrepo generations",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "docs/UAT-BATCH-TRAINS.md: add a 'Polyrepo generations' section covering per-repo branches and base SHAs, the composite anchor in base_sha, contribution skipping, global hold-out, two-phase promote, and per-repo teardown. docs/MERGE-TRAIN.md: remove/adjust any 'polyrepo not supported' note from PAN-1696 and describe per-project polyrepo eligibility. features/merge-batches.mdx (Mintlify user docs): user-facing description of polyrepo batches. docs/ORDER-BOOKS.md: verify whether it references the single-repo UAT limitation; update it or record in the commit message that no reference exists. .pan/context/codebase/concerns.md: replace the 'UAT assembly is single-repo' concern with the landed state. See PRD WI-8."
+        },
+        "items": [
+          {
+            "id": "docs-polyrepo-uat.ac1",
+            "title": "grep -c 'polyrepo' docs/UAT-BATCH-TRAINS.md features/merge-batches.mdx prints a count of at least 1 for each file, and docs/UAT-BATCH-TRAINS.md contains a 'Polyrepo generations' section describing one branch per contributing member repo and all-or-nothing promote",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-polyrepo-uat.ac2",
+            "title": "grep -rni 'polyrepo.*not supported\\|polyrepo.*skipped' docs/UAT-BATCH-TRAINS.md docs/MERGE-TRAIN.md features/merge-batches.mdx returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "schema-per-repo-generation-tables",
+        "to": "polyrepo-assembly-engine",
+        "type": "blocks"
+      },
+      {
+        "from": "polyrepo-ready-set",
+        "to": "polyrepo-assembly-engine",
+        "type": "blocks"
+      },
+      {
+        "from": "conflict-hook-repo-scope",
+        "to": "polyrepo-assembly-engine",
+        "type": "blocks"
+      },
+      {
+        "from": "polyrepo-ready-set",
+        "to": "reconciler-routing-guard-removal",
+        "type": "blocks"
+      },
+      {
+        "from": "polyrepo-assembly-engine",
+        "to": "reconciler-routing-guard-removal",
+        "type": "blocks"
+      },
+      {
+        "from": "schema-per-repo-generation-tables",
+        "to": "two-phase-promote",
+        "type": "blocks"
+      },
+      {
+        "from": "polyrepo-assembly-engine",
+        "to": "two-phase-promote",
+        "type": "blocks"
+      },
+      {
+        "from": "schema-per-repo-generation-tables",
+        "to": "per-repo-teardown",
+        "type": "blocks"
+      },
+      {
+        "from": "polyrepo-assembly-engine",
+        "to": "per-repo-teardown",
+        "type": "blocks"
+      },
+      {
+        "from": "conflict-hook-repo-scope",
+        "to": "polyrepo-ready-set",
+        "type": "blocks"
+      },
+      {
+        "from": "polyrepo-ready-set",
+        "to": "per-repo-teardown",
+        "type": "blocks"
+      },
+      {
+        "from": "conflict-hook-repo-scope",
+        "to": "per-repo-teardown",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-routing-guard-removal",
+        "to": "docs-polyrepo-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "two-phase-promote",
+        "to": "docs-polyrepo-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "per-repo-teardown",
+        "to": "docs-polyrepo-uat",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3093-polyrepo-uat-assembly-per-repo-generation-branches-per-repo-base-shas-all-or-nothing-promote-unblocks-the-myn-train.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

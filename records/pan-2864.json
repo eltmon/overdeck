@@ -1,0 +1,146 @@
+{
+  "issueId": "PAN-2864",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-18T01:14:58.165Z",
+  "updated": "2026-07-27T16:52:43.281Z",
+  "pipeline": {
+    "issueId": "PAN-2864",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "mergeStatus": "merged",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-27T16:52:43.252Z",
+    "verificationNotes": "Checklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.",
+    "mergeNotes": "Post-rebase verification failed at incomplete-plan-items",
+    "strikeReadyHead": "cb48f756bf44fe438fdbd1c7b8da6399b7520fcc",
+    "strikeReadyAt": "2026-07-18T02:41:39.724Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-18T02:05:31.996Z",
+        "strikeHead": "a18c41391d11c489713a077f96d329679d23e43b",
+        "mainHead": "6f8bbe66d54a94e2df62affd902c5b5b1c7e8e39",
+        "outcome": "failed",
+        "detail": "Post-rebase verification failed at incomplete-plan-items"
+      }
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T16:52:43.252Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "strike": {
+          "openai/gpt-5.6-sol": {
+            "input": 1657010,
+            "output": 87305,
+            "cacheRead": 28842496,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 1657010,
+          "output": 87305,
+          "cacheRead": 28842496,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 25.325448,
+        "pricingAsOf": "2026-07-18T06:29:59.682Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T16:52:43.276Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: missing (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "PR #2870 is squash-merged and strike/pan-2864 matches the merged PR head; PR #2870 is squash-merged and origin/strike/pan-2864 matches the merged PR head; Superseded feature/pan-2864 residual: Feature branch is absent; positive merge evidence is required; PR #2870 MERGED at 2026-07-18T04:26:29Z",
+          "status": "pass",
+          "mergedAt": "2026-07-18T04:26:29Z",
+          "mergeCommit": "6540bb9b17f58aab736ffa50f8d03fa96d012eb2"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 6540bb9b17f58aab736ffa50f8d03fa96d012eb2",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit d44fa122 contains merge 6540bb9b",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; Preserved local branch strike/pan-2864 — not merged to main; Preserved remote branch strike/pan-2864 — not merged to main; Pruned 0 checkpoint ref(s) for agent-pan-2864, planning-pan-2864, strike-pan-2864; No specialist registry entries for PAN-2864"
+        }
+      ],
+      "accepted": []
+    }
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.6-sol",
+  "recoveryTrips": [
+    {
+      "issue": "PAN-2864",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-18T06:29:59.680Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-18T06:40:58.633Z"
+    }
+  ]
+}

@@ -1,0 +1,329 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T19:37:46.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3155: Strike-landed issues can never close out: DoD row 4 resolves 'merged' through the superseded feature branch, and row 7 cascades",
+    "updated": "2026-07-26T21:49:32.477Z"
+  },
+  "plan": {
+    "id": "pan-3155",
+    "title": "Strike-landed issues can never close out: DoD row 4 resolves 'merged' through the superseded feature branch, and row 7 cascades",
+    "status": "completed",
+    "uid": "1a2d13ef-486d-4ef0-809e-bbbf3b7fba1e",
+    "author": "agent:k3[1m]",
+    "sequence": 7,
+    "created": "2026-07-26T19:37:46.000Z",
+    "updated": "2026-07-26T21:49:32.477Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3155",
+        "label": "PAN-3155",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "close-out",
+      "dod-gate",
+      "strike",
+      "merge-verification",
+      "lifecycle"
+    ],
+    "narratives": {
+      "Problem": "A strike-landed issue (strike/<id> merged to main while the superseded feature/<id> branch keeps its unmerged commits) can never pass DoD close-out: row 4's git verifier (verifyBranchMergedImpl, src/lib/lifecycle/workflows.ts:511) only checks feature/<id>; the forge PR resolver (resolveIssuePullRequestRef, src/lib/overdeck/pull-requests.ts:127) returns the CLOSED superseded feature PR and never reaches the MERGED strike PR, so no merge commit is populated; and row 7 (checkDeployRow, src/lib/lifecycle/dod-gate.ts:392) turns the missing merge commit into an unconditional miss that cascades row 4's failure. Verified live against PAN-3116 (PR #3152 merged as 6ac4a3dc11, close-out rows 4 and 7 MISS).",
+      "Proposal": "Three surgical fixes inside the existing read doors plus docs. (1) Extract the per-branch merge cascade in workflows.ts into verifyConventionBranchMerged(ctx, branchName) and, only when the feature check does not pass, run the identical cascade against strike/<id> — reusing verifySquashMergedPrByBranch unchanged; BRANCH_ABSENT_MERGE_ERROR semantics preserved. (2) Make resolveIssuePullRequestRef collect PRs from both convention heads and rank OPEN > MERGED (most recent) > first-found, so the landing PR populates mergeCommit/mergedAt for rows 6-7 and the dashboard PR tab consistently. (3) Pass the merged row's status into checkDeployRow: missing merge commit becomes a dependency-named skip when row 4 missed, and a reworded miss only when row 4 passed without a resolvable commit. (4) Update docs/DEFINITION-OF-DONE.md and the DOD_ROWS expected string in the same commit. Full before/after detail in the PRD at drafts/pan-3155.md.",
+      "NonGoals": "- Healing PAN-3116's stale strike record (strikeLandingState stuck at 'recovering'); the fix resolves through branch+forge evidence so record staleness cannot block close-out\n- Recording the strike merge commit durably at strike-merge time (follow-up candidate)\n- Strike-awareness in the legacy isBranchMerged (src/lib/close-out.ts), which feeds only reap-issue-residue.ts\n- Loosening the containment lens (unmergedRefs.length === 0 stays; it is blind to squash merges by construction)\n- Hardening the branch-absent durable-merge fallback, which counts closeOut.merges URLs without checking they merged (flagged as hazard H3)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Resolve strike landings through the strike branch and forge evidence, not the durable strike record",
+        "rationale": "The issue text says the durable strike record already names the merge commit; verified false during planning — StrikeLandingStatus (src/lib/strike-landing.ts) records strikeReadyHead and attempt outcomes but no merge commit, and PAN-3116's record is stale ('recovering' despite having landed). The strike branch plus its MERGED forge PR is authoritative and cannot be stale."
+      },
+      {
+        "summary": "Row 4 passes when the strike branch verifies merged, even though the feature branch retains unmerged commits",
+        "rationale": "The strike exists precisely to supersede those commits, and a strict feature-code-diff rule fails legitimate landings (PAN-3116 differs from main by one line of rebase drift: +194/-660 on closed #3127 vs +194/-659 on merged #3152). The residual is named in the success details and the row stays operator-overridable."
+      },
+      {
+        "summary": "Fix PR resolution at the shared resolveIssuePullRequestRef layer rather than inside the DoD gate",
+        "rationale": "Single-source-of-truth tenet: no parallel resolution path. The same shadowing bug affects the dashboard PR tab; ranking OPEN > MERGED > other keeps mid-pipeline display stable while letting the landing PR through everywhere."
+      },
+      {
+        "summary": "Row 7 becomes a skip (not a miss) when row 4 missed, and stays a reworded miss when row 4 passed without a merge commit",
+        "rationale": "The row-4 miss already blocks the gate, so a second miss is noise; but a row-4 pass without a resolvable commit is a genuine deploy-evidence hole and must keep blocking."
+      },
+      {
+        "summary": "requiresInspection is false on all four items",
+        "rationale": "Each item is specified with exact files, before/after behavior, and named unit tests; a wrong implementation fails those tests immediately rather than rotting a downstream foundation. No item is a foundation another item builds on (WI-4 only documents the others)."
+      }
+    ],
+    "items": [
+      {
+        "id": "strike-cascade-verify-merged",
+        "title": "Add strike-branch cascade to verifyBranchMergedImpl",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T19:37:46.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3155",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/workflows.ts",
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/workflows.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all workflows.test.ts cases pass including the four new strike-cascade cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/lifecycle/workflows.ts, extract the per-branch cascade of verifyBranchMergedImpl (currently lines 530-616, everything after the review-status shortcut) into verifyConventionBranchMerged(ctx, branchName): Promise<StepResult | null>, parameterized on branchName and returning null where the body currently falls through to BRANCH_ABSENT_MERGE_ERROR. Keep the issue-closed skip (lines 585-597) inside the extracted helper. Rewrite verifyBranchMergedImpl to: (1) keep the review-status shortcut; (2) evaluate feature/<id> and return immediately on success/skipped; (3) only when the feature check failed or returned null, evaluate strike/<id> through the identical cascade (verifySquashMergedPrByBranch is already branch-parametric — reuse it unchanged); on strike success return stepOk with the strike details plus a line naming the superseded feature branch residual; (4) when the feature branch was absent everywhere and the strike check did not pass, return the exact current BRANCH_ABSENT_MERGE_ERROR (src/lib/lifecycle/dod.ts:70); when the feature check failed and the strike did not pass, return the original feature failure unchanged. Add four tests in tests/unit/lib/lifecycle/workflows.test.ts in the existing mocked-execAsync style (see lines 421-620): strike-merged passes and names the strike branch plus the superseded residual; strike-absent preserves the exact feature failure; both absent returns BRANCH_ABSENT_MERGE_ERROR; feature-pass performs no strike-branch git/gh calls (assert mock call arguments)."
+        },
+        "items": [
+          {
+            "id": "strike-cascade-verify-merged.ac1",
+            "title": "Given a feature branch with unmerged commits and a strike branch whose PR is squash-merged, verifyBranchMergedImpl returns success whose details name strike/<id> and the superseded feature residual",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-cascade-verify-merged.ac2",
+            "title": "Given no strike branch, verifyBranchMergedImpl returns the byte-identical feature-branch failure it returns today, and a feature-branch pass short-circuits with zero strike-branch git or gh invocations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-cascade-verify-merged.ac3",
+            "title": "Given both convention branches absent locally and remotely, verifyBranchMergedImpl returns the exact BRANCH_ABSENT_MERGE_ERROR string so checkMergedRow's durable-merge fallback still triggers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "prefer-merged-pr-resolution",
+        "title": "Rank OPEN > MERGED > other in resolveIssuePullRequestRef across both convention heads",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T19:37:46.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3155",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/pull-requests.ts",
+            "src/lib/github-pr-lookup.ts",
+            "tests/unit/dashboard/server/routes/issue-pr.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/issue-pr.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all issue-pr.test.ts cases pass including the three new ranking cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/github-pr-lookup.ts add lookupPullRequestForBranch(owner, repo, branch) returning { number, state, mergedAt } | null (gh path: gh pr list --head <branch> --state all --json number,state,mergedAt --limit 1; App path: map the state/merged/mergedAt fields listPullRequestsForHeadPromise already returns at src/lib/github-app.ts:574-596). Keep the existing lookupPullRequestNumberForBranch as a thin wrapper — it has two other callers (src/lib/cloister/coderabbit-ingestion.ts:145, src/lib/overdeck/discussions.ts:181). In src/lib/overdeck/pull-requests.ts, change resolveIssuePullRequestRef (lines 127-159) to collect candidates from BOTH convention heads instead of stopping at the first hit: zero candidates returns repoArg: null (unchanged); one candidate returns it (unchanged); two candidates rank OPEN first, then MERGED by most recent mergedAt, then the first found. The PAN-2883 comment above the branchCandidates array must be extended to state the ranking rule. Add tests in tests/unit/dashboard/server/routes/issue-pr.test.ts (existing fetchIssuePullRequest suite): closed feature PR + merged strike PR returns the strike PR; open feature PR + merged strike PR returns the open feature PR; single-PR issues resolve exactly as today."
+        },
+        "items": [
+          {
+            "id": "prefer-merged-pr-resolution.ac1",
+            "title": "Given a CLOSED PR on feature/<id> and a MERGED PR on strike/<id>, fetchIssuePullRequest returns the MERGED strike PR with its number, mergedAt, and mergeCommit populated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prefer-merged-pr-resolution.ac2",
+            "title": "Given an OPEN PR on feature/<id> and a MERGED PR on strike/<id>, resolveIssuePullRequestRef returns the OPEN feature PR so mid-pipeline display is stable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prefer-merged-pr-resolution.ac3",
+            "title": "Given a single PR across both convention heads, resolution returns it with the same lookup sequence as before the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deploy-row-dependency-semantics",
+        "title": "Decouple DoD deploy row from the merged-row cascade",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T19:37:46.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3155",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all dod-gate.test.ts cases pass including the two new dependency-semantics cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/lifecycle/dod-gate.ts: (1) add mergedRowStatus?: DodRowResult['status'] to checkDeployRow's merge parameter and to the EvaluateDodGateDeps['deploy'] signature; (2) in evaluateDodGate (lines 451-461) pass merged.status through; (3) in checkDeployRow (lines 392-430), when merge.mergeCommit is missing: return skip with observed 'no merge commit resolved because the merged row missed — deploy ancestry depends on row 4; build ancestry unchecked' when mergedRowStatus === 'miss', and keep miss but reworded to 'merged row passed without a resolvable merge commit; build ancestry cannot be checked' otherwise. All commit-present behavior is unchanged. Add two tests in the existing 'Definition-of-Done deploy row' describe block (lines 411-474 of dod-gate.test.ts): merged-row miss produces skip with the dependency string; merged-row pass without commit produces the reworded miss. Existing deploy-row cases must pass unmodified."
+        },
+        "items": [
+          {
+            "id": "deploy-row-dependency-semantics.ac1",
+            "title": "Given the merged row missed and no merge commit, checkDeployRow returns skip with observed text naming the row-4 dependency instead of a second miss",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-row-dependency-semantics.ac2",
+            "title": "Given the merged row passed without a resolvable merge commit, checkDeployRow returns miss whose observed text names the unresolvable input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-row-dependency-semantics.ac3",
+            "title": "Given a merge commit is present, checkDeployRow produces byte-identical results to before the change (all pre-existing deploy-row tests pass unmodified)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dod-docs-strike-landing",
+        "title": "Document strike-landing resolution in DEFINITION-OF-DONE and DOD_ROWS",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T19:37:46.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3155",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DEFINITION-OF-DONE.md",
+            "src/lib/lifecycle/dod.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-doc-drift.test.ts tests/unit/lib/lifecycle/dod.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "doc-drift and dod tests pass",
+            "lint completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/DEFINITION-OF-DONE.md and src/lib/lifecycle/dod.ts in the same commit: (1) row 4 (merged) description gains strike-branch resolution — merge evidence resolves through either convention head (feature/<id> or strike/<id>), forge squash-merge detection included; (2) the 'Branch absence is not merge evidence' rule gains one sentence stating that a strike-landed issue passes row 4 through the strike branch's own evidence and the superseded feature branch's unmerged commits are reported in the observed string rather than treated as a miss; (3) row 7 (deploy) description notes that when the merged row missed, deploy reports the unresolved dependency instead of a second miss; (4) the merged row's expected string in src/lib/lifecycle/dod.ts (line 31) becomes 'PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)'. The doc-drift test (tests/unit/lib/lifecycle/dod-doc-drift.test.ts) only couples row num/id, so it needs no change — but the table text, rules section, and code string must agree."
+        },
+        "items": [
+          {
+            "id": "dod-docs-strike-landing.ac1",
+            "title": "docs/DEFINITION-OF-DONE.md row 4 and the 'Branch absence' rule state that merge evidence resolves through feature/<id> or strike/<id> and that the superseded branch's residual is reported in the observed string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-docs-strike-landing.ac2",
+            "title": "docs/DEFINITION-OF-DONE.md row 7 states the dependency behavior (skip when the merged row missed) and the merged row's expected string in dod.ts names both convention heads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-docs-strike-landing.ac3",
+            "title": "npx vitest run tests/unit/lib/lifecycle/dod-doc-drift.test.ts passes, proving the doc table and DOD_ROWS still enumerate the same rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "strike-cascade-verify-merged",
+        "to": "dod-docs-strike-landing",
+        "type": "blocks"
+      },
+      {
+        "from": "prefer-merged-pr-resolution",
+        "to": "dod-docs-strike-landing",
+        "type": "blocks"
+      },
+      {
+        "from": "deploy-row-dependency-semantics",
+        "to": "dod-docs-strike-landing",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3155-strike-landed-issues-can-never-close-out-dod-row-4-resolves-merged-through-the-superseded-feature-branch-and-row-7-cascades.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

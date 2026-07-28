@@ -1,0 +1,316 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-18T00:42:59.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2857: Pipeline membership is blind to strike/ branches — active strike work shows as 'backlog, never started' and is hidden from the issue rail",
+    "updated": "2026-07-18T13:27:11.704Z"
+  },
+  "plan": {
+    "id": "pan-2857",
+    "title": "Pipeline membership is blind to strike/ branches — active strike work shows as 'backlog, never started' and is hidden from the issue rail",
+    "status": "completed",
+    "uid": "ae4462ba-de63-44f9-b4c1-f58ce14071e2",
+    "author": "agent:claude-fable-5",
+    "sequence": 5,
+    "created": "2026-07-18T00:42:59.000Z",
+    "updated": "2026-07-18T13:27:11.704Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2857",
+        "label": "PAN-2857",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "pipeline-membership",
+      "strike",
+      "dashboard",
+      "backend"
+    ],
+    "narratives": {
+      "Problem": "resolvePipelineMembership() decides membership from durable lenses, but every lens is blind to strike work during its working phase: issueIdFromRef() (src/lib/pipeline-membership-gather.ts:190) requires a feature/ segment, the two git for-each-ref calls (:210-211) list only feature/* refs, and the candidateHeads/merged-PR fallbacks (:260-268) hardcode feature/<id> head names. An active strike (live strike/pan-XXXX branch, running agent, no PR yet) therefore fails every lens and classifies clean_terminal ('backlog, never started') — invisible in the issues rail, the CommandDeck pipeline board, pan pending, and the flywheel, all of which delegate to this one chain.",
+      "Proposal": "Stay inside the durable-lens doctrine: a strike/<id> branch is a durable git artifact the L2 lens should read. Widen issueIdFromRef() to accept feature|strike (which also fixes L1 open-PR head parsing at :241), add strike/* patterns to both for-each-ref invocations, include strike/<id> in the candidateHeads and merged-PR fallbacks, generalize the resolver's branch-live reason wording from 'feature branch' to 'convention branch (feature/ or strike/)', and document strike/ as a recognized convention branch. The resolver's bucket logic is untouched — strike issues surface as planned_backlog before the PR opens and in_flight once it does.",
+      "NonGoals": "- No new IssueLensSignals field or distinct strike-specific reason string/bucket — the shared planned_backlog bucket with generalized wording is the issue's stated minimum\n- No changes to resolvePipelineMembership() bucket logic or lens precedence\n- No change to PLANNED_BACKLOG_SPEC_ONLY_REASON (PAN-2822 specOnlyPlanned derivation depends on it byte-for-byte)\n- No frontend changes — rail and CommandDeck consume the shared membership chain and need nothing\n- No changes to other strike-aware surfaces (webhook-handlers.ts strike review-pass, strike-workspace-reaper.ts)\n- No live browser UAT with a real strike branch — unit tests plus the existing six-consumer delegation audit prove all surfaces"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Bucket strike-branch issues as planned_backlog with a generalized shared reason string instead of adding a distinct 'active strike branch — awaiting PR' reason.",
+        "rationale": "The issue lists planned_backlog as the minimum acceptable option; a distinct reason requires a new branch-kind signal in IssueLensSignals since the resolver only sees booleans, widening the lens interface and every gather/test surface for cosmetic benefit. Visibility — the actual acceptance criterion — is delivered by the bucket."
+      },
+      {
+        "summary": "Verify the CommandDeck acceptance check via the existing delegation audit rather than live UAT.",
+        "rationale": "tests/unit/lib/pipeline-membership-audit.test.ts mechanically enforces that enumerate-in-flight (CommandDeck's feed) and the other five consumers delegate to resolvePipelineMembership, so a gather-level unit test proves both surfaces at once; creating a live strike branch to eyeball the dashboard adds no coverage."
+      },
+      {
+        "summary": "Fix the L1 open-PR lens for strike heads in the same regex change even though the issue only names L2.",
+        "rationale": "issueIdFromRef() is also the parser for pr.headRefName (gather :241); leaving it feature-only would keep an OPEN strike PR invisible, a strictly worse variant of the reported bug. Same one-line change, so it belongs to this issue."
+      }
+    ],
+    "items": [
+      {
+        "id": "gather-strike-refs",
+        "title": "Recognize strike/ refs in issueIdFromRef and the for-each-ref branch listings",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-18T00:42:59.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2857",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest exits 0 with new strike-ref cases and all pre-existing feature-branch cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/pipeline-membership-gather.ts: (1) change the guard in issueIdFromRef() at line 190 from /(?:^|\\/)feature\\//.test(ref) to /(?:^|\\/)(?:feature|strike)\\//.test(ref); (2) in the Promise.all at lines 210-211, add 'refs/heads/strike/*' and 'refs/remotes/origin/strike/*' to BOTH for-each-ref invocations (the plain listing at :210 and the --no-merged=main listing at :211) — all four new patterns, matching the existing feature/* pairs. In tests/unit/lib/pipeline-membership-gather.test.ts, extend the deps() run() mock (lines 49-53) and add cases: a local 'strike/pan-20' and remote 'origin/strike/pan-21' ref produce signals with hasConventionBranch true (and branchUnmerged true when listed by the --no-merged mock); feeding an open-issue strike-branch signal through resolvePipelineMembership (already imported at line 15) returns bucket planned_backlog with inPipeline true; a closed issue with a leftover strike branch returns clean_terminal; an open PR with headRefName 'strike/pan-22' sets hasOpenPr true and resolves to in_flight; a foreign-prefix 'strike/krux-9' ref produces no candidate (extend the 'ignores foreign refs' test at line 126)."
+        },
+        "items": [
+          {
+            "id": "gather-strike-refs.ac1",
+            "title": "Given a local strike/pan-N or remote origin/strike/pan-N ref in the for-each-ref output, gatherProjectLensSignals returns a signal row for PAN-N with hasConventionBranch true, and when the ref also appears in the --no-merged listing it returns branchUnmerged true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gather-strike-refs.ac2",
+            "title": "Given an open issue with an unmerged strike branch and no PR, resolvePipelineMembership returns bucket planned_backlog with inPipeline true; given the same branch on a closed issue it returns clean_terminal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gather-strike-refs.ac3",
+            "title": "Given an open PR whose headRefName is strike/pan-N on the project's own repo, gather returns hasOpenPr true for PAN-N and the resolver returns bucket in_flight",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gather-strike-refs.ac4",
+            "title": "Given a strike/krux-9 ref under the PAN prefix project, gather produces no candidate row for it (foreign-prefix filtering preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gather-strike-refs.ac5",
+            "title": "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts exits 0 with every pre-existing feature-branch expectation unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "strike-merge-oracle-fallbacks",
+        "title": "Include strike/<id> heads in the candidateHeads and merged-PR fallbacks",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-18T00:42:59.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2857",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest exits 0 including a merged-and-deleted strike branch resolving hasMergedPr true",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/pipeline-membership-gather.ts: (1) at the candidateHeads construction (lines 260-261), change the no-headRefs fallback from new Set([`feature/${id.toLowerCase()}`]) to include both `feature/${id.toLowerCase()}` and `strike/${id.toLowerCase()}`; (2) at the merged-PR fallback loop (lines 266-268), mark mergedPrIssues when mergedHeads has EITHER `feature/${id.toLowerCase()}` OR `strike/${id.toLowerCase()}`. These fallbacks only fire for candidates with no live refs (branch deleted after merge), so this makes a merged strike PR the merge oracle exactly like a merged feature PR. In tests/unit/lib/pipeline-membership-gather.test.ts add: an open issue (from listOpenIssues) with no refs whose listMergedPullRequestHeads mock returns strike/pan-N gets hasMergedPr true and resolves to post_merge_limbo; and update the 'checks merged PR history only for active candidate heads' test (line 163) to expect both feature/ and strike/ fallback heads in the listMergedPullRequestHeads call."
+        },
+        "items": [
+          {
+            "id": "strike-merge-oracle-fallbacks.ac1",
+            "title": "Given a candidate issue with no live refs, listMergedPullRequestHeads receives both feature/pan-N and strike/pan-N fallback heads for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-merge-oracle-fallbacks.ac2",
+            "title": "Given listMergedPullRequestHeads reports strike/pan-N merged and no local/remote refs exist for PAN-N, gather returns hasMergedPr true and the resolver returns bucket post_merge_limbo for the open issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-merge-oracle-fallbacks.ac3",
+            "title": "For issues with live refs, gather produces a listMergedPullRequestHeads call containing only their exact head names (no fallback heads) and preserves the existing active-candidate-heads test expectations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "generalize-branch-reason-wording",
+        "title": "Generalize the branch-live planned_backlog reason and lens doc comments to both conventions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-18T00:42:59.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2857",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership.ts",
+            "tests/unit/dashboard/server/services/resource-discovery.test.ts",
+            "tests/unit/lib/pipeline-membership-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-audit.test.ts tests/unit/dashboard/server/services/resource-discovery.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest exits 0 with the updated reason-string assertion and the byte-identical PLANNED_BACKLOG_SPEC_ONLY_REASON assertion both green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/pipeline-membership.ts: (1) change the branch-live reason at line 139 from 'open issue with an unmerged feature branch but no PR — needs a PR or disposition' to 'open issue with an unmerged convention branch (feature/ or strike/) but no PR — needs a PR or disposition'; (2) update the JSDoc on hasOpenPr (line 40, currently names only feature/<id>) and hasConventionBranch (line 44, currently 'A feature/<id-lowercase> convention branch') to name both feature/<id> and strike/<id> conventions. Do NOT touch PLANNED_BACKLOG_SPEC_ONLY_REASON at line 34 — PAN-2822's specOnlyPlanned DTO derivation and the audit test's byte-for-byte assertion (pipeline-membership-audit.test.ts:81-83) depend on it. Update the verbatim reason assertion at tests/unit/dashboard/server/services/resource-discovery.test.ts:403 to the new wording. Add one audit-test case asserting the branch-live reason names both conventions."
+        },
+        "items": [
+          {
+            "id": "generalize-branch-reason-wording.ac1",
+            "title": "resolvePipelineMembership returns the reason 'open issue with an unmerged convention branch (feature/ or strike/) but no PR — needs a PR or disposition' for a branch-live open issue with no PR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "generalize-branch-reason-wording.ac2",
+            "title": "PLANNED_BACKLOG_SPEC_ONLY_REASON remains byte-identical — the exact-string assertion in pipeline-membership-audit.test.ts still exits green, preserving the PAN-2822 specOnlyPlanned derivation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "generalize-branch-reason-wording.ac3",
+            "title": "The updated assertion in tests/unit/dashboard/server/services/resource-discovery.test.ts matches the new reason wording and npx vitest run on that file exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-strike-convention",
+        "title": "Document strike/ as a recognized convention branch in PIPELINE-MEMBERSHIP.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-18T00:42:59.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-2857",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-MEMBERSHIP.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'strike/' docs/PIPELINE-MEMBERSHIP.md"
+          ],
+          "expected_outputs": [
+            "grep returns a count of at least 1 — the durable-lenses section names strike/<id> alongside feature/<id>"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/PIPELINE-MEMBERSHIP.md, update the 'Durable lenses' section (lines 5-18): state that the convention branches read by lenses 1-3 are BOTH feature/<id> and strike/<id>, and add one sentence that an active strike (live strike/ branch, no PR yet) therefore surfaces as planned_backlog before its PR opens rather than clean_terminal. Keep the bucket table wording ('unmerged convention branch') as is — it is already convention-neutral."
+        },
+        "items": [
+          {
+            "id": "docs-strike-convention.ac1",
+            "title": "grep 'strike/<id>' docs/PIPELINE-MEMBERSHIP.md exits 0 — the Durable lenses section states both feature/<id> and strike/<id> as the convention branches the PR and branch lenses read",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-strike-convention.ac2",
+            "title": "The doc states that an open issue with a live strike/ branch and no PR surfaces as planned_backlog (in the pipeline) before the PR opens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "gather-strike-refs",
+        "to": "strike-merge-oracle-fallbacks",
+        "type": "blocks"
+      },
+      {
+        "from": "generalize-branch-reason-wording",
+        "to": "docs-strike-convention",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-18-PAN-2857-pipeline-membership-is-blind-to-strike-branches-active-strike-work-shows-as-backlog-never-started-and-is-hidden-from-the-issue-rail.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

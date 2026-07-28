@@ -1,0 +1,430 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-19T00:11:57Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2890: Agent pills: clickable drill-down, per-agent context, and scoped counts",
+    "updated": "2026-07-19T03:16:01.189Z"
+  },
+  "plan": {
+    "id": "pan-2890",
+    "title": "Agent pills: clickable drill-down, per-agent context, and scoped counts",
+    "status": "completed",
+    "uid": "4ee56111-ad46-4b10-a487-c7568c72a774",
+    "author": "agent:claude-fable-5",
+    "sequence": 5,
+    "created": "2026-07-19T00:11:57Z",
+    "updated": "2026-07-19T03:16:01.189Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2890",
+        "label": "PAN-2890",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2890.md",
+        "label": "PRD",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "app-bar",
+      "agents",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "The app-bar agent pills hide their contents: the running-agents pill ('9 agents') is a non-interactive span with no way to see which agents it counts, and the stopped-agents popover shows only bare issueId + role rows — no title, no stop reason, no timestamp, no click path to the issue. Three simultaneous counts (boot banner held / stopped pill / running pill) carry no scope labels explaining their relationship, and an operator-reported 'Save Session' string has no known source in the dashboard codebase.",
+      "Proposal": "Introduce one shared AgentPillPopoverRow component plus pure utils (describeAgentStop, navigateToIssue, relativeTime) rendering mono issue ID, title, role, and a context line; make every row a button navigating to /issues/<ID> via the URL door. Replace the static running span with a RunningAgentsPill drill-down driven by an extracted isRunningAgentStatus predicate shared with the count memo. Rewrite the stopped popover rows onto the shared component with stop reasons and a 'last 7 days' scoped header, keeping selection filters and Restart all unchanged. Investigate 'Save Session' per the FR-6 decision rule, and update docs/COMMAND-DECK-RESTORATION.md. All data comes from the existing Zustand store — no new endpoints, no polling.",
+      "NonGoals": "- No per-row restart buttons; 'Restart all' stays as the only bulk control (D-5)\n- No changes to the stopped-set selection filters: pipeline roles, 7-day recency, phantom-stop exclusion, dedupe (D-3)\n- No new REST endpoints, no polling, no useQuery for agent or issue data (NFR-1)\n- No changes to the boot-reconciliation banner beyond its already-shipped scope label\n- No navigation to /command-deck/<project>/<issue> routes — rows navigate to /issues/<ID> only (D-1)\n- No fetching of issue titles absent from the store — bare-ID fallback instead (D-4)\n- No new Mintlify user-docs page — no user-facing page documents the app bar today (verified 2026-07-18)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted PRD design decisions D-1 through D-5 verbatim as plan constraints without operator re-confirmation.",
+        "rationale": "The PRD (drafts/pan-2890.md) was authored operator-directed on 2026-07-18 and explicitly states these decisions are 'made here, not by the implementer'; auto mode must not re-ask documented decisions."
+      },
+      {
+        "summary": "The isRunningAgentStatus extraction is owned by the running-pill item (which edits App.tsx anyway), not the shared-row item.",
+        "rationale": "Matches the PRD's WI-2 step 1 exactly; keeps the shared-row item a leaf-file change and puts the predicate change in the same diff as its two consumers."
+      },
+      {
+        "summary": "The 'Save Session' spike proceeds without waiting for the operator screenshot; if none arrives before close-out it is recorded as 'not reproduced, no screenshot' in a PAN-2890 issue comment.",
+        "rationale": "FR-6 states this fallback explicitly; blocking the whole issue on an external artifact would strand four completed work items."
+      },
+      {
+        "summary": "The interactive mockup docs/design/mockups/agent-pills-pan-2890.html is already committed (e71a3a1375); the docs item verifies its presence rather than recreating it.",
+        "rationale": "The file exists on the feature branch; recreating it would churn a delivered artifact."
+      }
+    ],
+    "items": [
+      {
+        "id": "shared-row-component",
+        "title": "Shared AgentPillPopoverRow component with stop-reason and navigation utils",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-19T00:11:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2890",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "running-agents-pill",
+            "stopped-popover-enrichment"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/AgentPillPopoverRow.tsx",
+            "src/dashboard/frontend/src/components/AgentPillPopoverRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix src/dashboard/frontend run test -- src/components/AgentPillPopoverRow.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "AgentPillPopoverRow.test.tsx passes with all describeAgentStop branches, navigation, and relativeTime assertions green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/AgentPillPopoverRow.tsx exporting: (1) describeAgentStop(agent: Agent): string with priority order pausedReason ('paused: <reason>') → paused ('paused') → troubled ('troubled (N failure[s])' using consecutiveFailures) → stoppedByUser ('stopped by operator') → 'stopped cleanly'; (2) navigateToIssue(issueId): pushState to /issues/<encodeURIComponent(ID)> when pathname differs, then dispatch new PopStateEvent('popstate') — the URL-door pattern from DecisionsIndicator.navigateForDecision; (3) relativeTime(iso: string, now: number): string producing '5m ago' / '3h ago' / '2d ago' with no new dependency; (4) AgentPillPopoverRow({ agent, title?, contextLine, onNavigate? }) — a <button type=\"button\"> row with hover:bg-accent: line 1 is font-mono issue ID + truncated title (title attr carries full text) + right-aligned role in text-muted-foreground; line 2 is contextLine in text-[11px] text-muted-foreground truncated; click calls navigateToIssue(agent.issueId) then onNavigate?.(). Layout matches docs/design/mockups/agent-pills-pan-2890.html. Colocated Vitest + Testing Library test covers all five describeAgentStop branches, bare-ID fallback when title is undefined, and click → pushState('/issues/PAN-2377') + popstate dispatch. Repo rule: relativeTime tests use vi.useFakeTimers() + vi.setSystemTime(), never real Date.now(). Style: mono IDs, muted secondary text, no decorative color (pan-style-guide)."
+        },
+        "items": [
+          {
+            "id": "shared-row-component.ac1",
+            "title": "Given pausedReason 'X' describeAgentStop returns 'paused: X'; given troubled with consecutiveFailures 2 it returns 'troubled (2 failures)'; given stoppedByUser it returns 'stopped by operator'; given no flags it returns 'stopped cleanly' — all five branches asserted in AgentPillPopoverRow.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-row-component.ac2",
+            "title": "When a row is clicked, the component pushes /issues/<ID> via window.history.pushState and dispatches a popstate event, then invokes onNavigate — asserted with spies",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-row-component.ac3",
+            "title": "The row renders a font-mono issue ID with truncated title carrying the full text in a title attribute, and falls back to the bare issue ID when no title prop is given",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-row-component.ac4",
+            "title": "relativeTime produces '5m ago', '3h ago', and '2d ago' style strings for minute/hour/day deltas, asserted under vi.useFakeTimers with vi.setSystemTime — no real-clock assertions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "running-agents-pill",
+        "title": "Running-agents pill becomes an interactive drill-down popover",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-19T00:11:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2890",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/RunningAgentsPill.tsx",
+            "src/dashboard/frontend/src/components/RunningAgentsPill.test.tsx",
+            "src/dashboard/frontend/src/components/AgentPillPopoverRow.tsx",
+            "src/dashboard/frontend/src/App/AppChrome.tsx",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix src/dashboard/frontend run test -- src/components/RunningAgentsPill.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "RunningAgentsPill.test.tsx passes: popover set equals predicate set, trigger count equals row count, zero-running renders nothing, row click navigates and closes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "1) Export isRunningAgentStatus(status: Agent['status']): boolean from AgentPillPopoverRow.tsx (or sibling agent-status.ts) with the exact predicate ['running','active','starting','thinking','working'].includes(status) currently inlined in App.tsx:536-539, and change the runningAgentCount memo to call it. 2) Create RunningAgentsPill.tsx: selects agents itself via useDashboardStore(selectAgents), filters with isRunningAgentStatus, returns null at zero; trigger button styled exactly like the current emerald span (AppChrome.tsx:207-210) plus aria-expanded; popover uses the DecisionsIndicator open/close pattern (outside mousedown + Escape) with header '{n} running now' and one AgentPillPopoverRow per agent with contextLine `${agent.model} · ${relativeTime(agent.lastActivity)}`, sorted lastActivity desc; row click closes the popover. 3) In AppChrome.tsx replace the span at lines 206-210 with <RunningAgentsPill />, dropping the runningAgentCount > 0 guard around the pill only — KEEP the guard around the adjacent 'Stop all' button and its emergency-stop wiring; App keeps passing runningAgentCount for that guard. Colocated test asserts the four expected_outputs behaviors; freeze time with fake timers for relativeTime output."
+        },
+        "items": [
+          {
+            "id": "running-agents-pill.ac1",
+            "title": "Given a store with 3 agents in running-family statuses and 2 stopped, the trigger renders '3 agents' and the popover lists exactly those 3 rows sorted by lastActivity descending — trigger count always equals row count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "running-agents-pill.ac2",
+            "title": "With zero running agents the component renders nothing, while the AppChrome 'Stop all' button remains guarded by runningAgentCount > 0 and its emergency-stop wiring survives unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "running-agents-pill.ac3",
+            "title": "The popover header renders '{n} running now' and each row's context line renders the agent model plus relative last-activity time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "running-agents-pill.ac4",
+            "title": "The runningAgentCount memo in App.tsx produces its count via the exported isRunningAgentStatus predicate — the same predicate the popover filters with — so count and list can never disagree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "running-agents-pill.ac5",
+            "title": "Clicking a popover row pushes /issues/<ID>, dispatches popstate, and closes the popover",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stopped-popover-enrichment",
+        "title": "Stopped-agents popover rows gain title, stop reason, and scoped header",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-19T00:11:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2890",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/StoppedAgentsBanner.tsx",
+            "src/dashboard/frontend/src/components/StoppedAgentsBanner.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix src/dashboard/frontend run test -- src/components/StoppedAgentsBanner.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "StoppedAgentsBanner.test.tsx passes: enriched rows, bare-ID fallback, 'last 7 days' header, one restart POST per agent, and all pre-existing popover elements still render"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In StoppedAgentsBanner.tsx (pill variant popover only): 1) Build an issueTitleById map from selectIssues (already imported at line 5; copy the map-building pattern used for issue statuses at lines ~37-42) keyed on identifier.toUpperCase(). 2) Replace the bare rows at lines ~222-227 with AgentPillPopoverRow, passing title = issueTitleById.get(a.issueId.toUpperCase()), contextLine = `${describeAgentStop(a)} · ${relativeTime(...)}` from the agent's max(lastActivity, startedAt), and onNavigate = () => setPopoverOpen(false). 3) Change the popover header to '{n} stopped · pipeline agents, last 7 days'. 4) Widen the popover from w-72 to w-80 and the list max height from max-h-40 to max-h-64 for two-line rows. 5) Do NOT touch the selection filters (lines ~61-115), 'Restart all' handler, results summary, or the banner variant. Create StoppedAgentsBanner.test.tsx (none exists — it doubles as the no-loss audit): assert enriched row content, bare-ID fallback for issues absent from the store, header scope wording, one POST per listed agent from Restart all, and that every pre-existing popover element (count header, agent list, results line, Restart all button, pill trigger) still renders. Fake timers for any relative-time assertions."
+        },
+        "items": [
+          {
+            "id": "stopped-popover-enrichment.ac1",
+            "title": "A popover row for an agent whose issue is in the store renders the issue title and a stop-reason context line from describeAgentStop; an agent whose issue is absent falls back to the bare issue ID and still renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stopped-popover-enrichment.ac2",
+            "title": "The popover header renders the scope wording containing 'last 7 days'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stopped-popover-enrichment.ac3",
+            "title": "'Restart all' still issues exactly one POST per listed stopped agent, and the test asserts every pre-existing popover element (count header, list, results summary, Restart all button, pill trigger) still renders — the no-loss audit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stopped-popover-enrichment.ac4",
+            "title": "The stopped-set selection filters (pipeline roles, 7-day recency, phantom-stop exclusion, dedupe by issue) remain byte-for-byte unchanged, and the popover renders the same agent set as before the refactor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stopped-popover-enrichment.ac5",
+            "title": "Clicking a stopped row pushes /issues/<ID>, dispatches popstate, and closes the popover",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "save-session-investigation",
+        "title": "Identify and resolve the 'Save Session' string sighting",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-19T00:11:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "spike",
+          "issueLabel": "pan-2890",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/COMMAND-DECK-RESTORATION.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "gh issue view 2890 --repo eltmon/overdeck --comments | tail -40"
+          ],
+          "expected_outputs": [
+            "the PAN-2890 issue thread or this branch carries exactly one of: a fix commit referencing the identified surface, a doc note in docs/COMMAND-DECK-RESTORATION.md, or a 'not reproduced, no screenshot' comment"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ],
+          "acJustification": "Spike with a single tri-state deliverable; two ACs cover the decision rule and the recorded outcome."
+        },
+        "narrative": {
+          "Action": "The string 'Save Session' does not exist in src/dashboard (grep-verified 2026-07-18). Check the PAN-2890 issue thread for an operator screenshot. If one exists, identify the rendering surface and apply the FR-6 decision rule: rendered by Overdeck frontend/server code → fix it in this branch with grep evidence (file:line) in the commit message; originates inside an agent terminal pane (harness TUI output) → add a doc note to docs/COMMAND-DECK-RESTORATION.md explaining the string's origin and that it is external to the dashboard. If no screenshot is available when the other items are done, post a 'not reproduced, no screenshot' comment on PAN-2890 (gh issue comment 2890 --repo eltmon/overdeck) and mark this item completed — do not block the issue on it."
+        },
+        "items": [
+          {
+            "id": "save-session-investigation.ac1",
+            "title": "The investigation applies the FR-6 decision rule and produces exactly one deliverable: a fix commit (Overdeck-rendered), a doc note in docs/COMMAND-DECK-RESTORATION.md (external/harness output), or a 'not reproduced, no screenshot' comment on PAN-2890",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "save-session-investigation.ac2",
+            "title": "Whichever branch is taken, the deliverable records its evidence: a fix commit cites the file:line that rendered the string, a doc note records the identified origin, or the issue comment records that no screenshot arrived before close-out",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-app-bar-update",
+        "title": "Document the interactive agent pills in COMMAND-DECK-RESTORATION.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-19T00:11:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2890",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/COMMAND-DECK-RESTORATION.md",
+            "docs/design/mockups/agent-pills-pan-2890.html"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'AgentPillPopoverRow' docs/COMMAND-DECK-RESTORATION.md",
+            "test -f docs/design/mockups/agent-pills-pan-2890.html && echo mockup-present"
+          ],
+          "expected_outputs": [
+            "grep finds the shared row component named in the app-bar description",
+            "mockup-present"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ],
+          "acJustification": "Docs-only item with two concrete file deliverables; two ACs cover both."
+        },
+        "narrative": {
+          "Action": "Update the app-bar description in docs/COMMAND-DECK-RESTORATION.md ('What shipped' section, lines ~8-9, mentioning 'status pills') to state that both agent pills are now interactive drill-downs — the running pill opens a '{n} running now' popover and the stopped pill a '{n} stopped · pipeline agents, last 7 days' popover — with clickable rows navigating to /issues/<ID>, and name AgentPillPopoverRow as the shared row component. Verify the interactive mockup remains at docs/design/mockups/agent-pills-pan-2890.html (already committed in e71a3a1375 — do not recreate). No Mintlify user-doc page documents the app bar today (verified by grep of configuration/ and reference/, 2026-07-18), so no user-docs change is required — this is the explicit no-user-docs statement."
+        },
+        "items": [
+          {
+            "id": "docs-app-bar-update.ac1",
+            "title": "docs/COMMAND-DECK-RESTORATION.md's app-bar description contains the statement that both agent pills are interactive drill-downs with scoped popover headers, and contains 'AgentPillPopoverRow' as the named shared row component",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-app-bar-update.ac2",
+            "title": "The interactive mockup file persists at docs/design/mockups/agent-pills-pan-2890.html on the feature branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "shared-row-component",
+        "to": "running-agents-pill",
+        "type": "blocks"
+      },
+      {
+        "from": "shared-row-component",
+        "to": "stopped-popover-enrichment",
+        "type": "blocks"
+      },
+      {
+        "from": "running-agents-pill",
+        "to": "docs-app-bar-update",
+        "type": "blocks"
+      },
+      {
+        "from": "stopped-popover-enrichment",
+        "to": "docs-app-bar-update",
+        "type": "blocks"
+      },
+      {
+        "from": "save-session-investigation",
+        "to": "docs-app-bar-update",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-19-PAN-2890-agent-pills-clickable-drill-down-per-agent-context-and-scoped-counts.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

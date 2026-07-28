@@ -1,0 +1,378 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T06:10:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3109: DoD close-out gate blind to non-PR-path landings — merged row needs the membership resolver's branch-containment lens",
+    "updated": "2026-07-26T08:53:16.012Z"
+  },
+  "plan": {
+    "id": "pan-3109",
+    "title": "DoD close-out gate blind to non-PR-path landings — merged row needs the membership resolver's branch-containment lens",
+    "status": "completed",
+    "uid": "b497853b-33bf-43df-86d1-d55303f8a7a8",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-26T06:10:00.000Z",
+    "updated": "2026-07-26T08:53:16.012Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3109",
+        "label": "PAN-3109",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2828",
+        "label": "PAN-2828 (related, out of scope)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dod-gate",
+      "close-out",
+      "pipeline-membership",
+      "polyrepo"
+    ],
+    "narratives": {
+      "Problem": "The DoD close-out gate's merged row (checkMergedRow, src/lib/lifecycle/dod-gate.ts:236-294) only accepts the verify-merged step, a durable merge record, or a merged forge PR. Work that landed via a non-PR path — e.g. the four MYN issues whose branches live in polyrepo sub-repos while ctx.projectPath is the repo-less wrapper — misses row 4 (and row 5 downstream) forever, even though the pipeline-membership resolver already derives 'branch work contained in main, no merged PR' from its L2-work containment lens. The gate refuses its own remedy: membership says 'run close-out', close-out fails the gate.",
+      "Proposal": "Extract the membership gather's branch-containment computation (contained in default branch + tip off its first-parent line = merged work; not-contained = unmerged; contained on first-parent = pointer) into shared exported helpers in src/lib/pipeline-membership-gather.ts, add an issue-scoped gatherIssueBranchContainment over projectRepositories(project), and use it as a fallback in checkMergedRow: when the row would miss and no merged PR exists, pass iff at least one merged-work ref exists and zero unmerged refs exist across all project repos. Tag the pass with evidence: 'branch-containment' and let checkPostMergeRow accept that evidence when no work/plan agents are running. Rows 1-3 stay operator --accept-* territory.",
+      "NonGoals": "- No change to rows 1-3 (review/tests/verification) — operator --accept-* territory for non-PR landings\n- No derivation of a merge commit for non-PR landings; rows 6-7 (main-verify, deploy) semantics unchanged\n- No change to membership resolver/gather classification outcomes (extract-and-reuse only)\n- No fast-forward-landing detection (PAN-2887 blind spot stays: pointer refs never count as merge evidence)\n- No fix for PAN-2828's pan done --strike ancestry check\n- No per-repo partial-failure tolerance in the containment helper (git failure = evidence unavailable = row stays miss)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Shared lens lives in pipeline-membership-gather.ts (export projectRepositories, extract snapshot + classification helpers, add gatherIssueBranchContainment) rather than a new module or a copy in dod-gate.ts.",
+        "rationale": "The gather is the canonical membership door and the issue explicitly demands 'reuse its lens, don't fork a second implementation'; one implementation with two callers makes drift structurally impossible."
+      },
+      {
+        "summary": "Row 4 flips to pass iff mergedWorkRefs > 0 AND unmergedRefs == 0 across all configured project repositories.",
+        "rationale": "Mirrors resolvePipelineMembership precedence exactly (branchLive wins over merged-work, pipeline-membership.ts:102,146-155), so the two doors agree by construction."
+      },
+      {
+        "summary": "Row 5 accepts evidence: 'branch-containment' only with zero running work/plan agents; the lifecycle-observed half is waived for non-PR landings.",
+        "rationale": "The post-merge lifecycle can never have observed a merge event the system never saw; agent quiescence is the half of the invariant that remains meaningful and checkable."
+      },
+      {
+        "summary": "Containment passes carry no mergedAt/mergeCommit; git failures in the helper leave the row miss with the error appended to observed.",
+        "rationale": "Never fabricate merge metadata (rows 6-7 already skip/degrade gracefully without it), and fail-closed evidence gathering keeps the gate honest."
+      }
+    ],
+    "items": [
+      {
+        "id": "extract-containment-lens",
+        "title": "Extract shared branch-containment lens in pipeline-membership-gather",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T06:10:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3109",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "merged-row-containment-fallback",
+            "post-merge-row-containment"
+          ],
+          "files_scope": [
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "pipeline-membership-gather.test.ts passes including new gatherIssueBranchContainment tests, with all pre-existing tests unmodified"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Wave-0 item touching only pipeline-membership-gather.ts and its test file; no other item in this plan or overlap group edits those files, so it is parallel-safe despite its complex refactor scope.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D1 (.pan/drafts/PAN-3109.md): in src/lib/pipeline-membership-gather.ts, export the ProjectRepository interface (line 279) and projectRepositories (line 284). Extract the per-repo snapshot block (lines 314-334: the three git commands for-each-ref refs, for-each-ref --no-merged=<defaultBranch>, rev-list --first-parent <defaultBranch>) into an exported snapshotBranchRefs(repoPath, defaultBranch, refPatterns, run) and the per-ref decision (lines 392-411) into a pure exported classifyBranchRefLine(line, unmergedSet, firstParentShas) returning 'unmerged' | 'merged-work' | 'pointer'. Add exported interface IssueBranchContainment { unmergedRefs: string[]; mergedWorkRefs: string[]; pointerRefs: string[] } and exported async gatherIssueBranchContainment(project: ProjectConfig, issueId: string, run = defaultDeps.run): Promise<IssueBranchContainment> that iterates projectRepositories(project) with issue-scoped ref patterns (refs/heads/feature/<id-lower>, refs/remotes/origin/feature/<id-lower>, refs/heads/strike/<id-lower>, refs/remotes/origin/strike/<id-lower>) and aggregates classified refs qualified with their repo path. Rewire gatherProjectLensSignals through the extracted helpers so classification exists exactly once; its outputs must be byte-identical to today. Git failures propagate (PRD D2). Add unit tests with an injected fake run covering: merged-work ref detected (contained + tip off first-parent), pointer ref ignored, unmerged ref reported, multi-repo aggregation (one repo merged-work + one repo pointer), and strike/ ref inclusion."
+        },
+        "items": [
+          {
+            "id": "extract-containment-lens.ac1",
+            "title": "Given a fake run where a feature ref is absent from --no-merged output and its tip SHA is absent from the first-parent list, gatherIssueBranchContainment returns it in mergedWorkRefs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-containment-lens.ac2",
+            "title": "Given a contained ref whose tip SHA appears in the first-parent list, gatherIssueBranchContainment returns it in pointerRefs and mergedWorkRefs stays empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-containment-lens.ac3",
+            "title": "Given a ref listed by --no-merged, gatherIssueBranchContainment returns it in unmergedRefs; strike/<id> refs and origin/ remote refs are included in the queried patterns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-containment-lens.ac4",
+            "title": "Given a polyrepo project with two configured repos, the helper aggregates refs across both repo paths and preserves each repo's configured default branch in the git arguments",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-containment-lens.ac5",
+            "title": "After the refactor, gatherProjectLensSignals produces identical IssueLensSignals for the existing fixture scenarios: npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts exits 0 with zero pre-existing test cases modified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merged-row-containment-fallback",
+        "title": "Row 4: branch-containment fallback in checkMergedRow",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T06:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3109",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "src/lib/lifecycle/dod.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts",
+            "tests/unit/lib/lifecycle/dod-doc-drift.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/lifecycle/"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all lifecycle unit tests pass including new containment-fallback cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W2/D3 (.pan/drafts/PAN-3109.md): in src/lib/lifecycle/dod-gate.ts add evidence?: 'branch-containment' to MergedDodRowResult (line 44) and readBranchContainment?: (ctx: LifecycleContext) => Promise<IssueBranchContainment> to MergedRowDeps (line 49). Default implementation resolves the project via resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath) (same chain as readDurableMerges at lines 74-77) and calls gatherIssueBranchContainment from ../pipeline-membership-gather.js; when no project resolves, return { unmergedRefs: [], mergedWorkRefs: [], pointerRefs: [] }. In checkMergedRow after the branchAbsent fallback block (lines 281-291): if merged.status === 'miss', call the dep inside try/catch; on { mergedWorkRefs.length > 0 && unmergedRefs.length === 0 } set status 'pass', set evidence = 'branch-containment', and append '; branch work contained in default branch with no merged PR — non-PR landing (membership L2-work lens): <mergedWorkRefs joined>' to observed; leave mergedAt/mergeCommit unset (PRD D5). On throw, append '; branch containment evidence unavailable: <message>' and keep miss. Do not call the dep when the row already passes. In src/lib/lifecycle/dod.ts line 31 change the merged row's expected to 'PR merged on the forge, or branch work contained in main (non-PR landing)'. Add deps-injected tests following the existing checkMergedRow style (tests/unit/lib/lifecycle/dod-gate.test.ts:125-213)."
+        },
+        "items": [
+          {
+            "id": "merged-row-containment-fallback.ac1",
+            "title": "Given verifyMerged returns BRANCH_ABSENT_MERGE_ERROR, no durable merges, no forge PR, and containment { mergedWorkRefs: ['frontend:feature/min-873'], unmergedRefs: [] }, checkMergedRow returns status 'pass' with evidence 'branch-containment' and an observed string naming the ref",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-row-containment-fallback.ac2",
+            "title": "Given containment reporting any unmergedRefs entry, checkMergedRow keeps status 'miss' and sets no evidence field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-row-containment-fallback.ac3",
+            "title": "Given readBranchContainment rejects, checkMergedRow keeps status 'miss' and appends 'branch containment evidence unavailable' to observed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-row-containment-fallback.ac4",
+            "title": "Given verifyMerged succeeds, checkMergedRow returns 'pass' without invoking readBranchContainment (asserted via a spy), and containment passes leave mergedAt/mergeCommit undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-row-containment-fallback.ac5",
+            "title": "DOD_ROWS row 4 expected reads 'PR merged on the forge, or branch work contained in main (non-PR landing)' and the dod-doc-drift test still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "post-merge-row-containment",
+        "title": "Row 5: accept containment-evidenced non-PR landings when agents are quiescent",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T06:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3109",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/lifecycle/ tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lifecycle and gather unit tests pass, including the assembled-gate MIN-305-shaped case"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W3/D4 (.pan/drafts/PAN-3109.md): in src/lib/lifecycle/dod-gate.ts change EvaluateDodGateDeps.postMerge (line 120) to (ctx: LifecycleContext, merged?: MergedDodRowResult) and pass the already-computed merged row at the call site (line 426: deps.postMerge(ctx, merged)). Give checkPostMergeRow (line 296) an optional merged?: MergedDodRowResult parameter (before the deps parameter stays last: signature (ctx, merged?, deps?)). Inside, when lifecycleObserved is false and merged?.evidence === 'branch-containment', return pass iff runningAgents.length === 0 with observed 'non-PR landing (branch-containment evidence) — post-merge lifecycle not applicable; ' + agentsObserved; a running work/plan agent keeps miss. All other paths byte-identical. Update existing postMerge stubs in tests/unit/lib/lifecycle/dod-gate.test.ts for the new optional parameter, add the two evidence cases, and add an assembled evaluateDodGate test shaped like MIN-305 (verifyMerged returns BRANCH_ABSENT_MERGE_ERROR, no ctx.github, no durable merges, containment merged-work, no running agents, review/tests/verification missing) asserting misses is exactly ['review','tests','verification']."
+        },
+        "items": [
+          {
+            "id": "post-merge-row-containment.ac1",
+            "title": "Given a merged row with evidence 'branch-containment' and no running work/plan agents, checkPostMergeRow returns 'pass' with an observed string stating the post-merge lifecycle is not applicable to a non-PR landing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-merge-row-containment.ac2",
+            "title": "Given a merged row with evidence 'branch-containment' and one running work agent, checkPostMergeRow returns 'miss' naming the agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-merge-row-containment.ac3",
+            "title": "Given no merged-row evidence, checkPostMergeRow preserves existing behavior: verifying_on_main with no agents passes, otherwise misses (existing tests pass with only stub-signature updates)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "post-merge-row-containment.ac4",
+            "title": "Given a MIN-305-shaped context (branch absent in projectPath, no forge, containment merged-work, no agents, rows 1-3 missing), evaluateDodGate returns misses exactly ['review','tests','verification']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-dod-containment",
+        "title": "Document the containment fallback in DoD and membership docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T06:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3109",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DEFINITION-OF-DONE.md",
+            "docs/PIPELINE-MEMBERSHIP.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-doc-drift.test.ts"
+          ],
+          "expected_outputs": [
+            "dod-doc-drift.test.ts passes, proving the row table still enumerates every canonical row exactly once"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W4 (.pan/drafts/PAN-3109.md): update docs/DEFINITION-OF-DONE.md rows 4 and 5 to state the branch-containment fallback — row 4 also passes when the membership gather's L2-work lens finds at least one convention-branch ref contained in the repo's default branch with its tip off the first-parent line AND zero unmerged refs across the project's configured repositories (non-PR landing); row 5 then passes when no work/plan agents are running, because the post-merge lifecycle never observed a merge event. Preserve the '| <num> | `<id>` |' table format the drift test parses. Add a short note to docs/PIPELINE-MEMBERSHIP.md that the DoD merged row consumes the same containment computation via gatherIssueBranchContainment in src/lib/pipeline-membership-gather.ts, so the lens must be changed in one place only."
+        },
+        "items": [
+          {
+            "id": "docs-dod-containment.ac1",
+            "title": "docs/DEFINITION-OF-DONE.md row-4 entry documents that the merged row falls back to branch containment (merged-work refs present, zero unmerged refs) and the row-5 entry documents that a containment-evidenced landing passes only when no work/plan agents are running",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-dod-containment.ac2",
+            "title": "docs/PIPELINE-MEMBERSHIP.md names gatherIssueBranchContainment in pipeline-membership-gather.ts as the single containment implementation the DoD merged row accepts evidence from",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-dod-containment.ac3",
+            "title": "The dod-doc-drift test passes against the updated document, proving the canonical row table survives the edit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-containment-lens",
+        "to": "merged-row-containment-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "merged-row-containment-fallback",
+        "to": "post-merge-row-containment",
+        "type": "blocks"
+      },
+      {
+        "from": "merged-row-containment-fallback",
+        "to": "docs-dod-containment",
+        "type": "informs"
+      },
+      {
+        "from": "post-merge-row-containment",
+        "to": "docs-dod-containment",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3109-dod-close-out-gate-blind-to-non-pr-path-landings-merged-row-needs-the-membership-resolver-s-branch-containment-lens.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

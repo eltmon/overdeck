@@ -1,0 +1,582 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-25T20:52:50Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3037: pan sync-main fails on polyrepo workspaces — probes workspace root for .git instead of iterating member repos",
+    "updated": "2026-07-27T09:59:39.711Z"
+  },
+  "plan": {
+    "id": "pan-3037",
+    "title": "pan sync-main fails on polyrepo workspaces — probes workspace root for .git instead of iterating member repos",
+    "status": "completed",
+    "uid": "6c59f2f1-155b-45ac-9dc3-854ae8cd9637",
+    "author": "agent:claude-fable-5",
+    "sequence": 9,
+    "created": "2026-07-25T20:52:50Z",
+    "updated": "2026-07-27T09:59:39.711Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3037",
+        "label": "PAN-3037",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3076",
+        "label": "PAN-3076 (deferred verdict-anchor cluster)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2948",
+        "label": "PAN-2948 (read-side resolver adoption)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "polyrepo",
+      "sync-main",
+      "git",
+      "resolver-door"
+    ],
+    "narratives": {
+      "Problem": "syncMainIntoWorkspace runs every git operation (MERGE_HEAD probe, auto-commit, fetch, merge) at the workspace root. Polyrepo workspace roots are wrapper directories, not code repos, so pan sync-main, the dashboard Sync with Main button, and pan start's prep sync all fail immediately with 'not a git repository'. Several other pipeline surfaces probe the workspace root with `git branch --show-current`/`rev-parse` and silently degrade on polyrepo (review restart feeds branch='unknown', dashboard agent git status shows null, start.ts hand-rolls a sub-repo directory scan).",
+      "Proposal": "Route every in-scope workspace git probe through the canonical resolver door src/lib/project-repos.ts. syncMainIntoWorkspace iterates resolveWorkspaceRepoRootsSync(issueId, workspacePath) — one element for monorepo, so no polyrepo conditionals — running the existing single-repo flow per root against origin/<root.targetBranch>, stopping at the first failed repo, and returning an additive per-repo breakdown that the CLI and route surface. Branch-detection probes (review restart, host-side review dispatch, agents listing, start verification) move to a new resolvePrimaryWorkspaceRepoDirSync helper / root iteration with sourceBranch fallbacks. Docs and the pan-sync-main skill are updated to the shipped behavior. Full design in the PRD draft (drafts/pan-3037.md).",
+      "NonGoals": "- The five verdict-anchor stamp/compare sites (deacon.ts reviewedAtCommit stamp :1524 and post-review patrol :1600-1614, roleRunHead stamp spawn.ts:468 / compare service-reactive.ts:172, review-status stamp routes) and composite runId/progressFingerprint work — deferred to PAN-3076; this diff must not modify those sites\n- Merge/rebase/push and merge-train paths (PAN-2467), pan strike (PAN-3040), UAT merge train (PAN-1696), pan done polyrepo gaps (PAN-2465/932/2945)\n- swarm-tiered-hooks getHeadSha (polyrepo swarm unsupported) and handoff-context captureGitState (non-fatal, not issue-pipeline-scoped)\n- Parallel per-repo sync; iteration stays sequential in resolver order\n- Cross-repo rollback of already-merged repos when a later repo conflicts\n- Per-repo git-status display in the dashboard UI (primary-repo status only)\n- Any MergeSet schema changes (sync-main is a local workspace operation)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Stop iteration at the first repo whose sync fails; report remaining repos as skipped; keep earlier repos' merges.",
+        "rationale": "Issue body specifies 'stopping on conflicts'; merges are local and un-pushed so partial progress is recoverable, and one-at-a-time conflict resolution matches operator workflow."
+      },
+      {
+        "summary": "Sync only required (readonly !== true) repos via the resolver's existing filter.",
+        "rationale": "Readonly repos carry no feature branch to merge into; the door already encodes this and extending it is unnecessary."
+      },
+      {
+        "summary": "Defer the verdict-anchor stamp/compare probe sites to PAN-3076 (filed during planning) despite the comment's 'every workspace-root git probe' phrasing.",
+        "rationale": "The operator's own MIN-901 analysis requires stamp and compare sites to convert to composite HeadAnchor together; piecemeal probe fixes create mixed anchor formats and re-review loops."
+      },
+      {
+        "summary": "Prefix aggregated file paths with repoKey/ only for polyrepo workspaces.",
+        "rationale": "Matches the PAN-2948 manifest convention while keeping monorepo output byte-compatible for existing consumers."
+      },
+      {
+        "summary": "Dashboard agent git status shows the primary repo's state for polyrepo workspaces.",
+        "rationale": "Restores signal where today there is null, without designing a new per-repo UI surface."
+      },
+      {
+        "summary": "Merge source becomes origin/<root.targetBranch> rather than hardcoded origin/main.",
+        "rationale": "The resolver's targetBranch defaults to main, so behavior changes only where a different default branch was deliberately configured — where hardcoded main was a latent bug."
+      }
+    ],
+    "items": [
+      {
+        "id": "primary-repo-helper",
+        "title": "Add resolvePrimaryWorkspaceRepoDirSync to project-repos.ts and adopt it at the three existing inline sites",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T20:52:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3037",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/project-repos.ts",
+            "src/lib/cloister/review-agent.ts",
+            "src/lib/cloister/review-convoy.ts",
+            "src/lib/__tests__/project-repos-primary-dir.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/project-repos-primary-dir.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "project-repos-primary-dir.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/project-repos.ts, add exported resolvePrimaryWorkspaceRepoDirSync(issueId, workspacePath) returning resolveWorkspaceRepoRootsSync(issueId, workspacePath)[0].dir (the roots list always has >=1 element). Refactor the behavior-identical inline pattern `resolveWorkspaceRepoRootsSync(...)[0]?.dir ?? workspace` at review-agent.ts:366, review-agent.ts:549, and review-convoy.ts:301 to call the helper. Add unit test with temp dirs per PRD WI-1."
+        },
+        "items": [
+          {
+            "id": "primary-repo-helper.ac1",
+            "title": "Given a monorepo project config, resolvePrimaryWorkspaceRepoDirSync returns the workspace path itself",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "primary-repo-helper.ac2",
+            "title": "Given a polyrepo config with existing sub-repo .git dirs, the helper returns the first required repo's directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "primary-repo-helper.ac3",
+            "title": "Given a monorepo or polyrepo workspace, each refactored call site in review-agent.ts and review-convoy.ts returns the same probe directory as the pre-refactor inline expression",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sync-main-iterate-roots",
+        "title": "syncMainIntoWorkspace iterates resolver repo roots with per-repo results and stop-on-failure",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T20:52:50Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3037",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "sync-main-reporting",
+            "docs-and-skill"
+          ],
+          "readinessReason": "Touches only merge-agent.ts plus its new test file; the file-overlap matrix shows no cross-item overlaps, so it can run in parallel with wave-0 siblings.",
+          "files_scope": [
+            "src/lib/cloister/merge-agent.ts",
+            "src/lib/cloister/__tests__/sync-main-polyrepo.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/sync-main-polyrepo.test.ts src/lib/cloister/__tests__/merge-agent-auto-commit.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sync-main-polyrepo.test.ts passes (polyrepo clean, conflict-stop, all-current, monorepo passthrough cases)",
+            "merge-agent-auto-commit.test.ts still passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-2: extract the current syncMainIntoWorkspace body into module-private syncMainIntoRepo(repoDir, issueId, targetBranch, signal) with origin/main replaced by origin/${targetBranch} in the fetch and merge commands. Rewrite syncMainIntoWorkspace to resolve roots via resolveWorkspaceRepoRootsSync(issueId, projectPath), run syncMainIntoRepo sequentially per root, stop at the first failure marking remaining roots skipped, and aggregate into the additively-extended SyncMainResult (new repos?: SyncMainRepoResult[] field; repoKey/-prefixed paths only when isPolyrepo; summed commitCount; reason lines prefixed [repoKey]). Preserve all existing log/logActivity calls, adding repo keys when polyrepo. Tests use real temp git repos; no fake timers needed (no delay/retry paths)."
+        },
+        "items": [
+          {
+            "id": "sync-main-iterate-roots.ac1",
+            "title": "Given a polyrepo workspace with two member repos behind origin, sync-main merges origin/<targetBranch> into each and returns repos[] with per-repo commitCount and repoKey/-prefixed changedFiles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-main-iterate-roots.ac2",
+            "title": "Given a conflict in the first repo, sync-main aborts that repo's merge leaving no MERGE_HEAD and a clean porcelain status, marks subsequent repos skipped:true, and returns success:false with the conflicting repoKey in reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-main-iterate-roots.ac3",
+            "title": "Given all member repos already contain origin/<targetBranch>, the aggregate result returns alreadyUpToDate:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-main-iterate-roots.ac4",
+            "title": "Given a monorepo workspace, the result preserves today's shape: single-element repos[], unprefixed changedFiles, and unchanged top-level field semantics",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-main-iterate-roots.ac5",
+            "title": "An AbortSignal firing mid-iteration produces the existing cancellation result for the active repo and skipped entries for unattempted repos, leaving the active repo quiescent (no MERGE_HEAD)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sync-main-reporting",
+        "title": "Surface per-repo sync results in the sync-main route response and CLI output",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T20:52:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-3037",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "src/cli/commands/sync-main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3: the POST /api/issues/:issueId/sync-main handler includes repos: result.repos in both success and failure JSON responses, keeping every existing field. pan sync-main's SyncMainResponse gains repos?; when repos.length > 1 the CLI prints one line per repo (e.g. '  api: 14 commit(s)', '  fe: already up to date', '  docs: skipped (earlier repo failed)') and groups conflict files under their repo. Monorepo output is unchanged."
+        },
+        "items": [
+          {
+            "id": "sync-main-reporting.ac1",
+            "title": "The sync-main route returns the repos array in both success and failure responses and preserves every pre-existing response field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-main-reporting.ac2",
+            "title": "For a polyrepo result, pan sync-main prints one status line per repo including skipped repos, and groups conflict files under the conflicting repo key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-main-reporting.ac3",
+            "title": "For a monorepo result, pan sync-main output renders identically to the pre-change format",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-restart-branch-probe",
+        "title": "Review-restart route detects branch from the primary repo root with sourceBranch fallback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T20:52:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3037",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/specialists/project-routes.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4: in postProjectReviewRestartRoute (project-routes.ts ~:600-608), run git branch --show-current with cwd: resolvePrimaryWorkspaceRepoDirSync(issueId, workspacePath) via execAsync's cwd option (dropping the `cd \"...\" &&` shell prefix); on probe error or empty output, set branch to resolveWorkspaceRepoRootsSync(issueId, workspacePath)[0].sourceBranch instead of 'unknown'."
+        },
+        "items": [
+          {
+            "id": "review-restart-branch-probe.ac1",
+            "title": "On a polyrepo workspace, the restart route passes the primary member repo's current branch (not 'unknown') to spawnReviewRoleForIssue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-restart-branch-probe.ac2",
+            "title": "When the git probe fails, the route falls back to the resolver root's sourceBranch and never emits branch:'unknown'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-dispatch-branch-probe",
+        "title": "Host-side review dispatch detects branch from the primary repo root",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T20:52:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3037",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/review-status.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5: in dispatchReviewHostSide (review-status.ts ~:522-541), initialize branch from resolveWorkspaceRepoRootsSync(issueId, workspace)[0].sourceBranch (replacing the hardcoded feature/<issue> template so per-repo branch_prefix configs resolve correctly) and run the probe with cwd: resolvePrimaryWorkspaceRepoDirSync(issueId, workspace). This module is dashboard-server-reachable: execAsync only, no execSync."
+        },
+        "items": [
+          {
+            "id": "review-dispatch-branch-probe.ac1",
+            "title": "On a polyrepo workspace, dispatchReviewHostSide passes the primary member repo's live branch to spawnReviewRoleForIssue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-dispatch-branch-probe.ac2",
+            "title": "When the probe fails, the dispatched branch defaults to the resolver root's sourceBranch, honoring configured branch_prefix values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-git-status-polyrepo",
+        "title": "Agents-listing git status resolves the primary repo root so polyrepo agents show git state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T20:52:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3037",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/shared.ts",
+            "src/dashboard/server/routes/agents/listing.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6: getGitStatusAsync (shared.ts ~:380) gains an issueId parameter and runs its three probes (branch, uncommitted count, latest commit) with cwd = resolvePrimaryWorkspaceRepoDirSync(issueId, workspacePath), keeping the existsSync(workspacePath) guard. listing.ts:224 passes the in-scope issueId. Update the shared.ts export and let typecheck surface any other caller."
+        },
+        "items": [
+          {
+            "id": "agents-git-status-polyrepo.ac1",
+            "title": "For a polyrepo agent, the agents listing returns branch, uncommittedFiles, and latestCommit from the primary member repo instead of git:null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-git-status-polyrepo.ac2",
+            "title": "For monorepo agents, the listing preserves the pre-change git payload (identical branch, uncommittedFiles, and latestCommit values)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-branch-verification",
+        "title": "pan start branch verification iterates resolver roots instead of probing the workspace root",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T20:52:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3037",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/start.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7: replace start.ts's pre-sync workspace-root branch probe (~:1011-1029) and the post-sync verification with its hand-rolled readdirSync sub-repo scan (~:1060-1100) with loops over resolveWorkspaceRepoRootsSync(normalizedId, workspace): every root's `git branch --show-current` must be non-empty and not main/master. Keep repairMainBranchWorkspace only for a violating monorepo root (isPolyrepo false); polyrepo violations set skipSyncMainForUnsafeWorkspace / failPostCreateValidation naming the offending repo key. execSync remains acceptable (CLI-only code path)."
+        },
+        "items": [
+          {
+            "id": "start-branch-verification.ac1",
+            "title": "On a polyrepo workspace with all member repos on feature branches, pan start's verification passes without probing the workspace root and without the readdirSync scan (removed from the diff)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-branch-verification.ac2",
+            "title": "A member repo sitting on main rejects verification (or skips sync-main in the pre-sync check) and emits a message naming that repo key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-branch-verification.ac3",
+            "title": "A monorepo workspace on main still applies repairMainBranchWorkspace exactly as before the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-skill",
+        "title": "Update pan-sync-main skill and SPECIALIST_WORKFLOW docs to the shipped polyrepo behavior",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T20:52:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3037",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-sync-main/SKILL.md",
+            "docs/SPECIALIST_WORKFLOW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including scripts/lint-skills.sh) passes with the updated SKILL.md"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-8: sync-sources/skills/pan-sync-main/SKILL.md's 'What It Does' gains the polyrepo iteration step, 'Outcomes' gains a per-repo/skipped row, and the stale Design Decisions bullet 'All-or-nothing for polyrepo — ... (not implemented yet ...)' is replaced with the shipped semantics (required member repos sync sequentially in config order; iteration stops at the first conflicted repo; earlier repos keep their merges; output reports per-repo results). docs/SPECIALIST_WORKFLOW.md's 'Sync with Main' section (~:648) gains a short polyrepo paragraph stating the same and that repo discovery routes through src/lib/project-repos.ts. No CLI flags change, so no lint-skills exclusions are needed."
+        },
+        "items": [
+          {
+            "id": "docs-and-skill.ac1",
+            "title": "SKILL.md now states the per-repo sequential sync with stop-at-first-conflict semantics and no longer contains the 'not implemented yet' all-or-nothing bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-skill.ac2",
+            "title": "SPECIALIST_WORKFLOW.md's Sync with Main section contains a polyrepo paragraph that states the per-repo sequential sync and names src/lib/project-repos.ts as the repo-discovery door",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "primary-repo-helper",
+        "to": "review-restart-branch-probe",
+        "type": "blocks"
+      },
+      {
+        "from": "primary-repo-helper",
+        "to": "review-dispatch-branch-probe",
+        "type": "blocks"
+      },
+      {
+        "from": "primary-repo-helper",
+        "to": "agents-git-status-polyrepo",
+        "type": "blocks"
+      },
+      {
+        "from": "sync-main-iterate-roots",
+        "to": "sync-main-reporting",
+        "type": "blocks"
+      },
+      {
+        "from": "sync-main-iterate-roots",
+        "to": "docs-and-skill",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-25-PAN-3037-pan-sync-main-fails-on-polyrepo-workspaces-probes-workspace-root-for-git-instead-of-iterating-member-repos.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

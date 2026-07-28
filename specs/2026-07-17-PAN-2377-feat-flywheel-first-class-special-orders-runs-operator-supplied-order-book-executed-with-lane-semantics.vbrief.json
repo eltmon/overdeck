@@ -1,0 +1,1399 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-17T12:57:55Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2377: feat(flywheel): first-class 'special orders' runs — operator-supplied order book executed with lane semantics",
+    "updated": "2026-07-22T20:55:48.616Z"
+  },
+  "plan": {
+    "id": "pan-2377",
+    "title": "feat(flywheel): first-class 'special orders' runs — operator-supplied order book executed with lane semantics",
+    "status": "completed",
+    "uid": "0a78e5ba-9f52-4c80-b360-e19f7077e0ec",
+    "author": "agent:claude-fable-5",
+    "sequence": 10,
+    "created": "2026-07-17T12:57:55Z",
+    "updated": "2026-07-22T20:55:48.616Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2377",
+        "label": "PAN-2377",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2377.md",
+        "label": "PRD (normative)",
+        "type": "doc"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/main/docs/design/order-book-page-mockup.html",
+        "label": "Order Book page mockup (normative for the page)",
+        "type": "doc"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/tree/main/docs/design/mockups",
+        "label": "Design-pass mockups d1c0e5fb4b (order-book-*-pan-2377.html)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "orders",
+      "backlog",
+      "dashboard",
+      "cli",
+      "state-door"
+    ],
+    "narratives": {
+      "Problem": "The special-orders pattern (operator hands the flywheel an ordered two-lane campaign) is proven across RUN-56…62 but exists only as prose briefs: lane serialization, prereqs, re-verify, and membership-as-release are all prompt discipline. Nothing mechanical stops a second Lane B dispatch, nothing mechanically ends the run when the book drains, and there is no surface to assemble or watch an order book.",
+      "Proposal": "Make the order book a first-class entity: JSON documents in orders/ on overdeck-state behind a two-door module (src/lib/orders resolver + writer), REST routes, pan orders + pan flywheel start --orders + pan flywheel complete CLI verbs, mechanical lane/prereq enforcement at the start-agent dispatch chokepoint, membership-as-released in isAutoPickable, a FlywheelStatus.orders progress block with mechanical drain detection (parked counts as terminal), drain → retro → continuation doctrine, and a dedicated /orders dashboard page as the ONLY write surface with read-only projections on the flywheel page, issues pane, and a promotion entry point on the backlog page. Design decisions D-1…D-8 of the PRD and the operator's 2026-07-17 mockup decisions are binding; see continue.json decisions.",
+      "NonGoals": "- No SQLite read-through cache for orders in v1 (state-branch JSON only; PRD D-1)\n- No support for more than one concurrently running book (single active-run gate stays; PRD D-3)\n- No write/edit affordances on the flywheel module, issues-pane widget, or kanban/drawer beyond add-to-book; the backlog page asks only the Lane A/B judgment on promotion — it is not a second editor (operator decision 2026-07-17)\n- No change to --brief semantics for bookless runs; backlog-mode runs keep today's behavior (PRD D-8)\n- No separate drip-orchestrator or second pipeline authority\n- No change to the auto_pickup_backlog default; off-book issues stay gated exactly as today\n- No retro ceremony when the flywheel recognizes no findings (single no-findings line only; FR-12)\n- Sequencer rank is never rendered as a chip on any surface (muted text only; operator decision 2026-07-17)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted the PRD drafts/pan-2377.md as the normative spec and its D-1…D-8 decisions verbatim; did not re-litigate storage, lane-enforcement location, drain semantics, or finalizer shape.",
+        "rationale": "The PRD is operator-directed, verified against the tree, and explicitly marks decisions as 'do not re-litigate downstream'; auto mode takes documented decisions."
+      },
+      {
+        "summary": "Folded the operator's 2026-07-17 issue comment (four mockup-pass decisions: single write surface, eligibility-predicate rendering, posture colors, lane-position chips) into binding acceptance criteria on the frontend items.",
+        "rationale": "The comment is explicitly 'operator-approved direction … carry these decisions into the PRD/implementation'."
+      },
+      {
+        "summary": "Decomposed the PRD's 12 work items into 18 tracer-bullet vBRIEF items: CLI split into pan-orders / start --orders / complete; frontend split into page shell, lane editors, add rails, progress view; cross-surface split into write actions vs read-only projections; retro surfacing folded into the complete verb and progress view.",
+        "rationale": "Task-granularity doctrine: independently reviewable, mergeable, testable slices; PRD item 8 (retro surfacing) is too small to stand alone and its two halves belong to the complete verb and the progress view."
+      },
+      {
+        "summary": "Corrected the PRD's skill paths from skills/<name>/SKILL.md to sync-sources/skills/<name>/SKILL.md.",
+        "rationale": "Verified in-tree: skills live under sync-sources/skills/ (only location of pan-flywheel/SKILL.md); scripts/lint-skills.sh gates drift."
+      },
+      {
+        "summary": "PAN-2229 eval-harness regression case for the drain→retro→complete doctrine instruction is a recorded follow-up, not a blocker.",
+        "rationale": "PRD item 7 says 'coordinate; if PAN-2229 has not landed, note it in the vBRIEF as a follow-up AC, don't block'."
+      },
+      {
+        "summary": "requiresInspection true only on contracts-orders and orders-domain-lib (fast depth); all other items false.",
+        "rationale": "Those two crystallize the cross-cutting schema and the two-door module every other item consumes; remaining items are leaves whose defects surface at typecheck/tests/review."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-orders",
+        "title": "Contracts: OrderBook types + FlywheelStatus.orders block",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2377",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "orders-domain-lib",
+            "orders-routes",
+            "cli-pan-orders",
+            "cli-flywheel-start-orders",
+            "cli-flywheel-complete",
+            "run-binding-status",
+            "frontend-progress-view"
+          ],
+          "files_scope": [
+            "packages/contracts/src/orders.ts",
+            "packages/contracts/src/flywheel.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/__tests__/orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd packages/contracts && npm run build",
+            "npx vitest run packages/contracts"
+          ],
+          "expected_outputs": [
+            "contracts build completes without errors",
+            "orders schema round-trip tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Create packages/contracts/src/orders.ts with OrderBookItem { issue, lane: 'A'|'B', order, prereqs: string[], reVerify: boolean, addedAt, addedBy }, OrderBookSettings, OrderBook (status: 'draft'|'ready'|'running'|'drained'|'complete', runId?), OrderBookIndexEntry — Effect Schema mirroring packages/contracts/src/flywheel.ts style. Extend interface FlywheelStatus (packages/contracts/src/flywheel.ts:218, anchor 'interface FlywheelStatus') and its Schema with optional orders?: { bookId, bookName, landed, total, laneAInFlight: string[], laneBInFlight?: string, drained: boolean } after openQuestions. Export from the contracts index and rebuild contracts."
+        },
+        "items": [
+          {
+            "id": "contracts-orders.ac1",
+            "title": "Given a valid OrderBook JSON fixture, the Schema decode returns an equal value on encode/decode round-trip; an item with lane 'C' or missing issue is rejected by decode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-orders.ac2",
+            "title": "FlywheelStatus decodes both with and without the orders block (round-trip test covers each)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-orders.ac3",
+            "title": "cd packages/contracts && npm run build exits 0 and the new types are importable from @overdeck/contracts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "orders-domain-lib",
+        "title": "Domain lib src/lib/orders/ — the two doors (io, resolver, writer, validate)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2377",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "orders-routes",
+            "cli-pan-orders",
+            "cli-flywheel-start-orders",
+            "cli-flywheel-complete",
+            "pickup-membership-release",
+            "lane-enforcement",
+            "run-binding-status"
+          ],
+          "files_scope": [
+            "src/lib/orders/types.ts",
+            "src/lib/orders/io.ts",
+            "src/lib/orders/resolver.ts",
+            "src/lib/orders/writer.ts",
+            "src/lib/orders/validate.ts",
+            "tests/unit/lib/orders/orders-io.test.ts",
+            "tests/unit/lib/orders/orders-resolver.test.ts",
+            "tests/unit/lib/orders/orders-writer.test.ts",
+            "tests/unit/lib/orders/orders-validate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/orders",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all tests under tests/unit/lib/orders pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Mirror the backlog module shape (src/lib/backlog/types.ts, sequence-io.ts). types.ts re-exports contract types + parseOrderBookJson validator (pattern: parseSequenceJson, src/lib/backlog/types.ts:108). io.ts: path helpers rooted at the state worktree (orders/ sibling of backlog/), read/write with the operator-owned-state merge discipline of writeSequenceMd (src/lib/backlog/sequence-io.ts:80); writes auto-commit through the state door. resolver.ts is the ONLY read path: listBooks(), getBook(id), membership(): Map<issueId, bookId> over non-complete books, backlogCandidates(limit) (parseSequenceMd from sequence-io.ts:17, filter issues present in any non-complete book, take top N preserving rank), computeBookProgress(book) (join issues resolver terminal states → per-item status + drained; closed OR parked = terminal). writer.ts is the ONLY write path: createBook (id = <yyyy-mm-dd>-<kebab-name>), renameBook, addItems, removeItem, moveItem (lane/order), setItemFlags (reVerify, planAtPickup), setSettings, setStatus(bookId, status, runId?), advanceQueue(). validate.ts: validateBookForStart(book) → { blocks, warns } per FR-7 — every issue OPEN, no item in another non-complete book, prereqs resolve and are acyclic, PRD presence (drafts/<issue>.md on state branch OR spec via findSpecByIssue) with no-PRD defaulting to blocks for Lane B and downgradeable to warn per item. All functions take the state root as a parameter so tests use temp fixture dirs (never the real ${OVERDECK_HOME}/state)."
+        },
+        "items": [
+          {
+            "id": "orders-domain-lib.ac1",
+            "title": "Given a temp fixture state dir, createBook → addItems → moveItem → setStatus round-trips: getBook returns the mutated book and index.json preserves queue order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orders-domain-lib.ac2",
+            "title": "backlogCandidates(10) against a fixture sequence.md + fixture books excludes in-book issues and preserves sequence rank order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orders-domain-lib.ac3",
+            "title": "computeBookProgress returns drained: true exactly when every item is closed or parked (parked-only fixture included); a running item yields drained: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orders-domain-lib.ac4",
+            "title": "validateBookForStart rejects with blocks findings for: closed issue, cross-book duplicate membership, unresolvable prereq, prereq cycle; Lane B item without a PRD defaults to blocks and downgrades to warn when planAtPickup is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orders-domain-lib.ac5",
+            "title": "Writer writes auto-commit on the state worktree fixture (a commit exists after createBook) and parseOrderBookJson rejects malformed fixtures with a descriptive error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "orders-routes",
+        "title": "Server routes: /api/orders* Effect layer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/orders.ts",
+            "src/dashboard/server/routes/__tests__/orders.test.ts",
+            "src/dashboard/server/server.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/orders.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "orders route tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "New src/dashboard/server/routes/orders.ts exporting ordersRouteLayer (Effect HttpRouter); register in src/dashboard/server/server.ts makeRoutesLayer = Layer.mergeAll (line 302; anchor 'flywheelRouteLayer' import at line 69, merge entry at line 337). Endpoints, all through the resolver/writer only: GET /api/orders · POST /api/orders · GET /api/orders/:id (includes computeBookProgress) · PATCH /api/orders/:id (name/settings/status) · POST /api/orders/:id/items · DELETE /api/orders/:id/items/:issue · PATCH /api/orders/:id/items/:issue (lane/order/flags) · GET /api/orders/backlog-candidates?limit=10 · POST /api/orders/:id/start (validateBookForStart → delegate to the same code path as pan flywheel start --orders; 422 with findings on blocks) · GET /api/orders/:id/preview-brief. No execSync anywhere; async only."
+        },
+        "items": [
+          {
+            "id": "orders-routes.ac1",
+            "title": "Route tests create a book via POST /api/orders, add/move/remove items, and GET /api/orders/:id returns the book with per-item progress statuses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orders-routes.ac2",
+            "title": "GET /api/orders/backlog-candidates returns top-N sequenced issues excluding all in-book issues, in rank order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orders-routes.ac3",
+            "title": "POST /api/orders/:id/start on a book with blocks findings returns 422 naming each finding and starts nothing; on a clean book it delegates to the shared start path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orders-routes.ac4",
+            "title": "grep of routes/orders.ts shows zero direct reads/writes of orders/*.json paths — every handler calls the resolver or writer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-pan-orders",
+        "title": "CLI: pan orders create/list/show/add/remove/move/start + skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/orders.ts",
+            "src/cli/index.ts",
+            "sync-sources/skills/pan-orders/SKILL.md",
+            "tests/unit/cli/orders.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/orders.test.ts",
+            "npm run lint",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "orders CLI tests pass",
+            "lint (including scripts/lint-skills.sh) passes with the new skill present",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "New src/cli/commands/orders.ts registering pan orders create <name>, list, show <id>, add <id> <issue…> [--lane B] [--after <issue>] [--reverify], remove <id> <issue>, move <id> <issue> [--lane A|B] [--order n], start <id> (alias delegating to pan flywheel start --orders <id>). All verbs go through the writer/resolver. Register in the CLI entry the same way sibling commands are registered. New sync-sources/skills/pan-orders/SKILL.md documenting every verb and flag in the same commit (scripts/lint-skills.sh cross-checks against pan orders --help)."
+        },
+        "items": [
+          {
+            "id": "cli-pan-orders.ac1",
+            "title": "pan orders create then add then show against a scratch state fixture prints the book with items in lane/order; add --lane B --after <issue> places the item after the named issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pan-orders.ac2",
+            "title": "pan orders add rejects an issue already present in another non-complete book with a self-contained error naming that book",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pan-orders.ac3",
+            "title": "npm run lint passes with sync-sources/skills/pan-orders/SKILL.md present — every documented flag matches pan orders --help output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-flywheel-start-orders",
+        "title": "CLI: pan flywheel start --orders <book-id> binds a run to a book",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/flywheel.ts",
+            "sync-sources/skills/pan-flywheel/SKILL.md",
+            "tests/unit/cli/flywheel-orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/flywheel-orders.test.ts",
+            "npm run lint",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "start --orders tests pass (valid book starts; blocked book refuses)",
+            "skills lint passes with the updated pan-flywheel skill",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit src/cli/commands/flywheel.ts: the start command options (line 907–909; anchor \"--brief <path>\") gain --orders <book-id>. startFlywheelRun (line 323) resolves the book via the resolver, runs validateBookForStart (error listing findings and exit non-zero on blocks), stamps orders: { bookId } into launch.json, and flips the book → running via the writer with runId stamped — only after the active-run gate is acquired; on any start failure roll the book back to ready (hazard H4). Doctrine + standard brief still load; an optional per-run brief overlay path may be attached; --brief keeps working for bookless runs. Update sync-sources/skills/pan-flywheel/SKILL.md for --orders in the same commit."
+        },
+        "items": [
+          {
+            "id": "cli-flywheel-start-orders.ac1",
+            "title": "pan flywheel start --orders <id> on a validation-clean fixture book persists launch.json containing orders.bookId and marks the book running with the runId stamped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-flywheel-start-orders.ac2",
+            "title": "start --orders on a book with blocks findings exits non-zero, prints each finding, and leaves the book status unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-flywheel-start-orders.ac3",
+            "title": "When run-gate acquisition fails after validation, the book remains ready (no orphaned running status)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-flywheel-start-orders.ac4",
+            "title": "A second start --orders while a run is active refuses via the existing single active-run gate with a self-contained message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-flywheel-complete",
+        "title": "CLI: pan flywheel complete — report + retro + gate clear + FR-13 continuation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/flywheel.ts",
+            "sync-sources/skills/pan-flywheel/SKILL.md",
+            "tests/unit/cli/flywheel-complete.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/flywheel-complete.test.ts",
+            "npm run lint",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "continuation matrix tests pass (next-book / backlog-mode / needs-you branches)",
+            "skills lint passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-11",
+            "FR-12",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "New verb pan flywheel complete in src/cli/commands/flywheel.ts (register beside report, near line 949): requires the run's book drained (per computeBookProgress) or --force. Writes report.md reusing the existing report builder (lines ~589–639/816; anchor 'report.md'); inlines a '## Retrospective' section from <run-dir>/retro.md when present, else the single line 'Retrospective: no findings recognized.'; clears the active-run gate; flips book → complete via the writer; then continuation per FR-13: (a) next ready book in index.json order → call startFlywheelRun with that book in-process (never a one-shot exec; hazard H9); (b) else auto_pickup_backlog true → start a backlog-mode run; (c) else stay stopped and emit a needs-you: 'pipeline idle — no order book queued and auto-pickup is off'. pan flywheel stop keeps today's semantics; report keeps refusing while the session is alive. Any waits in tests use vi.useFakeTimers(). Update sync-sources/skills/pan-flywheel/SKILL.md in the same commit."
+        },
+        "items": [
+          {
+            "id": "cli-flywheel-complete.ac1",
+            "title": "complete on a non-drained book without --force exits non-zero naming the non-terminal items; with --force it proceeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-flywheel-complete.ac2",
+            "title": "complete writes report.md containing either a ## Retrospective section (when retro.md exists) or the exact no-findings line, clears the active-run gate, and flips the book to complete",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-flywheel-complete.ac3",
+            "title": "Continuation branch (a): with a ready book queued, complete creates a new run bound to it in-process and the new run's launch.json contains the next bookId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-flywheel-complete.ac4",
+            "title": "Continuation branches (b) and (c): with no queued book, auto_pickup_backlog=true starts a backlog-mode run; false emits the pipeline-idle needs-you and starts nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pickup-membership-release",
+        "title": "Pickup gate: active-book membership counts as released",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/backlog/pickup.ts",
+            "src/lib/backlog/__tests__/pickup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/backlog/__tests__",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pickup gate tests pass including membership cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit isAutoPickable() in src/lib/backlog/pickup.ts (line 107) so membership in the active order book is treated as released: released || autoPickupBacklog || activeBookMembership.has(issueId). Membership is threaded in as a parameter by callers (who obtain it from the orders resolver) — pickup.ts itself gains no store access. Update the caller at line 151 accordingly. Off-book issues behave exactly as today."
+        },
+        "items": [
+          {
+            "id": "pickup-membership-release.ac1",
+            "title": "Given auto_pickup_backlog=false and an unplanned issue present in the active book, isAutoPickable returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pickup-membership-release.ac2",
+            "title": "Given auto_pickup_backlog=false and an off-book issue without operator release, isAutoPickable returns false (unchanged behavior)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pickup-membership-release.ac3",
+            "title": "pickup.ts contains no import of the orders store or state-worktree paths — membership arrives only as a parameter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-enforcement",
+        "title": "Mechanical lane semantics at the start-agent dispatch chokepoint",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents.ts",
+            "src/lib/orders/eligibility.ts",
+            "src/cli/commands/start.ts",
+            "tests/unit/lib/orders/lane-enforcement.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/orders/lane-enforcement.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lane enforcement tests pass (Lane B singleton 409, prereq 409, off-book refusal + override)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Touches only the dispatch route, a new pure eligibility module, and its own test file — disjoint from sibling wave items (the shared orders resolver is read-only here).",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D-4: at the server-side start-agent dispatch path (the route pan start calls to spawn a work agent — locate via the start-agent endpoint; files may have moved with cloister decompositions, re-grep first per hazard H2), when the active run is orders-bound (launch.json orders.bookId present), consult the orders resolver before dispatch: (1) refuse a Lane B item while another Lane B item is non-terminal; (2) refuse any item whose prereqs are non-terminal; (3) enforce the book's Lane A concurrency setting; (4) refuse off-book work-agent dispatch unless an explicit --off-book override flag is passed (CLI + route param), and log every override into the run dir. Refusals return 409 with a complete-sentence operator message naming the blocking item and the condition (per the operator-facing-messages rule). Enforcement is server-side exactly like swarm slot bounds — never prompt discipline. Extract the eligibility predicate into a pure function the frontend eligibility rendering (frontend-progress-view) can mirror."
+        },
+        "items": [
+          {
+            "id": "lane-enforcement.ac1",
+            "title": "Given an orders-bound active run with one Lane B item in flight, dispatching a second Lane B item returns 409 whose body names the in-flight item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-enforcement.ac2",
+            "title": "Dispatching an item whose prereq is non-terminal returns 409 naming the unmet prereq; after the prereq is terminal the same dispatch succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-enforcement.ac3",
+            "title": "The dispatch route rejects off-book work-agent dispatch during an orders-bound run without --off-book; with --off-book it accepts the dispatch and logs an override entry in the run dir",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-enforcement.ac4",
+            "title": "A Lane A dispatch beyond the book's laneAConcurrency setting returns 409 naming the setting; a bookless run consults no gate and dispatches exactly as today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "run-binding-status",
+        "title": "Run binding, FlywheelStatus.orders population, mechanical drain detection",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/flywheel-run-state.ts",
+            "src/cli/commands/flywheel-surfaces.ts",
+            "src/dashboard/server/services/__tests__/flywheel-run-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/flywheel-run-state.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "progress fixtures pass: all-terminal ⇒ drained true, parked counts as terminal",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Touches flywheel-run-state and the status emit path only — file-disjoint from every sibling wave-2 item.",
+          "traces": [
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit src/dashboard/server/services/flywheel-run-state.ts: launch.json schema gains orders?: { bookId }; run detail includes book progress via computeBookProgress. deriveRunStatus (line 237; anchor 'report.md') stays unchanged — drained is a book state surfaced on status; run completion still = report written. Edit the status emit path (pan flywheel emit-status in src/cli/commands/flywheel-surfaces.ts and the server-side status builder) to populate FlywheelStatus.orders { bookId, bookName, landed, total, laneAInFlight, laneBInFlight, drained } from the resolver. Drain derives from issues-resolver terminal states (closed or parked; PRD D-5/D-7) — never from flywheel self-report."
+        },
+        "items": [
+          {
+            "id": "run-binding-status.ac1",
+            "title": "A status emit for an orders-bound run produces FlywheelStatus.orders with landed/total counts and current laneAInFlight/laneBInFlight issue ids matching the fixture book",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-binding-status.ac2",
+            "title": "When every book item is closed or parked, the next status computation reports orders.drained: true (fixture includes a parked-only terminal item)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-binding-status.ac3",
+            "title": "A bookless run emits status with no orders block and deriveRunStatus behavior is unchanged (existing tests stay green)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctrine-order-books",
+        "title": "Doctrine: order-books section in roles/flywheel.md + brief reference",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/flywheel.md",
+            "docs/flywheel-brief.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Order books' roles/flywheel.md",
+            "grep -n 'order book' docs/flywheel-brief.md"
+          ],
+          "expected_outputs": [
+            "roles/flywheel.md contains the Order books section with the drain→retro→complete instruction",
+            "docs/flywheel-brief.md references order-book scope resolution"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ],
+          "acJustification": "Doc-content item; the two ACs each name the observable text the docs must carry."
+        },
+        "narrative": {
+          "Action": "Edit roles/flywheel.md (pickup-gate section begins line 146, anchor '## The pickup gate'): add an 'Order books' section stating — membership in the active book = released for the pickup gate; lane rules are mechanically enforced (the dispatch gate will refuse violations — don't fight it, don't retry-loop); when status shows orders.drained: true the run is over: author <run-dir>/retro.md ONLY if you recognize real improvements (doctrine deltas, substrate bugs to file, brief-template fixes; file issues per policy), then run pan flywheel complete and end your turn — continuation is mechanical, not yours. Edit docs/flywheel-brief.md to reference order-book scope resolution. If the PAN-2229 prompt-regression eval harness is present in-tree at execution time, add a case asserting the drain→retro→complete instruction survives edits; if absent, add a follow-up note in the PR body instead (do not block; hazard H8)."
+        },
+        "items": [
+          {
+            "id": "doctrine-order-books.ac1",
+            "title": "roles/flywheel.md contains an Order books section stating membership-as-released, mechanically-enforced lane rules, and the drain→retro→pan flywheel complete instruction ending the turn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctrine-order-books.ac2",
+            "title": "docs/flywheel-brief.md contains a paragraph describing order-book scope resolution for orders-bound runs and preserves bookless-brief semantics",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-orders-page-shell",
+        "title": "Frontend: /orders route, nav entry, page shell, book strip, lifecycle strip",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App/routes.ts",
+            "src/dashboard/frontend/src/App/AppRoutes.tsx",
+            "src/dashboard/frontend/src/pages/OrderBookPage.tsx",
+            "src/dashboard/frontend/src/components/orders/BookStrip.tsx",
+            "src/dashboard/frontend/src/components/orders/LifecycleStrip.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/pages/__tests__",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "page renders in component tests with book strip and lifecycle strip",
+            "typecheck and lint (file-size ratchet) pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "TAB_PATHS in src/dashboard/frontend/src/App/routes.ts (line 6) gains orders: '/orders'; render OrderBookPage in AppRoutes.tsx following the backlog pattern; sidebar nav entry beside Flywheel. OrderBookPage.tsx + components/orders/BookStrip.tsx (active + queued + drained books, '+ New book', 'retro ✓' on drained tabs) and LifecycleStrip.tsx per docs/design/order-book-page-mockup.html and docs/design/mockups/order-book-page-pan-2377.html (normative). This page is the ONLY write surface for books (operator decision D8). Posture colors per D10: DRAIN amber with who-set-it-and-why copy, OPEN neutral. Style guide NFR-3: DM Sans, font-medium, one colored signal per row, badge 8%/32% tint, no pills. Keep components decomposed under components/orders/ (file-size ratchet, hazard H7)."
+        },
+        "items": [
+          {
+            "id": "frontend-orders-page-shell.ac1",
+            "title": "Navigating to /orders renders the page with the book switcher strip listing active, queued, and drained books plus '+ New book'; creating a book via the strip calls POST /api/orders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-orders-page-shell.ac2",
+            "title": "The lifecycle strip renders the book's status chain (draft→ready→running→drained→complete) with the current status marked; a drained book tab shows 'retro ✓' when its run report contains a retrospective",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-orders-page-shell.ac3",
+            "title": "DRAIN posture renders amber with the who-set-it-and-why copy; OPEN posture renders neutral (no glow) — asserted in a component test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-lane-editors",
+        "title": "Frontend: lane editors, run settings, validation panel gating Start run",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
+            "src/dashboard/frontend/src/components/orders/LaneItem.tsx",
+            "src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx",
+            "src/dashboard/frontend/src/components/orders/ValidationPanel.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/LaneEditor.test.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/ValidationPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/orders",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "LaneEditor reorder/swap and ValidationPanel gating tests pass",
+            "typecheck and lint pass"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Owns its own component and test files; the only shared file (OrderBookPage.tsx) lands in the page-shell item this one is blocked on.",
+          "traces": [
+            "FR-2",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "LaneEditor + LaneItem: Lane A and Lane B columns with drag-reorder, lane swap, remove, and per-item chips (prereq, re-verify, PRD-presence) exactly as the mockups lay out. Lane-position chips per D11: mono, leading with 'B11 · book', issue id second. RunSettingsPanel: the book's settings block (lane A concurrency, off-book policy display, brief overlay path). ValidationPanel: renders validateBookForStart findings from GET /api/orders/:id; blocks disable the Start run button (and show why); warns render but do not disable. Preview brief opens GET /api/orders/:id/preview-brief. Start run posts to /api/orders/:id/start. All mutations go through the /api/orders* endpoints — this page is the only write surface."
+        },
+        "items": [
+          {
+            "id": "frontend-lane-editors.ac1",
+            "title": "Dragging an item within a lane reorders it and PATCH /api/orders/:id/items/:issue persists the new order; lane swap moves the item between A and B",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-lane-editors.ac2",
+            "title": "With blocks findings present, the Start run button renders disabled and the panel lists each finding; with only warns the button is enabled and warns render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-lane-editors.ac3",
+            "title": "Each LaneItem renders its lane-position chip in mono leading with position ('B11 · book') and the issue id second; prereq/re-verify/PRD chips render per item state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-lane-editors.ac4",
+            "title": "A held or released row renders neutral; an in-pipeline row renders blue and a landed row renders emerald — one colored signal per row (styleguide test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-add-rails",
+        "title": "Frontend: search-and-add rail + backlog top-10 candidates rail",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/AddIssuesRail.tsx",
+            "src/dashboard/frontend/src/components/orders/BacklogCandidatesRail.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/AddIssuesRail.test.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/BacklogCandidatesRail.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/orders",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "add-rail tests pass (search add + candidates exclusion)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "AddIssuesRail: search box querying open issues (id/title/label) via existing store selectors (selectIssues in src/dashboard/frontend/src/lib/store.ts); each result has one-click add posting to /api/orders/:id/items. Adding never dispatches anything — a book is a plan until its run starts. BacklogCandidatesRail: GET /api/orders/backlog-candidates?limit=10 rendered in rank order, one-click add. Sequencer rank renders as muted text, never a chip (D11)."
+        },
+        "items": [
+          {
+            "id": "frontend-add-rails.ac1",
+            "title": "The search box renders open issues filtered by id/title/label; clicking a result persists the add to the selected lane via POST /api/orders/:id/items and emits no dispatch request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-add-rails.ac2",
+            "title": "The candidates rail renders the top 10 sequenced issues excluding in-book issues, in rank order, with rank as muted text (no chip)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-add-rails.ac3",
+            "title": "An issue already in a non-complete book renders its add affordance disabled naming the owning book",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-progress-view",
+        "title": "Frontend: Setup ⇄ Progress toggle, live checklist, eligibility predicate rendering",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/ProgressPanel.tsx",
+            "src/dashboard/frontend/src/pages/OrderBookPage.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/ProgressPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/orders",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "progress view tests pass including eligibility predicate rows",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Owns ProgressPanel and its test; OrderBookPage.tsx is shared only with the page-shell item this one is blocked on (serialized by edge).",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Setup ⇄ Progress view toggle on OrderBookPage. ProgressPanel renders the book as a live checklist from FlywheelStatus.orders over the existing WS transport (statuses: queued / planning / working / review / merged / closed; colors per D10 — queued neutral, working blue, in-review amber, merged/closed emerald). Per operator decision D9: every held item renders its mechanical eligibility conditions as ✓/✕ (pickup posture · serial B-slot free · prereqs landed · PRD re-verified), mirroring the pure eligibility predicate extracted in the lane-enforcement item — 'why is nothing starting?' must be answerable at a glance. Drained state shows the run-over banner and links the report/retro."
+        },
+        "items": [
+          {
+            "id": "frontend-progress-view.ac1",
+            "title": "Toggling to Progress renders every book item with its live status from FlywheelStatus.orders and the n/total landed count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-progress-view.ac2",
+            "title": "A held item renders four ✓/✕ eligibility conditions (pickup posture, serial B-slot free, prereqs landed, PRD re-verified) matching the fixture's mechanical state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-progress-view.ac3",
+            "title": "When status reports orders.drained true, the Progress view renders the drained banner linking the run report; row colors follow queued-neutral/working-blue/review-amber/landed-emerald",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cross-surface-add-actions",
+        "title": "Cross-surface adds: ISSUE_ACTIONS submenu (kanban + drawer) and backlog-row promotion",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/issueActions.ts",
+            "src/dashboard/frontend/src/pages/BacklogSequencerPage.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "issueActions enabledWhen tests pass; submenu snapshot renders",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add addToOrderBook to ISSUE_ACTIONS (src/dashboard/frontend/src/lib/issueActions.ts:239): submenu listing non-complete books + 'New book…', enabledWhen issue open and not already in a non-complete book — one registry entry automatically covers the kanban card menu and the drawer action bar via IssueActionMenu. BacklogSequencerPage rows gain a hover action '+ Order book' per the backlog-integration mockup: the promotion asks ONLY the Lane A/B judgment (operator decision D8 — the backlog page is a promotion entry point, never a second editor), then posts to /api/orders/:id/items and links to /orders."
+        },
+        "items": [
+          {
+            "id": "cross-surface-add-actions.ac1",
+            "title": "'Add to order book' renders in the kanban card menu and the issue drawer via the single ISSUE_ACTIONS entry, listing non-complete books plus 'New book…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cross-surface-add-actions.ac2",
+            "title": "enabledWhen returns false for a closed issue and for an issue already in a non-complete book (unit-tested)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cross-surface-add-actions.ac3",
+            "title": "A backlog row's '+ Order book' hover action shows only the Lane A/B choice, persists the issue into the target book, and renders no other editing affordance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "readonly-projections",
+        "title": "Read-only projections: flywheel-page order-book module + issues-pane widget",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/FlywheelPage.tsx",
+            "src/dashboard/frontend/src/components/orders/OrderBookModule.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/OrderBookModule.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/orders",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "projection component tests pass (read-only, links to /orders)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "When the active run is orders-bound, FlywheelPage renders the book checklist module (per order-book-flywheel-module-pan-2377.html) and the issues-pane widget renders the compact per-issue order-book position (per order-book-issues-pane-widget-pan-2377.html; locate the issues-pane host component by following how existing issue widgets mount — re-grep at execution). Both are STRICTLY read-only projections of FlywheelStatus.orders / the orders endpoints, linking back to /orders for any edit (operator decision D8). Compact chips lead with lane-position in mono ('B11 · book'), issue id second (D11)."
+        },
+        "items": [
+          {
+            "id": "readonly-projections.ac1",
+            "title": "With an orders-bound active run, FlywheelPage renders the book checklist with live statuses and a link to /orders; it exposes no edit, release, hold, or add affordance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readonly-projections.ac2",
+            "title": "The issues-pane widget renders the issue's lane-position chip (mono, position first) and book name, linking to /orders; absent for issues not in a book",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readonly-projections.ac3",
+            "title": "With a bookless active run, FlywheelPage renders exactly as today (no orders module)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "guard-rail-tests",
+        "title": "Guard-rail tests: two-door lint + cross-cutting enforcement matrix",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-state-writes.sh",
+            "tests/unit/lib/orders/two-door-guard.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run lint",
+            "npm test"
+          ],
+          "expected_outputs": [
+            "two-door guard fails on a synthetic direct orders/*.json access and passes on the real tree",
+            "full suite green (TENET-10: no --changed shortcut — this touches dispatch paths)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "FR-11",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend the existing state-writes guard (scripts/lint-state-writes.sh or the matching CI guard pattern — re-grep for where specs/ and backlog/ direct-access guards live) so direct orders/*.json access outside src/lib/orders/ fails the build. Audit that the cross-cutting matrix is covered by the per-item tests and fill any gap: Lane B singleton + prereq 409s through the route layer (lane-enforcement), complete continuation matrix (cli-flywheel-complete), membership-as-released (pickup-membership-release), drain incl. parked (run-binding-status). Run the FULL suite — this issue touches cloister dispatch paths, so no --changed shortcut before merge."
+        },
+        "items": [
+          {
+            "id": "guard-rail-tests.ac1",
+            "title": "The two-door guard rejects a synthetic file reading orders/*.json outside src/lib/orders/ and passes on the landing tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-rail-tests.ac2",
+            "title": "npm test (full suite, root + frontend) exits green on the final tree with every guard-rail case from items 5, 6, 7, and 9 present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-order-books",
+        "title": "Documentation: ORDER-BOOKS.md, Mintlify order-books.mdx, CLAUDE.md pointer, master-plan header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T12:57:55Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-2377",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ORDER-BOOKS.md",
+            "configuration/order-books.mdx",
+            "docs.json",
+            "CLAUDE.md",
+            "docs/master-plan-cicd-and-refactoring.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "ls docs/ORDER-BOOKS.md configuration/order-books.mdx",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both docs exist and are nav-linked",
+            "docs lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "New docs/ORDER-BOOKS.md (dev doc): entity model, two doors, lane-enforcement chokepoint, run lifecycle draft→ready→running→drained→retro→complete→next, FR-13 continuation matrix, --off-book override. New Mintlify user page configuration/order-books.mdx, linked in the docs nav (verify the nav file name — docs.json or mint.json — at execution): building a book, page tour with mockup screenshots, starting a run, what drained means, retrospectives, the auto_pickup_backlog interaction. Update the repo CLAUDE.md flywheel section pointer. Update docs/master-plan-cicd-and-refactoring.md header noting its remainder (A13, B10–B13) becomes the seed content of the first real order book ('Refactor P3 remainder') once this lands. (Skill files ship inside the CLI items per the same-commit rule.)"
+        },
+        "items": [
+          {
+            "id": "docs-order-books.ac1",
+            "title": "docs/ORDER-BOOKS.md contains sections covering the entity model, two doors, enforcement chokepoint, full lifecycle, continuation matrix, and --off-book override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-order-books.ac2",
+            "title": "configuration/order-books.mdx renders in the docs nav and covers building a book, starting a run, drained semantics, retrospectives, and the auto-pickup interaction",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-order-books.ac3",
+            "title": "docs/master-plan-cicd-and-refactoring.md header contains the note naming its remainder as the seed of the first real order book; the CLAUDE.md flywheel section contains a pointer to the new docs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-orders",
+        "to": "orders-domain-lib",
+        "type": "blocks"
+      },
+      {
+        "from": "orders-domain-lib",
+        "to": "orders-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "orders-domain-lib",
+        "to": "cli-pan-orders",
+        "type": "blocks"
+      },
+      {
+        "from": "orders-domain-lib",
+        "to": "cli-flywheel-start-orders",
+        "type": "blocks"
+      },
+      {
+        "from": "orders-domain-lib",
+        "to": "pickup-membership-release",
+        "type": "blocks"
+      },
+      {
+        "from": "orders-domain-lib",
+        "to": "lane-enforcement",
+        "type": "blocks"
+      },
+      {
+        "from": "orders-domain-lib",
+        "to": "run-binding-status",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-flywheel-start-orders",
+        "to": "cli-flywheel-complete",
+        "type": "blocks"
+      },
+      {
+        "from": "run-binding-status",
+        "to": "cli-flywheel-complete",
+        "type": "blocks"
+      },
+      {
+        "from": "orders-routes",
+        "to": "frontend-orders-page-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-orders-page-shell",
+        "to": "frontend-lane-editors",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-orders-page-shell",
+        "to": "frontend-add-rails",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-orders-page-shell",
+        "to": "frontend-progress-view",
+        "type": "blocks"
+      },
+      {
+        "from": "run-binding-status",
+        "to": "frontend-progress-view",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-enforcement",
+        "to": "frontend-progress-view",
+        "type": "informs"
+      },
+      {
+        "from": "orders-routes",
+        "to": "cross-surface-add-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "run-binding-status",
+        "to": "readonly-projections",
+        "type": "blocks"
+      },
+      {
+        "from": "run-binding-status",
+        "to": "doctrine-order-books",
+        "type": "informs"
+      },
+      {
+        "from": "lane-enforcement",
+        "to": "guard-rail-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-flywheel-complete",
+        "to": "guard-rail-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "pickup-membership-release",
+        "to": "guard-rail-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "run-binding-status",
+        "to": "guard-rail-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-flywheel-complete",
+        "to": "docs-order-books",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-17-PAN-2377-feat-flywheel-first-class-special-orders-runs-operator-supplied-order-book-executed-with-lane-semantics.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

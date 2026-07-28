@@ -1,23 +1,379 @@
 {
   "issueId": "PAN-2168",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:23:26.027Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:49:29.395Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:20:37.437Z"
+    },
+    {
+      "timestamp": "2026-07-16T08:32:29.971Z",
+      "reason": "end",
+      "note": "No deviations. Delivered the global live Flywheel open-questions indicator, stable section anchor, cold/warm reveal scrolling, AppChrome navigation wiring, and focused tests. Corrected a legacy rendered-surface fixture exposed by the new global consumer. Full tests, typecheck, and lint pass; all commits are pushed."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T08:35Z] review-agent → FAILED — seq 2",
+      "timestamp": "2026-07-16T08:35:27.290Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:45:42.117Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:45:44.232Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:45:44.251Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:45:44.261Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:45:44.278Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T08:47Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T08:47:47.943Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:58:33.060Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:58:35.160Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:58:35.171Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:58:35.202Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:58:35.213Z"
+    }
+  ],
+  "feedback": [],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-06-29T12:57:55.944Z",
+  "updated": "2026-07-16T12:00:53.703Z",
   "pipeline": {
     "issueId": "PAN-2168",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T12:57:55.944Z"
+    "updatedAt": "2026-07-16T12:00:53.655Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2786",
+    "lastVerifiedCommit": "efdf6bf28798d0779a04402341824a44c2962842",
+    "reviewRequestedAt": "2026-07-16T08:35:05.583Z",
+    "reviewSpawnedAt": "2026-07-16T08:58:31.395Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-16T12:00:53.655Z"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 2685863,
+            "output": 5757,
+            "cacheRead": 2435584,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 39734500,
+            "output": 57710,
+            "cacheRead": 38191104,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 7520,
+            "output": 256,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 33215,
+            "output": 94263,
+            "cacheRead": 13880363,
+            "cacheWrite": 364448
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 2685863,
+          "output": 5757,
+          "cacheRead": 2435584,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 39734500,
+          "output": 57710,
+          "cacheRead": 38191104,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 7520,
+          "output": 256,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 33215,
+          "output": 94263,
+          "cacheRead": 13880363,
+          "cacheWrite": 364448
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 40.284469,
+        "pricingAsOf": "2026-07-16T10:01:17.149Z"
+      }
     },
-    "merges": [],
-    "ranOn": "eltmon-z790"
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2786"
+    ],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-16T12:00:53.675Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at efdf6bf28798d0779a04402341824a44c2962842",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2786 MERGED at 2026-07-16T10:01:12Z",
+          "status": "pass",
+          "mergedAt": "2026-07-16T10:01:12Z",
+          "mergeCommit": "69e9e9ac533714e76929e4888da062d0c1760ef2"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: in_review; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 69e9e9ac533714e76929e4888da062d0c1760ef2",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-16T11:59:53.000Z, dist built 2026-07-16T11:43:20.890Z, merge 2026-07-16T10:01:12.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; Killed 6 orphaned process(es); Removed git worktree; No agent state directories found; Preserved local branch strike/pan-2168 — not merged to main; Preserved remote branch strike/pan-2168 — not merged to main; Pruned 0 checkpoint ref(s) for agent-pan-2168, planning-pan-2168, strike-pan-2168; No specialist registry entries for PAN-2168"
+        }
+      ],
+      "accepted": []
+    }
   },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 14,
+    "claims": {},
+    "claimHistory": [
+      {
+        "writerId": "agent-pan-2168",
+        "agentId": "agent-pan-2168",
+        "pid": 2352358,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:28:29.905Z",
+        "itemId": "reveal-signal-module",
+        "outcome": "completed",
+        "reason": "Added sticky reveal request/consume/subscribe signal with listener unsubscribe coverage; focused tests, typecheck, and lint pass",
+        "releasedAt": "2026-07-16T06:33:16.102Z"
+      },
+      {
+        "writerId": "agent-pan-2168",
+        "agentId": "agent-pan-2168",
+        "pid": 2410680,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:33:50.440Z",
+        "itemId": "open-questions-anchor",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-2168 dead)",
+        "releasedAt": "2026-07-16T06:35:42.214Z"
+      },
+      {
+        "writerId": "agent-pan-2168",
+        "agentId": "agent-pan-2168",
+        "pid": 3119889,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:29:13.289Z",
+        "itemId": "open-questions-anchor",
+        "outcome": "completed",
+        "reason": "Added a stable DOM anchor to the Open Questions section and asserted the anchored section contains every question; full tests, typecheck, and lint pass.",
+        "releasedAt": "2026-07-16T07:36:54.163Z"
+      },
+      {
+        "writerId": "agent-pan-2168",
+        "agentId": "agent-pan-2168",
+        "pid": 3270669,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:37:20.707Z",
+        "itemId": "open-questions-indicator",
+        "outcome": "completed",
+        "reason": "Added a live amber app-bar indicator that seeds and refreshes Flywheel status, reacts to RPC snapshots, self-hides at zero, and requests reveal/navigation on activation; focused tests and required gates pass.",
+        "releasedAt": "2026-07-16T07:40:09.904Z"
+      },
+      {
+        "writerId": "agent-pan-2168",
+        "agentId": "agent-pan-2168",
+        "pid": 3317300,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:40:22.584Z",
+        "itemId": "flywheel-page-consume-reveal",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-2168 dead)",
+        "releasedAt": "2026-07-16T07:42:53.692Z"
+      },
+      {
+        "writerId": "agent-pan-2168",
+        "agentId": "agent-pan-2168",
+        "pid": 3939586,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T08:22:20.234Z",
+        "itemId": "flywheel-page-consume-reveal",
+        "outcome": "completed",
+        "reason": "FlywheelPage now consumes cold and warm reveal signals, selects Status, and smooth-scrolls the anchored questions section; both cases are covered by focused tests and all gates pass.",
+        "releasedAt": "2026-07-16T08:22:22.644Z"
+      },
+      {
+        "writerId": "agent-pan-2168",
+        "agentId": "agent-pan-2168",
+        "pid": 3944387,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T08:22:35.556Z",
+        "itemId": "wire-indicator-into-appchrome",
+        "outcome": "completed",
+        "reason": "Rendered the live OpenQuestionsIndicator globally in AppChrome and routed activation to Flywheel; hardened incomplete snapshots, corrected the browser fixture, and passed the full 9,431-test suite, typecheck, and lint.",
+        "releasedAt": "2026-07-16T08:32:04.115Z"
+      }
+    ],
+    "statusReasons": {
+      "reveal-signal-module": {
+        "reason": "Added sticky reveal request/consume/subscribe signal with listener unsubscribe coverage; focused tests, typecheck, and lint pass",
+        "updatedAt": "2026-07-16T06:33:16.102Z"
+      },
+      "open-questions-anchor": {
+        "reason": "Added a stable DOM anchor to the Open Questions section and asserted the anchored section contains every question; full tests, typecheck, and lint pass.",
+        "updatedAt": "2026-07-16T07:36:54.163Z"
+      },
+      "open-questions-indicator": {
+        "reason": "Added a live amber app-bar indicator that seeds and refreshes Flywheel status, reacts to RPC snapshots, self-hides at zero, and requests reveal/navigation on activation; focused tests and required gates pass.",
+        "updatedAt": "2026-07-16T07:40:09.904Z"
+      },
+      "flywheel-page-consume-reveal": {
+        "reason": "FlywheelPage now consumes cold and warm reveal signals, selects Status, and smooth-scrolls the anchored questions section; both cases are covered by focused tests and all gates pass.",
+        "updatedAt": "2026-07-16T08:22:22.644Z"
+      },
+      "wire-indicator-into-appchrome": {
+        "reason": "Rendered the live OpenQuestionsIndicator globally in AppChrome and routed activation to Flywheel; hardened incomplete snapshots, corrected the browser fixture, and passed the full 9,431-test suite, typecheck, and lint.",
+        "updatedAt": "2026-07-16T08:32:04.115Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "reveal-signal-module": "completed",
+    "reveal-signal-module.reveal-signal-module.ac1": "completed",
+    "reveal-signal-module.reveal-signal-module.ac2": "completed",
+    "reveal-signal-module.reveal-signal-module.ac3": "completed",
+    "open-questions-anchor": "completed",
+    "open-questions-anchor.open-questions-anchor.ac1": "completed",
+    "open-questions-anchor.open-questions-anchor.ac2": "completed",
+    "open-questions-anchor.open-questions-anchor.ac3": "completed",
+    "open-questions-indicator": "completed",
+    "open-questions-indicator.open-questions-indicator.ac1": "completed",
+    "open-questions-indicator.open-questions-indicator.ac2": "completed",
+    "open-questions-indicator.open-questions-indicator.ac3": "completed",
+    "open-questions-indicator.open-questions-indicator.ac4": "completed",
+    "flywheel-page-consume-reveal": "completed",
+    "flywheel-page-consume-reveal.flywheel-page-consume-reveal.ac1": "completed",
+    "flywheel-page-consume-reveal.flywheel-page-consume-reveal.ac2": "completed",
+    "flywheel-page-consume-reveal.flywheel-page-consume-reveal.ac3": "completed",
+    "flywheel-page-consume-reveal.flywheel-page-consume-reveal.ac4": "completed",
+    "wire-indicator-into-appchrome": "completed",
+    "wire-indicator-into-appchrome.wire-indicator-into-appchrome.ac1": "completed",
+    "wire-indicator-into-appchrome.wire-indicator-into-appchrome.ac2": "completed",
+    "wire-indicator-into-appchrome.wire-indicator-into-appchrome.ac3": "completed"
+  }
 }

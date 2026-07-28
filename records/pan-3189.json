@@ -1,0 +1,121 @@
+{
+  "issueId": "PAN-3189",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-27T04:02:41.420Z",
+  "updated": "2026-07-27T05:16:50.364Z",
+  "pipeline": {
+    "issueId": "PAN-3189",
+    "reviewStatus": "passed",
+    "testStatus": "skipped",
+    "mergeStatus": "merged",
+    "mergeStep": "merged",
+    "releaseStatus": "skipped",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-27T05:16:50.348Z",
+    "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
+    "verificationNotes": "Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)",
+    "strikeReadyHead": "4cd19edb52ddda05b6a5b98de17942c19597fd1b",
+    "strikeReadyAt": "2026-07-27T04:59:18.499Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-27T04:41:45.875Z",
+        "strikeHead": "bc13bfadd598826abca1168b4d5516a1b0a63e90",
+        "mainHead": "595ba45f8d31e40d4b6260e9332a2a0dd6b50b6f",
+        "outcome": "failed",
+        "detail": "Stale strike signal: recorded HEAD bc13bfadd598826abca1168b4d5516a1b0a63e90 differs from origin/strike/pan-3189 at 6d0e7496cc0c2e4d26f6670dc38342cd325dd4a6"
+      }
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T05:16:50.348Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {},
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-07-27T04:59:18.522Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T05:16:50.361Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: skipped (skipped per issue policy)",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed",
+          "observed": "verificationStatus: skipped (skipped per issue policy; no lastVerifiedCommit recorded)",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3193 MERGED at 2026-07-27T04:55:57Z",
+          "status": "pass",
+          "mergedAt": "2026-07-27T04:55:57Z",
+          "mergeCommit": "441a01ce79a95a651e8f2cb7fb4e422ea5f68c46"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 441a01ce79a95a651e8f2cb7fb4e422ea5f68c46",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 51bf13ee contains merge 441a01ce",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 3 agent state directories; Preserved local branch strike/pan-3189 — not merged to main; Preserved remote branch strike/pan-3189 — not merged to main; Pruned 57 checkpoint ref(s) for agent-pan-3189, planning-pan-3189, strike-pan-3189; No specialist registry entries for PAN-3189"
+        }
+      ],
+      "accepted": []
+    }
+  },
+  "harness": "claude-code",
+  "model": "claude-opus-5"
+}

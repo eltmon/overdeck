@@ -1,0 +1,93 @@
+{
+  "issueId": "PAN-2869",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-18T01:46:29.372Z",
+  "updated": "2026-07-27T04:42:15.694Z",
+  "pipeline": {
+    "issueId": "PAN-2869",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "failed",
+    "mergeStatus": "failed",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-27T04:42:15.582Z",
+    "verificationNotes": "Checklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.",
+    "mergeNotes": "Post-rebase verification failed at incomplete-plan-items",
+    "strikeReadyHead": "c895b36ec47232dd35acd8b98f984cb44b9e5dfc",
+    "strikeReadyAt": "2026-07-18T03:22:09.607Z",
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-18T03:06:42.168Z",
+        "strikeHead": "e85765d03425fd672218e89ca13f5e3d23a9c6bd",
+        "mainHead": "366e42bd09b3911c1ed0c57be9e48c78f7c3c004",
+        "outcome": "failed",
+        "detail": "Stale strike signal: recorded HEAD e85765d03425fd672218e89ca13f5e3d23a9c6bd differs from origin/strike/pan-2869 at 10d17f3079cf30f27812ac393939e8436d896931"
+      },
+      {
+        "timestamp": "2026-07-18T03:26:51.258Z",
+        "strikeHead": "c895b36ec47232dd35acd8b98f984cb44b9e5dfc",
+        "mainHead": "366e42bd09b3911c1ed0c57be9e48c78f7c3c004",
+        "outcome": "failed",
+        "detail": "Post-rebase verification failed at incomplete-plan-items"
+      }
+    ]
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 89,
+            "output": 20456,
+            "cacheRead": 16891855,
+            "cacheWrite": 67780
+          }
+        },
+        "strike": {
+          "openai/gpt-5.6-sol": {
+            "input": 4004744,
+            "output": 297687,
+            "cacheRead": 54979584,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 89,
+          "output": 20456,
+          "cacheRead": 16891855,
+          "cacheWrite": 67780
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 4004744,
+          "output": 297687,
+          "cacheRead": 54979584,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 75.206925,
+        "pricingAsOf": "2026-07-27T04:42:15.614Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.6-sol",
+  "recoveryTrips": [
+    {
+      "issue": "PAN-2869",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-18T07:51:22.147Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-18T08:02:28.690Z"
+    }
+  ]
+}

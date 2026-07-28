@@ -1,0 +1,448 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T19:30:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3154: A merge to main silently invalidates open branches: no agent is notified when its base stops applying",
+    "updated": "2026-07-27T13:14:29.129Z"
+  },
+  "plan": {
+    "id": "pan-3154",
+    "title": "A merge to main silently invalidates open branches: no agent is notified when its base stops applying",
+    "status": "completed",
+    "uid": "d5fe8005-4a64-4e7e-a677-8cdb4b816ae0",
+    "author": "agent:k3[1m]",
+    "sequence": 5,
+    "created": "2026-07-26T19:30:04Z",
+    "updated": "2026-07-27T13:14:29.129Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3154",
+        "label": "PAN-3154",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "deacon",
+      "merge",
+      "conflict-detection",
+      "agent-notification"
+    ],
+    "narratives": {
+      "Problem": "A merge to main silently invalidates open branches: nothing detects that a live agent's base stopped applying until the merge gate, so agents keep building on invalid bases and one merge quietly creates N stalled branches. On 2026-07-26 merge 6ac4a3dc11 (PAN-3116) invalidated three live branches and none were notified for 12+ minutes.",
+      "Proposal": "Add a branch-invalidation sweep to the deacon patrol: watch each project's origin/main head (ls-remote, 120s cooldown, last-seen SHA in app_settings); on change, probe every in-pipeline issue's workspace with git merge-tree; mark newly-conflicting branches with a merge_conflict blocker plus a new conflictsSince {sha, detectedAt, paths} review-status field; notify the live owning agent via resolveIssueFeedbackTarget + messageAgent naming the commit and paths; emit a summary activity entry per sweep; clear conflictsSince in the conflict gate's existing clean path.",
+      "NonGoals": "- No automatic rebase of agents' branches (detect, mark, notify only)\n- No change to merge-train eligibility or the merge_train.enabled default\n- No polyrepo multi-repo probing (primary workspace repo only)\n- No dedicated dashboard badge for conflictsSince (blockerReasons/stuckReason already render; field lands in API DTO + durable record)\n- No backfill for merges that landed before this ships\n- No change to webhook blocker handling (additive; dedupes via conflictsSince.sha)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Detect via a deacon-patrol main-head watcher (ls-remote per project, 120s cooldown) instead of hooking firePostMergeLifecycle",
+        "rationale": "firePostMergeLifecycle misses webhook admin merges (webhook-handlers.ts:423 calls postMergeLifecycle directly) and out-of-band pushes; keying on the remote ref moving covers every merge path with one mechanism. The issue's fix direction 1 ('on merge to main, evaluate every open PR') is satisfied by reacting to the observable effect — main moved — within ~2 minutes."
+      },
+      {
+        "summary": "Mark invalidated branches with the existing merge_conflict blockerReason plus a new conflictsSince field, rather than a parallel marker",
+        "rationale": "A blocker flips readyForMerge and routes the issue into the existing conflict gate, review-dispatch defer, resolver dispatch, and cockpit stuckReason display for free; conflictsSince carries what blockers cannot (causing SHA + paths), which is the issue's fix direction 3."
+      },
+      {
+        "summary": "Notify via resolveIssueFeedbackTarget + messageAgent, deduped per main head SHA; skip silently when no live agent",
+        "rationale": "The feedback-target resolver handles swarm slots and unregistered slots; stopped agents are already covered by the existing conflict-resolver dispatch, so a second nudge channel would duplicate it."
+      },
+      {
+        "summary": "Sweep-local workspace resolution (agents-table workspace column, then workspaces/feature-<issue>* prefix scan)",
+        "rationale": "getWorkspaceInfoForIssue (routes/workspaces.ts:411) misses feature-<issue>-strike and -slot-N directories and lives in a route module; the PAN-3150 victim was a strike branch, so missing -strike workspaces would fail the issue's own repro."
+      },
+      {
+        "summary": "No auto-rebase of mid-work branches",
+        "rationale": "The issue asks for detection + notification so the rebase happens early; the owning agent rebases with full context. Auto-rebasing a mid-work branch would race the agent's uncommitted state."
+      }
+    ],
+    "items": [
+      {
+        "id": "conflict-path-probe",
+        "title": "Add probeBranchConflictPaths returning conflicting paths to the conflict gate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T19:30:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3154",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/conflict-gate.ts",
+            "tests/unit/lib/cloister/conflict-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/conflict-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conflict-gate.test.ts passes including the new probeBranchConflictPaths parse fixtures",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/conflict-gate.ts, add an exported probeBranchConflictPaths(workspacePath, targetBranch, deps?) returning Promise<{ mergeability: BranchMergeability; paths: string[] }>, using the same fetch + `git merge-tree --write-tree --name-only HEAD origin/<target>` invocation as checkBranchMergeability (lines 77-105). Parse rule (verified experimentally, see PRD): exit 0 → { mergeability: 'clean', paths: [] }; exit 1 → { mergeability: 'conflicts', paths: <stdout lines after the tree-OID first line, up to the first blank line> }; any other failure (fatal/usage in output, fetch failure) → { mergeability: 'unknown', paths: [] }, matching mergeTreeFailureIndicatesConflict semantics (lines 330-340). Export the path extraction as a pure function (e.g. parseMergeTreeNameOnly(stdout)) for unit tests. Reimplement checkBranchMergeability as a thin wrapper over probeBranchConflictPaths (behavior-preserving — same tri-state results) so there is one probe implementation. Extend tests/unit/lib/cloister/conflict-gate.test.ts with fake-exec fixtures using the exact strings from the PRD's verified git output: conflict case returns { mergeability: 'conflicts', paths: ['a.txt'] }; a 3-file conflict returns all 3 paths in order; clean case returns { mergeability: 'clean', paths: [] }; fatal output returns 'unknown'. All git I/O stays async (execAsync pattern, 30s timeout, no execSync)."
+        },
+        "items": [
+          {
+            "id": "conflict-path-probe.ac1",
+            "title": "Given a merge-tree exit 1 fixture with one conflicting file, probeBranchConflictPaths returns mergeability 'conflicts' and paths ['a.txt']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-path-probe.ac2",
+            "title": "Given a merge-tree exit 1 fixture with three conflicting files, the probe returns all three paths in output order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-path-probe.ac3",
+            "title": "Given a merge-tree exit 0 fixture, the probe returns mergeability 'clean' and an empty paths array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflict-path-probe.ac4",
+            "title": "Given a fatal/usage failure or failed fetch, the probe returns mergeability 'unknown' and checkBranchMergeability keeps its current tri-state behavior (existing tests stay green)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conflicts-since-status-field",
+        "title": "Plumb a conflictsSince {sha, detectedAt, paths} field through review status, DB, durable record, and DTO",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T19:30:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3154",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "branch-invalidation-sweep"
+          ],
+          "files_scope": [
+            "src/lib/review-status-reconcile.ts",
+            "src/lib/database/schema.ts",
+            "src/lib/overdeck/review-status-sync.ts",
+            "src/lib/pan-dir/record.ts",
+            "src/lib/pan-dir/records.ts",
+            "src/lib/overdeck/review-status-record-sync.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
+            "scripts/file-size-baseline.txt",
+            "tests/unit/lib/overdeck/review-status-sync.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/review-status-sync.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "review-status-sync round-trip test passes with conflictsSince set and undefined",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add conflictsSince?: { sha: string; detectedAt: string; paths: string[] } end to end, following the conflictResolutionDispatchedAt/blocker_reasons plumbing precedents. (1) src/lib/review-status-reconcile.ts: add the field to ReviewStatus (near line 57). (2) src/lib/database/schema.ts: add `conflicts_since TEXT` to the CREATE TABLE review_status statement (near conflict_resolution_dispatched_at, ~line 250); add migration `if (currentVersion < 62) { tryIdempotentDdl(db, 62, 'ALTER TABLE review_status ADD COLUMN conflicts_since TEXT'); }`; bump SCHEMA_VERSION from 61 to 62. (3) src/lib/overdeck/review-status-sync.ts: add conflicts_since to the DbRow type; map in rowToReviewStatus (JSON.parse, undefined when null — follow the blocker_reasons parse precedent) and in upsertReviewStatusSync (JSON.stringify — follow the line ~280 conflictResolutionDispatchedAt plumbing). (4) src/lib/pan-dir/record.ts + src/lib/pan-dir/records.ts: add conflictsSince to PanIssuePipelineRecord and to projectPipeline. (5) src/lib/overdeck/review-status-record-sync.ts: include conflictsSince in durableSubset (~line 106) so it mirrors to records/<issue>.json. (6) src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts: add the optional field to ReviewStatusData (line 208). (7) FILE-SIZE RATCHET: src/lib/database/schema.ts is at its scripts/file-size-baseline.txt cap (1726 lines = 1726 baseline) and this item grows it — bump the schema.ts baseline entry to the new line count in the SAME commit (a manual, audited baseline edit per scripts/lint-file-size.sh rule D4; cite PAN-3154 in the commit message). Do not run lint-file-size.sh --update; edit the number by hand. Tests: extend or create tests/unit/lib/overdeck/review-status-sync.test.ts proving conflictsSince survives write → read and survives undefined."
+        },
+        "items": [
+          {
+            "id": "conflicts-since-status-field.ac1",
+            "title": "setReviewStatusSync with conflictsSince persists it and getReviewStatusSync returns the identical {sha, detectedAt, paths} object",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflicts-since-status-field.ac2",
+            "title": "getReviewStatusSync returns conflictsSince undefined for a pre-migration row (a row without conflicts_since survives the migration)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflicts-since-status-field.ac3",
+            "title": "schema.ts contains the conflicts_since column in CREATE TABLE review_status, a currentVersion < 62 migration block, and SCHEMA_VERSION 62",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conflicts-since-status-field.ac4",
+            "title": "The durable per-issue record projection (projectPipeline + durableSubset) includes conflictsSince so records/<issue>.json mirrors it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "branch-invalidation-sweep",
+        "title": "Add reconcileBranchInvalidation deacon patrol sweep that marks branches invalidated by a main-head move",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T19:30:04Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3154",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "invalidation-agent-notify"
+          ],
+          "files_scope": [
+            "src/lib/cloister/branch-invalidation.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/conflict-gate.ts",
+            "scripts/file-size-baseline.txt",
+            "tests/unit/lib/cloister/branch-invalidation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/branch-invalidation.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "branch-invalidation.test.ts passes covering unchanged-SHA no-op, changed-SHA fan-out, dedup, unknown/ls-remote failure, and strike/slot workspace resolution",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/branch-invalidation.ts exporting reconcileBranchInvalidation(): Promise<string[]> (action strings, deacon convention) with injectable deps for tests. Behavior: (1) group in-pipeline issues (loadReviewStatuses(), mergeStatus !== 'merged') by project via resolveProjectFromIssueSync (deacon-merge.ts:449 precedent). (2) Per project on a 120s in-memory cooldown (same shape as staleMergeBlockerCooldowns in deacon-merge.ts), run `git ls-remote origin refs/heads/main` in the project root (async exec, 30s timeout — no execSync); compare with getSetting('branch_invalidation.main_head.<projectKey>'); unchanged → skip; failure → skip and keep last-seen. (3) On change, for each issue of that project resolve the workspace: the agents-table workspace column (listAllAgentsSync, src/lib/overdeck/agents.ts:1000) if set and existing, else the first existing directory matching <projectPath>/workspaces/feature-<issueLower>* (prefix covers -strike/-slot-N); skip when none exists. (4) Probe with conflict-path-probe's probeBranchConflictPaths(workspacePath, 'main'): conflicts AND existing.conflictsSince?.sha !== newSha → setReviewStatusSync with conflictsSince {sha, detectedAt, paths} and blockerReasons replacing prior merge blockers with { type: 'merge_conflict', summary: 'Conflicts with main since <sha7> (<n> path[s]): <first 3 paths comma-joined>', detectedAt } while keeping non-merge blockers (replace pattern from webhook-handlers.ts:482-498), plus a per-issue warn activity entry via emitActivityEntrySync; clean → no write; unknown → no write. (5) After each changed project's sweep, setSetting the new SHA and, if any issues were newly marked, emit ONE summary activity entry (source 'cloister', level 'warn'): 'main <sha7> invalidated N branch(es): <issue ids comma-joined>'. (6) In src/lib/cloister/conflict-gate.ts resolveConflictGate clean path (lines 167-176), add conflictsSince: undefined to the same setReviewStatus write that clears blockers. Wire reconcileBranchInvalidation() into runPatrol in src/lib/cloister/deacon.ts immediately after the reconcileStaleMergeBlockers block (lines 3101-3108), following the exact `const xActions = await …; actions.push(...); for (const a of …) addLog('action', a, state.patrolCycle);` pattern with the neighbors' try/catch convention. FILE-SIZE RATCHET: src/lib/cloister/deacon.ts is at its scripts/file-size-baseline.txt cap (3605 = 3605) and the patrol wiring grows it — bump the deacon.ts baseline entry to the new line count in the SAME commit (manual audited edit per scripts/lint-file-size.sh rule D4; cite PAN-3154 in the commit message; do not use --update). The new branch-invalidation.ts must stay ≤1000 lines (new-file ceiling). Tests in tests/unit/lib/cloister/branch-invalidation.test.ts with injected deps (status map, ls-remote result, probe result, setReviewStatus, settings store, activity emitter, now) assert: unchanged SHA → zero probes; changed SHA → only that project's issues probed; newly-conflicting issue gets conflictsSince + replaced merge blocker + one summary entry; same SHA on a second run → no second mark; unknown probe and ls-remote failure → zero writes; workspace resolution prefers the agents-table workspace and falls back to the feature-<issue>* prefix scan matching -strike/-slot-N dirs."
+        },
+        "items": [
+          {
+            "id": "branch-invalidation-sweep.ac1",
+            "title": "When the stored main head is unchanged, the sweep skips workspace probing and produces zero writes; when origin/main moves, the sweep probes every in-pipeline issue of that project with a workspace within one run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-invalidation-sweep.ac2",
+            "title": "A newly-conflicting issue's review status records conflictsSince.sha equal to the new main head, the probed paths, a merge_conflict blocker replacing prior merge blockers (non-merge blockers preserved), and readyForMerge false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-invalidation-sweep.ac3",
+            "title": "Running the sweep twice against the same main head marks and reports each issue exactly once (dedup via conflictsSince.sha)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-invalidation-sweep.ac4",
+            "title": "A probe result of 'unknown' or an ls-remote failure produces zero state writes, zero activity entries, and preserves the stored main head SHA",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-invalidation-sweep.ac5",
+            "title": "When a branch becomes mergeable again, resolveConflictGate's clean path updates the record to remove both the merge blockers and conflictsSince in one write (FR-6 test in conflict-gate.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "invalidation-agent-notify",
+        "title": "Notify the live owning agent with the causing commit and conflicting paths",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T19:30:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3154",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/branch-invalidation.ts",
+            "tests/unit/lib/cloister/branch-invalidation.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/branch-invalidation.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "notification tests pass: live target messaged once with sha+paths, needsYou target skipped, same-SHA resweep does not re-message",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/branch-invalidation.ts add notifyBranchInvalidated(issueId, info: { sha: string; paths: string[] }) and call it from reconcileBranchInvalidation for each newly-marked issue. Use resolveIssueFeedbackTarget(issueId) from src/lib/cloister/feedback-target.ts (verification-runner.ts:218-224 precedent): if the result is needsYou, skip silently (stopped agents are covered by the blocker + existing conflict-resolver dispatch — do NOT build a second nudge channel); otherwise messageAgent(target.agentId, message, 'internal') with: 'main moved: merge <sha7> now conflicts with your branch in: <paths comma-joined>. Rebase onto the new main NOW while the conflict is small — run `pan sync-main <ISSUE>` (or `git fetch origin main && git rebase origin/main`), resolve preserving BOTH intents, then continue your current task.' Dedup is structural (the sweep only calls this when conflictsSince.sha !== newSha) — one notification per main head per issue. Extend branch-invalidation.test.ts: live target → messageAgent called once and the message contains the sha and every conflicting path; needsYou target → no call and no throw; second sweep with the same SHA → no second call."
+        },
+        "items": [
+          {
+            "id": "invalidation-agent-notify.ac1",
+            "title": "Given a live agent target, the sweep delivers exactly one message per main head SHA containing the 7-char sha and every conflicting path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "invalidation-agent-notify.ac2",
+            "title": "Given a needsYou feedback target (no live agent), the sweep sends no message, throws no error, and still records conflictsSince + the blocker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "invalidation-agent-notify.ac3",
+            "title": "Given a second sweep with an unchanged main head, no additional message is delivered to the agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "branch-invalidation-docs",
+        "title": "Document the branch-invalidation sweep in MERGE-WORKFLOW, MERGE-TRAIN, and CLAUDE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T19:30:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3154",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md",
+            "docs/MERGE-TRAIN.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Branch invalidation sweep' docs/MERGE-WORKFLOW.md",
+            "grep -n 'conflictsSince\\|reconcileBranchInvalidation' docs/MERGE-WORKFLOW.md docs/MERGE-TRAIN.md CLAUDE.md"
+          ],
+          "expected_outputs": [
+            "docs/MERGE-WORKFLOW.md contains a '## Branch invalidation sweep' section naming conflictsSince, the branch_invalidation.main_head.<projectKey> setting, and reconcileBranchInvalidation",
+            "docs/MERGE-TRAIN.md distinguishes the sweep (all in-pipeline branches, always on, notify-only) from the merge train (ready siblings only, opt-in, rebases)",
+            "CLAUDE.md gains one sentence pointing at the sweep"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Document the new machinery so future agents can grep it. (1) docs/MERGE-WORKFLOW.md: add a '## Branch invalidation sweep' section (after '## Single Merge Oracle') describing the main-head watcher (ls-remote per project, 120s cooldown, last-seen SHA in app_settings key branch_invalidation.main_head.<projectKey>), the merge-tree probe fan-out, the conflictsSince review-status field, the merge_conflict blocker + readyForMerge effect, agent notification via resolveIssueFeedbackTarget, the per-sweep summary activity entry, and the recovery clear path in resolveConflictGate. (2) docs/MERGE-TRAIN.md: add a short paragraph distinguishing the sweep (all in-pipeline branches, always on, detect+mark+notify only) from the merge train (readyForMerge siblings only, opt-in via merge_train.enabled, actually rebases). (3) CLAUDE.md: add one sentence near the postMergeLifecycle/merge sections pointing at the sweep and docs/MERGE-WORKFLOW.md — detail lives in the doc, not CLAUDE.md."
+        },
+        "items": [
+          {
+            "id": "branch-invalidation-docs.ac1",
+            "title": "docs/MERGE-WORKFLOW.md contains a '## Branch invalidation sweep' section that names conflictsSince, branch_invalidation.main_head.<projectKey>, and reconcileBranchInvalidation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-invalidation-docs.ac2",
+            "title": "docs/MERGE-TRAIN.md contains a paragraph stating the sweep is always-on and notify-only for all in-pipeline branches while the merge train is opt-in and rebases ready siblings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "branch-invalidation-docs.ac3",
+            "title": "CLAUDE.md contains one sentence naming the branch-invalidation sweep and pointing to docs/MERGE-WORKFLOW.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "conflict-path-probe",
+        "to": "branch-invalidation-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "conflicts-since-status-field",
+        "to": "branch-invalidation-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "branch-invalidation-sweep",
+        "to": "invalidation-agent-notify",
+        "type": "blocks"
+      },
+      {
+        "from": "invalidation-agent-notify",
+        "to": "branch-invalidation-docs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3154-a-merge-to-main-silently-invalidates-open-branches-no-agent-is-notified-when-its-base-stops-applying.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

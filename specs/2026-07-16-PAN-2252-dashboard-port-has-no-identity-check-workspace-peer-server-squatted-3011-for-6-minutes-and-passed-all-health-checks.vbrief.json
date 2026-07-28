@@ -1,0 +1,492 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-16T18:05:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2252: Dashboard port has no identity check — workspace peer server squatted :3011 for 6 minutes and passed all health checks",
+    "updated": "2026-07-18T18:57:34.190Z"
+  },
+  "plan": {
+    "id": "pan-2252",
+    "title": "Dashboard port has no identity check — workspace peer server squatted :3011 for 6 minutes and passed all health checks",
+    "status": "completed",
+    "uid": "bdca96dc-98c1-456d-89fa-78be91601175",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-16T18:05:00.000Z",
+    "updated": "2026-07-18T18:57:34.190Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2252",
+        "label": "PAN-2252",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2251",
+        "label": "PAN-2251 (crash that ended the squat)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "cli",
+      "identity",
+      "lifecycle",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "Port ownership was the dashboard's only identity check: any dist/dashboard/server.js from any checkout that won the bind on :3011 became 'the dashboard'. Commit 55ae3c878c already landed the issue's two proposed layers (identity in /api/health, expectedIdentity-verified CLI health gates, and peer/workspace server-side bind refusal), so both original acceptance bullets are satisfied on main. What remains is the issue comment's requirement and coverage holes found in discovery: pan up has no cwd guard at all (the confirmed 2026-07-03 spawner was an agent's `pan up` from workspaces/feature-pan-1917), pan reload has no cwd guard, the guards and the bind refusal only recognize workspaces/feature-* (handoff worktrees like hoff-gh-quota slip through), the foreground pan up health gate skips identity, and identity is anchored to the invoker's cwd so a `pan up` from a non-repo directory (another incident spawner: /home/eltmon/Projects) produces a permanently mis-identified server.",
+      "Proposal": "Close the residual gaps: (1) detect any linked git worktree mechanically (.git is a file, not a directory) and extend the server-side host-port bind refusal with it; (2) generalize pan restart's workspace-only cwd guard into a shared refuseNonPrimaryDashboardCwd and wire it into pan up (before any host side effects) and pan reload (before the restart lock); (3) anchor dashboard identity to the resolved bundle root via one shared helper that supplies both the spawn cwd and every expectedIdentity value, and add the missing expectedIdentity to the foreground pan up health gate; (4) document the refusal and identity gate in the pan-up and pan-restart skills and the dev SOP. Containers stay exempt (their worktree mounts have .git files) and product installs (normal clones, non-repo cwds) are never refused.",
+      "NonGoals": "- No changes to pan dev (interactive operator mode; pan up already refuses to start over a dev supervisor)\n- No janitor/watchdog changes — src/supervisor/watchdog.ts already asserts dashboard identity per poll; orphan cleanup is PAN-1625's scope\n- No authentication or token on /api/health; identity stays an advisory payload verified by callers\n- No rework of already-landed layers (health identity payload, peer bind refusal, PAN-2322 override policy) beyond the linked-worktree extension\n- Must NOT refuse product installs: a cwd outside any git repo or inside a normal clone (.git directory) always passes the guard\n- Must NOT break workspace-container boots or in-container CLI use (container exemption evaluated before worktree refusal)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scoped the plan to residual gaps only — did not re-plan the issue's two proposed layers.",
+        "rationale": "Commit 55ae3c878c (2026-07-03, plus f6cbd6d143 and PAN-2322 hardening) already implements /api/health identity, expectedIdentity health gates, and the peer/workspace bind refusal on main; both original acceptance bullets pass today. Re-implementing them would duplicate main."
+      },
+      {
+        "summary": "Defined 'non-primary checkout' as: git repo root that is a linked worktree (.git is a plain file) or matches workspaces/feature-*.",
+        "rationale": "Covers every worktree-shaped incident spawner (feature-*, hoff-*, slot worktrees) with zero configuration and cannot false-positive on a normal clone or non-repo cwd, so npm-installed product use keeps working. This is the smallest mechanical definition that satisfies the comment's 'workspace worktree, handoff worktree' list."
+      },
+      {
+        "summary": "Anchored dashboard identity (spawn cwd + expectedIdentity) to the resolved bundle root instead of process.cwd().",
+        "rationale": "The '/home/eltmon/Projects' incident spawner ran the correct dist from a non-repo cwd, producing a server whose repoRoot identity fails every later check. Deriving both sides from resolveBundledServerPath() via one shared helper makes identity deterministic and closes the 'any non-primary path' clause of the comment without config coupling."
+      },
+      {
+        "summary": "Left pan dev unguarded.",
+        "rationale": "The comment names pan up/pan restart; dev mode is interactive operator use and pan up already refuses to boot over a running dev supervisor."
+      },
+      {
+        "summary": "Kept container exemptions ordered before any linked-worktree refusal.",
+        "rationale": "Workspace containers mount linked worktrees whose .git is a file; refusing them would break the documented workspace-container peer-server contract (single-deacon invariant docs)."
+      }
+    ],
+    "items": [
+      {
+        "id": "linked-worktree-detection",
+        "title": "Detect linked git worktrees in identity.ts and extend the host-port bind refusal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T18:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2252",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "cli-guard-non-primary"
+          ],
+          "files_scope": [
+            "src/dashboard/server/identity.ts",
+            "tests/unit/dashboard/identity.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/identity.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/dashboard/identity.test.ts passes including new linked-worktree cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/identity.ts add two exported helpers: isLinkedWorktreeRoot(repoRoot: string): boolean — true iff <repoRoot>/.git exists and statSync(...).isFile() (a linked git worktree stores a 'gitdir: …' pointer file where a primary clone has a directory); and primaryRootFromLinkedWorktree(repoRoot: string): string | null — read the .git file, match /^gitdir:\\s*(.+)$/m, and when the target contains '/.git/worktrees/', return the portion before '/.git/'; otherwise null. Extend shouldRefuseHostDashboardPort to also return true when isLinkedWorktreeRoot(repoRoot); the new check MUST come after the existing runningInContainer early-return (container worktree mounts have a .git file — hazard H1 in continue.json). Add tests using fs.mkdtempSync fixtures (one dir with a .git pointer file, one with a .git directory), following the existing style in tests/unit/dashboard/identity.test.ts."
+        },
+        "items": [
+          {
+            "id": "linked-worktree-detection.ac1",
+            "title": "Given a temp dir whose .git is a file containing 'gitdir: /primary/.git/worktrees/x', isLinkedWorktreeRoot returns true and primaryRootFromLinkedWorktree returns '/primary'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-worktree-detection.ac2",
+            "title": "Given a temp dir whose .git is a directory (or absent), isLinkedWorktreeRoot returns false and primaryRootFromLinkedWorktree returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-worktree-detection.ac3",
+            "title": "shouldRefuseHostDashboardPort returns true for a linked-worktree repoRoot outside workspaces/ (hoff-style path) on the host port in primary mode, and returns false for the same input when runningInContainer=true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "linked-worktree-detection.ac4",
+            "title": "The extended shouldRefuseHostDashboardPort preserves all pre-existing behavior: the full tests/unit/dashboard/identity.test.ts suite passes with its existing cases unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-guard-non-primary",
+        "title": "Generalize the restart cwd guard into a shared refuseNonPrimaryDashboardCwd",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T18:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2252",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/restart.ts",
+            "src/cli/commands/__tests__/dashboard-cwd-guard.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/dashboard-cwd-guard.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new dashboard-cwd-guard.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/restart.ts, rename/generalize refuseWorkspaceDashboardRestart (lines ~81-92) into an exported refuseNonPrimaryDashboardCwd(cwd: string, verb: string): boolean. Logic: (1) if existsSync('/.dockerenv') return false (container exemption); (2) resolve repoRoot via the existing resolveGitRepoRoot(cwd); if null return false (non-repo cwds are legitimate for product installs); (3) refuse when isWorkspaceRepoRoot(repoRoot) || isLinkedWorktreeRoot(repoRoot) — both imported from '../../dashboard/server/identity.js' (isWorkspaceRepoRoot is already imported there). On refusal print via console.error+chalk.red: 'Refusing to <verb> the host dashboard from non-primary checkout <repoRoot>. Run this command from the primary checkout at <primary>.' where <primary> = primaryRootFromLinkedWorktree(repoRoot) ?? dirname(dirname(repoRoot)) when repoRoot matches workspaces/feature-*; omit the second sentence when no primary path is derivable. Set process.exitCode = 2 and return true. Update the existing call site at restart.ts:212 to refuseNonPrimaryDashboardCwd(process.cwd(), 'restart'). Add src/cli/commands/__tests__/dashboard-cwd-guard.test.ts with mkdtempSync fixtures."
+        },
+        "items": [
+          {
+            "id": "cli-guard-non-primary.ac1",
+            "title": "Given cwd inside a linked-worktree fixture (.git pointer file), the guard returns true, sets process.exitCode to 2, and its message names the primary checkout path parsed from the gitdir pointer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-guard-non-primary.ac2",
+            "title": "Given cwd inside a normal-clone fixture (.git directory) or a directory with no enclosing git repo, the guard returns false and prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-guard-non-primary.ac3",
+            "title": "Given cwd matching workspaces/feature-*, the guard still refuses (preserves the pre-existing pan restart behavior) and derives the primary as dirname(dirname(repoRoot))",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-guard-non-primary.ac4",
+            "title": "The restart.ts dashboard/full-scope call site compiles against the renamed guard and pan restart from a workspace checkout still exits with code 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "guard-pan-up-cwd",
+        "title": "pan up refuses to run from a non-primary checkout before any host side effects",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T18:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2252",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "git grep -n 'refuseNonPrimaryDashboardCwd' src/cli/index.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grep shows the guard call inside the up action before the dev-supervisor check and the tmux/traefik/host-tools blocks"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In the pan up action in src/cli/index.ts (program.command('up'), action starting ~line 658), add the guard as the FIRST substantive statement — before the dev-supervisor marker check and before every host side effect (tmux global-env flush via set-environment, Traefik config regeneration, ensureHostTools, server spawn): import refuseNonPrimaryDashboardCwd from './commands/restart.js' (dynamic import matching the file's style) and `if (refuseNonPrimaryDashboardCwd(process.cwd(), 'start')) return;`. The guard already sets exitCode 2 — mirror the dev-supervisor refusal pattern (plain return, no process.exit). Hazard H3: placement before side effects is the point of this item; a guard after the tmux env flush still lets a workspace agent mutate host state."
+        },
+        "items": [
+          {
+            "id": "guard-pan-up-cwd.ac1",
+            "title": "pan up invoked with cwd in a workspace or linked worktree exits with code 2 and prints the non-primary refusal without flushing tmux env, regenerating Traefik config, or spawning the server (guard call precedes those blocks in the action body)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-pan-up-cwd.ac2",
+            "title": "pan up from the primary checkout (or any non-repo cwd) proceeds to the normal boot flow — the guard returns false and prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "guard-pan-reload-cwd",
+        "title": "pan reload refuses to run from a non-primary checkout before the restart lock",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T18:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2252",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/reload.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "git grep -n 'refuseNonPrimaryDashboardCwd' src/cli/commands/reload.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grep shows the guard call at the top of reloadCommand before acquireRestartLock"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/reload.ts reloadCommand (line ~182), after the parseHealthTimeout try/catch and BEFORE acquireRestartLock and any build/worktree operations, add `if (refuseNonPrimaryDashboardCwd(process.cwd(), 'reload')) return;` (import from './restart.js', which reload.ts already imports for spawnDashboardDetached). Hazard H4: reload builds from origin/main inside whatever repoRoot it resolves and swaps dist — the guard must run before any of that."
+        },
+        "items": [
+          {
+            "id": "guard-pan-reload-cwd.ac1",
+            "title": "pan reload invoked with cwd in a workspace or linked worktree exits with code 2 and returns before acquiring the restart lock or starting a build",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-pan-reload-cwd.ac2",
+            "title": "Given cwd at the primary checkout, the guard returns false and reloadCommand proceeds to acquire the restart lock with no refusal printed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "anchor-identity-install-root",
+        "title": "Derive dashboard identity from the bundle root and verify it on every boot path",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T18:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2252",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/restart.ts",
+            "src/cli/commands/reload.ts",
+            "src/cli/index.ts",
+            "src/cli/commands/__tests__/dashboard-cwd-guard.test.ts",
+            "tests/unit/lib/platform-lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm test -- --run tests/unit/lib/platform-lifecycle.test.ts",
+            "git grep -n 'repoRoot: process.cwd()' src/cli || true"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "platform-lifecycle identity tests pass",
+            "git grep for 'repoRoot: process.cwd()' under src/cli returns no matches"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/restart.ts add an exported resolvePrimaryDashboardIdentity(): { repoRoot: string; mode: 'primary' } that returns { repoRoot: resolve(resolveBundledServerPath(), '..', '..', '..'), mode: 'primary' } — every bundle candidate resolves to <root>/dist/dashboard/server.js, so ../../.. is the checkout/package root (hazard H6: derive from the resolved bundle path, never from __dirname). Then: (1) spawnDashboardDetached (restart.ts:143) passes cwd: <that repoRoot> in its spawn options so the server's runtime cwd — and therefore getDashboardIdentity().repoRoot — equals the expected value; (2) replace all four `expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' }` literals (restart.ts restartCommand + runFullRestart, reload.ts reloadCommand, index.ts detached up) with resolvePrimaryDashboardIdentity(); (3) add expectedIdentity: resolvePrimaryDashboardIdentity() to the foreground resolveDashboardReadyUrl call in index.ts (the second call, currently missing it — gap G4). Hazard H2: the health check compares repoRoot by exact string equality, so spawn cwd and expectedIdentity MUST both come from this one helper. Unit-test the helper's derivation (bundle path <root>/dist/dashboard/server.js → <root>)."
+        },
+        "items": [
+          {
+            "id": "anchor-identity-install-root.ac1",
+            "title": "resolvePrimaryDashboardIdentity returns the checkout root for a resolved bundle path <root>/dist/dashboard/server.js, and spawnDashboardDetached spawns the server with cwd equal to that root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anchor-identity-install-root.ac2",
+            "title": "git grep 'repoRoot: process.cwd()' under src/cli returns no matches — all expectedIdentity call sites (restart x2, reload, up detached, up foreground) use the shared helper",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anchor-identity-install-root.ac3",
+            "title": "The foreground pan up health gate passes expectedIdentity to resolveDashboardReadyUrl, so a squatter answering 200 on the port produces the 'port held by non-primary server (cwd=…, mode=…)' failure instead of success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anchor-identity-install-root.ac4",
+            "title": "pan restart run from a subdirectory of the primary checkout still passes its identity-verified health gate (identity no longer depends on the invoker's cwd)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-identity-refusal",
+        "title": "Document the non-primary refusal and identity gate in pan-up/pan-restart skills and the dev SOP",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T18:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2252",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-up/SKILL.md",
+            "sync-sources/skills/pan-restart/SKILL.md",
+            "docs/OVERDECK_DEV_SOP.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "git grep -n 'non-primary' sync-sources/skills/pan-up/SKILL.md sync-sources/skills/pan-restart/SKILL.md docs/OVERDECK_DEV_SOP.md"
+          ],
+          "expected_outputs": [
+            "lint (including scripts/lint-skills.sh) passes with the updated skills",
+            "grep shows the refusal documented in all three files"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a short 'Identity guard' section to sync-sources/skills/pan-up/SKILL.md and sync-sources/skills/pan-restart/SKILL.md stating: (a) the verb refuses to run when cwd is in a non-primary checkout — a workspace worktree or any linked git worktree such as a handoff worktree — exiting with code 2 and a message naming the primary checkout to run from; (b) the post-boot health gate verifies /api/health identity (repoRoot + mode) and reports 'port held by non-primary server (cwd=…, mode=…)' when an impostor holds the port — a 200 from the wrong server is a failure, not success. Extend the restart/triage section of docs/OVERDECK_DEV_SOP.md with one paragraph on the same behavior (reference PAN-2252). Hazard H5: scripts/lint-skills.sh cross-checks every flag a SKILL.md mentions against pan <verb> --help — document behavior only, no flags (none are added)."
+        },
+        "items": [
+          {
+            "id": "docs-identity-refusal.ac1",
+            "title": "Each of pan-up SKILL.md and pan-restart SKILL.md contains an Identity guard section that shows the exit-code-2 non-primary-cwd refusal and the identity-verified health gate with its 'port held by non-primary server' failure shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-identity-refusal.ac2",
+            "title": "docs/OVERDECK_DEV_SOP.md's restart/triage guidance shows the non-primary refusal behavior and contains a PAN-2252 reference naming the incident class it prevents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-identity-refusal.ac3",
+            "title": "npm run lint passes — the skill lint's flag cross-check accepts the updated SKILL.md files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "linked-worktree-detection",
+        "to": "cli-guard-non-primary",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-guard-non-primary",
+        "to": "guard-pan-up-cwd",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-guard-non-primary",
+        "to": "guard-pan-reload-cwd",
+        "type": "blocks"
+      },
+      {
+        "from": "guard-pan-up-cwd",
+        "to": "anchor-identity-install-root",
+        "type": "blocks"
+      },
+      {
+        "from": "guard-pan-reload-cwd",
+        "to": "anchor-identity-install-root",
+        "type": "blocks"
+      },
+      {
+        "from": "guard-pan-up-cwd",
+        "to": "docs-identity-refusal",
+        "type": "informs"
+      },
+      {
+        "from": "guard-pan-reload-cwd",
+        "to": "docs-identity-refusal",
+        "type": "informs"
+      },
+      {
+        "from": "anchor-identity-install-root",
+        "to": "docs-identity-refusal",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-16-PAN-2252-dashboard-port-has-no-identity-check-workspace-peer-server-squatted-3011-for-6-minutes-and-passed-all-health-checks.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

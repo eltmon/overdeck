@@ -1,0 +1,255 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-17T13:00:20.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2665: Issue tree: Lint node between Work and Review showing verification gate output",
+    "updated": "2026-07-17T14:38:17.664Z"
+  },
+  "plan": {
+    "id": "pan-2665",
+    "title": "Issue tree: Lint node between Work and Review showing verification gate output",
+    "status": "completed",
+    "uid": "ea0e3392-c63a-4ff0-96f2-37d374c5fac3",
+    "author": "agent:claude-fable-5",
+    "sequence": 8,
+    "created": "2026-07-17T13:00:20.000Z",
+    "updated": "2026-07-17T14:38:17.664Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2665",
+        "label": "PAN-2665",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "issue-tree",
+      "verification",
+      "frontend",
+      "test",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "The Lint node feature (verification artifact writer, 'lint' SessionNode builder wired into both tree payloads, contracts literal, TYPE_PRIORITY ordering, SessionPanel VerificationGatesPanel branch) was already merged to main on 2026-07-14 in commits b2be1d6256, da0c867c25, ea03c099d5, 3e58582787, e0225f6a35, 51cdb1d117 — the feature branch has zero delta vs origin/main. Three residual gaps remain: the ProjectTree rail renders the raw lowercase label 'lint' with the generic Code2 work icon and a generic purpose description (AgentStepRow.tsx has no 'lint' case in deriveSessionLabel, TYPE_ICON, or describeSessionPurpose); buildLintSessionNode has no unit tests; and no doc describes the Lint node or the verification artifact.",
+      "Proposal": "Close only the residual delta with three small independent items: (1) add the 'lint' cases (label 'Lint', icon ListChecks, purpose text) to AgentStepRow.tsx plus a rail-density rendering test; (2) add unit tests for buildLintSessionNode at tests/unit/dashboard/command-deck-lint-node.test.ts covering null suppression, failed transcript content, running presence, no-artifact fallback, and transcript omission; (3) document the Lint node and .overdeck/verification-latest.json in docs/MISSION-CONTROL.md near the /api/session-trees description. The PRD draft (.pan/drafts/PAN-2665.md) carries exact file/line references and before/after guidance.",
+      "NonGoals": "- Re-implementing or modifying the merged verification artifact writer (src/lib/cloister/verification-artifact.ts), lint node builder (command-deck-lint-node.ts), contracts SessionNodeType, TYPE_PRIORITY ordering, or the SessionPanel lint branch\n- Changing gate semantics, gate order, verification dispatch, or the verification runner\n- Cockpit tile-color treatment for the lint node (default styling is acceptable)\n- OKF knowledge-bundle updates (owned by the knowledge role)\n- New endpoints, stores, or polling loops"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scoped the plan to the residual delta (label/icon/purpose, builder unit tests, docs) instead of the full issue body.",
+        "rationale": "Code-level audit showed all three issue bullets except 'labels, icons' already merged to main on 2026-07-14 with zero branch delta; re-planning merged work would dispatch a work agent to duplicate it."
+      },
+      {
+        "summary": "Chose ListChecks (lucide-react) as the lint row icon.",
+        "rationale": "A checklist icon reads as the quality-gate table; it is unused by any other node type or reviewer role in AgentStepRow.tsx, keeping the row visually distinct from Work's Code2."
+      },
+      {
+        "summary": "Placed builder unit tests at tests/unit/dashboard/command-deck-lint-node.test.ts.",
+        "rationale": "tests/unit/dashboard/ is the established home for server route unit tests (e.g. git-activity-route.test.ts); src/dashboard/server/routes has no __tests__ directory."
+      },
+      {
+        "summary": "Placed docs in docs/MISSION-CONTROL.md near the /api/session-trees description.",
+        "rationale": "That doc already describes the session-tree payload the Lint node rides in; no other doc enumerates tree node sources."
+      }
+    ],
+    "items": [
+      {
+        "id": "lint-row-label-icon",
+        "title": "Add Lint label, ListChecks icon, and purpose text to AgentStepRow",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:00:20.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2665",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/AgentStepRow.tsx",
+            "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/issue-view/AgentStepRow.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "AgentStepRow.test.tsx passes including the new lint rail-density case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/issue-view/AgentStepRow.tsx: add `case 'lint': return 'Lint';` to deriveSessionLabel (currently falls to `default: return session.type;`), add `lint: ListChecks,` to the TYPE_ICON map and `ListChecks` to the existing lucide-react import, and add `case 'lint': return 'Quality-gate run (install/typecheck/lint/test) that gates review dispatch.';` to describeSessionPurpose. cockpitLabel needs no change (capitalize default already yields 'Lint'). Extend AgentStepRow.test.tsx with a rail-density lint-node rendering case following the file's existing patterns. Line anchors (may drift — search the quoted code): TYPE_ICON ~98-108, deriveSessionLabel ~145-162, describeSessionPurpose ~322-343."
+        },
+        "items": [
+          {
+            "id": "lint-row-label-icon.ac1",
+            "title": "Given a session node with type 'lint', when AgentStepRow renders at rail density, then the row displays the label 'Lint' (Title case), not the raw string 'lint'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-row-label-icon.ac2",
+            "title": "TypeIcon resolves type 'lint' to the ListChecks icon so the lint row renders an icon distinct from the Work row's Code2 fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-row-label-icon.ac3",
+            "title": "describeSessionPurpose returns 'Quality-gate run (install/typecheck/lint/test) that gates review dispatch.' for type 'lint' instead of the generic 'Session for this issue.' fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-row-label-icon.ac4",
+            "title": "The new AgentStepRow.test.tsx case renders a type 'lint' session and asserts the visible 'Lint' label, and the suite passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lint-node-builder-tests",
+        "title": "Unit tests for buildLintSessionNode",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:00:20.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2665",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/dashboard/command-deck-lint-node.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/command-deck-lint-node.test.ts"
+          ],
+          "expected_outputs": [
+            "command-deck-lint-node.test.ts passes with all five behavior cases green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/unit/dashboard/command-deck-lint-node.test.ts exercising buildLintSessionNode from src/dashboard/server/routes/command-deck-lint-node.ts. Write a real .overdeck/verification-latest.json into a fs.mkdtempSync(os.tmpdir()) workspace per case — do not mock fs (readVerificationArtifact has its own JSON-parse fallback). No fake timers needed (no delays/retries). Cases: (1) returns null with no artifact and centralStatus null or verificationStatus 'skipped'; (2) failed artifact yields status 'failed', presence 'ended', transcript containing the failing gate's '✗ <gate>' line and '--- <gate> output ---' block; (3) running artifact (outcome 'running', currentGate set) yields status 'running', presence 'active', transcript containing '▶ <gate> running…'; (4) no artifact with verificationStatus 'passed' yields status 'completed' and the 'No gate details recorded' fallback text; (5) includeTranscripts false yields a node without a transcript key."
+        },
+        "items": [
+          {
+            "id": "lint-node-builder-tests.ac1",
+            "title": "Given no artifact and centralStatus null or verificationStatus 'skipped', buildLintSessionNode returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-node-builder-tests.ac2",
+            "title": "Given a failed artifact with gate output, the node has status 'failed', presence 'ended', and its transcript contains the failing gate line and its '--- <gate> output ---' block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-node-builder-tests.ac3",
+            "title": "Given a running artifact with currentGate set, the node has status 'running', presence 'active', and its transcript contains the '▶ <gate> running…' line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-node-builder-tests.ac4",
+            "title": "Given no artifact but verificationStatus 'passed', the node has status 'completed' and its transcript contains the 'No gate details recorded' fallback; given includeTranscripts false, the returned node omits the transcript key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lint-node-docs",
+        "title": "Document the Lint node and verification artifact in MISSION-CONTROL.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T13:00:20.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2665",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MISSION-CONTROL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"Lint node\" docs/MISSION-CONTROL.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new 'Lint node (PAN-2665)' subsection heading with its line number"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a subsection titled 'Lint node (PAN-2665)' to docs/MISSION-CONTROL.md near the /api/session-trees description (~line 45). It must state: the tree synthesizes a 'lint' SessionNode ordered between Work and Review from <workspace>/.overdeck/verification-latest.json (written by src/lib/cloister/verification-runner.ts via verification-artifact.ts); the node has no agent/tmux/JSONL backing; clicking it opens VerificationGatesPanel showing the gate table and failing-gate output; the builder is src/dashboard/server/routes/command-deck-lint-node.ts."
+        },
+        "items": [
+          {
+            "id": "lint-node-docs.ac1",
+            "title": "docs/MISSION-CONTROL.md contains a 'Lint node (PAN-2665)' subsection that names the artifact path <workspace>/.overdeck/verification-latest.json and its writer (verification-runner via verification-artifact.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-node-docs.ac2",
+            "title": "The subsection states the node is synthesized (no agent/tmux/JSONL backing) by src/dashboard/server/routes/command-deck-lint-node.ts and ordered between Work and Review",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-node-docs.ac3",
+            "title": "The subsection states that clicking the node opens VerificationGatesPanel rendering the gate table and failing-gate output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-07-17-PAN-2665-issue-tree-lint-node-between-work-and-review-showing-verification-gate-output.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

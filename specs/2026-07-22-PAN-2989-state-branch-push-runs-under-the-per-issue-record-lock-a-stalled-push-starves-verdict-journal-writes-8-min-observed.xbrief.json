@@ -1,0 +1,353 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-22T21:44:26.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2989: State-branch push runs under the per-issue record lock — a stalled push starves verdict journal writes (8+ min observed)",
+    "updated": "2026-07-25T07:12:03.986Z"
+  },
+  "plan": {
+    "id": "pan-2989",
+    "title": "State-branch push runs under the per-issue record lock — a stalled push starves verdict journal writes (8+ min observed)",
+    "status": "completed",
+    "uid": "a93f77d0-b156-4ead-9aea-dbff7242029c",
+    "author": "agent:k3",
+    "sequence": 5,
+    "created": "2026-07-22T21:44:26.000Z",
+    "updated": "2026-07-25T07:12:03.986Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2989",
+        "label": "PAN-2989",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "state-plane",
+      "record-lock",
+      "durability",
+      "review-status",
+      "deploy-patrol"
+    ],
+    "narratives": {
+      "Problem": "updateIssueRecord (src/lib/pan-dir/record-update.ts:208) holds the per-issue fs lock across flushAutoCommits AND reconcileStatePush; a stalled git push held the PAN-806 lock 8+ minutes on 2026-07-21, starving a review-passed verdict write past its ~1s retry budget into the workspace pipeline-verdict.json fallback. Compounding defects: nothing ever folds back or deletes the fallback file (canonical journal lagged ~1h), and the dashboard server inherits OVERDECK_AGENT_ID=deploy-patrol from deploy-patrol's pan reload child (src/cli/commands/restart.ts:182 passthrough), so every lock-owner string misattributes server writes.",
+      "Proposal": "Three independent fixes (operator-verified direction in the issue comment): (1) bound the under-lock durability wait with a shared deadline (OVERDECK_RECORD_DURABILITY_BUDGET_MS, default 30s) that throws a typed RecordDurabilityTimeoutError, skips restore-on-timeout, and never aborts peers' shared-gitRoot flushes; (2) scrub OVERDECK_AGENT_ID/OVERDECK_ISSUE_ID/OVERDECK_SESSION_TYPE from the spawned dashboard server env, preserving the inherited identity as OVERDECK_DASHBOARD_SPAWNED_BY for the PAN-2322 port guard; (3) proactively drain the workspace verdict fallback (drainWorkspaceVerdictFallback + unref'd 5s/30s/120s retries), deleting the file once the journal is at least as new.",
+      "NonGoals": "- No lock TTL or steal-with-audit path (breaks mutual exclusion; PAN-1791-class corruption risk)\n- No restructuring of the under-lock flush; the durability-ordering invariant stands\n- No change to RECORD_LOCK_RETRY_DELAYS_MS (~1s contender budget)\n- No change to the flush's own 60s bound or per-git 30s timeouts (OVERDECK_STATE_FLUSH_TIMEOUT_MS / OVERDECK_STATE_PUSH_TIMEOUT_MS)\n- No drain on the status-read path; reads keep overlay semantics\n- No retry-budget increase or re-drive logic for updateIssueRecordForIssue callers beyond the drain triggers"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Deadline race (30s default, env-tunable) around flush+reconcile instead of restructuring the lock scope",
+        "rationale": "The issue comment names the bounded hold as 'the smaller correct change'; the under-lock flush is deliberate for durability ordering (record-update.ts:220-222)."
+      },
+      {
+        "summary": "Skip restoreRetryableRecord on durability timeout",
+        "rationale": "The mutation may still land via the un-aborted background flush; rewinding to the pre-mutation snapshot could clobber a concurrently-landing commit."
+      },
+      {
+        "summary": "Promise.race without AbortSignal to flushAutoCommits",
+        "rationale": "The signal path aborts ALL active flushes for the shared state-worktree gitRoot (abortAndSettleGitRoot, auto-commit.ts:463); one writer's timeout must not kill peers' commits."
+      },
+      {
+        "summary": "Relocate inherited OVERDECK_AGENT_ID to OVERDECK_DASHBOARD_SPAWNED_BY rather than plain deletion",
+        "rationale": "The PAN-2322 port-override guard legitimately needs the spawner identity (conv-* exempt, pipeline-role refused, absent allowed); relocating preserves its decision table exactly while making record-lock owner strings truthful."
+      },
+      {
+        "summary": "Drain triggers live in review-status-record-sync.ts (successful write + scheduled retries), not an fs-lock release hook",
+        "rationale": "A generic lock-release callback couples the records domain to the verdict domain; the chosen triggers satisfy 'drain proactively' without that coupling, and reads already overlay the fallback so a stranded fallback is cosmetic lag, not corruption."
+      },
+      {
+        "summary": "Lock TTL/steal rejected",
+        "rationale": "Stealing a live lock breaks the read-modify-write mutual exclusion that prevents lost updates (PAN-1791); bounding the hold relieves starvation without corruption risk."
+      }
+    ],
+    "items": [
+      {
+        "id": "bound-record-durability-hold",
+        "title": "Bound the under-lock durability wait in updateIssueRecord",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-22T21:44:26.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/record-update.ts",
+            "tests/unit/lib/pan-dir/record-update-durability-budget.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pan-dir/record-update-durability-budget.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "record-update-durability-budget.test.ts passes (timeout, no-restore, env-override, and no-regression cases)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/pan-dir/record-update.ts: add RecordDurabilityTimeoutError, recordDurabilityBudgetMs() (env OVERDECK_RECORD_DURABILITY_BUDGET_MS, default 30000), and withRecordDurabilityDeadline() (Promise.race against a shared deadline; NO AbortSignal to flushAutoCommits — aborting would kill peers' shared-gitRoot flushes). Wrap the flushAutoCommits await (line ~223), the reconcileStatePush call (line ~227, with onTimeout = best-effort abortRebase), and the restoreRetryableRecord call in the shared deadline. At the top of the catch, rethrow RecordDurabilityTimeoutError without restoring. Full before/after snippets are in the PRD (.pan/drafts/PAN-2989.md, WI-1). Tests: new tests/unit/lib/pan-dir/record-update-durability-budget.test.ts with vi.mock('./auto-commit.js') controlling flushAutoCommits and vi.useFakeTimers throughout."
+        },
+        "items": [
+          {
+            "id": "bound-record-durability-hold.ac1",
+            "title": "Given a flushAutoCommits that never resolves, updateIssueRecord rejects with RecordDurabilityTimeoutError after advanceTimersByTimeAsync(30000) and the record lock is immediately acquirable by a second updateIssueRecord call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bound-record-durability-hold.ac2",
+            "title": "After a durability timeout the record file on disk still contains the mutation (restoreRetryableRecord is not invoked) and the never-resolving flush promise was not aborted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bound-record-durability-hold.ac3",
+            "title": "With OVERDECK_RECORD_DURABILITY_BUDGET_MS=5000, updateIssueRecord rejects with RecordDurabilityTimeoutError at 5000ms instead of the 30000ms default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bound-record-durability-hold.ac4",
+            "title": "A flush resolving normally within budget commits, pushes, and returns the updated record exactly as before (no behavior regression on the healthy path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scrub-dashboard-server-agent-identity",
+        "title": "Scrub agent identity from the spawned dashboard server env",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-22T21:44:26.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/restart.ts",
+            "src/dashboard/server/config.ts",
+            "src/cli/commands/__tests__/restart.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "spawn-env tests pass: server env lacks OVERDECK_AGENT_ID/OVERDECK_ISSUE_ID/OVERDECK_SESSION_TYPE and carries OVERDECK_DASHBOARD_SPAWNED_BY when inherited",
+            "port-override guard decision tests pass for conv-*, pipeline-role, and absent identities",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In spawnDashboardDetached (src/cli/commands/restart.ts:182), after applyBootGateEnv: if env.OVERDECK_AGENT_ID is defined copy it to env.OVERDECK_DASHBOARD_SPAWNED_BY, then delete OVERDECK_AGENT_ID, OVERDECK_ISSUE_ID, and OVERDECK_SESSION_TYPE. The env object is built once and flows to both the systemd-unit and plain-spawn paths, so one edit covers both. In src/dashboard/server/config.ts:89 read process.env['OVERDECK_DASHBOARD_SPAWNED_BY'] instead of OVERDECK_AGENT_ID for the nonConversationUsingOverride check — the conv-*/pipeline-role/absent decision table must be byte-for-byte unchanged (NFR-3). Exact snippet in the PRD (.pan/drafts/PAN-2989.md, WI-2)."
+        },
+        "items": [
+          {
+            "id": "scrub-dashboard-server-agent-identity.ac1",
+            "title": "Given process.env.OVERDECK_AGENT_ID='deploy-patrol', the env passed to the spawned server contains OVERDECK_DASHBOARD_SPAWNED_BY='deploy-patrol' and none of OVERDECK_AGENT_ID, OVERDECK_ISSUE_ID, OVERDECK_SESSION_TYPE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scrub-dashboard-server-agent-identity.ac2",
+            "title": "Given no inherited OVERDECK_AGENT_ID, the spawned server env has no OVERDECK_DASHBOARD_SPAWNED_BY key at all (not the string 'undefined')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scrub-dashboard-server-agent-identity.ac3",
+            "title": "The config.ts port-override guard produces identical allow/refuse decisions as before for conv-*, agent-*, and absent spawner identities (unit-tested against OVERDECK_DASHBOARD_SPAWNED_BY)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "proactive-verdict-fallback-drain",
+        "title": "Proactively drain the workspace verdict fallback",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-22T21:44:26.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/review-status-record-sync.ts",
+            "tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "review-status-record-sync-drain.test.ts passes (newer-journal cleanup, fold-and-delete, clearedFields, retry-schedule cases)",
+            "existing review-status-record-sync tests still pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/overdeck/review-status-record-sync.ts: add drainWorkspaceVerdictFallback(issueId) — read the fallback; if absent return true; if the journal record's pipeline.updatedAt is >= fallback.updatedAt delete the file and return true; otherwise call updateIssueRecordForIssue with a ReviewStatus reconstructed from the fallback (cleared fields stay absent so they do not resurrect) and delete the file when the write lands. Wire triggers into updateIssueRecordForReviewStatusSync: on a landed journal write, drain (tracked in pendingJournalWrites so flushReviewStatusJournalWrites covers short-lived CLIs); on a fallback write, scheduleVerdictFallbackDrain with unref'd setTimeout retries at 5s/30s/120s, one timer per issue, stopping on success, exhaustion, or a missing file. Full snippet in the PRD (.pan/drafts/PAN-2989.md, WI-3). Tests use vi.useFakeTimers (repo rule)."
+        },
+        "items": [
+          {
+            "id": "proactive-verdict-fallback-drain.ac1",
+            "title": "Given a fallback file and a journal already newer than it, drainWorkspaceVerdictFallback deletes the file and performs no record write",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "proactive-verdict-fallback-drain.ac2",
+            "title": "Given a fallback newer than the journal, the drain writes the record, deletes the file, and a subsequent readJournalStatusSync returns the record's data with the fallback overlay gone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "proactive-verdict-fallback-drain.ac3",
+            "title": "The drain preserves clearedFields semantics: fields the fallback cleared (e.g. strikeTransportRetryCount) stay absent from the record's pipeline block after the fold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "proactive-verdict-fallback-drain.ac4",
+            "title": "When a journal write fails, the scheduled drain runs at 5s/30s/120s of fake-timer advances, stops after a success, and emits no further attempt after exhaustion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-record-lock-bounds-and-drain",
+        "title": "Document the bounded record-lock hold, server-identity scrub, and fallback drain",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-22T21:44:26.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2989",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/state-branch.mdx",
+            "docs/AGENT-STATE-PLANES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "configuration/state-branch.mdx describes the bounded durability hold, OVERDECK_RECORD_DURABILITY_BUDGET_MS, the timeout behavior, and the drain lifecycle",
+            "docs/AGENT-STATE-PLANES.md documents the lock budget env var, the fallback-drain lifecycle, and server writerId attribution (process-<pid>@<hostname>)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Update configuration/state-branch.mdx (user-facing) to document: record writes hold the per-issue lock for a bounded durability window (OVERDECK_RECORD_DURABILITY_BUDGET_MS, default 30s); on timeout the mutation stays local, the flush continues in background, and verdict writers fall back to pipeline-verdict.json which is drained proactively; the dashboard server never carries an agent identity (OVERDECK_DASHBOARD_SPAWNED_BY records the spawner for the port guard). Update docs/AGENT-STATE-PLANES.md (developer) with the same env var, the drain lifecycle, and the server writerId attribution (process-<pid>@<hostname>). Write what WI-1..WI-3 actually shipped — verify against the merged code, not just this plan."
+        },
+        "items": [
+          {
+            "id": "docs-record-lock-bounds-and-drain.ac1",
+            "title": "configuration/state-branch.mdx covers the default 30s durability budget, names OVERDECK_RECORD_DURABILITY_BUDGET_MS, and shows the timeout + fallback + drain behavior a user can observe",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-record-lock-bounds-and-drain.ac2",
+            "title": "docs/AGENT-STATE-PLANES.md covers the lock budget env var and the fallback-drain lifecycle, and records that server record writes attribute to process-<pid>@<hostname>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-record-lock-bounds-and-drain.ac3",
+            "title": "Given the shipped WI-1..WI-3 code, every behavior the docs describe matches the implementation when verified against the code rather than the plan text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "bound-record-durability-hold",
+        "to": "docs-record-lock-bounds-and-drain",
+        "type": "blocks"
+      },
+      {
+        "from": "scrub-dashboard-server-agent-identity",
+        "to": "docs-record-lock-bounds-and-drain",
+        "type": "blocks"
+      },
+      {
+        "from": "proactive-verdict-fallback-drain",
+        "to": "docs-record-lock-bounds-and-drain",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-22-PAN-2989-state-branch-push-runs-under-the-per-issue-record-lock-a-stalled-push-starves-verdict-journal-writes-8-min-observed.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

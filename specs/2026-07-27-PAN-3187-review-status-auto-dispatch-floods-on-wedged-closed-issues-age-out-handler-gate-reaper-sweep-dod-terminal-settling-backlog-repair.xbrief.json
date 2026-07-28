@@ -1,0 +1,564 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-27T04:52:30.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3187: Review-status auto-dispatch floods on 11 wedged closed issues — stale reviewRequestedAt never ages out, CLI processes attempt handler-less dispatch; expanded per operator direction to the DoD rows 1/2/3 terminal-settling rule for the 22-issue close-out backlog",
+    "updated": "2026-07-27T08:24:47.098Z"
+  },
+  "plan": {
+    "id": "pan-3187",
+    "title": "Review-status auto-dispatch floods on wedged closed issues — age-out, handler gate, reaper sweep, DoD terminal settling, backlog repair",
+    "status": "completed",
+    "uid": "251778ca-fd7a-4cbf-8adb-8081f818f2d0",
+    "author": "agent:k3[1m]",
+    "sequence": 7,
+    "created": "2026-07-27T04:52:30.000Z",
+    "updated": "2026-07-27T08:24:47.098Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3187",
+        "label": "PAN-3187",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "review-status",
+      "cloister",
+      "deacon",
+      "close-out",
+      "dod-gate",
+      "lifecycle"
+    ],
+    "narratives": {
+      "Problem": "Eleven tracker-closed issues carry an unserviced reviewRequestedAt (18-28 days old) in their journal pipeline block. needsReviewDispatch has no age-out, so every reconcile-on-read in every CLI boot and dashboard boot re-attempts a host-side dispatch that can never succeed (no durable pipeline handler registered outside the server) and logs one line per wedged issue. The closed-issue reaper never clears the residue because it discovers closed issues only via agent/session/workspace/devnet signals, none of which survive. The same wedge blocks close-out for 22 issues (11 named + 11 more tracker-closed residue): their pending/pending/pending statuses miss DoD rows 1/2/3, and rows 1/2/3 have no terminal-settling rule the way PAN-3180 (strike waiver) and PAN-3188 (rows 5/7) established for other landing classes.",
+      "Proposal": "Four dispatch-side fixes plus the ledger-side settling rule plus a one-time repair. (1) needsReviewDispatch ages out requests older than REVIEW_REQUEST_MAX_AGE_MS (7 days) via a pure isReviewRequestStale predicate. (2) The reconcile read path clears stale requests through setReviewStatusSync (best-effort, existing merge base passed to avoid re-entrancy) with one warn + activity entry per issue per process. (3) dispatchReviewHostSide early-returns when hasDurableReviewPipelineHandler() is false (CLI processes), logging at most one debug line per process. (4) The closed-issue reaper sweep clears unserviced review intent for tracker-closed issues. (5) evaluateDodGate computes mainVerify first and threads {trackerClosed, landedWork, mainVerifyStatus} into rows 1/2/3: never-requested verdicts settle as skip, negative test/verification verdicts settle as skip only when main-verify passes (superseded), negative review verdicts and closed-without-landed-work stay miss. (6) Docs updated. (7) A checked-in repair script runs pan close (no --accept-* overrides) on the 11 named issues plus discovered tracker-closed residue, using a workspace-built pan.",
+      "NonGoals": "- Deleting review_status rows or rewriting verdict history from the reaper (close-out owns that)\n- Changing startDurableReviewPipelineHostSide's false-return contract or the server's registered handler path\n- A config knob for the age bound\n- Journal-only wedge enumeration in the sweep (the read-path clear handles it)\n- Preventing inert pending row resurrection for closed issues with a journal pipeline block (pre-existing, harmless once intent is cleared)\n- Re-running or reconstructing verdicts for terminal-closed issues (settling is skip, never fabricated pass)\n- Mechanically waiving negative review verdicts, or negative test/verification verdicts without a passing main-verify\n- Extending terminal settling to issues closed WITHOUT landed work"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Age bound is 7 days (REVIEW_REQUEST_MAX_AGE_MS), not 24 hours",
+        "rationale": "The PAN-1988 auto-heal exists for outage recovery; a weekend dashboard outage must still dispatch Monday. 7d is far beyond planned downtime while a week-old unserviced request is wedged by any measure, and all 11 live wedges are 18-28 days old."
+      },
+      {
+        "summary": "Stale-request clearing runs on the reconcile read path in any process, best-effort",
+        "rationale": "The flood originates in CLI boots, so a deacon-only sweep cannot be the only clear mechanism; writes-on-read through the door is the established pattern (reconcile upsert, closedOut delete), and sandboxed readers still get suppression from the age-out alone."
+      },
+      {
+        "summary": "Tracker-closed check lives in the async deacon sweep, not the sync read path",
+        "rationale": "isIssueClosed is async; needsReviewDispatch stays pure and sync. The issue's '(or its callers)' wording permits caller-side placement."
+      },
+      {
+        "summary": "Sweep clears intent fields only; no row deletes, no closedOut stamping",
+        "rationale": "Deleting the DB row is churn (journal re-reconciles an inert row) and stamping closedOut would fake the close-out ceremony and corrupt pan close's audit."
+      },
+      {
+        "summary": "DoD rows 1/2/3 settle mechanically only for terminal-closed issues with landed work (row 4 pass)",
+        "rationale": "Operator-directed design question. For landed work on a tracker-closed issue the verdict gate's purpose (keeping unverified code off main) is moot; for closed-without-landed the miss must keep demanding an explanation. Mirrors the PAN-3188 skip-chain precedent."
+      },
+      {
+        "summary": "Never-requested verdicts skip; negative review verdicts never settle; negative test/verification verdicts skip only when main-verify passes on the landed commit",
+        "rationale": "Operator asked for the never-requested (MIN-305) vs stale/superseded (PAN-1919) distinction. A specialist that said no is a different fact from one never dispatched (PAN-3180); green landed CI mechanically supersedes a stale test failure but cannot override a human design block; unprovable supersession stays operator judgment."
+      },
+      {
+        "summary": "Settle, never recover — no re-running or fabricating verdicts for terminal-closed issues",
+        "rationale": "Re-dispatching specialists against ancient commits wastes fleet capacity on issues nobody will act on; the close-out ledger records skip with the original verdict preserved (NFR-5)."
+      },
+      {
+        "summary": "Repair covers the full 22-issue backlog via discovery, runs as a checked-in script with a workspace-built pan, no --accept-* overrides",
+        "rationale": "The issue names 11 PAN issues; the operator counts 22 including other tracker-closed residue. A discovered list is honest evidence, the script satisfies the files_scope lint, and running the installed pan (without the settling item) would produce 22 refusals."
+      }
+    ],
+    "items": [
+      {
+        "id": "age-out-stale-review-requests",
+        "title": "Add 7-day age-out to needsReviewDispatch with isReviewRequestStale predicate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:52:30.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3187",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "clear-stale-review-request-on-read"
+          ],
+          "files_scope": [
+            "src/lib/review-dispatch-decision.ts",
+            "src/lib/__tests__/review-dispatch-decision.test.ts",
+            "tests/unit/lib/review-dispatch-decision.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/review-dispatch-decision.test.ts tests/unit/lib/review-dispatch-decision.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both dispatch-decision test files pass, including new age-boundary cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/review-dispatch-decision.ts add `export const REVIEW_REQUEST_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000` and a pure `isReviewRequestStale({ reviewRequestedAt?, now?, maxAgeMs? })` (false when no request; now defaults Date.now(); maxAgeMs defaults the constant). Add optional `now?: number` and `maxRequestAgeMs?: number` to needsReviewDispatch's params and return false when the request is stale (guard right after the missing-request guard). BEFORE/AFTER and full context: PRD WI-1 (drafts/pan-3187.md on overdeck-state). CRITICAL: the two existing test files are time bombs — src/lib/__tests__/review-dispatch-decision.test.ts uses fixed 2026-06-20 dates (already >7d old) and tests/unit/lib/review-dispatch-decision.test.ts uses 2026-07-25 dates; update every expect-true case to pass an explicit `now` so they stay deterministic. Add new cases: 7d+1ms old → false; 7d−1ms old → true; isReviewRequestStale false for missing request; injected maxAgeMs honored."
+        },
+        "items": [
+          {
+            "id": "age-out-stale-review-requests.ac1",
+            "title": "Given an unserviced request 7 days + 1 ms old and an injected now, needsReviewDispatch returns false; given one 7 days − 1 ms old, it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "age-out-stale-review-requests.ac2",
+            "title": "isReviewRequestStale returns false for a missing reviewRequestedAt and honors an injected maxAgeMs override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "age-out-stale-review-requests.ac3",
+            "title": "Both pre-existing dispatch-decision test files pass with explicit injected now in every expect-true case, and npx vitest run on both files exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "clear-stale-review-request-on-read",
+        "title": "Clear stale review requests through the write door on the reconcile read path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:52:30.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/review-status.ts",
+            "src/lib/__tests__/review-status-stale-clear.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/review-status",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "review-status test files pass, including the stale-clear cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/review-status.ts, change maybeAutoDispatchReviewHostSide (lines 522-537): when needsReviewDispatch returns false AND isReviewRequestStale is true for the status's reviewRequestedAt, clear the request via `setReviewStatusSync(issueId, { reviewRequestedAt: undefined }, status)` — passing the reconciled status as the `existing` merge base is MANDATORY (NFR-2: otherwise setReviewStatusSync re-enters getReviewStatusSync → reconcile → this hook = recursion). Guard with a per-process `staleReviewRequestClearAttemptedAt` Map so each issue attempts once per process, wrap in try/catch (sandboxed read-only readers fail silently), and on success emit one console.warn plus emitActivityEntrySync({ source: 'cloister', level: 'warn', issueId, message }) — emitActivityEntrySync is already imported at review-status.ts:5 and 'warn' is a valid ActivityLevel. Full snippet: PRD WI-2. Tests in a new src/lib/__tests__/review-status-stale-clear.test.ts following the existing review-status test mocking pattern."
+        },
+        "items": [
+          {
+            "id": "clear-stale-review-request-on-read.ac1",
+            "title": "When the hook runs with an 8-day-old unserviced request, it clears reviewRequestedAt via setReviewStatusSync with the reconciled status passed as existing, attempts no dispatch, and logs exactly one warn across two invocations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-stale-review-request-on-read.ac2",
+            "title": "When the hook runs with a 1-day-old unserviced request, it preserves reviewRequestedAt and takes the normal dispatch path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "clear-stale-review-request-on-read.ac3",
+            "title": "npx vitest run src/lib/__tests__/review-status exits 0 and npm run typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skip-host-dispatch-without-handler",
+        "title": "Skip host-side review dispatch when no durable pipeline handler is registered",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:52:30.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/durable-review-pipeline.ts",
+            "src/lib/review-status.ts",
+            "src/lib/cloister/__tests__/durable-review-pipeline.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/durable-review-pipeline.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "durable-review-pipeline tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/durable-review-pipeline.ts add `export function hasDurableReviewPipelineHandler(): boolean { return handler !== null; }`. In src/lib/review-status.ts dispatchReviewHostSide (lines 538-556): export the function, destructure hasDurableReviewPipelineHandler from the existing dynamic import, and when it returns false skip the attempt entirely, emitting at most one console.debug per process (module-level `loggedMissingPipelineHandler` flag) — only the dashboard server registers the handler (src/dashboard/server/services/durable-review-pipeline.ts:129), so a CLI dispatch can never succeed. The registered-path behavior (including the existing info-level 'unavailable or already in flight' line) stays byte-identical. Full snippet: PRD WI-3. Tests in new src/lib/cloister/__tests__/durable-review-pipeline.test.ts; the handler is module-global with no unregister, so register only in the last test or isolate per the repo's module-global test pattern."
+        },
+        "items": [
+          {
+            "id": "skip-host-dispatch-without-handler.ac1",
+            "title": "hasDurableReviewPipelineHandler returns false in a fresh process and true after registerDurableReviewPipelineHandler is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skip-host-dispatch-without-handler.ac2",
+            "title": "With no handler registered, dispatchReviewHostSide resolves without calling console.log and emits at most one console.debug across two calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skip-host-dispatch-without-handler.ac3",
+            "title": "npx vitest run src/lib/cloister/__tests__/durable-review-pipeline.test.ts exits 0 and npm run typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reap-closed-issue-review-requests",
+        "title": "Sweep and clear unserviced review intent for tracker-closed issues in the deacon reaper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:52:30.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/closed-issue-reaper.ts",
+            "src/lib/cloister/__tests__/closed-issue-reaper.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/closed-issue-reaper.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "closed-issue-reaper tests pass, including the four new sweep matrix cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/closed-issue-reaper.ts add exported `reapClosedIssueReviewRequests(closedChecks: Map<string, Promise<boolean>>): Promise<string[]>`: enumerate getAllReviewStatusesFromDb(), pre-filter reviewStatus === 'pending', read each candidate's journal via readJournalStatusSync, keep only unserviced requests (reviewRequestedAt set and (no reviewSpawnedAt or request newer than spawn)), check isClosedIssue(issueId, closedChecks), and for tracker-closed matches clear intent via `setReviewStatusSync(issueId, { reviewRequestedAt: undefined, reviewSpawnedAt: undefined }, existing)` — build `existing` as DB row + journal durable overlay and pass it (NFR-2: otherwise the internal getReviewStatusSync re-runs the reconcile and, in the server, dispatches a review for a closed issue). Log each clearing as a deacon action + emitActivityEntrySync (level 'info'). Wire `actions.push(...await reapClosedIssueReviewRequests(closedChecks))` into reconcileClosedIssueAgents immediately before `return actions;` (line 263). Clears intent fields ONLY (D4): no row deletes, no closedOut stamping, verdict history untouched. Full snippet: PRD WI-4. Extend src/lib/cloister/__tests__/closed-issue-reaper.test.ts (14 existing cases) following its mocking pattern."
+        },
+        "items": [
+          {
+            "id": "reap-closed-issue-review-requests.ac1",
+            "title": "When the sweep encounters a tracker-closed issue with an unserviced request, it clears reviewRequestedAt and reviewSpawnedAt and logs a deacon action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reap-closed-issue-review-requests.ac2",
+            "title": "When the sweep encounters a tracker-OPEN issue with an identical unserviced request, it preserves the request untouched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reap-closed-issue-review-requests.ac3",
+            "title": "When the sweep encounters a tracker-closed issue whose request is already serviced (spawn newer than request) or whose reviewStatus is passed, it preserves the row untouched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reap-closed-issue-review-requests.ac4",
+            "title": "reconcileClosedIssueAgents invokes the sweep exactly once per patrol and npx vitest run src/lib/cloister/__tests__/closed-issue-reaper.test.ts exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dod-terminal-settling-rows-1-2-3",
+        "title": "Settle DoD rows 1/2/3 mechanically for terminal-closed issues with landed work",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:52:30.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3187",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "repair-closeout-backlog"
+          ],
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "src/lib/lifecycle/dod.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "parallelSafeReason": "touches only src/lib/lifecycle/* and its test file, which no other item in this plan modifies",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dod-gate test suite passes, including the eight new settling cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Mirror PAN-3188's skip chain (commit 5a8eef4010) for the verdict rows. In src/lib/lifecycle/dod-gate.ts evaluateDodGate (lines 533-585): compute `merged`, then `mainVerify`, then a new `trackerClosed` dep (default isIssueClosed from ../cloister/issue-closed.js), build `{ trackerClosed, landedWork: merged.status === 'pass', mainVerifyStatus: mainVerify.status }` and pass it as an optional second parameter into deps.review/tests/verification (additive signature — existing custom deps keep working); deploy keeps using mainVerify as PAN-3188 wired it. In checkVerdict (lines 238-260) and checkVerificationRow (lines 270-292), after the existing passed/skipped and PAN-3180 strike-waiver branches, add the terminal-settling branch gated on trackerClosed && landedWork: (a) verdict NOT in NEGATIVE_VERDICTS → result 'skip' with observed naming the real (absent/pending) verdict and the settling reason; (b) negative verdict AND row id !== 'review' AND mainVerifyStatus === 'pass' → result 'skip' with observed naming the superseded verdict and the green landed state. Row 1 (review) NEVER takes the supersession branch (D8); closed-without-landed-work and tracker-open issues NEVER settle (D7). Update the DOD_ROWS review/tests/verification entries in dod.ts so the --accept help text states the settling rule in one line each. Find the existing dod-gate test file (ls src/lib/lifecycle/__tests__/) and mirror PAN-3188's skip-chain test structure. Full context: PRD WI-5."
+        },
+        "items": [
+          {
+            "id": "dod-terminal-settling-rows-1-2-3.ac1",
+            "title": "Tracker-closed + merged pass + reviewStatus pending → row 1 resolves skip; tracker-closed + merged pass + testStatus missing → row 2 resolves skip; tracker-closed + merged pass + verificationStatus pending → row 3 resolves skip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-terminal-settling-rows-1-2-3.ac2",
+            "title": "When the gate evaluates tracker-closed + merged miss + reviewStatus pending, row 1 resolves miss (no landed work, no settling); when it evaluates tracker-OPEN + merged pass + reviewStatus pending, row 1 resolves miss",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-terminal-settling-rows-1-2-3.ac3",
+            "title": "Tracker-closed + merged pass + reviewStatus blocked → row 1 stays miss even when main-verify passes (review negatives are never superseded)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-terminal-settling-rows-1-2-3.ac4",
+            "title": "Tracker-closed + merged pass + testStatus failed → row 2 resolves skip when main-verify passes and stays miss when main-verify skips (supersession unprovable)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-terminal-settling-rows-1-2-3.ac5",
+            "title": "Every settled skip's observed string contains the original verdict value, evaluateDodGate computes mainVerify before the verdict rows, and npx vitest run src/lib/lifecycle exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-intent-lifecycle-and-settling",
+        "title": "Document the intent death lifecycle and the rows 1/2/3 terminal-settling rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-27T04:52:30.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "docs/DEFINITION-OF-DONE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n REVIEW_REQUEST_MAX_AGE_MS docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "grep -ni 'terminal' docs/DEFINITION-OF-DONE.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new lifecycle lines in REVIEW-AGENT-ARCHITECTURE.md",
+            "grep prints the new settling-rule lines in DEFINITION-OF-DONE.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Two files. (1) docs/REVIEW-AGENT-ARCHITECTURE.md lines 63-74 ('The work ↔ review loop', item 1): extend the intent-lifecycle stage list — after the needsReviewDispatch guards stage, add that the intent DIES when older than REVIEW_REQUEST_MAX_AGE_MS (7 days), cleared from the journal on the next status read with a warn log + activity entry, or when the tracker issue closes (the deacon's closed-issue sweep clears it on patrol); and state that host-side dispatch only ever happens in the dashboard server process because only it registers the durable review pipeline handler (CLI processes log one debug line and skip). (2) docs/DEFINITION-OF-DONE.md: document the rows 1/2/3 terminal-settling rule — what settles (skip for terminal-closed with landed work: never-requested verdicts, and negative test/verification verdicts superseded by a passing main-verify), what never settles (closed without landed work, negative review verdicts, unprovable supersession), and that skip never means a fabricated verdict (the observed string preserves the original value)."
+        },
+        "items": [
+          {
+            "id": "docs-intent-lifecycle-and-settling.ac1",
+            "title": "docs/REVIEW-AGENT-ARCHITECTURE.md contains REVIEW_REQUEST_MAX_AGE_MS, the 7-day intent death, the tracker-close sweep, and the server-only dispatch gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-intent-lifecycle-and-settling.ac2",
+            "title": "docs/DEFINITION-OF-DONE.md contains the terminal-settling rule for rows 1/2/3 including the never-requested vs stale/superseded distinction and the cases that never settle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "repair-closeout-backlog",
+        "title": "Run the one-time repair script closing out the wedged and residue backlog via pan close",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-27T04:52:30.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3187",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/repair-pan-3187-closed-review-residue.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "bash scripts/repair-pan-3187-closed-review-residue.sh"
+          ],
+          "expected_outputs": [
+            "the workspace build completes without errors",
+            "the script prints a per-issue table of closed-out / refused: <blocking DoD row> / error and exits 0",
+            "a subsequent CLI boot prints zero '[review-status] durable review pipeline unavailable' lines"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Create scripts/repair-pan-3187-closed-review-residue.sh (checked in, chmod +x) per the contract in PRD WI-7: hardcode the 11 named issues (PAN-2510 PAN-2230 PAN-2420 PAN-2375 PAN-2167 PAN-2407 PAN-2257 PAN-2258 PAN-2248 PAN-1935 PAN-2150); add a discovery step that enumerates ~/.overdeck/state/<project>/records/*.json across projects for closeOut.closedOut != true, checks tracker state (gh issue view for GitHub projects), prints every additional tracker-closed match, and joins them to the repair list (target: the operator's count of 22 total); then run `pan close <id>` for each with NO --accept-* flags, capture exit codes, and print a final per-issue table (closed-out / refused: <blocking DoD row> / error), exiting 0 regardless. SEQUENCING IS MANDATORY (hazard H7): run `npm run build` in this workspace first and invoke the workspace's built CLI so the run includes the dod-terminal-settling-rows-1-2-3 item — the installed pan is built from main and would refuse all 22 on rows 1/2/3. After the run, verify by reading record files how many reached closeOut.closedOut: true, record per-issue refusals with their exact blocking DoD row in the commit message, and confirm a fresh CLI boot prints zero '[review-status] durable review pipeline unavailable' lines. If an issue refuses on its merged row (work genuinely not landed), stop for that issue and surface it in the completion notes — never override."
+        },
+        "items": [
+          {
+            "id": "repair-closeout-backlog.ac1",
+            "title": "scripts/repair-pan-3187-closed-review-residue.sh exists, is executable, contains no --accept- flag, and prints the discovered backlog list before acting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repair-closeout-backlog.ac2",
+            "title": "The script runs against a workspace-built pan containing the settling item, and its output table shows every listed issue as closed-out or refused with a named blocking DoD row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repair-closeout-backlog.ac3",
+            "title": "After the run, record files show closeOut.closedOut: true for every repaired issue and a fresh CLI boot prints zero '[review-status] durable review pipeline unavailable' lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "age-out-stale-review-requests",
+        "to": "clear-stale-review-request-on-read",
+        "type": "blocks"
+      },
+      {
+        "from": "skip-host-dispatch-without-handler",
+        "to": "clear-stale-review-request-on-read",
+        "type": "blocks"
+      },
+      {
+        "from": "clear-stale-review-request-on-read",
+        "to": "repair-closeout-backlog",
+        "type": "blocks"
+      },
+      {
+        "from": "skip-host-dispatch-without-handler",
+        "to": "repair-closeout-backlog",
+        "type": "blocks"
+      },
+      {
+        "from": "reap-closed-issue-review-requests",
+        "to": "repair-closeout-backlog",
+        "type": "blocks"
+      },
+      {
+        "from": "dod-terminal-settling-rows-1-2-3",
+        "to": "repair-closeout-backlog",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-27-PAN-3187-review-status-auto-dispatch-floods-on-wedged-closed-issues-age-out-handler-gate-reaper-sweep-dod-terminal-settling-backlog-repair.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

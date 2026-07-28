@@ -1,0 +1,774 @@
+{
+  "issueId": "PAN-2255",
+  "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-16T06:59:38.439Z",
+      "reason": "end",
+      "note": "Implemented issue-role feedback mailboxes, live-delivery optimization, spawn/resume drain, delayed escalation, and close-out stale warnings; focused suites, typecheck, and lint gates pass"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T07:04Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T07:04:02.788Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:11:20.617Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:11:23.596Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:11:23.762Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:11:23.794Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:11:23.822Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T07:14Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T07:14:27.954Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T07:17Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-07-16T07:17:49.914Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:17:49.999Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:19:18.440Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T07:19Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-16T07:19:19.439Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:19:21.427Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:19:21.437Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:19:21.447Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:19:21.463Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:33:49.573Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T07:37Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T07:37:13.046Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:37:13.103Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:47:22.358Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:47:24.877Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:47:25.023Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:47:25.035Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:47:25.120Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:48:08.427Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T07:50Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T07:50:44.759Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:04:06.588Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:11:28.822Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:11:30.615Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:11:30.625Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:11:30.635Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:11:30.648Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T08:14Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-16T08:14:21.675Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:15:06.001Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T08:17Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-16T08:17:16.972Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:18:06.311Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:18:07.244Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T08:20Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-16T08:20:23.080Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:22:12.359Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T08:22Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T08:22:54.915Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:29:26.725Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:29:28.977Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:29:28.992Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:29:29.008Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:29:29.024Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T08:31Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T08:31:54.596Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T09:14:49.091Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T09:20:56.757Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T09:21:01.511Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T09:21:01.529Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T09:21:01.547Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T09:21:01.557Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T09:24Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-16T09:24:03.056Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T09:29Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-07-16T09:29:39.487Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T09:34:37.209Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:32:56.641Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:34:04.909Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:34:05.234Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:34:06.710Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:34:06.721Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:34:06.733Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:34:06.744Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:34:06.943Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:34:06.954Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:34:06.966Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:34:06.977Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:37:06.100Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:37:07.871Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:37:07.897Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:37:07.907Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:37:07.917Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T11:38Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-16T11:38:54.693Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:40:03.708Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:50:26.000Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:50:27.902Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:50:27.959Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:50:27.975Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:50:27.991Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T11:53:57.525Z"
+    }
+  ],
+  "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/dashboard-types-baseline.txt",
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/__tests__/feedback-writer.test.ts",
+      "src/lib/cloister/__tests__/review-verdict-feedback.test.ts",
+      "src/lib/cloister/agent-mailbox-escalation.ts",
+      "src/lib/cloister/mailbox-status-source.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/lib/agents/supervisor-channels.ts",
+      "src/lib/cloister/__tests__/config.test.ts",
+      "src/lib/cloister/__tests__/pan-871-auto-resume.test.ts",
+      "src/lib/cloister/config.ts",
+      "src/lib/cloister/deacon-auto-resume.ts",
+      "src/lib/cloister/feedback-target.ts",
+      "src/lib/lifecycle/close-issue.ts",
+      "src/lib/pan-dir/feedback.ts",
+      "tests/cloister/verification-runner.test.ts",
+      "tests/lib/cloister/review-verdict-feedback.test.ts",
+      "tests/unit/lib/cloister/feedback-target.test.ts"
+    ],
+    "declaredScope": [
+      "src/dashboard/server/__tests__/pending-feedback.test.ts",
+      "src/dashboard/server/pending-feedback.ts",
+      "src/dashboard/server/routes/workspaces.ts",
+      "src/lib/__tests__/agent-mailbox-drain.test.ts",
+      "src/lib/__tests__/close-out.test.ts",
+      "src/lib/agents/resume.ts",
+      "src/lib/agents/spawn.ts",
+      "src/lib/agents/supervisor-channels.ts",
+      "src/lib/cloister/__tests__/agent-mailbox-escalation.test.ts",
+      "src/lib/cloister/__tests__/agent-mailbox.test.ts",
+      "src/lib/cloister/__tests__/config.test.ts",
+      "src/lib/cloister/__tests__/pan-871-auto-resume.test.ts",
+      "src/lib/cloister/agent-mailbox.ts",
+      "src/lib/cloister/ci-failure-feedback.ts",
+      "src/lib/cloister/config.ts",
+      "src/lib/cloister/deacon-auto-resume.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/feedback-target.ts",
+      "src/lib/cloister/feedback-writer.ts",
+      "src/lib/cloister/review-verdict-feedback.ts",
+      "src/lib/cloister/verification-runner.ts",
+      "src/lib/close-out.ts",
+      "src/lib/lifecycle/close-issue.ts",
+      "src/lib/pan-dir/feedback.ts",
+      "src/lib/review-status.ts",
+      "tests/cloister/verification-runner.test.ts",
+      "tests/lib/cloister/review-verdict-feedback.test.ts",
+      "tests/unit/lib/cloister/feedback-target.test.ts"
+    ],
+    "actualChangedFiles": [
+      "scripts/dashboard-types-baseline.txt",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/server/__tests__/pending-feedback.test.ts",
+      "src/dashboard/server/pending-feedback.ts",
+      "src/dashboard/server/routes/workspaces.ts",
+      "src/lib/__tests__/agent-mailbox-drain.test.ts",
+      "src/lib/__tests__/close-out.test.ts",
+      "src/lib/agents/resume.ts",
+      "src/lib/agents/spawn.ts",
+      "src/lib/cloister/__tests__/agent-mailbox-escalation.test.ts",
+      "src/lib/cloister/__tests__/agent-mailbox.test.ts",
+      "src/lib/cloister/__tests__/feedback-writer.test.ts",
+      "src/lib/cloister/__tests__/review-verdict-feedback.test.ts",
+      "src/lib/cloister/agent-mailbox-escalation.ts",
+      "src/lib/cloister/agent-mailbox.ts",
+      "src/lib/cloister/ci-failure-feedback.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/feedback-writer.ts",
+      "src/lib/cloister/mailbox-status-source.ts",
+      "src/lib/cloister/review-verdict-feedback.ts",
+      "src/lib/cloister/verification-runner.ts",
+      "src/lib/close-out.ts",
+      "src/lib/review-status.ts"
+    ],
+    "recordedAt": "2026-07-16T06:59:35.993Z"
+  },
+  "created": "2026-07-16T05:46:13.495Z",
+  "updated": "2026-07-18T18:57:54.140Z",
+  "pipeline": {
+    "issueId": "PAN-2255",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "inspectStatus": "failed",
+    "mergeStatus": "merged",
+    "releaseStatus": "skipped",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-18T18:57:54.116Z",
+    "testNotes": "Skipped: issue is already merged",
+    "inspectNotes": "Commit 309d306e only deletes .pan/drafts/PAN-2255.md and .pan/records/pan-2255.json (infra state-migration cleanup); it contains no changes to writeFeedbackFile(), no mailbox reader/writer module, and no create/list/mark-delivered/mark-acknowledged API. None of the 4 ACs are addressed. Required: land the actual mailbox-contract implementation (writeFeedbackFile metadata, pending-item reader, idempotent mark-delivered/mark-acknowledged, issueId+role public API) in a commit scoped to this bead.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2783",
+    "reviewedAtCommit": "6ff696806c07ad0ff3be94bb5cccc156bf89afb2",
+    "lastVerifiedCommit": "6ff696806c07ad0ff3be94bb5cccc156bf89afb2",
+    "reviewRequestedAt": "2026-07-16T11:39:59.401Z",
+    "reviewSpawnedAt": "2026-07-16T11:50:24.022Z",
+    "strikeRecoveryCount": 0,
+    "closedOut": true,
+    "closedOutAt": "2026-07-18T18:57:54.116Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 9649947,
+            "output": 12286,
+            "cacheRead": 9020544,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 163388784,
+            "output": 300660,
+            "cacheRead": 157684224,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 24096,
+            "output": 424,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 12,
+            "output": 2716,
+            "cacheRead": 957725,
+            "cacheWrite": 178172
+          }
+        },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 890,
+            "output": 35330,
+            "cacheRead": 11583410,
+            "cacheWrite": 372702
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 9649947,
+          "output": 12286,
+          "cacheRead": 9020544,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 163388784,
+          "output": 300660,
+          "cacheRead": 157684224,
+          "cacheWrite": 0
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 24096,
+          "output": 424,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 902,
+          "output": 38046,
+          "cacheRead": 12541135,
+          "cacheWrite": 550874
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 120.65239,
+        "pricingAsOf": "2026-07-18T18:22:46.567Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2783"
+    ],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-18T18:57:54.134Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: pending at 6ff696806c07ad0ff3be94bb5cccc156bf89afb2",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-verification",
+            "by": "flywheel-orchestrator",
+            "at": "2026-07-18T18:57:48.163Z"
+          }
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2783 MERGED at 2026-07-16T12:05:24Z",
+          "status": "pass",
+          "mergedAt": "2026-07-16T12:05:24Z",
+          "mergeCommit": "f7268f62a4f1542a47a25c5bd630088990a69cc3"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on f7268f62a4f1542a47a25c5bd630088990a69cc3",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-18T17:59:58.000Z, dist built 2026-07-18T17:59:34.492Z, merge 2026-07-16T12:05:24.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 8 agent state directories; No strike branch strike/pan-2255 found; Pruned 7 checkpoint ref(s) for agent-pan-2255, planning-pan-2255, strike-pan-2255; No specialist registry entries for PAN-2255"
+        }
+      ],
+      "accepted": [
+        "verification"
+      ]
+    }
+  },
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 10,
+    "claims": {},
+    "claimHistory": [
+      {
+        "writerId": "agent-pan-2255",
+        "agentId": "agent-pan-2255",
+        "pid": 2353478,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:28:38.519Z",
+        "itemId": "mailbox-contract",
+        "outcome": "completed",
+        "reason": "Added issue-role YAML mailbox envelopes, legacy action-status fallback, idempotent delivery/acknowledgement transitions, and focused tests",
+        "releasedAt": "2026-07-16T06:37:13.817Z"
+      },
+      {
+        "writerId": "agent-pan-2255",
+        "agentId": "agent-pan-2255",
+        "pid": 2451085,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:38:37.038Z",
+        "itemId": "feedback-producers",
+        "outcome": "completed",
+        "reason": "Persisted issue-role feedback deliveries, resolved live agents at send time, marked mailbox delivery after successful sends, and deferred escalation when no target exists",
+        "releasedAt": "2026-07-16T06:44:56.987Z"
+      },
+      {
+        "writerId": "agent-pan-2255",
+        "agentId": "agent-pan-2255",
+        "pid": 2504622,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:45:11.727Z",
+        "itemId": "drain-spawn-resume",
+        "outcome": "completed",
+        "reason": "Prepended pending mailbox feedback to work/strike spawn and resume prompts with idempotent delivered/acknowledged transitions; Deacon auto-resume inherits the shared path",
+        "releasedAt": "2026-07-16T06:48:07.173Z"
+      },
+      {
+        "writerId": "agent-pan-2255",
+        "agentId": "agent-pan-2255",
+        "pid": 2558946,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:48:19.504Z",
+        "itemId": "delayed-escalation",
+        "outcome": "completed",
+        "reason": "Added one-patrol mailbox escalation policy with resurrection-first targeting, exactly-once operator fallback, and fake-timer coverage",
+        "releasedAt": "2026-07-16T06:50:44.193Z"
+      },
+      {
+        "writerId": "agent-pan-2255",
+        "agentId": "agent-pan-2255",
+        "pid": 2603844,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:50:59.493Z",
+        "itemId": "closeout-pending-comment",
+        "outcome": "completed",
+        "reason": "Posted one stale-warning tracker comment with pending mailbox details before workspace teardown; empty mailboxes preserve existing close-out behavior",
+        "releasedAt": "2026-07-16T06:52:36.001Z"
+      }
+    ],
+    "statusReasons": {
+      "mailbox-contract": {
+        "reason": "Added issue-role YAML mailbox envelopes, legacy action-status fallback, idempotent delivery/acknowledgement transitions, and focused tests",
+        "updatedAt": "2026-07-16T06:37:13.817Z"
+      },
+      "feedback-producers": {
+        "reason": "Persisted issue-role feedback deliveries, resolved live agents at send time, marked mailbox delivery after successful sends, and deferred escalation when no target exists",
+        "updatedAt": "2026-07-16T06:44:56.987Z"
+      },
+      "drain-spawn-resume": {
+        "reason": "Prepended pending mailbox feedback to work/strike spawn and resume prompts with idempotent delivered/acknowledged transitions; Deacon auto-resume inherits the shared path",
+        "updatedAt": "2026-07-16T06:48:07.173Z"
+      },
+      "delayed-escalation": {
+        "reason": "Added one-patrol mailbox escalation policy with resurrection-first targeting, exactly-once operator fallback, and fake-timer coverage",
+        "updatedAt": "2026-07-16T06:50:44.193Z"
+      },
+      "closeout-pending-comment": {
+        "reason": "Posted one stale-warning tracker comment with pending mailbox details before workspace teardown; empty mailboxes preserve existing close-out behavior",
+        "updatedAt": "2026-07-16T06:52:36.001Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "mailbox-contract": "completed",
+    "mailbox-contract.mailbox-contract.ac1": "completed",
+    "mailbox-contract.mailbox-contract.ac2": "completed",
+    "mailbox-contract.mailbox-contract.ac3": "completed",
+    "mailbox-contract.mailbox-contract.ac4": "completed",
+    "feedback-producers": "completed",
+    "feedback-producers.feedback-producers.ac1": "completed",
+    "feedback-producers.feedback-producers.ac2": "completed",
+    "feedback-producers.feedback-producers.ac3": "completed",
+    "feedback-producers.feedback-producers.ac4": "completed",
+    "drain-spawn-resume": "completed",
+    "drain-spawn-resume.drain-spawn-resume.ac1": "completed",
+    "drain-spawn-resume.drain-spawn-resume.ac2": "completed",
+    "drain-spawn-resume.drain-spawn-resume.ac3": "completed",
+    "drain-spawn-resume.drain-spawn-resume.ac4": "completed",
+    "delayed-escalation": "completed",
+    "delayed-escalation.delayed-escalation.ac1": "completed",
+    "delayed-escalation.delayed-escalation.ac2": "completed",
+    "delayed-escalation.delayed-escalation.ac3": "completed",
+    "delayed-escalation.delayed-escalation.ac4": "completed",
+    "closeout-pending-comment": "completed",
+    "closeout-pending-comment.closeout-pending-comment.ac1": "completed",
+    "closeout-pending-comment.closeout-pending-comment.ac2": "completed",
+    "closeout-pending-comment.closeout-pending-comment.ac3": "completed",
+    "closeout-pending-comment.closeout-pending-comment.ac4": "completed",
+    "closeout-pending-comment.closeout-pending-comment.ac5": "completed"
+  }
+}

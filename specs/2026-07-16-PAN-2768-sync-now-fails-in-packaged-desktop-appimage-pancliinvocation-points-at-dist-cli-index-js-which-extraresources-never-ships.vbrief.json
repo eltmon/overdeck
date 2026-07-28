@@ -1,0 +1,467 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-16T03:41:40Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2768: Sync Now fails in packaged desktop (AppImage): panCliInvocation points at dist/cli/index.js, which extraResources never ships",
+    "updated": "2026-07-16T16:59:23.314Z"
+  },
+  "plan": {
+    "id": "pan-2768",
+    "title": "Sync Now fails in packaged desktop (AppImage): panCliInvocation points at dist/cli/index.js, which extraResources never ships",
+    "status": "completed",
+    "uid": "4ab4c958-4f3f-4303-b31d-0535c51e2089",
+    "author": "agent:claude-fable-5",
+    "sequence": 5,
+    "created": "2026-07-16T03:41:40Z",
+    "updated": "2026-07-16T16:59:23.314Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2768",
+        "label": "PAN-2768",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "desktop",
+      "packaging",
+      "electron",
+      "appimage",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "Every packaged-desktop code path that shells out to the pan CLI fails with MODULE_NOT_FOUND. panCliInvocation (src/lib/pan-cli-invocation.ts:17) builds `<packageRoot>/dist/cli/index.js`, and packageRoot resolves to the app's resources/ directory in the packaged layout — but apps/desktop's electron-builder extraResources ships only drizzle, sync-sources (hooks only), server, and resources. dist/cli was never copied in, so Sync Now (POST /api/system/sync), context sync, reset-to-planned, restart --dashboard, agent spawn, and the workspace rebuild/start chains all fail identically in the AppImage (and dmg/nsis, which share the config). A second latent gap: the staging ships only sync-sources/hooks, but `pan sync` — the command Sync Now runs — reads the full sync-sources tree (skills, rules, agents) at packageRoot/sync-sources, so shipping the CLI alone would let Sync Now launch and then fail on missing sources.",
+      "Proposal": "Option 1 from the issue: ship the CLI bundle. Extend apps/desktop/scripts/prepare-server-resources.mjs to stage a self-contained CLI runtime into apps/desktop/cli/ (gitignored): the dist/cli/ assets plus the dist-root chunk closure (dist/cli/index.js imports ../chunk-*.js), a node_modules with the CLI's discovered bare-import externals pinned to repo-root versions, and an isolated tmpdir smoke-run — all reusing the machinery the script already uses for the server bundle and pty-supervisor. Map it with extraResources {from: 'cli', to: 'dist'} so the packaged file lands exactly at resources/dist/cli/index.js, which panCliInvocation already resolves — zero runtime code change. Also stage the full sync-sources tree so pan sync has its payload. ELECTRON_RUN_AS_NODE=1 reaches CLI children via env inheritance from the server spawn (apps/desktop/src/server.ts:99); all 7 call sites were audited and none overrides env, and the AppImage smoke verification runs the exact production invocation shape to prove it.",
+      "NonGoals": "- No in-process rewrite of sync or any other pan-CLI shell-out (issue option 2): restart --dashboard cannot run in-process and the detached rebuild/start chains are child processes by design, so the CLI must ship regardless.\n- No changes to panCliInvocation, spawnPanCli, or paths.ts resolution logic.\n- No fix for the npx/global-install flavor of @overdeck/desktop (npm pack strips nested node_modules; tracked with the PAN-2561 npx vendoring story) — do not add 'cli' to package.json files[].\n- No on-platform macOS/Windows runtime verification (same electron-builder extraResources config; release pipeline owns cross-platform builds).\n- No GUI click automation of the Sync Now button."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose issue option 1 (ship the CLI bundle) over option 2 (call sync in-process).",
+        "rationale": "The caller audit found 7 panCliInvocation sites; several are architecturally child processes (detached, output-streamed, must outlive the request) and `pan restart --dashboard` cannot run in-process at all. The CLI therefore must ship regardless; an in-process sync rewrite would be a redundant partial refactor. The issue asked for one deliberate choice, and option 1 repairs the entire failure class."
+      },
+      {
+        "summary": "Ship at resources/dist/cli with a self-contained node_modules rather than nesting under server/ to share server/node_modules.",
+        "rationale": "Preserves the canonical packageRoot/dist/cli/index.js path so no runtime code changes; sharing server's vendored deps would require new resolution logic in panCliInvocation and entangle two staging graphs. The uncompressed duplication (~150MB, squashfs-compressed far less) is an accepted size cost."
+      },
+      {
+        "summary": "Extended scope to stage the full sync-sources tree (currently hooks-only).",
+        "rationale": "pan sync reads SYNC_SOURCES.skills/rules/agents at packageRoot/sync-sources (src/lib/paths.ts:159-169); without them, the fixed spawn would still fail Sync Now on missing source dirs. Fixing the spawn but not the payload would not close Drew's report."
+      },
+      {
+        "summary": "Verification via --appimage-extract plus running the staged CLI under the bundled Electron with ELECTRON_RUN_AS_NODE=1, instead of GUI automation.",
+        "rationale": "This exercises the exact production invocation mechanism that failed (electron-as-node loading resources/dist/cli/index.js) without FUSE or a display server, and is mechanically checkable."
+      }
+    ],
+    "items": [
+      {
+        "id": "stage-cli-runtime",
+        "title": "Stage a self-contained pan CLI runtime in prepare-server-resources.mjs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T03:41:40Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-2768",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "ship-cli-extraresources",
+            "package-structure-tests",
+            "appimage-smoke-verify"
+          ],
+          "files_scope": [
+            "apps/desktop/scripts/prepare-server-resources.mjs",
+            "apps/desktop/.gitignore"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "node apps/desktop/scripts/prepare-server-resources.mjs",
+            "test -f apps/desktop/cli/cli/index.js && test -d apps/desktop/cli/node_modules"
+          ],
+          "expected_outputs": [
+            "prepare-server-resources logs a staged-CLI line including chunk count and externals, and exits 0",
+            "apps/desktop/cli/cli/index.js and apps/desktop/cli/node_modules exist after the script runs",
+            "the script's isolated CLI smoke-run reports success (staged CLI --version exits 0 from a tmpdir outside the repo)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In apps/desktop/scripts/prepare-server-resources.mjs, after the existing server staging, assemble apps/desktop/cli/ as a dist-shaped tree: (1) copy repo dist/cli/ recursively excluding *.map — this brings index.js plus the runtime asset dirs prompts/, caveman/, caveman-compress/ that scripts/build-cli.mjs places there; (2) walk the relative-import closure starting from dist/cli/index.js and copy every reached dist-root chunk into apps/desktop/cli/ — generalize the existing supervisor walker to resolve both './' and '../' specifiers relative to the importing file (dist/cli/index.js imports ../chunk-*.js); (3) collect bare-import externals over that closure with the existing bare-specifier scan, skip packages not installed at the repo root with the existing parity warning, write a package.json with pinned versions into apps/desktop/cli/, and npm install --omit=dev there (reuse/refactor the server staging's install block); (4) smoke-run the staged CLI by copying the tree to a tmpdir OUTSIDE the repo (per the pty-supervisor smoke precedent — in-place runs let repo node_modules mask missing externals) and executing `node <tmp>/cli/index.js --version` with OVERDECK_HOME set to a fresh temp dir, failing the build unless it exits 0; (5) add `cli` to apps/desktop/.gitignore. Do NOT name the staging dir `dist` — that is electron-builder's output dir (stamp-update-manifests.mjs reads ../dist/)."
+        },
+        "items": [
+          {
+            "id": "stage-cli-runtime.ac1",
+            "title": "Given a fresh repo-root build, when prepare-server-resources.mjs runs, it produces apps/desktop/cli/ containing cli/index.js, the dist-root chunks that cli/index.js transitively imports, and the dist/cli asset directories (prompts, caveman, caveman-compress), with no *.map files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-cli-runtime.ac2",
+            "title": "The script creates apps/desktop/cli/package.json listing the CLI closure's bare-import externals pinned to repo-root installed versions, and npm install --omit=dev produces apps/desktop/cli/node_modules containing every listed package",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-cli-runtime.ac3",
+            "title": "The script smoke-runs the staged CLI from a tmpdir outside the repo with OVERDECK_HOME pointed at a temp dir, and exits non-zero (failing the packaging build) when `node cli/index.js --version` does not exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-cli-runtime.ac4",
+            "title": "Given apps/desktop/.gitignore contains a new `cli` entry, when staging has run, git status produces no untracked entries under apps/desktop/cli/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ship-cli-extraresources",
+        "title": "Map the staged CLI into the package via extraResources cli → dist",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T03:41:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-2768",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/desktop && npx vitest run tests/package-structure.test.ts --configLoader runner"
+          ],
+          "expected_outputs": [
+            "package-structure tests pass, including the new extraResources cli→dist assertion once package-structure-tests lands"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In apps/desktop/package.json build.extraResources, add { \"from\": \"cli\", \"to\": \"dist\", \"filter\": [\"**/*\", \"!**/*.map\"] } alongside the existing entries. This lands the staged tree at <resources>/dist/, so the packaged file path is resources/dist/cli/index.js — exactly what panCliInvocation computes from packageRoot=resources — and Node's upward resolution from resources/dist/cli/ finds resources/dist/node_modules for the vendored externals. Do NOT add 'cli' to the top-level files[] array (npm flavor is out of scope per NonGoals; npm pack strips nested node_modules)."
+        },
+        "items": [
+          {
+            "id": "ship-cli-extraresources.ac1",
+            "title": "apps/desktop/package.json build.extraResources contains an entry mapping from 'cli' to 'dist' with a filter excluding **/*.map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ship-cli-extraresources.ac2",
+            "title": "The top-level files[] array preserves exactly its existing entries (bin, dist-electron, server, resources, drizzle, sync-sources) with no 'cli' entry added, keeping the npm flavor out of scope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stage-full-sync-sources",
+        "title": "Stage the full sync-sources tree so packaged pan sync has its payload",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T03:41:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-2768",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/scripts/prepare-server-resources.mjs"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node apps/desktop/scripts/prepare-server-resources.mjs",
+            "test -d apps/desktop/sync-sources/rules && test -d apps/desktop/sync-sources/skills && test -d apps/desktop/sync-sources/hooks"
+          ],
+          "expected_outputs": [
+            "apps/desktop/sync-sources contains rules/, skills/, hooks/ (and every other top-level dir present in repo sync-sources), not only hooks/"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the hooks-only copy in prepare-server-resources.mjs (the block that does cpSync(join(repoRoot, 'sync-sources', 'hooks'), …)) with a copy of the entire repo sync-sources tree into apps/desktop/sync-sources/. Rationale to encode in the block comment: pan sync reads SYNC_SOURCES.skills/rules/agents/devSkills/hooks at packageRoot/sync-sources (src/lib/paths.ts:159-169), and packageRoot is resources/ in the packaged app, so Sync Now needs the whole tree, not just the hook bundle the dashboard provisions at boot. The existing extraResources sync-sources→sync-sources entry already ships whatever is staged; no package.json change needed for this item."
+        },
+        "items": [
+          {
+            "id": "stage-full-sync-sources.ac1",
+            "title": "After running prepare-server-resources.mjs, apps/desktop/sync-sources/ contains the full repo sync-sources tree including rules/, skills/, and hooks/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-full-sync-sources.ac2",
+            "title": "The staging block's comment states that pan sync resolves skills/rules/agents from packageRoot/sync-sources in the packaged layout, so future editors preserve the full-tree copy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "package-structure-tests",
+        "title": "Extend package-structure tests to lock the CLI and sync-sources packaging contract",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T03:41:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2768",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/tests/package-structure.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/desktop && npx vitest run tests/package-structure.test.ts --configLoader runner"
+          ],
+          "expected_outputs": [
+            "all package-structure tests pass, including new assertions for the cli→dist extraResources entry and the CLI/full-sync-sources staging in prepare-server-resources.mjs"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend apps/desktop/tests/package-structure.test.ts — the suite the issue names as the one that should have caught this gap. Add: (1) an assertion that build.extraResources contains an entry with from='cli' and to='dist' whose filter excludes **/*.map; (2) an assertion that build.extraResources still contains the sync-sources, server, drizzle, and resources entries (no-loss guard on the existing set); (3) script-content assertions on scripts/prepare-server-resources.mjs in the style of the existing stamp-update-manifests test: the script references dist/cli staging and the isolated CLI smoke-run, and it copies the full sync-sources tree rather than only the hooks subdirectory (e.g. asserts the hooks-only cpSync pattern is gone). Keep every existing assertion passing unchanged."
+        },
+        "items": [
+          {
+            "id": "package-structure-tests.ac1",
+            "title": "A new test rejects an apps/desktop/package.json whose extraResources lacks the cli→dist mapping (removing the entry makes the suite fail)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "package-structure-tests.ac2",
+            "title": "A new test rejects a prepare-server-resources.mjs that lacks the CLI staging and smoke-run markers — the vitest run exits non-zero when those script sections are removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "package-structure-tests.ac3",
+            "title": "A new test rejects a prepare-server-resources.mjs that copies only sync-sources/hooks — the vitest run exits non-zero if the hooks-only cpSync pattern reappears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "package-structure-tests.ac4",
+            "title": "vitest run tests/package-structure.test.ts exits 0 with every pre-existing assertion (files array, bin, engines, build:publish) intact and unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "appimage-smoke-verify",
+        "title": "Build the Linux AppImage and verify the packaged CLI launches under bundled Electron-as-Node",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T03:41:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2768",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/scripts/prepare-server-resources.mjs",
+            "apps/desktop/package.json"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "npm run build",
+            "cd apps/desktop && npm run dist:linux",
+            "cd apps/desktop/dist && ./Overdeck-*.AppImage --appimage-extract >/dev/null && test -f squashfs-root/resources/dist/cli/index.js",
+            "cd apps/desktop/dist && OVERDECK_HOME=$(mktemp -d) ELECTRON_RUN_AS_NODE=1 ./squashfs-root/overdeck squashfs-root/resources/dist/cli/index.js --version"
+          ],
+          "expected_outputs": [
+            "AppImage build completes and --appimage-extract yields squashfs-root/resources/dist/cli/index.js",
+            "the bundled Electron binary with ELECTRON_RUN_AS_NODE=1 runs the packaged CLI: --version prints a version and exits 0 with no MODULE_NOT_FOUND"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ],
+          "acJustification": "Verification-only item exercising the packaged artifact; no new source diff is expected, so two end-to-end ACs cover it."
+        },
+        "narrative": {
+          "Action": "End-to-end verification of the packaged artifact on Linux — this item is expected to produce evidence, not code (fixes discovered here belong to the earlier items). Steps: run the root build, then apps/desktop `npm run dist:linux`; extract the produced AppImage with --appimage-extract (works without FUSE); assert resources/dist/cli/index.js exists in the extracted tree; then run the exact production invocation shape: the extracted Electron binary (squashfs-root/overdeck — confirm the actual binary name in squashfs-root/) with ELECTRON_RUN_AS_NODE=1 executing resources/dist/cli/index.js --version, with OVERDECK_HOME pointed at a fresh temp dir. This reproduces what panCliInvocation + env inheritance do when Sync Now is clicked (apps/desktop/src/server.ts:99 sets ELECTRON_RUN_AS_NODE=1 on the server, and all seven audited call sites inherit env). Record the command transcript in the item completion note. If any step fails, route the fix back to stage-cli-runtime / ship-cli-extraresources rather than patching here."
+        },
+        "items": [
+          {
+            "id": "appimage-smoke-verify.ac1",
+            "title": "Given a fresh dist:linux build, when the AppImage is extracted with --appimage-extract, then squashfs-root/resources/dist/cli/index.js exists alongside its chunk graph and resources/dist/node_modules",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appimage-smoke-verify.ac2",
+            "title": "When the extracted bundled Electron binary runs resources/dist/cli/index.js --version with ELECTRON_RUN_AS_NODE=1 and a temp OVERDECK_HOME, it prints the CLI version and exits 0 with no MODULE_NOT_FOUND in stderr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-desktop-app",
+        "title": "Document the packaged CLI runtime and the ELECTRON_RUN_AS_NODE inheritance invariant",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T03:41:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2768",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DESKTOP-APP.md",
+            "apps/desktop/scripts/prepare-server-resources.mjs"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'dist/cli' docs/DESKTOP-APP.md",
+            "grep -n 'ELECTRON_RUN_AS_NODE' docs/DESKTOP-APP.md"
+          ],
+          "expected_outputs": [
+            "docs/DESKTOP-APP.md describes the resources/dist/cli layout, the env-inheritance invariant, and the npx-flavor exclusion"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/DESKTOP-APP.md (the doc that already covers prepare-server-resources/extraResources): document that the packaged app ships a self-contained pan CLI runtime at resources/dist/ (cli/index.js + chunk closure + vendored node_modules), that panCliInvocation resolves it via packageRoot with no code-level special-casing, that pan-CLI children run as Node only because they inherit ELECTRON_RUN_AS_NODE=1 from the server spawn (apps/desktop/src/server.ts) — so pan-CLI spawn sites must never pass a replacement env without it — and that the npx/global-install flavor does not ship the CLI runtime (npm pack strips nested node_modules; tracked with the PAN-2561 npx vendoring story). Also refresh the prepare-server-resources.mjs header comment to list the CLI staging stage alongside server/supervisor/hooks."
+        },
+        "items": [
+          {
+            "id": "docs-desktop-app.ac1",
+            "title": "docs/DESKTOP-APP.md states the packaged CLI location (resources/dist/cli/index.js), how panCliInvocation finds it, and shows the extraResources cli→dist mapping",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-desktop-app.ac2",
+            "title": "grep ELECTRON_RUN_AS_NODE docs/DESKTOP-APP.md returns a passage describing the env-inheritance invariant and the rule that pan-CLI spawn sites must not override env without it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-desktop-app.ac3",
+            "title": "The prepare-server-resources.mjs header comment produces an up-to-date output list: grepping it for the CLI staging stage and the full sync-sources copy returns matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "stage-cli-runtime",
+        "to": "stage-full-sync-sources",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-cli-runtime",
+        "to": "ship-cli-extraresources",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-cli-runtime",
+        "to": "package-structure-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-full-sync-sources",
+        "to": "package-structure-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-full-sync-sources",
+        "to": "docs-desktop-app",
+        "type": "blocks"
+      },
+      {
+        "from": "ship-cli-extraresources",
+        "to": "appimage-smoke-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-full-sync-sources",
+        "to": "appimage-smoke-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "package-structure-tests",
+        "to": "appimage-smoke-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-desktop-app",
+        "to": "appimage-smoke-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-cli-runtime",
+        "to": "docs-desktop-app",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-16-PAN-2768-sync-now-fails-in-packaged-desktop-appimage-pancliinvocation-points-at-dist-cli-index-js-which-extraresources-never-ships.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

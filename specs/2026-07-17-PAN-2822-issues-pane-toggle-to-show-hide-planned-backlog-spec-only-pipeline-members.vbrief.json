@@ -1,0 +1,551 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-17T10:10:57Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2822: Issues pane: toggle to show/hide planned_backlog (spec-only) pipeline members",
+    "updated": "2026-07-17T11:43:14.263Z"
+  },
+  "plan": {
+    "id": "pan-2822",
+    "title": "Issues pane: toggle to show/hide planned_backlog (spec-only) pipeline members",
+    "status": "completed",
+    "uid": "bfa8dddf-68e5-491e-9d7d-e6c3ef951bc1",
+    "author": "agent:claude-fable-5",
+    "sequence": 5,
+    "created": "2026-07-17T10:10:57Z",
+    "updated": "2026-07-17T11:43:14.263Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2822",
+        "label": "PAN-2822",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1966",
+        "label": "PAN-1966 (L6 spec lens that surfaced these rows)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "pipeline-membership",
+      "display-filter"
+    ],
+    "narratives": {
+      "Problem": "PAN-1966 added the L6 spec lens to resolvePipelineMembership: any open issue with a vBRIEF spec on overdeck-state is planned_backlog, so months-old abandoned plans now render as Idle rows in the dashboard Issues pane. That is by design (aging plans need disposition) but noisy during drain pushes when the operator wants to see only work in motion. There is currently no way to hide them without changing membership semantics.",
+      "Proposal": "Display-only visibility toggle. Server side: extract the spec-lens reason literal in src/lib/pipeline-membership.ts into an exported constant PLANNED_BACKLOG_SPEC_ONLY_REASON (byte-identical output, no semantic change) and have resource-discovery.ts annotate each ResourceAllocatedIssue with a constant boolean specOnlyPlanned derived from bucket === 'planned_backlog' && reasons.includes(constant). Client side: a zustand preference store backed by localStorage key 'overdeck.ui.showPlannedBacklog' (default true = visible), a pure filter helper filterSpecOnlyPlanned(features, show) that drops only features with specOnlyPlanned === true when show is false, a toggle button in the CommandDeck Issues pane filter row (extracted with the existing All/Alive/Failed row into a new component to respect the file-size ratchet), and filter application at the CommandDeck tree + count badge, ProjectHome/ProjectOverview swimlanes, Sidebar rail counts, and HomePage project cards. The server never reads the toggle, so API responses are byte-identical regardless of toggle state by construction.",
+      "NonGoals": "- No change to resolvePipelineMembership semantics, bucket assignment, or reason wording (only a non-semantic extraction of the spec-lens reason literal into an exported constant)\n- No server-side filtering, no new query parameters, no toggle-dependent API behavior on /api/issues/resource-allocated or any membership endpoint\n- planned_backlog rows caused by an unmerged branch or the explicit ready label are NOT hidden — the toggle targets only spec-lens rows\n- Kanban board, pipeline list page, and backlog views (tracker-canonical surfaces) are untouched; the toggle governs only surfaces fed by /api/issues/resource-allocated\n- Single-issue surfaces (IssueMissionControl cockpit, console drawer, IssueOverview) are not filtered — a hidden issue navigated directly still renders fully\n- No per-project scoping of the preference (one global localStorage key) and no settings-page control; the Issues pane toggle is the only control\n- No changes to the issue-view kit section inventory (no issue-view section is added or removed)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Hide only spec-lens-reason planned_backlog rows, not the whole bucket.",
+        "rationale": "The issue title says '(spec-only)' and AC1 says 'whose only membership reason is the planned_backlog spec-lens bucket'; branch-backed and ready-label planned_backlog rows represent different operator obligations and stay visible."
+      },
+      {
+        "summary": "Extract the spec-lens reason string into an exported constant despite the 'do NOT change resolvePipelineMembership' constraint.",
+        "rationale": "The constraint protects membership semantics; the extraction emits a byte-identical string and changes no classification. The alternative — duplicating the prose literal in resource-discovery — is a drift-prone bandaid."
+      },
+      {
+        "summary": "Annotate the resource-allocated DTO with a constant specOnlyPlanned boolean rather than shipping reasons[] to the client.",
+        "rationale": "The frontend cannot otherwise distinguish spec-only from branch-backed planned_backlog (the DTO carries only pipelineBucket); a derived boolean computed at one server site keeps the discriminator single-sourced and the response minimal. It is constant per issue, so AC4 (byte-identical responses regardless of toggle) holds."
+      },
+      {
+        "summary": "Place the toggle in the Issues pane All/Alive/Failed filter row, not next to a 'Policies' control.",
+        "rationale": "No Policies control exists in the Issues pane header — IssuePolicyStrip is a per-issue control in IssueHeader.tsx; the treeFilterRow is the pane's existing display-filter affordance."
+      },
+      {
+        "summary": "localStorage key 'overdeck.ui.showPlannedBacklog', default true, global (not per-project), zustand store mirroring useTheme.",
+        "rationale": "Matches the overdeck.ui.* pref convention the issue cites and preserves PAN-1966's default-visible intent; useTheme is the established localStorage-backed store pattern."
+      },
+      {
+        "summary": "Issues with both a vBRIEF spec and the ready label are hidden when the toggle is off.",
+        "rationale": "The resolver checks hasVbriefSpec before explicitlyReady and emits a single reason, so such rows carry the spec-lens reason; they are planned work not in motion, which is what a drain push hides."
+      },
+      {
+        "summary": "Surfaces filtered: CommandDeck Issues tree + badge, ProjectHome/ProjectOverview swimlanes, Sidebar rail counts, HomePage project cards; single-issue views unfiltered.",
+        "rationale": "These are exactly the surfaces rendering lists/counts from the /api/issues/resource-allocated tree; filtering a directly-opened issue's own view would break navigation to hidden issues."
+      },
+      {
+        "summary": "Respect the file-size ratchet by extracting the Issues pane filter row into a new component instead of growing CommandDeck/index.tsx.",
+        "rationale": "index.tsx sits exactly at its 1537-line baseline and the ratchet forbids growth; extraction keeps lint green without a manual baseline raise."
+      }
+    ],
+    "items": [
+      {
+        "id": "spec-lens-reason-const",
+        "title": "Export the spec-lens planned_backlog reason as a named constant",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T10:10:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-2822",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership.ts",
+            "tests/unit/lib/pipeline-membership-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner tests/unit/lib/pipeline-membership-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "pipeline-membership-audit.test.ts passes including the new constant-lock assertions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/pipeline-membership.ts, extract the spec-lens reason string literal currently inlined at the `if (s.hasVbriefSpec)` branch (lines 145-150: 'open issue with a vBRIEF spec but no branch/PR — planned work whose plan encodes code paths that age; needs starting or re-planning') into an exported module constant `export const PLANNED_BACKLOG_SPEC_ONLY_REASON = '<exact same string>'` declared near the top of the file, and pass the constant at that call site. Do NOT change any other reason string, any bucket assignment, or any control flow — the resolver's output must be byte-identical. Add assertions to tests/unit/lib/pipeline-membership-audit.test.ts locking the coupling: (a) spec-only signals ({issueOpen: true, hasVbriefSpec: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, phaseLabel: null, explicitlyReady: false}) resolve to bucket 'planned_backlog' with reasons containing PLANNED_BACKLOG_SPEC_ONLY_REASON; (b) an open issue with an unmerged convention branch (hasConventionBranch: true, branchUnmerged: true, no PRs) resolves to 'planned_backlog' with reasons NOT containing the constant. Follow the existing test file's fixture style."
+        },
+        "items": [
+          {
+            "id": "spec-lens-reason-const.ac1",
+            "title": "Given spec-only lens signals (open issue, hasVbriefSpec true, no branch/PR/label), resolvePipelineMembership returns bucket 'planned_backlog' and reasons containing the exported PLANNED_BACKLOG_SPEC_ONLY_REASON constant, asserted by a unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spec-lens-reason-const.ac2",
+            "title": "The constant's value is byte-identical to the previously inlined literal, so the resolver emits exactly the same reason string as before the change (the test asserts the constant equals the full prior prose)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spec-lens-reason-const.ac3",
+            "title": "Given an open issue with an unmerged convention branch and no PR, resolvePipelineMembership returns 'planned_backlog' with reasons that do NOT contain PLANNED_BACKLOG_SPEC_ONLY_REASON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dto-spec-only-flag",
+        "title": "Annotate ResourceAllocatedIssue with a constant specOnlyPlanned boolean",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T10:10:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2822",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/resource-discovery.ts",
+            "tests/unit/dashboard/server/services/resource-discovery.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner tests/unit/dashboard/server/services/resource-discovery.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "resource-discovery.test.ts passes including new specOnlyPlanned assertions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/resource-discovery.ts: (1) add `specOnlyPlanned?: boolean;` to the ResourceAllocatedIssue interface (next to `pipelineBucket?: PipelineBucket;` around line 101) with a doc comment '/** PAN-2822: planned_backlog caused solely by the L6 spec lens — display surfaces may hide these. */'; (2) import PLANNED_BACKLOG_SPEC_ONLY_REASON from '../../../lib/pipeline-membership.js'; (3) in the discovered-issue mapping where `pipelineBucket: membership.bucket` is set (~line 796), add `specOnlyPlanned: membership.bucket === 'planned_backlog' && membership.reasons.includes(PLANNED_BACKLOG_SPEC_ONLY_REASON),`. The field is derived only from membership — never from any request input — so it is constant for a given system state. Extend tests/unit/dashboard/server/services/resource-discovery.test.ts using its existing membership-stubbing style: a planned_backlog membership whose reasons contain the constant yields specOnlyPlanned true; a planned_backlog membership with a branch-style reason yields false; an in_flight membership yields false."
+        },
+        "items": [
+          {
+            "id": "dto-spec-only-flag.ac1",
+            "title": "Given a planned_backlog membership whose reasons include the spec-lens constant, the resource-discovery mapping produces a row with specOnlyPlanned: true and GET /api/issues/resource-allocated returns that field, asserted by the resource-discovery unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dto-spec-only-flag.ac2",
+            "title": "Given a planned_backlog membership with a non-spec reason or a membership in any other bucket, the mapping returns specOnlyPlanned: false for that row, asserted by unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dto-spec-only-flag.ac3",
+            "title": "The annotation reads no request parameter and the endpoint accepts no new query input, so the response for a given system state remains identical regardless of any client toggle state (diff shows no request-derived input feeding specOnlyPlanned)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pref-store-and-filter",
+        "title": "Planned-backlog visibility preference store and pure filter helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T10:10:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2822",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/hooks/usePlannedBacklogVisibility.ts",
+            "src/dashboard/frontend/src/hooks/__tests__/usePlannedBacklogVisibility.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/hooks/__tests__/usePlannedBacklogVisibility.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "usePlannedBacklogVisibility.test.ts passes (default, persistence, and filter-helper cases)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "(1) Add `specOnlyPlanned?: boolean;` to the ProjectFeature interface in src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx (mirrors the server DTO field from item dto-spec-only-flag). (2) Create src/dashboard/frontend/src/hooks/usePlannedBacklogVisibility.ts as a zustand store following the useTheme pattern (src/dashboard/frontend/src/hooks/useTheme.ts): STORAGE_KEY = 'overdeck.ui.showPlannedBacklog'; a getStored() that returns true unless localStorage holds the exact string 'false' (missing/invalid values mean visible); state { showPlannedBacklog: boolean; toggleShowPlannedBacklog: () => void } where toggle writes 'true'/'false' to localStorage then sets state. Wrap localStorage access in try/catch like useDiffPreferences does. No server sync (unlike useTheme). (3) In src/dashboard/frontend/src/components/CommandDeck/projectsData.ts export a pure helper `export function filterSpecOnlyPlanned(features: ProjectFeature[], showPlannedBacklog: boolean): ProjectFeature[]` that returns the input array unchanged (same reference) when showPlannedBacklog is true, else `features.filter((f) => f.specOnlyPlanned !== true)` — undefined/missing field means visible (hazard H1: stale caches must degrade to today's behavior). (4) Write unit tests in src/dashboard/frontend/src/hooks/__tests__/usePlannedBacklogVisibility.test.ts modeled on the existing useTheme.test.ts localStorage stubbing: default true when key absent, default true when value is garbage, toggle persists 'false' and flips state, filter helper keeps branch-backed planned rows and rows lacking the field while dropping specOnlyPlanned===true rows only when hidden."
+        },
+        "items": [
+          {
+            "id": "pref-store-and-filter.ac1",
+            "title": "usePlannedBacklogVisibility defaults to visible (showPlannedBacklog === true) when localStorage has no 'overdeck.ui.showPlannedBacklog' key or holds an unrecognized value, asserted by unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pref-store-and-filter.ac2",
+            "title": "toggleShowPlannedBacklog persists 'false'/'true' under 'overdeck.ui.showPlannedBacklog' and a fresh read of the stored value reproduces the toggled state, asserted by unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pref-store-and-filter.ac3",
+            "title": "filterSpecOnlyPlanned(features, true) returns the input unchanged, and filterSpecOnlyPlanned(features, false) removes exactly the features with specOnlyPlanned === true while preserving features lacking the field, asserted by unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pref-store-and-filter.ac4",
+            "title": "ProjectFeature accepts the optional specOnlyPlanned boolean delivered by /api/issues/resource-allocated (typecheck passes with the field consumed by the filter helper)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issues-pane-toggle",
+        "title": "Issues pane toggle button and filtered rendering (tree, badge, cockpit swimlanes)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T10:10:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2822",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/IssuesPaneFilterRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/CommandDeck.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "CommandDeck.test.tsx passes including the new toggle interaction test",
+            "lint-file-size.sh exits 0 without any baseline edit (index.tsx stays at or below 1537 lines)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/index.tsx: (1) extract the existing Issues-section filter row markup (the div.treeFilterRow with the All/Alive/Failed buttons, ~line 1350) into a new component src/dashboard/frontend/src/components/CommandDeck/IssuesPaneFilterRow.tsx taking { filter, onFilterChange } props plus rendering the new planned-backlog toggle; this extraction is REQUIRED because index.tsx sits exactly at its file-size ratchet baseline (1537 lines in scripts/file-size-baseline.txt) and the ratchet forbids growth — index.tsx must end at or below 1537 lines and the baseline file must NOT be edited. (2) The toggle: a button styled with the existing styles.treeFilterButton / treeFilterButtonActive classes (active when visible), label 'Planned', title 'Show spec-only planned items (planned_backlog)', data-testid 'planned-backlog-toggle', wired to usePlannedBacklogVisibility. Reuse the existing command-deck.module.css classes; per the style guide add no new colors. (3) In index.tsx add a `visibleFeatures` useMemo = filterSpecOnlyPlanned(selectedProjectData?.features ?? [], showPlannedBacklog) and use it for: the Issues count badge (currently selectedProjectData?.features.length ?? 0, line 1346), the ProjectNode features prop (line 1373), and the ProjectHome features prop (line 1452). Do NOT filter the issueTitles/branch lookup memos (lines 1238-1267) or any other selectedProjectData reader — open tabs of hidden issues must keep resolving titles/branches (hazard H4). (4) Add a CommandDeck.test.tsx case following its existing render/stub style: render with one feature specOnlyPlanned: true and one without; assert both rows render initially (default ON), click the toggle, assert the spec-only row disappears while the other remains and the count badge decrements, click again to restore."
+        },
+        "items": [
+          {
+            "id": "issues-pane-toggle.ac1",
+            "title": "The Issues pane filter row renders a 'Planned' toggle button (data-testid 'planned-backlog-toggle') whose active styling reflects the stored preference, and clicking it flips visibility without a page reload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-pane-toggle.ac2",
+            "title": "With the toggle OFF, no feature with specOnlyPlanned === true renders in the Issues tree and the Issues count badge shows the filtered count; features in other buckets or non-spec planned_backlog rows still render, asserted in CommandDeck.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-pane-toggle.ac3",
+            "title": "With the toggle ON, the pane renders identically to today (the same visibleFeatures array as the unfiltered features), asserted by toggling back in the test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-pane-toggle.ac4",
+            "title": "ProjectHome/ProjectOverview receives the same filtered visibleFeatures, so cockpit pipeline swimlanes exclude hidden spec-only rows while title/branch lookup memos keep reading the unfiltered list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-pane-toggle.ac5",
+            "title": "bash scripts/lint-file-size.sh exits 0 from this item's committed tree with scripts/file-size-baseline.txt unmodified (index.tsx at or below 1537 lines via the IssuesPaneFilterRow extraction)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sidebar-rail-counts",
+        "title": "Sidebar project rail counts respect the visibility preference",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T10:10:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2822",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Sidebar.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Sidebar.tsx, the project rail rows read project.features.length for the hasActivity flag and the per-project count badge (~lines 427-448). Subscribe to usePlannedBacklogVisibility and apply filterSpecOnlyPlanned(project.features, showPlannedBacklog) (imported from CommandDeck/projectsData) before computing both, so hiding spec-only planned rows also removes them from rail counts. Keep every other use of the projects data unfiltered."
+        },
+        "items": [
+          {
+            "id": "sidebar-rail-counts.ac1",
+            "title": "With the preference hidden, each Sidebar project row's issue count badge renders the filtered count (a project whose only features are spec-only planned shows 0 / no badge)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sidebar-rail-counts.ac2",
+            "title": "With the preference visible, the rail renders counts identical to today (filterSpecOnlyPlanned returns the input unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "homepage-counts",
+        "title": "HomePage project cards respect the visibility preference",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T10:10:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2822",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/HomePage.tsx",
+            "src/dashboard/frontend/src/pages/HomePage.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/pages/HomePage.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "HomePage.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "src/dashboard/frontend/src/pages/HomePage.tsx consumes the shared 'command-deck-projects' query and renders per-project feature activity/counts from project.features (~lines 249-264: hasActivity and the features.length badge). Subscribe to usePlannedBacklogVisibility and apply filterSpecOnlyPlanned(project.features, showPlannedBacklog) before those reads so the landing page agrees with the Issues pane. If HomePage.test.tsx's existing stubs render project cards, extend one assertion for the hidden case; otherwise keep the existing suite green (the pure helper is already unit-tested in pref-store-and-filter)."
+        },
+        "items": [
+          {
+            "id": "homepage-counts.ac1",
+            "title": "With the preference hidden, HomePage project cards compute activity and count badges from the filtered feature list, so a project whose only features are spec-only planned renders as having no active issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "homepage-counts.ac2",
+            "title": "With the preference visible, HomePage renders identically to today (unfiltered counts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-display-toggle",
+        "title": "Document the display-only toggle in docs/PIPELINE-MEMBERSHIP.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T10:10:57Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-2822",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-MEMBERSHIP.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint passes; docs/PIPELINE-MEMBERSHIP.md contains the new Display filtering section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "acJustification": "Docs-only item; two criteria fully pin the section's required statements."
+        },
+        "narrative": {
+          "Action": "Add a short 'Display filtering (PAN-2822)' subsection to docs/PIPELINE-MEMBERSHIP.md, near the bucket table that already describes planned_backlog (~line 27). It must state: (1) the dashboard Issues pane offers a display-only toggle (localStorage key 'overdeck.ui.showPlannedBacklog', default visible) that hides rows whose planned_backlog membership comes solely from the L6 spec lens; (2) resolvePipelineMembership and all membership/resource API responses are unchanged by the toggle — surfaces discriminate via the exported PLANNED_BACKLOG_SPEC_ONLY_REASON constant and the derived specOnlyPlanned DTO field; (3) branch-backed and ready-label planned_backlog rows are never hidden. Match the doc's existing tone and formatting."
+        },
+        "items": [
+          {
+            "id": "docs-display-toggle.ac1",
+            "title": "docs/PIPELINE-MEMBERSHIP.md renders a 'Display filtering' subsection naming the localStorage key, the default-visible behavior, and the fact that only spec-lens planned_backlog rows are hidden",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-display-toggle.ac2",
+            "title": "The subsection renders prose declaring that membership resolution and API responses are unchanged by the toggle, and renders PLANNED_BACKLOG_SPEC_ONLY_REASON / specOnlyPlanned as the named discriminator pair",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "spec-lens-reason-const",
+        "to": "dto-spec-only-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "dto-spec-only-flag",
+        "to": "issues-pane-toggle",
+        "type": "blocks"
+      },
+      {
+        "from": "pref-store-and-filter",
+        "to": "issues-pane-toggle",
+        "type": "blocks"
+      },
+      {
+        "from": "pref-store-and-filter",
+        "to": "sidebar-rail-counts",
+        "type": "blocks"
+      },
+      {
+        "from": "pref-store-and-filter",
+        "to": "homepage-counts",
+        "type": "blocks"
+      },
+      {
+        "from": "dto-spec-only-flag",
+        "to": "sidebar-rail-counts",
+        "type": "informs"
+      },
+      {
+        "from": "dto-spec-only-flag",
+        "to": "homepage-counts",
+        "type": "informs"
+      },
+      {
+        "from": "issues-pane-toggle",
+        "to": "docs-display-toggle",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-17-PAN-2822-issues-pane-toggle-to-show-hide-planned-backlog-spec-only-pipeline-members.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

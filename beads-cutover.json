@@ -1,0 +1,10 @@
+{
+  "remoteUrl": "git+ssh://git@github.com/eltmon/overdeck.git",
+  "remoteDoltHead": "00ceed74da4a85e3c3888df6762b8186f510e9f5",
+  "localReconciledHead": "00ceed74da4a85e3c3888df6762b8186f510e9f5",
+  "reconcileReport": {
+    "path": "notes/beads-reconcile-2026-07-12.md",
+    "sha256": "0036a171237734478c104f99f66edb9d3f38fa5d44885d104cc9677157b563c2"
+  },
+  "completedAt": "2026-07-12T21:35:00Z"
+}

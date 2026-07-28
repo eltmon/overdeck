@@ -35,14 +35,13 @@
     "issueId": "PAN-2257",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T11:53:09.339Z",
+    "updatedAt": "2026-07-27T18:35:23.045Z",
     "inspectNotes": "Spec fidelity passed: the diff factors gate metadata into readSessionGateFields and applies troubled fields plus queued mail count to planning/work/strike and review/test/ship session nodes. Constraint compliance passed: no prohibited patterns or PRD constraint violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2281",
-    "reviewRequestedAt": "2026-07-03T09:26:26.633Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2257.md",
@@ -83,38 +82,191 @@
         "tests/unit/dashboard/server/routes/projects.test.ts"
       ],
       "recordedAt": "2026-07-03T09:26:20.325Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T18:35:23.045Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 29911,
+            "output": 124,
+            "cacheRead": 7040,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 3366724,
+            "output": 9083,
+            "cacheRead": 3209856,
+            "cacheWrite": 0
+          },
+          "unknown": {
+            "input": 3396635,
+            "output": 9207,
+            "cacheRead": 3216896,
+            "cacheWrite": 0
+          }
+        },
+        "implementation": {
+          "custom/kimi-k2.7-code": {
+            "input": 97506,
+            "output": 401,
+            "cacheRead": 24832,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
-            "input": 77886,
-            "output": 1457,
+            "input": 82076,
+            "output": 2078,
             "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "test": {
+          "custom/kimi-k2.7-code": {
+            "input": 840573,
+            "output": 37095,
+            "cacheRead": 10851584,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 29911,
+          "output": 124,
+          "cacheRead": 7040,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 3366724,
+          "output": 9083,
+          "cacheRead": 3209856,
+          "cacheWrite": 0
+        },
+        "unknown": {
+          "input": 3396635,
+          "output": 9207,
+          "cacheRead": 3216896,
+          "cacheWrite": 0
+        },
+        "custom/kimi-k2.7-code": {
+          "input": 938079,
+          "output": 37496,
+          "cacheRead": 10876416,
+          "cacheWrite": 0
+        },
         "cliproxy/gpt-5.4-mini": {
-          "input": 77886,
-          "output": 1457,
+          "input": 82076,
+          "output": 2078,
           "cacheRead": 0,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-03T11:53:09.362Z"
+        "usd": 8.431191,
+        "pricingAsOf": "2026-07-27T08:24:18.685Z"
       }
     },
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2281"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T18:35:23.069Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Residue is 3 process-record commits plus one July-3 test-stabilization commit (eb2636b8be); the hooks it stabilized have since been stabilized differently and main CI is green without it. Functional work already merged via PR #2281. Superseded, not lost work."
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Residue is 3 process-record commits plus one July-3 test-stabilization commit (eb2636b8be); the hooks it stabilized have since been stabilized differently and main CI is green without it. Functional work already merged via PR #2281. Superseded, not lost work."
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Residue is 3 process-record commits plus one July-3 test-stabilization commit (eb2636b8be); the hooks it stabilized have since been stabilized differently and main CI is green without it. Functional work already merged via PR #2281. Superseded, not lost work."
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Residue is 3 process-record commits plus one July-3 test-stabilization commit (eb2636b8be); the hooks it stabilized have since been stabilized differently and main CI is green without it. Functional work already merged via PR #2281. Superseded, not lost work."
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Residue is 3 process-record commits plus one July-3 test-stabilization commit (eb2636b8be); the hooks it stabilized have since been stabilized differently and main CI is green without it. Functional work already merged via PR #2281. Superseded, not lost work."
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Residue is 3 process-record commits plus one July-3 test-stabilization commit (eb2636b8be); the hooks it stabilized have since been stabilized differently and main CI is green without it. Functional work already merged via PR #2281. Superseded, not lost work."
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Residue is 3 process-record commits plus one July-3 test-stabilization commit (eb2636b8be); the hooks it stabilized have since been stabilized differently and main CI is green without it. Functional work already merged via PR #2281. Superseded, not lost work."
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Residue is 3 process-record commits plus one July-3 test-stabilization commit (eb2636b8be); the hooks it stabilized have since been stabilized differently and main CI is green without it. Functional work already merged via PR #2281. Superseded, not lost work."
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed 3 agent state directories; No strike branch strike/pan-2257 found; Pruned 0 checkpoint ref(s) for agent-pan-2257, planning-pan-2257, strike-pan-2257; No specialist registry entries for PAN-2257"
+        }
+      ],
+      "accepted": [],
+      "disposition": {
+        "reason": "Residue is 3 process-record commits plus one July-3 test-stabilization commit (eb2636b8be); the hooks it stabilized have since been stabilized differently and main CI is green without it. Functional work already merged via PR #2281. Superseded, not lost work.",
+        "by": "conv-20260727-4876"
+      }
+    }
   },
   "created": "2026-07-03T10:06:21.823Z",
-  "updated": "2026-07-03T11:53:09.363Z"
+  "updated": "2026-07-27T18:35:23.070Z"
 }

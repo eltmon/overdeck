@@ -1,0 +1,340 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-25T12:20:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3055: A pending AskUserQuestion outlives its agent: PAN-1865's 4-week-old question re-emits (with TTS) on every boot and cannot be answered — no pane exists",
+    "updated": "2026-07-26T00:56:29.837Z"
+  },
+  "plan": {
+    "id": "pan-3055",
+    "title": "A pending AskUserQuestion outlives its agent: PAN-1865's 4-week-old question re-emits (with TTS) on every boot and cannot be answered — no pane exists",
+    "status": "completed",
+    "uid": "8f1818ed-82ac-4e98-9208-fe1e94271575",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-25T12:20:00.000Z",
+    "updated": "2026-07-26T00:56:29.837Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3055",
+        "label": "PAN-3055",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "enrichment",
+      "pending-input",
+      "askuserquestion",
+      "tts",
+      "liveness",
+      "dashboard-server"
+    ],
+    "narratives": {
+      "Problem": "A stopped agent's unanswered AskUserQuestion is never reaped. At dashboard boot after a host restart the tmux server has no sessions, so the runtime census reports tmuxAvailable:false, listRunningAgents fails open and marks every registered agent tmuxActive:true, and the enrichment poller scans long-dead agents: it promotes them to running in the read model, fires the awaiting-input rising edge (activity + TTS) for a 4-week-old question, and re-emits every 10s until the census recovers. When the agent then drops out of the active set, the cleanup loop deletes only the poller's private cache and emits nothing, so the read model keeps a running+pending row forever and the Decisions list advertises an unanswerable question on every boot.",
+      "Proposal": "Enforce liveness at the single write door for pendingness — the enrichment poller. (1) Census gate: pollOnce early-returns before any emission or cache mutation when census.tmuxAvailable is false; no evidence means no claims. (2) Falling-edge reap: with a fulfilled census, an agent tracked with pending input that is no longer tmux-active gets one clearing agent.enrichment_changed event plus one info-level activity entry (no TTS) in the same cycle. History stays intact via the JSONL transcript, the agent's terminal status, and the expiry activity entry. No frontend or decisions-door changes; listRunningAgents fail-open stays for CLI callers.",
+      "NonGoals": "- Deciding the disposition of PAN-1865's actual question (separate operator decision)\n- Changing listRunningAgents/listRunningAgentsSync fail-open semantics or deacon orphan-recovery\n- Any frontend/decisions-door change, new expired-questions UI, or new Decisions list section\n- Editing or deleting JSONL transcripts\n- Emitting agent.status_changed from the reap path\n- Restarting or hot-patching the live dashboard server (live AC lands at verify-on-main/deploy DoD rows)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Census unavailable skips the entire poll cycle rather than treating agents as dead or alive.",
+        "rationale": "Fail-open resurrects zombies (the bug); fail-closed would mass-reap live agents' pending questions during a transient census failure. Only a fulfilled census carries liveness evidence; a skipped cycle costs at most 10s of enrichment latency."
+      },
+      {
+        "summary": "The 'question remains inspectable in history' acceptance criterion is satisfied by the JSONL transcript, the agent row's terminal status, and a new info-level expiry activity entry — no new UI surface.",
+        "rationale": "The transcript preserves the question and options verbatim and is already viewable; AC1 requires expired questions OUT of the Decisions list, so any new decisions-adjacent surface would contradict it. Smallest change satisfying the issue's 'keep the record' principle."
+      },
+      {
+        "summary": "The tmuxActive fail-open in listRunningAgents is kept; the gate is applied only inside the enrichment poller.",
+        "rationale": "The fail-open exists so one-off CLI processes that cannot see the overdeck socket do not declare agents dead — recovery and kill paths depend on it. Changing it globally risks orphan-recovery killing live agents; gating the one consumer that emits operator-facing claims is the surgical fix."
+      },
+      {
+        "summary": "Reap keys purely on absence from the census-verified tmux-active set, never on registry status.",
+        "rationale": "Preserves PAN-2633 idle-alive agents (stop-shaped status, live pane, awaiting operator) — they remain in the active set and are never reaped; registry status is owned by other doors."
+      }
+    ],
+    "items": [
+      {
+        "id": "census-gate",
+        "title": "Gate pollOnce on runtime-census tmux availability",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T12:20:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3055",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/agent-enrichment-service.ts",
+            "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-enrichment-service.test.ts passes including new shouldSkipEnrichmentCycle cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/agent-enrichment-service.ts, add a pure exported helper shouldSkipEnrichmentCycle(census: Pick<RuntimeCensus,'tmuxAvailable'>): boolean returning !census.tmuxAvailable, with a comment explaining PAN-3055 (no census evidence => no liveness claims; the listRunningAgents fail-open would otherwise mark every stopped agent tmuxActive at boot and resurrect dead agents' questions with TTS). At the top of pollOnce, before listRunningAgents(), obtain the census via await getRuntimeCensus() (plain Promise — do NOT wrap in Effect.runPromise) inside try/catch (return on throw), and return immediately when shouldSkipEnrichmentCycle(census) is true — before any event emission, activity entry, TTS, or mutation of state.lastEnrichment/lastScan/seenAgentIds/reconciledAgentIds, and before the stale-entry cleanup loop. Import getRuntimeCensus and the RuntimeCensus type from '../../../lib/runtime-census.js'. Do not modify listRunningAgents, listRunningAgentsSync, or shouldForceReemitPendingInput. Add unit tests in the existing pure-helper style: shouldSkipEnrichmentCycle({tmuxAvailable:false}) is true; ({tmuxAvailable:true}) is false."
+        },
+        "items": [
+          {
+            "id": "census-gate.ac1",
+            "title": "Given a census with tmuxAvailable:false, shouldSkipEnrichmentCycle returns true, and pollOnce returns before any eventStore append, activity entry, TTS emit, or poller-state mutation (gate precedes them all in the function body)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "census-gate.ac2",
+            "title": "Given a census with tmuxAvailable:true, shouldSkipEnrichmentCycle returns false and pollOnce proceeds to scan tmux-active agents exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "census-gate.ac3",
+            "title": "The diff preserves listRunningAgents/listRunningAgentsSync fail-open behavior unchanged (src/lib/agents/queries.ts untouched)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "census-gate.ac4",
+            "title": "npx vitest run src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts exits green with the new gate cases included",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pending-reap",
+        "title": "Reap dead agents' pending input on the falling edge",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T12:20:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3055",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/agent-enrichment-service.ts",
+            "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-enrichment-service.test.ts passes including hasReapablePendingInput, buildPendingReapEvent, and buildExpiredQuestionActivityMessage cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/agent-enrichment-service.ts, add three pure exported helpers per the PRD (WI-2): hasReapablePendingInput(e: AgentEnrichment) — true when e.pendingInputCount > 0 or e.pendingAskUserQuestion != null or e.pendingProposedPlan != null; buildPendingReapEvent(agentId, previous: AgentEnrichment): Omit<AgentEnrichmentChangedEvent,'sequence'> — type 'agent.enrichment_changed', fresh ISO timestamp, payload { agentId, role: previous.role, hasPendingQuestion: false, pendingQuestionCount: 0, pendingQuestionPrompt: undefined, pendingQuestionReason: undefined, pendingInputCount: 0, pendingInputKinds: [], pendingAskUserQuestion: undefined, pendingProposedPlan: undefined, resolution: previous.resolution, resolutionCount: previous.resolutionCount }; buildExpiredQuestionActivityMessage(agentId, issueId: string|undefined) — '<agentId> on <issueId> stopped with its question unanswered — the question has expired and is no longer actionable' (omit the ' on <issueId>' clause when issueId is undefined). Rework the stale-entry cleanup loop at the end of pollOnce: for each id in state.lastEnrichment not in activeIds, when hasReapablePendingInput(previousEnrichment), first append buildPendingReapEvent via eventStore.appendAsync (same try/catch tolerance as the existing append), then emit exactly one emitActivityEntrySync({ source: toRole(agentRecord?.role) ?? 'work', level: 'info', message, issueId }) where agentRecord is looked up by id from the already-fetched runningAgents array (issueId undefined when the agent is absent), and emit NO activity.tts. Then delete the lastEnrichment and lastScan entries as today. This loop runs only after the census-gate item's early return, so it executes only with a fulfilled census. Do not emit agent.status_changed and do not touch shouldForceReemitPendingInput or the rising-edge block. Add unit tests: hasReapablePendingInput truth table (count>0; AUQ payload only; proposed-plan only; neither); buildPendingReapEvent zeroes/clears every pending field and preserves role/resolution/resolutionCount; buildExpiredQuestionActivityMessage includes agent id and issue id, and drops the issue clause when issueId is undefined."
+        },
+        "items": [
+          {
+            "id": "pending-reap.ac1",
+            "title": "Given a lastEnrichment entry with pendingInputCount>0 whose agent is absent from the census-verified active set, pollOnce emits one agent.enrichment_changed event whose payload carries pendingInputCount 0, pendingInputKinds [], and undefined pendingAskUserQuestion/pendingProposedPlan in the same cycle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-reap.ac2",
+            "title": "The reap path emits exactly one info-level activity entry naming the agent (and issue when known) and contains no emitActivityTtsSync call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-reap.ac3",
+            "title": "buildPendingReapEvent preserves role, resolution, and resolutionCount from the previous enrichment while clearing all pending fields (asserted by unit test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-reap.ac4",
+            "title": "Given an idle-alive agent (live tmux pane, stop-shaped registry status), pollOnce emits no clearing enrichment event for it and preserves its pending payload: the reap candidate check consults only activeIds membership, never registry status (PAN-2633 survives)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-reap.ac5",
+            "title": "The reap path emits no agent.status_changed event (diff-reviewable)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "boot-rehydration-test",
+        "title": "Regression test: zombie AUQ sequence resolves and boot re-hydration surfaces nothing",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T12:20:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-3055",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/__tests__/read-model-pending-input.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/read-model-pending-input.test.ts"
+          ],
+          "expected_outputs": [
+            "read-model-pending-input.test.ts passes including the new reap-event and stopped-agent bootstrap sequence tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend src/dashboard/server/__tests__/read-model-pending-input.test.ts with the PAN-3055 zombie sequence at the reducer/projection level. Test 1: apply an agent.enrichment_changed event that plants a pendingAskUserQuestion payload (toolUseId, askedAt, questions with options) on a running agent row, then apply a clearing agent.enrichment_changed event in the pending-reap shape (hasPendingQuestion false, pendingQuestionCount 0, pendingInputCount 0, pendingInputKinds [], pendingAskUserQuestion/pendingProposedPlan undefined); assert the row's pendingAskUserQuestion is undefined, hasPendingQuestion is false, and pendingInputCount is 0. Test 2: run projectPendingInput (exported from src/dashboard/server/read-model.ts) with status 'stopped' and fully-populated pending fields; assert every pending field projects to undefined — naming the PAN-3055 scenario (agent stopped weeks ago with stale cached pending fields must surface nothing at bootstrap). Follow the file's existing test style and fixtures; no production code changes in this item."
+        },
+        "items": [
+          {
+            "id": "boot-rehydration-test.ac1",
+            "title": "Given a running agent row with a planted pendingAskUserQuestion, when the reap-shaped clearing enrichment event is applied, the reducer returns a row with pendingAskUserQuestion undefined and pendingInputCount 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-rehydration-test.ac2",
+            "title": "Given status 'stopped' and populated pending fields, projectPendingInput returns undefined for every pending field (boot re-hydration surfaces nothing for a dead asker)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-rehydration-test.ac3",
+            "title": "npx vitest run src/dashboard/server/__tests__/read-model-pending-input.test.ts exits green with the new tests included",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-liveness-pendingness",
+        "title": "Document liveness-is-part-of-pendingness in the AUQ field guide",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T12:20:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3055",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ASKUSERQUESTION-DASHBOARD.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'PAN-3055' docs/ASKUSERQUESTION-DASHBOARD.md"
+          ],
+          "expected_outputs": [
+            "grep prints at least one match inside a section describing the census gate and the falling-edge reap"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a section 'Liveness is part of pendingness (PAN-3055)' to docs/ASKUSERQUESTION-DASHBOARD.md after the PAN-2765 Decisions section. It must document: (1) the boot fail-open chain — tmux server absent at boot => census tmuxAvailable:false => listRunningAgents marks every agent tmuxActive:true => the poller scanned long-stopped agents, promoted them to running, and announced their weeks-old questions with TTS; (2) the census gate — pollOnce returns before any emission when the census cannot see tmux; (3) the falling-edge reap — clearing enrichment event + info-level activity entry, no TTS, when a tracked agent with pending input leaves the census-verified active set; (4) why the fail-open stays in listRunningAgents for CLI callers; (5) the PAN-2633 carve-out — a live pane is never reaped regardless of registry status; (6) that an expired question remains inspectable via the agent's JSONL transcript and terminal status while leaving the Decisions list. Match the file's existing debugging-field-guide voice."
+        },
+        "items": [
+          {
+            "id": "docs-liveness-pendingness.ac1",
+            "title": "docs/ASKUSERQUESTION-DASHBOARD.md contains a PAN-3055 section that names the census gate, the falling-edge reap with its no-TTS info activity entry, the retained fail-open rationale, and the PAN-2633 live-pane carve-out",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-liveness-pendingness.ac2",
+            "title": "The section names the JSONL transcript and the agent's terminal status as where an expired question survives, and names the Decisions list as where it no longer renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "census-gate",
+        "to": "pending-reap",
+        "type": "blocks"
+      },
+      {
+        "from": "pending-reap",
+        "to": "boot-rehydration-test",
+        "type": "informs"
+      },
+      {
+        "from": "pending-reap",
+        "to": "docs-liveness-pendingness",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-25-PAN-3055-a-pending-askuserquestion-outlives-its-agent-pan-1865-s-4-week-old-question-re-emits-with-tts-on-every-boot-and-cannot-be-answered-no-pane-exists.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

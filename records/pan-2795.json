@@ -1,0 +1,150 @@
+{
+  "issueId": "PAN-2795",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-16T19:47:29.273Z",
+  "updated": "2026-07-27T16:50:00.373Z",
+  "pipeline": {
+    "issueId": "PAN-2795",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "mergeStatus": "merged",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-27T16:50:00.349Z",
+    "verificationNotes": "Checklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.",
+    "mergeNotes": "Post-rebase verification failed at incomplete-plan-items",
+    "strikeReadyHead": "394d0154b0acbe87599d4f510df50d812fa2d9b3",
+    "strikeReadyAt": "2026-07-17T03:08:18.756Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-16T20:49:32.599Z",
+        "strikeHead": "f9f23ead9cb7ad229a728fb18df4fc01656b6a83",
+        "mainHead": "fd517078d47e5ec57ddb8f5cabe0de3f12e68e3c",
+        "outcome": "failed",
+        "detail": "Strike merge trigger is not registered"
+      },
+      {
+        "timestamp": "2026-07-17T01:43:58.197Z",
+        "strikeHead": "f9f23ead9cb7ad229a728fb18df4fc01656b6a83",
+        "mainHead": "6179ece80fa7b51bc2b61fddef3abaac84453393",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-07-17T02:47:55.331Z",
+        "strikeHead": "586375f586961a69dde9d78f514fc93aec047966",
+        "mainHead": "823fa624614fd5c29b6e5fac1906360b5c66049e",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
+      }
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T16:50:00.349Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "strike": {
+          "openai/gpt-5.6-sol": {
+            "input": 3371249,
+            "output": 222860,
+            "cacheRead": 48254976,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 3371249,
+          "output": 222860,
+          "cacheRead": 48254976,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 47.669533,
+        "pricingAsOf": "2026-07-17T06:25:04.167Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T16:50:00.372Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: pending from pipeline journal; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: missing (from pipeline journal); settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "PR #2815 is squash-merged and strike/pan-2795 matches the merged PR head; PR #2815 is squash-merged and origin/strike/pan-2795 matches the merged PR head; Superseded feature/pan-2795 residual: Feature branch is absent; positive merge evidence is required; PR #2815 MERGED at 2026-07-17T06:25:03Z",
+          "status": "pass",
+          "mergedAt": "2026-07-17T06:25:03Z",
+          "mergeCommit": "57222e4bcbff2936d1a64b7e34228799ced7f2ac"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 57222e4bcbff2936d1a64b7e34228799ced7f2ac",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit d44fa122 contains merge 57222e4b",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; Preserved local branch strike/pan-2795 — not merged to main; Preserved remote branch strike/pan-2795 — not merged to main; Pruned 0 checkpoint ref(s) for agent-pan-2795, planning-pan-2795, strike-pan-2795; No specialist registry entries for PAN-2795"
+        }
+      ],
+      "accepted": []
+    }
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.6-sol"
+}

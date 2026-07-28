@@ -1,0 +1,695 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T09:44:54.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3115: Pipeline membership read door returns 503 for 6 of 12 registered projects — the authoritative resolver is blind for half the fleet",
+    "updated": "2026-07-26T13:54:05.773Z"
+  },
+  "plan": {
+    "id": "pan-3115",
+    "title": "Pipeline membership read door: typed per-project unavailability instead of 503",
+    "status": "completed",
+    "uid": "be8a913d-753e-424f-b0d0-5a9cbd7afe0b",
+    "author": "agent:k3[1m]",
+    "sequence": 7,
+    "created": "2026-07-26T09:44:54.000Z",
+    "updated": "2026-07-26T13:54:05.773Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3115",
+        "label": "PAN-3115",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "pipeline-membership",
+      "read-door",
+      "api",
+      "flywheel"
+    ],
+    "narratives": {
+      "Problem": "GET /api/pipeline/membership?project=<key> — the canonical read door flywheel Mission #3 must call for every registered project — returns 503 for 6 of 12 registered projects (verified on disk 2026-07-26: auricle's polyrepo 'infra' path is not a git repo; pan-tts is master-only while config says main; papers-please/puzzdom have no issue_prefix; lexerra/krux's GitHub App is not installed so the forge 404s). The snapshot layer discards the failure TYPE (lastError is a plain string), so the route can only emit a bare 503 with prose. An orchestrator cannot distinguish 'no pipeline work' from 'could not tell', so it either silently under-reports the pipeline or falls back to ad-hoc derivation — the drift the two-door model exists to prevent.",
+      "Proposal": "Introduce a typed unavailability contract end to end. (1) Define MembershipUnavailableReason (missing_issue_prefix | repo_unavailable | default_branch_unresolved | forge_unavailable | tracker_unconfigured | gather_failed) plus PipelineMembershipUnavailableBody in @overdeck/contracts, and a PipelineMembershipUnavailableError in the gather module. (2) The gather throws typed errors: repo-path preflight fails closed naming the path; the default branch is resolved from repo reality (configured-if-verifiable → origin/HEAD → current HEAD → main/master probe); forge-lens failures rethrow as forge_unassigned by lens boundary, never by error-text parsing. (3) The snapshot/service propagates the reason. (4) The route returns HTTP 200 with the typed body for determined failures (success keeps the bare array; cold-boot loading keeps the PAN-2972 503). (5) /api/registered-projects gains additive membershipQueryable. (6) The frontend probe parses the typed body and preserves the error+Retry UX. (7) Docs and orchestrator prompts (PIPELINE-MEMBERSHIP.md, flywheel.md, uat-promote-notify, pipeline-status skill) teach the two response shapes.",
+      "NonGoals": "- No edits to ~/.overdeck/projects.yaml (phantom auricle infra entry, pan-tts default_branch, papers-please/puzzdom prefixes are operator registration decisions)\n- No installing the GitHub App on eltmon/lexerra or eltmon/krux\n- No change to getPipelineMembershipForProjects throw-on-first-error semantics (no production callers)\n- No change to resource-discovery or the issues route (already degrade per project)\n- No uniform response envelope for the success case (bare PipelineMembership[] array preserved)\n- No partial-lens gathering for polyrepo projects with a missing member checkout (fail closed)\n- No classifying failures by parsing gh/HTTP error message text (reasons come from lens boundaries)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Determined failures return HTTP 200 with {status:'unavailable', reason, message, projectKey}; success keeps the bare array (no uniform envelope)",
+        "rationale": "The issue mandates never 503-ing a determined failure; keeping the success array is no-loss for the frontend probe, the flywheel doc parsing, and the resource-strip Playwright mock, which all already handle non-array failure responses."
+      },
+      {
+        "summary": "Cold-boot 'loading' (no snapshot, no recorded error) keeps the PAN-2972 fast-503 + Retry behavior",
+        "rationale": "It is a seconds-long transient that self-heals on the first background refresh, not a determined answer; a third 200-status would force a new frontend state for no operator value."
+      },
+      {
+        "summary": "A non-repo project/polyrepo-member path fails the whole project closed with repo_unavailable naming the path",
+        "rationale": "Gathering a partial lens set (e.g. auricle without infra) could silently classify issues with only-missing-repo branches as clean_terminal — a wrong authoritative answer is worse than a loud typed blind spot."
+      },
+      {
+        "summary": "Default branch resolved from repo reality rather than editing machine config",
+        "rationale": "Fixes pan-tts (master-only) and every future master-based project permanently; the configured default_branch stays the first preference when it verifies."
+      },
+      {
+        "summary": "papers-please/puzzdom get no invented issue_prefix; the door reports missing_issue_prefix and registered-projects exposes membershipQueryable",
+        "rationale": "Their tracker identity is an operator registration decision that cannot be derived from code; the additive flag lets orchestrators skip them deliberately instead of discovering the failure."
+      },
+      {
+        "summary": "Reasons are assigned by which lens failed, never by parsing error message text",
+        "rationale": "String-matching gh/HTTP error output is brittle across gh versions and locales; the lens boundary (tracker/forge vs git vs spec) is a stable classifier, with gather_failed as the honest fallback."
+      }
+    ],
+    "items": [
+      {
+        "id": "typed-unavailable-contract",
+        "title": "Add MembershipUnavailableReason + unavailable body to contracts and the typed error class",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T09:44:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3115",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "service-reason-propagation",
+            "route-typed-200",
+            "frontend-unavailable-probe",
+            "docs-prompts-contract"
+          ],
+          "files_scope": [
+            "packages/contracts/src/types.ts",
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd packages/contracts && npm run build",
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "contracts build completes",
+            "gather test file passes including the new typed-error test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/types.ts add MEMBERSHIP_UNAVAILABLE_REASONS (const array: 'missing_issue_prefix', 'repo_unavailable', 'default_branch_unresolved', 'forge_unavailable', 'tracker_unconfigured', 'gather_failed'), the MembershipUnavailableReason union type derived from it, and PipelineMembershipUnavailableBody {status:'unavailable', reason, message, projectKey}. In src/lib/pipeline-membership-gather.ts add and export class PipelineMembershipUnavailableError extends Error carrying readonly reason: MembershipUnavailableReason. Rebuild contracts (cd packages/contracts && npm run build) before root typecheck. Add a unit test in tests/unit/lib/pipeline-membership-gather.test.ts asserting the error exposes .reason and that the union order matches the constant array."
+        },
+        "items": [
+          {
+            "id": "typed-unavailable-contract.ac1",
+            "title": "Given the built contracts package, when a consumer imports MEMBERSHIP_UNAVAILABLE_REASONS, then it contains exactly the six documented reason strings and MembershipUnavailableReason type-checks against them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "typed-unavailable-contract.ac2",
+            "title": "Given new PipelineMembershipUnavailableError('repo_unavailable', 'msg'), when reading .reason and .message, then they return 'repo_unavailable' and 'msg'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "typed-unavailable-contract.ac3",
+            "title": "Given the contracts change, when running `cd packages/contracts && npm run build` then root `npm run typecheck`, then both complete without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gather-repo-preflight",
+        "title": "Fail closed with repo_unavailable when a project or polyrepo-member path is not a git repo",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T09:44:54.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3115",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new preflight tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "At the top of snapshotBranchRefs (src/lib/pipeline-membership-gather.ts:310-330), before the three existing git calls, run `git rev-parse --show-toplevel` via the injected run dep. On rejection OR when the realpath-normalized toplevel differs from the realpath-normalized repoPath (a subdir of an unrelated parent repo must not silently classify that repo's branches), throw PipelineMembershipUnavailableError('repo_unavailable', `Workspace repo path is not a git repository: ${repoPath}`). This single chokepoint covers both gatherProjectLensSignals and gatherIssueBranchContainment. Tests with fake run: (a) rejecting run → typed error, reason repo_unavailable, message contains the repo path; (b) toplevel '/other/repo' for repoPath '/expected/repo' → typed error; (c) matching toplevel → proceeds to the three existing calls."
+        },
+        "items": [
+          {
+            "id": "gather-repo-preflight.ac1",
+            "title": "Given a fake run that rejects with 'not a git repository', when snapshotBranchRefs is called, then it throws PipelineMembershipUnavailableError with reason 'repo_unavailable' and the message contains the repo path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gather-repo-preflight.ac2",
+            "title": "Given a fake run returning a toplevel that differs from the configured repo path, when snapshotBranchRefs is called, then it throws reason 'repo_unavailable' instead of classifying the parent repo's branches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gather-repo-preflight.ac3",
+            "title": "Given a fake run returning the matching toplevel, when snapshotBranchRefs is called, then it proceeds to issue the for-each-ref and rev-list calls and returns the parsed snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gather-default-branch-resolution",
+        "title": "Resolve each repo's effective default branch from repo reality",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T09:44:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3115",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new branch-resolution tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add exported resolveRepositoryDefaultBranch(repoPath, configured, run) to src/lib/pipeline-membership-gather.ts and call it in snapshotBranchRefs; the resolved name feeds both --no-merged= and `rev-list --first-parent` (currently line 327). Resolution order, each step via the injected run: (1) configured branch if `git rev-parse --verify --quiet refs/heads/<b>` succeeds; else refs/remotes/origin/<b> → use 'origin/<b>'; (2) `git symbolic-ref --quiet --short refs/remotes/origin/HEAD`; (3) `git symbolic-ref --quiet --short HEAD`; (4) probe 'main', 'master', 'origin/main', 'origin/master' in order; (5) else throw PipelineMembershipUnavailableError('default_branch_unresolved', ...) naming repoPath and the configured value. Tests with fake run keyed on argv: master-only repo (configured 'main' unverifiable, HEAD → master) → resolves 'master' and the rev-list call uses 'master'; configured branch verifiable → configured wins and no further probes run; repo with no refs at all → typed default_branch_unresolved."
+        },
+        "items": [
+          {
+            "id": "gather-default-branch-resolution.ac1",
+            "title": "Given a master-only fake repo whose configured default is 'main', when snapshotBranchRefs runs, then it resolves 'master' and issues `git rev-list --first-parent master`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gather-default-branch-resolution.ac2",
+            "title": "Given a fake repo where refs/heads/main verifies, when resolving, then the result is 'main' and no symbolic-ref or probe calls are issued",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gather-default-branch-resolution.ac3",
+            "title": "Given a fake repo with no verifiable refs, when resolving, then it throws PipelineMembershipUnavailableError with reason 'default_branch_unresolved' naming the repo path and configured value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gather-forge-error-typing",
+        "title": "Type gather failures by lens boundary (forge_unavailable / tracker_unconfigured / missing_issue_prefix / gather_failed)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T09:44:54.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3115",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new lens-typing tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In gatherProjectLensSignals (src/lib/pipeline-membership-gather.ts:395-546): convert the 'Missing issue_prefix' throw (line 400) to reason 'missing_issue_prefix' and the resolveProjectTrackerType 'Cannot resolve tracker' throw (line 191) to 'tracker_unconfigured'. Wrap each forge-lens promise — listTrackerIssues, listOpenIssues, listPhaseLabeledIssues, listOpenPullRequests, listIssueStates, listMergedPullRequestHeads — so a rejection that is NOT already a PipelineMembershipUnavailableError rethrows as PipelineMembershipUnavailableError('forge_unavailable', originalMessage); wrap the spec lens (listSpecIssueIds) rejections as 'gather_failed'. No error-message string matching anywhere. Tests with injected deps (the module already takes PipelineMembershipGatherDeps): listOpenIssues rejecting with Error('HTTP 404') → typed forge_unavailable, message preserved; listSpecIssueIds rejecting → gather_failed; a PipelineMembershipUnavailableError from the git preflight passes through unchanged (not re-wrapped)."
+        },
+        "items": [
+          {
+            "id": "gather-forge-error-typing.ac1",
+            "title": "Given listOpenIssues rejects with Error('HTTP 404'), when gatherProjectLensSignals runs, then it throws reason 'forge_unavailable' and the message contains 'HTTP 404'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gather-forge-error-typing.ac2",
+            "title": "Given a project with no issue_prefix, when gatherProjectLensSignals runs, then it throws reason 'missing_issue_prefix' naming the project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gather-forge-error-typing.ac3",
+            "title": "Given the git preflight throws PipelineMembershipUnavailableError('repo_unavailable'), when the forge wrapper sees it, then the reason stays 'repo_unavailable' (no re-wrap to forge_unavailable)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gather-forge-error-typing.ac4",
+            "title": "Given listSpecIssueIds rejects, when gatherProjectLensSignals runs, then it throws reason 'gather_failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "service-reason-propagation",
+        "title": "Propagate unavailableReason through the membership snapshot service",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T09:44:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3115",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/pipeline-membership.ts",
+            "tests/unit/dashboard/pipeline-membership-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/pipeline-membership-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "service test file passes including new propagation tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/pipeline-membership.ts: MembershipSnapshot (lines 63-69) gains lastErrorReason?: MembershipUnavailableReason; the refreshMembershipSnapshot catch (lines 86-95) records error instanceof PipelineMembershipUnavailableError ? error.reason : 'gather_failed' alongside the existing lastError string. ProjectPipelineMembershipResult (lines 44-48) gains unavailableReason?: MembershipUnavailableReason; readPipelineMembershipSnapshotsForProjects (103-118) populates it from the snapshot, and getPipelineMembershipSnapshotsForResourceDiscovery's failure result (line 157) passes it through as well. Do not change the .error field shape — routes/issues.ts:243-251 and resource-discovery read it unchanged. Tests: a getMembership rejecting with PipelineMembershipUnavailableError('forge_unavailable') → read result carries unavailableReason 'forge_unavailable'; a plain Error rejection → 'gather_failed'; a successful refresh clears lastErrorReason."
+        },
+        "items": [
+          {
+            "id": "service-reason-propagation.ac1",
+            "title": "Given getMembership rejects with PipelineMembershipUnavailableError('forge_unavailable'), when readPipelineMembershipSnapshotsForProjects runs after the refresh settles, then the result carries unavailableReason 'forge_unavailable' and an error whose message contains the original text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-reason-propagation.ac2",
+            "title": "Given getMembership rejects with a plain Error, when the result is read, then unavailableReason falls back to 'gather_failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-reason-propagation.ac3",
+            "title": "Given a project whose refresh later succeeds, when the result is read, then memberships are returned and no unavailableReason is present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-typed-200",
+        "title": "Return HTTP 200 with the typed unavailable body from the membership routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T09:44:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3115",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/pipeline-membership.ts",
+            "tests/unit/dashboard/routes/pipeline-membership-route.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/routes/pipeline-membership-route.test.ts tests/unit/dashboard/routes/issues-no-loss.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new route tests pass",
+            "issues-no-loss route registration test stays green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/pipeline-membership.ts: GET (lines 37-42) — memberships → 200 bare array (unchanged); snapshot.error present → 200 PipelineMembershipUnavailableBody {status:'unavailable', reason: result.unavailableReason ?? 'gather_failed', message: error message, projectKey}; no snapshot and no error → keep the 503 'Pipeline membership snapshot is loading' (NFR-2). POST refresh (lines 62-68) — after refreshMembershipSnapshotsForProjects, apply the same mapping; the 502 branch disappears because every determined failure now carries a reason. Keep the literal registration strings 'GET /api/pipeline/membership' and 'POST /api/pipeline/membership/refresh' (issues-no-loss.test.ts:52-53 greps them). Add tests/unit/dashboard/routes/pipeline-membership-route.test.ts following the exercise pattern of tests/unit/dashboard/routes/git-activity-route.test.ts: seeded failed snapshot → 200 + typed body with the propagated reason; cold snapshot → 503 loading; healthy snapshot → 200 array."
+        },
+        "items": [
+          {
+            "id": "route-typed-200.ac1",
+            "title": "Given a snapshot whose last gather failed with reason 'repo_unavailable', when GET /api/pipeline/membership?project=x runs, then it returns HTTP 200 with body {status:'unavailable', reason:'repo_unavailable', message, projectKey:'x'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-typed-200.ac2",
+            "title": "Given a healthy snapshot, when GET runs, then it returns HTTP 200 with the bare memberships array and no status/projectKey fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-typed-200.ac3",
+            "title": "Given no snapshot has ever completed and no error is recorded, when GET runs, then it returns HTTP 503 with the loading message (transient cold-boot preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-typed-200.ac4",
+            "title": "Given a refresh whose re-gather fails with a typed reason, when POST /api/pipeline/membership/refresh runs, then it returns HTTP 200 with the typed unavailable body and never a 502",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-typed-200.ac5",
+            "title": "Given the route file after the change, when tests/unit/dashboard/routes/issues-no-loss.test.ts runs, then it exits 0 with both route registrations intact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "registered-projects-queryable-flag",
+        "title": "Add membershipQueryable to GET /api/registered-projects entries",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T09:44:54.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-3115",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc/meta.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "route tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/misc/meta.ts (the getRegisteredProjectsRoute mapping at lines 135-142), add membershipQueryable: Boolean(getIssuePrefix(p.config)) to each returned entry — the file already imports getIssuePrefix from lib/projects.js. Additive only; do not remove or rename existing fields (key, name, path, linearTeam, githubRepo, linearProject). Search tests/ for existing 'registered-projects' assertions and extend them: a project with issue_prefix → membershipQueryable true; a project without → false."
+        },
+        "items": [
+          {
+            "id": "registered-projects-queryable-flag.ac1",
+            "title": "Given a registered project with issue_prefix set, when GET /api/registered-projects runs, then its entry contains membershipQueryable: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registered-projects-queryable-flag.ac2",
+            "title": "Given a registered project with no issue_prefix, when GET /api/registered-projects runs, then its entry contains membershipQueryable: false and retains all pre-existing fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-unavailable-probe",
+        "title": "Frontend membership probe parses the typed unavailable body",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T09:44:54.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3115",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "CommandDeck frontend tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/projectsData.ts:74-93 — in both fetchProjectPipelineMembership and refreshProjectPipelineMembership, when response.ok, parse the JSON body: if it is an object (not an array) with status === 'unavailable', throw Error(`${message} (${reason})`) so ProjectMembershipBoundary renders the same error + Retry UX it shows for 503 today; arrays → return true as now; non-OK responses keep the existing readMembershipError path. Add unit tests (create projectsData.test.ts beside it if none exists — check first; ProjectMembershipBoundary.test.tsx mocks this module and must keep passing unmodified): mocked fetch returning 200 + {status:'unavailable', reason:'forge_unavailable', message:'HTTP 404'} → the fetch rejects and the error message contains 'HTTP 404'; mocked 200 + [] → resolves true."
+        },
+        "items": [
+          {
+            "id": "frontend-unavailable-probe.ac1",
+            "title": "Given fetch returns 200 with {status:'unavailable', reason:'forge_unavailable', message:'HTTP 404'}, when fetchProjectPipelineMembership runs, then it throws and the error message contains 'HTTP 404'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-unavailable-probe.ac2",
+            "title": "Given fetch returns 200 with a bare array, when fetchProjectPipelineMembership runs, then it resolves true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-unavailable-probe.ac3",
+            "title": "Given fetch returns 503 with {error:'Pipeline membership snapshot is loading'}, when fetchProjectPipelineMembership runs, then it throws with the loading message via the existing readMembershipError path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-prompts-contract",
+        "title": "Teach the two response shapes in docs and orchestrator prompts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T09:44:54.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3115",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-MEMBERSHIP.md",
+            "roles/flywheel.md",
+            "src/lib/cloister/uat-promote-notify.ts",
+            "sync-sources/skills/pipeline-status/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-pipeline-membership.sh",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "pipeline-membership lint script passes (SKILL.md still references /api/pipeline/membership)",
+            "eslint passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the four documented surfaces to the new contract. docs/PIPELINE-MEMBERSHIP.md line 48 paragraph: rewrite to state 200 bare array on success; 200 {status:'unavailable', reason, message, projectKey} with the six-reason taxonomy on determined failure; 503 only for transient cold-boot loading. roles/flywheel.md Mission #3 (near line 78): arrays contribute inPipeline === true rows; a status:'unavailable' object means a typed blind spot the flywheel surfaces as an investigate suggestion and NEVER works around with ad-hoc membership derivation; membershipQueryable from /api/registered-projects is the upfront hint for missing_issue_prefix projects. src/lib/cloister/uat-promote-notify.ts line 24 prompt string: same two-shape teaching. sync-sources/skills/pipeline-status/SKILL.md: update endpoint semantics and KEEP the literal '/api/pipeline/membership' (scripts/lint-pipeline-membership.sh:60 requires it)."
+        },
+        "items": [
+          {
+            "id": "docs-prompts-contract.ac1",
+            "title": "Given docs/PIPELINE-MEMBERSHIP.md after the change, when reading the membership API paragraph, then it states the 200-array success shape, the 200 typed unavailable body with all six reason strings, and the 503 loading transient",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-prompts-contract.ac2",
+            "title": "Given roles/flywheel.md Mission #3 after the change, when reading the read-door instruction, then it directs the flywheel to surface status:'unavailable' projects as investigate suggestions and prohibits ad-hoc membership derivation for them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-prompts-contract.ac3",
+            "title": "Given the edited sync-sources/skills/pipeline-status/SKILL.md, when scripts/lint-pipeline-membership.sh runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "typed-unavailable-contract",
+        "to": "gather-repo-preflight",
+        "type": "blocks"
+      },
+      {
+        "from": "typed-unavailable-contract",
+        "to": "gather-default-branch-resolution",
+        "type": "blocks"
+      },
+      {
+        "from": "typed-unavailable-contract",
+        "to": "gather-forge-error-typing",
+        "type": "blocks"
+      },
+      {
+        "from": "gather-repo-preflight",
+        "to": "gather-default-branch-resolution",
+        "type": "blocks"
+      },
+      {
+        "from": "gather-default-branch-resolution",
+        "to": "gather-forge-error-typing",
+        "type": "blocks"
+      },
+      {
+        "from": "typed-unavailable-contract",
+        "to": "service-reason-propagation",
+        "type": "blocks"
+      },
+      {
+        "from": "service-reason-propagation",
+        "to": "route-typed-200",
+        "type": "blocks"
+      },
+      {
+        "from": "route-typed-200",
+        "to": "frontend-unavailable-probe",
+        "type": "blocks"
+      },
+      {
+        "from": "route-typed-200",
+        "to": "docs-prompts-contract",
+        "type": "blocks"
+      },
+      {
+        "from": "registered-projects-queryable-flag",
+        "to": "docs-prompts-contract",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3115-pipeline-membership-read-door-typed-per-project-unavailability-instead-of-503.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

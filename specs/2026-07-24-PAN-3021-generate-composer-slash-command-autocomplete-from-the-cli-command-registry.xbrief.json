@@ -1,0 +1,487 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-24T17:40:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3021: Composer slash-command autocomplete is a hand-maintained list drifted 38 commands behind the CLI (strike, swarm, task, approve, merge, flywheel…)",
+    "updated": "2026-07-25T15:20:41.304Z"
+  },
+  "plan": {
+    "id": "pan-3021",
+    "title": "Generate composer slash-command autocomplete from the CLI command registry",
+    "status": "completed",
+    "uid": "7f3a1c2e-9b4d-4e6a-8c5f-2d1b0a9e8f47",
+    "author": "agent:claude-fable-5",
+    "sequence": 5,
+    "created": "2026-07-24T17:40:00.000Z",
+    "updated": "2026-07-25T15:20:41.304Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3021",
+        "label": "PAN-3021",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "cli",
+      "codegen",
+      "single-source-of-truth",
+      "composer"
+    ],
+    "narratives": {
+      "Problem": "SLASH_COMMANDS in src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx:65-211 is a hardcoded, hand-maintained array that has drifted 38 top-level commands behind the pan CLI (strike, swarm, task, approve, merge, flywheel, pause, release, …) and also lists commands whose CLI shape no longer exists. Operators typing a real verb get no autocomplete match and doubt the verb exists.",
+      "Proposal": "Generate the pan-command entries from the CLI's own commander registry: a new plumbing subcommand `pan admin commands --json` (pure walker collectCommandTree over visibleCommands) feeds scripts/generate-slash-commands.mjs, which applies an explicit curation overlay (deny/categories/extras) and writes a committed slashCommands.generated.ts. The composer merges that with a small static list (/model, /context, /effort, /cancel, /handoff). A drift lint (scripts/lint-slash-commands.sh, wired into npm run lint after lint:skills) regenerates and fails CI on any diff — the same mechanical pattern as scripts/lint-skills.sh. A no-loss test pins the entire pre-change surface. Full PRD: .pan/drafts/PAN-3021.md.",
+      "NonGoals": "- No runtime endpoint serving commands (/api/slash-commands); build-time generation only\n- No generated per-flag/option entries; flag variants remain curated extras\n- No change to menu UX (filtering, grouping, highlighting, keyboard nav, insert semantics)\n- No populated deny list in this issue — it ships empty; hiding plumbing is a later explicit curation decision\n- No changes to skills tooling, scripts/lint-skills.sh, or the t3code composer redesign"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Build-time generation into a committed file with a drift lint, instead of a runtime endpoint backed by the registry.",
+        "rationale": "The CLI entrypoint has load-time side effects and cannot be imported by the dashboard server; the repo already enforces exactly this pattern for skills via scripts/lint-skills.sh running the locally built CLI; a committed file keeps the frontend build decoupled."
+      },
+      {
+        "summary": "Introspection implemented as a CLI plumbing subcommand (pan admin commands --json) rather than a separate program-construction script.",
+        "rationale": "Running inside the CLI guarantees the emitted tree is byte-for-byte the registry the shipped binary parses — no second construction path that could itself drift."
+      },
+      {
+        "summary": "deny list ships empty; every visible command appears in the menu.",
+        "rationale": "The issue states curation must be an explicit act over the generated set; defaulting to full visibility is the smallest defensible choice and hidden:true commands are already excluded by commander."
+      },
+      {
+        "summary": "Old flag-variant entries (pan show --cv, pan fork --plain, pan handoff --model/--harness/--cwd, pan plan --auto --auto-start, pan review reset --session, pan show --context, pan show --health) are preserved as curated extras.",
+        "rationale": "Generating option permutations explodes the menu; the no-loss rule requires these existing affordances to survive, and extras are additive curation, not an independent copy."
+      }
+    ],
+    "items": [
+      {
+        "id": "cli-introspection",
+        "title": "Add collectCommandTree walker and `pan admin commands --json` plumbing subcommand",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-24T17:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3021",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "generator-and-overlay",
+            "drift-lint-gate"
+          ],
+          "files_scope": [
+            "src/cli/command-introspection.ts",
+            "src/cli/commands/admin/index.ts",
+            "src/cli/commands/__tests__/command-introspection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:cli",
+            "node dist/cli/index.js admin commands --json | node -e \"let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const t=JSON.parse(d);const paths=t.map(c=>c.path.join(' '));for(const p of ['strike','swarm','admin cloister status']){if(!paths.includes(p)){console.error('missing '+p);process.exit(1)}}if(paths.includes('review spawn-reviewer')){console.error('hidden leaked');process.exit(1)}console.log('ok '+t.length+' commands')})\"",
+            "npx vitest run --configLoader runner src/cli/commands/__tests__/command-introspection.test.ts"
+          ],
+          "expected_outputs": [
+            "introspection smoke prints 'ok <n> commands' with strike/swarm/admin cloister status present and no hidden review spawn-reviewer entry",
+            "command-introspection.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/command-introspection.ts exporting CommandInfo {path, description, args, hasSubcommands} and collectCommandTree(root: Command): CommandInfo[] — depth-first walk in registration order using root.createHelp().visibleCommands(cmd) (public commander API; never the private _hidden field), skipping the implicit 'help' command, reading positional args from cmd.registeredArguments (name/required/variadic). In registerAdminCommands (src/cli/commands/admin/index.ts:25, which already receives the root program) register `commands` with --json: JSON mode prints JSON.stringify(tree, null, 2); human mode prints one 'pan <path>  —  <description>' line per entry. Unit-test the walker against a synthetic commander program containing nested groups, a {hidden:true} command, and an <id> argument. Exact interface and snippets: PRD W1 in .pan/drafts/PAN-3021.md."
+        },
+        "items": [
+          {
+            "id": "cli-introspection.ac1",
+            "title": "Given the built CLI, `pan admin commands --json` emits a JSON array containing paths ['strike'], ['swarm'] and ['admin','cloister','status'], each with a non-empty description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-introspection.ac2",
+            "title": "Given the built CLI, the --json output contains no hidden command entry (no ['review','spawn-reviewer']) and no implicit 'help' entry at any depth",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-introspection.ac3",
+            "title": "collectCommandTree returns args metadata: for a synthetic command 'kill <id>' the unit test asserts it produces {name:'id', required:true, variadic:false}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-introspection.ac4",
+            "title": "The unit test on a synthetic program with a {hidden:true} subcommand asserts the walker emits exactly the visible paths in registration order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "generator-and-overlay",
+        "title": "Generator script + curation overlay producing committed slashCommands.generated.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-24T17:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3021",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/generate-slash-commands.mjs",
+            "scripts/slash-commands-curation.json",
+            "src/dashboard/frontend/src/components/chat/slashCommands.generated.ts",
+            "src/dashboard/frontend/src/components/chat/slashCommandTypes.ts",
+            "package.json",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run generate:slash-commands && cp src/dashboard/frontend/src/components/chat/slashCommands.generated.ts /tmp/gen1.ts && npm run generate:slash-commands && diff /tmp/gen1.ts src/dashboard/frontend/src/components/chat/slashCommands.generated.ts",
+            "grep -c \"label: 'pan strike'\" src/dashboard/frontend/src/components/chat/slashCommands.generated.ts"
+          ],
+          "expected_outputs": [
+            "diff between two consecutive generator runs is empty (byte-identical output)",
+            "generated file contains an entry labeled 'pan strike'"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create slashCommandTypes.ts holding the SlashCommand interface (moved verbatim from ComposerPromptEditor.tsx:57-63; no imports). Create scripts/slash-commands-curation.json with deny: [] (ships empty), categories map (top-level verb → menu section, PRD W2 lists the full initial map; unmapped verbs default to 'CLI'), and extras: the nine flag-variant entries copied verbatim from the old list. Create scripts/generate-slash-commands.mjs: fail fast if dist/cli/index.js missing (message names npm run build:cli); spawnSync the CLI's `admin commands --json`; include leaves at any depth plus non-leaf commands with positional args (covers `pan plan [id]`; pure groups like review/workspace/admin/backup are excluded); apply deny prefixes; map to {id:'pan-'+path.join('-'), label:'pan '+path.join(' '), insert: label + (args.length? ' ' : ''), description: first sentence hard-capped at 100 chars with ellipsis, category from overlay}; append extras; support --out <path>; write the GENERATED-header file importing type SlashCommand from './slashCommandTypes'. Add package.json script generate:slash-commands. Commit the generated file; if scripts/lint-file-size.sh flags it, baseline it in scripts/file-size-baseline.txt in this same commit. Exact output template: PRD W2."
+        },
+        "items": [
+          {
+            "id": "generator-and-overlay.ac1",
+            "title": "Running npm run generate:slash-commands twice in a row produces byte-identical slashCommands.generated.ts (deterministic output, no timestamps)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "generator-and-overlay.ac2",
+            "title": "The generated file contains entries for pan strike, pan swarm, pan pause, pan flywheel and pan merge leaves, and pan task leaves — the commands the issue names as missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "generator-and-overlay.ac3",
+            "title": "The generator produces insert text ending in a trailing space for commands with positional args (e.g. 'pan strike ') and no trailing space for arg-less commands (e.g. 'pan status')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "generator-and-overlay.ac4",
+            "title": "The generated file contains a GENERATED-file header naming npm run generate:slash-commands and every generated description it contains is ≤100 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "generator-and-overlay.ac5",
+            "title": "With dist/cli/index.js absent the generator exits non-zero and its stderr names 'npm run build:cli'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-swap",
+        "title": "Composer consumes generated + static entries; delete the hand-maintained list",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-24T17:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3021",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/slashCommands.ts",
+            "src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
+            "grep -c \"pan-admin-cloister-status\" src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx || true"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ComposerPromptEditor.test.tsx passes including the pinned reset-to-planned autocomplete assertion",
+            "grep finds 0 occurrences — the hand-maintained array body is gone from ComposerPromptEditor.tsx"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create slashCommands.ts: STATIC_SLASH_COMMANDS holding the five non-CLI entries copied verbatim from the old list (/model, /context, /effort, /cancel in category 'AI CLI'; /handoff in category 'Conversation' with its dashboard-intercepted description), import GENERATED_SLASH_COMMANDS from './slashCommands.generated', export SLASH_COMMANDS = [...static, ...generated] and re-export the SlashCommand type. In ComposerPromptEditor.tsx delete lines 57-211 (interface + array), import { SLASH_COMMANDS, type SlashCommand } from './slashCommands', and re-export both so the existing test import from '../ComposerPromptEditor' (test line 7) keeps compiling. Usage sites at :546 (filterCommands) and :677 (SlashMenu commands prop) are unchanged. The pinned test 'offers reset-to-planned in composer autocomplete' must pass against the generated entry {id:'pan-reset-to-planned', insert:'pan reset-to-planned '}."
+        },
+        "items": [
+          {
+            "id": "composer-swap.ac1",
+            "title": "ComposerPromptEditor.tsx no longer contains any hand-maintained pan-command entry (grep for 'pan-admin-cloister-status' returns nothing) while still re-exporting SLASH_COMMANDS and SlashCommand",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-swap.ac2",
+            "title": "The merged SLASH_COMMANDS renders both a static entry (/model) and a generated entry (pan strike) through the existing SlashMenu grouping without UX changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-swap.ac3",
+            "title": "The pre-existing test 'offers reset-to-planned in composer autocomplete' passes unmodified against the generated data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-swap.ac4",
+            "title": "npm run typecheck exits 0 with no errors across root and dashboard configs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drift-lint-gate",
+        "title": "Drift lint script wired into the npm lint chain",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-24T17:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3021",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-slash-commands.sh",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:cli && npm run lint:slash-commands",
+            "echo '// tamper' >> src/dashboard/frontend/src/components/chat/slashCommands.generated.ts && (npm run lint:slash-commands; rc=$?; git checkout -- src/dashboard/frontend/src/components/chat/slashCommands.generated.ts; exit $rc); test $? -ne 0 && echo 'drift correctly detected'"
+          ],
+          "expected_outputs": [
+            "lint:slash-commands exits 0 on a freshly generated file",
+            "prints 'drift correctly detected' after a tampered generated file makes the gate exit non-zero (file then restored)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create scripts/lint-slash-commands.sh: exit 2 with a 'run npm run build:cli first' message if dist/cli/index.js is absent; run node scripts/generate-slash-commands.mjs --out <tempfile>; diff -u against the committed src/dashboard/frontend/src/components/chat/slashCommands.generated.ts; on mismatch print \"slash-command autocomplete has drifted from the CLI registry — run 'npm run generate:slash-commands' and commit the result\" and exit 1. Add package.json script lint:slash-commands and insert 'npm run lint:slash-commands' into the root lint chain immediately after 'npm run lint:skills' (whose prelint already builds the CLI, so the chain never hits the missing-dist path)."
+        },
+        "items": [
+          {
+            "id": "drift-lint-gate.ac1",
+            "title": "With a freshly regenerated committed file, npm run lint:slash-commands exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drift-lint-gate.ac2",
+            "title": "With the generated file hand-modified, npm run lint:slash-commands exits non-zero and its output names npm run generate:slash-commands as the fix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drift-lint-gate.ac3",
+            "title": "The root package.json lint script contains 'npm run lint:slash-commands' immediately after 'npm run lint:skills', so npm run lint runs the drift gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-loss-audit-test",
+        "title": "No-loss audit test pinning the entire pre-change autocomplete surface",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-24T17:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3021",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/slashCommands.no-loss.test.ts"
+          ],
+          "expected_outputs": [
+            "slashCommands.no-loss.test.ts passes, covering all pre-change entries either as survivors or verified deliberate removals"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Create the no-loss audit test per .claude/rules/additive-refactor-no-loss.md. Embed as data the complete pre-change SLASH_COMMANDS surface — every {label, insert} pair from ComposerPromptEditor.tsx:65-211 at commit acdd72d806 (use `git show acdd72d806:src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx` to copy it exactly). Embed DELIBERATE_REMOVALS [{label, reason}] filled by checking each old entry against live `pan admin commands --json` output; only entries whose CLI path no longer exists may be listed (planning found candidates: pan admin tasks compact, pan admin tasks stats — verify every entry mechanically, entry by entry). Assert: (1) each old entry not in removals has an exact-insert match in the new merged SLASH_COMMANDS; (2) no removals entry has a match (guards against parking live commands there); (3) /model, /context, /effort, /cancel, /handoff are present verbatim; (4) labels 'pan strike', 'pan swarm', 'pan pause' exist and at least one label each starts with 'pan flywheel ', 'pan merge ', 'pan task ', 'pan release '."
+        },
+        "items": [
+          {
+            "id": "no-loss-audit-test.ac1",
+            "title": "The test enumerates every pre-change entry and fails when any survivor's exact insert text is removed from the merged SLASH_COMMANDS (demonstrated during development by temporarily deleting one extras entry)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit-test.ac2",
+            "title": "The test fails if a DELIBERATE_REMOVALS entry's insert text actually exists in the merged list, preventing live commands from being parked as removals",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit-test.ac3",
+            "title": "The test fails when the merged SLASH_COMMANDS is missing any of the five static entries or the issue-headline commands (pan strike, pan swarm, pan pause, plus flywheel/merge/task/release leaves), and passes when all are present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pipeline",
+        "title": "Document the slash-command generation pipeline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-24T17:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3021",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/COMPOSER-SLASH-COMMANDS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f docs/COMPOSER-SLASH-COMMANDS.md && grep -l 'generate:slash-commands' docs/COMPOSER-SLASH-COMMANDS.md"
+          ],
+          "expected_outputs": [
+            "docs/COMPOSER-SLASH-COMMANDS.md exists and names the regeneration command"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Write docs/COMPOSER-SLASH-COMMANDS.md describing the pipeline (CLI registry → pan admin commands --json → scripts/generate-slash-commands.mjs + scripts/slash-commands-curation.json → committed slashCommands.generated.ts → scripts/lint-slash-commands.sh drift gate), how to add a static entry vs a curated extra vs a deny prefix, the regeneration command, and the rule that the generated file is never hand-edited and no hand-maintained command copy may be reintroduced. Cross-link scripts/lint-skills.sh as the sibling drift-gate pattern."
+        },
+        "items": [
+          {
+            "id": "docs-pipeline.ac1",
+            "title": "docs/COMPOSER-SLASH-COMMANDS.md renders the full pipeline naming all five artifacts (introspection command, generator, overlay, generated file, lint script) with their exact paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pipeline.ac2",
+            "title": "The doc shows the three curation mechanisms (static entry, extras, deny prefix) with the file each lives in, and contains npm run generate:slash-commands as the regeneration command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "cli-introspection",
+        "to": "generator-and-overlay",
+        "type": "blocks"
+      },
+      {
+        "from": "generator-and-overlay",
+        "to": "composer-swap",
+        "type": "blocks"
+      },
+      {
+        "from": "generator-and-overlay",
+        "to": "drift-lint-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-swap",
+        "to": "no-loss-audit-test",
+        "type": "blocks"
+      },
+      {
+        "from": "generator-and-overlay",
+        "to": "docs-pipeline",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-24-PAN-3021-generate-composer-slash-command-autocomplete-from-the-cli-command-registry.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

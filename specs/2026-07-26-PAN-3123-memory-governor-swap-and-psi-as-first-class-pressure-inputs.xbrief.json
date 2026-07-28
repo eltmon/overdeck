@@ -1,0 +1,348 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T12:40:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3123: Memory governor ignores swap entirely — swap can hit 0 free while it reports 'admitting', removing all OOM runway",
+    "updated": "2026-07-26T15:35:13.894Z"
+  },
+  "plan": {
+    "id": "pan-3123",
+    "title": "Memory governor: swap and PSI as first-class pressure inputs",
+    "status": "completed",
+    "uid": "b56a82fc-24d5-451f-a801-f69ef080ec8c",
+    "author": "agent:k3[1m]",
+    "sequence": 7,
+    "created": "2026-07-26T12:40:00.000Z",
+    "updated": "2026-07-26T15:35:13.894Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3123",
+        "label": "PAN-3123",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "memory-governor",
+      "deacon",
+      "resource-governor",
+      "oom-prevention"
+    ],
+    "narratives": {
+      "Problem": "assessMemoryPressure() in src/lib/cloister/memory-governor.ts decides purely on MemAvailable. Observed 2026-07-26: MemAvailable 28.98 GB with SwapFree 0.00 GB — the governor reported 'admitting' into a machine with zero swap runway, the state a prior run OOM-killed from. MemAvailable alone overstates headroom exactly when the machine cannot absorb a burst.",
+      "Proposal": "Make swap and PSI first-class governor inputs. The snapshot already carries SwapFree/SwapTotal on both platforms; add PSI full/some avg10 from /proc/pressure/memory. Compose a swap verdict into the existing single-mode hysteresis: SwapFree below a soft percent of SwapTotal gates admission (holding — cheap, reversible); PSI full avg10 at/above threshold on top of low swap gates shedding (expensive, only when genuinely stalling). Re-admission requires both RAM >= RECOVERY and SwapFree >= swap-recovery percent. Swapless machines and PSI-unavailable platforms keep today's RAM-only behavior. All thresholds are new config-yaml keys with defaults 25% / 50% / 1.0.",
+      "NonGoals": "- No change to canAdmit, the footprint budget, or the HTTP spawn-path classifyMemoryPressure predicate.\n- No swap-activity (pswpin/pswpout) rate gating — PSI full already captures the thrashing it indicates.\n- No shedding on PSI alone while swap is healthy.\n- No behavior change on swapless machines (SwapTotal = 0).\n- No new dashboard surface for the verdict fields (additive data only)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Swap gates admission (holding), PSI gates shedding",
+        "rationale": "The operator's 10:38Z issue comment explicitly refines the issue body's 'near zero => shedding': PSI full avg10 measured 0.00 while swap sat at ~99% used, so a swap-only shed rule would have shed healthy agents on an unstalled machine."
+      },
+      {
+        "summary": "Swapless machines (SwapTotal = 0) are exempt from both runway gates",
+        "rationale": "A machine that never had swap elasticity must not suddenly hold forever — that would be a behavior change beyond this issue's scope."
+      },
+      {
+        "summary": "PSI unavailable => no PSI shedding, swap gate still applies",
+        "rationale": "Non-Linux platforms and kernels without PSI return null; Darwin still reports swap via sysctl, so the swap rule remains meaningful there."
+      },
+      {
+        "summary": "Runway composes into the existing single-mode hysteresis via a new exported nextGovernorModeWithRunway; nextGovernorMode and canAdmit keep their signatures and RAM-only semantics",
+        "rationale": "canAdmit is a pinned public shape and nextGovernorMode is covered by existing tests that must stay green; composition preserves the anti-oscillation guarantee without a second latch."
+      },
+      {
+        "summary": "Defaults 25% swap-soft, 50% swap-recovery, PSI full shed threshold 1.0",
+        "rationale": "25/50 matches the issue body's ~25% suggestion and gives a wide hysteresis band; 1.0 matches the existing LINUX_MEMORY_PRESSURE_DEFAULTS.fullCriticalAvg10 in src/lib/system-health/linux.ts:21."
+      },
+      {
+        "summary": "MemoryVerdict gains optional swapTotalBytes/swapFreeBytes/psiFullAvg10",
+        "rationale": "The original defect was invisibility — operators could not see why the governor admitted. Additive fields, no consumer changes."
+      }
+    ],
+    "items": [
+      {
+        "id": "psi-snapshot-reader",
+        "title": "Add PSI avg10 fields to ProcMemorySnapshot",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3123",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/system-health-service.ts",
+            "tests/unit/dashboard/server/services/system-health-service-psi.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/system-health-service-psi.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "system-health-service-psi.test.ts passes all parse cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend ProcMemorySnapshot (system-health-service.ts:66-74) with `psiSomeAvg10: number | null` and `psiFullAvg10: number | null`. Add an exported pure `parseMemoryPsi(content)` mirroring the regex semantics of parseMemoryPressure in src/lib/system-health/linux.ts:97-108 (match /^(some|full)\\s+.*\\bavg10=([^\\s]+)/, Number(), reject non-finite or negative). readProcMemoryLinux (:327-345) reads /proc/pressure/memory inside its own try/catch (catch => both fields null, mirroring the Darwin vm_stat/sysctl pattern at :368/:378) and spreads the parsed values into the snapshot. readProcMemoryDarwin (:380-388) returns null for both. New test file covers: realistic two-line content parses both values; malformed lines and negative values are skipped; a missing `full` line yields fullAvg10 null while someAvg10 still parses; empty string yields both null. Full before/after snippets are in the PRD at drafts/pan-3123.md WI-1."
+        },
+        "items": [
+          {
+            "id": "psi-snapshot-reader.ac1",
+            "title": "parseMemoryPsi('some avg10=1.23 avg60=0.40 avg300=0.10 total=12345\\nfull avg10=0.05 avg60=0.01 avg300=0.00 total=678\\n') returns { someAvg10: 1.23, fullAvg10: 0.05 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "psi-snapshot-reader.ac2",
+            "title": "ProcMemorySnapshot produces psiFullAvg10 null on Darwin and on an unreadable /proc/pressure/memory, while meminfo-derived fields still populate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "psi-snapshot-reader.ac3",
+            "title": "The new vitest file passes and npm run typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "governor-runway-config",
+        "title": "Add governor swap/PSI threshold config keys with normalization",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3123",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "tests/lib/config-yaml.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/config-yaml.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "config-yaml.test.ts passes including the new defaults and normalization cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Add three config keys: governor_swap_soft_free_percent (default 25), governor_swap_recovery_free_percent (default 50), governor_psi_full_shed_avg10 (default 1). Touch: schema.ts input block after governor_footprint_default_test_gb (:413) and the resolved resources type after governorFootprintDefaultTestGb (:888); defaults.ts after :212; merge.ts defaults spread near :185-189 plus per-key typeof overrides after the footprint-test override (:661-663). After the existing RECOVERY>SOFT normalization (merge.ts:665-668) add the swap analog: when governorSwapRecoveryFreePercent <= governorSwapSoftFreePercent, set it to min(soft + 10, 100) — normalize rather than throw, mirroring the GiB reserves. Tests in tests/lib/config-yaml.test.ts: defaults 25/50/1 when unset; explicit values round-trip; recovery <= soft normalizes to min(soft + 10, 100). Exact snippets in PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "governor-runway-config.ac1",
+            "title": "loadConfigSync().config.resources exposes governorSwapSoftFreePercent=25, governorSwapRecoveryFreePercent=50, governorPsiFullShedAvg10=1 when the keys are unset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-runway-config.ac2",
+            "title": "merge accepts explicitly configured values and preserves them on the resolved resources, and defaults governor_swap_recovery_free_percent to min(soft + 10, 100) when configured <= the soft percent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-runway-config.ac3",
+            "title": "tests/lib/config-yaml.test.ts passes and npm run typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "governor-swap-psi-hysteresis",
+        "title": "Compose swap/PSI runway into the governor mode state machine",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T12:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3123",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "governor-runway-docs"
+          ],
+          "files_scope": [
+            "src/lib/cloister/memory-governor.ts",
+            "src/lib/cloister/memory-verdict-cache.ts",
+            "tests/unit/lib/cloister/memory-governor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/memory-governor.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "memory-governor.test.ts passes including the FR-2 issue-acceptance case (healthy RAM + SwapFree 0 => not admitting)",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-8",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "memory-verdict-cache.ts: add optional swapTotalBytes?, swapFreeBytes?, psiFullAvg10? to MemoryVerdict (additive). memory-governor.ts: export GovernorRunway { swapTotalBytes, swapFreeBytes, psiFullAvg10: number | null }, GovernorRunwayThresholds, and readGovernorRunwayThresholds() reading the three WI-2 resource values. Add the exported composer nextGovernorModeWithRunway(availableBytes, reserves, runway, runwayThresholds, previousMode): compute memMode via the UNCHANGED nextGovernorMode; return memMode untouched when runway.swapTotalBytes <= 0 (FR-5); otherwise swapSoftBytes = swapTotal * softPercent/100, swapRecoveryBytes = swapTotal * recoveryPercent/100, swapLow = (previousMode === 'admitting' ? swapFree < swapSoftBytes : swapFree < swapRecoveryBytes); psiShed = swapLow && psiFullAvg10 != null && psiFullAvg10 >= threshold; return 'shedding' when memMode === 'shedding' || psiShed, 'holding' when swapLow, else memMode. Leave nextGovernorMode (:90-101) and canAdmit (:185-187) byte-identical (NFR-1/NFR-2). assessMemoryPressure() (:116-127) calls the composer with the snapshot's swap/PSI fields and populates the three new verdict fields. Update the test file's readProcMemory/loadConfigSync mocks to carry swap/PSI and the new config keys (H2 in continue.json). New named tests: (a) FR-2 issue AC — RAM above RECOVERY, SwapTotal 8 GiB, SwapFree 0, psi 0 => band != ok (holding); (b) FR-3 swap hysteresis — held, SwapFree between soft and recovery stays holding, above recovery admits; (c) FR-4 — RAM healthy, SwapFree below soft, psiFullAvg10 = 1 => shedding; (d) FR-6 — same with psiFullAvg10 null => holding; (e) FR-5 — SwapTotal 0 => admitting, RAM-only behavior; (g) FR-8 — verdict carries the snapshot's swap/PSI fields. The existing nextGovernorMode block must pass unmodified. Full composer source in PRD WI-3."
+        },
+        "items": [
+          {
+            "id": "governor-swap-psi-hysteresis.ac1",
+            "title": "With memAvailable above RECOVERY and SwapFree 0 of an 8 GiB SwapTotal, assessMemoryPressure() returns a non-'ok' verdict (holding/soft) — the issue's acceptance criterion, failing on pre-change code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-swap-psi-hysteresis.ac2",
+            "title": "Once held for low swap, the governor re-admits only when SwapFree reaches the swap-recovery percent of SwapTotal and RAM >= RECOVERY; SwapFree between soft and recovery preserves holding",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-swap-psi-hysteresis.ac3",
+            "title": "RAM healthy + SwapFree below the soft percent + psiFullAvg10 >= threshold produces shedding; the same inputs with psiFullAvg10 null produce holding instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-swap-psi-hysteresis.ac4",
+            "title": "SwapTotal 0 produces verdicts identical to RAM-only behavior, and the pre-existing nextGovernorMode and canAdmit tests pass unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-swap-psi-hysteresis.ac5",
+            "title": "assessMemoryPressure() returns a MemoryVerdict that contains swapTotalBytes, swapFreeBytes, and psiFullAvg10 populated from the snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "governor-runway-docs",
+        "title": "Document swap/PSI inputs in RESOURCE-GOVERNOR.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T12:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3123",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/RESOURCE-GOVERNOR.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'governor_swap_soft_free_percent' docs/RESOURCE-GOVERNOR.md",
+            "grep -n 'SwapFree' docs/RESOURCE-GOVERNOR.md",
+            "grep -n 'PSI' docs/RESOURCE-GOVERNOR.md"
+          ],
+          "expected_outputs": [
+            "each grep prints matching lines in the model section and config table"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/RESOURCE-GOVERNOR.md 'The three bands and hysteresis' section (:66-102), add a subsection after the transition rule documenting the runway inputs: SwapFree gates admission with its own soft/recovery percent hysteresis composed into the same single governor mode; PSI full avg10 gates the shed upgrade (low swap + PSI full >= threshold => shedding); re-admission requires RAM >= RECOVERY AND SwapFree >= swap-recovery percent; swapless machines and PSI-unavailable platforms keep RAM-only behavior. In the config table (:336 area), add rows for governor_swap_soft_free_percent (default 25), governor_swap_recovery_free_percent (default 50, normalized above soft), governor_psi_full_shed_avg10 (default 1)."
+        },
+        "items": [
+          {
+            "id": "governor-runway-docs.ac1",
+            "title": "The model section shows the exact rules: low swap holds, low swap + PSI full >= threshold sheds, and re-admission applies only when both RAM >= RECOVERY and SwapFree >= the swap-recovery percent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "governor-runway-docs.ac2",
+            "title": "The config table contains rows for governor_swap_soft_free_percent, governor_swap_recovery_free_percent, and governor_psi_full_shed_avg10 with defaults 25, 50, and 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "psi-snapshot-reader",
+        "to": "governor-swap-psi-hysteresis",
+        "type": "blocks"
+      },
+      {
+        "from": "governor-runway-config",
+        "to": "governor-swap-psi-hysteresis",
+        "type": "blocks"
+      },
+      {
+        "from": "governor-swap-psi-hysteresis",
+        "to": "governor-runway-docs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3123-memory-governor-swap-and-psi-as-first-class-pressure-inputs.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

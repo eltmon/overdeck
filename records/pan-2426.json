@@ -35,10 +35,9 @@
     "issueId": "PAN-2426",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T03:57:08.747Z",
+    "updatedAt": "2026-07-17T00:33:52.750Z",
     "reviewNotes": "Verification failed at test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2481",
     "reviewedAtCommit": "4f3b8909281b5687a8313c74cf45882e160c2e5d",
@@ -99,7 +98,9 @@
         "tests/vbrief/full-spec.test.ts"
       ],
       "recordedAt": "2026-07-07T23:34:17.286Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-17T00:33:52.750Z"
   },
   "closeOut": {
     "usage": {
@@ -177,8 +178,81 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2481"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-17T00:33:52.768Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at 4f3b8909281b5687a8313c74cf45882e160c2e5d",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2481 MERGED at 2026-07-08T01:21:42Z",
+          "status": "pass",
+          "mergedAt": "2026-07-08T01:21:42Z",
+          "mergeCommit": "1d6a7a12a7122a043d7d5eaba735d714ee81c3eb"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: done; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "7 check-runs concluded successfully on 1d6a7a12a7122a043d7d5eaba735d714ee81c3eb",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-17T00:31:08.000Z, dist built 2026-07-17T00:28:58.492Z, merge 2026-07-08T01:21:42.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; No strike branch strike/pan-2426 found; Pruned 0 checkpoint ref(s) for agent-pan-2426, planning-pan-2426, strike-pan-2426; No specialist registry entries for PAN-2426"
+        }
+      ],
+      "accepted": []
+    }
   },
   "created": "2026-07-07T23:45:09.633Z",
-  "updated": "2026-07-08T03:57:08.771Z"
+  "updated": "2026-07-17T00:33:52.773Z"
 }

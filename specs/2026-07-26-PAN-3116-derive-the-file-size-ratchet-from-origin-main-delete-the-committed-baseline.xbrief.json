@@ -1,0 +1,424 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-26T09:12:47Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3116: scripts/file-size-baseline.txt is a cross-branch serialization point — every concurrent branch conflicts on the same 31 lines",
+    "updated": "2026-07-26T21:49:57.628Z"
+  },
+  "plan": {
+    "id": "pan-3116",
+    "title": "Derive the file-size ratchet from origin/main; delete the committed baseline",
+    "status": "completed",
+    "uid": "f06adf53-cc94-4904-b79e-e0916fa06a1a",
+    "author": "agent:k3[1m]",
+    "sequence": 7,
+    "created": "2026-07-26T09:12:47Z",
+    "updated": "2026-07-26T21:49:57.628Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3116",
+        "label": "PAN-3116",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "codebase-health",
+      "ratchet",
+      "merge-conflicts",
+      "lint",
+      "flywheel-run-71"
+    ],
+    "narratives": {
+      "Problem": "scripts/file-size-baseline.txt is shared mutable state committed to the repo: lint-file-size.sh fails on stale entries, so any branch changing a god file's line count must edit the same 31-line file. 71 commits touched it in 7 days; PAN-3037 and PAN-1696 both conflicted on it in RUN-71 (PAN-1696's only conflict). Two branches that each shrink a DIFFERENT god file still conflict because both rewrite the snapshot.",
+      "Proposal": "Derive, don't store: lint-file-size.sh compares working-tree line counts against origin/main (FILE_SIZE_BASE_REF override) at lint time — allowed = max(CEILING=1000, count on base ref), allowlist entries in the new scripts/file-size-allowlist.txt ('<lines> <path> # <ISSUE-REF>') permit audited growth. Delete scripts/file-size-baseline.txt, the --update mode, file-size-reconcile.ts + its uat-promote wiring, the deferred-file-size-ratchet quality-lint rule, and retarget lint-ratchet-audit.sh at the allowlist. Full decision rules and before/after core logic are in the PRD (.pan/drafts/PAN-3116.md) — follow it exactly.",
+      "NonGoals": "- Splitting or refactoring any god file\n- Changing the 1000-line ceiling or extending the guard outside src/\n- Auto-pruning moot allowlist entries\n- scripts/lint-dashboard-types.sh's separate baseline contract\n- Migrating historical docs/journals that mention the old baseline (FLYWHEEL-STATE.md, flywheel-briefs/, B-deacon-decomp.md)\n- Retrofitting the new contract into already-active xBRIEF plans on other branches\n- Committing .pan/context/codebase/ files (untracked on main since PAN-2541; deliberately skipped)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Compare against origin/main (env-overridable via FILE_SIZE_BASE_REF), hard-failing when the ref is unresolvable",
+        "rationale": "The issue names 'git show origin/main:<path> | wc -l' as the fix direction; origin/main is the merge target in every context the lint runs (worktrees, pre-push, CI with fetch-depth: 0). A missing ref must fail loudly (no-bandaids rule), and the env override keeps tests hermetic."
+      },
+      {
+        "summary": "Allowlist rows require an inline issue ref and malformed rows fail the lint",
+        "rationale": "Makes every exception self-documenting at the read site and preserves the old D4 'audited growth with issue reference' property even where the commit-message audit (pre-push range mode) doesn't run."
+      },
+      {
+        "summary": "No stale-entry failures and no --update mode anywhere in the new design",
+        "rationale": "Fail-on-stale is precisely the mechanism that forced every god-file-touching branch to edit shared lint metadata. Removing it is the root-cause fix; moot allowlist entries are harmless and pruned manually."
+      },
+      {
+        "summary": "Delete file-size-reconcile.ts and the uat-promote amend rather than repurposing them",
+        "rationale": "They exist only to keep the stored snapshot fresh. With nothing stored, keeping them is dead code and the uat-promote amend becomes a no-op trigger."
+      },
+      {
+        "summary": "Update only A3-file-size-guard.md with an Update note; leave historical journals untouched",
+        "rationale": "Follows the repo convention (B-deacon-decomp.md:26) and the surgical-changes rule — journals record what happened at the time and must not be rewritten."
+      },
+      {
+        "summary": "Skipped the .pan/context/codebase/ bootstrap the planning template requests",
+        "rationale": ".pan/ is untracked on main since the PAN-2541 state migration (cc30721631); the four context files exist untracked at the project root. Re-committing them under .pan/ contradicts the migration direction and is orthogonal to this issue."
+      }
+    ],
+    "items": [
+      {
+        "id": "rewrite-lint-derive-from-base",
+        "title": "Rewrite lint-file-size.sh to derive from the base ref; delete the baseline; add the allowlist",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T09:12:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3116",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "ratchet-audit-allowlist"
+          ],
+          "files_scope": [
+            "scripts/lint-file-size.sh",
+            "scripts/file-size-baseline.txt",
+            "scripts/file-size-allowlist.txt",
+            "tests/unit/scripts/lint-file-size.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/lint-file-size.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest suite for lint-file-size passes",
+            "lint-file-size.sh exits 0 on this branch with no baseline file present",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite scripts/lint-file-size.sh per the PRD's 'New core logic' listing: CEILING=1000; BASE_REF=${FILE_SIZE_BASE_REF:-origin/main} with a hard exit-1 (actionable message) when unresolvable; parse scripts/file-size-allowlist.txt rows of '<lines> <path> # <ISSUE-REF>' (blank lines and # comments skipped; any other malformed row fails naming the line); for each non-test src file (keep the existing find enumeration and exclusions verbatim), skip files at/under 1000 lines, else allowed = allowlist value, or max(CEILING, count on base ref) — a file absent from the base ref gets allowed=CEILING so new god files fail. Fail when the working-tree count exceeds allowed, printing the allowlist remedy. No --update mode, no stale-entry checks. In the SAME commit: git rm scripts/file-size-baseline.txt and create scripts/file-size-allowlist.txt with a header comment documenting the format and zero entries. Rewrite tests/unit/scripts/lint-file-size.test.ts: makeTempRepo creates an initial commit of the 'main' state and a 'base' ref (git update-ref refs/heads/base HEAD); runLint passes env { ...process.env, FILE_SIZE_BASE_REF: 'base' }. Cases: new god file fails; over-ceiling file at/below base count passes; growth past base count fails; allowlist entry permits audited growth; malformed allowlist row fails naming the line; missing base ref exits 1 with the actionable message; shrinking a god file requires no metadata edit (assert no baseline file exists in the installed temp repo)."
+        },
+        "items": [
+          {
+            "id": "rewrite-lint-derive-from-base.ac1",
+            "title": "Given a src file at 1001 lines absent from the base ref, bash scripts/lint-file-size.sh exits 1 and prints the file path and the allowlist remedy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewrite-lint-derive-from-base.ac2",
+            "title": "Given a file at 1200 lines on the base ref, the guard exits 0 when the working tree is at or below 1200 and exits 1 when the working tree exceeds 1200 without an allowlist entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewrite-lint-derive-from-base.ac3",
+            "title": "Given an allowlist row '1300 src/foo.ts # PAN-3116', the guard exits 0 at 1300 lines and exits 1 at 1301; a row missing the issue ref exits 1 naming the malformed line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewrite-lint-derive-from-base.ac4",
+            "title": "The item's commit deletes scripts/file-size-baseline.txt and creates scripts/file-size-allowlist.txt containing a header comment that documents the '<lines> <path> # <ISSUE-REF>' format",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewrite-lint-derive-from-base.ac5",
+            "title": "Given FILE_SIZE_BASE_REF pointing at a nonexistent ref, the guard exits 1 and prints a message naming the ref and the fetch/override remedy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ratchet-audit-allowlist",
+        "title": "Retarget lint-ratchet-audit.sh from the deleted baseline to the file-size allowlist",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-26T09:12:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3116",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-ratchet-audit.sh",
+            "tests/unit/scripts/lint-ratchet-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/lint-ratchet-audit.test.ts",
+            "bash scripts/lint-ratchet-audit.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vitest suite for lint-ratchet-audit passes",
+            "lint-ratchet-audit.sh exits 0 on the current HEAD",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In scripts/lint-ratchet-audit.sh: replace BASELINE=\"scripts/file-size-baseline.txt\" (line 22) with FILE_SIZE_ALLOWLIST=\"scripts/file-size-allowlist.txt\"; rename baseline_at/parent_baseline_at/baseline_increases_for_commit to file-size-allowlist equivalents pointed at the new file — the awk '$1 ~ /^[0-9]+$/ && NF >= 2' parsing and the added/raised detection (lines 75-80) work unchanged on '<lines> <path> # <ref>' rows; update the audit loop (line 213) to iterate the new file alongside eslint-any-allowlist.json and circular-deps-baseline.txt; update the header comment to state that additions/raises to the file-size allowlist require an issue-referencing commit while removals and lowerings are free. In tests/unit/scripts/lint-ratchet-audit.test.ts: rewrite the four baseline-specific cases (rise-without-ref fails, rise-with-ref passes, lowerings pass, malformed conflict-marker rows ignored) against scripts/file-size-allowlist.txt; leave the allowlist/circular/rename/root-commit/merge-attribution cases intact. Do not otherwise reformat the script."
+        },
+        "items": [
+          {
+            "id": "ratchet-audit-allowlist.ac1",
+            "title": "A commit that adds or raises a scripts/file-size-allowlist.txt entry without an issue reference fails lint-ratchet-audit.sh --range and names the commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-audit-allowlist.ac2",
+            "title": "A commit that raises an allowlist entry with an issue reference in its message passes the range audit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-audit-allowlist.ac3",
+            "title": "Commits that remove or lower allowlist entries pass the range audit without an issue reference",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ratchet-audit-allowlist.ac4",
+            "title": "git grep -n 'file-size-baseline' scripts/lint-ratchet-audit.sh returns no matches and the eslint-any/circular-baseline audits still pass their existing tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remove-baseline-reconcile",
+        "title": "Delete file-size-reconcile.ts and its UAT-promote wiring",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T09:12:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3116",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/file-size-reconcile.ts",
+            "src/lib/cloister/uat-promote.ts",
+            "tests/unit/lib/cloister/file-size-reconcile.test.ts",
+            "tests/unit/lib/cloister/uat-promote-baseline.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/",
+            "git grep -n reconcileFileSizeBaseline -- src tests || true"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "cloister unit tests pass",
+            "git grep for reconcileFileSizeBaseline returns no matches"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "First run git grep -n reconcileFileSizeBaseline to confirm src/lib/cloister/uat-promote.ts is the only importer. Then: delete src/lib/cloister/file-size-reconcile.ts; in src/lib/cloister/uat-promote.ts remove the import (line 26), the 'const { changed } = await reconcileFileSizeBaseline(...)' and the conditional 'commit --amend --no-edit' in mergeIntoMain (~line 232), and update the stale header comments at line 7 and line 208 that describe baseline reconciliation; delete tests/unit/lib/cloister/file-size-reconcile.test.ts and tests/unit/lib/cloister/uat-promote-baseline.test.ts. UAT promote merges must still merge --no-ff and push HEAD:main exactly as before — only the reconcile+amend step disappears."
+        },
+        "items": [
+          {
+            "id": "remove-baseline-reconcile.ac1",
+            "title": "src/lib/cloister/file-size-reconcile.ts and both of its test files no longer exist, and git grep reconcileFileSizeBaseline returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-baseline-reconcile.ac2",
+            "title": "npm run typecheck passes with the module deleted, proving no remaining importer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-baseline-reconcile.ac3",
+            "title": "src/lib/cloister/uat-promote.ts preserves the worktree-add, merge --no-ff, and push HEAD:main calls in mergeIntoMain and contains no 'commit --amend' invocation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remove-quality-lint-ratchet-rule",
+        "title": "Remove the deferred-file-size-ratchet plan-quality rule and rewrite the planning prompt paragraph",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T09:12:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3116",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/quality-lint.ts",
+            "src/lib/xbrief/__tests__/quality-lint.test.ts",
+            "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+            "src/lib/cloister/prompts/planning.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/xbrief/__tests__/quality-lint.test.ts src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+            "npm run lint:prompts",
+            "git grep -n deferred-file-size-ratchet || true"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "quality-lint and complete-planning test files pass",
+            "lint:prompts passes",
+            "git grep for deferred-file-size-ratchet returns no matches"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/xbrief/quality-lint.ts remove the deferred-file-size-ratchet rule entirely: constants FILE_SIZE_BASELINE_PATH, FILE_SIZE_RECONCILIATION_PATTERN, FILE_SIZE_LINT_COMMAND_PATTERN (lines 49-51), requiresFileSizeLint (289-293), lintDeferredFileSizeRatchet (295-332), and its spread call site (line 411). Then git grep -n 'itemSearchText\\|scopeIncludesPath' src/lib/xbrief/quality-lint.ts — if the rule was their only caller (verified at planning time: itemSearchText line 274, scopeIncludesPath line 285 are single-use), delete both helpers; if any new caller appeared since, keep the helper and note it. Remove the describe block covering the rule in src/lib/xbrief/__tests__/quality-lint.test.ts (~lines 214-283). In src/dashboard/server/routes/__tests__/complete-planning.test.ts remove the assertion pair at lines 353-362 that expects the rule to fire and clear; remove the baseline-reconcile fixture item (~lines 156-181) ONLY if no other assertion in the file consumes it — check before deleting. Rewrite the 'Ratchet-backed verification' paragraph at src/lib/cloister/prompts/planning.md:229 to state: the file-size ratchet is derived not stored — lint-file-size.sh compares working-tree line counts against origin/main at lint time, there is no baseline file to reconcile, items never carry lint metadata in files_scope, and an item that grows a god file past its origin/main count must add an allowlist row ('<lines> <path> # <ISSUE-REF>' in scripts/file-size-allowlist.txt) in the same commit. If npm run lint:prompts or lint:prompt-trailer fails on the prompt edit, follow the failing lint's own instructions."
+        },
+        "items": [
+          {
+            "id": "remove-quality-lint-ratchet-rule.ac1",
+            "title": "git grep -n 'deferred-file-size-ratchet' returns no matches across src and tests, and npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-quality-lint-ratchet-rule.ac2",
+            "title": "npx vitest run on quality-lint.test.ts and complete-planning.test.ts passes with the rule's test blocks removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-quality-lint-ratchet-rule.ac3",
+            "title": "The planning prompt paragraph states the derive-at-lint-time contract and the allowlist remedy, and npm run lint:prompts passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-quality-lint-ratchet-rule.ac4",
+            "title": "itemSearchText and scopeIncludesPath are deleted when git grep confirms the removed rule was their only caller, or kept with a noted new caller otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-a3-update-note",
+        "title": "Document the derive-don't-store ratchet in the A3 guard doc",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-26T09:12:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3116",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/codebase-health/A3-file-size-guard.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'PAN-3116' docs/codebase-health/A3-file-size-guard.md"
+          ],
+          "expected_outputs": [
+            "grep prints the Update note line referencing PAN-3116"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a '> Update (PAN-3116):' block directly under the front matter of docs/codebase-health/A3-file-size-guard.md, matching the convention at docs/codebase-health/B-deacon-decomp.md:26. The note states: the committed baseline was deleted; the guard now derives allowed counts from origin/main at lint time (FILE_SIZE_BASE_REF override); audited growth uses scripts/file-size-allowlist.txt rows of '<lines> <path> # <ISSUE-REF>'; the --update mode and the reconcile machinery (file-size-reconcile.ts, uat-promote amend) are gone; branches that shrink god files no longer edit any lint metadata. Do not rewrite the historical body of the doc, and do not touch FLYWHEEL-STATE.md, flywheel-briefs, B-deacon-decomp.md, or CODEBASE-HEALTH-ROADMAP.md (verified at planning time: the roadmap has no baseline reference)."
+        },
+        "items": [
+          {
+            "id": "docs-a3-update-note.ac1",
+            "title": "docs/codebase-health/A3-file-size-guard.md contains an Update (PAN-3116) note under the front matter describing the derived ratchet, the allowlist format, and the deleted baseline/reconcile machinery",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-a3-update-note.ac2",
+            "title": "git diff --name-only for this item's commit shows only docs/codebase-health/A3-file-size-guard.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "rewrite-lint-derive-from-base",
+        "to": "ratchet-audit-allowlist",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-26-PAN-3116-derive-the-file-size-ratchet-from-origin-main-delete-the-committed-baseline.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

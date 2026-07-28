@@ -1,0 +1,169 @@
+{
+  "issueId": "PAN-2749",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-16T00:57:15.378Z",
+  "updated": "2026-07-27T06:18:03.109Z",
+  "pipeline": {
+    "issueId": "PAN-2749",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "mergeStatus": "merged",
+    "mergeStep": "merged",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-27T06:18:03.064Z",
+    "testNotes": "Skipped: issue is already merged",
+    "verificationNotes": "merge-verify: CI green on the merged tip (PAN-2487 local-gate skip)",
+    "lastVerifiedCommit": "695732172e1b79bc66610931f57e2fcc9b71085b",
+    "strikeLandingState": "landed",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-27T04:50:03.065Z",
+        "strikeHead": "286c9b19c79bd8c3f91f6466693dc2aead478690",
+        "mainHead": "595ba45f8d31e40d4b6260e9332a2a0dd6b50b6f",
+        "outcome": "failed",
+        "detail": "Stale strike signal: recorded HEAD 286c9b19c79bd8c3f91f6466693dc2aead478690 differs from origin/strike/pan-2749 at 8c4ba381f166af639854c0e32f3f65b9cbc552d5"
+      },
+      {
+        "timestamp": "2026-07-27T05:02:40.241Z",
+        "strikeHead": "8c4ba381f166af639854c0e32f3f65b9cbc552d5",
+        "mainHead": "51bf13ee386923f9e0397f2e6141516c063e225b",
+        "outcome": "failed",
+        "detail": "Stale strike signal: recorded HEAD 8c4ba381f166af639854c0e32f3f65b9cbc552d5 differs from origin/strike/pan-2749 at 695732172e1b79bc66610931f57e2fcc9b71085b"
+      }
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T06:18:03.064Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 717310,
+            "output": 2407,
+            "cacheRead": 610048,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 14261155,
+            "output": 17781,
+            "cacheRead": 12568832,
+            "cacheWrite": 0
+          }
+        },
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 473,
+            "output": 200,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 717310,
+          "output": 2407,
+          "cacheRead": 610048,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 14261155,
+          "output": 17781,
+          "cacheRead": 12568832,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-haiku-4-5": {
+          "input": 473,
+          "output": 200,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 15.280934,
+        "pricingAsOf": "2026-07-27T05:17:44.423Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T06:18:03.081Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed",
+          "observed": "verificationStatus: passed at 695732172e1b79bc66610931f57e2fcc9b71085b",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3195 MERGED at 2026-07-27T05:17:21Z",
+          "status": "pass",
+          "mergedAt": "2026-07-27T05:17:21Z",
+          "mergeCommit": "e14ac3b31d84126851ff03019fe02f4663097262"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on e14ac3b31d84126851ff03019fe02f4663097262",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 3297fb26 contains merge e14ac3b3",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 3 agent state directories; Preserved local branch strike/pan-2749 — not merged to main; Preserved remote branch strike/pan-2749 — not merged to main; Pruned 30 checkpoint ref(s) for agent-pan-2749, planning-pan-2749, strike-pan-2749; No specialist registry entries for PAN-2749"
+        }
+      ],
+      "accepted": []
+    }
+  },
+  "harness": "claude-code",
+  "model": "claude-opus-5"
+}

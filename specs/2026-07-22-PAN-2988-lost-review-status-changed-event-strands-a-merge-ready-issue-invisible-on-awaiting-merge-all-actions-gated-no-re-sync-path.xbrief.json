@@ -1,0 +1,611 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-22T21:42:47.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2988: Lost review.status_changed event strands a merge-ready issue: invisible on Awaiting Merge, all actions gated, no re-sync path",
+    "updated": "2026-07-24T20:58:16.174Z"
+  },
+  "plan": {
+    "id": "pan-2988",
+    "title": "Lost review.status_changed event strands a merge-ready issue: invisible on Awaiting Merge, all actions gated, no re-sync path",
+    "status": "completed",
+    "uid": "6466b5ce-2677-431b-825a-3731deadd704",
+    "author": "agent:k3",
+    "sequence": 7,
+    "created": "2026-07-22T21:42:47.000Z",
+    "updated": "2026-07-24T20:58:16.174Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2988",
+        "label": "PAN-2988",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "event-store",
+      "review-status",
+      "dashboard",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "The status_changed branch of the dashboard pipeline handler (src/dashboard/server/main.ts:248-267) enriches via async tmux before es.append, with no timeout and no retry; a wedged tmux call or a server restart loses the review.status_changed domain event silently. The read model (reviewStatusByIssueId) advances only via events, so one lost event permanently strands a merge-ready issue off Awaiting Merge with all actions gated, while read-door surfaces see the truth. Verified incident: PAN-806 on 2026-07-21 (67-minute drift, 327 other events appended fine).",
+      "Proposal": "Four changes (full detail in .pan/drafts/PAN-2988.md): (1) a shared emit helper src/dashboard/server/review-status-emit.ts appends the UNENRICHED status synchronously at all three emit sites, then applies a bounded (5s), stale-guarded, sugar-only enrichment patch; (2) enrichReviewStatusPromise wraps listSessionNames in Effect.timeout('5 seconds'); (3) the read door getReviewStatusSync emits status_changed when its journal-newer reconcile changes the effective status, and a new 60s dashboard-side sweep service diffs canonical statuses against the latest emitted event per issue (new EventStore.queryLatestPerIssue) and re-emits on drift; (4) a read-only POST /api/review/:issueId/resync endpoint + 'pan review resync <id>' verb + never-gated RECOVER-menu action 'Re-sync pipeline state' give the operator an escape hatch. Ratchet: review-status.ts and cli/index.ts are at their line baseline, so items 3 and 6 are extraction-shaped and lower scripts/file-size-baseline.txt in-commit.",
+      "NonGoals": "- Fixing the deploy-patrol per-issue record lock hold (separate issue, incident contributing factor)\n- Replacing the read model's bootstrap+events architecture with polling\n- Changing the review.status_changed reducer semantics (wholesale replace stays)\n- Backfilling historically lost events (the sweep heals live drift going forward)\n- Any mutation-capable force-status operator action (resync is strictly read + re-emit)\n- Reconciliation for event types other than review.status_changed"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Implement all three issue fix directions plus both operator comment additions (timeout after reorder; periodic sweep)",
+        "rationale": "The issue body states all three are needed and the operator's verified comment names the two additions explicitly; no documented options remained to choose among."
+      },
+      {
+        "summary": "Emit helper placed at src/dashboard/server/review-status-emit.ts with a structural append callback",
+        "rationale": "Both server call sites (main.ts, deacon-main.ts) can share it without new lib import cycles; the append injection covers EventStore.append and the deacon eventClient."
+      },
+      {
+        "summary": "Enrichment patch guarded by updatedAt stale-check and no-sugar skip",
+        "rationale": "Without the guard a slow patch overwrites a newer transition in the wholesale-replace reducer; without the skip every transition emits two events of noise."
+      },
+      {
+        "summary": "5-second enrichment timeout",
+        "rationale": "list-sessions is a local tmux call that returns in milliseconds when healthy; 5s is generous yet bounds the leak the operator flagged."
+      },
+      {
+        "summary": "Reconcile sweep is dashboard-side (60s, primary-process gated), not a deacon patrol",
+        "rationale": "The drift detector needs EventStore query access; the deacon child process has an append-only event client and cannot query the parent's store."
+      },
+      {
+        "summary": "Recovery endpoint is read-only POST /api/review/:issueId/resync with verb 'pan review resync <id>'",
+        "rationale": "The incident recovery mutated state via POST /api/review/:id/status; a read + re-emit endpoint removes the mutation hazard and needs no body validation."
+      },
+      {
+        "summary": "Ratchet compliance via extraction (review-status-reconcile.ts, review-subcommands.ts) with baseline reconciliation in the same commits",
+        "rationale": "src/lib/review-status.ts (1159) and src/cli/index.ts (1412) sit exactly at baseline; extraction is the smallest change that adds behavior while netting the god files down."
+      }
+    ],
+    "items": [
+      {
+        "id": "durable-sync-emit",
+        "title": "Append unenriched review status synchronously via a shared emit helper at all three emit sites",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-22T21:42:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2988",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "reconcile-sweep-service"
+          ],
+          "files_scope": [
+            "src/dashboard/server/review-status-emit.ts",
+            "src/dashboard/server/main.ts",
+            "src/dashboard/server/deacon-main.ts",
+            "tests/unit/dashboard/server/review-status-emit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/review-status-emit.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all tests in tests/unit/dashboard/server/review-status-emit.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/review-status-emit.ts exporting emitReviewStatusChanged(append, issueId, status) per the PRD snippet: (1) append the unenriched status synchronously; (2) async enrichment patch bounded by Effect.timeout('5 seconds') with catchAll-to-null, skipped on timeout/failure (warn log), skipped when no sugar fields were produced, and skipped when getReviewStatusSync shows a different updatedAt (stale guard against the wholesale-replace reducer). Rewire the three call sites to it: main.ts:248-267 status_changed branch, main.ts:478-494 setMergeReadyNotifier, deacon-main.ts:97-108 setMergeReadyNotifier (drop its now-unused enrichReviewStatus import). Keep the existing try/catch error logging around the sync append in main.ts. Tests with vi.useFakeTimers cover: sync append before enrichment resolves; hung enrichment past 5s logs a warning and yields exactly one event; sugar + unchanged updatedAt yields a second enriched event; moved updatedAt yields no second event; no-sugar yields no second event."
+        },
+        "items": [
+          {
+            "id": "durable-sync-emit.ac1",
+            "title": "Given a status_changed notification, when the handler runs, then it appends a review.status_changed event carrying the unenriched status synchronously before any enrichment completes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "durable-sync-emit.ac2",
+            "title": "Given enrichment that hangs past 5 seconds, when the timeout fires, then the helper logs a warning naming the issue and produces exactly one appended event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "durable-sync-emit.ac3",
+            "title": "Given enrichment that returns sugar fields and an unchanged canonical updatedAt, when the patch runs, then it appends a second review.status_changed event carrying the enriched status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "durable-sync-emit.ac4",
+            "title": "Given a newer canonical updatedAt or enrichment with no sugar fields, when the patch decision runs, then it appends no second event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "durable-sync-emit.ac5",
+            "title": "Given the rewired call sites, when grep runs over main.ts and deacon-main.ts, then no remaining call site awaits enrichReviewStatus before appending review.status_changed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "timeout-enrichment",
+        "title": "Bound listSessionNames with Effect.timeout inside enrichReviewStatusPromise",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-22T21:42:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2988",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/review-status-enrichment.ts",
+            "tests/unit/lib/review-status-enrichment.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/review-status-enrichment.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "enrichment timeout test passes using fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In enrichReviewStatusPromise (src/lib/review-status-enrichment.ts:42-53), wrap the tmux call as listSessionNames().pipe(Effect.timeout('5 seconds')) so the existing catch { return status; } also catches the timeout and returns the unenriched status. Add a comment tying the 5s budget to the emit helper's patch budget (PAN-2988). New test file tests/unit/lib/review-status-enrichment.test.ts mocks ./tmux.js listSessionNames to never resolve and asserts, under vi.useFakeTimers, that enrichReviewStatusPromise resolves with the unenriched status (no sugar fields) after advancing 5s."
+        },
+        "items": [
+          {
+            "id": "timeout-enrichment.ac1",
+            "title": "Given a listSessionNames that never resolves, when enrichReviewStatusPromise is invoked and fake timers advance 5s, then it resolves with the unenriched status containing no reviewSessionNames",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "timeout-enrichment.ac2",
+            "title": "Given the change, when git diff shows enrichReviewStatusPromise, then the listSessionNames call carries an explicit Effect.timeout and no caller-visible signature changed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "read-door-reconcile-emit",
+        "title": "Emit status_changed from the getReviewStatusSync reconcile branch, extracting the block to shrink the god file",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-22T21:42:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2988",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/review-status-reconcile.ts",
+            "src/lib/review-status.ts",
+            "scripts/file-size-baseline.txt",
+            "tests/unit/lib/review-status-reconcile.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/review-status-reconcile.test.ts tests/unit/lib/review-status.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reconcile-emission tests pass and existing review-status tests stay green",
+            "lint-file-size reports no growth and the lowered baseline entry for src/lib/review-status.ts",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/review-status-reconcile.ts and move into it, per PRD item 3: the journalNewer reconcile block (review-status.ts:830-900) as exported reconcileJournalIntoCacheSync(issueId, dbStatus, journal), plus emitReactiveLifecycleEvent (:22), deliverReviewVerdictFeedbackHostSide (:656), maybeAutoDispatchReviewHostSide (:687), maybeRecoverTestVerdictHostSide (:742), and reviewGatesPassedSync (:146). The new module imports only external modules (never ./review-status.js); review-status.ts re-exports reviewGatesPassedSync so src/lib/cloister/deacon-merge.ts:11 keeps working, and its journalNewer branch becomes a call to reconcileJournalIntoCacheSync. Inside the moved block, immediately after the successful dbUpsert(reconciled), add notifyPipelineSync({ type: 'status_changed', issueId, status: reconciled }) with the PAN-2988 comment from the PRD. Run bash scripts/lint-file-size.sh --update and commit the lowered baseline entry in the same commit. Tests: journal-newer → exactly one status_changed notify carrying the reconciled status; DB-current → no notify; existing tests/unit/lib/review-status*.test.ts stay green."
+        },
+        "items": [
+          {
+            "id": "read-door-reconcile-emit.ac1",
+            "title": "Given a journal record newer than the DB row, when getReviewStatusSync reconciles, then it calls notifyPipelineSync once with type status_changed and the reconciled status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-door-reconcile-emit.ac2",
+            "title": "Given a DB row that is current with the journal, when getReviewStatusSync runs, then it produces no status_changed notification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-door-reconcile-emit.ac3",
+            "title": "Given the extraction, when lint-file-size runs, then src/lib/review-status.ts is smaller than its previous 1159-line baseline and scripts/file-size-baseline.txt records the lowered value in the same commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "read-door-reconcile-emit.ac4",
+            "title": "Given the re-export, when the test suite runs, then src/lib/cloister/deacon-merge.ts and all existing review-status tests pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconcile-sweep-service",
+        "title": "Add a 60s dashboard-side sweep that re-emits review status when canonical is newer than the last emitted event",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-22T21:42:47.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2988",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/review-status-reconcile-service.ts",
+            "src/dashboard/server/event-store.ts",
+            "src/dashboard/server/main.ts",
+            "tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts",
+            "tests/dashboard/event-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/review-status-reconcile-service.test.ts tests/dashboard/event-store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sweep re-emit/no-drift/error-swallow tests pass under fake timers",
+            "queryLatestPerIssue event-store test passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend the EventStore door (src/dashboard/server/event-store.ts) with queryLatestPerIssue(type): StoredEvent[] using the grouped MAX(sequence) SQL from PRD item 4 (verify column names against the insertStmt at event-store.ts:243-250 first; fallback to queryByType + JS grouping if json_extract does not apply, noting it in the commit message). Create src/dashboard/server/services/review-status-reconcile-service.ts following the merge-blocker-reconcile-service.ts:107-127 start/stop/setInterval+unref pattern with POLL_INTERVAL_MS = 60_000: each tick enumerates loadReviewStatuses() (src/lib/review-status.ts:195), reads canonical getReviewStatusSync(issueId), skips falsy or mergeStatus === 'merged', and when no review.status_changed event exists for the issue or the last event's status.updatedAt is older than the canonical updatedAt, logs the healing line from the PRD and re-emits via emitReviewStatusChanged (item durable-sync-emit) bound to getEventStore().append. Per-tick errors are swallowed. Start it in main.ts right after startMergeBlockerReconcileService() (:213) with a boolean primary-process gate and started/skipped logging like startUatTrainReconciler (main.ts:510-514). Tests use vi.useFakeTimers: drift → exactly one re-emit per tick; no drift → zero appends across ticks; throwing tick keeps the interval alive; event-store test covers queryLatestPerIssue picking the latest event per issue."
+        },
+        "items": [
+          {
+            "id": "reconcile-sweep-service.ac1",
+            "title": "Given a canonical status whose updatedAt is newer than the last emitted event, when a sweep tick runs, then it appends exactly one fresh review.status_changed event for that issue and logs the healing line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-sweep-service.ac2",
+            "title": "Given canonical statuses that match their last emitted events, when several sweep ticks run, then the service appends no events and logs nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-sweep-service.ac3",
+            "title": "Given a tick that throws, when the interval continues, then subsequent ticks still run and the server process survives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-sweep-service.ac4",
+            "title": "Given two events for issue A and one for issue B, when queryLatestPerIssue('review.status_changed') runs, then it returns the later issue-A event and the issue-B event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resync-endpoint",
+        "title": "Add read-only POST /api/review/:issueId/resync that re-emits the canonical review status",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-22T21:42:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-2988",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/review-control.ts",
+            "tests/unit/dashboard/server/routes/resync-review-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/resync-review-route.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route tests pass: 200 + one status_changed notify for existing status, 404 for missing, write door never called",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the route beside the reset route in src/dashboard/server/routes/workspaces/review-control.ts (:322-398), mirroring its auth/CSRF guards exactly. Handler: getReviewStatusSync(issueId) → 404 { ok: false, error } when falsy; otherwise notifyPipelineSync({ type: 'status_changed', issueId, status }) and return { ok: true, status }. The route never calls setReviewStatus and accepts no status body; its comment documents it as the read-only operator escape hatch for PAN-2988 lost events. Route test mirrors tests/unit/dashboard/server/routes/reset-review-route.test.ts."
+        },
+        "items": [
+          {
+            "id": "resync-endpoint.ac1",
+            "title": "Given an existing review status, when POST /api/review/:issueId/resync is called, then it returns 200 with ok: true and triggers exactly one status_changed notification carrying the canonical status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resync-endpoint.ac2",
+            "title": "Given no review status for the issue, when the route is called, then it returns 404 and emits nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resync-endpoint.ac3",
+            "title": "Given any request, when the handler runs, then it never calls setReviewStatus (verified by an unused-mock assertion in the route test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-review-resync",
+        "title": "Add 'pan review resync <id>' verb, extracting the review subcommand block to shrink cli/index.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-22T21:42:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2988",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/review-subcommands.ts",
+            "src/cli/commands/resync-review.ts",
+            "src/cli/index.ts",
+            "sync-sources/skills/pan-review/SKILL.md",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-skills.sh",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck",
+            "npx tsx src/cli/index.ts review resync --help"
+          ],
+          "expected_outputs": [
+            "lint-skills and lint-file-size pass with the lowered cli/index.ts baseline",
+            "'pan review resync --help' prints the new verb's usage",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Move the review command group registration (src/cli/index.ts:333-387) into src/cli/commands/review-subcommands.ts as registerReviewCommands(program), leaving one call line in index.ts. Add src/cli/commands/resync-review.ts mirroring src/cli/commands/reset-review.ts:21: POST /api/review/:issueId/resync with the same dashboard-URL resolution and headers, print a one-line confirmation with reviewStatus/testStatus/readyForMerge from the response, non-zero exit on 404/error. Register review.command('resync <id>') with the PRD description inside the moved module. Update sync-sources/skills/pan-review/SKILL.md: add the verb to the command list and a when-to-use row ('Issue passed review but is missing from Awaiting Merge / actions wrongly gated → pan review resync <id>'). Run bash scripts/lint-file-size.sh --update and commit the lowered baseline in the same commit."
+        },
+        "items": [
+          {
+            "id": "cli-review-resync.ac1",
+            "title": "Given the CLI, when 'pan review resync --help' runs, then it prints usage for the resync verb alongside the existing review subcommands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-review-resync.ac2",
+            "title": "Given the extraction, when lint-file-size runs, then src/cli/index.ts is smaller than its previous 1412-line baseline and the lowered baseline is committed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-review-resync.ac3",
+            "title": "Given the new verb, when lint-skills runs, then sync-sources/skills/pan-review/SKILL.md documents resync and the check passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "recover-action-menu-entry",
+        "title": "Add never-gated 'Re-sync pipeline state' action to the issue action registry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-22T21:42:47.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2988",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/issueActions.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "issue-actions parity suite passes with the new key and verb registered",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the resyncPipelineState entry to ISSUE_ACTION_DEFINITIONS (src/dashboard/frontend/src/lib/issueActions.ts:600-646, beside recoverReview at :611) exactly as specced in PRD item 7: panVerb 'review resync', endpoint '/api/review/:id/resync', enabledWhen: always, kind 'safe', group 'recover'. Update the parity test: add 'review resync' to ISSUE_SCOPED_PAN_VERBS (:26-50) and 'resyncPipelineState' to AUDITED_REGISTRY_KEYS (:52-99). If IssueActionKey is a manual union, add the key there. No disabledReasonForAction case — the action is never disabled because gating is computed from the state it repairs."
+        },
+        "items": [
+          {
+            "id": "recover-action-menu-entry.ac1",
+            "title": "Given any issue state, when the issue action menu renders, then 'Re-sync pipeline state' appears in the RECOVER group enabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recover-action-menu-entry.ac2",
+            "title": "Given the registry addition, when the parity test runs, then it passes with 'review resync' in ISSUE_SCOPED_PAN_VERBS and 'resyncPipelineState' in AUDITED_REGISTRY_KEYS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the recovery action and self-healing sweep in troubleshooting and issue-view docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-22T21:42:47.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-2988",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/troubleshooting.mdx",
+            "docs/ISSUE-VIEW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Re-sync pipeline state' reference/troubleshooting.mdx",
+            "grep -n 'resyncPipelineState\\|review resync' docs/ISSUE-VIEW.md reference/troubleshooting.mdx"
+          ],
+          "expected_outputs": [
+            "troubleshooting.mdx contains a 'missing from Awaiting Merge' section naming the action, the CLI verb, and the 60s self-healing sweep",
+            "docs/ISSUE-VIEW.md lists resyncPipelineState in the recover-group inventory"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "reference/troubleshooting.mdx: add a section 'Issue passed review but is missing from Awaiting Merge' with symptoms (backend readyForMerge: true, card missing, actions gated), cause (a lost review.status_changed event; the dashboard read model advances only via events), fix (issue action menu → RECOVER → 'Re-sync pipeline state', or pan review resync <id>), and a note that the 60-second reconcile sweep heals this automatically within a minute. docs/ISSUE-VIEW.md: add resyncPipelineState to the issue-actions registry inventory (~lines 40-44) so the no-loss audit surface stays complete."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given the docs change, when grep runs, then reference/troubleshooting.mdx contains a section that names the 'Re-sync pipeline state' action, the 'pan review resync' verb, and the 60s sweep",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given the docs change, when grep runs, then docs/ISSUE-VIEW.md mentions resyncPipelineState in its recover-group action inventory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "durable-sync-emit",
+        "to": "reconcile-sweep-service",
+        "type": "blocks"
+      },
+      {
+        "from": "resync-endpoint",
+        "to": "cli-review-resync",
+        "type": "blocks"
+      },
+      {
+        "from": "resync-endpoint",
+        "to": "recover-action-menu-entry",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-review-resync",
+        "to": "recover-action-menu-entry",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-22-PAN-2988-lost-review-status-changed-event-strands-a-merge-ready-issue-invisible-on-awaiting-merge-all-actions-gated-no-re-sync-path.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

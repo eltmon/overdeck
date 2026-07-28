@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multi-agent UX for Overdeck — Task rooms & councils</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel-2: #1c2330; --panel-3: #11161e;
+    --border: #2d333f; --text: #d6dde6; --muted: #8b949e;
+    --teal: #2ea89e; --teal-dim: #1f6f6a; --amber: #d97706; --amber-soft: #f0a93c;
+    --red: #e5534b; --violet: #9e8bff; --blue: #5b9bd5; --pink: #d478a8; --green: #6fbf73;
+    --mono: "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 28px 22px 70px; }
+  h1 { font-size: 24px; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); margin: 0 0 22px; max-width: 820px; }
+  code { font-family: var(--mono); font-size: 0.92em; background: #21262e; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+  a { color: var(--blue); }
+  .verdict { background: linear-gradient(180deg, #152030, #121a26); border: 1px solid #28405c; border-left: 3px solid var(--teal); border-radius: 8px; padding: 13px 18px; margin: 0 0 24px; max-width: 960px; }
+  .verdict b { color: #fff; }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 22px; flex-wrap: wrap; }
+  .tab { background: none; border: none; color: var(--muted); font: inherit; font-weight: 600; padding: 9px 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--amber-soft); border-bottom-color: var(--amber); }
+  .pane { display: none; }
+  .pane.active { display: block; }
+
+  /* ── Dashboard frame ── */
+  .dash { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .dash-titlebar { display: flex; align-items: center; gap: 10px; background: var(--panel-2); border-bottom: 1px solid var(--border); padding: 8px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .dash-titlebar .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .dash-body { display: grid; grid-template-columns: 250px 1fr; min-height: 560px; }
+  @media (max-width: 900px) { .dash-body { grid-template-columns: 1fr; } }
+
+  /* sidebar: lineage tree */
+  .tree { border-right: 1px solid var(--border); padding: 12px 10px; background: var(--panel-3); font-size: 13px; }
+  .tree h3 { margin: 2px 4px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
+  .tnode { display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+  .tnode:hover { background: #1a2230; }
+  .tnode.sel { background: #1c2a38; outline: 1px solid #28405c; }
+  .tnode .harness { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .tchild { margin-left: 18px; border-left: 1px solid #262e3a; padding-left: 8px; }
+  .presence { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .presence.running { background: var(--teal); box-shadow: 0 0 6px var(--teal); animation: pulse 1.6s infinite; }
+  .presence.idle { background: #5c6b7d; }
+  .presence.awaiting { background: var(--amber-soft); animation: pulse 1s infinite; }
+  .presence.exited { background: var(--red); }
+  @keyframes pulse { 50% { opacity: 0.45; } }
+  .agent-chip { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+  /* member tab bar */
+  .member-tabs { display: flex; gap: 2px; padding: 8px 12px 0; border-bottom: 1px solid var(--border); background: var(--panel-3); flex-wrap: wrap; }
+  .mtab { background: none; border: 1px solid transparent; border-bottom: none; color: var(--muted); font: 600 12px var(--mono); padding: 7px 12px; cursor: pointer; border-radius: 6px 6px 0 0; }
+  .mtab.active { color: var(--text); background: var(--panel); border-color: var(--border); }
+  .mtab .presence { display: inline-block; margin-right: 6px; }
+  .mtab.room { color: var(--amber-soft); }
+
+  .timeline { padding: 16px 18px 20px; max-height: 620px; overflow-y: auto; }
+  .msg { margin-bottom: 14px; max-width: 88%; }
+  .msg .head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 12px; }
+  .msg .who { font-weight: 700; font-family: var(--mono); font-size: 11.5px; }
+  .msg .time { color: var(--muted); font-size: 11px; }
+  .msg .body { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 13px; font-size: 13.5px; }
+  .msg.operator { margin-left: auto; }
+  .msg.operator .head { justify-content: flex-end; }
+  .msg.operator .body { background: #1d2c22; border-color: #2c4a38; }
+  .msg.a2a .body { border-left: 3px solid var(--teal); }
+  .msg.notice .body { border-left: 3px solid var(--red); background: #241a1c; font-family: var(--mono); font-size: 12px; }
+  .prov { font-family: var(--mono); font-size: 10.5px; color: var(--teal); display: block; margin-bottom: 5px; }
+  .thread-chip { font-family: var(--mono); font-size: 10px; background: #262b33; border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; color: var(--muted); }
+  .thread-chip.open { color: var(--amber-soft); border-color: #6b4d16; }
+  .thread-chip.closed { color: var(--teal); border-color: var(--teal-dim); }
+
+  /* composer */
+  .composer { border-top: 1px solid var(--border); padding: 12px 16px; background: var(--panel-3); }
+  .composer-row { display: flex; gap: 10px; align-items: flex-end; }
+  .composer textarea { flex: 1; background: #0a0e14; color: var(--text); border: 1px solid var(--border); border-radius: 8px; font: 13px/1.5 var(--mono); padding: 10px 12px; resize: none; height: 64px; }
+  .send-btn { background: var(--amber); color: #fff; border: none; border-radius: 8px; font: 700 13px inherit; padding: 10px 16px; cursor: pointer; white-space: nowrap; }
+  .send-btn:disabled { opacity: 0.45; cursor: default; }
+  .member-pick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; font-size: 11px; }
+  .pick { display: inline-flex; align-items: center; gap: 6px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 20px; padding: 3px 10px; cursor: pointer; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .pick.on { color: var(--text); border-color: var(--teal); background: #142e2b; }
+
+  /* council answer cards */
+  .answers { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; padding: 14px 16px; }
+  .acard { background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; overflow: hidden; opacity: 0; transform: translateY(8px); transition: opacity .35s, transform .35s; }
+  .acard.show { opacity: 1; transform: none; }
+  .acard header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--panel-3); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 11.5px; }
+  .acard header .st { margin-left: auto; font-size: 10.5px; color: var(--muted); }
+  .acard header .st.done { color: var(--teal); }
+  .acard .ans { padding: 10px 13px; font-size: 12.8px; min-height: 96px; white-space: pre-wrap; }
+  .spinner { display: inline-block; width: 11px; height: 11px; border: 2px solid #39424e; border-top-color: var(--amber-soft); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -1px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .synthesis { margin: 4px 16px 16px; border: 1px solid #4c3d80; border-radius: 10px; background: linear-gradient(180deg, #191530, #14121f); overflow: hidden; opacity: 0; transform: translateY(8px); transition: opacity .4s, transform .4s; }
+  .synthesis.show { opacity: 1; transform: none; }
+  .synthesis header { display: flex; align-items: center; gap: 8px; padding: 9px 14px; background: #1d1838; border-bottom: 1px solid #4c3d80; font-family: var(--mono); font-size: 12px; }
+  .synthesis .syn-body { padding: 12px 16px; font-size: 13.2px; }
+  .synthesis h4 { margin: 10px 0 5px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--violet); }
+  .synthesis h4:first-child { margin-top: 0; }
+  .synthesis ul { margin: 0; padding-left: 19px; }
+  .synthesis table { width: 100%; border-collapse: collapse; font-size: 12.3px; margin-top: 4px; }
+  .synthesis td, .synthesis th { text-align: left; padding: 5px 8px; border-bottom: 1px solid #2c2547; vertical-align: top; }
+  .synthesis th { color: var(--muted); font-weight: 600; }
+
+  .wire { margin: 0 16px 16px; border: 1px solid var(--border); border-radius: 8px; background: #0a0e14; display: none; }
+  .wire.show { display: block; }
+  .wire pre { margin: 0; padding: 12px 14px; font: 11.8px/1.6 var(--mono); color: #9fb0c2; overflow-x: auto; }
+  .wire .c { color: #5c6b7d; } .wire .k { color: var(--amber-soft); } .wire .m { color: var(--teal); } .wire .n { color: var(--red); }
+  .wire-toggle { margin: 0 16px 14px; background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; font: 600 11.5px var(--mono); padding: 5px 11px; cursor: pointer; }
+  .wire-toggle:hover { color: var(--text); }
+
+  .note { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--amber); border-radius: 8px; padding: 12px 16px; margin: 0 0 20px; font-size: 13.5px; max-width: 960px; }
+  .note b { color: var(--amber-soft); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Multi-agent UX for Overdeck</h1>
+  <p class="sub">Interactive UX mockup for <a href="https://github.com/eltmon/overdeck/issues/2565">PAN-2565</a> —
+    a conversation with N member sessions (the "room"), plus the "ask the room" council flow:
+    one question fanned out to five agents, rolled up by a synthesizer. Companion to the
+    <a href="index.html">architecture flow mockup</a>.</p>
+
+  <div class="verdict">
+    <b>The point of this page:</b> everything you see here runs on the broker from the architecture
+    mockup — no new machinery per feature. A "room" is a <b>read model</b> over
+    <code>a2a_messages</code>; a "council" is five <code>expect-reply</code> threads plus one
+    synthesis send. The UX is the product; the plumbing is already designed.
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-pane="room">The room (conversation view)</button>
+    <button class="tab" data-pane="council">Ask the room — council flow</button>
+    <button class="tab" data-pane="notes">Design notes</button>
+  </div>
+
+  <!-- ═══════════ PANE 1: ROOM ═══════════ -->
+  <div class="pane active" id="pane-room">
+    <div class="note">
+      <b>What you're looking at:</b> one <b>conversation</b> with six member sessions — not a new
+      surface. It lives in the project's CONVERSATIONS list in the Command Deck, at
+      <code>/conv/1042</code>, like every other conversation; the "6 members" chip is the only
+      list-level difference. The operator asked a design question; five agents answered on their
+      own threads and are now <i>discussing the disagreements with each other</i>. The
+      <b>Room</b> tab (default when a conversation has &gt;1 member) merges everything the broker
+      sees into one timeline; member tabs drill into each session's own transcript (where A2A
+      mail lands as <code>[overdeck inbox]</code> user turns). Presence dots come from existing
+      run-state signals.
+    </div>
+
+    <div class="dash">
+      <div class="dash-titlebar">
+        <span class="dot" style="background:var(--red)"></span>
+        <span class="dot" style="background:var(--amber-soft)"></span>
+        <span class="dot" style="background:var(--green)"></span>
+        <span style="margin-left:6px">overdeck.localhost — panopticon-cli ▸ CONVERSATIONS ▸ <b style="color:var(--text)">/conv/1042</b> “A2A wire format council” <span style="background:#1c2a38; border:1px solid #28405c; border-radius:4px; padding:1px 6px; margin-left:6px">6 members</span></span>
+      </div>
+      <div class="dash-body">
+        <div class="tree" id="tree"></div>
+        <div>
+          <div class="member-tabs" id="member-tabs"></div>
+          <div class="timeline" id="timeline"></div>
+          <div class="composer">
+            <div class="member-pick" id="room-pick"></div>
+            <div class="composer-row">
+              <textarea id="room-input">Fable, GPT — you two disagree on adopting the A2A envelope verbatim. Take one round: each reply to the other with your single strongest objection, then I'll decide.</textarea>
+              <button class="send-btn" id="room-send">Send to room ▾</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ PANE 2: COUNCIL ═══════════ -->
+  <div class="pane" id="pane-council">
+    <div class="note">
+      <b>The council flow:</b> one question, fanned out. The operator picks members and hits
+      <b>Ask the room</b> — the broker opens one <code>expect-reply</code> thread per member, answers
+      stream back as they land, and when the last thread closes (or you click
+      <b>Synthesize now</b>) a synthesizer member gets the question plus every reply and rolls up
+      consensus, disagreements, and a recommendation. Press <b>Run the council</b> below.
+      Toggle <b>wire view</b> to see the broker traffic under the UX.
+    </div>
+
+    <div class="dash">
+      <div class="dash-titlebar">
+        <span class="dot" style="background:var(--red)"></span>
+        <span class="dot" style="background:var(--amber-soft)"></span>
+        <span class="dot" style="background:var(--green)"></span>
+        <span style="margin-left:6px">overdeck.localhost — panopticon-cli ▸ CONVERSATIONS ▸ <b style="color:var(--text)">/conv/1042</b> “A2A wire format council” <span style="background:#1c2a38; border:1px solid #28405c; border-radius:4px; padding:1px 6px; margin-left:6px">6 members</span> — the council, as it happened in the conversation</span>
+      </div>
+      <div class="composer" style="border-top:none; border-bottom:1px solid var(--border)">
+        <div class="member-pick" id="council-pick"></div>
+        <div class="composer-row">
+          <textarea id="council-q">Should Overdeck adopt the Google A2A protocol's envelope/task model verbatim for agent-to-agent messaging, or build the internal broker from the PAN-2565 PRD and align vocabulary only? Give your position in 3-5 sentences with your strongest reason.</textarea>
+          <button class="send-btn" id="council-run">▶ Run the council</button>
+          <button class="send-btn" id="council-syn" style="background:var(--violet)" disabled>Synthesize now</button>
+        </div>
+      </div>
+      <div class="answers" id="answers"></div>
+      <div class="synthesis" id="synthesis">
+        <header>
+          <span class="agent-chip" style="background:var(--violet)"></span>
+          <b>synthesizer</b>&nbsp;· fable-5 · claude-code
+          <span class="st done" style="margin-left:auto" id="syn-status">reading 5 threads…</span>
+        </header>
+        <div class="syn-body" id="syn-body"></div>
+      </div>
+      <button class="wire-toggle" id="wire-toggle">▸ wire view (broker traffic)</button>
+      <div class="wire" id="wire"><pre id="wire-pre"></pre></div>
+    </div>
+  </div>
+
+  <!-- ═══════════ PANE 3: NOTES ═══════════ -->
+  <div class="pane" id="pane-notes">
+    <div class="note" style="max-width:none">
+      <b>IA placement — it IS a conversation (operator direction, 2026-07-25):</b> no new
+      top-level noun. A multi-agent "room" is a <b>conversation with N member sessions</b>,
+      project-scoped, in the existing CONVERSATIONS list; a one-member room renders exactly like
+      today's conversation. The PRD's "Task" noun stays internal domain language at most — and
+      even there it collides with the xBRIEF <code>pan task</code> checklist verbs, so the
+      planner should rename the internal column (<code>room_id</code>).<br><br>
+      <b>How each UX element maps to the broker (nothing here is new machinery):</b>
+      <ul style="margin:8px 0 0; padding-left:20px; line-height:1.8">
+        <li><b>Room timeline</b> — a read model: union of <code>a2a_messages</code> rows for the task plus each member's public turns, ordered by time. The broker already sees every message; the room is a query, not a transport.</li>
+        <li><b>Member tabs</b> — the existing <code>ConversationPanel</code>, reused per member session (PRD WI-5). A2A mail renders as <code>[overdeck inbox]</code> user turns because that's literally what was injected into the transcript — the JSONL stays the single source of truth (NFR-2).</li>
+        <li><b>Presence dots</b> — existing run-state events; <code>awaiting-input</code> reuses the AUQ / needs-you detection (FR-8).</li>
+        <li><b>Council fan-out</b> — N sends with <code>expectReply: true</code>; the broker mints N thread ids. No "council" concept exists in the broker — the pattern lives in the composer.</li>
+        <li><b>Synthesis</b> — one more member session whose kickoff brief is the question + the N reply bodies (read from <code>a2a_messages</code>, not scraped from panes). Its answer is an ordinary send back to the operator's room.</li>
+        <li><b>Liveness notices in-room</b> — a stalled answerer doesn't silently hang the council: the sender (here the room itself) surfaces the broker's typed notice, and "Synthesize now" lets the operator proceed with whoever answered.</li>
+        <li><b>Standards alignment</b> — thread states <code>open|closed|stalled</code> deliberately mirror A2A's task states (<code>submitted|working|input-required|completed</code>), and <code>pan msg list</code> rows mirror Agent Card capability fields. If an A2A facade ever ships, the mapping is mechanical.</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── shared agent cast ──────────────────────────────────────────────────
+const AGENTS = {
+  synth:  { name: 'synthesizer', model: 'fable-5',    harness: 'claude-code', color: '#9e8bff', parent: 'operator' },
+  gpt:    { name: 'gpt-council', model: 'gpt-5.6',    harness: 'codex',       color: '#5b9bd5', parent: 'operator' },
+  sonnet: { name: 'sonnet-council', model: 'sonnet-5', harness: 'claude-code', color: '#2ea89e', parent: 'operator' },
+  kimi:   { name: 'kimi-council', model: 'kimi-k2',   harness: 'acp',         color: '#d478a8', parent: 'operator' },
+  pi:     { name: 'pi-council',  model: 'gpt-5.6',    harness: 'pi',          color: '#6fbf73', parent: 'operator' },
+  codex:  { name: 'app-council', model: 'gpt-5.6',    harness: 'codex-app',   color: '#f0a93c', parent: 'operator' },
+};
+
+// ─── tabs ────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('pane-' + btn.dataset.pane).classList.add('active');
+  });
+});
+
+// ═══════════════ PANE 1: ROOM ═══════════════
+const tree = document.getElementById('tree');
+const mtabs = document.getElementById('member-tabs');
+const timeline = document.getElementById('timeline');
+const roomPick = document.getElementById('room-pick');
+
+const PRESENCE = { synth: 'idle', gpt: 'running', sonnet: 'running', kimi: 'idle', pi: 'awaiting', codex: 'idle' };
+
+function chip(color) { return `<span class="agent-chip" style="background:${color}"></span>`; }
+function dot(state) { return `<span class="presence ${state}"></span>`; }
+
+function renderTree(sel) {
+  let html = `<h3>Members</h3>
+    <div class="tnode" data-m="room"><span style="color:var(--amber-soft)">⌂</span> operator <span class="harness">room</span></div>`;
+  for (const id in AGENTS) {
+    const a = AGENTS[id];
+    html += `<div class="tchild"><div class="tnode ${sel===id?'sel':''}" data-m="${id}">${dot(PRESENCE[id])}${chip(a.color)} ${a.name} <span class="harness">${a.harness}</span></div></div>`;
+  }
+  tree.innerHTML = html;
+  tree.querySelectorAll('.tnode').forEach(n => n.addEventListener('click', () => selectMember(n.dataset.m)));
+}
+
+function renderTabs(sel) {
+  let html = `<button class="mtab room ${sel==='room'?'active':''}" data-m="room">◈ Room</button>`;
+  for (const id in AGENTS) {
+    const a = AGENTS[id];
+    html += `<button class="mtab ${sel===id?'active':''}" data-m="${id}">${dot(PRESENCE[id])}${a.name}</button>`;
+  }
+  mtabs.innerHTML = html;
+  mtabs.querySelectorAll('.mtab').forEach(n => n.addEventListener('click', () => selectMember(n.dataset.m)));
+}
+
+function msg(opts) {
+  const cls = ['msg'];
+  if (opts.operator) cls.push('operator');
+  if (opts.a2a) cls.push('a2a');
+  if (opts.notice) cls.push('notice');
+  const thread = opts.thread ? `<span class="thread-chip ${opts.threadState||''}">${opts.thread}</span>` : '';
+  const prov = opts.prov ? `<span class="prov">${opts.prov}</span>` : '';
+  return `<div class="${cls.join(' ')}">
+    <div class="head">${opts.color?chip(opts.color):''}<span class="who">${opts.who}</span><span class="time">${opts.time}</span>${thread}</div>
+    <div class="body">${prov}${opts.body}</div></div>`;
+}
+
+const ROOM_FEED = [
+  { who: 'operator', operator: true, time: '14:02', body: 'Question for the room: adopt Google A2A verbatim, or keep the PAN-2565 internal broker and align vocabulary? @synthesizer @gpt-council @sonnet-council @kimi-council @pi-council @app-council' },
+  { who: 'gpt-council', color: AGENTS.gpt.color, a2a: true, prov: '[overdeck inbox] from operator · reply with: pan msg send --to room --response-id thr_q1-gpt', thread: 'thr_q1-gpt', threadState: 'closed', time: '14:03', body: 'Adopt A2A verbatim. The envelope, task states, and Agent Card are already a Linux Foundation standard with 150+ enterprises on it; every month we run a bespoke wire format is a month external tools can\'t address our agents. JSON-RPC over HTTP+SSE is boring and sufficient.' },
+  { who: 'sonnet-council', color: AGENTS.sonnet.color, a2a: true, prov: '[overdeck inbox] from operator · thread thr_q1-son', thread: 'thr_q1-son', threadState: 'closed', time: '14:04', body: 'Keep the internal broker. A2A is designed for cross-org delegation — signed cards, OAuth, discovery directories. We are one machine and one operator; we\'d be importing an authorization model for a trust domain that doesn\'t exist here. Align vocabulary, ship the broker, revisit a facade later.' },
+  { who: 'kimi-council', color: AGENTS.kimi.color, a2a: true, prov: '[overdeck inbox] from operator · thread thr_q1-kim', thread: 'thr_q1-kim', threadState: 'closed', time: '14:05', body: 'Hybrid: internal broker now, thin A2A adapter in front of it for outside callers. The adapter is ~200 lines once the broker exists; sequencing adapter-first would force auth and versioning decisions before we have a single production thread.' },
+  { who: 'pi-council', color: AGENTS.pi.color, a2a: true, prov: '[overdeck inbox] from operator · thread thr_q1-pi', thread: 'thr_q1-pi', threadState: 'closed', time: '14:06', body: 'Simplest viable: extend pan tell with --expect-reply and ship. We have a delivery door, a mail dir, and a registry. Everything else is a GUI.' },
+  { who: 'app-council', color: AGENTS.codex.color, a2a: true, prov: '[overdeck inbox] from operator · thread thr_q1-app', thread: 'thr_q1-app', threadState: 'closed', time: '14:07', body: 'Sequencing matters more than the format: fix the durable queue first (PAN-2668 — feedback stranding in a queue nothing drains), then threads on top. A wire standard on top of a lossy queue is a standardized way to lose messages.' },
+  { who: 'synthesizer', color: AGENTS.synth.color, a2a: true, prov: '[overdeck inbox] thread rollup · 5 replies read', time: '14:09', body: '<b>Rollup:</b> 4 of 5 say build the internal broker first — the split is only about <i>when</i> to face A2A outward. Disagreement is genuine between gpt-council (standard now) and sonnet-council (facade later, maybe never). Consensus: broker first, vocabulary aligned to A2A so a facade is mechanical. See the council tab for the full synthesis.' },
+  { who: 'gpt-council', color: AGENTS.gpt.color, a2a: true, prov: '[overdeck inbox] from sonnet-council (agent-pan-2565-son) · reply with: pan msg send --to sonnet-council --response-id thr_debate1', thread: 'thr_debate1', threadState: 'open', time: '14:11', body: 'Fair — but "align vocabulary" is how systems become compatible in name only. If our thread states don\'t map 1:1 to A2A task states on day one, the facade becomes a translation layer with edge cases. Name one place where mapping open|closed|stalled onto submitted|working|completed loses information.' },
+  { who: 'sonnet-council', color: AGENTS.sonnet.color, a2a: true, prov: '[overdeck inbox] from gpt-council (agent-pan-2565-gpt) · thread thr_debate1', thread: 'thr_debate1', threadState: 'open', time: '14:12', body: 'input-required. Our equivalent is awaiting-input from the AUQ pipeline, but it\'s a liveness notice, not a thread state — an agent can be awaiting operator input while its thread is still legitimately open. I\'d add it as a notice reason, not a state. Your turn: name one A2A concept you\'d actually force on us today.' },
+  { who: 'system', notice: true, who: 'a2a-broker', time: '14:13', body: '[overdeck:a2a-notice] kind=inactivity reason=awaiting-input thread=thr_q1-pi\npi-council asked the operator a question mid-answer; its council thread stays open until a person responds. The room may proceed without it.' },
+  { who: 'operator', operator: true, time: '14:14', body: 'Good round. Decision: internal broker per PAN-2565, states and list-rows mapped 1:1 to A2A vocabulary from day one, facade revisited after the council pattern proves itself. Synthesizer, write that into the PRD feedback file.' },
+];
+
+const MEMBER_VIEWS = {
+  synth: [
+    { who: 'operator', operator: true, time: '14:08', body: 'You are the synthesizer for task t_01J9KQ. Question + 5 reply bodies follow. Produce: consensus, disagreements, recommendation. (kickoff brief)' },
+    { who: 'synthesizer', color: AGENTS.synth.color, time: '14:09', body: 'Rollup posted to the room. Consensus: internal broker, A2A-aligned vocabulary. Genuine split on facade timing — flagged gpt-council vs sonnet-council for a direct round; opened thr_debate1 between them.' },
+    { who: 'synthesizer', color: AGENTS.synth.color, a2a: true, prov: '[overdeck inbox] from operator · no reply required', time: '14:14', body: 'Decision recorded. Writing PRD feedback file: drafts/pan-2565-FEEDBACK-fable5.md per the feedback-naming rule.' },
+  ],
+  gpt: [
+    { who: 'operator', operator: true, time: '14:02', body: 'Council question: adopt Google A2A verbatim, or internal broker + vocabulary alignment? 3-5 sentences, strongest reason.' },
+    { who: 'gpt-council', color: AGENTS.gpt.color, time: '14:03', body: 'Adopt A2A verbatim. The envelope, task states, and Agent Card are a Linux Foundation standard… (sent on thr_q1-gpt, thread closed)' },
+    { who: 'sonnet-council', color: AGENTS.sonnet.color, a2a: true, prov: '[overdeck inbox] from sonnet-council · reply with: pan msg send --to sonnet-council --response-id thr_debate1', thread: 'thr_debate1', threadState: 'open', time: '14:12', body: 'Name one A2A concept you\'d actually force on us today.' },
+  ],
+  sonnet: [
+    { who: 'operator', operator: true, time: '14:02', body: 'Council question: adopt Google A2A verbatim, or internal broker + vocabulary alignment? 3-5 sentences, strongest reason.' },
+    { who: 'sonnet-council', color: AGENTS.sonnet.color, time: '14:04', body: 'Keep the internal broker. A2A is designed for cross-org delegation… (sent on thr_q1-son, thread closed)' },
+    { who: 'gpt-council', color: AGENTS.gpt.color, a2a: true, prov: '[overdeck inbox] from gpt-council · thread thr_debate1', thread: 'thr_debate1', threadState: 'open', time: '14:11', body: '"Align vocabulary" is how systems become compatible in name only. Name one place where mapping our states onto A2A\'s loses information.' },
+    { who: 'sonnet-council', color: AGENTS.sonnet.color, time: '14:12', body: 'input-required — ours is a liveness notice, not a thread state… (replied on thr_debate1)' },
+  ],
+  kimi: [
+    { who: 'operator', operator: true, time: '14:02', body: 'Council question…' },
+    { who: 'kimi-council', color: AGENTS.kimi.color, time: '14:05', body: 'Hybrid: internal broker now, thin A2A adapter in front for outside callers… (sent on thr_q1-kim, thread closed)' },
+  ],
+  pi: [
+    { who: 'operator', operator: true, time: '14:02', body: 'Council question…' },
+    { who: 'pi-council', color: AGENTS.pi.color, time: '14:06', body: 'Simplest viable: extend pan tell with --expect-reply and ship… (sent on thr_q1-pi)' },
+    { who: 'pi-council', color: AGENTS.pi.color, time: '14:13', body: '⏸ Waiting on operator: "Do you want Pi agents to also join rooms, or councils only?" — the broker marked this thread awaiting-input.' },
+  ],
+  codex: [
+    { who: 'operator', operator: true, time: '14:02', body: 'Council question…' },
+    { who: 'app-council', color: AGENTS.codex.color, time: '14:07', body: 'Sequencing matters more than format: durable queue first (PAN-2668), then threads… (sent on thr_q1-app, thread closed)' },
+  ],
+};
+
+let currentMember = 'room';
+function selectMember(id) {
+  currentMember = id;
+  renderTree(id); renderTabs(id);
+  const feed = id === 'room' ? ROOM_FEED : MEMBER_VIEWS[id];
+  timeline.innerHTML = feed.map(msg).join('');
+  timeline.scrollTop = timeline.scrollHeight;
+}
+
+// room composer member chips
+roomPick.innerHTML = 'To: ' + Object.keys(AGENTS).map(id =>
+  `<span class="pick on" data-id="${id}">${chip(AGENTS[id].color)}${AGENTS[id].name}</span>`).join('');
+roomPick.querySelectorAll('.pick').forEach(p => p.addEventListener('click', () => p.classList.toggle('on')));
+document.getElementById('room-send').addEventListener('click', () => {
+  const text = document.getElementById('room-input').value.trim();
+  if (!text) return;
+  ROOM_FEED.push({ who: 'operator', operator: true, time: 'now', body: text.replace(/</g, '&lt;') });
+  // simulate the broker delivering to selected members: fable replies after a beat
+  const targets = [...roomPick.querySelectorAll('.pick.on')].map(p => p.dataset.id);
+  if (targets.includes('gpt')) PRESENCE.gpt = 'running';
+  if (targets.includes('sonnet')) PRESENCE.sonnet = 'running';
+  if (currentMember === 'room') selectMember('room'); else { renderTree(currentMember); renderTabs(currentMember); }
+  setTimeout(() => {
+    ROOM_FEED.push({ who: 'gpt-council', color: AGENTS.gpt.color, a2a: true, prov: '[overdeck inbox] from operator · thread thr_debate2', thread: 'thr_debate2', threadState: 'open', time: 'now', body: 'Strongest objection, one line: a bespoke envelope will quietly grow fields A2A already standardized (attachments, streaming partials), and each one becomes a bespoke mapping at the facade. Signed Agent Cards: that is the concept I would import today — capability discovery is the piece our pan msg list already half-reimplements.' });
+    PRESENCE.gpt = 'idle';
+    selectMember(currentMember);
+  }, 1600);
+  setTimeout(() => {
+    ROOM_FEED.push({ who: 'sonnet-council', color: AGENTS.sonnet.color, a2a: true, prov: '[overdeck inbox] from operator · thread thr_debate3', thread: 'thr_debate3', threadState: 'open', time: 'now', body: 'Conceded on Agent Cards — capability discovery is the one A2A artifact worth importing now, since pan msg list is already 80% of a card. My objection stands on the envelope: our injection format must stay harness-native ([overdeck inbox] user turns), because A2A\'s envelope assumes the peer speaks JSON-RPC, and our peers speak tmux.' });
+    PRESENCE.sonnet = 'idle';
+    selectMember(currentMember);
+  }, 2600);
+});
+
+// ═══════════════ PANE 2: COUNCIL ═══════════════
+const councilPick = document.getElementById('council-pick');
+const answersEl = document.getElementById('answers');
+const synEl = document.getElementById('synthesis');
+const synBody = document.getElementById('syn-body');
+const synStatus = document.getElementById('syn-status');
+const wirePre = document.getElementById('wire-pre');
+const runBtn = document.getElementById('council-run');
+const synBtn = document.getElementById('council-syn');
+
+const COUNCIL = [
+  { id: 'gpt',    latency: 2400, answer: 'Adopt A2A verbatim. It is a Linux Foundation standard with real enterprise momentum; envelopes, task states, and Agent Cards are designed and versioned already. Every month on a bespoke wire format is a month external tools cannot address our agents. JSON-RPC over HTTP+SSE is boring and sufficient.' },
+  { id: 'sonnet', latency: 3600, answer: 'Keep the internal broker. A2A is built for cross-org delegation — signed cards, OAuth, discovery directories — and we are one machine with one operator. We would import an authorization model for a trust domain that does not exist here. Align vocabulary, ship the broker, revisit a facade later.' },
+  { id: 'kimi',   latency: 5200, answer: 'Hybrid. Internal broker now; a thin A2A adapter in front of it later for outside callers. The adapter is ~200 lines once the broker exists. Adapter-first would force auth and versioning decisions before we have a single production thread in flight.' },
+  { id: 'pi',     latency: 1500, answer: 'Simplest viable: extend pan tell with --expect-reply and ship. We already have a delivery door, a mail dir, and a registry. Everything else is a GUI. Standards discussions are premature for one machine.' },
+  { id: 'codex',  latency: 6400, answer: 'Sequencing over format: fix the durable queue first — PAN-2668 strands feedback in a queue nothing drains — then build threads on top. A wire standard on a lossy queue is a standardized way to lose messages.' },
+];
+
+const SYNTHESIS_HTML = `
+<h4>Consensus (4 of 5)</h4>
+<ul>
+  <li>Build the PAN-2565 internal broker first. No one defends adopting A2A's transport inside the machine.</li>
+  <li>Align vocabulary from day one: thread states map to A2A task states; <code>pan msg list</code> rows carry Agent-Card-shaped capability fields.</li>
+  <li>Durable queueing is the actual risk item — app-council's PAN-2668 point is adopted as WI-2 acceptance criteria.</li>
+</ul>
+<h4>Disagreements</h4>
+<table>
+  <tr><th>Member</th><th>Position</th><th>Strongest reason</th></tr>
+  <tr><td>gpt-council</td><td>Adopt A2A now</td><td>Interop compounds; "aligned vocabulary" drifts into compatibility-in-name-only.</td></tr>
+  <tr><td>sonnet-council</td><td>Facade later, maybe never</td><td>A2A's auth/trust model solves a cross-org problem this machine doesn't have.</td></tr>
+  <tr><td>kimi-council</td><td>Broker + thin adapter</td><td>Adapter is cheap <i>after</i> the broker exists, expensive before.</td></tr>
+  <tr><td>pi-council</td><td>Defer standards entirely</td><td>One machine, one operator; pan tell + threads is the whole need.</td></tr>
+</table>
+<h4>Recommendation</h4>
+<ul>
+  <li>Proceed with PAN-2565 as drafted; add an explicit WI: <b>thread states and list-row fields mapped 1:1 to A2A vocabulary</b> (cheap now, expensive to retrofit).</li>
+  <li>File a deferred spike: "A2A facade for external callers" — revisit after the council pattern has run in production for a month.</li>
+  <li>Import one A2A artifact early: <b>Agent Cards</b>, as the shape of discovery rows — it's the piece <code>pan msg list</code> already half-reimplements.</li>
+</ul>`;
+
+const WIRE_LINES = [
+  ['c', '# operator hits "Run the council" — one expect-reply thread per member'],
+  ['k', 'pan msg send --to gpt-council    --expect-reply -m "Should Overdeck adopt…"  → thr_q1-gpt'],
+  ['k', 'pan msg send --to sonnet-council --expect-reply -m "Should Overdeck adopt…"  → thr_q1-son'],
+  ['k', 'pan msg send --to kimi-council   --expect-reply -m "Should Overdeck adopt…"  → thr_q1-kim'],
+  ['k', 'pan msg send --to pi-council     --expect-reply -m "Should Overdeck adopt…"  → thr_q1-pi'],
+  ['k', 'pan msg send --to app-council    --expect-reply -m "Should Overdeck adopt…"  → thr_q1-app'],
+  ['c', '# broker: 5 rows in a2a_messages, 5 threads open; delivery via deliverAgentMessage per member'],
+  ['m', 'thr_q1-pi   ← reply (1.5s)  state: open → closed'],
+  ['m', 'thr_q1-gpt  ← reply (2.4s)  state: open → closed'],
+  ['m', 'thr_q1-son  ← reply (3.6s)  state: open → closed'],
+  ['m', 'thr_q1-kim  ← reply (5.2s)  state: open → closed'],
+  ['m', 'thr_q1-app  ← reply (6.4s)  state: open → closed'],
+  ['c', '# all threads closed (or operator clicked "Synthesize now") → synthesis send:'],
+  ['k', 'pan msg send --to synthesizer --expect-reply \\\n  -m "Question + 5 reply bodies (from a2a_messages, not scraped panes): …"  → thr_rollup'],
+  ['m', 'thr_rollup ← synthesis      state: open → closed → posted to room'],
+  ['n', '# failure path shown in Scenario B of the architecture mockup: a silent member yields'],
+  ['n', '# [overdeck:a2a-notice] kind=inactivity reason=turn-ended thread=thr_q1-… — council proceeds without them'],
+];
+
+let councilTimers = [];
+function resetCouncil() {
+  councilTimers.forEach(clearTimeout); councilTimers = [];
+  answersEl.innerHTML = '';
+  synEl.classList.remove('show');
+  synBody.innerHTML = '';
+  synStatus.textContent = 'reading 5 threads…';
+  wirePre.innerHTML = '';
+  synBtn.disabled = true;
+  runBtn.disabled = false;
+}
+
+function runCouncil() {
+  resetCouncil();
+  runBtn.disabled = true;
+  synBtn.disabled = false;
+  let wireIdx = 0;
+  const wireTimer = setInterval(() => {
+    if (wireIdx >= WIRE_LINES.length) { clearInterval(wireTimer); return; }
+    const [cls, text] = WIRE_LINES[wireIdx++];
+    const span = document.createElement('span');
+    span.className = cls;
+    span.textContent = text + '\n';
+    wirePre.appendChild(span);
+  }, 420);
+  councilTimers.push(wireTimer);
+
+  COUNCIL.forEach((c, i) => {
+    const a = AGENTS[c.id];
+    const card = document.createElement('div');
+    card.className = 'acard';
+    card.innerHTML = `<header>${chip(a.color)}<b>${a.name}</b> · ${a.model} · ${a.harness}
+      <span class="st"><span class="spinner"></span> thinking…</span></header>
+      <div class="ans"></div>`;
+    answersEl.appendChild(card);
+    councilTimers.push(setTimeout(() => card.classList.add('show'), 120 + i * 90));
+    councilTimers.push(setTimeout(() => {
+      card.querySelector('.ans').textContent = c.answer;
+      const st = card.querySelector('.st');
+      st.classList.add('done');
+      st.textContent = '✓ replied · thr_q1-' + c.id.slice(0,3) + ' closed';
+    }, c.latency));
+  });
+
+  const maxLatency = Math.max(...COUNCIL.map(c => c.latency));
+  councilTimers.push(setTimeout(showSynthesis, maxLatency + 1100));
+}
+
+function showSynthesis() {
+  if (synEl.classList.contains('show')) return;
+  synEl.classList.add('show');
+  synBtn.disabled = true;
+  councilTimers.push(setTimeout(() => {
+    synBody.innerHTML = SYNTHESIS_HTML;
+    synStatus.textContent = '✓ synthesis posted to room';
+  }, 900));
+}
+
+runBtn.addEventListener('click', runCouncil);
+synBtn.addEventListener('click', showSynthesis);
+document.getElementById('wire-toggle').addEventListener('click', function () {
+  const w = document.getElementById('wire');
+  w.classList.toggle('show');
+  this.textContent = w.classList.contains('show') ? '▾ wire view (broker traffic)' : '▸ wire view (broker traffic)';
+});
+
+councilPick.innerHTML = 'Council: ' + Object.keys(AGENTS).filter(id => id !== 'synth').map(id =>
+  `<span class="pick on">${chip(AGENTS[id].color)}${AGENTS[id].name}</span>`).join('') +
+  ` <span class="pick" style="cursor:default">+ ${chip(AGENTS.synth.color)}synthesizer (auto)</span>`;
+
+// presence simulation in room
+setInterval(() => {
+  if (currentMember !== 'room') return;
+  // gentle churn: pi flips between awaiting and idle
+  PRESENCE.pi = PRESENCE.pi === 'awaiting' ? 'idle' : 'awaiting';
+  renderTree('room'); renderTabs('room');
+}, 7000);
+
+selectMember('room');
+</script>
+</body>
+</html>

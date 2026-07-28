@@ -1,0 +1,117 @@
+{
+  "issueId": "PAN-3088",
+  "schemaVersion": 2,
+  "created": "2026-07-25T23:51:08.980Z",
+  "updated": "2026-07-27T18:23:56.352Z",
+  "pipeline": {
+    "issueId": "PAN-3088",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-27T18:23:56.340Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T18:23:56.340Z",
+    "mergeStatus": "merged"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T18:23:56.351Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Linked PR #3091 was closed unmerged — work never landed."
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Linked PR #3091 was closed unmerged — work never landed."
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Linked PR #3091 was closed unmerged — work never landed."
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Linked PR #3091 was closed unmerged — work never landed."
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Linked PR #3091 was closed unmerged — work never landed."
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Linked PR #3091 was closed unmerged — work never landed."
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Linked PR #3091 was closed unmerged — work never landed."
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260727-4876: Linked PR #3091 was closed unmerged — work never landed."
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 1 agent state directory; Preserved local branch strike/pan-3088 — not merged to main; Pruned 19 checkpoint ref(s) for agent-pan-3088, planning-pan-3088, strike-pan-3088; No specialist registry entries for PAN-3088"
+        }
+      ],
+      "accepted": [],
+      "disposition": {
+        "reason": "Linked PR #3091 was closed unmerged — work never landed.",
+        "by": "conv-20260727-4876"
+      }
+    }
+  },
+  "harness": "claude-code",
+  "model": "claude-opus-5"
+}

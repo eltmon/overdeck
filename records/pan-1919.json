@@ -66,7 +66,6 @@
     }
   ],
   "resumePoint": null,
-  "beadsMapping": {},
   "sessionHistory": [
     {
       "reason": "planning",
@@ -77,19 +76,22 @@
     }
   ],
   "feedback": [],
+  "beadsMapping": {},
   "created": "2026-06-21T00:03:06.401Z",
-  "updated": "2026-07-12T06:41:37.599Z",
+  "updated": "2026-07-27T04:51:46.218Z",
   "pipeline": {
     "issueId": "PAN-1919",
     "reviewStatus": "passed",
     "testStatus": "failed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T06:41:37.549Z",
+    "updatedAt": "2026-07-27T04:51:46.206Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1950",
-    "reviewedAtCommit": "6a8721abfe0ba6c6a3fa8cabf7192ba8bc5ad514"
+    "reviewedAtCommit": "6a8721abfe0ba6c6a3fa8cabf7192ba8bc5ad514",
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T04:51:46.206Z"
   },
   "closeOut": {
     "usage": {
@@ -215,13 +217,92 @@
       },
       "costAtCloseOut": {
         "usd": 91.468388,
-        "pricingAsOf": "2026-07-12T06:41:37.598Z"
+        "pricingAsOf": "2026-07-24T15:04:29.395Z"
       }
     },
     "merges": [
       "https://github.com/eltmon/overdeck/pull/1950"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T04:51:46.218Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: failed",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-tests",
+            "by": "conv-20260727-4876",
+            "at": "2026-07-27T04:51:14.399Z"
+          }
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed",
+          "observed": "verificationStatus: passed (no lastVerifiedCommit recorded)",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Feature branch is absent; positive merge evidence is required; PR #1950 CLOSED; durable close-out record contains 1 merge artifact(s)",
+          "status": "pass",
+          "mergedAt": null
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "no merge commit resolvable — verified-on-main has no durable marker (see DoD row 6)",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "verified-on-main skipped — no merge commit resolvable, so deploy build-ancestry has no durable anchor either (same landing class as DoD row 6 skip)",
+          "status": "skip"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; Removed 2 agent state directories; No strike branch strike/pan-1919 found; Pruned 829 checkpoint ref(s) for agent-pan-1919, planning-pan-1919, strike-pan-1919; No specialist registry entries for PAN-1919"
+        }
+      ],
+      "accepted": [
+        "tests"
+      ]
+    }
   },
   "harness": "claude-code",
   "model": "claude-sonnet-4-6",
@@ -308,6 +389,86 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-07-12T04:21:11.064Z"
+    },
+    {
+      "issue": "PAN-1919",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-12T14:33:43.553Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-12T14:45:42.558Z"
+    },
+    {
+      "issue": "PAN-1919",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-14T00:05:50.175Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-14T00:17:50.751Z"
+    },
+    {
+      "issue": "PAN-1919",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-14T10:45:01.845Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-14T10:55:47.780Z"
+    },
+    {
+      "issue": "PAN-1919",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-17T10:45:46.137Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-17T10:56:47.459Z"
+    },
+    {
+      "issue": "PAN-1919",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-18T06:04:00.309Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-18T06:14:15.648Z"
+    },
+    {
+      "issue": "PAN-1919",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-20T21:44:09.649Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-20T21:54:15.029Z"
+    },
+    {
+      "issue": "PAN-1919",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-22T05:16:31.627Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-22T05:27:31.045Z"
+    },
+    {
+      "issue": "PAN-1919",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-23T02:43:01.447Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-23T02:53:52.772Z"
+    },
+    {
+      "issue": "PAN-1919",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-23T17:51:44.265Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-23T18:02:45.703Z"
+    },
+    {
+      "issue": "PAN-1919",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-24T15:04:29.392Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-24T15:14:36.118Z"
     }
   ]
 }

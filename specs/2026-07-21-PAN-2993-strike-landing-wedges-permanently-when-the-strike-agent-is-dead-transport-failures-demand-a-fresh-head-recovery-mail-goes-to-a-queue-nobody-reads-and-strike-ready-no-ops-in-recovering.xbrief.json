@@ -1,0 +1,502 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-21T23:05:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2993: Strike landing wedges permanently when the strike agent is dead: transport failures demand a fresh head, recovery mail goes to a queue nobody reads, and strike-ready no-ops in 'recovering'",
+    "updated": "2026-07-22T20:59:04.343Z"
+  },
+  "plan": {
+    "id": "pan-2993",
+    "title": "Strike landing wedges permanently when the strike agent is dead: transport failures demand a fresh head, recovery mail goes to a queue nobody reads, and strike-ready no-ops in 'recovering'",
+    "status": "completed",
+    "uid": "e4130c60-ad6f-4d3c-9bb1-119d6fa973c0",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-21T23:05:00.000Z",
+    "updated": "2026-07-22T20:59:04.343Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2993",
+        "label": "PAN-2993",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2895",
+        "label": "PAN-2895 (observed wedge)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "deacon",
+      "strike-landing",
+      "reliability",
+      "agent-messaging"
+    ],
+    "narratives": {
+      "Problem": "Strike landings wedge permanently when the strike agent is dead. (1) Transport-level failures of the internal merge POST (fetch failed / ECONNREFUSED during a dashboard restart) are routed to agent recovery, which demands a fresh pushed HEAD for what is really an infra blip needing a plain retry. (2) When the strike session is unresumable, recovery feedback is queued to a mail directory nothing reads, yet the landing state becomes 'recovering' — terminal in practice because the patrol skips 'recovering' markers. (3) pan strike-ready cannot re-arm from 'recovering' at the same head, so the operator has no sanctioned retry short of inventing a new commit.",
+      "Proposal": "Three coordinated fixes per the PRD (.pan/drafts/PAN-2993.md): (a) classify transport failures at the source (transport:true on StrikeMergeResult) and retry them at the same head via patrol re-claim with data-driven exponential backoff (strikeNextAttemptAt, 60s base, x2, 30min cap, 10-retry cap then needs_you); (b) widen messageAgent to return a MessageDeliveryOutcome so handleFailure can route undelivered recovery (mail-only queuing to a dead agent) straight to needs_you instead of 'recovering'; (c) let pan strike-ready re-arm from 'recovering' at the same head, clearing recovery and transport counters. New status fields are mirrored through the permanent-record sync so backoff state survives DB rebuilds.",
+      "NonGoals": "- Re-enabling session rotation on resume failure (PAN-1980 stays: no fresh-launch fallback)\n- Changing the 3-cycle agent-recovery budget or the recovery message contents for genuinely agent-actionable failures\n- Adding retry/backoff to any non-strike merge path (verified merge door, swarm merges)\n- Draining or replaying the agent mail queue for dead agents\n- Allowing same-head re-arm from 'landing' or 'landed' states\n- Changing the StrikeLandingState union (no new states)\n- Editing messageAgent callers outside strike landing"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Transport failures detected at the source via transport:true on requestStrikeMerge's catch, not by regexing error strings downstream.",
+        "rationale": "Any throw inside the try means the endpoint never returned a verdict — that IS the transport class; string matching is fragile and the issue's observed 'fetch failed' is just one spelling."
+      },
+      {
+        "summary": "Transport failures form a third class that silently retries at the same head, instead of being folded into NON_ACTIONABLE (which routes to needs_you).",
+        "rationale": "The issue's own analysis says these need 'a plain retry, not a new commit'; needs_you would still page the operator for every dashboard restart. The regex is extended anyway as a safety net for the supervised-crash path."
+      },
+      {
+        "summary": "Backoff constants: 60s base, x2 per consecutive failure, 30min cap, 10 consecutive failures then needs_you; implemented as a strikeNextAttemptAt timestamp checked by the patrol, never setTimeout.",
+        "rationale": "Patrol-cycle-driven retry reuses the existing claim/lease machinery and keeps the module timer-free (fake-timers rule not triggered); the cap ensures a permanently dead endpoint still surfaces to the operator."
+      },
+      {
+        "summary": "messageAgent's return type widens from Promise<void> to Promise<MessageDeliveryOutcome> rather than throwing on mail-only queuing.",
+        "rationale": "Throwing would change observable behavior for ~20 existing callers; a returned outcome is source-compatible (callers ignore the value) and fixes the false-success report at the root for future callers too."
+      },
+      {
+        "summary": "Codex mid-turn .pending mail counts as delivered:true.",
+        "rationale": "The notify hook replays pending mail to a live session at turn end — guaranteed to be read; only mail queued for stopped/gated agents is undelivered."
+      },
+      {
+        "summary": "Same-head re-arm added only for 'recovering' (alongside existing 'needs_you'); 'landing' still returns unchanged.",
+        "rationale": "Operator readiness is the recovery signal for a wedged landing, but re-arming a merge already in flight could double-land."
+      }
+    ],
+    "items": [
+      {
+        "id": "transport-flag-and-fields",
+        "title": "Classify transport failures at the source and add backoff status fields with record mirroring",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-21T23:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2993",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-strike-landing.ts",
+            "src/lib/strike-landing.ts",
+            "src/lib/pan-dir/records.ts",
+            "src/lib/overdeck/review-status-record-sync.ts",
+            "tests/unit/lib/cloister/deacon-strike-transport.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-strike-transport.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-strike-transport.test.ts passes including a new transport-flag assertion"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W1: add `transport?: boolean` to StrikeMergeResult and set `transport: true` in requestStrikeMerge's catch branch (src/lib/cloister/deacon-strike-landing.ts:48-50). Add `strikeTransportRetryCount?: number` and `strikeNextAttemptAt?: string` to StrikeLandingStatus (src/lib/strike-landing.ts). Mirror both new fields alongside the existing five strike fields in src/lib/pan-dir/records.ts:136-140 and src/lib/overdeck/review-status-record-sync.ts:114-118. Extend tests/unit/lib/cloister/deacon-strike-transport.test.ts with a rejected-fetch case asserting transport:true and a structured-HTTP-error case asserting transport is absent."
+        },
+        "items": [
+          {
+            "id": "transport-flag-and-fields.ac1",
+            "title": "Given fetchImpl rejects, requestStrikeMerge returns { success: false, transport: true } with the error message preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transport-flag-and-fields.ac2",
+            "title": "Given the endpoint returns a structured HTTP error result, requestStrikeMerge returns success:false without the transport flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transport-flag-and-fields.ac3",
+            "title": "The record builders in records.ts and review-status-record-sync.ts emit strikeTransportRetryCount and strikeNextAttemptAt so a status containing them round-trips with values preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "transport-retry-backoff",
+        "title": "Retry transport failures at the same head with patrol-driven exponential backoff and a needs_you cap",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-21T23:05:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2993",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-strike-landing.ts",
+            "tests/lib/cloister/deacon-strike-landing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/cloister/deacon-strike-landing.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-strike-landing.test.ts passes including new transport-retry, backoff-skip, cap-escalation, and landed-clears-fields tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W2: in src/lib/cloister/deacon-strike-landing.ts add constants TRANSPORT_BACKOFF_BASE_MS=60_000, TRANSPORT_BACKOFF_CAP_MS=1_800_000, MAX_TRANSPORT_RETRIES=10. Add handleTransportFailure(issueId, head, detail, status, deps): append attempt with outcome 'transport-failed'; count = (status.strikeTransportRetryCount ?? 0) + 1; if count >= MAX_TRANSPORT_RETRIES route to the existing needs_you block (feedback file + needsYou + state needs_you); else setStatus back to 'ready' at the same head with strikeTransportRetryCount=count and strikeNextAttemptAt = new Date(Date.parse(deps.now()) + min(cap, base * 2^(count-1))).toISOString(). In executeStrikeLanding's failure branch, route result.transport to handleTransportFailure, everything else to handleFailure. In patrolStrikeLandings' filter, skip candidates whose strikeNextAttemptAt > deps.now() (ISO string comparison). On the 'landed' transition also clear strikeTransportRetryCount and strikeNextAttemptAt (set undefined). Extend NON_ACTIONABLE with |fetch failed|ECONNREFUSED|ECONNRESET|socket hang up|ETIMEDOUT|EAI_AGAIN. Never use setTimeout — backoff is data compared against injected deps.now(). Add tests using the existing injected-deps pattern in tests/lib/cloister/deacon-strike-landing.test.ts."
+        },
+        "items": [
+          {
+            "id": "transport-retry-backoff.ac1",
+            "title": "Given mergeIssue resolves { success:false, transport:true }, the patrol returns the marker to state 'ready' at the same strikeReadyHead with strikeTransportRetryCount incremented, a future strikeNextAttemptAt, and deliverRecovery never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transport-retry-backoff.ac2",
+            "title": "Given strikeNextAttemptAt is later than deps.now(), patrolStrikeLandings skips the marker without claiming; once deps.now() passes the due time it claims and invokes mergeIssue again at the same head",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transport-retry-backoff.ac3",
+            "title": "Given strikeTransportRetryCount already at 9, a further transport failure sets state 'needs_you', writes the feedback file, and surfaces needsYou with the full attempt history",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transport-retry-backoff.ac4",
+            "title": "Given a merge resolves mergeStatus 'merged' after transport retries, the 'landed' transition clears strikeTransportRetryCount and strikeNextAttemptAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transport-retry-backoff.ac5",
+            "title": "Given a non-transport failure whose detail contains 'fetch failed' or 'ECONNREFUSED' (supervised-crash path), handleFailure routes it to needs_you and never sends the agent a fresh-HEAD recovery demand",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "message-delivery-outcome",
+        "title": "messageAgent returns a MessageDeliveryOutcome from every path instead of Promise<void>",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-21T23:05:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2993",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "strike-recovery-undelivered"
+          ],
+          "files_scope": [
+            "src/lib/agents/messaging.ts",
+            "tests/unit/lib/agents/message-agent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/agents/message-agent.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors and no caller outside strike landing required edits",
+            "message-agent.test.ts passes including new outcome assertions for the PAN-1980, gated, and live-delivery paths"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Touches only src/lib/agents/messaging.ts and tests/unit/lib/agents/message-agent.test.ts; no other plan item edits those files, so it can run in parallel with the transport-flag wave.",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W3: in src/lib/agents/messaging.ts export interface MessageDeliveryOutcome { delivered: boolean; queuedToMail: boolean; reason?: string } and change messageAgent's return type to Promise<MessageDeliveryOutcome>. Label every return path exactly per the PRD W3 table: paused/gated/stopped-gated mail paths -> delivered:false, queuedToMail:true with the gate reason; PAN-1980 no-rotation stop -> delivered:false, queuedToMail:true, reason:stopMsg; suspended/stopped successful resume -> delivered:true; fallback fresh-launch -> delivered from its computed flag; remote agent -> delivered:true; codex mid-turn .pending mail -> delivered:true with reason 'queued for turn-end delivery'; codex idle direct and final tmux delivery -> delivered from deliverAgentMessage(...).ok. The four existing throw sites stay throws. Do not edit any caller outside strike landing. Extend tests/unit/lib/agents/message-agent.test.ts to assert the returned outcome on the PAN-1980 path, a gated path, and a live-delivery path."
+        },
+        "items": [
+          {
+            "id": "message-delivery-outcome.ac1",
+            "title": "Given a stopped agent whose resume fails under disabled session rotation (PAN-1980 path), messageAgent resolves { delivered:false, queuedToMail:true } with a reason naming the resume failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-delivery-outcome.ac2",
+            "title": "Given a paused or resume-gated agent, messageAgent queues mail and resolves delivered:false with the gate block reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-delivery-outcome.ac3",
+            "title": "Given a live session (or successful resume) that accepts the message, messageAgent resolves delivered:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "message-delivery-outcome.ac4",
+            "title": "npm run typecheck passes with zero edits to messageAgent callers outside src/lib/cloister/deacon-strike-landing.ts, and the existing throw sites still reject",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "strike-recovery-undelivered",
+        "title": "Route undelivered strike recovery straight to needs_you instead of 'recovering'",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-21T23:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2993",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-strike-landing.ts",
+            "tests/lib/cloister/deacon-strike-landing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/cloister/deacon-strike-landing.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deacon-strike-landing.test.ts passes including a new undelivered-recovery -> needs_you test and updated deliverRecovery doubles"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W4: change StrikeLandingDeps.deliverRecovery to (agentId, message) => Promise<MessageDeliveryOutcome> (default impl returns messageAgent's result). In handleFailure's recovery branch (src/lib/cloister/deacon-strike-landing.ts:118-124), capture the outcome; when outcome.delivered is false, append '; recovery not delivered: <reason or queued to mail only>' to the last attempt's detail and fall through to the existing needs_you block (feedback file + needsYou) instead of setting 'recovering'. delivered:true keeps the existing 'recovering' transition; thrown errors keep the existing catch escalation. Update the test double in tests/lib/cloister/deacon-strike-landing.test.ts from mockResolvedValue(undefined) to { delivered: true, queuedToMail: true } and add a delivered:false test."
+        },
+        "items": [
+          {
+            "id": "strike-recovery-undelivered.ac1",
+            "title": "Given deliverRecovery resolves { delivered:false, queuedToMail:true, reason }, handleFailure sets strikeLandingState 'needs_you', writes the feedback file, surfaces needsYou, and the attempt detail contains 'recovery not delivered'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-recovery-undelivered.ac2",
+            "title": "Given deliverRecovery resolves { delivered:true }, handleFailure preserves the existing transition to 'recovering' with strikeRecoveryCount incremented",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-recovery-undelivered.ac3",
+            "title": "Given deliverRecovery rejects, handleFailure still escalates to 'needs_you' with the delivery error appended to the attempt detail (existing test stays green)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "strike-ready-rearm-recovering",
+        "title": "pan strike-ready re-arms a 'recovering' landing at the same pushed head",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-21T23:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2993",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/strike-ready.ts",
+            "tests/unit/cli/commands/strike-ready.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/commands/strike-ready.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "new strike-ready.test.ts passes covering recovering/needs_you re-arm and landing/ready no-op cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W5: in src/cli/commands/strike-ready.ts change the same-head early-return condition (lines 72-81) from `if (previous.strikeLandingState !== 'needs_you') return previous;` to also allow 'recovering': `if (previous.strikeLandingState !== 'needs_you' && previous.strikeLandingState !== 'recovering') return previous;`. In both the same-head re-arm setStatus and the new-head setStatus, also clear strikeTransportRetryCount and strikeNextAttemptAt (set undefined). Create tests/unit/cli/commands/strike-ready.test.ts using injected StrikeReadyDependencies (mock git — no real git calls) covering: same-head from 'recovering' re-arms; same-head from 'needs_you' re-arms (existing behavior); same-head from 'landing' and 'ready' returns previous unchanged; re-arm zeroes strikeRecoveryCount and preserves strikeLandingAttempts."
+        },
+        "items": [
+          {
+            "id": "strike-ready-rearm-recovering.ac1",
+            "title": "Given an unchanged pushed head and state 'recovering', strikeReadyCommand returns a status with strikeLandingState 'ready', strikeRecoveryCount 0, cleared strikeTransportRetryCount/strikeNextAttemptAt, and preserved strikeLandingAttempts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-ready-rearm-recovering.ac2",
+            "title": "Given an unchanged pushed head and state 'needs_you', strikeReadyCommand still re-arms to 'ready' (existing behavior preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strike-ready-rearm-recovering.ac3",
+            "title": "Given an unchanged pushed head and state 'landing' or 'ready', strikeReadyCommand returns the previous status unchanged without calling setStatus",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-strike-lifecycle",
+        "title": "Document transport retries, undelivered-recovery escalation, and recovering re-arm in the strike lifecycle docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-21T23:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2993",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SPECIALIST_WORKFLOW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'strike-ready' docs/SPECIALIST_WORKFLOW.md"
+          ],
+          "expected_outputs": [
+            "the strike section names same-head transport retries with backoff, needs-you on undelivered recovery, and strike-ready re-arm from recovering"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W6: update the strike handoff paragraphs in docs/SPECIALIST_WORKFLOW.md (currently lines 311-313) so they state: (1) transport-level merge-request failures (dashboard restart, connection refused) are retried by the Deacon at the same pushed HEAD with exponential backoff and never generate a rebase-and-repush recovery request; (2) a recovery message that cannot be delivered to a live strike session surfaces as needs-you immediately instead of leaving the landing in 'recovering'; (3) pan strike-ready <id> re-arms a 'recovering' landing at the same HEAD — the sanctioned operator retry. Keep the existing three-failed-cycles description for agent-actionable failures."
+        },
+        "items": [
+          {
+            "id": "docs-strike-lifecycle.ac1",
+            "title": "docs/SPECIALIST_WORKFLOW.md's strike section contains the same-head retry rule: transport-level merge-request failures are retried at the same pushed HEAD with backoff and never produce a fresh-HEAD recovery demand to the agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-strike-lifecycle.ac2",
+            "title": "The strike section covers the needs-you escalation for undelivered recovery messages and shows pan strike-ready re-arming a 'recovering' landing at the same HEAD as the sanctioned operator retry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "transport-flag-and-fields",
+        "to": "transport-retry-backoff",
+        "type": "blocks"
+      },
+      {
+        "from": "transport-flag-and-fields",
+        "to": "strike-ready-rearm-recovering",
+        "type": "blocks"
+      },
+      {
+        "from": "transport-flag-and-fields",
+        "to": "strike-recovery-undelivered",
+        "type": "blocks"
+      },
+      {
+        "from": "transport-retry-backoff",
+        "to": "strike-recovery-undelivered",
+        "type": "blocks"
+      },
+      {
+        "from": "message-delivery-outcome",
+        "to": "strike-recovery-undelivered",
+        "type": "blocks"
+      },
+      {
+        "from": "transport-retry-backoff",
+        "to": "docs-strike-lifecycle",
+        "type": "informs"
+      },
+      {
+        "from": "strike-recovery-undelivered",
+        "to": "docs-strike-lifecycle",
+        "type": "informs"
+      },
+      {
+        "from": "strike-ready-rearm-recovering",
+        "to": "docs-strike-lifecycle",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-21-PAN-2993-strike-landing-wedges-permanently-when-the-strike-agent-is-dead-transport-failures-demand-a-fresh-head-recovery-mail-goes-to-a-queue-nobody-reads-and-strike-ready-no-ops-in-recovering.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

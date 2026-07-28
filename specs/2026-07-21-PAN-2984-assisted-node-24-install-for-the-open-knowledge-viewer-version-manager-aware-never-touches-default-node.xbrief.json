@@ -1,0 +1,733 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-21T15:17:07Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2984: Assisted Node-24 install for the open-knowledge viewer (version-manager aware, never touches default node)",
+    "updated": "2026-07-22T20:56:22.104Z"
+  },
+  "plan": {
+    "id": "pan-2984",
+    "title": "Assisted Node-24 install for the open-knowledge viewer (version-manager aware, never touches default node)",
+    "status": "completed",
+    "uid": "a2e189a8-83cb-477b-93bd-c49f677998b2",
+    "author": "agent:claude-fable-5",
+    "sequence": 5,
+    "created": "2026-07-21T15:17:07Z",
+    "updated": "2026-07-22T20:56:22.104Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2984",
+        "label": "PAN-2984",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2066",
+        "label": "PAN-2066",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2983",
+        "label": "PAN-2983",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "installers",
+      "knowledge-viewer",
+      "cli",
+      "dashboard",
+      "node-runtime"
+    ],
+    "narratives": {
+      "Problem": "pan knowledge open and the dashboard Knowledge page hard-fail on machines whose ambient Node is <24 (`open-knowledge requires Node 24+; found v22.22.0`). @inkeep/open-knowledge needs Node >=24 for its subprocess only, while Overdeck requires >=22.16 and the dashboard is pinned to Node 22 — so 'upgrade your Node' is a dead end. A Node 24 runtime often already exists under a version manager; the installer never looks.",
+      "Proposal": "Replace the hard failure with a detection ladder in ensureOpenKnowledge(): (1) working ok binary (PATH plus explicit ~/.local/bin/ok probe), (2) OVERDECK_OPEN_KNOWLEDGE_NODE override, (3) version manager (nvm/fnm/volta/mise/asdf) with an existing 24+ runtime — install the package under it and write a pinned shim to ~/.local/bin/ok, (4) manager without 24 — consent-gated install of Node 24 through their manager, (5) no manager — consent-gated nvm bootstrap or manual instructions. The resolved command threads through every ok invocation; CLI and dashboard share one setup-plan resolver; the dashboard error state becomes a 'Set up the viewer' assisted flow. Full spec: .pan/drafts/PAN-2984.md (promoted to drafts/pan-2984.md on overdeck-state).",
+      "NonGoals": "- Windows support for the shim or detection ladder (POSIX sh only)\n- Changing the dashboard's Node 22 pin, Overdeck's engines range, or the user's ambient/default Node\n- Eager installation from pan install, dashboard boot, or any unattended path\n- Importing, linking, or bundling open-knowledge code (GPL boundary stays)\n- Auto-updating an already-working ok installation\n- Homebrew/apt/system package managers as Node sources"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Thread the resolved ok command (absolute shim path) through status/start/stop via okCommand?: string defaulting to 'ok', instead of relying on PATH.",
+        "rationale": "The dashboard server's PATH cannot be assumed to include ~/.local/bin; defaulting to 'ok' keeps every existing caller and test working unchanged."
+      },
+      {
+        "summary": "Put detection/enumeration/shim-writing in a new src/lib/installers/node-runtime.ts module; keep ladder orchestration in open-knowledge.ts.",
+        "rationale": "Keeps open-knowledge.ts focused and gives the version-manager logic its own injectable seams and test file, matching the installer-module convention."
+      },
+      {
+        "summary": "Use non-default-changing install commands per manager: volta fetch node@24, nvm install in a sourced subshell, fnm/mise/asdf plain installs.",
+        "rationale": "FR-1 forbids touching the default Node; volta install would change it, volta fetch does not."
+      },
+      {
+        "summary": "Install the package under the pinned runtime by spawning its npm with PATH prepended by the runtime bin dir; resolve the entry script via realpath of the installed bin symlink.",
+        "rationale": "Prevents the npm shebang from resolving ambient Node 22 and keeps all writes inside the runtime tree; realpath is robust against the package moving dist/cli.mjs."
+      },
+      {
+        "summary": "Gate rungs 4-5 behind a typed OpenKnowledgeSetupRequiredError carrying the setup plan; rungs 2-3 run under the existing autoInstall consent.",
+        "rationale": "Rungs 2-3 download nothing new beyond the npm package (already consented today); downloading a Node runtime or installing nvm is a bigger action the user must see and approve first."
+      },
+      {
+        "summary": "No new dashboard endpoints: status gains a setupPlan field, and the existing POST /api/knowledge-viewer/install executes the full ladder after the frontend shows the plan.",
+        "rationale": "The install button is already the explicit consent affordance; reusing it keeps the API surface and auth posture unchanged."
+      },
+      {
+        "summary": "Shim ownership is a marker comment; foreign ~/.local/bin/ok files are never overwritten.",
+        "rationale": "The operator's hand-written shim predates the marker and must keep working; clobbering user files is unrecoverable."
+      },
+      {
+        "summary": "Windows is out of scope.",
+        "rationale": "The shim is POSIX sh and Overdeck targets Linux/macOS; no Windows support exists in the surrounding surfaces."
+      }
+    ],
+    "items": [
+      {
+        "id": "node-runtime-resolver",
+        "title": "node-runtime.ts: version-manager detection and Node 24 runtime resolution",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-21T15:17:07Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2984",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "ensure-ladder",
+            "ok-shim-writer",
+            "cli-assisted-flow",
+            "dashboard-setup-endpoints"
+          ],
+          "files_scope": [
+            "src/lib/installers/node-runtime.ts",
+            "src/lib/installers/__tests__/node-runtime.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/installers/__tests__/node-runtime.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "node-runtime.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Creates a brand-new module and test file no other wave-0 item touches; nothing existing imports it yet.",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/installers/node-runtime.ts exporting resolveNode24Runtime({ env, homedir, listDir, runCommand }) implementing the PRD's manager table: detect nvm ($NVM_DIR, ~/.nvm, ~/.config/nvm), fnm, volta, mise, asdf by detection-root existence (env var first); enumerate runtime node binaries by the per-manager globs; parse versions from path segments; validate the chosen binary once with --version; honor OVERDECK_OPEN_KNOWLEDGE_NODE as a validated override that errors loudly when invalid. Return { kind: 'runtime', nodePath, source } | { kind: 'manager-without-24', manager } | { kind: 'none' }. All seams injectable (NFR-1). See .pan/drafts/PAN-2984.md §'Version-manager table'."
+        },
+        "items": [
+          {
+            "id": "node-runtime-resolver.ac1",
+            "title": "Given a fake nvm tree with v22.22.0 and v24.17.0, resolveNode24Runtime returns the v24 bin/node path with source 'nvm'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "node-runtime-resolver.ac2",
+            "title": "Given manager roots containing only <24 runtimes, it returns { kind: 'manager-without-24' } naming the manager; with no roots it returns { kind: 'none' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "node-runtime-resolver.ac3",
+            "title": "Given OVERDECK_OPEN_KNOWLEDGE_NODE pointing at a fake node reporting v24, it returns that path with source 'override' without scanning managers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "node-runtime-resolver.ac4",
+            "title": "Given an override whose --version validation fails, it rejects with an error message containing 'OVERDECK_OPEN_KNOWLEDGE_NODE'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "node-runtime-resolver.ac5",
+            "title": "Given multiple >=24 runtimes, resolveNode24Runtime returns the highest version's bin/node selected by path-segment parsing, and the injected runCommand records a --version call only for that selected binary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ok-shim-writer",
+        "title": "node-runtime.ts: writeOkShim with ownership marker and foreign-file protection",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-21T15:17:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2984",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/installers/node-runtime.ts",
+            "src/lib/installers/__tests__/node-runtime.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/installers/__tests__/node-runtime.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "node-runtime.test.ts passes including shim-writer cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add writeOkShim({ nodePath, entryScript, shimPath }) and readShimOwnership(shimPath) -> 'overdeck' | 'foreign' | 'absent' to node-runtime.ts. The shim is the PRD's POSIX sh template with the 'overdeck-managed shim' marker line, written mode 0755 with mkdir -p on the parent (default shim path ~/.local/bin/ok). Overwriting is allowed only when ownership is 'overdeck' or 'absent'; a 'foreign' file rejects with an error naming the path and asking the user to delete or fix it (H3). See .pan/drafts/PAN-2984.md §'Shim contract'."
+        },
+        "items": [
+          {
+            "id": "ok-shim-writer.ac1",
+            "title": "writeOkShim creates an executable (0755) file whose content contains the marker line and exec \"<nodePath>\" \"<entryScript>\" \"$@\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ok-shim-writer.ac2",
+            "title": "Called with an existing file lacking the marker, writeOkShim rejects naming the path and preserves the file content byte-for-byte",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ok-shim-writer.ac3",
+            "title": "Called with an existing overdeck-owned shim, writeOkShim produces an updated shim whose exec line contains the new node and entry paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ok-shim-writer.ac4",
+            "title": "readShimOwnership returns 'absent' for a missing file, 'overdeck' for a marked shim, 'foreign' otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ensure-ladder",
+        "title": "ensureOpenKnowledge: detection ladder, setup-plan resolver, and typed setup-required error",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-21T15:17:07Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2984",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "thread-ok-command",
+            "cli-assisted-flow",
+            "dashboard-setup-endpoints",
+            "knowledge-page-assisted-flow"
+          ],
+          "files_scope": [
+            "src/lib/installers/open-knowledge.ts",
+            "src/lib/installers/__tests__/open-knowledge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/installers/__tests__/open-knowledge.test.ts src/lib/installers/__tests__/node-runtime.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "open-knowledge.test.ts passes with new ladder cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "NFR-1"
+          ],
+          "acJustification": "Six ACs: the ladder has five distinct rung behaviors plus the repo fake-timer rule; collapsing them would hide independently verifiable outcomes."
+        },
+        "narrative": {
+          "Action": "Rework ensureOpenKnowledge (src/lib/installers/open-knowledge.ts:88-119): rung 1 probes 'ok' on PATH and then ~/.local/bin/ok by absolute path; export resolveOpenKnowledgeSetupPlan() and executeOpenKnowledgeSetupPlan() plus the OpenKnowledgeSetupPlan union and OpenKnowledgeSetupRequiredError from the PRD. With autoInstall: true, plans of kind 'install-under-runtime' (rungs 2-3) execute inline: spawn <runtimeBin>/npm install -g @inkeep/open-knowledge with env PATH prepended by <runtimeBin> (H2/D4), resolve entryScript = realpath(<runtimePrefix>/bin/ok), write the shim via ok-shim-writer, health-check via the shim path, and return { status: 'installed', command: <shim path> }. Plans 'install-node-via-manager'/'install-nvm' (rungs 4-5) throw OpenKnowledgeSetupRequiredError carrying the plan with plain-English steps (exact commands from the PRD manager table; volta fetch, nvm sourced subshell). autoInstall: false keeps today's manual-command error verbatim. EnsureOpenKnowledgeResult.command widens to string. Keep injectable runCommand/sleep seams; existing installationError stays as terminal fallback (D9). All retry tests use fake timers (H6)."
+        },
+        "items": [
+          {
+            "id": "ensure-ladder.ac1",
+            "title": "With a fake runtime resolved, ensureOpenKnowledge({autoInstall:true}) spawns npm with PATH prefixed by the runtime bin dir, writes the shim, and resolves { command: <shim path> }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-ladder.ac2",
+            "title": "With only a manager-without-24, it rejects with OpenKnowledgeSetupRequiredError whose plan.kind is 'install-node-via-manager' and whose installCommand for volta equals 'volta fetch node@24'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-ladder.ac3",
+            "title": "With no version manager, it rejects with a plan of kind 'install-nvm' whose steps include the manual npm install one-liner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-ladder.ac4",
+            "title": "Rung 1 returns command '~/.local/bin/ok' (absolute) when the bare 'ok' probe fails but the shim path probe succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-ladder.ac5",
+            "title": "With autoInstall: false and no working ok, it rejects with the existing manual-install message and never invokes the resolver (rungs 2-5 skipped)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ensure-ladder.ac6",
+            "title": "The post-install health-polling test advances time via vi.advanceTimersByTimeAsync under fake timers and exits without real setTimeout delays",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "thread-ok-command",
+        "title": "Thread okCommand through status/start/stop and their callers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-21T15:17:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2984",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/installers/open-knowledge.ts",
+            "src/dashboard/server/services/knowledge-viewer.ts",
+            "src/cli/commands/knowledge.ts",
+            "src/lib/installers/__tests__/open-knowledge.test.ts",
+            "src/dashboard/server/services/__tests__/knowledge-viewer.test.ts",
+            "src/cli/commands/__tests__/knowledge.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/installers/__tests__/open-knowledge.test.ts src/cli/commands/__tests__/knowledge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "installer and CLI test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add okCommand?: string (default 'ok') to getOpenKnowledgeStatus, StartOpenKnowledgeServerOptions (replacing the hardcoded 'ok' at open-knowledge.ts:186, :216, :257), and the dashboard service stop path (stopOpenKnowledgeWithSpawn, knowledge-viewer.ts:242-251). knowledgeOpenCommand (src/cli/commands/knowledge.ts:146-150) and createKnowledgeViewerService pass ensure().command into start/status/stop. Defaults preserve every existing caller; existing tests must pass unmodified. If the service test file path differs from the listed one, follow the existing test location for knowledge-viewer service tests."
+        },
+        "items": [
+          {
+            "id": "thread-ok-command.ac1",
+            "title": "getOpenKnowledgeStatus and startOpenKnowledgeServer spawn the provided okCommand string instead of 'ok' when the option is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "thread-ok-command.ac2",
+            "title": "With okCommand omitted, all invocations still spawn 'ok' and the pre-existing test suite passes without edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "thread-ok-command.ac3",
+            "title": "knowledgeOpenCommand passes the command returned by ensure into the viewer start call, so a shim-resolved install starts the viewer via the shim path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "thread-ok-command.ac4",
+            "title": "The dashboard service stop path invokes the resolved command rather than the literal 'ok' when a resolved command is known",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-assisted-flow",
+        "title": "pan knowledge open: consent prompt for rung 4/5 setup plans",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-21T15:17:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2984",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/knowledge.ts",
+            "src/cli/commands/__tests__/knowledge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/cli/commands/__tests__/knowledge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "knowledge.test.ts passes with the new prompt cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In knowledgeOpenCommand (src/cli/commands/knowledge.ts:136-160), catch OpenKnowledgeSetupRequiredError from ensure. On a TTY (process.stdin.isTTY), print each plan step as its own line, prompt 'Proceed? [y/N]' via readline/promises createInterface (pattern: src/cli/commands/start.ts), and on yes run executeOpenKnowledgeSetupPlan(plan) then re-run ensure and continue; on no, print the plan's manual command and exit without error. On non-TTY stdin, rethrow an error whose message contains the steps and manual command (no hanging prompt). Inject the prompt and executor via KnowledgeOpenDependencies for tests. --no-install (options.install === false) keeps passing autoInstall: false and never reaches the prompt."
+        },
+        "items": [
+          {
+            "id": "cli-assisted-flow.ac1",
+            "title": "On TTY with an install-node-via-manager plan, the CLI prints the plan steps and prompts; answering y executes the plan and retries ensure to completion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-assisted-flow.ac2",
+            "title": "Answering n exits printing the manual command without invoking the executor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-assisted-flow.ac3",
+            "title": "With non-TTY stdin the command rejects with a message containing the plan steps and never opens a readline interface",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-assisted-flow.ac4",
+            "title": "With --no-install and no working ok, the command rejects with the manual-install message, renders no prompt, and never executes a setup plan",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-setup-endpoints",
+        "title": "Dashboard server: setupPlan in status, full ladder in install",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-21T15:17:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2984",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/knowledge-viewer.ts",
+            "src/dashboard/server/routes/knowledge-viewer.ts",
+            "src/dashboard/server/services/__tests__/knowledge-viewer.test.ts",
+            "src/dashboard/server/routes/__tests__/knowledge-viewer.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/dashboard/server",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dashboard server knowledge-viewer tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Service (src/dashboard/server/services/knowledge-viewer.ts): when ensure({autoInstall:false}) fails, call the injected resolveOpenKnowledgeSetupPlan and include setupPlan: { kind, steps } in KnowledgeViewerStatus (installed stays false). Routes (src/dashboard/server/routes/knowledge-viewer.ts:86-90): the install handler runs ensure({autoInstall:true}); on OpenKnowledgeSetupRequiredError it runs executeOpenKnowledgeSetupPlan(plan) then re-runs ensure, then invalidates the installation cache and returns fresh status. No new routes; auth/origin handling unchanged. If existing test files for these modules live at different paths, extend those instead of creating parallel ones."
+        },
+        "items": [
+          {
+            "id": "dashboard-setup-endpoints.ac1",
+            "title": "getStatus returns setupPlan with non-empty plain-English steps when the viewer is not installed and a plan is resolvable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-setup-endpoints.ac2",
+            "title": "The install handler, given ensure that throws OpenKnowledgeSetupRequiredError once, executes the plan, re-runs ensure, invalidates the cache, and returns an installed status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-setup-endpoints.ac3",
+            "title": "When plan execution fails, the install endpoint returns an error response whose message contains the underlying failure detail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-setup-endpoints.ac4",
+            "title": "When the viewer is installed, status omits setupPlan and existing status fields are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "knowledge-page-assisted-flow",
+        "title": "Knowledge page: 'Set up the viewer' panel rendering the setup plan",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-21T15:17:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2984",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/knowledge/KnowledgePage.tsx",
+            "src/dashboard/frontend/src/components/knowledge/KnowledgePage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/knowledge/KnowledgePage.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "KnowledgePage.test.tsx passes with the setup-plan cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In KnowledgePage.tsx's not-installed state (currently lines 187-208): render status.setupPlan.steps as a list of complete sentences above the action button; relabel the button 'Set up the viewer' (pending: 'Setting up the viewer'); keep the existing explicit-consent copy ('OpenKnowledge is installed only after this explicit request…') and the existing error region for mutation failures. Extend the KnowledgeViewerStatus frontend type with setupPlan. Follow pan-style-guide: no decorative color, sentence-case labels, existing button variant. Update KnowledgePage.test.tsx."
+        },
+        "items": [
+          {
+            "id": "knowledge-page-assisted-flow.ac1",
+            "title": "Given a status with setupPlan steps, the not-installed panel renders each step sentence and a button labeled 'Set up the viewer'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-page-assisted-flow.ac2",
+            "title": "Clicking the button emits the install POST request and renders the label 'Setting up the viewer' while the mutation is pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-page-assisted-flow.ac3",
+            "title": "A failed install mutation renders its error message in the existing error region",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "knowledge-page-assisted-flow.ac4",
+            "title": "With no setupPlan on the status, the panel renders the current copy unchanged (no empty list artifacts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-knowledge-ladder",
+        "title": "Docs: knowledge.mdx ladder/override/shim section and OKF skill contract update",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-21T15:17:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2984",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/knowledge.mdx",
+            "sync-sources/skills/okf/references/overdeck.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -l OVERDECK_OPEN_KNOWLEDGE_NODE configuration/knowledge.mdx",
+            "npm run lint:skills"
+          ],
+          "expected_outputs": [
+            "grep exits 0 finding the env var in knowledge.mdx",
+            "skills lint passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "configuration/knowledge.mdx: add a section documenting the assisted Node-24 resolution — the ladder order in plain English, the OVERDECK_OPEN_KNOWLEDGE_NODE override, the shim at ~/.local/bin/ok (ownership marker, safe to delete, regenerated by pan knowledge open), the promise that the default Node and shell rc files are untouched except an explicitly-consented nvm install, and the manual path; keep the --no-install row and the 'no unattended install' sentence (line 31) accurate. sync-sources/skills/okf/references/overdeck.md: mention the assisted Node-24 resolution and the override env var in the viewer section. Do not edit .claude/skills/ copies (sync targets)."
+        },
+        "items": [
+          {
+            "id": "docs-knowledge-ladder.ac1",
+            "title": "knowledge.mdx contains OVERDECK_OPEN_KNOWLEDGE_NODE, the shim path ~/.local/bin/ok, and a numbered/plain-English ladder description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-knowledge-ladder.ac2",
+            "title": "knowledge.mdx contains an explicit sentence that the default Node and shell rc files are preserved untouched, including the consented nvm-install exception",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-knowledge-ladder.ac3",
+            "title": "sync-sources/skills/okf/references/overdeck.md mentions the assisted Node-24 resolution and the override env var, and npm run lint:skills passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "node-runtime-resolver",
+        "to": "ensure-ladder",
+        "type": "blocks"
+      },
+      {
+        "from": "node-runtime-resolver",
+        "to": "ok-shim-writer",
+        "type": "blocks"
+      },
+      {
+        "from": "ok-shim-writer",
+        "to": "ensure-ladder",
+        "type": "blocks"
+      },
+      {
+        "from": "ensure-ladder",
+        "to": "thread-ok-command",
+        "type": "blocks"
+      },
+      {
+        "from": "ensure-ladder",
+        "to": "cli-assisted-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "ensure-ladder",
+        "to": "dashboard-setup-endpoints",
+        "type": "blocks"
+      },
+      {
+        "from": "thread-ok-command",
+        "to": "dashboard-setup-endpoints",
+        "type": "blocks"
+      },
+      {
+        "from": "thread-ok-command",
+        "to": "cli-assisted-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "dashboard-setup-endpoints",
+        "to": "knowledge-page-assisted-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-assisted-flow",
+        "to": "docs-knowledge-ladder",
+        "type": "informs"
+      },
+      {
+        "from": "knowledge-page-assisted-flow",
+        "to": "docs-knowledge-ladder",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-21-PAN-2984-assisted-node-24-install-for-the-open-knowledge-viewer-version-manager-aware-never-touches-default-node.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

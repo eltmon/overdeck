@@ -1,20 +1,20 @@
 {
-  "vBRIEFInfo": {
+  "xBRIEFInfo": {
     "version": "0.5",
     "created": "2026-06-12T20:44:45.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1696: feat: decouple merge-train from the Flywheel — per-project pipeline feature + multi-project view",
-    "updated": "2026-06-12T20:55:06.516Z"
+    "updated": "2026-07-26T13:52:16.702Z"
   },
   "plan": {
     "id": "pan-1696",
     "title": "feat: decouple merge-train from the Flywheel — per-project pipeline feature + multi-project view",
-    "status": "proposed",
+    "status": "completed",
     "uid": "12f932ff-6292-4cee-847d-17f84a769aad",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 9,
     "created": "2026-06-12T20:44:45.000Z",
-    "updated": "2026-06-12T20:55:06.516Z",
+    "updated": "2026-07-26T13:52:16.702Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1696",
@@ -946,5 +946,5 @@
       "canonicalFilename": "2026-06-12-PAN-1696-feat-decouple-merge-train-from-the-flywheel-per-project-pipeline-feature-multi-project-view.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

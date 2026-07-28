@@ -2,22 +2,23 @@
   "issueId": "PAN-2214",
   "schemaVersion": 2,
   "feedback": [],
-  "harness": "claude-code",
-  "model": "claude-fable-5",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "pipeline": {
     "issueId": "PAN-2214",
     "reviewStatus": "pending",
     "testStatus": "passed",
-    "verificationStatus": "failed",
     "inspectStatus": "passed",
-    "mergeStatus": "failed",
+    "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-02T20:12:46.647Z",
+    "updatedAt": "2026-07-27T17:46:15.594Z",
     "verificationNotes": "Acceptance criteria check FAILED — 25/25 AC incomplete:\n\n### Merge origin/main into feature/pan-2214, prune duplicates per PRD landed table, re-prove gates (4/4 incomplete)\n  - [ ] Given the completed item, `git merge-base --is-ancestor origin/main HEAD` exits 0 — the branch contains all of current main with no rebase or force-push\n  - [ ] Given the merged branch, When npx vitest run executes the four previously-failing sentinel suites (deacon-swarm-synthesis, foreman-swarm, auto-resume-gating, synced-skills), Then vitest exits 0 with zero failed tests\n  - [ ] Given the merged branch, When npm run typecheck and npm run lint execute, Then both exit 0\n  - [ ] The merged deacon-swarm.ts preserves exactly one implementation each of the gc liveness guard and dispatch-eligibility gating (main's) alongside the branch's per-spawn freeze gate and bounded allocator — proven by deacon-swarm-gc, deacon-swarm-hold, and deacon-swarm-dispatch suites passing\n\n### FR-12: per-issue async mutex serializing .pan/records read-modify-write (4/4 incomplete)\n  - [ ] Given two concurrent updateIssueRecordForIssue calls for the same issue, When both resolve, Then the test's execution-order log proves the second rebuild started only after the first's write completed\n  - [ ] Given swarm.slotAssignments written via writeIssueRecordForWorkspaceSync while a rebuild is in flight, When the rebuild completes, Then the final record preserves the slot assignments (PAN-1791 wipe regression)\n  - [ ] Given concurrent updateIssueRecordForIssue calls for two different issues, Then their critical sections overlap in the order log — the mutex is per-issue, not global\n  - [ ] writeIssueRecordSync and writeIssueRecordForWorkspaceSync remain synchronous functions (no signature change), and each carries the never-split-by-await invariant comment\n\n### FR-13: done-without-signal detection in classifyInFlightSlots, gated by swarm.infer_completion (5/5 incomplete)\n  - [ ] Given infer_completion='nudge' and a live slot idle past threshold with commits ahead and a clean worktree, Then classifyInFlightSlots emits exactly one nudge action containing `pan done` and does not repeat it on the next unchanged observation\n  - [ ] Given infer_completion='auto' and the done-signature holding across a second consecutive idle expiry, Then the slot classifies ready-to-merge and the action log contains a `signal: inferred` marker\n  - [ ] Given infer_completion='off', Then classification output preserves current behavior for the same inputs (running/stalled only, no nudges, no inference)\n  - [ ] Given a dirty slot worktree OR zero commits ahead, Then no nudge fires and no inference happens regardless of mode — the slot falls back to the existing stalled classification\n  - [ ] Given the new completion-inference suite, When it runs, Then it exits 0 driving all timing through fake timers or the injected `now` option — no real-clock waits appear in the tests\n\n### FR-14: pan swarm reset retires dead slot agent records via removeAgentSync (4/4 incomplete)\n  - [ ] Given a reset where slot agents are stopped/pause-gated with no live tmux session, Then swarmResetCommand calls removeAgentSync for each and the summary output names the retired agent ids\n  - [ ] Given a slot agent whose tmux session is alive, Then reset never calls removeAgentSync for it and reports it as skipped\n  - [ ] Retirement preserves JSONL transcripts — the test asserts removal goes through the injected removeAgentSync dep and no transcript path is unlinked\n  - [ ] A second reset run with nothing left to retire exits 0 with a no-op summary (idempotent), and the pan-swarm SKILL.md documents record retirement in the same commit (lint passes)\n\n### FR-15: swarm-aware feedback target resolver replaces hardcoded agent-<issue> delivery (4/4 incomplete)\n  - [ ] Given a swarm issue with live slot agents and no whole-issue agent, When test-failure feedback is delivered, Then messageAgent receives the slot agent id (agent-<issue>-slot-N), not agent-<issue>\n  - [ ] Given opts.itemId matching a slot assignment with a live session, Then the resolver returns that specific slot agent rather than an arbitrary live slot\n  - [ ] Given no whole-issue agent and no live slot agents, Then delivery emits a needs-you operator notification carrying the undelivered reason and never returns silently\n  - [ ] Given a normal single-agent issue with agent-<issue> running, Then delivery behavior is unchanged (messageAgent receives agent-<issue>)\n\n### FR-16: state-derived verification gates never silently reset a passed review verdict (4/4 incomplete)\n  - [ ] Given reviewStatus='passed' and the vbrief-ac gate finding incomplete ACs, Then verification records verificationStatus='failed' while reviewStatus remains 'passed'\n  - [ ] Given that held-verdict case, Then a needs-you operator notification is emitted naming the vbrief-ac gate and the incomplete-AC cause\n  - [ ] Given a code-gate failure (typecheck/lint/test), Then the existing requeue behavior is preserved and the reviewStatus transition carries its reason in verificationNotes\n  - [ ] Given vbrief-ac failing while reviewStatus is not 'passed', Then no needs-you notification fires (normal retry feedback only)",
     "mergeNotes": "Post-rebase verification failed at vbrief-ac",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2221",
     "reviewedAtCommit": "988a85a2a51b0d83bffd802f4a2b4f257b90a00c",
-    "lastVerifiedCommit": "1d26189af071831fafe39586fdbde7dc78865806"
+    "lastVerifiedCommit": "1d26189af071831fafe39586fdbde7dc78865806",
+    "closedOut": true,
+    "closedOutAt": "2026-07-27T17:46:15.594Z"
   },
   "closeOut": {
     "usage": {
@@ -93,10 +94,83 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2221"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T17:46:15.613Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: pending; settled because the tracker issue is closed and merged work is landed",
+          "status": "skip"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: failed at 1d26189af071831fafe39586fdbde7dc78865806; superseded because the tracker issue is closed, merged work is landed, and main verification passed",
+          "status": "skip"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Feature branch is absent; positive merge evidence is required; PR #2221 MERGED at 2026-07-02T20:21:51Z; durable close-out record contains 1 merge artifact(s)",
+          "status": "pass",
+          "mergedAt": "2026-07-02T20:21:51Z",
+          "mergeCommit": "56a43564b09a9adffab836da68f77fefc9c3d1ea"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "6 check-runs concluded successfully on 56a43564b09a9adffab836da68f77fefc9c3d1ea",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 7d8cc5e3 contains merge 56a43564",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; Removed 5 agent state directories; No strike branch strike/pan-2214 found; Pruned 0 checkpoint ref(s) for agent-pan-2214, planning-pan-2214, strike-pan-2214; No specialist registry entries for PAN-2214"
+        }
+      ],
+      "accepted": []
+    }
   },
   "created": "2026-07-02T20:12:46.644Z",
-  "updated": "2026-07-06T12:55:37.231Z",
+  "updated": "2026-07-27T17:46:15.614Z",
   "statusOverrides": {
     "salvage-merge-prune": "completed",
     "salvage-merge-prune.salvage-merge-prune.ac1": "completed",

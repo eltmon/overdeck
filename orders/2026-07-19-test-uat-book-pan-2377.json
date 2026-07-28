@@ -1,0 +1,15 @@
+{
+  "id": "2026-07-19-test-uat-book-pan-2377",
+  "name": "Test UAT Book PAN-2377",
+  "status": "draft",
+  "settings": {
+    "laneAConcurrency": 1,
+    "posture": "open",
+    "postureSetAt": "2026-07-19T07:21:48.160Z",
+    "postureSetBy": "dashboard",
+    "postureReason": "Operator paused new pickup."
+  },
+  "items": [],
+  "createdAt": "2026-07-19T07:18:44.092Z",
+  "updatedAt": "2026-07-21T14:21:46.988Z"
+}

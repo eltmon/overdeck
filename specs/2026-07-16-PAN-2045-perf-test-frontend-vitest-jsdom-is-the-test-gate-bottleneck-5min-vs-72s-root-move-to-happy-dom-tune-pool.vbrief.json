@@ -1,0 +1,626 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-16T17:49:25Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2045: perf(test): frontend vitest (jsdom) is the test-gate bottleneck — ~5min vs ~72s root; move to happy-dom / tune pool",
+    "updated": "2026-07-17T00:38:59.666Z"
+  },
+  "plan": {
+    "id": "pan-2045",
+    "title": "perf(test): frontend vitest (jsdom) is the test-gate bottleneck — ~5min vs ~72s root; move to happy-dom / tune pool",
+    "status": "completed",
+    "uid": "0987e139-72b5-4d61-880c-15abaef580d7",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-16T17:49:25Z",
+    "updated": "2026-07-17T00:38:59.666Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2045",
+        "label": "PAN-2045",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1918",
+        "label": "PAN-1918",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "perf",
+      "test",
+      "frontend",
+      "vitest",
+      "happy-dom"
+    ],
+    "narratives": {
+      "Problem": "The frontend vitest suite (214 test files, jsdom environment) takes ~5 minutes per run while the root suite takes ~72s, making it the wall-clock bottleneck of the verification test gate and of every work-agent `pan done` cycle. jsdom instantiates a fresh DOM per test file, which dominates the cost. A prior precision strike (2026-06-25) that tried to flip environment/pool settings in one shot self-aborted: happy-dom exposed several test-compatibility classes (style serialization, accessible-name computation, missing window.prompt, config/render mismatches) and jsdom pool tuning with isolate=false caused widespread cross-test state bleed. Separately (PAN-1918), IssueMissionControl.test.tsx leaks an open handle (an untorn-down @tanstack/react-query QueryClient created at line 118), so a full-suite run never exits — which also blocks any before/after measurement.",
+      "Proposal": "Migrate the frontend suite from jsdom to happy-dom through the normal pipeline with per-divergence-class fixes, keeping test isolation ON throughout. Sequence: (1) fix the IssueMissionControl.test.tsx open handle so full-suite runs complete; (2) record the jsdom baseline wall-clock in docs/TESTING.md; (3) switch environment to happy-dom (pinned devDependency, window.prompt stub, existing canvas/xterm stubs retained); (4–6) fix each known divergence class — style-serialization assertions, accessible-name queries, then all remaining failures — with explicit triage rules and no assertion weakening; (7) trial pool:'threads' (isolate stays true) with a documented revert-to-forks rule, and record the final measured wall-clock, targeting <120s; (8) document the chosen approach and before/after numbers in docs/TESTING.md.",
+      "NonGoals": "- Do NOT set `isolate: false` in any vitest config — the 2026-06-25 strike demonstrated widespread cross-test state bleed; this lever is rejected for this issue.\n- No CI workflow wiring of the full frontend suite (.github/workflows/ci.yml) and no change to the root package.json `test` script's 3-file frontend narrowing — that is PAN-1918's remaining scope.\n- No changes to the root (non-frontend) vitest suite or its config.\n- No changes to the test-gate parallelism in ~/.overdeck/projects.yaml (root+frontend parallel split already landed).\n- No weakening, deleting, or skipping of test assertions to achieve a green suite; divergences are fixed to behavior-equivalent assertions.\n- No product-code behavior changes made solely to satisfy a test under happy-dom."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose happy-dom migration as the primary lever, with per-divergence-class fix tasks, instead of jsdom pool tuning.",
+        "rationale": "The issue body names the environment switch as the biggest single win (typically 2–3×), and the operator's 2026-06-25 comment routes exactly this migration through the normal pipeline with focused test fixes and full-suite verification — which is what this plan is."
+      },
+      {
+        "summary": "Kept `isolate: true` (vitest default) and excluded `isolate: false` from scope entirely.",
+        "rationale": "The strike attempt empirically produced widespread cross-test state bleed under isolate=false; the operator comment records this. The remaining levers (happy-dom + threads pool) are expected to reach the <2min target without sacrificing isolation."
+      },
+      {
+        "summary": "Included the IssueMissionControl.test.tsx open-handle fix (PAN-1918 part 1) in scope; left CI wiring (PAN-1918 part 2) out.",
+        "rationale": "The issue's acceptance criteria require full-suite green and a measured before/after, but the open handle prevents any full-suite run from exiting — fixing it is a hard prerequisite for both measurement and verification. CI wiring is independent and stays with PAN-1918."
+      },
+      {
+        "summary": "Trial `pool: 'threads'` unconditionally after the happy-dom migration is green, with an explicit revert-to-'forks' rule if failures appear only under threads.",
+        "rationale": "Vitest 4 defaults to the forks pool; thread workers are cheaper to spawn and this is a low-risk config trial with a stated fallback, avoiding a judgment call for the work agent."
+      },
+      {
+        "summary": "Target wall-clock is <120 seconds on this hardware, measured with a full `npx vitest run` of the frontend suite.",
+        "rationale": "The issue's acceptance criterion says 'under ~2 min on this hardware'; 120s is the concrete mechanically-checkable form."
+      }
+    ],
+    "items": [
+      {
+        "id": "fix-imc-open-handle",
+        "title": "Fix IssueMissionControl.test.tsx open-handle hang (QueryClient teardown)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T17:49:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2045",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && timeout 180 npx vitest run --configLoader runner src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "vitest process exits with code 0 within the 180s timeout (previously it never exited)",
+            "all test cases in the file pass, none skipped"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "The test creates `new QueryClient({...})` (line 118 of IssueMissionControl.test.tsx) inside its render helper with no teardown, so React Query's garbage-collection timers keep the worker alive after the last test — the PAN-1918 open-handle hang. Fix inside the test file only: construct the QueryClient with `defaultOptions: { queries: { gcTime: 0, retry: false } }`, keep a module-level reference, and add an `afterEach` that calls `queryClient.clear()` and unmounts the rendered tree (testing-library `cleanup()` already runs with globals:true; ensure no interval/subscription created by the component survives — if one does, drive it with `vi.useFakeTimers()` per the repo fake-timers rule). Do not delete or skip any assertion."
+        },
+        "items": [
+          {
+            "id": "fix-imc-open-handle.ac1",
+            "title": "Given a solo run of IssueMissionControl.test.tsx, the vitest process exits with code 0 within 180 seconds instead of hanging on an open handle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-imc-open-handle.ac2",
+            "title": "The test file creates its QueryClient with gcTime: 0 and retry: false and clears it in afterEach, so no react-query timer survives the final test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-imc-open-handle.ac3",
+            "title": "A solo vitest run of the file produces the same passing test-case count as before the change, with 0 skipped and 0 failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "baseline-jsdom-timing",
+        "title": "Record jsdom full-suite baseline wall-clock in docs/TESTING.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T17:49:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2045",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TESTING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'PAN-2045' docs/TESTING.md"
+          ],
+          "expected_outputs": [
+            "docs/TESTING.md contains a 'Frontend suite performance (PAN-2045)' section with a jsdom baseline row (date, environment, test-file count, wall-clock seconds)"
+          ],
+          "readiness": "sequential"
+        },
+        "narrative": {
+          "Action": "With the open handle fixed, run the full frontend suite once under the current jsdom config from src/dashboard/frontend: `time npx vitest run --configLoader runner`. Record the measured wall-clock (seconds), the reported test-file and test-case counts, and the date into a new 'Frontend suite performance (PAN-2045)' section of docs/TESTING.md as the 'before' row of a before/after table (the 'after' row is filled by item pool-threads-tuning). This measurement is the denominator for the issue's before/after acceptance criterion — do not skip it even though the run takes ~5 minutes."
+        },
+        "items": [
+          {
+            "id": "baseline-jsdom-timing.ac1",
+            "title": "A full frontend-suite vitest run under jsdom exits (completes) with its wall-clock captured, demonstrating the open-handle fix holds suite-wide",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "baseline-jsdom-timing.ac2",
+            "title": "docs/TESTING.md renders a 'Frontend suite performance (PAN-2045)' section containing a baseline table row with date, environment=jsdom, file count, and measured wall-clock seconds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "switch-happy-dom",
+        "title": "Switch frontend vitest environment to happy-dom (pinned dep + setup stubs)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T17:49:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2045",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "fix-style-serialization-tests",
+            "fix-accessible-name-tests",
+            "green-full-suite-happy-dom",
+            "pool-threads-tuning"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/vitest.config.ts",
+            "src/dashboard/frontend/package.json",
+            "src/dashboard/frontend/src/test-setup.ts",
+            "bun.lock"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx"
+          ],
+          "expected_outputs": [
+            "the three issueActions gate files pass under environment: 'happy-dom' with exit code 0"
+          ],
+          "readiness": "sequential"
+        },
+        "narrative": {
+          "Action": "1) Add `happy-dom` as an exact-pinned devDependency in src/dashboard/frontend/package.json (vitest 4.1.6 peer-allows any version; pin the latest stable at implementation time) and run `bun install` from the workspace root — note the frontend vitest.config.ts `ensureFrontendNodeModules()` shim symlinks only packages listed in the frontend package.json, so the devDependency entry is mandatory, not optional. 2) In src/dashboard/frontend/vitest.config.ts change `environment: 'jsdom'` to `environment: 'happy-dom'`, keeping the setupFiles order (canvas-setup.ts first — happy-dom also has no canvas backend, the stub stays). 3) In src/test-setup.ts add a guarded `window.prompt` stub (`if (typeof window.prompt !== 'function') window.prompt = () => null;`) — the strike found happy-dom lacks it and ~20 test files reference prompt; make the existing scrollIntoView/ResizeObserver/matchMedia stubs conditional (install only when missing) so they don't clobber native happy-dom implementations. Do NOT attempt to fix the wider suite in this item — downstream items own the divergence classes; this item only proves the environment boots and the three issueActions gate files pass. Keep the `jsdom` devDependency in place until the migration is complete (removal, if desired, happens in green-full-suite-happy-dom once nothing references it)."
+        },
+        "items": [
+          {
+            "id": "switch-happy-dom.ac1",
+            "title": "src/dashboard/frontend/vitest.config.ts sets environment: 'happy-dom' and package.json pins happy-dom as an exact-version devDependency that bun install resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-happy-dom.ac2",
+            "title": "test-setup.ts installs a window.prompt stub returning null when the environment provides none, and existing global stubs install conditionally so native happy-dom implementations are preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-happy-dom.ac3",
+            "title": "Each of the three issueActions gate files (issueActions.test.ts, issueActions.no-actions-lost.test.ts, issueActions.parity.test.tsx) passes under happy-dom and vitest exits with code 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-style-serialization-tests",
+        "title": "Fix style-serialization assertion divergences under happy-dom",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T17:49:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2045",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/contextMenuFallback.test.ts",
+            "src/dashboard/frontend/src/components/Sidebar.test.tsx",
+            "src/dashboard/frontend/src/components/XTerminal.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx",
+            "src/dashboard/frontend/src/components/primitives/AgentCard.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && grep -rl 'toHaveStyle' src --include='*.test.*' | xargs npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "every test file containing a toHaveStyle assertion passes under happy-dom with exit code 0"
+          ],
+          "readiness": "sequential"
+        },
+        "narrative": {
+          "Action": "The 2026-06-25 strike identified style-serialization differences as a happy-dom failure class (happy-dom serializes computed/inline CSS values differently from jsdom — e.g. color formats, shorthand expansion). Currently 8 test files use `toHaveStyle`. Run those files under happy-dom, and for each failing assertion rewrite it to a behavior-equivalent form: assert the exact property/value happy-dom reports when the semantic meaning is unchanged, or assert the class name/inline style attribute the component actually sets when serialization is unstable. Never delete an assertion, convert it to a weaker matcher like toBeTruthy, or skip a test. If a failure in this class appears in a file without toHaveStyle (e.g. a snapshot containing serialized style), fix it here under the same rules."
+        },
+        "items": [
+          {
+            "id": "fix-style-serialization-tests.ac1",
+            "title": "All test files containing toHaveStyle assertions pass under happy-dom (vitest run of that file set exits 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-style-serialization-tests.ac2",
+            "title": "Each rewritten assertion preserves its original semantic target (same element, same styling behavior) — no assertion is deleted, skipped, or reduced to an existence check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-accessible-name-tests",
+        "title": "Fix accessible-name query divergences under happy-dom",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T17:49:25Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2045",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/*.test.ts",
+            "src/dashboard/frontend/src/components/*.test.tsx",
+            "src/dashboard/frontend/src/components/Agents/*.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/*.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/*.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/*.test.tsx",
+            "src/dashboard/frontend/src/components/Pipeline/*.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/primitives/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/*.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/*.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/*.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/panes/*.test.tsx",
+            "src/dashboard/frontend/src/components/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/context/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/conversations/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/drawer/*.test.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/issue-view/*.test.tsx",
+            "src/dashboard/frontend/src/components/resources/*.test.tsx",
+            "src/dashboard/frontend/src/components/sessionFeed/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/*.test.tsx",
+            "src/dashboard/frontend/src/components/vbrief/*.test.tsx",
+            "src/dashboard/frontend/src/pages/*.test.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/*.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd src/dashboard/frontend && grep -rlE 'ByRole\\([^)]*name:' src --include='*.test.*' | xargs npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "every test file using role queries with accessible-name options passes under happy-dom with exit code 0"
+          ],
+          "readiness": "sequential"
+        },
+        "narrative": {
+          "Action": "The strike identified accessible-name computation differences as a second failure class: happy-dom's accname algorithm can compute a different accessible name than jsdom for the same DOM (aria-label vs. text-content precedence, whitespace normalization). 61 test files use `*ByRole(..., { name: ... })`. Run that file set under happy-dom; for each failure, first adjust the query to match the accessible name happy-dom correctly computes (it is often the more spec-correct one) while keeping the same target element; where happy-dom's computation is genuinely wrong/missing for a pattern, switch the query to an equivalent selector (ByLabelText, ByText scoped within the role) that still identifies the same element. Do not add aria attributes to product components merely to satisfy a test; a product change is allowed only if it is a genuine accessibility defect and is described as such in the commit message."
+        },
+        "items": [
+          {
+            "id": "fix-accessible-name-tests.ac1",
+            "title": "All test files using ByRole queries with a name option pass under happy-dom (vitest run of that file set exits 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-accessible-name-tests.ac2",
+            "title": "Each adjusted query preserves its original target element (same role and semantics); no query falls back to a bare container or getByTestId escape hatch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-accessible-name-tests.ac3",
+            "title": "The item's diff contains changes to test files only, unless the commit message records a genuine accessibility defect justifying each product-file change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "green-full-suite-happy-dom",
+        "title": "Drive the remaining full frontend suite green under happy-dom",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T17:49:25Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-2045",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/test-setup.ts",
+            "src/dashboard/frontend/src/canvas-setup.ts",
+            "src/dashboard/frontend/src/*.test.ts",
+            "src/dashboard/frontend/src/__tests__/*.test.ts",
+            "src/dashboard/frontend/src/components/*.test.tsx",
+            "src/dashboard/frontend/src/components/Agents/*.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/*.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/*.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/SessionView/*.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/GodView/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/*.test.tsx",
+            "src/dashboard/frontend/src/components/Pipeline/*.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/primitives/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/*.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/*.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/*.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/panes/*.test.tsx",
+            "src/dashboard/frontend/src/components/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/backlog/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/chat/*.test.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/context/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/conversations/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/drawer/*.test.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/issue-view/*.test.tsx",
+            "src/dashboard/frontend/src/components/primitives/*.test.tsx",
+            "src/dashboard/frontend/src/components/resources/*.test.tsx",
+            "src/dashboard/frontend/src/components/search/*.test.tsx",
+            "src/dashboard/frontend/src/components/sessionFeed/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/*.test.tsx",
+            "src/dashboard/frontend/src/components/shared/branding/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/components/vbrief/*.test.tsx",
+            "src/dashboard/frontend/src/components/vbrief/__tests__/*.test.tsx",
+            "src/dashboard/frontend/src/hooks/*.test.ts",
+            "src/dashboard/frontend/src/hooks/__tests__/*.test.ts",
+            "src/dashboard/frontend/src/lib/*.test.ts",
+            "src/dashboard/frontend/src/lib/__tests__/*.test.ts",
+            "src/dashboard/frontend/src/pages/*.test.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/*.test.tsx"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "full frontend suite exits 0 under happy-dom: 0 failed test cases, no open-handle hang, no newly skipped tests"
+          ],
+          "readiness": "sequential"
+        },
+        "narrative": {
+          "Action": "After the two known divergence classes are fixed, run the FULL frontend suite under happy-dom and fix every remaining failure (the strike's 'config/render mismatches' class plus anything unforeseen). Triage rules — apply in order, no judgment calls: (a) failure caused by a web API missing on happy-dom → add a guarded stub in test-setup.ts (or canvas-setup.ts if it must precede imports) with a one-line comment naming the happy-dom gap; (b) failure caused by serialization/behavior differences in assertions → rewrite the assertion to a behavior-equivalent form per the same rules as the style/accname items; (c) failure exposing a genuine product defect that jsdom masked → fix the product code and describe the defect in the commit message; (d) cross-test interference (test passes solo, fails in suite) → fix the leaking test's cleanup (fake timers, afterEach restore) — NEVER change isolation settings to dodge it. Repeat full-suite runs until green. If a specific failure genuinely cannot be resolved under these rules, mark this item blocked and surface it — do not skip the test."
+        },
+        "items": [
+          {
+            "id": "green-full-suite-happy-dom.ac1",
+            "title": "A full frontend-suite vitest run under happy-dom exits 0 with zero failed test cases and completes without hanging",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "green-full-suite-happy-dom.ac2",
+            "title": "The full-suite run produces a skipped-test count no higher than the jsdom baseline run's (no test is skipped to dodge a divergence)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "green-full-suite-happy-dom.ac3",
+            "title": "Every new global stub in test-setup.ts or canvas-setup.ts applies only when the API is missing and contains a comment naming the happy-dom gap it fills",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pool-threads-tuning",
+        "title": "Trial pool:'threads' (isolate stays true) and record final wall-clock",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T17:49:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-2045",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/vitest.config.ts",
+            "docs/TESTING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner",
+            "grep -n 'isolate' src/dashboard/frontend/vitest.config.ts || true"
+          ],
+          "expected_outputs": [
+            "full frontend suite exits 0 under the committed pool configuration",
+            "no `isolate: false` setting exists in the config (grep finds none or only isolate: true)"
+          ],
+          "readiness": "sequential"
+        },
+        "narrative": {
+          "Action": "With the suite green under happy-dom, set `pool: 'threads'` in src/dashboard/frontend/vitest.config.ts (vitest 4 defaults to 'forks'; thread workers spawn faster). Leave `isolate` at its default (true) — setting isolate:false is forbidden by this plan's NonGoals. Run the full suite: if it is green, keep threads; if any failure appears under threads that does not occur under forks, revert to the default forks pool and note the revert in docs/TESTING.md. Then run the full suite twice under the committed config with `time` and record the better wall-clock as the 'after' row of the docs/TESTING.md PAN-2045 table. Target: under 120 seconds on this hardware. If the measured wall-clock is 120s or more after both levers, mark this item blocked and surface the shortfall with the measured number — do not reach for isolate:false or test deletion to close the gap."
+        },
+        "items": [
+          {
+            "id": "pool-threads-tuning.ac1",
+            "title": "The committed vitest.config.ts contains the pool decision ('threads', or default forks with the revert reason recorded in docs/TESTING.md) and contains no isolate: false setting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pool-threads-tuning.ac2",
+            "title": "A full frontend-suite run under the committed config exits 0 with zero failures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pool-threads-tuning.ac3",
+            "title": "docs/TESTING.md's PAN-2045 table records the measured 'after' wall-clock, and the value is under 120 seconds on this hardware",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-perf-record",
+        "title": "Document the chosen approach and before/after in docs/TESTING.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T17:49:25Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2045",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TESTING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'happy-dom' docs/TESTING.md",
+            "grep -n 'isolate' docs/TESTING.md"
+          ],
+          "expected_outputs": [
+            "docs/TESTING.md names happy-dom as the frontend test environment and shows the before/after wall-clock table",
+            "docs/TESTING.md states why isolate: false was rejected"
+          ],
+          "readiness": "sequential"
+        },
+        "narrative": {
+          "Action": "Complete the 'Frontend suite performance (PAN-2045)' section in docs/TESTING.md: the finished before/after table (jsdom baseline vs happy-dom + final pool config), the chosen environment and pool with one-paragraph rationale, the divergence classes that were fixed (style serialization, accessible names, missing window.prompt, remaining render/config mismatches, the IssueMissionControl QueryClient open handle), and an explicit statement that `isolate: false` was evaluated during the 2026-06-25 strike, produced widespread cross-test state bleed, and is rejected — future perf work should not re-try it casually. Mention that this resolves PAN-1918's open-handle hang (part 1) while CI wiring of the full suite remains PAN-1918's scope."
+        },
+        "items": [
+          {
+            "id": "docs-perf-record.ac1",
+            "title": "docs/TESTING.md's PAN-2045 section shows a completed before/after table (jsdom baseline vs final happy-dom config) and names the chosen environment and pool",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-perf-record.ac2",
+            "title": "The section records that isolate: false was rejected because the 2026-06-25 strike observed widespread cross-test state bleed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-perf-record.ac3",
+            "title": "The section contains the list of divergence classes fixed during the migration and records that the IssueMissionControl open-handle hang (PAN-1918 part 1) is resolved here while CI wiring stays with PAN-1918",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fix-imc-open-handle",
+        "to": "baseline-jsdom-timing",
+        "type": "blocks"
+      },
+      {
+        "from": "baseline-jsdom-timing",
+        "to": "switch-happy-dom",
+        "type": "blocks"
+      },
+      {
+        "from": "switch-happy-dom",
+        "to": "fix-style-serialization-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "switch-happy-dom",
+        "to": "fix-accessible-name-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-style-serialization-tests",
+        "to": "green-full-suite-happy-dom",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-accessible-name-tests",
+        "to": "green-full-suite-happy-dom",
+        "type": "blocks"
+      },
+      {
+        "from": "green-full-suite-happy-dom",
+        "to": "pool-threads-tuning",
+        "type": "blocks"
+      },
+      {
+        "from": "pool-threads-tuning",
+        "to": "docs-perf-record",
+        "type": "blocks"
+      },
+      {
+        "from": "baseline-jsdom-timing",
+        "to": "docs-perf-record",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-16-PAN-2045-perf-test-frontend-vitest-jsdom-is-the-test-gate-bottleneck-5min-vs-72s-root-move-to-happy-dom-tune-pool.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

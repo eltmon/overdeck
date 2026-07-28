@@ -63,7 +63,7 @@
     }
   ],
   "created": "2026-06-27T02:50:24.426Z",
-  "updated": "2026-07-06T12:54:21.462Z",
+  "updated": "2026-07-27T08:24:43.938Z",
   "pipeline": {
     "issueId": "PAN-2054",
     "reviewStatus": "passed",
@@ -71,18 +71,38 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T03:12:12.302Z",
+    "updatedAt": "2026-07-27T08:24:39.719Z",
     "reviewNotes": "review passed; terminal close-out production path and residue cleanup look correct",
     "testNotes": "Quality gates: typecheck ✓, lint ✓ (7480 tests/735 files + 32 frontend tests). All implementation items verified by test suite — closedOut record field, read-door terminal shortcircuit, close-out marking, label stripping, reap-residue helper, patrol integration, integration test, resource-tree regression lock. No new failures. No UAT required for backend lifecycle fix.",
     "inspectNotes": "workspace-m9lki passed: reapIssueResidue matches the vBRIEF helper requirements, uses the merge guard before disk/branch cleanup, uses execAsync plus Effect killSession, and introduces no prohibited execSync/sendKeys pattern.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2092",
-    "lastVerifiedCommit": "9ce404869ab723f66deae5e8fd21ed0c86d1f4b5",
-    "reviewRequestedAt": "2026-06-27T05:05:39.099Z"
+    "lastVerifiedCommit": "9ce404869ab723f66deae5e8fd21ed0c86d1f4b5"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "implementation": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 0,
+            "output": 862,
+            "cacheRead": 212877,
+            "cacheWrite": 1843
+          },
+          "anthropic/claude-opus-4-8": {
+            "input": 154,
+            "output": 127,
+            "cacheRead": 207771,
+            "cacheWrite": 3675
+          },
+          "openai/gpt-5.5": {
+            "input": 128478,
+            "output": 1528,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
         "inspect-deep": {
           "openai/gpt-5.5": {
             "input": 881317,
@@ -117,9 +137,21 @@
         }
       },
       "totals": {
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 37,
+          "output": 3702,
+          "cacheRead": 1573466,
+          "cacheWrite": 163920
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 23354,
+          "output": 43059,
+          "cacheRead": 5304054,
+          "cacheWrite": 195611
+        },
         "openai/gpt-5.5": {
-          "input": 881317,
-          "output": 26814,
+          "input": 1009795,
+          "output": 28342,
           "cacheRead": 3954688,
           "cacheWrite": 0
         },
@@ -128,23 +160,11 @@
           "output": 4865,
           "cacheRead": 0,
           "cacheWrite": 0
-        },
-        "anthropic/claude-opus-4-8": {
-          "input": 23200,
-          "output": 42932,
-          "cacheRead": 5096283,
-          "cacheWrite": 191936
-        },
-        "anthropic/claude-haiku-4-5-20251001": {
-          "input": 37,
-          "output": 2840,
-          "cacheRead": 1360589,
-          "cacheWrite": 162077
         }
       },
       "costAtCloseOut": {
-        "usd": 12.478285,
-        "pricingAsOf": "2026-07-03T03:12:12.346Z"
+        "usd": 13.325215,
+        "pricingAsOf": "2026-07-27T08:24:41.488Z"
       }
     },
     "merges": [
@@ -153,7 +173,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-4-8",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "closedout-record-field": "completed",
     "closedout-record-field.ac1": "completed",

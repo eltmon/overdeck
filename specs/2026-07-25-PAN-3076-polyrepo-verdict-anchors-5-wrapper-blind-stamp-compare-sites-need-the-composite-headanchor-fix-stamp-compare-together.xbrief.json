@@ -1,0 +1,818 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-25T21:17:08Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3076: Polyrepo verdict anchors: 5 wrapper-blind stamp/compare sites need the composite HeadAnchor fix (stamp + compare together)",
+    "updated": "2026-07-26T03:30:14.606Z"
+  },
+  "plan": {
+    "id": "pan-3076",
+    "title": "Polyrepo verdict anchors: 5 wrapper-blind stamp/compare sites need the composite HeadAnchor fix (stamp + compare together)",
+    "status": "completed",
+    "uid": "df79b859-61e3-4600-9c31-2fd3b75014df",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-25T21:17:08Z",
+    "updated": "2026-07-26T03:30:14.606Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3076",
+        "label": "PAN-3076",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2948",
+        "label": "PAN-2948 (read-side fix)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3037",
+        "label": "PAN-3037 (independent probes)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "polyrepo",
+      "review-pipeline",
+      "deacon",
+      "verdict-anchors"
+    ],
+    "narratives": {
+      "Problem": "Verdict anchors (reviewedAtCommit, lastVerifiedCommit, roleRunHead) are plain strings, so a composite polyrepo anchor (fe@sha api@sha) and a frozen wrapper-repo SHA are silently interchangeable. Five wrapper-blind stamp/compare sites therefore either loop forever (composite anchor vs wrapper HEAD never equal — MIN-901: 56 review resets + convoy re-dispatches in 3h44m) or ship unreviewed code green (wrapper anchor vs wrapper HEAD always equal — post-review sub-repo commits never invalidate review).",
+      "Proposal": "Introduce a branded HeadAnchor type in src/lib/git-utils.ts with snapshotWorkspaceHeadsPromise() as the single producer and an exported parseCompositeSnapshot as the single lenient parser. Add a composite-aware drift evaluator applying per-repo benign-move checks (tree-identical, state-plane-only, patch-id-identical). Convert all five stamp/compare sites in this one branch (deacon checkPostReviewCommits; roleRunHead stamp+compare pair; the review-status route, legacy specialists-done route, and deacon bypass stamps), plus the two degraded sites (review runId derivation, crash progressFingerprint). Lock the write-site inventory with a targeted scan test. Full details, decisions D1-D9, and verified line references are in the PRD draft (drafts/pan-3076.md).",
+      "NonGoals": "- No changes to the independent read-only probes owned by PAN-3037 (sync-main, review-restart branch detection, dashboard git status, start verification)\n- No repo-wide grep/CI guard on 'git rev-parse HEAD' (explicitly rejected by the issue — many legitimate per-repo uses)\n- No branding of the contracts wire Schema (packages/contracts/src/types.ts) or frontend types\n- No merging of parseWorkspaceHeadAnchor (strict git-show validator) into parseCompositeSnapshot\n- No migration/rewrite of already-persisted anchor values; legacy values converge via one conservative reset at runtime\n- No changes to merge-train, close-out, or verification-runner stamp sites already using the producer"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Included the two 'degraded' sites (review-agent runId, service-crash progressFingerprint) in scope alongside the five stamp/compare sites.",
+        "rationale": "They are listed in this issue's body as part of the same coupled cluster, convert to the same producer, and are small diffs; deferring them would leave known wrapper-blind probes behind the same brand boundary this issue creates."
+      },
+      {
+        "summary": "Brand enforcement at write doors only; contracts Schema and roleRunHead storage types stay plain string; plane-copy paths use a rehydrateHeadAnchor cast; roleRunHead writes locked by the scan test.",
+        "rationale": "Branding the wire Schema would ripple into the frontend and ~6 deserializers with zero enforcement gain, since stored values re-enter as plain strings anyway; the write door is where fabrication happens."
+      },
+      {
+        "summary": "roleRunHead switches from short-8 wrapper SHA to the full producer anchor on both sides; persisted pre-fix values intentionally read as stale once after deploy.",
+        "rationale": "Stale-once costs at most one redundant respawn; the current polyrepo behavior (staleness never fires) is the bug being fixed, and equality-only comparison needs no short form."
+      },
+      {
+        "summary": "Mixed legacy anchor shapes (wrapper SHA stored, composite current) evaluate as 'drifted' — one conservative full re-review, then convergence.",
+        "rationale": "There is no repoKey mapping between shapes, so benign-move analysis is impossible; a single reset is the smallest safe outcome and the fixed stamp sites make it terminal."
+      },
+      {
+        "summary": "Polyrepo review runId head8 = first 8 hex of sha1(composite anchor), derived by one helper shared by runId construction and the staleness probe.",
+        "rationale": "Any sub-repo commit must change the runId (roots[0]-only misses non-primary commits), and a shared helper makes stamp/compare divergence structurally impossible."
+      }
+    ],
+    "items": [
+      {
+        "id": "head-anchor-type",
+        "title": "Branded HeadAnchor type, producer return type, and canonical parseCompositeSnapshot export in git-utils",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T21:17:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3076",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "anchor-drift-evaluator",
+            "deacon-post-review-compare",
+            "stamp-review-status-route",
+            "stamp-legacy-specialists-done",
+            "stamp-deacon-bypass",
+            "role-run-head-pair",
+            "review-runid-composite",
+            "crash-fingerprint-and-scan-test",
+            "review-status-write-door-brand"
+          ],
+          "files_scope": [
+            "src/lib/git-utils.ts",
+            "src/lib/cloister/inspect-checkpoints.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "git grep -c 'function parseCompositeSnapshot' src/"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grep reports exactly 1 definition, located in src/lib/git-utils.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-1: add the branded HeadAnchor type (unique-symbol brand) and rehydrateHeadAnchor() escape hatch in src/lib/git-utils.ts directly above snapshotWorkspaceHeadsPromise (:361); change the producer's return type to Promise<HeadAnchor | undefined> (return heads.join(' ') as HeadAnchor); move parseCompositeSnapshot verbatim from src/lib/cloister/inspect-checkpoints.ts:119-128 into git-utils.ts as an export and re-import it in inspect-checkpoints.ts, deleting the private copy. Do NOT touch parseWorkspaceHeadAnchor (git-utils.ts:278) — it stays a separate strict validator (decision D4)."
+        },
+        "items": [
+          {
+            "id": "head-anchor-type.ac1",
+            "title": "Given the branch tree, when npm run typecheck runs, it completes without errors and snapshotWorkspaceHeadsPromise's declared return type is Promise<HeadAnchor | undefined>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "head-anchor-type.ac2",
+            "title": "git grep 'function parseCompositeSnapshot' src/ returns exactly one definition, in src/lib/git-utils.ts, and inspect-checkpoints.ts imports it instead of defining its own",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "head-anchor-type.ac3",
+            "title": "A test-only compile probe shows assigning a plain string literal where a HeadAnchor is required produces a TypeScript error, while the producer's return value is accepted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "anchor-drift-evaluator",
+        "title": "Composite-aware workspace anchor drift evaluator with per-repo benign-move checks",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T21:17:08Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3076",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "deacon-post-review-compare"
+          ],
+          "files_scope": [
+            "src/lib/workspace-anchor-drift.ts",
+            "tests/unit/lib/workspace-anchor-drift.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/workspace-anchor-drift.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "workspace-anchor-drift.test.ts passes with named tests for current/benign/drifted/shape-mismatch/unreadable verdicts"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-2: create src/lib/workspace-anchor-drift.ts exporting evaluateWorkspaceAnchorDrift(issueId, workspacePath, storedAnchor) returning { kind: 'current' | 'benign' | 'drifted' | 'unreadable', currentAnchor?, changedRepos? }. Decision rules are fully specified in the PRD (steps 1-5): producer-undefined → unreadable; string-equal → current; two plain SHAs → today's workspace-root benign checks (^{tree} equality, haveSameEffectiveCodeCommit, haveSameCodeContribution from src/lib/pipeline-state-paths.ts:56,79); shape mismatch → drifted (decision D5); both composite → per-repoKey comparison with benign checks run in each changed root.dir using baseRef 'origin/' + root.targetBranch (decision D9). Unit tests use mkdtemp real git repos and vi.mock of resolveWorkspaceRepoRootsSync (pattern: tests/unit/lib/cloister/deacon-stash-janitor.test.ts)."
+        },
+        "items": [
+          {
+            "id": "anchor-drift-evaluator.ac1",
+            "title": "Given equal stored and current composite anchors, evaluateWorkspaceAnchorDrift returns kind 'current'; given a commit in one sub-repo it returns 'drifted' naming that repoKey in changedRepos",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anchor-drift-evaluator.ac2",
+            "title": "Given a tree-identical rebase in exactly one sub-repo, the evaluator returns kind 'benign' with currentAnchor equal to the fresh producer snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anchor-drift-evaluator.ac3",
+            "title": "Given a stored plain wrapper SHA and a current composite snapshot (shape mismatch), the evaluator returns kind 'drifted', never loops, and never throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anchor-drift-evaluator.ac4",
+            "title": "Given two plain single-SHA anchors (monorepo), the evaluator reproduces today's workspace-root semantics: tree-identical or state-plane-only moves return 'benign', real code changes return 'drifted', unreadable workspace returns 'unreadable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-post-review-compare",
+        "title": "checkPostReviewCommits compares via the drift evaluator and renders composite anchors in logs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T21:17:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3076",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash -c \"! git grep -n 'rev-parse HEAD' src/lib/cloister/deacon.ts\""
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "no raw 'rev-parse HEAD' remains in deacon.ts (grep exits non-zero on no matches)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3: in src/lib/cloister/deacon.ts checkPostReviewCommits (:1597-1666), replace the raw workspace-root rev-parse (:1598-1604), inline ^{tree} comparison (:1611-1623), and workspace-root haveSameEffectiveCodeCommit/haveSameCodeContribution block (:1629-1640) with one evaluateWorkspaceAnchorDrift call. Verdict mapping: unreadable→continue, current→continue, benign→setReviewStatusSync({ reviewedAtCommit: verdict.currentAnchor }) with the preserved-verdict log, drifted→the existing reset block (:1647-1666) unchanged. Add a formatAnchorShort(anchor) helper (composite → 'fe@<8sha> api@<8sha>', plain → first 8 chars) and use it in every log line that previously called .substring(0,8) on an anchor."
+        },
+        "items": [
+          {
+            "id": "deacon-post-review-compare.ac1",
+            "title": "Given a polyrepo issue with a passed review and no new sub-repo commits, a deacon patrol produces zero review resets (the MIN-901 infinite-reset signature is gone)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-post-review-compare.ac2",
+            "title": "Given a real code commit in any sub-repo after review passed, the patrol resets review exactly once and the log renders both anchors as composite forms (repo@<8-char sha>), not a truncated .substring(0,8)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-post-review-compare.ac3",
+            "title": "git grep 'rev-parse HEAD' src/lib/cloister/deacon.ts returns no matches after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stamp-review-status-route",
+        "title": "POST /api/review/:issueId/status stamps reviewedAtCommit via the producer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T21:17:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3076",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors; the route's reviewedAtCommit assignment type-resolves to HeadAnchor"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4: in src/dashboard/server/routes/workspaces.ts:1454-1470, replace the getWorkspaceGitInfo(localPath) block with yield* Effect.promise(() => import('../../../lib/git-utils.js')).then producer call snapshotWorkspaceHeadsPromise(issueId, localPath), assigning update.reviewedAtCommit only when the result is defined. Keep the non-fatal try/catch posture. Must stay inside Effect (Effect.promise) — no execSync (hazard H1)."
+        },
+        "items": [
+          {
+            "id": "stamp-review-status-route.ac1",
+            "title": "Given a polyrepo workspace, posting reviewStatus 'passed' to the route persists a composite reviewedAtCommit (contains 'repoKey@sha' tokens), not the wrapper SHA",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stamp-review-status-route.ac2",
+            "title": "Given a monorepo workspace, the route persists the same single full HEAD SHA as before the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stamp-legacy-specialists-done",
+        "title": "Legacy specialists-done route stamps reviewedAtCommit via the producer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T21:17:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3076",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/specialists/legacy-routes.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors; the reviewedAtCommit stamp in legacy-routes.ts flows from snapshotWorkspaceHeadsPromise"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5: in src/dashboard/server/routes/specialists/legacy-routes.ts:288-311, replace getWorkspaceGitInfo(workspacePath) with snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath) inside the existing Effect.promise(async () => ...) block; skip the setReviewStatusBase call when the producer returns undefined; log the stamped value with the formatAnchorShort helper instead of HEAD.substring(0, 8)."
+        },
+        "items": [
+          {
+            "id": "stamp-legacy-specialists-done.ac1",
+            "title": "Given a polyrepo workspace, the review-passed path of this route persists a composite reviewedAtCommit and logs it in repo@<8sha> form",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stamp-legacy-specialists-done.ac2",
+            "title": "Given the producer returns undefined (unreadable workspace), the route leaves reviewedAtCommit unset and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stamp-deacon-bypass",
+        "title": "Deacon verification-bypass path stamps reviewedAtCommit via the producer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T21:17:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3076",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors; checkVerificationReviewContradiction contains no raw rev-parse"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6: in src/lib/cloister/deacon.ts checkVerificationReviewContradiction (:1514-1528), replace the raw 'git rev-parse HEAD' at the workspace root (:1524) with snapshotWorkspaceHeadsPromise(issueId, workspacePath) via dynamic import, matching the style already used at src/lib/cloister/deacon-review-status.ts:543. reviewedAtCommit stays undefined when the producer returns undefined (unchanged non-fatal posture)."
+        },
+        "items": [
+          {
+            "id": "stamp-deacon-bypass.ac1",
+            "title": "Given a polyrepo workspace, the bypass path persists a composite reviewedAtCommit so the subsequent checkPostReviewCommits comparison evaluates 'current' instead of perpetually drifting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stamp-deacon-bypass.ac2",
+            "title": "Given an unreadable or missing workspace, the bypass still sets reviewStatus 'passed' with reviewedAtCommit omitted and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-run-head-pair",
+        "title": "roleRunHead stamp (spawn) and staleness compare (service-reactive) both use the producer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T21:17:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3076",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn.ts",
+            "src/lib/cloister/service-reactive.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash -c \"! git grep -n 'rev-parse --short=8 HEAD' src/lib/agents/spawn.ts src/lib/cloister/service-reactive.ts\""
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "no short=8 workspace-root probe remains in either file (grep exits non-zero)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7 (single item because stamp and compare must move together — hazard H5): in src/lib/agents/spawn.ts:462-471 stamp state.roleRunHead = await snapshotWorkspaceHeadsPromise(issueId, workspace) (keep try/catch, skip assignment on undefined); in src/lib/cloister/service-reactive.ts:164-182 probe with the same producer and compare full anchors for inequality, updating the comment to note anchors are producer-issued and that legacy short-8 values intentionally read as stale once (decision D6)."
+        },
+        "items": [
+          {
+            "id": "role-run-head-pair.ac1",
+            "title": "Given a polyrepo role run stamped and then probed with no new commits, activeRoleRunExists treats the session as active (anchors compare equal)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-run-head-pair.ac2",
+            "title": "Given a commit in any sub-repo after the stamp, the staleness check reports the session stale and returns false — behavior that never fired for polyrepo before this change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-run-head-pair.ac3",
+            "title": "Given a monorepo workspace, both sides now carry the full HEAD SHA and equality semantics are preserved (no false-stale for an unchanged HEAD)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-runid-composite",
+        "title": "Review runId derivation and staleness probe share one composite-aware head8 helper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T21:17:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3076",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/review-agent.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-stash-janitor.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "existing runId-shaped tests still pass (agent-<issue>-review-<8 hex> format preserved)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-8 and decision D7: add module-local deriveReviewRunHead8(issueId, workspace) in src/lib/cloister/review-agent.ts — monorepo: git rev-parse --short=8 HEAD of the single root (unchanged); polyrepo: first 8 hex of sha1(composite producer anchor) via node:crypto; returns 'unknown' on failure like today. Replace BOTH the runId construction probe (:546-555) and the staleness probe (:362-372) with this helper so stamp and compare cannot diverge."
+        },
+        "items": [
+          {
+            "id": "review-runid-composite.ac1",
+            "title": "Given a commit to a non-primary sub-repo, the derived runId changes, producing a new review directory and firing the stale-runId disambiguation for the old convoy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-runid-composite.ac2",
+            "title": "Given a monorepo workspace, runIds keep the exact agent-<issue>-review-<short8> shape they have today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-runid-composite.ac3",
+            "title": "git grep 'rev-parse --short=8 HEAD' src/lib/cloister/review-agent.ts exits with zero matches because both the runId construction and the staleness probe now call deriveReviewRunHead8",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "crash-fingerprint-and-scan-test",
+        "title": "progressFingerprint uses the producer; write-site scan test locks the anchor-field inventory",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T21:17:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3076",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/service-crash.ts",
+            "tests/unit/lib/head-anchor-write-sites.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/head-anchor-write-sites.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "head-anchor-write-sites.test.ts passes, including its self-check case proving an unlisted raw write site fails"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-9: (1) in src/lib/cloister/service-crash.ts:106-126, when state?.workspace && state?.issueId use snapshotWorkspaceHeadsPromise for the git component of the fingerprint, keeping the raw probe as fallback when issueId is absent. (2) Create tests/unit/lib/head-anchor-write-sites.test.ts: scan src/**/*.ts (excluding __tests__) for write patterns of reviewedAtCommit / lastVerifiedCommit / roleRunHead (property assignment or object-literal key, excluding type declarations and comparisons) and assert every hit's file is in an explicit allowlist (producer-fed stamp sites from this plan, undefined clears, rehydration/mirror/deserializer modules, contracts Schema), each entry annotated with why it is legitimate. Include a self-check case running the scanner over an inline fixture containing a raw-string write and asserting it is flagged. This is the enforcement mechanism chosen INSTEAD of a repo-wide rev-parse grep guard (decision D8, NFR-4)."
+        },
+        "items": [
+          {
+            "id": "crash-fingerprint-and-scan-test.ac1",
+            "title": "Given a polyrepo workspace, progressFingerprint's git component changes when any sub-repo receives a commit (previously frozen at the wrapper SHA)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crash-fingerprint-and-scan-test.ac2",
+            "title": "The scan test passes on the converted tree and its self-check case proves an unlisted raw-string anchor write is reported with file and line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crash-fingerprint-and-scan-test.ac3",
+            "title": "The branch diff produces no new CI or lint-script rule matching on 'git rev-parse HEAD' — git diff main -- .github/ scripts/ contains no hunk adding such a guard (NonGoal preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-status-write-door-brand",
+        "title": "Narrow the review-status write-door update types to HeadAnchor with rehydration casts for plane copies",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-25T21:17:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3076",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/review-status.ts",
+            "src/lib/pan-dir/record.ts",
+            "src/lib/review-status-reconcile.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors, and a @ts-expect-error probe on a raw-string reviewedAtCommit assignment stays green (the error is expected and produced)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-11 and decision D3, sequenced AFTER all reviewedAtCommit stamp conversions: narrow the setReviewStatus/setReviewStatusSync/setReviewStatusBase update parameter type in src/lib/review-status.ts so reviewedAtCommit and lastVerifiedCommit accept only HeadAnchor | undefined (undefined clears still compile). Fix typecheck fallout: producer-fed sites compile unchanged; plane-copy/mirror/history-restore paths (src/lib/pan-dir/record.ts:166, src/lib/review-status-reconcile.ts:48, deacon history restores) wrap stored strings in rehydrateHeadAnchor(...) with a one-line justification comment per cast. The stored/read ReviewStatus type and the contracts Schema (packages/contracts/src/types.ts:381) stay plain string (decision D2). files_scope_confidence is medium because the typecheck may flag additional callers; converting those callers is in scope for this item."
+        },
+        "items": [
+          {
+            "id": "review-status-write-door-brand.ac1",
+            "title": "Passing a raw string literal as reviewedAtCommit to setReviewStatusSync produces a TypeScript error (proved by a @ts-expect-error probe); with the probe annotation present, npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-status-write-door-brand.ac2",
+            "title": "npm run typecheck passes on the full tree with every rehydrateHeadAnchor call site carrying a justification comment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-status-write-door-brand.ac3",
+            "title": "The diff preserves packages/contracts/src/types.ts and all frontend type files unchanged — git diff main -- packages/contracts src/dashboard/frontend produces no hunks from this item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-head-anchor-contract",
+        "title": "Document the HeadAnchor contract in REVIEW-AGENT-ARCHITECTURE.md and the producer doc comment",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-25T21:17:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3076",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "src/lib/git-utils.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -l 'HeadAnchor' docs/"
+          ],
+          "expected_outputs": [
+            "grep returns docs/REVIEW-AGENT-ARCHITECTURE.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-10: add a 'Verdict anchors (HeadAnchor)' section to docs/REVIEW-AGENT-ARCHITECTURE.md (it already documents PAN-2948) covering: the producer/parser contract, the brand and rehydrateHeadAnchor rules, the stamp/compare pairing rule ('a compare site may only compare against what the producer stamped'), the D5 legacy-convergence behavior, the five converted sites, and the MIN-901 log signature for future debugging. Extend the snapshotWorkspaceHeadsPromise doc comment (src/lib/git-utils.ts:349-360) to name the brand contract."
+        },
+        "items": [
+          {
+            "id": "docs-head-anchor-contract.ac1",
+            "title": "docs/REVIEW-AGENT-ARCHITECTURE.md contains a section naming all five converted sites and stating the stamp/compare pairing rule verbatim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-head-anchor-contract.ac2",
+            "title": "The snapshotWorkspaceHeadsPromise doc comment in git-utils.ts contains the rule that its return value is the only legitimate source for reviewedAtCommit, lastVerifiedCommit, and roleRunHead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "head-anchor-type",
+        "to": "anchor-drift-evaluator",
+        "type": "blocks"
+      },
+      {
+        "from": "head-anchor-type",
+        "to": "stamp-review-status-route",
+        "type": "blocks"
+      },
+      {
+        "from": "head-anchor-type",
+        "to": "stamp-legacy-specialists-done",
+        "type": "blocks"
+      },
+      {
+        "from": "head-anchor-type",
+        "to": "stamp-deacon-bypass",
+        "type": "blocks"
+      },
+      {
+        "from": "head-anchor-type",
+        "to": "role-run-head-pair",
+        "type": "blocks"
+      },
+      {
+        "from": "head-anchor-type",
+        "to": "review-runid-composite",
+        "type": "blocks"
+      },
+      {
+        "from": "anchor-drift-evaluator",
+        "to": "deacon-post-review-compare",
+        "type": "blocks"
+      },
+      {
+        "from": "deacon-post-review-compare",
+        "to": "crash-fingerprint-and-scan-test",
+        "type": "blocks"
+      },
+      {
+        "from": "stamp-review-status-route",
+        "to": "crash-fingerprint-and-scan-test",
+        "type": "blocks"
+      },
+      {
+        "from": "stamp-legacy-specialists-done",
+        "to": "crash-fingerprint-and-scan-test",
+        "type": "blocks"
+      },
+      {
+        "from": "stamp-deacon-bypass",
+        "to": "crash-fingerprint-and-scan-test",
+        "type": "blocks"
+      },
+      {
+        "from": "role-run-head-pair",
+        "to": "crash-fingerprint-and-scan-test",
+        "type": "blocks"
+      },
+      {
+        "from": "review-runid-composite",
+        "to": "crash-fingerprint-and-scan-test",
+        "type": "blocks"
+      },
+      {
+        "from": "deacon-post-review-compare",
+        "to": "review-status-write-door-brand",
+        "type": "blocks"
+      },
+      {
+        "from": "stamp-review-status-route",
+        "to": "review-status-write-door-brand",
+        "type": "blocks"
+      },
+      {
+        "from": "stamp-legacy-specialists-done",
+        "to": "review-status-write-door-brand",
+        "type": "blocks"
+      },
+      {
+        "from": "stamp-deacon-bypass",
+        "to": "review-status-write-door-brand",
+        "type": "blocks"
+      },
+      {
+        "from": "review-status-write-door-brand",
+        "to": "crash-fingerprint-and-scan-test",
+        "type": "blocks"
+      },
+      {
+        "from": "stamp-deacon-bypass",
+        "to": "deacon-post-review-compare",
+        "type": "blocks"
+      },
+      {
+        "from": "head-anchor-type",
+        "to": "docs-head-anchor-contract",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-25-PAN-3076-polyrepo-verdict-anchors-5-wrapper-blind-stamp-compare-sites-need-the-composite-headanchor-fix-stamp-compare-together.xbrief.json"
+    }
+  },
+  "status": "completed"
+}

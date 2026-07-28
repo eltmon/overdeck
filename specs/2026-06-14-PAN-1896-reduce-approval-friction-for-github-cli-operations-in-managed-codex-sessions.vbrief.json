@@ -4,17 +4,17 @@
     "created": "2026-06-14T19:18:20.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1896: Reduce approval friction for GitHub CLI operations in managed Codex sessions",
-    "updated": "2026-06-14T19:42:27.704Z"
+    "updated": "2026-07-18T16:15:49.939Z"
   },
   "plan": {
     "id": "pan-1896",
     "title": "Reduce approval friction for GitHub CLI operations in managed Codex sessions",
-    "status": "proposed",
+    "status": "completed",
     "uid": "c44ca1b9-280d-4693-96e3-dfef786ddf6c",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 53,
     "created": "2026-06-14T19:18:20.000Z",
-    "updated": "2026-06-14T19:42:27.704Z",
+    "updated": "2026-07-18T16:15:49.939Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1896",
@@ -433,5 +433,5 @@
       "canonicalFilename": "2026-06-14-PAN-1896-reduce-approval-friction-for-github-cli-operations-in-managed-codex-sessions.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

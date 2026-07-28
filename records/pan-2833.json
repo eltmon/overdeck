@@ -1,0 +1,62 @@
+{
+  "issueId": "PAN-2833",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-07-17T12:02:49.446Z",
+  "updated": "2026-07-27T04:42:15.623Z",
+  "pipeline": {
+    "issueId": "PAN-2833",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "failed",
+    "mergeStatus": "failed",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-27T04:42:15.550Z",
+    "verificationNotes": "Checklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.",
+    "mergeNotes": "Post-rebase verification failed at incomplete-plan-items",
+    "strikeReadyHead": "4c52d2e2abbe9f465b3608fdcc4d2f84bbda0a34",
+    "strikeReadyAt": "2026-07-17T12:23:48.130Z",
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-17T12:26:44.942Z",
+        "strikeHead": "4c52d2e2abbe9f465b3608fdcc4d2f84bbda0a34",
+        "mainHead": "34c61be4613b4184b3bf441955ea882bf3f6c131",
+        "outcome": "failed",
+        "detail": "Post-rebase verification failed at incomplete-plan-items"
+      }
+    ]
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "strike": {
+          "openai/gpt-5.6-sol": {
+            "input": 470086,
+            "output": 21708,
+            "cacheRead": 7955968,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 470086,
+          "output": 21708,
+          "cacheRead": 7955968,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 6.979654,
+        "pricingAsOf": "2026-07-27T04:42:15.556Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.6-sol"
+}

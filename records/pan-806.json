@@ -1,0 +1,422 @@
+{
+  "issueId": "PAN-806",
+  "schemaVersion": 2,
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Sentinel env var OVERDECK_PAN_GIT_OP=1 is the contract: pan sets it around its own history ops (only rebase-helper.ts needs it); both guards bypass when present. Without it, pan done's internal `git rebase` (done.ts:357 → rebase-helper.ts:97) gets blocked and the submit flow bricks. The PRD missed this entirely.",
+      "recordedAt": "2026-06-23T08:55:20.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "pre-rebase hook installs into the git-RESOLVED hooks path (`git rev-parse --git-path hooks`), NOT `.git/hooks/`. This repo sets core.hooksPath=.husky/_ (Husky v9), so git ignores .git/hooks entirely — the PRD's path would never fire. Resolved path is correct for husky (→.husky/_/pre-rebase) and plain-git (→.git/hooks/pre-rebase) projects.",
+      "recordedAt": "2026-06-23T08:55:20.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Hook install moves from start.ts (PRD) to workspace-manager.ts createWorktree (after `git worktree add`, ~:342-351). That is the single real worktree-creation chokepoint covering `pan start`, the dashboard start route, and strike agents.",
+      "recordedAt": "2026-06-23T08:55:20.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Hook is gated on OVERDECK_AGENT_ID (only blocks inside an agent session) and bypasses on the sentinel. A human shell in the workspace or on main can still rebase (NFR-1). Same gating logic the PATH wrapper uses.",
+      "recordedAt": "2026-06-23T08:55:20.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "PATH wrapper goes in launcher-generator.ts generateLauncherScriptSync (single generator for all harnesses), after env exports (:268-281), before cd/command. Installed only for issue-bound agent sessions (overdeckEnv.agentId present, not conversation panels). Guard dir is a DETERMINISTIC per-agent path (<AGENTS_DIR>/agent-<id>/git-guard) baked into the script — NOT mktemp — so stopAgentSync can clean it.",
+      "recordedAt": "2026-06-23T08:55:20.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "rebase-and-submit skill edits are OUT OF SCOPE: SKILLS-INVENTORY.md:109 marks it User scope; its only copy is ~/.claude/skills/rebase-and-submit/SKILL.md with no source in this repo, so a commit here cannot change it. work.md (pipeline-owned) already carries correct merge-not-rebase / no-stash guidance.",
+      "recordedAt": "2026-06-23T08:55:20.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "work.md prose at :46/:48/:50 already forbids stash/rebase/reset (Epic D likely landed this). The remaining defect is the contradictory raw-rebase restart block at :241-246 — that is the only prompt edit needed plus adding an explicit permitted/forbidden table.",
+      "recordedAt": "2026-06-23T08:55:20.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "pan sync-main is safe and unchanged: syncMainIntoWorkspace (merge-agent.ts:1183) auto-commits then `git merge` — never rebase/reset/stash — so neither guard affects it. No sentinel needed there.",
+      "recordedAt": "2026-06-23T08:55:20.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "If the hook (B3) or PATH wrapper (B4) lands before the sentinel (B1), every agent's `pan done` internal rebase is blocked and the submit flow bricks.",
+      "mitigation": "Bead edges: B1 (rebase-helper-sentinel) blocks B3 (prerebase-hook-install) and B4 (git-path-wrapper). Land B1 first."
+    },
+    {
+      "id": "H2",
+      "summary": "Husky regenerates .husky/_/ on a mid-session `bun install`, clobbering the installed _/pre-rebase stub back to a no-op.",
+      "mitigation": "The PATH wrapper (B4) independently blocks rebase; the clobber window is narrow (installs rarely re-run mid-session). Defense-in-depth holds."
+    },
+    {
+      "id": "H3",
+      "summary": "PATH wrapper is bypassable via absolute path (e.g. /usr/bin/git reset --hard). PRD-acknowledged.",
+      "mitigation": "The pre-rebase HOOK covers the higher-risk rebase even via absolute path (git always runs hooks). reset/stash wrapper is defense-in-depth behind the prompt (the primary control)."
+    },
+    {
+      "id": "H4",
+      "summary": "Adding the PATH wrapper changes the toMatchInlineSnapshot snapshots in src/lib/__tests__/launcher-generator.test.ts.",
+      "mitigation": "Update those snapshots in B4 (same commit). Run `npm test -- launcher-generator` and accept the new snapshots intentionally, verifying the diff is only the guard block."
+    },
+    {
+      "id": "H5",
+      "summary": "The sentinel var name must be byte-identical across B1/B3/B4. A typo means the bypass never triggers and pan done breaks.",
+      "mitigation": "Literal string is OVERDECK_PAN_GIT_OP everywhere. B1 is requiresInspection:true to catch a mismatch before the guards go live."
+    },
+    {
+      "id": "H6",
+      "summary": "Remote (Fly.io) worktrees are created by the Fly provider, not createWorktree, so the hook won't install there.",
+      "mitigation": "Out of scope (NonGoal). The launcher PATH wrapper still applies wherever the generator runs; remote substrate has its own discipline."
+    }
+  ],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-21T16:29:59.438Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-21T17:42:46.292Z",
+      "reason": "end",
+      "note": "No skipped work. Deviation: final-suite failures exposed and fixed a pre-existing config loader bug that ignored OVERDECK_HOME, causing 63 tests to read the operator's weighted model config. Hazard: the pre-rebase hook exits 1 as specified, while Git maps hook rejection to git-rebase exit 128; the command is still blocked with pan guidance. Delivered prompt controls, pan-owned rebase sentinel, executable pre-rebase guard, per-agent PATH wrapper, and stop cleanup. npm test, npm run lint, and npm run typecheck pass."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-21T17:50Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-21T17:50:37.336Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-21T17:50:37.439Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-21T17:50:38.320Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-21T17:58:13.147Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-21T18:01Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-21T18:01:18.985Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-21T18:03:20.635Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-21T18:19:13.156Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-21T18:22:14.981Z"
+    }
+  ],
+  "feedback": [],
+  "created": "2026-07-21T16:29:59.439Z",
+  "updated": "2026-07-21T20:34:26.225Z",
+  "pipeline": {
+    "issueId": "PAN-806",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "inspectStatus": "passed",
+    "mergeStatus": "merged",
+    "releaseStatus": "skipped",
+    "readyForMerge": false,
+    "panDoneRecoveredAt": "2026-07-21T17:44:12.340Z",
+    "updatedAt": "2026-07-21T20:34:26.206Z",
+    "reviewNotes": "Prior hook-interpreter and git global-option blockers are fixed; no blocking findings remain",
+    "inspectNotes": "rebase-helper.ts:101,200 add OVERDECK_PAN_GIT_OP:'1' alongside GIT_EDITOR:'true' on git rebase and git rebase --continue; abort/merge-fallback also sentineled. New tests/unit/lib/rebase-helper.test.ts (3 tests) assert coexistence via objectContaining; ran locally, all pass.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2986",
+    "reviewedAtCommit": "812ae913c39efb733bfdc2903ba7cdf46a7b754c",
+    "lastVerifiedCommit": "812ae913c39efb733bfdc2903ba7cdf46a7b754c",
+    "reviewRequestedAt": "2026-07-21T17:44:12.340Z",
+    "reviewSpawnedAt": "2026-07-21T18:22:13.792Z",
+    "strikeRecoveryCount": 0,
+    "closedOut": true,
+    "closedOutAt": "2026-07-21T20:34:26.206Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 9004,
+            "output": 269,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 18972,
+            "output": 82371,
+            "cacheRead": 5814819,
+            "cacheWrite": 235496
+          }
+        },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 3907733,
+            "output": 269938,
+            "cacheRead": 31446016,
+            "cacheWrite": 0
+          }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 8,
+            "output": 3199,
+            "cacheRead": 357614,
+            "cacheWrite": 126457
+          }
+        },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 42,
+            "output": 5254,
+            "cacheRead": 2750323,
+            "cacheWrite": 154167
+          }
+        },
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 2467636,
+            "output": 313754,
+            "cacheRead": 151222272,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 9004,
+          "output": 269,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 18972,
+          "output": 82371,
+          "cacheRead": 5814819,
+          "cacheWrite": 235496
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 6375369,
+          "output": 583692,
+          "cacheRead": 182668288,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 50,
+          "output": 8453,
+          "cacheRead": 3107937,
+          "cacheWrite": 280624
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 148.662927,
+        "pricingAsOf": "2026-07-21T19:42:44.556Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2986"
+    ],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-21T20:34:26.225Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at 812ae913c39efb733bfdc2903ba7cdf46a7b754c",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2986 MERGED at 2026-07-21T19:42:28Z",
+          "status": "pass",
+          "mergedAt": "2026-07-21T19:42:28Z",
+          "mergeCommit": "5dbdb3ecf44d60c5e0e95c75bd8c867482e946bc"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 5dbdb3ecf44d60c5e0e95c75bd8c867482e946bc",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 9fe54364 contains merge 5dbdb3ec",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 6 agent state directories; No strike branch strike/pan-806 found; Pruned 244 checkpoint ref(s) for agent-pan-806, planning-pan-806, strike-pan-806; No specialist registry entries for PAN-806"
+        }
+      ],
+      "accepted": []
+    }
+  },
+  "workModel": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 10,
+    "claims": {},
+    "claimHistory": [
+      {
+        "writerId": "agent-pan-806",
+        "agentId": "agent-pan-806",
+        "pid": 2852980,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T16:31:06.668Z",
+        "itemId": "rebase-helper-sentinel",
+        "outcome": "completed",
+        "reason": "Added OVERDECK_PAN_GIT_OP=1 to pan-owned rebase, abort, merge fallback, and continue calls with mocked execAsync coverage",
+        "releasedAt": "2026-07-21T16:36:02.287Z"
+      },
+      {
+        "writerId": "agent-pan-806",
+        "agentId": "agent-pan-806",
+        "pid": 3197948,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T16:42:21.735Z",
+        "itemId": "workmd-prompt-fix",
+        "outcome": "completed",
+        "reason": "Replaced raw restart rebase instructions with pan sync-main and added tested permitted/forbidden git operations table",
+        "releasedAt": "2026-07-21T16:43:55.369Z"
+      },
+      {
+        "writerId": "agent-pan-806",
+        "agentId": "agent-pan-806",
+        "pid": 3216548,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T16:44:03.778Z",
+        "itemId": "prerebase-hook-install",
+        "outcome": "completed",
+        "reason": "Installed executable agent-gated pre-rebase hook at git-resolved hooks path, preserved existing hooks, reapplied after Husky installs, and tested sentinel/human bypass plus agent blocking",
+        "releasedAt": "2026-07-21T16:50:47.929Z"
+      },
+      {
+        "writerId": "agent-pan-806",
+        "agentId": "agent-pan-806",
+        "pid": 3470617,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T16:50:59.960Z",
+        "itemId": "git-path-wrapper",
+        "outcome": "completed",
+        "reason": "Generated per-agent git wrappers for all non-conversation launchers, blocking rebase/reset --hard/stash while preserving sentinel and permitted-command passthrough; updated deterministic snapshots and execution tests",
+        "releasedAt": "2026-07-21T16:56:50.336Z"
+      },
+      {
+        "writerId": "agent-pan-806",
+        "agentId": "agent-pan-806",
+        "pid": 3863119,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-21T16:57:24.117Z",
+        "itemId": "guard-dir-cleanup",
+        "outcome": "completed",
+        "reason": "Removed per-agent git-guard directories on both sync and async stop paths with force/recursive cleanup and absence coverage",
+        "releasedAt": "2026-07-21T17:02:56.966Z"
+      }
+    ],
+    "statusReasons": {
+      "rebase-helper-sentinel": {
+        "reason": "Added OVERDECK_PAN_GIT_OP=1 to pan-owned rebase, abort, merge fallback, and continue calls with mocked execAsync coverage",
+        "updatedAt": "2026-07-21T16:36:02.287Z"
+      },
+      "workmd-prompt-fix": {
+        "reason": "Replaced raw restart rebase instructions with pan sync-main and added tested permitted/forbidden git operations table",
+        "updatedAt": "2026-07-21T16:43:55.369Z"
+      },
+      "prerebase-hook-install": {
+        "reason": "Installed executable agent-gated pre-rebase hook at git-resolved hooks path, preserved existing hooks, reapplied after Husky installs, and tested sentinel/human bypass plus agent blocking",
+        "updatedAt": "2026-07-21T16:50:47.929Z"
+      },
+      "git-path-wrapper": {
+        "reason": "Generated per-agent git wrappers for all non-conversation launchers, blocking rebase/reset --hard/stash while preserving sentinel and permitted-command passthrough; updated deterministic snapshots and execution tests",
+        "updatedAt": "2026-07-21T16:56:50.336Z"
+      },
+      "guard-dir-cleanup": {
+        "reason": "Removed per-agent git-guard directories on both sync and async stop paths with force/recursive cleanup and absence coverage",
+        "updatedAt": "2026-07-21T17:02:56.966Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "rebase-helper-sentinel": "completed",
+    "rebase-helper-sentinel.rebase-helper-sentinel.ac1": "completed",
+    "rebase-helper-sentinel.rebase-helper-sentinel.ac2": "completed",
+    "workmd-prompt-fix": "completed",
+    "workmd-prompt-fix.workmd-prompt-fix.ac1": "completed",
+    "workmd-prompt-fix.workmd-prompt-fix.ac2": "completed",
+    "prerebase-hook-install": "completed",
+    "prerebase-hook-install.prerebase-hook-install.ac1": "completed",
+    "prerebase-hook-install.prerebase-hook-install.ac2": "completed",
+    "prerebase-hook-install.prerebase-hook-install.ac3": "completed",
+    "git-path-wrapper": "completed",
+    "git-path-wrapper.git-path-wrapper.ac1": "completed",
+    "git-path-wrapper.git-path-wrapper.ac2": "completed",
+    "git-path-wrapper.git-path-wrapper.ac3": "completed",
+    "git-path-wrapper.git-path-wrapper.ac4": "completed",
+    "guard-dir-cleanup": "completed",
+    "guard-dir-cleanup.guard-dir-cleanup.ac1": "completed",
+    "guard-dir-cleanup.guard-dir-cleanup.ac2": "completed"
+  }
+}

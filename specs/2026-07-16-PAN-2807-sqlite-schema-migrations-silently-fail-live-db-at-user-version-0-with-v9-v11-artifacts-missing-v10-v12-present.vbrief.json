@@ -1,0 +1,451 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-16T20:45:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2807: SQLite schema migrations silently fail — live DB at user_version=0 with v9/v11 artifacts missing, v10/v12 present",
+    "updated": "2026-07-18T13:26:32.679Z"
+  },
+  "plan": {
+    "id": "pan-2807",
+    "title": "SQLite schema migrations silently fail — live DB at user_version=0 with v9/v11 artifacts missing, v10/v12 present",
+    "status": "completed",
+    "uid": "e9b06811-35fd-4d4a-acc9-e344ab5e9312",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-16T20:45:00.000Z",
+    "updated": "2026-07-18T13:26:32.679Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2807",
+        "label": "PAN-2807",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2805",
+        "label": "PAN-2805",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "database",
+      "sqlite",
+      "migrations",
+      "reliability",
+      "substrate"
+    ],
+    "narratives": {
+      "Problem": "Discovery re-framed the issue: the live ~/.overdeck/overdeck.db is owned by src/lib/overdeck/infra.ts (one-shot init migration drizzle/overdeck/0000_overdeck_init.sql + bare-catch top-ups in ensureRuntimeIndexesSync), which never stamps PRAGMA user_version — so user_version=0 is expected there, and the db.pragma() shim was empirically verified to read/write user_version correctly under both node:sqlite and bun:sqlite. The real defects: (1) idx_cost_agent_id and idx_cost_issue_upper were never declared for overdeck.db (they exist only in legacy schema.ts for panopticon.db), so every machine except the operator-patched one full-scans 200k+ cost_events rows on agents-stats polls (PAN-2805, 61% server CPU); (2) both layers swallow ALL errors in bare catch blocks intended for 'duplicate column', so real failures (SQLITE_BUSY, I/O, typos) vanish silently — and in schema.ts a swallowed failure still lets user_version stamp past the failed step; (3) a partially-failed init migration is skipped forever once the agents table exists, with nothing to report the drift.",
+      "Proposal": "Four tracer-bullet fixes plus a lock-in test and docs: add the two cost_events indexes to both the init migration and an idempotent top-up (exact live names/definitions so the patched machine no-ops); narrow error swallowing in infra.ts top-ups to expected-duplicate errors only, logging everything else while letting boot continue; narrow the ~60 bare catches in schema.ts's ladder the same way but rethrow on unexpected errors so user_version never advances past a failed step; add a report-only startup schema audit for overdeck.db that derives expected tables/columns/indexes from the init SQL plus top-up expectations and logs a [schema-audit] drift report; add a driver test locking pragma user_version write+read; document the schema-change checklist.",
+      "NonGoals": "- No user_version ladder or Drizzle migration journal for overdeck.db — init+top-ups stays the mechanism\n- No automated repair of a partially-applied init migration — the audit reports, code changes heal\n- No audit mutation of any DB — the audit performs reads only\n- No flagging of extra tables/columns the audit does not expect (memory.ts and friends lazily create tables in overdeck.db)\n- No schema audit for legacy panopticon.db, cache.db, or conversation-embeddings DBs\n- No reordering or cleanup of schema.ts migration steps beyond catch narrowing (the out-of-order v61/v60 block at schema.ts:1733 stays)\n- No changes to the operator's live DB — the manually created emergency indexes are adopted by name, not recreated"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Re-framed the issue's diagnosis: overdeck.db (infra.ts init+top-ups) owns the live DB, user_version=0 is by design there, and the pragma shim works under both drivers (verified empirically during planning).",
+        "rationale": "Grounded in live-DB inspection (index names cost_issue_idx/cost_ts_idx and tables like observation_index match the Drizzle init migration, not schema.ts) and scratchpad driver tests; planning against the issue's assumed mechanism would fix the wrong layer."
+      },
+      {
+        "summary": "Adopt the operator's emergency index names/definitions verbatim (idx_cost_agent_id ON cost_events(agent_id, ts); idx_cost_issue_upper ON cost_events(UPPER(issue_id))).",
+        "rationale": "CREATE INDEX IF NOT EXISTS with matching names makes the already-patched live machine a no-op and avoids duplicate indexes doubling write cost."
+      },
+      {
+        "summary": "Top-up failures log-and-continue; ladder failures log-and-rethrow without stamping user_version.",
+        "rationale": "A missing index degrades but must not brick dashboard boot (boot-brick history, PAN-2076 family); the ladder's ordered version semantics are corrupted by continuing past a failure, so it must stop and leave the stamp behind the failed step."
+      },
+      {
+        "summary": "Schema audit is report-only and checks expected ⊆ actual, deriving expectations by parsing the init migration SQL plus an exported top-up expectation list.",
+        "rationale": "The DB is a rebuildable cache; cheap drift visibility is the insurance the issue asks for, while runtime mutation would create a second uncontrolled write path to the schema."
+      }
+    ],
+    "items": [
+      {
+        "id": "add-cost-event-indexes",
+        "title": "Add idx_cost_agent_id and idx_cost_issue_upper to overdeck.db (init migration + top-up)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2807",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/__tests__/schema-topups.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/schema-topups.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "schema-topups.test.ts passes, including the fresh-DB and existing-DB index assertions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Append `CREATE INDEX \\`idx_cost_agent_id\\` ON \\`cost_events\\` (\\`agent_id\\`,\\`ts\\`);` and `CREATE INDEX \\`idx_cost_issue_upper\\` ON \\`cost_events\\` (UPPER(\\`issue_id\\`));` to drizzle/overdeck/0000_overdeck_init.sql after the existing cost_events index block (lines 123-126), each followed by the `--> statement-breakpoint` separator used throughout the file. Add matching `db.exec('CREATE INDEX IF NOT EXISTS ...')` top-ups in ensureRuntimeIndexesSync (src/lib/overdeck/infra.ts:69), next to the existing cost_session_id_idx top-up at line 81. These names/definitions exactly match the emergency indexes the operator created on the live DB for PAN-2805, so the live machine no-ops. Create src/lib/overdeck/__tests__/schema-topups.test.ts covering both paths against temp-file DBs."
+        },
+        "items": [
+          {
+            "id": "add-cost-event-indexes.ac1",
+            "title": "Given a fresh DB initialized via runOverdeckMigrationSync, querying sqlite_master returns index rows named idx_cost_agent_id (on cost_events(agent_id, ts)) and idx_cost_issue_upper (on cost_events(UPPER(issue_id)))",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-cost-event-indexes.ac2",
+            "title": "Given an existing DB created without those indexes, when getOverdeckDatabaseSync opens it, ensureRuntimeIndexesSync creates both indexes, and a second open produces no error and no duplicate index rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-cost-event-indexes.ac3",
+            "title": "EXPLAIN QUERY PLAN for `SELECT SUM(cost) FROM cost_events WHERE agent_id = ? AND ts >= ?` (the getAgentDailyCostSync query, src/lib/overdeck/cost-sync.ts:462) returns a plan row containing idx_cost_agent_id in a test against the initialized schema",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "narrow-topup-error-swallowing",
+        "title": "Top-ups in infra.ts swallow only expected-duplicate errors and log everything else",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2807",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/__tests__/schema-topups.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/schema-topups.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "schema-topups.test.ts passes, including the error-classification cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a helper in src/lib/overdeck/infra.ts, e.g. `function runSchemaTopUp(db: SqliteDatabase, sql: string): void`, that executes the statement and: returns silently when the error message matches /duplicate column name|already exists|no such table/i (the legitimately-idempotent cases the current comments name); otherwise calls console.error with a `[schema]` prefix, the failing SQL, and the SQLite message, and returns WITHOUT throwing so remaining top-ups and boot continue (decision D4 in continue.json — boot resilience). Replace every bare `try { db.exec(...) } catch { ... }` in ensureRuntimeIndexesSync (src/lib/overdeck/infra.ts:70-95) with runSchemaTopUp calls; plain CREATE INDEX IF NOT EXISTS calls may stay direct or go through the helper uniformly. Classification tests must trigger REAL driver errors (e.g. actually ALTER an existing column for the duplicate case, reference a missing table for no-such-table, use malformed SQL for the loud case) and assert console.error via a spy — not hand-written error strings (hazard H4)."
+        },
+        "items": [
+          {
+            "id": "narrow-topup-error-swallowing.ac1",
+            "title": "Given a top-up ALTER that fails with 'duplicate column name', ensureRuntimeIndexesSync continues silently — the test's console.error spy records no call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "narrow-topup-error-swallowing.ac2",
+            "title": "Given a top-up statement that fails with any other SQLite error (test uses malformed SQL), the helper emits console.error naming the failing statement and the SQLite message, does not throw, and subsequent top-ups in the same run still execute (verified by a later top-up's effect appearing in the DB)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "narrow-topup-error-swallowing.ac3",
+            "title": "Given a top-up against a table that does not exist, the helper returns silently (no console.error), preserving today's 'table absent' tolerance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "narrow-ladder-error-swallowing",
+        "title": "schema.ts migration ladder rethrows unexpected errors and never stamps user_version past a failed step",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T20:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2807",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/database/schema.ts",
+            "tests/unit/lib/database/schema-migrations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/database/schema-migrations.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "schema-migrations.test.ts passes, including the new failure-path cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a helper in src/lib/database/schema.ts, e.g. `function tryIdempotentDdl(db: SqliteDatabase, sql: string): void`, that swallows ONLY errors whose message matches /duplicate column name|already exists/i and rethrows anything else. Replace every bare `try { db.exec(...) } catch { /* already exists */ }` site in runMigrations (~60 sites between schema.ts:803 and :1738) and the equivalent sites in the v27 app_settings step with the helper. Do NOT wrap the deliberate console.warn catches (v27 seed at :1198, v55 snapshot at :1571, v55 backfill at :1641) — they already log. Because unexpected errors now propagate out of runMigrations before the final `db.pragma('user_version = ...')` at schema.ts:1741, user_version is never stamped past a failed step; verify that property in the test rather than restructuring the ladder. Keep the step order and the out-of-order v61 block at :1733 untouched (hazard H3, surgical changes). Extend tests/unit/lib/database/schema-migrations.test.ts: build a DB at an older user_version, sabotage one step so it raises a non-duplicate error (e.g. pre-create a conflicting object or corrupt a target table), assert runMigrations throws and user_version is unchanged; separately assert a duplicate-column condition completes and stamps SCHEMA_VERSION."
+        },
+        "items": [
+          {
+            "id": "narrow-ladder-error-swallowing.ac1",
+            "title": "Given a migration step that raises a non-duplicate SQLite error, runMigrations rethrows and PRAGMA user_version remains at its pre-run value (asserted in schema-migrations.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "narrow-ladder-error-swallowing.ac2",
+            "title": "Given a migration step whose ALTER fails with 'duplicate column name', the ladder completes and stamps user_version = SCHEMA_VERSION",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "narrow-ladder-error-swallowing.ac3",
+            "title": "When a step fails with a non-duplicate error, runMigrations emits a console.error (or produces a rethrown error message) that contains the failed step's target version number, so the operator log pinpoints the step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "overdeck-schema-audit",
+        "title": "Report-only startup schema audit for overdeck.db",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T20:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2807",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/schema-audit.ts",
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/__tests__/schema-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/schema-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "schema-audit.test.ts passes, including the missing-index, missing-column, extra-table, and minimum-parse-count cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/overdeck/schema-audit.ts exporting `auditOverdeckSchemaSync(db: SqliteDatabase): SchemaDriftReport` where SchemaDriftReport lists missingTables: string[], missingIndexes: string[], missingColumns: Array<{ table, column }>. Expectations come from two sources: (1) parse drizzle/overdeck/0000_overdeck_init.sql (path constant OVERDECK_MIGRATION_PATH from src/lib/overdeck/paths.ts) for CREATE TABLE / CREATE INDEX / CREATE UNIQUE INDEX names and each table's backticked column names — the file is drizzle-generated and format-regular; (2) an exported expectation list colocated with ensureRuntimeIndexesSync in infra.ts covering top-up-added columns and indexes (including the two new cost_events indexes from item add-cost-event-indexes). Compare against sqlite_master and pragma_table_info reads only — the audit performs no writes and no row scans (NFR-1/NFR-2). Extra tables, indexes, or columns are never reported: modules like src/lib/overdeck/memory.ts lazily create observation_index/transcripts in the same DB (decision D5). Call the audit from getOverdeckDatabaseSync (src/lib/overdeck/infra.ts:139) after ensureRuntimeIndexesSync and console.warn one `[schema-audit]` line per missing artifact; log nothing when the report is empty. Guard against parser rot (hazard H5): the test asserts the parsed expectation set from the real migration file contains at least OVERDECK_TABLE_COUNT tables (constant in src/lib/overdeck/paths.ts:5)."
+        },
+        "items": [
+          {
+            "id": "overdeck-schema-audit.ac1",
+            "title": "Given a DB initialized from the real init migration with one index dropped and one column missing, auditOverdeckSchemaSync returns a report listing exactly that index and that {table, column} pair",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overdeck-schema-audit.ac2",
+            "title": "Given a fully initialized DB with an extra table and extra column added on top, the audit returns an empty report and flags nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overdeck-schema-audit.ac3",
+            "title": "When getOverdeckDatabaseSync opens a drifted DB, the log contains a [schema-audit] warn line naming each missing artifact, and the DB file content is unchanged by the audit (reads only)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overdeck-schema-audit.ac4",
+            "title": "The expectation parser applied to the real drizzle/overdeck/0000_overdeck_init.sql produces at least OVERDECK_TABLE_COUNT table expectations, protecting against silent parser rot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pragma-user-version-driver-test",
+        "title": "Driver test locks pragma user_version write + read under the runtime driver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T20:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2807",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/database/__tests__/driver.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/database/__tests__/driver.test.ts"
+          ],
+          "expected_outputs": [
+            "driver.test.ts passes with the new user_version cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend src/lib/database/__tests__/driver.test.ts with cases against an in-memory DB from openDatabase: after `db.pragma('user_version = 61')`, `db.pragma('user_version', { simple: true })` returns 61, and the non-simple read returns rows shaped [{ user_version: 61 }]. This locks the behavior the issue asked to verify (planning verified it empirically under node:sqlite 22.22 and bun:sqlite; the test keeps it verified as drivers evolve)."
+        },
+        "items": [
+          {
+            "id": "pragma-user-version-driver-test.ac1",
+            "title": "After db.pragma('user_version = 61') on an openDatabase handle, db.pragma('user_version', { simple: true }) returns 61",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pragma-user-version-driver-test.ac2",
+            "title": "The non-simple read db.pragma('user_version') returns an array whose first row exposes user_version = 61",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion",
+              "acJustification": "Two ACs suffice: the item is a single focused test addition with exactly two observable read shapes."
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-db-schema-lifecycle",
+        "title": "Document the overdeck.db schema-change checklist and failure policies",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T20:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2807",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/overdeck-db-erd-notes.md",
+            "src/lib/overdeck/infra.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without new errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a 'Schema changes' section to docs/overdeck-db-erd-notes.md stating: every new overdeck.db column or index must land in BOTH drizzle/overdeck/0000_overdeck_init.sql (fresh DBs) and ensureRuntimeIndexesSync top-ups (existing DBs — the init migration never re-runs once the agents table exists); the startup schema audit (src/lib/overdeck/schema-audit.ts) reports missing expected artifacts as [schema-audit] warn lines and never mutates; overdeck.db does not use PRAGMA user_version (init+top-up model, verified 2026-07-16), while legacy panopticon.db's ladder (src/lib/database/schema.ts) rethrows on non-duplicate step failures and never stamps user_version past a failed step. Refresh the module header of src/lib/overdeck/infra.ts to name the top-up loud-failure policy and the audit hook."
+        },
+        "items": [
+          {
+            "id": "docs-db-schema-lifecycle.ac1",
+            "title": "docs/overdeck-db-erd-notes.md contains a 'Schema changes' section stating the both-places rule (init migration + ensureRuntimeIndexesSync) and that the init migration never re-runs once the agents table exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-db-schema-lifecycle.ac2",
+            "title": "The section states that overdeck.db does not use PRAGMA user_version, that the audit is report-only via [schema-audit] warn lines, and that panopticon.db's ladder rethrows without stamping past a failed step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-db-schema-lifecycle.ac3",
+            "title": "The src/lib/overdeck/infra.ts module header comment contains a description of the top-up loud-failure policy and states that getOverdeckDatabaseSync runs the report-only schema audit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "add-cost-event-indexes",
+        "to": "narrow-topup-error-swallowing",
+        "type": "blocks"
+      },
+      {
+        "from": "narrow-topup-error-swallowing",
+        "to": "overdeck-schema-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "overdeck-schema-audit",
+        "to": "docs-db-schema-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "narrow-ladder-error-swallowing",
+        "to": "docs-db-schema-lifecycle",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-16-PAN-2807-sqlite-schema-migrations-silently-fail-live-db-at-user-version-0-with-v9-v11-artifacts-missing-v10-v12-present.vbrief.json"
+    }
+  },
+  "status": "completed"
+}

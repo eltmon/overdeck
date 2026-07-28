@@ -184,7 +184,7 @@
     "inspectStatus": "failed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T03:17:23.179Z",
+    "updatedAt": "2026-07-27T06:26:17.453Z",
     "inspectNotes": "Bead door-scan-roots BLOCKED: commit dd09d685 (.github/workflows/pages.yml only) does not implement any acceptance criteria. No changes touch the codex reconcile scan-roots logic, session_meta cwd→issueId inference, sourceFile dedup, or default per-agent walk. Required: land the actual scan-roots implementation (extra roots param including ~/.codex/sessions, cost event emission with model/token counts/sourceFile, issue-from-path inference with UNKNOWN fallback, dedup-on-sourceFile, and unchanged default-walk behavior) with matching tests, or repoint this bead at the correct commit.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2431",
     "lastVerifiedCommit": "de2db5d5c8dadc8653e8f9efbfbb8e2a7e8a6bbb",
@@ -311,7 +311,7 @@
       "recordedAt": "2026-07-06T21:01:10.915Z"
     },
     "closedOut": true,
-    "closedOutAt": "2026-07-07T03:17:23.179Z"
+    "closedOutAt": "2026-07-27T06:26:17.453Z"
   },
   "closeOut": {
     "usage": {
@@ -405,11 +405,109 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2431"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-27T06:26:17.483Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: pending from pipeline journal",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-review",
+            "by": "conv-20260727-4876",
+            "at": "2026-07-27T06:26:10.814Z"
+          }
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: pending from pipeline journal",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-tests",
+            "by": "conv-20260727-4876",
+            "at": "2026-07-27T06:26:10.814Z"
+          }
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed",
+          "observed": "verificationStatus: missing at de2db5d5c8dadc8653e8f9efbfbb8e2a7e8a6bbb (from pipeline journal)",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-verification",
+            "by": "conv-20260727-4876",
+            "at": "2026-07-27T06:26:10.814Z"
+          }
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "PR #2431 is squash-merged and feature/pan-2389 matches the merged PR head; PR #2431 is squash-merged and origin/feature/pan-2389 matches the merged PR head; PR #2431 MERGED at 2026-07-06T22:49:04Z",
+          "status": "pass",
+          "mergedAt": "2026-07-06T22:49:04Z",
+          "mergeCommit": "7ed8c4d74bdbc9586d7c87c998e29f2647914a85"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "terminal canonical state: done — the post-merge lifecycle already ran to close-out; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "failed checks: deploy on 7ed8c4d74bdbc9586d7c87c998e29f2647914a85",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-main-verify",
+            "by": "conv-20260727-4876",
+            "at": "2026-07-27T06:26:10.814Z"
+          }
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 3297fb26 contains merge 7ed8c4d7",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; No strike branch strike/pan-2389 found; Pruned 0 checkpoint ref(s) for agent-pan-2389, planning-pan-2389, strike-pan-2389; No specialist registry entries for PAN-2389"
+        }
+      ],
+      "accepted": [
+        "review",
+        "tests",
+        "verification",
+        "main-verify"
+      ]
+    }
   },
   "swarm": {
     "slotAssignments": []
   },
   "created": "2026-07-06T20:57:58.338Z",
-  "updated": "2026-07-07T03:17:23.179Z"
+  "updated": "2026-07-27T06:26:17.510Z"
 }

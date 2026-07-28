@@ -1,0 +1,467 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T03:52:15Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2882: Pipeline membership has no GitLab merged-MR oracle — squash-merged GitLab branches show as unmerged (false planned_backlog rows, mislabeled post_merge_limbo)",
+    "updated": "2026-07-28T06:35:14.488Z"
+  },
+  "plan": {
+    "id": "pan-2882",
+    "title": "GitLab merged/open-MR oracle for pipeline membership",
+    "status": "running",
+    "uid": "493271fb-5181-4cde-bae1-91222de16ccf",
+    "author": "agent:k3[1m]",
+    "sequence": 4,
+    "created": "2026-07-28T03:52:15Z",
+    "updated": "2026-07-28T06:35:14.488Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2882",
+        "label": "PAN-2882",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3215",
+        "label": "PAN-3215 (sibling — DoD gate surface, NonGoal here)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2877",
+        "label": "PAN-2877 (predecessor — GitLab tracker/branch/spec lenses)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "pipeline-membership",
+      "gitlab",
+      "polyrepo",
+      "gather"
+    ],
+    "narratives": {
+      "Problem": "For GitLab projects every forge-dependent lens in gatherProjectLensSignals() is gated on project.github_repo, so hasOpenPr and hasMergedPr are always false. GitLab squash-merges leave stale branch tips off main's ancestry, so the git L2 lens keeps reporting them unmerged and only the (dead) L1-merged oracle could override it. Operator-verified live 2026-07-28 (flywheel RUN-73): MIN-896 (MR merged) showed planned_backlog, MIN-908 (MR merged) showed post_merge_limbo mislabeled 'landed via a non-PR path', MIN-864 (MR open) showed planned_backlog 'no PR' — and zombie_pr is unreachable for GitLab projects.",
+      "Proposal": "Add a glab-backed GitLab MR lens: (1) new module src/lib/gitlab-merge-requests.ts with listOpenGitLabMergeRequests(repoPath) and listGitLabMergedMergeRequestHeads(repoPath, heads), shelling glab with cwd in the repo (project identity from the git remote), TTL-cached and concurrency-limited; (2) per-repo forge on projectRepositories() via the existing getRepoForge; (3) wire open MRs into hasOpenPr and merged-MR heads into hasMergedPr behind the forge-capability split (no github_repo + >=1 gitlab-forge repo), with polyrepo union semantics — a head merged in ANY gitlab-forge repo counts; (4) glab failures surface as forge_unavailable; (5) update docs/PIPELINE-MEMBERSHIP.md.",
+      "NonGoals": "- DoD gate verify-merged GitLab/monorepo gaps (verifySquashMergedPrByBranch is GitHub-only; verifyConventionBranchMerged runs git in ctx.projectPath) — filed as PAN-3215.\n- No GitLab equivalent of listIssueStatesBatched — the tracker lens already supplies complete issue state for GitLab projects.\n- No head-sha matching in the gather — parity with the GitHub oracle (branch-name match); finer per-head-sha verdicts stay with merge-completeness.ts.\n- No raw GitLab REST/token client — glab CLI only, consistent with src/lib/forge.ts.\n- No changes for projects with github_repo set — the GitHub path is byte-for-byte unchanged.\n- No changes to resolvePipelineMembership bucket semantics — the lenses feed the existing resolver unchanged."
+    },
+    "autoDecisions": [
+      {
+        "summary": "glab CLI (cwd-scoped, project from git remote) instead of raw REST+token",
+        "rationale": "Every existing GitLab call in the codebase (src/lib/forge.ts:176,291) uses glab; auth/host incl. self-hosted resolve from glab config and the remote — no new auth surface. Verified live: glab auth status OK, both query shapes return correct MYN data."
+      },
+      {
+        "summary": "Per-head exact merged-MR queries, not a paginated full snapshot",
+        "rationale": "GitLab REST filters source_branch one at a time; a capped snapshot silently drops old merges — exactly the false-planned_backlog failure being fixed. Per-head is exact; cost bounded by open candidates, TTL cache, concurrency limit."
+      },
+      {
+        "summary": "GitHub path wins when github_repo is set; GitLab path only with no github_repo and >=1 gitlab-forge repo",
+        "rationale": "Zero regression risk for GitHub projects; the split mirrors the capability gating PAN-2877 established."
+      },
+      {
+        "summary": "Polyrepo union across all gitlab-forge repos without per-issue merge-set resolution",
+        "rationale": "The gather is project-wide; a merged MR named feature/<id> in any project repo is sound evidence the issue landed (issue body's own fix direction)."
+      },
+      {
+        "summary": "DoD gate GitLab gap filed as sibling PAN-3215, NonGoal here",
+        "rationale": "Different surface (per-issue, not batched) with its own GitHub-only oracle and monorepo assumption; the issue's scope is the membership gather."
+      },
+      {
+        "summary": "Scope widened to include the open-MR lens (L1_openPr)",
+        "rationale": "The operator's RUN-73 tick-2 comment on the issue authoritatively widened scope: MIN-864's open MR was reported as 'no PR' and zombie_pr is unreachable for GitLab."
+      }
+    ],
+    "items": [
+      {
+        "id": "repo-forge-plumbing",
+        "title": "Expose per-repo forge on projectRepositories()",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T03:52:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/project-repos.ts",
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the new forge-resolution test passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Export getRepoForge from src/lib/project-repos.ts (currently module-private at line 52). Extend ProjectRepository (src/lib/pipeline-membership-gather.ts:314-317) with `forge: ForgeType` and `repoKey?: string`. In projectRepositories() (line 331): monorepo path sets forge = inferProjectForgeSync(project) || 'github'; polyrepo path sets forge = getRepoForge(repo, project) and repoKey = repo.name per workspace.repos[] entry. gatherIssueBranchContainment consumes the same objects additively — no behavior change. Add a unit test: polyrepo config with gitlab_repo set + one `remote: github` entry yields forge 'github' for that repo and 'gitlab' for the default entries; monorepo with only gitlab_repo yields 'gitlab'."
+        },
+        "items": [
+          {
+            "id": "repo-forge-plumbing.ac1",
+            "title": "Given a polyrepo ProjectConfig with gitlab_repo set and one workspace.repos[] entry carrying remote: 'github', when projectRepositories() runs, then that entry returns forge 'github' and the remaining entries return forge 'gitlab'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-forge-plumbing.ac2",
+            "title": "Given a monorepo ProjectConfig with gitlab_repo set and no github_repo, when projectRepositories() runs, then the single repository returns forge 'gitlab'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-forge-plumbing.ac3",
+            "title": "gatherIssueBranchContainment produces identical output before and after the change for the existing test fixtures (additive field only)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gitlab-mr-module",
+        "title": "Create glab-backed GitLab MR helpers in src/lib/gitlab-merge-requests.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T03:52:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2882",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "open-mr-lens",
+            "merged-mr-oracle"
+          ],
+          "files_scope": [
+            "src/lib/gitlab-merge-requests.ts",
+            "tests/unit/lib/gitlab-merge-requests.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/gitlab-merge-requests.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all module tests pass with the injectable runner (no real glab)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "New module src/lib/gitlab-merge-requests.ts exporting GitLabMergeRequestRow { iid?, title?, web_url?, state?, source_branch, target_branch?, sha?, draft? } and two functions with an injectable runner (args, cwd) => Promise<string> defaulting to a glab execFileAsync runner (timeout 30_000, maxBuffer 16 MiB — async only, NFR-1): (1) listOpenGitLabMergeRequests(repoPath) runs `glab mr list --output json --per-page 100 --page N` with cwd=repoPath, looping pages until a short page (<100); result cached 30s per repoPath via createSettledTtlPromiseCache (src/lib/concurrency.ts:53), mirroring OPEN_PR_CACHE_TTL_MS. (2) listGitLabMergedMergeRequestHeads(repoPath, heads) returns the subset of heads with >=1 merged MR: per head run `glab mr list --merged --source-branch <head> --output json --per-page 100 --page N` (same page loop), fan out via withConcurrencyLimitPromise (src/lib/concurrency.ts:3, limit 5), cache per (repoPath, head) 30s. Empty stdout parses as [] (pattern from src/lib/forge.ts:307); glab non-zero exit propagates. Tests (new tests/unit/lib/gitlab-merge-requests.test.ts) use the injectable runner — never real glab — and vi.useFakeTimers() for cache tests (NFR-4): exact argv construction, JSON parse, page loop terminates on short and empty pages, empty stdout -> [], error propagation, TTL dedup of concurrent and repeat loads."
+        },
+        "items": [
+          {
+            "id": "gitlab-mr-module.ac1",
+            "title": "listOpenGitLabMergeRequests invokes the runner with argv ['mr','list','--output','json','--per-page','100',...] and cwd=repoPath, and returns parsed rows including source_branch and web_url",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitlab-mr-module.ac2",
+            "title": "listGitLabMergedMergeRequestHeads invokes the runner with argv containing '--merged' and '--source-branch <head>' per head, and returns exactly the heads whose query produced >=1 row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitlab-mr-module.ac3",
+            "title": "Both functions request page N+1 when a page returns exactly 100 rows and stop on a short or empty page, concatenating all pages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitlab-mr-module.ac4",
+            "title": "Given empty stdout from the runner, then the function returns [], and given a rejecting runner, then the function rejects with the runner's error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitlab-mr-module.ac5",
+            "title": "Given a completed first call, when a second call arrives within 30s (fake timers), then the cache returns the cached result without re-invoking the runner, and when the clock advances past the TTL, then the next call re-invokes the runner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "open-mr-lens",
+        "title": "Wire GitLab open MRs into the gather's hasOpenPr lens",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T03:52:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new open-MR lens tests pass",
+            "all pre-existing gather tests pass unmodified except the updated non-GitHub polyrepo fixture",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/pipeline-membership-gather.ts: (1) add `listOpenMergeRequests(repoPath: string): Promise<GitLabMergeRequestRow[]>` to PipelineMembershipGatherDeps (line 271), defaulting to listOpenGitLabMergeRequests. (2) In gatherProjectLensSignals, compute gitlabRepos = repositories.filter(r => r.forge === 'gitlab'). (3) When !(owner && repo) && gitlabRepos.length > 0, the openPrs element of the Promise.all (lines 536-538) instead fans out per gitlab repo: withUnavailableReason('forge_unavailable', () => Promise.all(gitlabRepos.map(r => deps.listOpenMergeRequests(r.path)))) then flatten to PullRequestRow[] with headRefName = source_branch, headRepoFullName parsed from web_url (path between host and '/-/', e.g. eltmon/mind-your-now), number/title/url/state/isDraft/baseRefName mapped from the MR. (4) Restructure the fork-filter at line 578 from `if (!owner || !repo || pr.headRepoFullName.toLowerCase() !== ...) continue;` to `if (owner && repo && pr.headRepoFullName.toLowerCase() !== (owner + '/' + repo).toLowerCase()) continue;` so GitLab rows (already project-scoped by the per-repo query) pass while GitHub fork PRs are still dropped — the existing fork test at line 624 must stay green unmodified. Tests: open MR on feature/min-864 yields hasOpenPr true and candidate added (resolvePipelineMembership -> in_flight for open issue); closed issue + open MR -> zombie_pr; MR with non-convention source branch ignored; rejecting dep -> forge_unavailable. Update the non-GitHub polyrepo test (line 541) to inject the new deps (its listOpenPullRequests/listMergedPullRequestHeads not-called assertions stay)."
+        },
+        "items": [
+          {
+            "id": "open-mr-lens.ac1",
+            "title": "Given a GitLab polyrepo project whose open-MR dep returns an MR with source_branch 'feature/min-864', when gatherProjectLensSignals runs, then MIN-864 appears with hasOpenPr: true and resolvePipelineMembership classifies an open MIN-864 as in_flight",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-mr-lens.ac2",
+            "title": "Given a closed issue whose convention branch has an open GitLab MR, when the resolver classifies the gathered signals, then it produces bucket zombie_pr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-mr-lens.ac3",
+            "title": "The pre-existing GitHub fork-filter test ('ignores foreign refs, specs, and fork pull requests') passes without modification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-mr-lens.ac4",
+            "title": "When the injected listOpenMergeRequests dep rejects, gatherProjectLensSignals rejects with reason 'forge_unavailable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merged-mr-oracle",
+        "title": "Wire GitLab merged-MR heads into the gather's hasMergedPr oracle",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T03:52:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "new merged-MR oracle tests pass",
+            "all pre-existing gather tests pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/pipeline-membership-gather.ts: (1) add `listMergedMergeRequestHeads(repoPath: string, heads: string[]): Promise<string[]>` to PipelineMembershipGatherDeps, defaulting to listGitLabMergedMergeRequestHeads. (2) Lift the open-candidate/candidate-heads computation (lines 637-642) out of the GitHub-only block so both forge paths share it. GitHub projects: unchanged call to deps.listMergedPullRequestHeads. When !(owner && repo) && gitlabRepos.length > 0: for each gitlab-forge repo call deps.listMergedMergeRequestHeads(repo.path, candidateHeads) under withUnavailableReason('forge_unavailable', ...); union all returned heads into mergedHeads; the existing possibleHeads.some(head => mergedHeads.has(head)) matching (lines 647-654) then fills mergedPrIssues unchanged. Keep open-candidate scoping (only issues with issueOpen true are queried; state comes from the tracker lens for GitLab projects). Tests mirror the issue's Verification section: stale unmerged branch + merged MR -> hasMergedPr true -> post_merge_limbo (open) / clean_terminal (closed), never planned_backlog; merged MR only in the api repo while the ref was observed in fe -> still hasMergedPr (FR-3 union); repos with forge 'github' in the same polyrepo are never queried (FR-4); merged-MR lookup skipped for closed candidates; rejecting dep -> forge_unavailable (FR-6)."
+        },
+        "items": [
+          {
+            "id": "merged-mr-oracle.ac1",
+            "title": "Given an open issue with a stale unmerged convention branch whose head the dep reports merged, when gatherProjectLensSignals runs, then the issue yields hasMergedPr: true and resolvePipelineMembership produces post_merge_limbo — never planned_backlog",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-mr-oracle.ac2",
+            "title": "Given a closed issue in the same merged-MR setup, when the resolver classifies it, then it produces clean_terminal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-mr-oracle.ac3",
+            "title": "Given the merged MR is returned only by the api repo's dep while the branch ref was observed in fe, when the gather runs, then the issue still yields hasMergedPr: true (polyrepo union)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-mr-oracle.ac4",
+            "title": "Given a polyrepo containing a github-forge repo, when the gather runs, then mock call inspection shows that repo's path is never passed to listMergedMergeRequestHeads or listOpenMergeRequests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-mr-oracle.ac5",
+            "title": "When the injected listMergedMergeRequestHeads dep rejects, gatherProjectLensSignals rejects with reason 'forge_unavailable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-membership-gitlab",
+        "title": "Document the GitLab MR lenses in docs/PIPELINE-MEMBERSHIP.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T03:52:15Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-2882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-MEMBERSHIP.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-pipeline-membership.sh --self-test"
+          ],
+          "expected_outputs": [
+            "the membership lint self-test passes",
+            "the doc names src/lib/gitlab-merge-requests.ts and both GitLab lens behaviors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/PIPELINE-MEMBERSHIP.md in two places. (1) Durable-lenses section: replace the closing capability-gating sentence ('Pull-request lenses are capability-gated: projects without github_repo still gather tracker state…') with the new three-tier behavior — GitHub projects use gh/GraphQL lenses; GitLab projects use the glab-backed per-repo lenses from src/lib/gitlab-merge-requests.ts (open + merged MRs, union across gitlab-forge repos); only projects with neither forge configured fall back to tracker/branch/spec lenses. (2) Read-doors section: add one sentence naming src/lib/gitlab-merge-requests.ts as the GitLab MR read path used by the gather, noting the 30s TTL cache and the per-head exact-query rationale (an arbitrarily old squash-merge must never paginate away)."
+        },
+        "items": [
+          {
+            "id": "docs-membership-gitlab.ac1",
+            "title": "docs/PIPELINE-MEMBERSHIP.md contains the string src/lib/gitlab-merge-requests.ts and states that GitLab projects gather open and merged MR lenses per repo with union semantics",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-membership-gitlab.ac2",
+            "title": "bash scripts/lint-pipeline-membership.sh --self-test exits 0 after the doc edit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "repo-forge-plumbing",
+        "to": "open-mr-lens",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-forge-plumbing",
+        "to": "merged-mr-oracle",
+        "type": "blocks"
+      },
+      {
+        "from": "gitlab-mr-module",
+        "to": "open-mr-lens",
+        "type": "blocks"
+      },
+      {
+        "from": "gitlab-mr-module",
+        "to": "merged-mr-oracle",
+        "type": "blocks"
+      },
+      {
+        "from": "open-mr-lens",
+        "to": "merged-mr-oracle",
+        "type": "blocks"
+      },
+      {
+        "from": "merged-mr-oracle",
+        "to": "docs-membership-gitlab",
+        "type": "blocks"
+      },
+      {
+        "from": "open-mr-lens",
+        "to": "docs-membership-gitlab",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-28-PAN-2882-gitlab-merged-open-mr-oracle-for-pipeline-membership.xbrief.json"
+    }
+  },
+  "status": "active"
+}

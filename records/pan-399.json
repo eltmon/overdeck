@@ -256,6 +256,81 @@
       "reason": "feedback",
       "note": "[2026-07-12T06:27Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-12T06:27:11.093Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T06:49:16.329Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T07:02:48.212Z"
+    },
+    {
+      "timestamp": "2026-07-12T07:06:21.874Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T07:06:24.789Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T07:56:46.793Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-12T08:14Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-07-12T08:14:55.446Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-12T08:14:55.511Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-12T08:29:48.801Z"
+    },
+    {
+      "timestamp": "2026-07-12T08:40:35.536Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T08:40:40.925Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-12T08:42Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-12T08:42:49.845Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T09:11:38.387Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T09:16:54.543Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T09:24:10.067Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-12T09:38:34.050Z"
     }
   ],
   "feedback": [],
@@ -281,6 +356,7 @@
       "tests/fixtures/synced-skills.txt",
       "tests/unit/dashboard/routes/resources-stacks.test.ts",
       "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
+      "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
       "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
       "tests/unit/lib/database/release-set-schema.test.ts",
       "tests/unit/lib/merge-set.test.ts",
@@ -370,6 +446,7 @@
       "tests/fixtures/synced-skills.txt",
       "tests/unit/dashboard/routes/resources-stacks.test.ts",
       "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
+      "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
       "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
       "tests/unit/lib/database/release-set-schema.test.ts",
       "tests/unit/lib/merge-set.test.ts",
@@ -380,24 +457,27 @@
       "tests/unit/lib/release-set.test.ts",
       "tests/unit/lib/review-status-release.test.ts"
     ],
-    "recordedAt": "2026-07-12T01:24:02.241Z"
+    "recordedAt": "2026-07-12T08:40:28.078Z"
   },
   "created": "2026-07-11T09:28:34.266Z",
-  "updated": "2026-07-12T06:27:27.121Z",
+  "updated": "2026-07-13T04:36:11.229Z",
   "pipeline": {
     "issueId": "PAN-399",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-12T06:27:26.780Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "panDoneRecoveredAt": "2026-07-12T09:16:46.873Z",
+    "updatedAt": "2026-07-13T04:36:11.229Z",
+    "reviewNotes": "Review APPROVED by agent-pan-399-review-076c4cf4; all blocking findings resolved",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2577",
-    "reviewedAtCommit": "a2edef4778231d558c49b0e76d6bb33ba3dee46f",
-    "lastVerifiedCommit": "a2edef4778231d558c49b0e76d6bb33ba3dee46f",
-    "reviewRequestedAt": "2026-07-12T01:32:07.847Z",
+    "reviewedAtCommit": "9ccdd0f9eda22eb7b357d43bc7b86823b732ce80",
+    "lastVerifiedCommit": "9ccdd0f9eda22eb7b357d43bc7b86823b732ce80",
+    "reviewRequestedAt": "2026-07-12T09:16:46.873Z",
+    "reviewSpawnedAt": "2026-07-12T09:38:32.553Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -420,6 +500,7 @@
         "tests/fixtures/synced-skills.txt",
         "tests/unit/dashboard/routes/resources-stacks.test.ts",
         "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
+        "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
         "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
         "tests/unit/lib/database/release-set-schema.test.ts",
         "tests/unit/lib/merge-set.test.ts",
@@ -509,6 +590,7 @@
         "tests/fixtures/synced-skills.txt",
         "tests/unit/dashboard/routes/resources-stacks.test.ts",
         "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
+        "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
         "tests/unit/lib/cloister/postmerge-release-isolation.test.ts",
         "tests/unit/lib/database/release-set-schema.test.ts",
         "tests/unit/lib/merge-set.test.ts",
@@ -519,23 +601,25 @@
         "tests/unit/lib/release-set.test.ts",
         "tests/unit/lib/review-status-release.test.ts"
       ],
-      "recordedAt": "2026-07-12T01:24:02.241Z"
-    }
+      "recordedAt": "2026-07-12T08:40:28.078Z"
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-13T04:36:11.229Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 9157557,
-            "output": 8800,
-            "cacheRead": 8570624,
+            "input": 9271852,
+            "output": 9331,
+            "cacheRead": 8582912,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 63520966,
-            "output": 163660,
-            "cacheRead": 59633920,
+            "input": 75764446,
+            "output": 198357,
+            "cacheRead": 70855040,
             "cacheWrite": 0
           },
           "unknown": {
@@ -547,10 +631,10 @@
         },
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 143,
-            "output": 6426,
-            "cacheRead": 1758262,
-            "cacheWrite": 11849
+            "input": 429,
+            "output": 16599,
+            "cacheRead": 9634524,
+            "cacheWrite": 25419
           },
           "anthropic/claude-opus-4-8": {
             "input": 133,
@@ -599,24 +683,24 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 6579678,
-            "output": 343143,
-            "cacheRead": 201811712,
+            "input": 7753022,
+            "output": 490123,
+            "cacheRead": 316998912,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 9157557,
-          "output": 8800,
-          "cacheRead": 8570624,
+          "input": 9271852,
+          "output": 9331,
+          "cacheRead": 8582912,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 64221326,
-          "output": 192689,
-          "cacheRead": 65325824,
+          "input": 76464806,
+          "output": 227386,
+          "cacheRead": 76546944,
           "cacheWrite": 0
         },
         "unknown": {
@@ -626,10 +710,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
-          "input": 143,
-          "output": 6426,
-          "cacheRead": 1758262,
-          "cacheWrite": 11849
+          "input": 429,
+          "output": 16599,
+          "cacheRead": 9634524,
+          "cacheWrite": 25419
         },
         "anthropic/claude-opus-4-8": {
           "input": 17122,
@@ -650,15 +734,15 @@
           "cacheWrite": 77989
         },
         "custom/kimi-k2.7-code": {
-          "input": 6579678,
-          "output": 343143,
-          "cacheRead": 201811712,
+          "input": 7753022,
+          "output": 490123,
+          "cacheRead": 316998912,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 152.21751700000002,
-        "pricingAsOf": "2026-07-12T06:27:26.975Z"
+        "usd": 196.126343,
+        "pricingAsOf": "2026-07-13T03:19:01.623Z"
       }
     },
     "merges": [
@@ -666,8 +750,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "release-engine-tests": "completed",
     "release-engine-tests.ac1": "completed",

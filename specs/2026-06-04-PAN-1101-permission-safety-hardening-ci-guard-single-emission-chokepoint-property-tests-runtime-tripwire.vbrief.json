@@ -4,17 +4,17 @@
     "created": "2026-06-04T06:09:57.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1101: Permission safety hardening: CI guard, single emission chokepoint, property tests, runtime tripwire",
-    "updated": "2026-06-04T06:13:21.182Z"
+    "updated": "2026-07-17T10:57:26.709Z"
   },
   "plan": {
     "id": "pan-1101",
     "title": "Permission safety hardening: CI guard, single emission chokepoint, property tests, runtime tripwire",
-    "status": "proposed",
+    "status": "cancelled",
     "uid": "563105b8-9c98-445e-bd98-148cb2111e81",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-06-04T06:09:57.000Z",
-    "updated": "2026-06-04T06:13:21.182Z",
+    "updated": "2026-07-17T10:57:26.709Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1101",
@@ -162,5 +162,5 @@
       "canonicalFilename": "2026-06-04-PAN-1101-permission-safety-hardening-ci-guard-single-emission-chokepoint-property-tests-runtime-tripwire.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "cancelled"
 }

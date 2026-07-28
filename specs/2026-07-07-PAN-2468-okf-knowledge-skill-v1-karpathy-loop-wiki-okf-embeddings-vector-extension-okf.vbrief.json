@@ -4,17 +4,17 @@
     "created": "2026-07-07T15:49:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2468: OKF knowledge skill v1 — Karpathy-loop wiki + okf-embeddings vector extension (/okf)",
-    "updated": "2026-07-09T05:47:50.117Z"
+    "updated": "2026-07-13T03:17:56.953Z"
   },
   "plan": {
     "id": "pan-2468",
     "title": "OKF knowledge skill v1 — Karpathy-loop wiki + okf-embeddings vector extension (/okf)",
-    "status": "running",
+    "status": "completed",
     "uid": "c0eabff2-59cf-4439-8452-e0a5cda24850",
     "author": "agent:claude-fable-5",
-    "sequence": 9,
+    "sequence": 10,
     "created": "2026-07-07T15:49:00Z",
-    "updated": "2026-07-09T05:47:50.117Z",
+    "updated": "2026-07-13T03:17:56.953Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2468",
@@ -1642,5 +1642,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }
