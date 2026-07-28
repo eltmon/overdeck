@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T17:52:32.091Z",
+  "updated": "2026-07-28T17:53:37.418Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "convergence-regression-test": {
-        "writerId": "agent-pan-3229",
-        "agentId": "agent-pan-3229",
-        "pid": 2098931,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T17:52:32.091Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3229",
@@ -139,6 +131,17 @@
         "outcome": "completed",
         "reason": "Added successful complete-planning marker cleanup with absent-marker tolerance, focused tests, and an audited file-size allowance.",
         "releasedAt": "2026-07-28T17:52:04.432Z"
+      },
+      {
+        "writerId": "agent-pan-3229",
+        "agentId": "agent-pan-3229",
+        "pid": 2098931,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:52:32.091Z",
+        "itemId": "convergence-regression-test",
+        "outcome": "completed",
+        "reason": "Added a fake-timer incident regression that creates the marker through planFinalizeCommand, converges with one healthy reconciler pass, and verifies a second pass is idempotent.",
+        "releasedAt": "2026-07-28T17:53:37.417Z"
       }
     ],
     "statusReasons": {
@@ -157,6 +160,10 @@
       "server-marker-cleanup": {
         "reason": "Added successful complete-planning marker cleanup with absent-marker tolerance, focused tests, and an audited file-size allowance.",
         "updatedAt": "2026-07-28T17:52:04.432Z"
+      },
+      "convergence-regression-test": {
+        "reason": "Added a fake-timer incident regression that creates the marker through planFinalizeCommand, converges with one healthy reconciler pass, and verifies a second pass is idempotent.",
+        "updatedAt": "2026-07-28T17:53:37.417Z"
       }
     }
   },
@@ -178,6 +185,9 @@
     "server-marker-cleanup": "completed",
     "server-marker-cleanup.server-marker-cleanup.ac1": "completed",
     "server-marker-cleanup.server-marker-cleanup.ac2": "completed",
-    "convergence-regression-test": "running"
+    "convergence-regression-test": "completed",
+    "convergence-regression-test.convergence-regression-test.ac1": "completed",
+    "convergence-regression-test.convergence-regression-test.ac2": "completed",
+    "convergence-regression-test.convergence-regression-test.ac3": "completed"
   }
 }
