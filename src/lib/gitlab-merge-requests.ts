@@ -16,11 +16,17 @@ export interface GitLabMergeRequestRow {
 }
 
 const OPEN_MR_CACHE_TTL_MS = 30_000;
-const cachedOpenMergeRequests = createSettledTtlPromiseCache<string, GitLabMergeRequestRow[]>(OPEN_MR_CACHE_TTL_MS);
+let cachedOpenMergeRequests = createSettledTtlPromiseCache<string, GitLabMergeRequestRow[]>(OPEN_MR_CACHE_TTL_MS);
 
 const MERGED_MR_CACHE_TTL_MS = 30_000;
 // Cache stores (repoPath:head) -> boolean (whether head has merged MRs)
-const cachedMergedMergeRequestHeads = createSettledTtlPromiseCache<string, boolean>(MERGED_MR_CACHE_TTL_MS);
+let cachedMergedMergeRequestHeads = createSettledTtlPromiseCache<string, boolean>(MERGED_MR_CACHE_TTL_MS);
+
+// Export cache reset function for testing with fake timers
+export function resetCachesWithClockFn(now?: () => number) {
+  cachedOpenMergeRequests = createSettledTtlPromiseCache<string, GitLabMergeRequestRow[]>(OPEN_MR_CACHE_TTL_MS, now);
+  cachedMergedMergeRequestHeads = createSettledTtlPromiseCache<string, boolean>(MERGED_MR_CACHE_TTL_MS, now);
+}
 
 /**
  * Runner function type for executing glab commands.
@@ -110,6 +116,7 @@ export async function listGitLabMergedMergeRequestHeads(
       const cacheKey = `${repoPath.toLowerCase()}:${head}`;
       const hasMerged = await cachedMergedMergeRequestHeads(cacheKey, async () => {
         let page = 1;
+        let foundAny = false;
 
         while (true) {
           const stdout = await runner(
@@ -118,17 +125,20 @@ export async function listGitLabMergedMergeRequestHeads(
           );
 
           if (!stdout.trim()) {
-            return false; // No merged MRs found
+            // Empty page means no results on this page; combined with prior pages, we know if head was merged
+            return foundAny;
           }
 
           const pageRows = JSON.parse(stdout) as GitLabMergeRequestRow[];
           if (!Array.isArray(pageRows)) {
             throw new Error(`Expected array from glab mr list, got ${typeof pageRows}`);
           }
-          if (pageRows.length > 0) return true; // Found at least one merged MR
 
-          // If we got fewer than 100 rows, we're on the last page with no results
-          if (pageRows.length < 100) return false;
+          // Track if we found any merged MRs
+          if (pageRows.length > 0) foundAny = true;
+
+          // If this page has fewer than 100 rows, it's the last page
+          if (pageRows.length < 100) return foundAny;
 
           page++;
         }

@@ -810,8 +810,8 @@ describe('gatherProjectLensSignals', () => {
     expect(membership).toEqual(expect.objectContaining({
       bucket: 'post_merge_limbo',
     }));
-    // Verify both repos were queried
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(2);
+    // Verify all (repo, head) pairs were queried: 2 repos × 2 candidate heads = 4 calls
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(4);
   });
 
   it('does not query merged MRs for closed issues (they\'re already terminal)', async () => {
@@ -911,8 +911,8 @@ describe('gatherProjectLensSignals', () => {
     await gatherProjectLensSignals(mixedPolyrepo, mocked);
 
     // Only the api repo (gitlab forge) should be queried, not fe (github forge)
-    // The mock was called once, meaning only one repo was queried (the gitlab one)
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(1);
+    // With 1 repo and 2 candidate heads (feature/test-1, strike/test-1), expect 2 calls
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(2);
     expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', expect.any(Array));
   });
 
@@ -1106,6 +1106,61 @@ describe('gatherProjectLensSignals', () => {
     const result = await gatherProjectLensSignals(project, deps());
     expect(resolvePipelineMembership(result.find((signal) => signal.issueId === 'PAN-1')!).bucket)
       .toBe('post_merge_limbo');
+  });
+
+  it('respects global concurrency limit of 5 for merged-MR lookups across multiple repos', async () => {
+    let maxConcurrentCalls = 0;
+    const callTimings: Array<{ start: number; end: number }> = [];
+
+    const mocked = deps();
+    mocked.listTrackerIssues = vi.fn().mockResolvedValue(
+      // 10 open issues → 10 × 2 = 20 candidate heads
+      Array.from({ length: 10 }, (_, i) => ({
+        issueId: `MIN-${i + 1}`,
+        state: 'open',
+        labels: [],
+      })),
+    );
+    mocked.listOpenMergeRequests = vi.fn().mockResolvedValue([]);
+    mocked.listMergedMergeRequestHeads = vi.fn().mockImplementation(async () => {
+      const startTime = Date.now();
+      const currentIndex = callTimings.length;
+      callTimings[currentIndex] = { start: startTime, end: 0 };
+
+      // Count concurrent calls at this start time
+      const concurrentNow = callTimings.filter((t) => t.start <= startTime && (t.end === 0 || t.end > startTime)).length;
+      maxConcurrentCalls = Math.max(maxConcurrentCalls, concurrentNow);
+
+      // Simulate a quick async operation (5ms)
+      await new Promise((r) => setTimeout(r, 5));
+      callTimings[currentIndex].end = Date.now();
+      return [];
+    });
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
+
+    const gitlabPolyrepo: ProjectConfig = {
+      name: 'test',
+      path: '/test',
+      issue_prefix: 'MIN',
+      gitlab_repo: 'test/test',
+      workspace: {
+        type: 'polyrepo',
+        repos: [
+          { name: 'api', path: '/test/api' },
+          { name: 'services', path: '/test/services' },
+          { name: 'workers', path: '/test/workers' },
+        ],
+      },
+    };
+
+    await gatherProjectLensSignals(gitlabPolyrepo, mocked);
+
+    // 10 issues × 2 candidate heads per issue = 20 heads
+    // 3 repos × 20 heads = 60 total (repo, head) pairs queried
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(60);
+    // Concurrency limit is 5, so max concurrent calls should not exceed 5
+    expect(maxConcurrentCalls).toBeLessThanOrEqual(5);
   });
 
   it('keeps forbidden disposable-state and synchronous process imports out of the gatherer', async () => {
