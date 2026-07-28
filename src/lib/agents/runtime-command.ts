@@ -245,6 +245,22 @@ export function getAcpLauncherFields(
   };
 }
 
+export function getKimiCodeLauncherFields(model: string): {
+  harness: 'kimi-code';
+  kimiCodeModel: string;
+  kimiCodeYolo: true;
+  model: string;
+  unsetProviderEnv: true;
+} {
+  return {
+    harness: 'kimi-code',
+    kimiCodeModel: model,
+    kimiCodeYolo: true,
+    model,
+    unsetProviderEnv: true,
+  };
+}
+
 export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string, role?: Role): {
   harness: 'codex';
   codexMode: 'app-server' | 'work-tui';
@@ -724,6 +740,11 @@ export async function getAgentRuntimeBaseCommand(
   if (behavior.launchCommandKind === 'acp-host') {
     return 'acp-host';
   }
+  if (behavior.launchCommandKind === 'kimi-code-tui') {
+    // buildKimiCodeCommand in launcher-generator builds the full `kimi -m ... --yolo`
+    // command; return a stub base command so the launcher generator can short-circuit.
+    return 'kimi-code';
+  }
 
   // Integration tests can inject a harmless harness command so a leaked or
   // intentionally-real tmux session never runs the production `claude` binary.
@@ -911,6 +932,11 @@ export async function getRoleRuntimeBaseCommand(
   }
   if (behavior.launchCommandKind === 'acp-host') {
     return 'acp-host';
+  }
+  if (behavior.launchCommandKind === 'kimi-code-tui') {
+    // buildKimiCodeCommand in launcher-generator builds the full `kimi -m ... --yolo`
+    // command; return a stub base command so the launcher generator can short-circuit.
+    return 'kimi-code';
   }
 
   // Integration tests can inject a harmless harness command so a leaked or

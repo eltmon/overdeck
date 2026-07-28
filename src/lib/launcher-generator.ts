@@ -83,6 +83,19 @@ export interface LauncherConfig {
   /** Materialized Overdeck context bundle injected into the first fresh ACP prompt. */
   acpContextFile?: string;
 
+  /**
+   * Native Kimi Code CLI model alias (e.g. 'k3'), passed as `kimi -m <model>`.
+   * Required for harness='kimi-code'. Kimi generates its own session id — no
+   * session/work-dir flag is passed (D2/erratum E1); the id is captured
+   * post-launch as the newest session directory under the workspace's
+   * workDirKey bucket.
+   */
+  kimiCodeModel?: string;
+  /** Auto-approve regular tool calls (`kimi --yolo`). Required for harness='kimi-code'. */
+  kimiCodeYolo?: boolean;
+  /** Additional workspace directories (`kimi --add-dir <dir>`, repeatable). */
+  kimiCodeAddDirs?: string[];
+
   // Command construction
   /**
    * Base command to run (e.g. 'claude', 'claude --model gpt-5.4').
@@ -446,6 +459,9 @@ function buildCommand(config: LauncherConfig): string[] {
     if (behavior.launchCommandKind === 'acp-host') {
       return buildAcpCommand(config, false);
     }
+    if (behavior.launchCommandKind === 'kimi-code-tui') {
+      return buildKimiCodeCommand(config, false);
+    }
 
     // Conversation panel doesn't use exec — it runs the command then loops
     if (config.baseCommand) {
@@ -536,6 +552,9 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   }
   if (behavior.launchCommandKind === 'acp-host') {
     return buildAcpCommand(config, useExec);
+  }
+  if (behavior.launchCommandKind === 'kimi-code-tui') {
+    return buildKimiCodeCommand(config, useExec);
   }
 
   const parts: string[] = [];
@@ -754,6 +773,32 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
   }
 
   const cmd = tokens.join(' ');
+  return [useExec ? `exec ${cmd}` : cmd];
+}
+
+/**
+ * Build a native Kimi Code CLI command line (D2/erratum E1 — RESOLVED 0.29.2
+ * checkpoint): `kimi -m <model> --yolo [--add-dir <dir>]...`, wrapped in the
+ * PTY supervisor like claude-code (KIMI_CODE_BEHAVIOR.supportsPtySupervisor
+ * is true). Deliberately NO --session, NO --work-dir (neither flag exists on
+ * the installed binary), and NO -p/--print (v1 work agents run interactively).
+ * Kimi generates its own session id; it is captured post-launch as the
+ * newest session directory under the workspace's workDirKey bucket.
+ */
+function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[] {
+  if (!config.kimiCodeModel) {
+    throw new Error('kimi-code launcher requires kimiCodeModel');
+  }
+
+  const tokens: string[] = ['kimi', '-m', shellQuoteModelIdSync(config.kimiCodeModel)];
+  if (config.kimiCodeYolo) {
+    tokens.push('--yolo');
+  }
+  for (const dir of config.kimiCodeAddDirs ?? []) {
+    tokens.push('--add-dir', shellQuote(dir));
+  }
+
+  const cmd = wrapWithSupervisor(config, tokens.join(' '));
   return [useExec ? `exec ${cmd}` : cmd];
 }
 
