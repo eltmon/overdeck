@@ -665,9 +665,9 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   return {
     role,
     hasPendingQuestion,
-    pendingQuestionCount: pendingQuestions.length,
-    pendingQuestionPrompt: detection?.prompt,
-    pendingQuestionReason: detection?.reason,
+    pendingQuestionCount: shouldSuppressPendingInput ? 0 : pendingQuestions.length,
+    pendingQuestionPrompt: shouldSuppressPendingInput ? undefined : detection?.prompt,
+    pendingQuestionReason: shouldSuppressPendingInput ? undefined : detection?.reason,
     pendingInputCount: pendingInputKinds.length,
     pendingInputKinds,
     pendingAskUserQuestion,
