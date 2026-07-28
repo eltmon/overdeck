@@ -73,20 +73,21 @@
     "recordedAt": "2026-07-28T18:59:19.959Z"
   },
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T19:07:41.200Z",
+  "updated": "2026-07-28T19:11:36.841Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:00:36.689Z",
-    "updatedAt": "2026-07-28T19:07:41.188Z",
+    "updatedAt": "2026-07-28T19:11:36.786Z",
     "reviewNotes": "Auto-synthesis bypasses the state write door, and the path guard misses multiline joins",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3239",
     "reviewedAtCommit": "ce4feae7b06ca159b5967603f389d4919236fa01",
+    "lastVerifiedCommit": "ce4feae7b06ca159b5967603f389d4919236fa01",
     "reviewSpawnedAt": "2026-07-28T19:02:19.555Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -141,17 +142,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 729847,
-            "output": 70376,
-            "cacheRead": 10987520,
+            "input": 735333,
+            "output": 70560,
+            "cacheRead": 11305984,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1606617,
-            "output": 91324,
-            "cacheRead": 69555712,
+            "input": 2203658,
+            "output": 125704,
+            "cacheRead": 82910720,
             "cacheWrite": 0
           }
         }
@@ -164,15 +165,15 @@
           "cacheWrite": 177096
         },
         "openai/gpt-5.6-sol": {
-          "input": 2336464,
-          "output": 161700,
-          "cacheRead": 80543232,
+          "input": 2938991,
+          "output": 196264,
+          "cacheRead": 94216704,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 65.276296,
-        "pricingAsOf": "2026-07-28T19:07:41.195Z"
+        "usd": 76.162587,
+        "pricingAsOf": "2026-07-28T19:11:36.833Z"
       }
     },
     "merges": [
