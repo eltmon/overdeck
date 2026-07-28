@@ -51,6 +51,12 @@ hooks:
 > pan admin specialists done review <issueId> --status blocked --notes "<one-line top blocker>" --run-id "<runId>"
 > ```
 >
+> **Signal once (PAN-3092).** If the command reports that the verdict went to the
+> workspace fallback because the journal write is contended, the verdict IS durable
+> — do NOT re-run the signal. The host folds it automatically (fallback drain plus
+> the deacon's stranded-fallback sweep). Repeated signals only add lock pressure and
+> burn tokens. Continue to your final summary.
+>
 > Use the dimension criteria, severity vocabulary, and verdict rules below as the
 > standard for **your own** review. Do NOT spawn anything, do NOT wait for any signal,
 > do NOT edit code. (The convoy/synthesis machinery below is kept for a later opt-in —
