@@ -467,4 +467,60 @@ describe('checkWorkspaceContainerHealth', () => {
       'deacon:container-restart-failed',
     );
   });
+
+  // -------------------------------------------------------------------------
+  // (j) PAN-3049 — crash sweep matches any compose-project prefix, not just
+  // the overdeck- fallback, so a myn-feature-* container crash gets the same
+  // auto-restart handling as an overdeck-feature-* one.
+  // -------------------------------------------------------------------------
+
+  it('(j) restarts a myn-feature- crashed container exactly like an overdeck-feature- one', async () => {
+    writeState({ containerRestarts: {} });
+
+    setupExec({
+      'docker ps -a': { stdout: 'myn-feature-pan-464-server-1|Exited (1) 2 minutes ago\n' },
+      'tmux has-session': { stdout: '' },
+      'docker restart': { stdout: '' },
+      'lsof': { stdout: '' },
+    });
+
+    const actions = await checkWorkspaceContainerHealth();
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatch(/Auto-restarted.*pan-464-server.*attempt 1\/5/);
+    const state = readState();
+    expect(state.containerRestarts!['myn-feature-pan-464-server-1']).toBeDefined();
+  });
+
+  it('(j) skips a myn-feature- api container (service set unchanged) and overdeck-traefik (no feature token)', async () => {
+    writeState({ containerRestarts: {} });
+
+    setupExec({
+      'docker ps -a': {
+        stdout: [
+          'myn-feature-pan-464-api-1|Exited (1) 2 minutes ago',
+          'overdeck-traefik|Exited (1) 2 minutes ago',
+          '',
+        ].join('\n'),
+      },
+      'tmux has-session': { stdout: '' },
+      'docker restart': { stdout: '' },
+      'lsof': { stdout: '' },
+    });
+
+    const actions = await checkWorkspaceContainerHealth();
+
+    expect(actions).toHaveLength(0);
+    const restartCalled = (mockExec.mock.calls as Array<[string]>).some(([cmd]) => cmd.includes('docker restart'));
+    expect(restartCalled).toBe(false);
+  });
+
+  it('(j) checkWorkspaceContainerHealth no longer hardcodes the overdeck-feature- prefix', () => {
+    const source = readFileSync(join(process.cwd(), 'src/lib/cloister/deacon.ts'), 'utf-8');
+    const start = source.indexOf('export async function checkWorkspaceContainerHealth');
+    expect(start).toBeGreaterThan(-1);
+    const nextExport = source.indexOf('\nexport ', start + 1);
+    const body = source.slice(start, nextExport === -1 ? undefined : nextExport);
+    expect(body).not.toContain('overdeck-feature-');
+  });
 });
