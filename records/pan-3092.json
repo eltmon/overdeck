@@ -11,24 +11,42 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T06:43:08.696Z",
+  "updated": "2026-07-28T06:43:37.401Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T06:36:51.051Z"
+    "updatedAt": "2026-07-28T06:43:37.382Z",
+    "inspectNotes": "Inspecting item verdict-aware-pipeline-merge"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 17119,
+            "output": 200,
+            "cacheRead": 3,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 17119,
+          "output": 200,
+          "cacheRead": 3,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-28T06:36:51.072Z"
+        "usd": 0.0181193,
+        "pricingAsOf": "2026-07-28T06:43:37.390Z"
       }
     },
     "merges": [],
