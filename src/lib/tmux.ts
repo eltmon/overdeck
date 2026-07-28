@@ -9,7 +9,9 @@ import { Effect } from 'effect';
 import { getOverdeckHome } from './paths.js';
 import { loadConfigSync, type TmuxConfigMode } from './config-yaml.js';
 import { buildChildEnvSync } from './child-env.js';
-import { TmuxError } from './errors.js';
+import { MessageDeliveryFailed, TmuxError } from './errors.js';
+
+export { MessageDeliveryFailed } from './errors.js';
 import { getUiTheme, TERMINAL_BG } from './ui-theme.js';
 import { paneTreeHasHarnessProcess } from './tmux-process-tree.js';
 import { paneHasBlockingChoiceMenu } from './pane-choice-menu.js';
@@ -674,22 +676,6 @@ export function killSessionSync(name: string): void {
   // Explicit stdio — killing a maybe-dead session is routine; see querySessionSync.
   tmuxExecSync(['kill-session', '-t', exactSession(name)], { stdio: ['ignore', 'pipe', 'pipe'] });
 }
-
-
-/**
- * Error raised when message delivery to a tmux session fails verification.
- */
-export class MessageDeliveryFailed extends Error {
-  constructor(
-    message: string,
-    public readonly sessionName: string,
-    public readonly paneSnapshot: string,
-  ) {
-    super(message);
-    this.name = 'MessageDeliveryFailed';
-  }
-}
-
 
 
 /**

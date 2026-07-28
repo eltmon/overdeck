@@ -78,6 +78,18 @@ export class TmuxError extends Data.TaggedError('TmuxError')<{
   readonly cause?: unknown;
 }> {}
 
+/** Message delivery could not safely submit text to a tmux-backed harness. */
+export class MessageDeliveryFailed extends Error {
+  constructor(
+    message: string,
+    public readonly sessionName: string,
+    public readonly paneSnapshot: string,
+  ) {
+    super(message);
+    this.name = 'MessageDeliveryFailed';
+  }
+}
+
 // ─── Tracker / API errors ─────────────────────────────────────────────────────
 
 /** A generic issue-tracker API call failed. */
