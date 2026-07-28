@@ -9,7 +9,7 @@ import { updateIssueRecordForWorkspace } from '../pan-dir/record-update.js';
 import { createMinimalIssueRecord, clearSwarmSlotCompletion } from './deacon-swarm-record.js';
 import type { PersistedTaskOperation } from '../xbrief/dag.js';
 import type { XBriefDocument } from '../xbrief/types.js';
-import { recordRecoveryFailure } from './recovery-trip.js';
+import { acknowledgeRecoveryTrip, recordRecoveryFailure } from './recovery-trip.js';
 import { getAgentDir, getAgentStateSync } from '../agents/agent-state.js';
 import { decideAgentAutonomousRedrive, decideAutonomousRedrive } from './redrive-gate.js';
 
@@ -19,6 +19,18 @@ export const SWARM_SUPERSEDED_RETENTION = 'issue-close-out' as const;
 export interface FailedSlotArchiveDeps {
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
   clearSlotAssignment: (workspacePath: string, issueId: string, slotIndex: number, itemId?: string) => Promise<void>;
+}
+
+interface FailedSlotRequeueDeps extends FailedSlotArchiveDeps {
+  applyTaskOperationToPlanFile: (
+    issueId: string,
+    operation: PersistedTaskOperation,
+    workspacePath?: string,
+  ) => Promise<unknown>;
+  decideAgentAutonomousRedrive?: typeof decideAgentAutonomousRedrive;
+  decideAutonomousRedrive?: typeof decideAutonomousRedrive;
+  recordRecoveryFailure?: typeof recordRecoveryFailure;
+  acknowledgeRecoveryTrip?: typeof acknowledgeRecoveryTrip;
 }
 interface ClassifiedSlot extends ReconciledSlotItem { lifecycle: string; reason?: string }
 
@@ -83,24 +95,51 @@ export async function requeueFailedSwarmSlots(
   classified: ClassifiedSlot[],
   doc: XBriefDocument,
   reconciled: SlotReconcileResult,
-  deps: FailedSlotArchiveDeps & { applyTaskOperationToPlanFile: (issueId: string, operation: PersistedTaskOperation, workspacePath?: string) => Promise<unknown> },
+  deps: FailedSlotRequeueDeps,
   blockedSlotIndexes: Set<number> = new Set(),
 ): Promise<{ doc: XBriefDocument; actions: string[] }> {
   let nextDoc = doc;
   const actions: string[] = [];
+  const decideAgentRedrive = deps.decideAgentAutonomousRedrive ?? decideAgentAutonomousRedrive;
+  const decideUnownedRedrive = deps.decideAutonomousRedrive ?? decideAutonomousRedrive;
+  const recordFailure = deps.recordRecoveryFailure ?? recordRecoveryFailure;
+  const acknowledgeTrip = deps.acknowledgeRecoveryTrip ?? acknowledgeRecoveryTrip;
   for (const slot of classified.filter(candidate => candidate.lifecycle === 'failed')) {
     if (blockedSlotIndexes.has(slot.slotIndex)) {
       actions.push(`[swarm] skipped requeue slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: failed-merge block — awaiting operator recovery`);
       continue;
     }
+    const pendingDecisionRecoveryPath = 'swarm-slot-pending-operator-decision';
+    const pendingDecisionGeneration = `${slot.itemId}:${slot.agentId ?? `slot-${slot.slotIndex}`}`;
     const admission = slot.agentId
-      ? await decideAgentAutonomousRedrive(
+      ? await decideAgentRedrive(
           getAgentStateSync(slot.agentId) ?? {},
           getAgentDir(slot.agentId),
           true,
         )
-      : decideAutonomousRedrive({}, { owesRework: true });
-    if (admission.decision === 'defer') { actions.push(`[swarm] deferred failed slot ${slot.slotIndex}: ${admission.reason}`); continue; }
+      : decideUnownedRedrive({}, { owesRework: true });
+    if (admission.decision === 'defer') {
+      if (admission.needsYou) {
+        const failure = await recordFailure(
+          workspacePath,
+          issueId,
+          pendingDecisionRecoveryPath,
+          pendingDecisionGeneration,
+          1,
+        );
+        if (failure.emitNeedsYou) {
+          actions.push(`[swarm] needs-you ${issueId}: failed slot ${slot.slotIndex} ${admission.reason}`);
+        }
+      }
+      actions.push(`[swarm] deferred failed slot ${slot.slotIndex}: ${admission.reason}`);
+      continue;
+    }
+    await acknowledgeTrip(
+      workspacePath,
+      issueId,
+      pendingDecisionRecoveryPath,
+      pendingDecisionGeneration,
+    );
     const attempt = await archiveFailedSwarmSlot(issueId, workspacePath, slot, deps);
     await deps.applyTaskOperationToPlanFile(issueId, {
       type: 'unblock', itemId: slot.itemId, writerId: 'deacon-swarm', reason: `Redispatch after ${slot.reason ?? 'slot failure'}`,
@@ -109,7 +148,7 @@ export async function requeueFailedSwarmSlots(
     reconciled.superseded = [...(reconciled.superseded ?? []), attempt];
     nextDoc = { ...nextDoc, plan: { ...nextDoc.plan, items: nextDoc.plan.items.map(item => item.id === slot.itemId ? { ...item, status: 'pending' as const } : item) } };
     actions.push(`[swarm] archived failed slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}`);
-    const failure = await recordRecoveryFailure(workspacePath, issueId, 'swarm-slot-requeue', slot.itemId);
+    const failure = await recordFailure(workspacePath, issueId, 'swarm-slot-requeue', slot.itemId);
     if (failure.emitNeedsYou) actions.push(`[swarm] needs-you ${issueId}: slot item ${slot.itemId} failed ${failure.trip.tripCount} times`);
   }
   return { doc: nextDoc, actions };
