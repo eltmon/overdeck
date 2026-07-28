@@ -59,15 +59,7 @@
       "timestamp": "2026-07-28T09:05:50.784Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T09:05:50Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3092\n\n# Review — PAN-3092 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED — conflicting verdicts are preserved but surfaced as transient lock contention, and the “one warning per episode” dedupe is lost on restart\n\n## Context\n- Branch: `feature/pan-3092`\n- HEAD reviewed: `981f88bcf04b49efad757967577a6955c3de2f65`\n- Prior reviewed HEAD: `566db378cb92103431348231524716843b9cf751`\n- Cycle scope: rework commit `d49217ad6596e16c6810e4ec8b85ed14109502ab`; merged `origin/main` changes are out of PR scope\n- Manifest: `.pan/review/agent-pan-3092-review-981f88bc/context.json`\n- Dimensions reviewed: correctness/logic, security, requirements/acceptance criteria, performance\n\n## Blocking Findings\n\n### ! [correctness / requirements] A terminal-verdict conflict is reported as a lock that will clear automatically — `src/lib/cloister/deacon-verdict-fallback-sweep.ts:95`\n**Evidence tier:** Tier 1 — static\n**Requirement:** The rework and updated documentation say that when journal and fallback hold different terminal values, the drain preserves both and the sweep puts the conflict in front of the operator rather than guessing a winner.\n**Changed code:** `drainWorkspaceVerdictFallback()` now deliberately returns `false` for `pipelineConflictsWithFallbackVerdicts()` (`src/lib/overdeck/review-status-record-sync.ts:461-476`). The sweep treats every `false` result as record-lock contention and emits: “the per-issue record lock is contended … folds automatically once the lock frees,” using recovery path `verdict-fallback-contention`.\n**Problem:** `false` now has two materially different meanings: a fold failed because the lock is contended, or the fold was intentionally withheld because two terminal verdicts conflict. In the conflict case there may be no lock owner at all, and freeing the lock cannot resolve the fallback because every later drain detects the same conflict and withholds the fold again.\n**Runtime impact:** The operator receives false remediation and can wait indefinitely for an automatic fold that is structurally forbidden. The issue remains stuck with two written verdicts while the needs-you surface calls it transient contention instead of naming the conflicting gate/values and asking for adjudication.\n**Fix:** Return a discriminated drain outcome (for example `drained | contended | verdict-conflict`) or otherwise expose the conflict reason to the sweep. Use a distinct `verdict-fallback-conflict` recovery path and an actionable message naming the gate and both terminal values; state that an operator must select the valid verdict or start a newer review cycle. Keep the contention message only for actual write failure.\n\n### ! [requirements] The activity-warning dedupe is process-local, so a dashboard restart repeats the same episode — `src/lib/cloister/deacon-verdict-fallback-sweep.ts:39`\n**Evidence tier:** Tier 1 — static\n**Requirement:** FR-4 requires one activity-log warning and one needs-you trip per contention episode; NFR-5 requires episode-level dedupe.\n**Changed code:** `warnedContentionEpisodes` is an in-memory `Set`. The warning is emitted before `recordRecoveryFailure()` is called, so after a dashboard restart the empty Set causes the warning to be emitted again even when the durable recovery trip already exists and `recordRecoveryFailure()` subsequently returns `emitNeedsYou: false`.\n**Problem:** The durable trip is described as the cross-restart dedupe, but the code consults it only after emitting the warning. It therefore cannot dedupe the warning across restarts. If the trip write was previously blocked, the same duplicate also occurs after restart because neither dedupe plane survives.\n**Runtime impact:** One prolonged fallback episode produces a new operator warning after every dashboard restart, violating the named no-nag-loop requirement. The Set also grows for the lifetime of the server because completed episode keys are never removed.\n**Fix:** Give the activity warning a durable idempotency key or consult the canonical recovery-trip state before emitting it, while preserving the lock-independent first-warning guarantee when no trip can be recorded. Add a restart simulation that clears module-local state while retaining an open trip and proves the same fallback generation does not emit a second activity entry.\n\n## Non-blocking Findings\n\n### ~ [test coverage] The frozen-agent regression test does not advance beyond the 30-minute nudge window — `tests/lib/cloister/deacon-test-signal.test.ts:250`\nThe new Set makes the production behavior correct, but the third patrol runs immediately after the second despite its comment claiming coverage after the dedup window reopens. Advance fake time by more than `NUDGE_DEDUP_MS` before the third pass so the test fails if generation-level escalation suppression is later removed.\n\n## Previous Findings Rechecked\n- **Lock-independent immediate warning:** Fixed for a single server process; `recordRecoveryFailure()` failure no longer suppresses the activity entry.\n- **UAT durability:** Fixed through `PanIssuePipelineRecord`, `projectPipeline()`, `durableSubset()`, note enrichment, terminal-value correction, and focused drain/merge tests.\n- **Conflicting terminal fallback deletion:** Fixed at the storage layer; value equality is restored and the drain preserves a conflicting fallback instead of deleting or pointlessly folding it.\n- **Repeated frozen-test nudges:** Fixed in code by tracking escalated dispatch generations.\n\n## Security\nNo blocking security findings. The rework adds no attacker-controlled execution, authorization bypass, secret exposure, unsafe deserialization, or destructive operation. Gate values and lock-owner descriptions are treated as data.\n\n## Performance\nNo blocking performance regression beyond the unbounded lifetime of the warning-dedupe Set noted above. Backoff remains bounded and asynchronous, delay tests use fake timers, and the patrol performs asynchronous fallback reads with record writes only for present fallbacks.\n\n## Requirements Coverage\nFR-1, FR-2 storage preservation, FR-3, FR-5, FR-6, FR-7, FR-8, and NFR-1 through NFR-4 are implemented. FR-4/NFR-5 remain incomplete because the new permanent verdict-conflict state is misclassified and activity-warning dedupe does not survive a server restart.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3092/.pan/review/agent-pan-3092-review-981f88bc/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3092 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/concerns.md",
@@ -125,10 +117,10 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T09:05:56.495Z",
+  "updated": "2026-07-28T09:31:53.295Z",
   "pipeline": {
     "issueId": "PAN-3092",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -136,11 +128,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T09:05:56.482Z",
+    "updatedAt": "2026-07-28T09:31:52.885Z",
     "reviewNotes": "Conflicting verdicts are surfaced as transient lock contention, and warning dedupe repeats after dashboard restart",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
-    "reviewedAtCommit": "981f88bcf04b49efad757967577a6955c3de2f65",
     "lastVerifiedCommit": "566db378cb92103431348231524716843b9cf751",
     "reviewSpawnedAt": "2026-07-28T09:00:45.507Z",
     "scopeDrift": {
@@ -213,9 +204,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2515464,
-            "output": 198001,
-            "cacheRead": 26434560,
+            "input": 2521100,
+            "output": 198205,
+            "cacheRead": 26931200,
             "cacheWrite": 0
           }
         }
@@ -228,15 +219,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 2515464,
-          "output": 198001,
-          "cacheRead": 26434560,
+          "input": 2521100,
+          "output": 198205,
+          "cacheRead": 26931200,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 31.7527493,
-        "pricingAsOf": "2026-07-28T09:05:56.488Z"
+        "usd": 32.0353693,
+        "pricingAsOf": "2026-07-28T09:31:52.936Z"
       }
     },
     "merges": [
