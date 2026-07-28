@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T21:04:47.530Z",
+  "updated": "2026-07-28T21:04:53.599Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -88,16 +88,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "workspace-doors": {
-        "writerId": "agent-pan-1990",
-        "agentId": "agent-pan-1990",
-        "pid": 582446,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:56:16.208Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -108,6 +100,16 @@
         "itemId": "schema-v64",
         "outcome": "completed",
         "releasedAt": "2026-07-28T20:55:43.938Z"
+      },
+      {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 582446,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:56:16.208Z",
+        "itemId": "workspace-doors",
+        "outcome": "completed",
+        "releasedAt": "2026-07-28T21:04:53.599Z"
       }
     ]
   },
@@ -117,6 +119,11 @@
     "schema-v64.schema-v64.ac2": "completed",
     "schema-v64.schema-v64.ac3": "completed",
     "schema-v64.schema-v64.ac4": "completed",
-    "workspace-doors": "running"
+    "workspace-doors": "completed",
+    "workspace-doors.workspace-doors.ac1": "completed",
+    "workspace-doors.workspace-doors.ac2": "completed",
+    "workspace-doors.workspace-doors.ac3": "completed",
+    "workspace-doors.workspace-doors.ac4": "completed",
+    "workspace-doors.workspace-doors.ac5": "completed"
   }
 }
