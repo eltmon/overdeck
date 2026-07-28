@@ -55,18 +55,18 @@
     "recordedAt": "2026-07-28T20:46:26.914Z"
   },
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T21:05:32.186Z",
+  "updated": "2026-07-28T21:10:01.310Z",
   "pipeline": {
     "issueId": "PAN-3233",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:48:00.219Z",
-    "updatedAt": "2026-07-28T21:05:23.520Z",
-    "reviewNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-28T20:22:39.328Z by deploy-patrol, flywheel-orchestrator, merge-step0). It re-runs automatically after the deploy.",
+    "updatedAt": "2026-07-28T21:10:01.223Z",
+    "reviewNotes": "Pane exemption disables suppression globally, leaking stale plan-mode payloads during active specialist runs",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -77,7 +77,6 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3247",
-    "reviewRequestedAt": "2026-07-28T20:48:00.219Z",
     "reviewSpawnedAt": "2026-07-28T21:05:23.518Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -125,6 +124,14 @@
             "cacheWrite": 181658
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 1211834,
+            "output": 89736,
+            "cacheRead": 9195008,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "anthropic/claude-sonnet-5": {
             "input": 278,
@@ -141,6 +148,12 @@
           "cacheRead": 4661726,
           "cacheWrite": 181658
         },
+        "openai/gpt-5.6-sol": {
+          "input": 1211834,
+          "output": 89736,
+          "cacheRead": 9195008,
+          "cacheWrite": 0
+        },
         "anthropic/claude-sonnet-5": {
           "input": 278,
           "output": 54049,
@@ -149,8 +162,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 17.108087,
-        "pricingAsOf": "2026-07-28T21:05:23.564Z"
+        "usd": 30.456841,
+        "pricingAsOf": "2026-07-28T21:10:01.276Z"
       }
     },
     "merges": [
