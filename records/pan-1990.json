@@ -2,7 +2,7 @@
   "issueId": "PAN-1990",
   "schemaVersion": 2,
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T18:06:28.687Z",
+  "updated": "2026-07-28T18:06:30.037Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-1990: First-class workspaces and projects with per-workspace memory",
       "timestamp": "2026-07-28T18:06:28.687Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
