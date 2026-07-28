@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T07:32:49.962Z",
+  "updated": "2026-07-28T07:32:57.209Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
@@ -207,5 +207,61 @@
     "state-planes-doc-update": "completed",
     "state-planes-doc-update.state-planes-doc-update.ac1": "completed",
     "state-planes-doc-update.state-planes-doc-update.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".overdeck/context/codebase/concerns.md",
+      "scripts/file-size-allowlist.txt",
+      "src/lib/cloister/__tests__/test-agent-queue.test.ts",
+      "tests/cli/commands/specialists/done.test.ts",
+      "tests/lib/cloister/deacon-test-signal.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/AGENT-STATE-PLANES.md",
+      "roles/review.md",
+      "roles/test.md",
+      "src/cli/commands/specialists/done.ts",
+      "src/lib/cloister/__tests__/test-verdict.test.ts",
+      "src/lib/cloister/deacon-verdict-fallback-sweep.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/test-agent-queue.ts",
+      "src/lib/cloister/test-verdict.ts",
+      "src/lib/overdeck/review-status-record-sync.ts",
+      "src/lib/pan-dir/fs-lock.ts",
+      "src/lib/pan-dir/pipeline-verdict-merge.ts",
+      "src/lib/pan-dir/records.ts",
+      "src/lib/review-status.ts",
+      "tests/unit/lib/cloister/deacon-verdict-fallback-sweep.test.ts",
+      "tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts",
+      "tests/unit/lib/overdeck/review-status-record-sync.test.ts",
+      "tests/unit/lib/pan-dir/pipeline-monotonic.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".overdeck/context/codebase/concerns.md",
+      "docs/AGENT-STATE-PLANES.md",
+      "roles/review.md",
+      "roles/test.md",
+      "scripts/file-size-allowlist.txt",
+      "src/cli/commands/specialists/done.ts",
+      "src/lib/cloister/__tests__/test-agent-queue.test.ts",
+      "src/lib/cloister/__tests__/test-verdict.test.ts",
+      "src/lib/cloister/deacon-verdict-fallback-sweep.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/test-agent-queue.ts",
+      "src/lib/cloister/test-verdict.ts",
+      "src/lib/overdeck/review-status-record-sync.ts",
+      "src/lib/pan-dir/fs-lock.ts",
+      "src/lib/pan-dir/pipeline-verdict-merge.ts",
+      "src/lib/pan-dir/records.ts",
+      "src/lib/review-status.ts",
+      "tests/cli/commands/specialists/done.test.ts",
+      "tests/lib/cloister/deacon-test-signal.test.ts",
+      "tests/unit/lib/cloister/deacon-verdict-fallback-sweep.test.ts",
+      "tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts",
+      "tests/unit/lib/overdeck/review-status-record-sync.test.ts",
+      "tests/unit/lib/pan-dir/pipeline-monotonic.test.ts"
+    ],
+    "recordedAt": "2026-07-28T07:32:57.208Z"
   }
 }
