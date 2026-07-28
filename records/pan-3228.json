@@ -194,7 +194,7 @@
     "recordedAt": "2026-07-28T22:30:42.486Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T22:31:21.434Z",
+  "updated": "2026-07-28T22:31:24.675Z",
   "pipeline": {
     "issueId": "PAN-3228",
     "reviewStatus": "pending",
@@ -204,7 +204,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T22:31:21.402Z",
+    "updatedAt": "2026-07-28T22:31:24.666Z",
     "reviewNotes": "Agent re-review request (1/25): Addressed feedback: graceful restart restores the running projection on a late pending-decision refusal; added route-level fake-timer coverage proving stop is not called.",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -353,7 +353,7 @@
       },
       "costAtCloseOut": {
         "usd": 210.024635,
-        "pricingAsOf": "2026-07-28T22:31:21.421Z"
+        "pricingAsOf": "2026-07-28T22:31:24.673Z"
       }
     },
     "merges": [
