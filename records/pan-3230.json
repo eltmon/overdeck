@@ -85,19 +85,21 @@
     "recordedAt": "2026-07-28T18:59:19.959Z"
   },
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T19:39:20.373Z",
+  "updated": "2026-07-28T19:44:12.008Z",
   "pipeline": {
     "issueId": "PAN-3230",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:00:36.689Z",
-    "updatedAt": "2026-07-28T19:39:18.923Z",
-    "reviewNotes": "Shared pan-dir writer changed outside scope, and template-literal state paths still bypass the lint guard",
+    "updatedAt": "2026-07-28T19:44:11.837Z",
+    "reviewNotes": "All prior blockers are resolved; state paths, durable writes, and lint enforcement meet the requirements",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3239",
+    "reviewedAtCommit": "d5a0bf4e352a7a2ccb09b850b195aff8733bc1c9",
     "lastVerifiedCommit": "ce4feae7b06ca159b5967603f389d4919236fa01",
     "reviewSpawnedAt": "2026-07-28T19:39:18.922Z",
     "scopeDrift": {
@@ -153,17 +155,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1745331,
-            "output": 151321,
-            "cacheRead": 24322560,
+            "input": 2732117,
+            "output": 163787,
+            "cacheRead": 29130752,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2781387,
-            "output": 180516,
-            "cacheRead": 107084288,
+            "input": 2788727,
+            "output": 181520,
+            "cacheRead": 107814400,
             "cacheWrite": 0
           }
         }
@@ -176,15 +178,15 @@
           "cacheWrite": 177096
         },
         "openai/gpt-5.6-sol": {
-          "input": 4526718,
-          "output": 331837,
-          "cacheRead": 131406848,
+          "input": 5520844,
+          "output": 345307,
+          "cacheRead": 136945152,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 106.763484,
-        "pricingAsOf": "2026-07-28T19:39:20.371Z"
+        "usd": 114.907366,
+        "pricingAsOf": "2026-07-28T19:44:11.982Z"
       }
     },
     "merges": [
