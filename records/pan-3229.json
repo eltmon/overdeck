@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T17:53:46.104Z",
+  "updated": "2026-07-28T17:55:45.975Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "docs-recovery-owner": {
-        "writerId": "agent-pan-3229",
-        "agentId": "agent-pan-3229",
-        "pid": 2128764,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T17:53:46.103Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3229",
@@ -150,6 +142,17 @@
         "outcome": "completed",
         "reason": "Added a fake-timer incident regression that creates the marker through planFinalizeCommand, converges with one healthy reconciler pass, and verifies a second pass is idempotent.",
         "releasedAt": "2026-07-28T17:53:37.417Z"
+      },
+      {
+        "writerId": "agent-pan-3229",
+        "agentId": "agent-pan-3229",
+        "pid": 2128764,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:53:46.103Z",
+        "itemId": "docs-recovery-owner",
+        "outcome": "completed",
+        "reason": "Documented the marker schema, patrol grace/escalation behavior, complete-planning cleanup, incident rationale, and xBRIEF lifecycle fallback.",
+        "releasedAt": "2026-07-28T17:55:45.975Z"
       }
     ],
     "statusReasons": {
@@ -172,6 +175,10 @@
       "convergence-regression-test": {
         "reason": "Added a fake-timer incident regression that creates the marker through planFinalizeCommand, converges with one healthy reconciler pass, and verifies a second pass is idempotent.",
         "updatedAt": "2026-07-28T17:53:37.417Z"
+      },
+      "docs-recovery-owner": {
+        "reason": "Documented the marker schema, patrol grace/escalation behavior, complete-planning cleanup, incident rationale, and xBRIEF lifecycle fallback.",
+        "updatedAt": "2026-07-28T17:55:45.975Z"
       }
     }
   },
@@ -197,6 +204,8 @@
     "convergence-regression-test.convergence-regression-test.ac1": "completed",
     "convergence-regression-test.convergence-regression-test.ac2": "completed",
     "convergence-regression-test.convergence-regression-test.ac3": "completed",
-    "docs-recovery-owner": "running"
+    "docs-recovery-owner": "completed",
+    "docs-recovery-owner.docs-recovery-owner.ac1": "completed",
+    "docs-recovery-owner.docs-recovery-owner.ac2": "completed"
   }
 }
