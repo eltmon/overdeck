@@ -1,5 +1,6 @@
 # Audited growth exceptions: <lines> <path> # <ISSUE-REF>
 1004 src/lib/overdeck/merge.ts # PAN-3166
+1551 src/lib/overdeck/conversations.ts # PAN-1990
 1766 src/lib/database/schema.ts # PAN-3092
 1008 src/lib/pan-dir/record.ts # PAN-3092
 1005 src/lib/review-status.ts # PAN-3092
