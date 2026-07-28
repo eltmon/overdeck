@@ -1,0 +1,552 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T03:43:52Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3092: verdict writes must survive record-lock contention — verdict-aware merge, bounded backoff, contention surfacing, frozen-agent escalation",
+    "updated": "2026-07-28T03:53:59.955Z"
+  },
+  "plan": {
+    "id": "pan-3092",
+    "title": "Review agent's own record lock blocks its own verdict write: specialists/done collides, fallback is consumed, reviewStatus stuck at reviewing (MIN-902)",
+    "status": "proposed",
+    "uid": "678676ae-5732-4a58-b1cc-8f8a16ead630",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-28T03:43:52Z",
+    "updated": "2026-07-28T03:53:59.955Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3092",
+        "label": "PAN-3092",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "review-status",
+      "record-lock",
+      "verdict-fallback",
+      "deacon",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "A completed specialist verdict can fail to reach any persisted plane while every mechanism reports success. pipeline.updatedAt is stamped on every status write, so every newer-wins comparison (pickNewerPipeline at src/lib/pan-dir/records.ts:316, the drain supersede check at src/lib/overdeck/review-status-record-sync.ts:404) treats a newer-but-verdict-free write as newer truth: the drain deletes the workspace fallback unlanded, or the fold is silently dropped during the record write while reporting success. The agent whose signal did not land retries at LLM-turn cost (~$5/hr observed on MIN-902) with no backoff or cap, and a frozen agent that never executed the write contract (MIN-858) is invisible: decideUnsignaledTestAction returns 'none' forever after one nudge. Operator constraint (issue comment 4): do NOT break or bypass the record lock — add backoff, surface long contention, make the frozen mode recoverable from outside the agent.",
+      "Proposal": "Four coordinated fixes around the untouched lock protocol. (1) Verdict-aware merge: a new src/lib/pan-dir/pipeline-verdict-merge.ts makes pickNewerPipeline and the drain supersede check content-aware — terminal verdicts survive newer verdict-free writes from the same review cycle; newer cycles (reviewSpawnedAt) and newer terminal verdicts still win. (2) Bounded in-process backoff: a journal write introducing a NEW terminal verdict retries updateIssueRecordForIssue with exponential backoff (~2.6 min, env OVERDECK_VERDICT_BACKOFF_DELAYS_MS) before falling back to the workspace file, so pan admin specialists done waits in-process instead of burning LLM turns; the CLI then prints an explicit do-not-retry message when the fallback holds the verdict. (3) A deacon sweep patrol drains stranded fallbacks every patrol cycle and emits one needs-you per episode when a fallback stays undrained past 10 min. (4) Frozen-agent escalation: a live idle test session with no verdict artifact escalates to needs-you after the nudge grace instead of 'none' forever (never fabricates a verdict). Role prompts gain the stop-signal contract (verdict in fallback/artifact is durable; do not re-run the signal).",
+      "NonGoals": "- No changes to the record lock protocol: no lock-exempt writes, no changes to RECORD_LOCK_RETRY_DELAYS_MS or the 30s durability budget, no specialists/done exemption (operator directive, issue comment 4)\n- No reconstruction of the already-lost MIN-858/MIN-902 verdicts (MIN-902 already landed; MIN-858 is operator-handled)\n- No new review-role verdict artifact contract (the fallback file plus existing .pan/review/<runId>/ verdict-report patrols suffice)\n- No verdict fabrication anywhere: recovery only from written evidence (fallback, artifact, verdict report); frozen mode escalates to the operator\n- No cross-machine verdict transport for remote/Fly agents\n- No changes to the journal→DB read-overlay semantics beyond what the consumption fix makes unnecessary"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Content-aware verdict merge in one new module over re-architecting pipeline.updatedAt stamps",
+        "rationale": "Contained to two call sites (pickNewerPipeline, drain supersede); preserves PAN-2587 newer-wins for all non-verdict fields; a per-gate verdictUpdatedAt refactor would touch every writer and reader."
+      },
+      {
+        "summary": "In-process backoff capped at ~2.6 min (2s/5s/10s/20s/40s/80s), long tail owned by the deacon sweep patrol",
+        "rationale": "MIN-902's hour-long contention was the outlier; the agent-facing budget stays short so the CLI never blocks more than a few minutes, and the server-side sweep retries indefinitely at zero token cost."
+      },
+      {
+        "summary": "Contention surfacing is duration-based (10 min) not spend-based",
+        "rationale": "Once retries happen in-process, LLM spend is ~0; elapsed time is the honest residual signal and a duration threshold in the long-lived server is mechanically simple."
+      },
+      {
+        "summary": "Frozen mode escalates to needs-you; never fabricates a verdict",
+        "rationale": "D6 in test-verdict.ts (never guess pass/fail) outranks automation — a pane-only verdict behind a live session is an operator decision."
+      },
+      {
+        "summary": "No new review-side verdict artifact",
+        "rationale": "The review role already has the fallback file and two deacon patrols reading .pan/review/<runId>/ verdict reports; the consumption fix plus the sweep close the hole without a third contract."
+      },
+      {
+        "summary": "reviewSpawnedAt is the new-cycle identity for the merge override",
+        "rationale": "It is the cycle marker setReviewStatusSync's existing regression guards (review-status.ts:201-219) already use — one consistent notion of cycle."
+      }
+    ],
+    "items": [
+      {
+        "id": "verdict-aware-pipeline-merge",
+        "title": "Verdict-aware pipeline merge: new pipeline-verdict-merge.ts, pickNewerPipeline delegates",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T03:43:52Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3092",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "drain-content-aware-supersede",
+            "stranded-verdict-sweep"
+          ],
+          "files_scope": [
+            "src/lib/pan-dir/pipeline-verdict-merge.ts",
+            "src/lib/pan-dir/records.ts",
+            "tests/unit/lib/pan-dir/pipeline-monotonic.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pan-dir/pipeline-monotonic.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pipeline-monotonic tests pass including the new verdict-preservation and new-cycle cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "touches only src/lib/pan-dir/* and tests/unit/lib/pan-dir/*, which no other wave-0 item modifies",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/pan-dir/pipeline-verdict-merge.ts (type-only imports from records.ts — no runtime cycle) exporting TERMINAL_GATE_VALUES, GATE_COMPANIONS, mergePipelineVerdictAware(rebuilt, fresh), and pipelineCoversFallbackVerdicts(journal, fallback). Terminal values: reviewStatus passed|blocked|failed|skipped; testStatus passed|failed; uatStatus passed|blocked|failed; verificationStatus passed|failed|skipped; inspectStatus passed|blocked|failed; mergeStatus merged|failed. Companions: reviewStatus→reviewNotes/reviewedAtCommit/reviewerVerdicts; testStatus→testNotes; uatStatus→uatNotes; verificationStatus→verificationNotes/lastVerifiedCommit; inspectStatus→inspectNotes; mergeStatus→mergeNotes/mergeStep. mergePipelineVerdictAware rules in order: (1) missing either updatedAt → rebuilt; (2) rebuilt.updatedAt >= fresh.updatedAt → rebuilt; (3) base = structuredClone(fresh); (4) both reviewSpawnedAt parse and fresh's is newer → return base (new-cycle reset); (5) per gate, rebuilt terminal and base non-terminal → copy status + companions from rebuilt; (6) return base. pipelineCoversFallbackVerdicts(journal, fallback): journal.reviewSpawnedAt parses and is > fallback.updatedAt → true; every gate with a terminal fallback value must equal journal's value, else false; no terminal gates in fallback → true. Change pickNewerPipeline (src/lib/pan-dir/records.ts:316-322) to delegate to mergePipelineVerdictAware, keeping the exported name (updateIssueRecordForIssue at records.ts:357 uses it). Extend tests/unit/lib/pan-dir/pipeline-monotonic.test.ts: keep all four PAN-2587 cases green; add (a) MIN-902 repro — rebuilt carries reviewStatus passed at T0 with notes+anchor, fresh is verdict-free at T1>T0 with the same reviewSpawnedAt → merged keeps passed + reviewNotes + reviewedAtCommit and fresh's non-verdict fields; (b) new-cycle reset — fresh has newer reviewSpawnedAt and reviewStatus reviewing → fresh wins wholesale; (c) fresh carries a newer terminal verdict (blocked at T1) over rebuilt's passed at T0 → fresh wins; (d) test-gate preservation — rebuilt testStatus passed, fresh testStatus testing, same cycle → passed + testNotes preserved. See PRD .pan/drafts/PAN-3092.md §FR-1 for the exact rule table."
+        },
+        "items": [
+          {
+            "id": "verdict-aware-pipeline-merge.ac1",
+            "title": "MIN-902 repro test: rebuilt carries reviewStatus passed at T0 with notes+anchor, fresh is verdict-free at T1>T0 with the same reviewSpawnedAt → merge preserves passed + reviewNotes + reviewedAtCommit while keeping fresh's non-verdict fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-aware-pipeline-merge.ac2",
+            "title": "New-cycle test: fresh with a strictly newer reviewSpawnedAt wins wholesale even when rebuilt carries a terminal verdict (merge returns fresh's pipeline unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-aware-pipeline-merge.ac3",
+            "title": "The four pre-existing PAN-2587 pickNewerPipeline cases remain unmodified and the pipeline-monotonic suite exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-aware-pipeline-merge.ac4",
+            "title": "pipelineCoversFallbackVerdicts returns false when the journal is newer but lacks the fallback's terminal reviewStatus, true when it carries the same terminal value, and true on a newer reviewSpawnedAt — covered by unit tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drain-content-aware-supersede",
+        "title": "Drain supersede check becomes content-aware (no more unlanded fallback deletion)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T03:43:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3092",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/review-status-record-sync.ts",
+            "tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "drain tests pass including the split supersede cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In drainWorkspaceVerdictFallback (src/lib/overdeck/review-status-record-sync.ts:403-407), extend the supersede condition from timestamp-only to timestamp AND content: supersede (delete claims, return true) only when journal.updatedAt >= fallback.updatedAt AND pipelineCoversFallbackVerdicts(journal, fallback) (imported from src/lib/pan-dir/pipeline-verdict-merge.ts). Otherwise proceed to the fold. The fold's updateIssueRecordForIssue already routes through the verdict-aware pickNewerPipeline from verdict-aware-pipeline-merge, so a verdict-free newer on-disk pipeline can no longer silently drop the fold. In tests/unit/lib/overdeck/review-status-record-sync-drain.test.ts, split the existing case at line 88 ('deletes the fallback without a record write when the journal is already newer') into two: (a) journal newer AND carrying the same terminal verdict → fallback deleted without a record write; (b) journal newer but verdict-free (e.g. reviewStatus reviewing with a later updatedAt) → drain folds the fallback's verdict into the record and deletes the file. Add (c) journal belongs to a newer cycle (reviewSpawnedAt > fallback.updatedAt) → superseded without folding. Keep every other drain test green."
+        },
+        "items": [
+          {
+            "id": "drain-content-aware-supersede.ac1",
+            "title": "Test: journal newer than the fallback but verdict-free → drain folds the fallback's verdict into the record (record's reviewStatus becomes the fallback's terminal value) and deletes the claim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drain-content-aware-supersede.ac2",
+            "title": "Test: journal newer AND carrying the same terminal verdict → drain deletes the fallback without any record write (existing supersede behavior preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drain-content-aware-supersede.ac3",
+            "title": "Test: when the journal's reviewSpawnedAt is newer than fallback.updatedAt, the drain deletes the fallback claim without any record write (new-cycle obsolescence)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drain-content-aware-supersede.ac4",
+            "title": "All other pre-existing drain tests remain unmodified and the drain suite exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verdict-write-backoff",
+        "title": "Bounded exponential backoff for terminal verdict journal writes + CLI do-not-retry message",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T03:43:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3092",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/review-status-record-sync.ts",
+            "src/lib/review-status.ts",
+            "src/cli/commands/specialists/done.ts",
+            "tests/unit/lib/overdeck/review-status-record-sync.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/review-status-record-sync.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fake-timer backoff tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Three coordinated changes. (1) src/lib/review-status.ts: setReviewStatusSync already computes terminalReviewVerdict (lines 243-248); extend the same notion to test/uat/verification/inspect/merge status transitions (a NEW terminal value different from the carried status) into a single carriesNewTerminalVerdict boolean and pass it as updateIssueRecordForReviewStatusSync(issueId, updated, { verdictWrite: carriesNewTerminalVerdict }). (2) src/lib/overdeck/review-status-record-sync.ts updateIssueRecordForReviewStatusSync (lines 15-41): accept the third options param; when verdictWrite is set, retry updateIssueRecordForIssue on failure (landed === false or throw) with delays from verdictWriteBackoffDelaysMs() — DEFAULT_VERDICT_BACKOFF_DELAYS_MS = [2000, 5000, 10000, 20000, 40000, 80000] with OVERDECK_VERDICT_BACKOFF_DELAYS_MS comma-list env override (same pattern as recordDurabilityBudgetMs in record-update.ts:39-42) — awaiting setTimeout between attempts; on success keep the landed===true → trackVerdictFallbackDrain behavior; only after schedule exhaustion write the fallback + scheduleVerdictFallbackDrain. Non-verdict writes keep the current single-shot behavior exactly. The retry promise stays in pendingJournalWrites so flushReviewStatusJournalWrites awaits it. (3) src/cli/commands/specialists/done.ts doneAndExitCommand (line 334): after flushReviewStatusJournalWrites(), call readWorkspaceVerdictFallbackSync(normalizedIssueId) (already exported) and when a fallback exists print a chalk.yellow warning: 'Journal write is contended — the verdict is durable at <path>. The host folds it automatically (drain + deacon sweep). Do NOT re-run this signal: repeated signals add lock pressure and burn tokens for nothing.' Tests (NFR-2 — vi.useFakeTimers + advanceTimersByTimeAsync, never real delays): mock updateIssueRecordForIssue to fail N times then land → assert retry schedule, no fallback written, drain tracked; fail always → fallback written only after the full schedule; verdictWrite unset → single attempt then fallback immediately."
+        },
+        "items": [
+          {
+            "id": "verdict-write-backoff.ac1",
+            "title": "Fake-timer test: a verdict write whose journal write fails twice then lands retries on the 2s/5s/10s schedule and produces NO workspace fallback file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-write-backoff.ac2",
+            "title": "Fake-timer test: a verdict write that always fails writes the workspace fallback only after the full backoff schedule exhausts (~157s of advanced time), not on first failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-write-backoff.ac3",
+            "title": "Test: a write with verdictWrite unset falls back to the workspace file after exactly one journal-write attempt (mocked updateIssueRecordForIssue call count is 1 — no retries)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-write-backoff.ac4",
+            "title": "When a fallback exists after flushReviewStatusJournalWrites, pan admin specialists done prints the do-not-retry durability message naming the fallback path (asserted via the messaging path in a unit or CLI-level test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stranded-verdict-sweep",
+        "title": "Deacon sweep patrol drains stranded verdict fallbacks and surfaces >10min contention",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T03:43:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3092",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-verdict-fallback-sweep.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/lib/pan-dir/fs-lock.ts",
+            "tests/unit/lib/cloister/deacon-verdict-fallback-sweep.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/deacon-verdict-fallback-sweep.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sweep patrol tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/deacon-verdict-fallback-sweep.ts exporting sweepStrandedVerdictFallbacks(now = Date.now()): Promise<string[]> per the PRD §FR-4/FR-5 skeleton: iterate loadReviewStatuses(); skip merged/closedOut issues; readWorkspaceVerdictFallback(issueId) (async — covers live path + stranded claims, newest-wins); when present call drainWorkspaceVerdictFallback(issueId) and record an action when drained; when NOT drained and the fallback's age exceeds VERDICT_CONTENTION_SURFACE_MS (10 min) and the issue is not stuck/deaconIgnored, emit ONE activity-log warning (emitActivityEntrySync, source 'cloister', level 'warn') naming the issue, the contention age in minutes, and the current lock owner description, and call recordRecoveryFailure(workspacePath, issueId, 'verdict-fallback-contention', fallback.updatedAt, 1) so a single needs-you trip opens per contention episode (deduped by the fallback's updatedAt as obligationGeneration). Export readOwner from src/lib/pan-dir/fs-lock.ts (currently module-private at line 65) and use readOwner(recordLockPath(project, issueId)) for the lock-owner description. Register the patrol in src/lib/cloister/deacon.ts alongside reconcileUnappliedReviewVerdicts (import wiring near lines 1136-1140 and the patrol-cycle invocation near line 2861); all filesystem access via the async readers (NFR-4 — nothing blocking on the dashboard event loop). Tests in tests/unit/lib/cloister/deacon-verdict-fallback-sweep.test.ts (follow the fake-timer/mocking style of the existing drain tests): (a) stranded fallback with no live claimant is drained and an action recorded; (b) a fallback that keeps failing to drain past 10 min emits exactly one needs-you across multiple sweep cycles; (c) a fallback younger than 10 min is drained-or-deferred with no needs-you; (d) stuck/deaconIgnored issues are drained but never surfaced."
+        },
+        "items": [
+          {
+            "id": "stranded-verdict-sweep.ac1",
+            "title": "Patrol test: sweepStrandedVerdictFallbacks folds a stranded workspace fallback (no live drain claimant) into the record and returns an action entry naming the issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stranded-verdict-sweep.ac2",
+            "title": "Patrol test: a fallback that stays undrained past 10 min produces exactly one needs-you trip and one activity warning across three consecutive sweep cycles (no nag loop)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stranded-verdict-sweep.ac3",
+            "title": "Patrol test: a fallback younger than 10 min never emits needs-you, and stuck/deaconIgnored issues are drained but never surfaced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stranded-verdict-sweep.ac4",
+            "title": "grep of src/lib/cloister/deacon.ts shows the patrol-cycle invocation of sweepStrandedVerdictFallbacks alongside reconcileUnappliedReviewVerdicts, and the patrol module contains no readFileSync/writeFileSync calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frozen-agent-escalation",
+        "title": "Frozen test agent escalates to needs-you instead of 'none' forever",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T03:43:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3092",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/test-verdict.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/__tests__/test-verdict.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/test-verdict.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "test-verdict decision tests pass including the escalate case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/test-verdict.ts decideUnsignaledTestAction (lines 99-134): add a new UnsignaledTestDecision variant { action: 'escalate' } and return it from the live + idle + no-artifact + alreadyNudged branch (currently returns 'none' at line 132). The 'none' variant stays for the dead-session/no-artifact branch. In src/lib/cloister/deacon.ts checkCompletedButUnsignaledTests (line 1389), handle 'escalate': emit one activity warning and recordRecoveryFailure(wsPath, issueId, 'unsignaled-test-verdict', lastDispatchAt ?? 'unknown', 1); the needs-you message tells the operator the test agent is alive but unresponsive after a nudge with no verdict artifact, that the verdict may exist only in the agent's pane, and to either apply it manually (pan admin specialists done test <id> --status passed|failed) or pan kill + re-dispatch. Never auto-complete without a written artifact (D6 preserved). Extend src/lib/cloister/__tests__/test-verdict.test.ts: (a) live + idle + no artifact + alreadyNudged → 'escalate'; (b) live + idle + no artifact + not nudged → 'nudge-write' (unchanged); (c) live + idle + artifact + alreadyNudged → 'auto-complete' (unchanged); (d) dead session + no artifact → 'none' (unchanged)."
+        },
+        "items": [
+          {
+            "id": "frozen-agent-escalation.ac1",
+            "title": "decideUnsignaledTestAction returns 'escalate' for live + idle + no artifact + alreadyNudged, and 'nudge-write'/'auto-complete'/'none' behavior for every other branch is unchanged (pinned by tests)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frozen-agent-escalation.ac2",
+            "title": "The deacon 'escalate' handler emits one needs-you per test dispatch generation naming the issue and the two operator actions (manual verdict application or kill + re-dispatch), and never calls setReviewStatusSync with a fabricated verdict",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-prompt-stop-signal",
+        "title": "Role prompts and test spawn prompt carry the do-not-retry stop-signal contract",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T03:43:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3092",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/review.md",
+            "roles/test.md",
+            "src/lib/cloister/test-agent-queue.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "npx vitest run src/lib/cloister/__tests__/test-verdict.test.ts"
+          ],
+          "expected_outputs": [
+            "lint passes (roles prompts are lint-checked surfaces where applicable)",
+            "existing prompt-related tests stay green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the stop-signal contract to the three prompt surfaces. (1) roles/review.md self-review block (after the signal commands at lines 49-52): 'If the command reports the verdict went to the workspace fallback (journal write contended), the verdict IS durable — do NOT re-run the signal. The host folds it automatically; repeated signals add lock pressure and burn tokens. Continue to your final summary.' (2) roles/test.md near the sentinel steps (lines 73-78): one POST attempt is enough — if it fails, .pan/test/result.json is the durable verdict and the deacon recovers from it; do not retry the POST in a loop; emit the sentinel and stop. (3) src/lib/cloister/test-agent-queue.ts buildTestRolePrompt steps 9-11 (lines 48-56): after the POST steps add the same one-attempt-is-enough instruction pointing at the step-8 artifact as the durable copy. Keep wording short and imperative to match each file's voice. Run any existing prompt-contract tests (src/lib/cloister/__tests__/prompts.test.ts if it covers these files) and keep them green."
+        },
+        "items": [
+          {
+            "id": "role-prompt-stop-signal.ac1",
+            "title": "grep of roles/review.md and roles/test.md shows the do-not-retry contract stating the fallback/artifact is durable and repeated signals are forbidden",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-prompt-stop-signal.ac2",
+            "title": "buildTestRolePrompt output contains the one-POST-attempt instruction referencing .pan/test/result.json as the durable verdict (asserted in a prompt test or by grep of test-agent-queue.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "state-planes-doc-update",
+        "title": "docs/AGENT-STATE-PLANES.md documents the new verdict-durability semantics",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T03:43:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3092",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/AGENT-STATE-PLANES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint passes on the docs change"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the verdict-fallback paragraph in docs/AGENT-STATE-PLANES.md (~lines 30-43) to describe the shipped semantics: (1) the record write door's pipeline merge is verdict-aware — a terminal verdict is never displaced by a newer verdict-free write from the same review cycle, and only a newer reviewSpawnedAt or a newer terminal verdict supersedes it; (2) the fallback drain's supersede check is content-aware (journal must carry the fallback's terminal verdicts or belong to a newer cycle); (3) terminal verdict writes retry the journal write in-process with exponential backoff (OVERDECK_VERDICT_BACKOFF_DELAYS_MS, default 2s/5s/10s/20s/40s/80s) before the workspace fallback is written; (4) the deacon sweep patrol (deacon-verdict-fallback-sweep.ts) drains stranded fallbacks every patrol cycle and opens one needs-you per episode after 10 min of contention; (5) a live idle test session with no verdict artifact escalates to needs-you instead of being ignored after one nudge. Match the doc's existing terse reference style."
+        },
+        "items": [
+          {
+            "id": "state-planes-doc-update.ac1",
+            "title": "grep of docs/AGENT-STATE-PLANES.md produces matches for 'verdict-aware', 'OVERDECK_VERDICT_BACKOFF_DELAYS_MS', 'sweepStrandedVerdictFallbacks', and the frozen-agent escalation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-planes-doc-update.ac2",
+            "title": "git diff shows the doc change updates only the verdict-fallback paragraph and its immediately related bullets — no other section is rewritten",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "verdict-aware-pipeline-merge",
+        "to": "drain-content-aware-supersede",
+        "type": "blocks"
+      },
+      {
+        "from": "drain-content-aware-supersede",
+        "to": "verdict-write-backoff",
+        "type": "blocks"
+      },
+      {
+        "from": "drain-content-aware-supersede",
+        "to": "stranded-verdict-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "frozen-agent-escalation",
+        "to": "stranded-verdict-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "drain-content-aware-supersede",
+        "to": "state-planes-doc-update",
+        "type": "blocks"
+      },
+      {
+        "from": "verdict-write-backoff",
+        "to": "state-planes-doc-update",
+        "type": "blocks"
+      },
+      {
+        "from": "stranded-verdict-sweep",
+        "to": "state-planes-doc-update",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-28-PAN-3092-review-agent-s-own-record-lock-blocks-its-own-verdict-write-specialists-done-collides-fallback-is-consumed-reviewstatus-stuck-at-reviewing-min-902.xbrief.json"
+    }
+  },
+  "status": "proposed"
+}
