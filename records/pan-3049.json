@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T07:08:11.517Z",
+  "updated": "2026-07-28T07:11:57.544Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "closeout-warning-actual-networks": {
-        "writerId": "agent-pan-3049",
-        "agentId": "agent-pan-3049",
-        "pid": 3887231,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T07:08:11.517Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -144,6 +136,17 @@
         "outcome": "completed",
         "reason": "Widened UI_CONTAINER_RE from requiring the overdeck-feature- prefix to an optional-prefix pattern, matching the full-stack tier's already-prefix-agnostic FEATURE_PROJECT_RE. Added 2 tests to the existing tests/unit/lib/cloister/idle-stack-reaper.test.ts covering AC1 (myn-feature- server/frontend reaped) and a regression guard that the widened regex still excludes dev containers. AC2 (dev protected via DEV_CONTAINER_RE in the full-stack tier) was already covered by a pre-existing myn-feature- test at that describe block, unaffected by this change. All 13 tests pass; typecheck/lint clean.",
         "releasedAt": "2026-07-28T07:08:03.124Z"
+      },
+      {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 3887231,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T07:08:11.517Z",
+        "itemId": "closeout-warning-actual-networks",
+        "outcome": "completed",
+        "reason": "Added remainingNetworks?: string[] to WorkspaceDockerTeardownResult, populated it in teardownWorkspaceDockerByNamePromise from the already-computed remaining-networks list, and replaced close-out.ts's hardcoded overdeck-feature-<issue>_devnet warning message with one naming the actual remaining network(s) (falling back to generic phrasing when absent). Updated the one existing close-out test that asserted the old hardcoded message and added 3 new tests across docker.test.ts and close-out.test.ts. Full workspace-manager + close-out suite (41 tests) passes; typecheck/lint clean.",
+        "releasedAt": "2026-07-28T07:11:57.544Z"
       }
     ],
     "statusReasons": {
@@ -166,6 +169,10 @@
       "idle-reaper-ui-regex-prefix-agnostic": {
         "reason": "Widened UI_CONTAINER_RE from requiring the overdeck-feature- prefix to an optional-prefix pattern, matching the full-stack tier's already-prefix-agnostic FEATURE_PROJECT_RE. Added 2 tests to the existing tests/unit/lib/cloister/idle-stack-reaper.test.ts covering AC1 (myn-feature- server/frontend reaped) and a regression guard that the widened regex still excludes dev containers. AC2 (dev protected via DEV_CONTAINER_RE in the full-stack tier) was already covered by a pre-existing myn-feature- test at that describe block, unaffected by this change. All 13 tests pass; typecheck/lint clean.",
         "updatedAt": "2026-07-28T07:08:03.124Z"
+      },
+      "closeout-warning-actual-networks": {
+        "reason": "Added remainingNetworks?: string[] to WorkspaceDockerTeardownResult, populated it in teardownWorkspaceDockerByNamePromise from the already-computed remaining-networks list, and replaced close-out.ts's hardcoded overdeck-feature-<issue>_devnet warning message with one naming the actual remaining network(s) (falling back to generic phrasing when absent). Updated the one existing close-out test that asserted the old hardcoded message and added 3 new tests across docker.test.ts and close-out.test.ts. Full workspace-manager + close-out suite (41 tests) passes; typecheck/lint clean.",
+        "updatedAt": "2026-07-28T07:11:57.544Z"
       }
     }
   },
@@ -189,6 +196,8 @@
     "idle-reaper-ui-regex-prefix-agnostic": "completed",
     "idle-reaper-ui-regex-prefix-agnostic.idle-reaper-ui-regex-prefix-agnostic.ac1": "completed",
     "idle-reaper-ui-regex-prefix-agnostic.idle-reaper-ui-regex-prefix-agnostic.ac2": "completed",
-    "closeout-warning-actual-networks": "running"
+    "closeout-warning-actual-networks": "completed",
+    "closeout-warning-actual-networks.closeout-warning-actual-networks.ac1": "completed",
+    "closeout-warning-actual-networks.closeout-warning-actual-networks.ac2": "completed"
   }
 }
