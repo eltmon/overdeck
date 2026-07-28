@@ -8,6 +8,15 @@
   },
   "items": [
     {
+      "issue": "PAN-2358",
+      "lane": "A",
+      "order": 1,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-07-28T16:22:06.287Z",
+      "addedBy": "conv-20260728-bd7c"
+    },
+    {
       "issue": "PAN-2233",
       "lane": "B",
       "order": 1,
@@ -36,5 +45,5 @@
     }
   ],
   "createdAt": "2026-07-28T16:00:14.253Z",
-  "updatedAt": "2026-07-28T16:22:03.680Z"
+  "updatedAt": "2026-07-28T16:22:06.289Z"
 }
