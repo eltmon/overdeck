@@ -21,6 +21,7 @@ The Deacon is Overdeck's health monitor, running as part of the dashboard server
 | **Merge-Ready Reminder** | Issue readyForMerge for >1 hour, human hasn't clicked MERGE | 1 hour | Dashboard notification | 3 reminders |
 | **Deleted Workspaces** | readyForMerge=true but workspace directory gone | Immediate | Clear readyForMerge | N/A |
 | **Pending Post-Merge** | pending-post-merge.json not consumed on startup | Immediate | Process lifecycle in-process | N/A |
+| **Pending Planning Promotion** | `complete-planning` did not produce the canonical spec | 120s marker grace; 5min markerless fallback | Re-run `complete-planning`; trip needs-you after 5 failures | Retries continue once per patrol |
 
 ## Detection Details
 
@@ -60,6 +61,15 @@ The Deacon is Overdeck's health monitor, running as part of the dashboard server
 - **Criteria:** `reviewStatus='blocked'` and the workspace tree moved past the reviewed anchor. Legacy rows may use `reviewerVerdicts[*].atCommit` only when every reviewer agrees on one anchor.
 - **Debounce:** The same new HEAD must appear on two consecutive patrol ticks, so per-item pushes do not start review before the rework batch is complete.
 - **Action:** Reset review to `pending` without clearing test verdicts or feedback notes, then emit `Re-dispatched review for <issue>: rework commit after BLOCKED verdict (<old> → <new>)` after the fresh convoy starts.
+
+### Pending-Promotion Reconciler (`reconcilePendingPromotions`)
+
+- **Files:** `src/lib/cloister/pending-promotion-reconciler.ts`, called from `runPatrol()` in `src/lib/cloister/deacon.ts`
+- **Marker:** `<workspace>/.overdeck/pending-promotion.json`, written atomically when `pan plan finalize` exhausts its five promotion attempts. The version-1 payload records `issueId`, `canonicalFilename`, `noPrd`, `autoSpawnRequested`, `finalizedAt`, `lastError`, `lastAttemptAt`, and `patrolAttempts`.
+- **Runs:** Every 60-second patrol cycle. Marker candidates receive a 120-second grace period so the patrol does not race the CLI retry loop. A defensive scan also finds markerless workspace specs that have remained `proposed` for at least five minutes and have no canonical counterpart through `findSpecByIssue()`.
+- **Action:** POST the dashboard's own `complete-planning` endpoint through the internal-token door. HTTP 200 removes the marker; HTTP 202, an in-flight response, or a pending-AskUserQuestion skip preserves it for the next cycle. Successful `completePlanningForIssue()` also removes any stale marker.
+- **Escalation:** Each real failure increments `patrolAttempts`. At five failures, the reconciler records one generation-deduplicated needs-you trip while continuing to retry once per patrol. The manual fallback is `pan plan done <issue-id>`.
+- **Rationale:** PAN-3212 remained finalized but unpromoted for 9.5 hours because its 15-second CLI retry budget expired during a deploy and no server-side owner revisited it. PAN-3229 makes that intermediate state durable and gives it a recovery owner.
 
 ### Context-Window Wedged Recovery (`checkApiErrorAgents`)
 - **File:** `src/lib/cloister/deacon.ts`
