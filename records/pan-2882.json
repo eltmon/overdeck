@@ -15,17 +15,38 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/lib/gitlab-merge-requests.ts",
+      "src/lib/pipeline-membership-gather.ts",
+      "src/lib/project-repos.ts",
+      "tests/unit/lib/gitlab-merge-requests.test.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "declaredScope": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/lib/gitlab-merge-requests.ts",
+      "src/lib/pipeline-membership-gather.ts",
+      "src/lib/project-repos.ts",
+      "tests/unit/lib/gitlab-merge-requests.test.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "actualChangedFiles": [],
+    "recordedAt": "2026-07-28T07:09:47.907Z"
+  },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T07:09:48.345Z",
+  "updated": "2026-07-28T07:09:50.662Z",
   "pipeline": {
     "issueId": "PAN-2882",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T07:09:48.344Z",
+    "updatedAt": "2026-07-28T07:09:50.635Z",
     "reviewRequestedAt": "2026-07-28T07:09:48.344Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -51,11 +72,27 @@
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 970,
+            "output": 56179,
+            "cacheRead": 23706432,
+            "cacheWrite": 527999
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 970,
+          "output": 56179,
+          "cacheRead": 23706432,
+          "cacheWrite": 527999
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-28T06:35:05.361Z"
+        "usd": 3.312514,
+        "pricingAsOf": "2026-07-28T07:09:50.657Z"
       }
     },
     "merges": [],
@@ -181,26 +218,5 @@
     "docs-membership-gitlab": "completed",
     "docs-membership-gitlab.docs-membership-gitlab.ac1": "completed",
     "docs-membership-gitlab.docs-membership-gitlab.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [
-      "docs/PIPELINE-MEMBERSHIP.md",
-      "src/lib/gitlab-merge-requests.ts",
-      "src/lib/pipeline-membership-gather.ts",
-      "src/lib/project-repos.ts",
-      "tests/unit/lib/gitlab-merge-requests.test.ts",
-      "tests/unit/lib/pipeline-membership-gather.test.ts"
-    ],
-    "declaredScope": [
-      "docs/PIPELINE-MEMBERSHIP.md",
-      "src/lib/gitlab-merge-requests.ts",
-      "src/lib/pipeline-membership-gather.ts",
-      "src/lib/project-repos.ts",
-      "tests/unit/lib/gitlab-merge-requests.test.ts",
-      "tests/unit/lib/pipeline-membership-gather.test.ts"
-    ],
-    "actualChangedFiles": [],
-    "recordedAt": "2026-07-28T07:09:47.907Z"
   }
 }
