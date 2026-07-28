@@ -8,3 +8,4 @@
 1315 src/lib/tmux.ts # PAN-3212
 1116 src/lib/lifecycle/workflows.ts # PAN-3215
 1446 src/dashboard/server/routes/command-deck.ts # PAN-3232
+1317 src/dashboard/server/ws-rpc.ts # PAN-3232
