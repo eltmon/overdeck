@@ -160,7 +160,7 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T10:50:14.346Z",
+  "updated": "2026-07-28T10:50:19.917Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "blocked",
@@ -171,11 +171,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T10:50:13.536Z",
+    "updatedAt": "2026-07-28T10:50:19.909Z",
     "reviewNotes": "The idempotent activity API is bypassed by the production Deacon HTTP client, which cannot query duplicates and reports local enqueue as durable; restart repeats and failed writes are suppressed.",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
-    "reviewedAtCommit": "1bec60c96e1fccf50d3343a2f79799958e70c164",
+    "reviewedAtCommit": "4db74b5910033b9d19d1f4b3f99dea7fbf1a2225",
     "lastVerifiedCommit": "51f15f597ae7b2b54c2e21b4f81ce496648728c9",
     "reviewSpawnedAt": "2026-07-28T10:46:42.141Z",
     "scopeDrift": {
@@ -271,7 +271,7 @@
       },
       "costAtCloseOut": {
         "usd": 72.0218533,
-        "pricingAsOf": "2026-07-28T10:50:13.556Z"
+        "pricingAsOf": "2026-07-28T10:50:19.914Z"
       }
     },
     "merges": [
