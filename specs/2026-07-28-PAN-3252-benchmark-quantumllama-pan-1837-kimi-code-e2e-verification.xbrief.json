@@ -1,0 +1,527 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T21:50:22Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3252: Benchmark: QuantumLlama — PAN-1837 kimi-code e2e verification",
+    "updated": "2026-07-28T21:54:39.642Z"
+  },
+  "plan": {
+    "id": "pan-3252",
+    "title": "Benchmark: QuantumLlama — PAN-1837 kimi-code e2e verification",
+    "status": "proposed",
+    "uid": "3e3a508d-7441-4f7e-8936-bf4b3cb032e7",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-28T21:50:22Z",
+    "updated": "2026-07-28T21:54:39.642Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3252",
+        "label": "PAN-3252",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1837",
+        "label": "PAN-1837",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "benchmark",
+      "provider",
+      "cost-tracking",
+      "model-routing"
+    ],
+    "metadata": {
+      "sizeJustification": "Registering one AI provider is inherently cross-cutting: the ProviderName/ModelId unions feed exhaustive Record maps (fallback + capabilities) that must change atomically, and pricing, env allowlists, dashboard catalog, and docs each hold a per-provider row. The precedent commit for the kimi K3 provider (353247e0e0, PAN-2859) touched 18 files across these same subsystems as one unit. Splitting into sibling issues would leave main in an inconsistent half-provider state between merges — and this is a benchmark issue whose branch is never merged, so sibling-issue parallelization has no value here.",
+      "canonicalFilename": "2026-07-28-PAN-3252-benchmark-quantumllama-pan-1837-kimi-code-e2e-verification.xbrief.json"
+    },
+    "narratives": {
+      "Problem": "Overdeck's pipeline must be verified end-to-end on the kimi-code harness (PAN-1837 wi14). QuantumLlama is a fictional provider defined entirely by benchmarks/specs/quantumllama.md; integrating it exercises the provider registry, cost tracking, model routing, and display layers without any live endpoint. The branch is never merged.",
+      "Proposal": "Add quantumllama as a first-class provider in configuration/metadata layers only: register it in PROVIDERS with model resolution and env injection (WI-1); add the three ql-* models to the ModelId union plus the exhaustive fallback and capability tables atomically, including a new optional maxOutputTokens capability field (WI-2); add per-1K pricing rows keyed provider 'custom' (WI-3); recognize ql-* in the jsonl cost parser so usage is not mis-priced as claude-sonnet-4 (WI-4); plumb QUANTUMLLAMA_API_KEY through settings/env allowlists (WI-5); surface friendly names in the dashboard catalog and cost breakdowns (WI-6); document the env var (WI-7). The authoritative data source is benchmarks/specs/quantumllama.md; the full implementation brief is the PRD at .pan/drafts/PAN-3252.md.",
+      "NonGoals": "- No HTTP client, request/response, or SSE streaming code for QuantumLlama (the provider does not exist)\n- No agent-spawning changes to actually invoke ql-* models\n- No widening of the 4-value AIProvider union in src/lib/cost.ts (pricing keyed 'custom')\n- No piProviderForModel case for quantumllama (Pi has no such provider)\n- No changes to model-validation.ts (pattern already accepts ql- IDs)\n- No changes to spawn-planning-session.ts / launcher-generator.ts env passthrough lists (QL agents are never spawned)\n- No entries in the curated chat/shared ModelPicker hard-coded lists (Settings modelCatalog.ts is the dropdown source)\n- Never merge this branch (benchmark verification only)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Pricing rows keyed provider:'custom' in DEFAULT_PRICING instead of widening the AIProvider union.",
+        "rationale": "Matches the existing convention for kimi/minimax/zai; widening the union ripples through CostSummary.byProvider and every provider mapper for zero benchmark value."
+      },
+      {
+        "summary": "PROVIDERS.quantumllama gets defaultHarness:'claude-code', authType:'static', tested:false.",
+        "rationale": "tests/unit/lib/providers.test.ts asserts every provider has a built-in default harness; claude-code is the simplest static-auth default for a provider that is never spawned."
+      },
+      {
+        "summary": "Add optional maxOutputTokens?: number to ModelCapability and populate it for the three QL models.",
+        "rationale": "The issue AC requires max-output metadata to be resolvable and no existing field holds it; an optional field is additive and touches no other entries."
+      },
+      {
+        "summary": "Fallback mapping: ql-reason-70b→claude-sonnet-5, ql-swift-8b→claude-haiku-4-5, ql-nano-1b→claude-haiku-4-5.",
+        "rationale": "Follows the documented FALLBACK_MAP pattern: flagship→Sonnet, fast/small→Haiku."
+      },
+      {
+        "summary": "No CLI code changes; CLI parity is raw model-ID passthrough.",
+        "rationale": "Verified: src/cli/commands/status.ts and cost.ts print raw model IDs for every provider — there is no CLI friendly-name mapper to extend."
+      },
+      {
+        "summary": "Dashboard friendly names via an exact-match QL map prepended to both friendlyModelName copies plus a modelCatalog.ts provider group.",
+        "rationale": "The generic heuristic renders 'Ql Reason 70b'; the spec requires 'QL Reason 70B'. The two friendlyModelName copies are an existing duplication — a cross-file refactor is out of scope (Karpathy surgical-change rule)."
+      }
+    ],
+    "items": [
+      {
+        "id": "ql-provider-registry",
+        "title": "Register quantumllama in the provider registry with model resolution and env injection",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T21:50:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3252",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "ql-models-core",
+            "ql-settings-env"
+          ],
+          "files_scope": [
+            "src/lib/providers.ts",
+            "tests/lib/providers.test.ts",
+            "tests/unit/lib/providers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/providers.test.ts tests/unit/lib/providers.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "providers tests pass including new quantumllama resolution and env cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-1: add 'quantumllama' to the ProviderName union (src/lib/providers.ts:18); add the PROVIDERS.quantumllama entry (displayName 'QuantumLlama', compatibility 'direct', defaultHarness 'claude-code', baseUrl 'https://api.quantumllama.ai/v1', authType 'static', models ['ql-reason-70b','ql-swift-8b','ql-nano-1b'], haikuModel 'ql-nano-1b', tierModels opus/sonnet/haiku = reason/swift/nano, tested false) modeled on the minimax entry; add a getProviderForModelSync branch returning PROVIDERS.quantumllama for the three ql-* IDs before the UnknownModelError throw; add 'else if (provider.name === \"quantumllama\") { env.QUANTUMLLAMA_API_KEY = apiKey; }' to the getProviderEnvSync Pi-native env ladder. Extend tests/lib/providers.test.ts following its existing per-provider blocks."
+        },
+        "items": [
+          {
+            "id": "ql-provider-registry.ac1",
+            "title": "Given model id 'ql-reason-70b' (and each of the three QL ids), getProviderForModelSync returns the provider named 'quantumllama' instead of throwing UnknownModelError",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ql-provider-registry.ac2",
+            "title": "Provider env for a QL model produces ANTHROPIC_BASE_URL 'https://api.quantumllama.ai/v1' and sets QUANTUMLLAMA_API_KEY to the configured key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ql-provider-registry.ac3",
+            "title": "The existing default-harness invariant test (tests/unit/lib/providers.test.ts) still passes because the new entry declares defaultHarness 'claude-code'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ql-models-core",
+        "title": "Add ql-* models to the ModelId union, fallback registry, and capability table atomically",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T21:50:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3252",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/model-capabilities.ts",
+            "tests/lib/model-fallback.test.ts",
+            "src/lib/__tests__/model-capabilities.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/model-fallback.test.ts src/lib/__tests__/model-capabilities.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fallback and capability tests pass including new ql-* cases",
+            "typecheck completes without errors (exhaustive Record<ModelId,...> maps satisfied)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-2 — these three source files MUST change in one commit because MODEL_PROVIDERS (model-fallback.ts:22) and MODEL_CAPABILITIES (model-capabilities.ts:159) are exhaustive Record<ModelId,...> maps (hazard H1). (1) settings.ts: add QuantumLlamaModel union type ('ql-reason-70b'|'ql-swift-8b'|'ql-nano-1b') and append it to ModelId. (2) model-fallback.ts: add 'quantumllama' to ModelProvider; add three MODEL_PROVIDERS rows; add FALLBACK_MAP rows per decision D4 (reason→claude-sonnet-5, swift/nano→claude-haiku-4-5); add startsWith('ql-') prefix heuristic in getModelProviderSync before the 'anthropic' default; extend detectEnabledProvidersSync param with quantumllama?: string and add its enabled.add block; include the three QL models in getAvailableModelsSync(enabledProviders) when 'quantumllama' is enabled. (3) model-capabilities.ts: add 'quantumllama' to the ModelCapability.provider union; add optional maxOutputTokens?: number field with doc comment; add three entries — displayName 'QL Reason 70B'/'QL Swift 8B'/'QL Nano 1B', contextWindow 200000/128000/32000, maxOutputTokens 16384/8192/4096, costPer1MTokens 16/4/0.8, skill scores in the 60–80 band, notes pointing at benchmarks/specs/quantumllama.md."
+        },
+        "items": [
+          {
+            "id": "ql-models-core.ac1",
+            "title": "getModelProviderSync('ql-swift-8b') returns 'quantumllama', and an unlisted 'ql-future-model' also resolves to 'quantumllama' via the prefix heuristic instead of defaulting to 'anthropic'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ql-models-core.ac2",
+            "title": "Capability lookup for 'ql-nano-1b' returns displayName 'QL Nano 1B', contextWindow 32000, and maxOutputTokens 4096; the other two models return their spec values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ql-models-core.ac3",
+            "title": "detectEnabledProvidersSync({ quantumllama: 'test-key' }) returns a set containing 'quantumllama', and getAvailableModelsSync(enabledProviders) includes the three ql-* models only when 'quantumllama' is enabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ql-models-core.ac4",
+            "title": "Fallback resolution returns 'claude-sonnet-5' for 'ql-reason-70b' and returns 'claude-haiku-4-5' for 'ql-nano-1b'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ql-pricing",
+        "title": "Add per-1K pricing rows for the three QL models to DEFAULT_PRICING",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T21:50:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3252",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost.ts",
+            "tests/lib/cost.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cost.test.ts"
+          ],
+          "expected_outputs": [
+            "cost tests pass including new QL rate, getPricingSync, and calculateCostSync cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3: append three ModelPricing rows to DEFAULT_PRICING in src/lib/cost.ts keyed provider 'custom' (decision D1) with the exact per-1K rates from benchmarks/specs/quantumllama.md — ql-reason-70b: in 0.008 / out 0.024 / cacheRead 0.0008 / cacheWrite5m 0.010; ql-swift-8b: 0.002 / 0.006 / 0.0002 / 0.0025; ql-nano-1b: 0.0004 / 0.0012 / 0.00004 / 0.0005; all currency USD. Extend tests/lib/cost.test.ts mirroring its per-model accuracy blocks: assert each rate, assert getPricingSync('custom','ql-reason-70b') returns the row, and assert calculateCostSync totals (e.g. 10,000 input + 2,000 output tokens on ql-reason-70b costs 0.128 USD; add one case exercising cacheReadTokens and cacheWrite5m)."
+        },
+        "items": [
+          {
+            "id": "ql-pricing.ac1",
+            "title": "getPricingSync('custom', <each ql model>) returns a row whose inputPer1k/outputPer1k/cacheReadPer1k/cacheWrite5mPer1k equal the spec's per-1K rates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ql-pricing.ac2",
+            "title": "calculateCostSync returns 0.128 USD for 10,000 input + 2,000 output tokens on ql-reason-70b",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ql-pricing.ac3",
+            "title": "A calculateCostSync case with cache-read and 5m cache-write tokens on a QL model produces the correct cache-priced total",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ql-cost-parser",
+        "title": "Recognize ql-* models in the jsonl cost parser instead of the sonnet-4 default",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T21:50:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3252",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost-parsers/jsonl-parser.ts",
+            "src/lib/cost-parsers/__tests__/jsonl-parser-model.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cost-parsers/__tests__/jsonl-parser-model.test.ts"
+          ],
+          "expected_outputs": [
+            "new test file passes: ql-* maps to provider 'custom', unknown model still falls back to claude-sonnet-4"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4: in the exported normalizeModelName (src/lib/cost-parsers/jsonl-parser.ts:142), add a branch 'if (model.startsWith(\"ql-\")) return { provider: \"custom\", model };' immediately before the final default 'return { provider: \"anthropic\", model: \"claude-sonnet-4\" };' (hazard H2 — without this QL usage is silently costed as Sonnet 4). Create src/lib/cost-parsers/__tests__/jsonl-parser-model.test.ts in the style of the sibling parser tests, asserting all three QL ids map to { provider: 'custom', model: <id> } and that an unrecognized model still returns the sonnet-4 default."
+        },
+        "items": [
+          {
+            "id": "ql-cost-parser.ac1",
+            "title": "normalizeModelName('ql-reason-70b') (and each QL id) returns { provider: 'custom', model: <the same id> }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ql-cost-parser.ac2",
+            "title": "normalizeModelName('some-unknown-model') still returns the { provider: 'anthropic', model: 'claude-sonnet-4' } default, preserving existing behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ql-settings-env",
+        "title": "Plumb QUANTUMLLAMA_API_KEY through settings, env loading, and provider env allowlists",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T21:50:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3252",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/env-loader.ts",
+            "src/lib/child-env.ts",
+            "src/lib/agents/provider-env.ts",
+            "src/lib/config-yaml/load.ts",
+            "tests/lib/settings.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/settings.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "settings tests pass including QL available-models gating cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5: (1) settings.ts — add quantumllama?: string to ApiKeysConfig; add 'if (process.env.QUANTUMLLAMA_API_KEY) envApiKeys.quantumllama = process.env.QUANTUMLLAMA_API_KEY;' to the env fallback ladder (~line 159); add a quantumllama: QuantumLlamaModel[] slot to getAvailableModelsSync(settings) gated on settings.api_keys.quantumllama returning the three models, updating the return type and fixing any compile errors typecheck surfaces. (2) env-loader.ts (~line 90): add quantumllama: process.env.QUANTUMLLAMA_API_KEY to the returned object and its type. (3) child-env.ts (~line 25): add 'QUANTUMLLAMA_API_KEY' to PROVIDER_ENV_KEYS. (4) agents/provider-env.ts (~line 90): add 'QUANTUMLLAMA_API_KEY' to PROVIDER_ENV_KEYS. (5) config-yaml/load.ts (~line 293): add the QUANTUMLLAMA_API_KEY block mirroring the MINIMAX_API_KEY one, including enabledProviders.add('quantumllama') unless explicitly disabled, extending config.apiKeys typing as the compiler requires. Extend tests/lib/settings.test.ts for the gating behavior."
+        },
+        "items": [
+          {
+            "id": "ql-settings-env.ac1",
+            "title": "With api_keys.quantumllama set, getAvailableModelsSync(settings) returns the three ql-* models; without it, the quantumllama slot is an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ql-settings-env.ac2",
+            "title": "Given QUANTUMLLAMA_API_KEY in the environment and no saved settings value, settings loading returns api_keys.quantumllama equal to the env value (falls back to the environment)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ql-settings-env.ac3",
+            "title": "Launcher export generation emits 'unset QUANTUMLLAMA_API_KEY' like other provider keys, and child-env stripping removes QUANTUMLLAMA_API_KEY from child process environments",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ql-settings-env.ac4",
+            "title": "Given QUANTUMLLAMA_API_KEY set and no explicit disable, config-yaml loading produces a config whose enabledProviders contains 'quantumllama' and whose apiKeys.quantumllama equals the env value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ql-dashboard",
+        "title": "Surface QuantumLlama models with friendly names in the dashboard catalog and cost views",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T21:50:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3252",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/dashboard/frontend/src/components/CostBreakdownModal.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/Timeline.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors including the frontend ratchet"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6: (1) modelCatalog.ts — add a quantumllama group to MODELS_BY_PROVIDER (name 'QuantumLlama') with three ModelDefs: names 'QL Reason 70B'/'QL Swift 8B'/'QL Nano 1B', icon FlaskConical, tiers premium/balanced/fast, costPer1MTokens 16/4/0.8, descriptions noting it is a fictional benchmark provider; use 'as ModelId' casts like the kimi entries. (2) CostBreakdownModal.tsx — prepend an exact-match map to friendlyModelName (line 60): QL_MODEL_NAMES = { 'ql-reason-70b': 'QL Reason 70B', 'ql-swift-8b': 'QL Swift 8B', 'ql-nano-1b': 'QL Nano 1B' }; return the mapped name before the generic heuristic (which would otherwise render 'Ql Reason 70b'). (3) Timeline.tsx — apply the same guard to its friendlyModelName copy (line 81). Do NOT refactor the two copies into a shared module (decision D9 / surgical-change rule), and do NOT touch the curated chat/shared ModelPicker lists."
+        },
+        "items": [
+          {
+            "id": "ql-dashboard.ac1",
+            "title": "MODELS_BY_PROVIDER renders a QuantumLlama provider group whose three models display 'QL Reason 70B', 'QL Swift 8B', 'QL Nano 1B' with blended costPer1MTokens 16/4/0.8",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ql-dashboard.ac2",
+            "title": "friendlyModelName('ql-reason-70b') in CostBreakdownModal returns 'QL Reason 70B' (not the heuristic's 'Ql Reason 70b'), and non-QL models preserve their existing rendering",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ql-dashboard.ac3",
+            "title": "The Timeline friendlyModelName copy applies the same QL mapping, so home-timeline entries render 'QL Swift 8B' for ql-swift-8b",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ql-docs",
+        "title": "Document QUANTUMLLAMA_API_KEY across provider docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T21:50:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3252",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "docs/TESTING-PROVIDERS.md",
+            "docs/CONFIGURATION.md",
+            "docs/USAGE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -l QUANTUMLLAMA_API_KEY configuration/harnesses.mdx docs/TESTING-PROVIDERS.md docs/CONFIGURATION.md docs/USAGE.md"
+          ],
+          "expected_outputs": [
+            "grep lists all four files, proving each documents the env var"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7: (1) configuration/harnesses.mdx — mention QuantumLlama in the multi-provider list (~lines 64–65) and add QUANTUMLLAMA_API_KEY to the native-env-var sentence (~lines 207–211), flagged as a fictional benchmark provider. (2) docs/TESTING-PROVIDERS.md — add the row '| QuantumLlama | api_keys.quantumllama or QUANTUMLLAMA_API_KEY | QUANTUMLLAMA_API_KEY |' to the provider→env-var table (~lines 129–134) with a note that it is benchmark-only with no live endpoint. (3) docs/CONFIGURATION.md — add QUANTUMLLAMA_API_KEY=ql-... to the env-var block (~line 135). (4) docs/USAGE.md — add the env var alongside the kimi examples (~lines 196, 210)."
+        },
+        "items": [
+          {
+            "id": "ql-docs.ac1",
+            "title": "docs/TESTING-PROVIDERS.md's provider table renders a QuantumLlama row naming QUANTUMLLAMA_API_KEY as both settings fallback and env var, marked benchmark-only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ql-docs.ac2",
+            "title": "grep for QUANTUMLLAMA_API_KEY over configuration/harnesses.mdx, docs/CONFIGURATION.md, and docs/USAGE.md produces a match in every file, each in its provider env-var section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ql-provider-registry",
+        "to": "ql-models-core",
+        "type": "blocks"
+      },
+      {
+        "from": "ql-provider-registry",
+        "to": "ql-settings-env",
+        "type": "blocks"
+      },
+      {
+        "from": "ql-models-core",
+        "to": "ql-settings-env",
+        "type": "blocks"
+      },
+      {
+        "from": "ql-models-core",
+        "to": "ql-dashboard",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
