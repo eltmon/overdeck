@@ -623,7 +623,11 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   // better than the generic turn-end phrasing, so it only speaks when nothing
   // more specific did.
   const detection = questionDetection ?? runtimeDetection ?? paneDetection ?? fallbackDetection ?? turnEndedDetection
-  const shouldSuppressPendingInput = hasActiveSpecialist === true && !isOwnActiveSpecialist(role)
+  // PAN-3233 — a live blocking pane modal (tool_permission foremost) is fresh
+  // evidence the agent is frozen RIGHT NOW; PAN-1834 suppression exists for the
+  // parked agent's stale JSONL/runtime surfaces, never for these.
+  const hasBlockingPaneDetection = paneDetection !== null && BLOCKING_AWAITING_INPUT_REASONS.has(paneDetection.reason)
+  const shouldSuppressPendingInput = hasActiveSpecialist === true && !isOwnActiveSpecialist(role) && !hasBlockingPaneDetection
   const hasPendingQuestion = !shouldSuppressPendingInput && detection !== null
 
   // PAN-1520 — fold every blocking surface into a uniform set.

@@ -53,15 +53,45 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
     rmSync(agentDir, { recursive: true, force: true })
   })
 
-  it('suppresses pendingInputKinds for a work-role agent when hasActiveSpecialist is true', async () => {
+  it('surfaces a tool_permission pane detection for a work-role agent even when hasActiveSpecialist is true', async () => {
     const agentDir = makeAgentDir('work')
     const agentId = `agent-test-${Date.now()}`
     vi.spyOn(agents, 'getAgentDir').mockReturnValue(agentDir)
     getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agents.getAgentStateSync>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
-    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed({ reason: 'rate_limit', prompt: 'Switch model?' }))
+    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed({ reason: 'tool_permission', prompt: 'Allow background operator?' }))
 
     const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, true, EMPTY_PENDING_INPUTS_SCAN))
+
+    expect(enrichment.role).toBe('work')
+    expect(enrichment.hasPendingQuestion).toBe(true)
+    expect(enrichment.pendingInputKinds).toEqual(['permissionRequest'])
+    expect(enrichment.resolution).toBe('needs_input')
+
+    rmSync(agentDir, { recursive: true, force: true })
+  })
+
+  it('suppresses a JSONL AskUserQuestion for a work-role agent when hasActiveSpecialist is true', async () => {
+    const agentDir = makeAgentDir('work')
+    const agentId = `agent-test-${Date.now()}`
+    vi.spyOn(agents, 'getAgentDir').mockReturnValue(agentDir)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agents.getAgentStateSync>)
+    getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
+    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+    const scanWithQuestion = {
+      ...EMPTY_PENDING_INPUTS_SCAN,
+      askUserQuestions: [
+        {
+          toolId: 'toolu_suppressed_auq',
+          timestamp: '2026-07-28T12:00:00.000Z',
+          questions: [
+            { question: 'Which approach?', header: 'Approach', multiSelect: false, options: [{ label: 'A' }, { label: 'B' }] },
+          ],
+        },
+      ],
+    }
+
+    const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, true, scanWithQuestion))
 
     expect(enrichment.role).toBe('work')
     expect(enrichment.hasPendingQuestion).toBe(false)
