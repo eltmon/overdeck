@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T20:19:57.951Z",
+  "updated": "2026-07-28T20:24:15.141Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "wi10-prereq": {
-        "writerId": "agent-pan-1837",
-        "agentId": "agent-pan-1837",
-        "pid": 3111672,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:19:57.951Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -210,6 +202,17 @@
         "outcome": "completed",
         "reason": "HarnessMarker/HARNESS_MARKERS/KNOWN_HARNESS_MARKERS were already done in wi1's validator sweep. Added kimi-code to SKILL_SYNC_HARNESSES (confirmed on the shared ~/.agents/skills discovery path from the wi-fixture capture's system prompt -- no second sync target needed per D6). Documented the D6 no-dedicated-global-file decision with a one-line comment in sync.ts. Extended harness.test.ts (span render + validateTemplate no-warning cases) and sync-agent-skills.test.ts's assertion. Had to allowlist sync.ts's growth (1208 lines, was 1205). typecheck unchanged.",
         "releasedAt": "2026-07-28T20:19:46.284Z"
+      },
+      {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 3111672,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:19:57.951Z",
+        "itemId": "wi10-prereq",
+        "outcome": "completed",
+        "reason": "Updated the kimi prerequisite's purpose string to cover both native (kimi-code) and ACP (acp) harnesses, keeping the single row and unchanged resolver per the narrative (resolveHarnessBinary already resolves the one kimi binary for both). Added a test asserting exactly one kimi row with the updated purpose text. All 8 tests pass, including the pre-existing ACP-resolver-routing test confirming no behavior change (AC2).",
+        "releasedAt": "2026-07-28T20:24:15.140Z"
       }
     ],
     "statusReasons": {
@@ -256,6 +259,10 @@
       "wi9-context-skills": {
         "reason": "HarnessMarker/HARNESS_MARKERS/KNOWN_HARNESS_MARKERS were already done in wi1's validator sweep. Added kimi-code to SKILL_SYNC_HARNESSES (confirmed on the shared ~/.agents/skills discovery path from the wi-fixture capture's system prompt -- no second sync target needed per D6). Documented the D6 no-dedicated-global-file decision with a one-line comment in sync.ts. Extended harness.test.ts (span render + validateTemplate no-warning cases) and sync-agent-skills.test.ts's assertion. Had to allowlist sync.ts's growth (1208 lines, was 1205). typecheck unchanged.",
         "updatedAt": "2026-07-28T20:19:46.284Z"
+      },
+      "wi10-prereq": {
+        "reason": "Updated the kimi prerequisite's purpose string to cover both native (kimi-code) and ACP (acp) harnesses, keeping the single row and unchanged resolver per the narrative (resolveHarnessBinary already resolves the one kimi binary for both). Added a test asserting exactly one kimi row with the updated purpose text. All 8 tests pass, including the pre-existing ACP-resolver-routing test confirming no behavior change (AC2).",
+        "updatedAt": "2026-07-28T20:24:15.140Z"
       }
     }
   },
@@ -310,6 +317,8 @@
     "wi9-context-skills.wi9-context-skills.ac1": "completed",
     "wi9-context-skills.wi9-context-skills.ac2": "completed",
     "wi9-context-skills.wi9-context-skills.ac3": "completed",
-    "wi10-prereq": "running"
+    "wi10-prereq": "completed",
+    "wi10-prereq.wi10-prereq.ac1": "completed",
+    "wi10-prereq.wi10-prereq.ac2": "completed"
   }
 }
