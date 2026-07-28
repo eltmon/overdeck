@@ -8004,3 +8004,9 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
   * **Deliberately did NOT post this as a third comment on PAN-3214.** Two substantive comments already sit there; "the other two packages are fine" is real but minor, and an issue that accumulates a comment per tick stops being readable. **Folded it into the operator report instead. Signal-to-noise on an issue is part of its usefulness.**
 - **RUN TOTALS (RUN-73): 1 close-out, 0 merges, 3 substrate bugs filed, 5 issues planned, 10 existing issues materially advanced, 1 duplicate-work collision prevented, 1 false-close prevented, 1 false alarm prevented, 1 predicted-defect retracted.**
 - **LESSON: a new check should be run at its natural scope, not the scope of the incident that motivated it.** The release-drift check was added because `@overdeck/core` broke. Running it only against `core` would have left two other published packages unexamined for the same class of defect — and the fact that they are clean is itself the answer to "how bad is this?", which is the first thing anyone cutting the release will ask.
+
+## RUN-73 tick 10 (2026-07-28 06:25Z) — watch tick, unchanged
+- Census `ready 0 / released 0 / blocks-main 2 / needs-handoff 5`; CI green on `60a89602e8`; review-ready empty; merge-blockers `[]`; zero open PRs; zero agents (4th consecutive tick); build drift 0.
+- **Release drift unchanged and still the only non-green line**: all three `@overdeck` packages published at `0.47.0`, 22 commits behind main. PAN-3214 into its third tick unresolved.
+- No operator action yet. Nothing actionable; no repeat issue comments made, per keeping watch ticks cheap.
+- Totals unchanged: 1 close-out, 0 merges, 3 substrate bugs filed, 5 issues planned, 10 issues materially advanced.
