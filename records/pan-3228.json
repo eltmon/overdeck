@@ -191,20 +191,21 @@
     "recordedAt": "2026-07-28T22:30:42.486Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T22:45:35.264Z",
+  "updated": "2026-07-28T22:45:47.873Z",
   "pipeline": {
     "issueId": "PAN-3228",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-28T22:45:26.215Z",
-    "updatedAt": "2026-07-28T22:45:35.209Z",
+    "updatedAt": "2026-07-28T22:45:47.810Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3228-review",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -354,7 +355,7 @@
       },
       "costAtCloseOut": {
         "usd": 219.563395,
-        "pricingAsOf": "2026-07-28T22:45:35.253Z"
+        "pricingAsOf": "2026-07-28T22:45:47.860Z"
       }
     },
     "merges": [
