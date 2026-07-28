@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T07:08:03.124Z",
+  "updated": "2026-07-28T07:08:11.517Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,8 +79,16 @@
     }
   ],
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "closeout-warning-actual-networks": {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 3887231,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T07:08:11.517Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -180,6 +188,7 @@
     "deacon-crash-sweep-prefix-agnostic.deacon-crash-sweep-prefix-agnostic.ac3": "completed",
     "idle-reaper-ui-regex-prefix-agnostic": "completed",
     "idle-reaper-ui-regex-prefix-agnostic.idle-reaper-ui-regex-prefix-agnostic.ac1": "completed",
-    "idle-reaper-ui-regex-prefix-agnostic.idle-reaper-ui-regex-prefix-agnostic.ac2": "completed"
+    "idle-reaper-ui-regex-prefix-agnostic.idle-reaper-ui-regex-prefix-agnostic.ac2": "completed",
+    "closeout-warning-actual-networks": "running"
   }
 }
