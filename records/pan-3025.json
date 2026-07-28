@@ -84,15 +84,7 @@
       "timestamp": "2026-07-28T09:22:10.949Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T09:22:10Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3025\n\n# Code Review — PAN-3025 — Cycle 3\n\n## Verdict: CHANGES REQUESTED\n\nThe two cycle-2 coverage gaps were addressed structurally, but the new production-path tests are red: four tests fail because Effect-returning dependencies are mocked as Promises. This blocker could not have been raised in cycle 1 because both focused test implementations were added or substantially replaced after cycle 2 at commit `958a517a69`.\n\n## Context\n\n- Branch: `feature/pan-3025`\n- Pull request: https://github.com/eltmon/overdeck/pull/3221\n- HEAD reviewed: `958a517a69fe3d6458fb81534574ac55d76da31b`\n- Prior reviewed HEAD: `b7d6b3390b56aa3f4d698ee69491cd6fe6af0a52`\n- Cycle-diff scope: commit `958a517a69`\n- Dimensions reviewed: correctness, security, requirements/acceptance criteria, performance\n\n## Findings\n\n### ! MUST — Effect-valued dependencies are mocked as Promises, leaving four required regression tests failing — `tests/unit/lib/lifecycle/dod-gate-journal-fallback.test.ts:47`\n\n**Scope:** `in_pr_scope`; introduced in the cycle-3 diff\n**Evidence tier:** Tier 2 — command\n\n**Changed code:** The new tests use `mockResolvedValue(...)` and `mockRejectedValue(...)` for `getReviewStatus` and `listRunningAgents`. Production calls both as Effects through `Effect.runPromise(...)`, so the mocks return an invalid runtime shape.\n\n**Observed failure:** The focused Vitest run reports 2 failed files and 4 failed tests. The journal tests receive `post-merge evidence unavailable: Fiber.runLoop: Not a valid effect: [object Promise]`; both expected-pass cases return `miss`, and the missing-status case observes the Effect runtime error instead of `mergeStatus: missing`. The idempotent guard's completed-close-out case returns `null` instead of the original `closedOutAt` timestamp for the same reason.\n\n**Impact:** AC-3 and AC-4 are still red, so the branch cannot advance. The error-path tests also pass for the wrong reason because an invalid Effect is rejected before the intended mocked database failure is exercised.\n\n**Fix:** Mock Effect-returning APIs with `Effect.succeed(...)` and `Effect.fail(...)`, while leaving Promise-returning `readIssueRecord` on `mockResolvedValue`/`mockRejectedValue`. Mock `listRunningAgents` with `Effect.succeed([])`. Re-run both focused suites and assert all required pass/miss, live-precedence, timestamp, live-row, and read-error cases.\n\n### ! MUST — The row-5 test still performs an external GitHub canonical-state lookup — `tests/unit/lib/lifecycle/dod-gate-journal-fallback.test.ts:59`\n\n**Scope:** `in_pr_scope`; the production-path test was rewritten in the cycle-3 diff\n**Evidence tier:** Tier 1 — static\n\n**Requirement:** AC-3 specifies a deterministic default-dependency test with canonical state mocked to `null`.\n\n**Observed:** The test mocks live status, journal records, and agents, but does not mock `getAutoCloseOutCanonicalState`. Every call to `checkPostMergeRow(ctx)` can therefore execute `gh issue view` through `deacon-canonical-state.ts`, and its cached tracker result can override the merge-status branch under test.\n\n**Impact:** After the Effect mocks are corrected, the suite remains network- and cache-dependent and can pass or fail based on GitHub availability or the current state of PAN-3025 rather than the supplied live/journal fixtures.\n\n**Fix:** Mock `getAutoCloseOutCanonicalState` to resolve `null` in this suite, matching the xBRIEF's required harness and isolating row 5's merge-status fallback.\n\n## ~ SHOULD\n\n- `tests/unit/lib/lifecycle/workflows.test.ts:985` now cleanly limits itself to workflow wiring while the new focused helper suite checks the two-condition completion witness. Once the focused suite uses valid Effect mocks, this division is appropriate.\n- The workflow short-circuit test should also assert `result.steps` has exactly one entry and `mockMarkRecordPipelineClosedOutSync` was not called, as named by AC-4; the early return currently makes this behavior clear, so this is advisory rather than an additional blocker.\n\n## Security\n\nNo security findings. The cycle diff changes tests only and introduces no new trust boundary, authorization, command, query, secret, network-service, or path-handling behavior in production.\n\n## Performance\n\nNo production performance findings. The only new performance concern is test-only: the unmocked canonical-state dependency can spawn a `gh` subprocess per uncached run, which is removed by the required deterministic mock above.\n\n## Requirements Coverage\n\n- **FR-1/NFR-2:** Implemented; close-out preserves the verification verdict and commit evidence.\n- **FR-2/AC-3:** Production implementation is correct, but the required regression suite fails and is not isolated from canonical-state network lookup.\n- **FR-3/NFR-1/AC-4:** Production helper and workflow wiring are present, but the required completed-close-out test fails because the status mock is not an Effect.\n- **FR-4/AC-2:** Implemented and verified with a real passed-to-pending fixture transition.\n- **Documentation and non-goals:** Complete and unchanged from the prior review.\n\n## Validation\n\nCommand run:\n\n`npx vitest run tests/unit/lib/lifecycle/dod-gate-idempotent-guard.test.ts tests/unit/lib/lifecycle/dod-gate-journal-fallback.test.ts tests/unit/lib/lifecycle/workflows.test.ts tests/lib/reopen.test.ts tests/unit/lib/pan-dir/record-close-out.test.ts src/lib/pan-dir/__tests__/records.test.ts src/lib/__tests__/close-out-terminal.test.ts`\n\nResult: **failed** — 2 test files failed, 5 passed; 4 tests failed, 96 passed, 1 skipped.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3025/.pan/review/agent-pan-3025-review-958a517a/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3025 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/__tests__/close-out-terminal.test.ts",
@@ -128,20 +120,19 @@
     "recordedAt": "2026-07-28T08:50:14.585Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T09:22:16.600Z",
+  "updated": "2026-07-28T09:24:45.150Z",
   "pipeline": {
     "issueId": "PAN-3025",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:50:42.357Z",
-    "updatedAt": "2026-07-28T09:22:16.589Z",
+    "updatedAt": "2026-07-28T09:24:44.614Z",
     "reviewNotes": "New production-path tests mock Effect APIs as Promises, causing four required regression tests to fail",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3221",
-    "reviewedAtCommit": "bcbc3a3c93ffe3fec08bb93297517e42b1a0f3c3",
     "lastVerifiedCommit": "6b218e665a20aeecd3e51dd3a9da4e695b49aa3e",
     "reviewSpawnedAt": "2026-07-28T09:11:09.871Z",
     "scopeDrift": {
@@ -184,38 +175,38 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3754343,
-            "output": 102317,
-            "cacheRead": 16427520,
+            "input": 3758759,
+            "output": 105309,
+            "cacheRead": 17236480,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2030,
-            "output": 101101,
-            "cacheRead": 46976328,
-            "cacheWrite": 2313704
+            "input": 2061,
+            "output": 105500,
+            "cacheRead": 47854200,
+            "cacheWrite": 2322627
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 3754343,
-          "output": 102317,
-          "cacheRead": 16427520,
+          "input": 3758759,
+          "output": 105309,
+          "cacheRead": 17236480,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2030,
-          "output": 101101,
-          "cacheRead": 46976328,
-          "cacheWrite": 2313704
+          "input": 2061,
+          "output": 105500,
+          "cacheRead": 47854200,
+          "cacheWrite": 2322627
         }
       },
       "costAtCloseOut": {
-        "usd": 38.152293,
-        "pricingAsOf": "2026-07-28T09:22:16.596Z"
+        "usd": 38.789581,
+        "pricingAsOf": "2026-07-28T09:24:44.647Z"
       }
     },
     "merges": [
