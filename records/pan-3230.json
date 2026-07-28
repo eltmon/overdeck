@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T17:31:52.723Z",
+  "updated": "2026-07-28T17:34:42.205Z",
   "pipeline": {
     "issueId": "PAN-3230",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "fix-flywheel-spec-drafts-scan": {
-        "writerId": "agent-pan-3230",
-        "agentId": "agent-pan-3230",
-        "pid": 1108658,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T17:31:52.723Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3230",
@@ -101,6 +93,17 @@
         "outcome": "completed",
         "reason": "Routed doctor orphan-proposed enumeration through getProjectPanPaths and added migrated state-worktree coverage.",
         "releasedAt": "2026-07-28T17:31:41.654Z"
+      },
+      {
+        "writerId": "agent-pan-3230",
+        "agentId": "agent-pan-3230",
+        "pid": 1108658,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T17:31:52.723Z",
+        "itemId": "fix-flywheel-spec-drafts-scan",
+        "outcome": "completed",
+        "reason": "Flywheel now resolves specs and drafts once through getProjectPanPaths and reuses the authoritative directories.",
+        "releasedAt": "2026-07-28T17:34:42.205Z"
       }
     ],
     "statusReasons": {
@@ -111,6 +114,10 @@
       "fix-doctor-orphan-scan": {
         "reason": "Routed doctor orphan-proposed enumeration through getProjectPanPaths and added migrated state-worktree coverage.",
         "updatedAt": "2026-07-28T17:31:41.654Z"
+      },
+      "fix-flywheel-spec-drafts-scan": {
+        "reason": "Flywheel now resolves specs and drafts once through getProjectPanPaths and reuses the authoritative directories.",
+        "updatedAt": "2026-07-28T17:34:42.205Z"
       }
     }
   },
@@ -122,6 +129,8 @@
     "fix-doctor-orphan-scan": "completed",
     "fix-doctor-orphan-scan.fix-doctor-orphan-scan.ac1": "completed",
     "fix-doctor-orphan-scan.fix-doctor-orphan-scan.ac2": "completed",
-    "fix-flywheel-spec-drafts-scan": "running"
+    "fix-flywheel-spec-drafts-scan": "completed",
+    "fix-flywheel-spec-drafts-scan.fix-flywheel-spec-drafts-scan.ac1": "completed",
+    "fix-flywheel-spec-drafts-scan.fix-flywheel-spec-drafts-scan.ac2": "completed"
   }
 }
