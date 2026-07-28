@@ -50,7 +50,7 @@
     "recordedAt": "2026-07-28T20:46:26.914Z"
   },
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T20:47:34.875Z",
+  "updated": "2026-07-28T20:48:01.206Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "pending",
@@ -71,7 +71,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3247",
-    "reviewRequestedAt": "2026-07-28T20:46:35.562Z",
+    "reviewRequestedAt": "2026-07-28T20:48:00.219Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/FLYWHEEL-STATE.md",
@@ -105,7 +105,8 @@
         "src/lib/agent-enrichment.ts"
       ],
       "recordedAt": "2026-07-28T20:46:26.914Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-28T20:48:00.219Z"
   },
   "closeOut": {
     "usage": {
