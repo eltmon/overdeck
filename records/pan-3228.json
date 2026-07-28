@@ -29,15 +29,7 @@
       "timestamp": "2026-07-28T19:32:02.435Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T19:32:02Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3228\n\n# Review — PAN-3228 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED — authentication is fixed, but three pending-decision recovery blockers remain unchanged\n\n## Context\n- Manifest: `.pan/review/agent-pan-3228-review-6f5cd82f/context.json`\n- Branch: `feature/pan-3228`\n- PR: https://github.com/eltmon/overdeck/pull/3241\n- HEAD reviewed: `6f5cd82fcf86789301625462a3bbdaf66f2efb76`\n- Cycle number: 2\n- Prior cycle SHA: `cb7d8f31782f5c054514f36493ec85ec0be5e0b0`\n- Cycle diff: one commit, changing `src/dashboard/server/routes/agents/permissions.ts` and adding `src/dashboard/server/routes/__tests__/agents-pane-choice-auth.test.ts`\n- Dimensions reviewed: correctness/logic, security, requirements/acceptance criteria, performance\n- Verification: pane-choice route suites passed, 4 tests across 2 files; cycle diff passes `git diff --check`\n- Scope note: the workspace currently has an uncommitted change in `src/lib/agents/recovery.ts`; this review evaluates the committed HEAD named by the run manifest, so that working-tree change is not part of the verdict.\n\n## Cycle-2 Finding Disposition\n\n| Prior finding | Disposition at committed HEAD |\n| --- | --- |\n| Pane-choice POST omitted origin/authentication guard | **Fixed.** The route now calls `validateOrigin` before reading the body, and the new route-level test proves an untrusted origin receives 403 without invoking the answer core. |\n| Graceful restart can destroy a decision appearing during its grace period | **Still blocking; file unchanged since cycle 1.** |\n| Forced discard is rediscovered from historical workspace JSONLs | **Still blocking; file unchanged since cycle 1.** |\n| Failed swarm slot drops the required needs-you escalation | **Still blocking; file unchanged since cycle 1.** |\n\n## Blocking Findings\n\n### ! [correctness] Graceful restart can destroy a decision that appears during its 60-second grace period — `src/lib/agents/recovery.ts:149`\n**Evidence tier:** Tier 1\n**Changed code:** `restartAgent()` checks `detectPendingOperatorDecision()` once at lines 107-121, then prepares the stack/harness and calls `sendGracefulRestartWarning()` before unconditionally stopping the session. The warning path waits 60 seconds and sends Escape before the warning.\n**Problem:** The live agent continues working after the sole decision check. If it reaches a permission, confirmation, or session-choice menu during preparation or the grace period, warning keystrokes can dismiss it or the later stop can destroy it even though `force` is false.\n**Runtime impact:** The incident invariant remains reachable through the normal graceful-restart path: no decision exists at request time, one appears during the one-minute grace period, and the restart discards it.\n**Fix:** Re-check immediately before warning keystrokes and immediately before `stopAgent()` after the wait. Abort with the typed `pending-operator-decision` result while leaving the session and projection untouched. Add the fake-timer race regression requested in cycle 1.\n\n### ! [correctness] A forced discard is rediscovered forever from historical workspace JSONLs — `src/lib/agents/pending-decision-gate.ts:70`\n**Evidence tier:** Tier 1\n**Changed code:** The gate calls `countPendingAskUserQuestionsForAgent(agentId)`, which scans every JSONL in the workspace project directory without limiting detection to the current agent session/generation.\n**Problem:** A forced fresh restart preserves the sacred historical JSONL containing the deliberately discarded AUQ. Every later restart, recovery, or autonomous re-drive scans that old file and recreates the gate; `pan answer` cannot answer a dead historical session.\n**Runtime impact:** The documented force escape hatch bypasses only its current call. The replacement agent is subsequently parked by stale state from the discarded session generation.\n**Fix:** Make the fallback session-generation-aware or persist a durable discard boundary/tombstone. Add a regression that force-discards an old AUQ, creates the replacement session, and proves the next gate check does not rediscover it.\n\n### ! [requirements] Failed swarm slots defer silently instead of emitting the required needs-you trip — `src/lib/cloister/swarm-failed-slot.ts:103`\n**Scope:** in_pr_scope\n**Evidence tier:** Tier 1\n**Requirement:** FR-4 and the issue body require autonomous destructive recovery to defer with a needs-you escalation when the agent owns a pending decision.\n**Expected:** A `{ decision: 'defer', needsYou: true }` result must persist/emit the canonical operator escalation and avoid requeueing.\n**Observed:** `requeueFailedSwarmSlots()` records only an action string and ignores `admission.needsYou`. Its recovery-trip call occurs after successful admission, so the pending-decision branch never reaches a durable needs-you writer.\n**Impact:** The slot is protected from replacement but can remain parked indefinitely without an actionable operator decision, contradicting the recovery contract and flywheel doctrine.\n**Fix:** Route `needsYou: true` through the canonical deduplicated needs-you writer before continuing, and add a failed-slot regression proving one escalation and no archive/requeue.\n\n## Non-blocking Finding\n\n### ~ [performance] The JSONL fallback performs an uncached workspace-wide scan on every gate evaluation — `src/lib/agents/pending-decision-gate.ts:70`\nEach evaluation can sequentially read and parse the last 512 KB of every transcript in the workspace. This remains advisory because recovery actions are infrequent, but the required session-generation correction should narrow or cache the scan.\n\n## Security Review\n- The cycle-1 authentication blocker is resolved correctly at `src/dashboard/server/routes/agents/permissions.ts:98`.\n- The guard runs before `readJsonBody` and before the answer core, matching the existing conversation pane-choice route.\n- The new test at `src/dashboard/server/routes/__tests__/agents-pane-choice-auth.test.ts` verifies 403 and no keystroke-core invocation for an untrusted origin.\n- No new security blocker was introduced by the cycle diff.\n\n## Requirement Coverage\n\n| Requirement | Status at committed HEAD |\n| --- | --- |\n| FR-1 / NFR-2 pending-decision helper | Partial — historical-session semantics remain blocking |\n| FR-2 fresh-start gate and force | Partial — force discard is not durable |\n| FR-3 / NFR-1 restart-family gate | Partial — graceful restart retains a decision-loss race |\n| FR-4 autonomous redrive + needs-you | Partial — failed swarm slots still drop needs-you |\n| FR-5 shared session pane-choice core | Implemented |\n| FR-6 agent GET/POST pane-choice routes | Implemented; authentication finding fixed this cycle |\n| FR-7 `pan answer` CLI | Implemented |\n| FR-8 flywheel doctrine | Implemented |\n| Documentation | Present, but still overstates durable force discard and universal needs-you behavior until the blockers above are fixed |\n\n## Non-goal Audit\nAll six must-not constraints remain satisfied: no decision-card UI/read-model plumbing, no supervisor protocol endpoint, no Channels revival, no nudge-path change, no unrelated Decisions indicator fix, and no rate-limit gating or auto-answer behavior.\n\n## Coverage\nCycle 1 reviewed the complete 43-file PR across correctness, security, requirements, and performance. Cycle 2 reviewed the full two-file delta and re-verified every prior blocker against committed HEAD; the three remaining blocker files have no committed changes since the prior verdict. The unrelated GitLab membership, transcript layout, generated manifest, documentation, and no-loss changes remain unchanged from the clean portions of cycle 1.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3228/.pan/review/agent-pan-3228-review-6f5cd82f/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3228 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -135,10 +127,10 @@
     "recordedAt": "2026-07-28T19:16:09.927Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T19:32:08.098Z",
+  "updated": "2026-07-28T19:36:33.716Z",
   "pipeline": {
     "issueId": "PAN-3228",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -146,11 +138,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:17:21.407Z",
-    "updatedAt": "2026-07-28T19:32:08.086Z",
+    "updatedAt": "2026-07-28T19:36:33.268Z",
     "reviewNotes": "Authentication is fixed, but graceful restart, historical-AUQ force discard, and swarm needs-you gaps remain",
     "inspectNotes": "All 3 ACs met. AC1: new src/lib/__tests__/session-pane-choice.test.ts covers 400 bad index, 400 missing signature, 409 menu-gone, 409 menu-changed, 409 delivery-unconfirmed, and 200 {ok,answeredLabel} with Down/Down/Enter keystrokes. AC2: tests/unit/lib/overdeck/conversation-pane-choice.test.ts is untouched by this commit (last touched by PAN-3113 commit 4d65ad1c) and its 12 cases pass through the delegating handler; 47/47 across the 4 pane-choice test files. AC3: captureSessionPaneChoice returns signature/title/options/recommended/selectedIndex and null on no-menu or capture throw. Delegation preserves defaults (conversation still passes tmuxSessionExists; core defaults to capturePaneText + Effect.runPromise(sessionExists)) and the validation ordering (400s before conv lookup).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3241",
-    "reviewedAtCommit": "6f5cd82fcf86789301625462a3bbdaf66f2efb76",
     "reviewSpawnedAt": "2026-07-28T19:30:21.209Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -262,17 +253,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2066638,
-            "output": 129823,
-            "cacheRead": 22743040,
+            "input": 2071862,
+            "output": 130015,
+            "cacheRead": 23194624,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2560092,
-            "output": 209150,
-            "cacheRead": 131805696,
+            "input": 2643468,
+            "output": 226431,
+            "cacheRead": 140226560,
             "cacheWrite": 0
           }
         }
@@ -285,15 +276,15 @@
           "cacheWrite": 121982
         },
         "openai/gpt-5.6-sol": {
-          "input": 4626730,
-          "output": 338973,
-          "cacheRead": 154548736,
+          "input": 4715330,
+          "output": 356446,
+          "cacheRead": 163421184,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 121.56683,
-        "pricingAsOf": "2026-07-28T19:32:08.092Z"
+        "usd": 126.970244,
+        "pricingAsOf": "2026-07-28T19:36:33.317Z"
       }
     },
     "merges": [
