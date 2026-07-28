@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T19:06:15.063Z",
+  "updated": "2026-07-28T19:14:42.907Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "wi6-launcher-command": {
-        "writerId": "agent-pan-1837",
-        "agentId": "agent-pan-1837",
-        "pid": 563517,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T19:06:15.063Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -144,6 +136,17 @@
         "outcome": "completed",
         "reason": "Pinned a real wire.jsonl fixture captured against the installed kimi 0.29.2 binary: 2-turn session (Read then Write tool calls) with inputCacheRead/inputCacheCreation usage fields, committed both flat and under the real sessions/<workDirKey>/<sessionId>/agents/main/ layout, confirming workDirKey format wd_<basename>_<12-hex-hash>. Truncated the large systemPrompt/tools_snapshot fields to placeholders (irrelevant to the parser, would embed local-machine skill catalog detail). Resolved the delivery checkpoint live: spawned the real PTY supervisor against installed kimi in a throwaway tmux session, delivered a message through the production code path, and confirmed Kimi processed and answered it -- standalone CR submits, no Ctrl-J or tmux-paste fallback needed. Recorded as D9 in .overdeck/continue.json.",
         "releasedAt": "2026-07-28T19:05:56.125Z"
+      },
+      {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 563517,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T19:06:15.063Z",
+        "itemId": "wi6-launcher-command",
+        "outcome": "completed",
+        "reason": "Added buildKimiCodeCommand (kimi -m <model> [--yolo] [--add-dir <dir>]..., wrapped in the PTY supervisor, no --session/--work-dir/-p per D2/erratum E1), wired into both dispatch sites, plus the kimiCodeModel/kimiCodeYolo/kimiCodeAddDirs LauncherConfig fields. Added getKimiCodeLauncherFields and the kimi-code-tui stub-command branch in both getAgentRuntimeBaseCommand/getRoleRuntimeBaseCommand, mirroring the acp-host pattern; unsetProviderEnv:true reuses the existing PROVIDER_ENV_UNSETS list for D4/H3. Extended launcher-generator.test.ts with 6 new kimi-code assertions (all 70 tests pass). Had to allowlist launcher-generator.ts's growth (1005 lines, was 1000). typecheck unchanged (only wi11's frontend gap remains). Actually wiring these fields into the real spawn call sites (spawn.ts/spawn-prep.ts/conversation-runtime.ts) is wi5's scope, not touched here.",
+        "releasedAt": "2026-07-28T19:14:42.907Z"
       }
     ],
     "statusReasons": {
@@ -166,6 +169,10 @@
       "wi-fixture": {
         "reason": "Pinned a real wire.jsonl fixture captured against the installed kimi 0.29.2 binary: 2-turn session (Read then Write tool calls) with inputCacheRead/inputCacheCreation usage fields, committed both flat and under the real sessions/<workDirKey>/<sessionId>/agents/main/ layout, confirming workDirKey format wd_<basename>_<12-hex-hash>. Truncated the large systemPrompt/tools_snapshot fields to placeholders (irrelevant to the parser, would embed local-machine skill catalog detail). Resolved the delivery checkpoint live: spawned the real PTY supervisor against installed kimi in a throwaway tmux session, delivered a message through the production code path, and confirmed Kimi processed and answered it -- standalone CR submits, no Ctrl-J or tmux-paste fallback needed. Recorded as D9 in .overdeck/continue.json.",
         "updatedAt": "2026-07-28T19:05:56.125Z"
+      },
+      "wi6-launcher-command": {
+        "reason": "Added buildKimiCodeCommand (kimi -m <model> [--yolo] [--add-dir <dir>]..., wrapped in the PTY supervisor, no --session/--work-dir/-p per D2/erratum E1), wired into both dispatch sites, plus the kimiCodeModel/kimiCodeYolo/kimiCodeAddDirs LauncherConfig fields. Added getKimiCodeLauncherFields and the kimi-code-tui stub-command branch in both getAgentRuntimeBaseCommand/getRoleRuntimeBaseCommand, mirroring the acp-host pattern; unsetProviderEnv:true reuses the existing PROVIDER_ENV_UNSETS list for D4/H3. Extended launcher-generator.test.ts with 6 new kimi-code assertions (all 70 tests pass). Had to allowlist launcher-generator.ts's growth (1005 lines, was 1000). typecheck unchanged (only wi11's frontend gap remains). Actually wiring these fields into the real spawn call sites (spawn.ts/spawn-prep.ts/conversation-runtime.ts) is wi5's scope, not touched here.",
+        "updatedAt": "2026-07-28T19:14:42.907Z"
       }
     }
   },
@@ -192,6 +199,10 @@
     "wi-fixture.wi-fixture.ac1": "completed",
     "wi-fixture.wi-fixture.ac2": "completed",
     "wi-fixture.wi-fixture.ac3": "completed",
-    "wi6-launcher-command": "running"
+    "wi6-launcher-command": "completed",
+    "wi6-launcher-command.wi6-launcher-command.ac1": "completed",
+    "wi6-launcher-command.wi6-launcher-command.ac2": "completed",
+    "wi6-launcher-command.wi6-launcher-command.ac3": "completed",
+    "wi6-launcher-command.wi6-launcher-command.ac4": "completed"
   }
 }
