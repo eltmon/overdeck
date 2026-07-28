@@ -46,7 +46,6 @@ import {
 import { isXBriefFilename } from '../../lib/xbrief/lifecycle.js';
 // Minimum supported omp harness version (PAN-1989); its lineage differs from pi and was baselined at 16.1.16.
 export const SUPPORTED_OMP_VERSION_MIN = '16.1.0';
-
 const execAsync = promisify(exec);
 
 function compareSemver(a: string, b: string): number {
