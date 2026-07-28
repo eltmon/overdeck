@@ -111,10 +111,16 @@ export function mergePipelineVerdictAware(
 }
 
 /**
- * Does the journal already carry every terminal verdict the workspace fallback
- * is holding? The drain uses this before deleting a fallback as superseded: a
+ * Has the journal settled every gate the workspace fallback holds a terminal
+ * verdict for? The drain asks this before deleting a fallback as superseded: a
  * newer-but-verdict-free journal write must not consume a verdict that never
  * landed anywhere (PAN-3092; MIN-902 lost its review verdict exactly this way).
+ *
+ * Callers must already have established that the journal is at least as new as
+ * the fallback, so a gate the journal has driven to ANY terminal value counts
+ * as covered — it is the newer verdict, and folding the fallback over it would
+ * regress it. Only a non-terminal journal value (reviewing, testing, pending)
+ * means the verdict never landed.
  */
 export function pipelineCoversFallbackVerdicts(
   journal: PanIssuePipelineRecord,
@@ -129,9 +135,8 @@ export function pipelineCoversFallbackVerdicts(
   const journalFields = fields(journal);
   const fallbackFields = fields(fallback.pipeline);
   for (const gate of GATE_NAMES) {
-    const held = fallbackFields[gate];
-    if (!isTerminal(gate, held)) continue;
-    if (journalFields[gate] !== held) return false;
+    if (!isTerminal(gate, fallbackFields[gate])) continue;
+    if (!isTerminal(gate, journalFields[gate])) return false;
   }
   return true;
 }

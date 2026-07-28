@@ -166,6 +166,20 @@ describe('pipelineCoversFallbackVerdicts (PAN-3092)', () => {
     ).toBe(true);
   });
 
+  it('reports covered when the newer journal settled the gate on a different verdict', () => {
+    // The caller has already established the journal is at least as new, so a
+    // journal that reached its own terminal verdict is the newer truth —
+    // folding the fallback over it would regress it.
+    const journal = pipeline({
+      reviewStatus: 'blocked',
+      reviewSpawnedAt: CYCLE,
+      updatedAt: '2026-07-27T00:30:00.000Z',
+    });
+    expect(
+      pipelineCoversFallbackVerdicts(journal, fallback({ reviewStatus: 'passed' })),
+    ).toBe(true);
+  });
+
   it('reports covered when the journal belongs to a strictly newer review cycle', () => {
     const journal = pipeline({
       reviewStatus: 'reviewing',

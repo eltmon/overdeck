@@ -4,6 +4,7 @@ import { basename, dirname, join } from 'node:path';
 import type { ReviewStatus } from '../review-status.js';
 import { updateIssueRecordForIssue, type PanIssuePipelineRecord } from '../pan-dir/records.js';
 import { readIssueRecord, readIssueRecordSync } from '../pan-dir/record.js';
+import { pipelineCoversFallbackVerdicts } from '../pan-dir/pipeline-verdict-merge.js';
 import { resolveProjectFromIssueSync, getProjectSync } from '../projects.js';
 
 // PAN-2689: fire-and-forget journal writes die with the process in a short-lived
@@ -401,7 +402,17 @@ export async function drainWorkspaceVerdictFallback(issueId: string): Promise<bo
   const losers = claims.filter((claim) => claim !== winner);
   const { fallback } = winner;
   const journal = readPipelineSync(issueId);
-  if (journal?.updatedAt && !(journal.updatedAt < fallback.updatedAt)) {
+  // PAN-3092: a newer `updatedAt` alone is not evidence the journal carries the
+  // verdict — `projectPipeline` stamps it on every write, verdict or not, so a
+  // bookkeeping write landing after a contended verdict used to make the drain
+  // delete the only surviving copy (MIN-902). Supersede only when the journal
+  // has actually settled the gates the fallback holds, or has moved to a newer
+  // review cycle.
+  if (
+    journal?.updatedAt
+    && !(journal.updatedAt < fallback.updatedAt)
+    && pipelineCoversFallbackVerdicts(journal, fallback)
+  ) {
     for (const claim of claims) rmSync(claim.claimPath, { force: true });
     return true;
   }

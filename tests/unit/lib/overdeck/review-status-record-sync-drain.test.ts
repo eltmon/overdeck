@@ -85,9 +85,41 @@ describe('workspace verdict fallback drain (PAN-2989)', () => {
     rmSync(state.projectPath, { recursive: true, force: true });
   });
 
-  it('deletes the fallback without a record write when the journal is already newer', async () => {
+  it('deletes the fallback without a record write when the journal is newer and already carries the verdict', async () => {
     state.pipeline = { reviewStatus: 'passed', testStatus: 'passed', updatedAt: '2026-07-22T10:00:00.000Z' };
-    writeFallback('2026-07-22T09:00:00.000Z', { reviewStatus: 'blocked' });
+    writeFallback('2026-07-22T09:00:00.000Z', { reviewStatus: 'passed' });
+
+    await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(true);
+
+    expect(mockUpdateIssueRecordForIssue).not.toHaveBeenCalled();
+    expect(existsSync(fallbackPathOrThrow())).toBe(false);
+  });
+
+  it('folds the verdict when the journal is newer but verdict-free (PAN-3092 / MIN-902)', async () => {
+    // The contended reviewer's `passed` went to the fallback; a bookkeeping
+    // write landed a minute later with a newer timestamp and no verdict. The
+    // timestamp-only supersede check used to delete the only surviving copy.
+    state.pipeline = { reviewStatus: 'reviewing', testStatus: 'pending', updatedAt: '2026-07-22T10:00:00.000Z' };
+    writeFallback('2026-07-22T09:00:00.000Z', { reviewStatus: 'passed', reviewNotes: 'APPROVED' });
+    mockUpdateIssueRecordForIssue.mockResolvedValue(true);
+
+    await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(true);
+
+    expect(mockUpdateIssueRecordForIssue).toHaveBeenCalledTimes(1);
+    const [, status] = mockUpdateIssueRecordForIssue.mock.calls[0] as [string, ReviewStatus];
+    expect(status.reviewStatus).toBe('passed');
+    expect(status.reviewNotes).toBe('APPROVED');
+    expect(existsSync(fallbackPathOrThrow())).toBe(false);
+  });
+
+  it('deletes the fallback without a record write when the journal moved to a newer review cycle', async () => {
+    state.pipeline = {
+      reviewStatus: 'reviewing',
+      testStatus: 'pending',
+      reviewSpawnedAt: '2026-07-22T11:00:00.000Z',
+      updatedAt: '2026-07-22T11:00:01.000Z',
+    };
+    writeFallback('2026-07-22T09:00:00.000Z', { reviewStatus: 'passed', reviewNotes: 'APPROVED (previous cycle)' });
 
     await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(true);
 
