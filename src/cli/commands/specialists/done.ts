@@ -340,8 +340,26 @@ export async function doneAndExitCommand(
   // PAN-2689: setReviewStatusSync's journal write is fire-and-forget; in this
   // short-lived process an immediate exit kills it — and in a sandbox (readonly
   // DB) that write is the ONLY durable copy of the verdict. Drain it first.
-  const { flushReviewStatusJournalWrites } = await import('../../../lib/overdeck/review-status-record-sync.js');
+  const {
+    flushReviewStatusJournalWrites,
+    readWorkspaceVerdictFallbackSync,
+    workspaceVerdictFallbackPath,
+  } = await import('../../../lib/overdeck/review-status-record-sync.js');
   await flushReviewStatusJournalWrites();
+  // PAN-3092: the flush waited out the verdict-write backoff. A fallback that
+  // still exists means the record lock is contended, NOT that the verdict was
+  // lost — MIN-902's reviewer re-ran this command for an hour at ~$5/hr because
+  // nothing said so. Say it plainly, once.
+  const normalized = issueId.toUpperCase();
+  if (readWorkspaceVerdictFallbackSync(normalized)) {
+    const path = workspaceVerdictFallbackPath(normalized) ?? 'the workspace fallback file';
+    console.log(chalk.yellow(
+      `\n⚠ The journal write is contended — the verdict is already durable at ${path}.\n` +
+      `  The host folds it into the canonical record automatically (the fallback drain\n` +
+      `  plus the deacon's stranded-fallback sweep). Do NOT re-run this signal: repeated\n` +
+      `  signals add lock pressure and burn tokens without making the verdict any safer.`,
+    ));
+  }
   return exitCli(0);
 }
 

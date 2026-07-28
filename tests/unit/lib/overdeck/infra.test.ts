@@ -167,3 +167,79 @@ describe('overdeck infra', () => {
     expect(MemoryFiles.key).toBe('overdeck/MemoryFiles');
   });
 });
+
+/**
+ * PAN-3092: the at-most-once append claims its key in `event_idempotency`, which
+ * lives in overdeck.db. Hand-built test databases that pre-create the table
+ * prove nothing about the shipping path — this exercises the real schema door,
+ * including the case that matters most in the field: an EXISTING database, where
+ * the init migration short-circuits on `agents` and only a runtime top-up runs.
+ */
+describe('event_idempotency reaches overdeck.db through the real schema door (PAN-3092)', () => {
+  function tableExists(dbPath: string): boolean {
+    const raw = openDatabase(dbPath);
+    try {
+      return !!raw.prepare(
+        `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'event_idempotency'`,
+      ).get();
+    } finally {
+      raw.close();
+    }
+  }
+
+  it('creates the table on a fresh database', async () => {
+    const { getOverdeckDatabaseSync, closeOverdeckDatabaseSync } =
+      await import('../../../../src/lib/overdeck/infra.js');
+    const dbPath = join(makeTempDir(), 'overdeck.db');
+
+    getOverdeckDatabaseSync(dbPath);
+    closeOverdeckDatabaseSync();
+
+    expect(tableExists(dbPath)).toBe(true);
+  });
+
+  it('tops up an existing database whose init migration already ran', async () => {
+    const { getOverdeckDatabaseSync, closeOverdeckDatabaseSync } =
+      await import('../../../../src/lib/overdeck/infra.js');
+    const dbPath = join(makeTempDir(), 'overdeck.db');
+
+    // Build a production-shaped database, then drop the table to model every
+    // installation that predates it. `agents` is present, so the init migration
+    // returns early and only the runtime top-up can restore it.
+    getOverdeckDatabaseSync(dbPath);
+    closeOverdeckDatabaseSync();
+    const raw = openDatabase(dbPath);
+    raw.exec('DROP TABLE event_idempotency');
+    expect(!!raw.prepare(`SELECT name FROM sqlite_master WHERE name = 'agents'`).get()).toBe(true);
+    raw.close();
+    expect(tableExists(dbPath)).toBe(false);
+
+    getOverdeckDatabaseSync(dbPath);
+    closeOverdeckDatabaseSync();
+
+    expect(tableExists(dbPath)).toBe(true);
+  });
+
+  it('lets appendOnce succeed against a database opened the production way', async () => {
+    const { getOverdeckDatabaseSync, closeOverdeckDatabaseSync } =
+      await import('../../../../src/lib/overdeck/infra.js');
+    const { createEventStore } = await import('../../../../src/dashboard/server/event-store.js');
+    const dbPath = join(makeTempDir(), 'overdeck.db');
+
+    const db = getOverdeckDatabaseSync(dbPath);
+    try {
+      const store = createEventStore(db as never);
+      const event = {
+        type: 'activity.entry',
+        timestamp: new Date().toISOString(),
+        payload: { id: 'verdict-fallback:PAN-3092:gen-1' },
+      };
+
+      // The exact production call that returned HTTP 500 with the table missing.
+      expect(store.appendOnce(event as never, 'episode-1').outcome).toBe('appended');
+      expect(store.appendOnce(event as never, 'episode-1').outcome).toBe('duplicate');
+    } finally {
+      closeOverdeckDatabaseSync();
+    }
+  });
+});

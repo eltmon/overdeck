@@ -1,5 +1,36 @@
 import type { PanIssueRecoveryTrip } from '../pan-dir/record.js';
+import { readIssueRecord } from '../pan-dir/record.js';
 import { updateIssueRecordForWorkspace } from '../pan-dir/record-update.js';
+import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
+
+/**
+ * PAN-3092: read an existing trip without taking the per-issue record lock.
+ *
+ * A caller that surfaces lock contention needs to know whether it has already
+ * surfaced this episode, and it cannot learn that from a path that takes the
+ * contended lock. Best-effort: an unreadable record returns undefined, which
+ * callers must treat as "not yet surfaced" so a first warning is never lost.
+ */
+export async function findRecoveryTrip(
+  issue: string,
+  recoveryPath: string,
+  obligationGeneration: string,
+): Promise<PanIssueRecoveryTrip | undefined> {
+  const normalized = issue.toUpperCase();
+  try {
+    const resolved = resolveProjectFromIssueSync(normalized);
+    if (!resolved) return undefined;
+    const project = getProjectSync(resolved.projectKey);
+    if (!project) return undefined;
+    const record = await readIssueRecord(project, normalized);
+    return (record?.recoveryTrips ?? []).find(trip =>
+      trip.issue === normalized
+      && trip.recoveryPath === recoveryPath
+      && trip.obligationGeneration === obligationGeneration);
+  } catch {
+    return undefined;
+  }
+}
 
 export async function recordRecoveryFailure(
   workspacePath: string,

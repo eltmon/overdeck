@@ -4,6 +4,12 @@ import { basename, dirname, join } from 'node:path';
 import type { ReviewStatus } from '../review-status.js';
 import { updateIssueRecordForIssue, type PanIssuePipelineRecord } from '../pan-dir/records.js';
 import { readIssueRecord, readIssueRecordSync } from '../pan-dir/record.js';
+import {
+  findFallbackVerdictConflicts,
+  pipelineConflictsWithFallbackVerdicts,
+  pipelineCoversFallbackVerdicts,
+  type VerdictConflict,
+} from '../pan-dir/pipeline-verdict-merge.js';
 import { resolveProjectFromIssueSync, getProjectSync } from '../projects.js';
 
 // PAN-2689: fire-and-forget journal writes die with the process in a short-lived
@@ -12,30 +18,70 @@ import { resolveProjectFromIssueSync, getProjectSync } from '../projects.js';
 // before process.exit — the long-lived server never needs to await these.
 const pendingJournalWrites = new Set<Promise<void>>();
 
-export function updateIssueRecordForReviewStatusSync(issueId: string, status: ReviewStatus): void {
+/**
+ * PAN-3092: a journal write carrying a NEW terminal verdict retries under lock
+ * contention instead of dropping straight to the workspace fallback. MIN-902's
+ * reviewer re-ran `pan admin specialists done` for an hour at LLM-turn cost
+ * (~$5/hr) because the only retry available to it was another agent turn; this
+ * schedule (~2.6 min total) does the same waiting in-process for free. The long
+ * tail belongs to the deacon sweep, not to the agent.
+ */
+const DEFAULT_VERDICT_BACKOFF_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 40_000, 80_000] as const;
+
+function verdictWriteBackoffDelaysMs(): readonly number[] {
+  const raw = process.env.OVERDECK_VERDICT_BACKOFF_DELAYS_MS;
+  if (!raw) return DEFAULT_VERDICT_BACKOFF_DELAYS_MS;
+  const parsed = raw
+    .split(',')
+    .map((part) => Number(part.trim()))
+    .filter((ms) => Number.isFinite(ms) && ms >= 0);
+  return parsed.length > 0 ? parsed : DEFAULT_VERDICT_BACKOFF_DELAYS_MS;
+}
+
+/**
+ * One journal-write attempt. `false` means the durable write definitively
+ * failed; `undefined` (a test double, say) is "unknown", not "failed", and only
+ * a definite `true` is safe to treat as a landed write.
+ */
+async function attemptJournalWrite(
+  issueId: string,
+  status: ReviewStatus,
+): Promise<boolean | undefined> {
+  try {
+    return await updateIssueRecordForIssue(issueId, status);
+  } catch {
+    return false;
+  }
+}
+
+export function updateIssueRecordForReviewStatusSync(
+  issueId: string,
+  status: ReviewStatus,
+  options?: { verdictWrite?: boolean },
+): void {
   // PAN-2583: the state-dir journal is the durable home, but a sandboxed reviewer
   // (codex workspace-write) cannot write ${OVERDECK_HOME}/state — and swallowing that
   // failure here is how blocked review verdicts silently vanished for hours. When the
   // journal write does not land, drop the durable verdict into the workspace runtime
   // dir (the one place a sandboxed agent can always write); readJournalStatusSync
   // overlays it on the next host-side read.
-  const write = Promise.resolve(updateIssueRecordForIssue(issueId, status))
-    .then((landed) => {
-      // Only an explicit `false` means the durable write failed — undefined
-      // (e.g. a test double) is "unknown", not "failed".
-      if (landed === false) {
-        writeWorkspaceVerdictFallbackSync(issueId, status);
-        scheduleVerdictFallbackDrain(issueId);
-      } else if (landed === true) {
+  const delays = options?.verdictWrite ? verdictWriteBackoffDelaysMs() : [];
+  const write = (async () => {
+    for (let attempt = 0; ; attempt += 1) {
+      const landed = await attemptJournalWrite(issueId, status);
+      if (landed !== false) {
         // PAN-2989: a landed journal write is the earliest safe moment to fold any
         // pending workspace fallback back into the canonical record.
-        trackVerdictFallbackDrain(issueId);
+        if (landed === true) trackVerdictFallbackDrain(issueId);
+        return;
       }
-    })
-    .catch(() => {
-      writeWorkspaceVerdictFallbackSync(issueId, status);
-      scheduleVerdictFallbackDrain(issueId);
-    });
+      const delay = delays[attempt];
+      if (delay === undefined) break;
+      await new Promise<void>((resolve) => { setTimeout(resolve, delay); });
+    }
+    writeWorkspaceVerdictFallbackSync(issueId, status);
+    scheduleVerdictFallbackDrain(issueId);
+  })();
   pendingJournalWrites.add(write);
   void write.finally(() => pendingJournalWrites.delete(write));
 }
@@ -93,6 +139,7 @@ export function enrichReviewNotesFromRecordSync(issueId: string, status: ReviewS
     ...status,
     reviewNotes: pipeline.reviewNotes ?? status.reviewNotes,
     testNotes: pipeline.testNotes ?? status.testNotes,
+    uatNotes: pipeline.uatNotes ?? status.uatNotes,
     mergeNotes: pipeline.mergeNotes ?? status.mergeNotes,
     inspectNotes: pipeline.inspectNotes ?? status.inspectNotes,
     verificationNotes: pipeline.verificationNotes ?? status.verificationNotes,
@@ -121,6 +168,10 @@ function durableSubset(p: PanIssuePipelineRecord): DurableStatusFields {
   return {
     reviewStatus: p.reviewStatus as ReviewStatus['reviewStatus'],
     testStatus: p.testStatus as ReviewStatus['testStatus'],
+    // PAN-3092: UAT gates merge eligibility, so a contended UAT verdict must
+    // survive in the fallback like every other gate's.
+    uatStatus: (p.uatStatus as ReviewStatus['uatStatus']) ?? undefined,
+    uatNotes: p.uatNotes,
     mergeStatus: (p.mergeStatus as ReviewStatus['mergeStatus']) ?? undefined,
     mergeStep: p.mergeStep,
     inspectStatus: (p.inspectStatus as ReviewStatus['inspectStatus']) ?? undefined,
@@ -162,7 +213,7 @@ function durableSubset(p: PanIssuePipelineRecord): DurableStatusFields {
  * write failed. Lives in the workspace runtime dir (gitignored), swept by
  * readJournalStatusSync on the next host-side read.
  */
-interface WorkspaceVerdictFallback {
+export interface WorkspaceVerdictFallback {
   issueId: string;
   updatedAt: string;
   pipeline: DurableStatusFields;
@@ -322,7 +373,7 @@ function claimWorkspaceVerdictFallbackSync(
   return claims.length > 0 ? claims : null;
 }
 
-function readWorkspaceVerdictFallbackSync(issueId: string): WorkspaceVerdictFallback | null {
+export function readWorkspaceVerdictFallbackSync(issueId: string): WorkspaceVerdictFallback | null {
   try {
     const path = workspaceVerdictFallbackPath(issueId);
     if (!path) return null;
@@ -348,7 +399,7 @@ function readWorkspaceVerdictFallbackSync(issueId: string): WorkspaceVerdictFall
   }
 }
 
-async function readWorkspaceVerdictFallback(issueId: string): Promise<WorkspaceVerdictFallback | null> {
+export async function readWorkspaceVerdictFallback(issueId: string): Promise<WorkspaceVerdictFallback | null> {
   try {
     const path = workspaceVerdictFallbackPath(issueId);
     if (!path) return null;
@@ -388,6 +439,25 @@ const drainTimers = new Map<string, NodeJS.Timeout>();
  * write was in flight stays at the live path for its own drain schedule, and
  * no step ever renames onto a path another process may have just created.
  */
+/**
+ * PAN-3092: why is a fallback still pending? A failed drain returns `false` for
+ * two materially different reasons — the record write lost to a contended lock,
+ * or the fold was deliberately withheld because the journal and the fallback
+ * hold different terminal verdicts for one gate. Only the first clears on its
+ * own; the second is permanent until an operator picks a verdict, so the sweep
+ * must be able to tell them apart before it tells anyone to wait.
+ *
+ * Read-only and lock-free: the caller is already reporting lock contention.
+ */
+export async function findWorkspaceVerdictConflicts(
+  issueId: string,
+  fallback: { updatedAt: string; pipeline: DurableStatusFields },
+): Promise<VerdictConflict[]> {
+  const journal = await readPipeline(issueId);
+  if (!journal?.updatedAt || journal.updatedAt < fallback.updatedAt) return [];
+  return findFallbackVerdictConflicts(journal, fallback);
+}
+
 export async function drainWorkspaceVerdictFallback(issueId: string): Promise<boolean> {
   const claims = claimWorkspaceVerdictFallbackSync(issueId);
   if (!claims) return true;
@@ -401,10 +471,24 @@ export async function drainWorkspaceVerdictFallback(issueId: string): Promise<bo
   const losers = claims.filter((claim) => claim !== winner);
   const { fallback } = winner;
   const journal = readPipelineSync(issueId);
-  if (journal?.updatedAt && !(journal.updatedAt < fallback.updatedAt)) {
+  // PAN-3092: a newer `updatedAt` alone is not evidence the journal carries the
+  // verdict — `projectPipeline` stamps it on every write, verdict or not, so a
+  // bookkeeping write landing after a contended verdict used to make the drain
+  // delete the only surviving copy (MIN-902). Supersede only when the journal
+  // has actually settled the gates the fallback holds, or has moved to a newer
+  // review cycle.
+  const journalAtLeastAsNew = !!journal?.updatedAt && !(journal.updatedAt < fallback.updatedAt);
+  if (journalAtLeastAsNew && pipelineCoversFallbackVerdicts(journal!, fallback)) {
     for (const claim of claims) rmSync(claim.claimPath, { force: true });
     return true;
   }
+  // PAN-3092: the journal and the fallback hold different terminal verdicts for
+  // the same gate and nothing can order them — the whole-pipeline `updatedAt`
+  // is restamped by bookkeeping, so it is not evidence either way. Folding would
+  // be declined by the verdict-aware merge and deleting would destroy the only
+  // written copy of one verdict, so preserve the fallback and let the sweep put
+  // the conflict in front of an operator.
+  const conflicted = journalAtLeastAsNew && pipelineConflictsWithFallbackVerdicts(journal!, fallback);
   // projectPipeline projects only from the ReviewStatus, so fields the fallback
   // cleared (clearedFields) stay absent and do not resurrect from the record.
   const status = {
@@ -413,12 +497,13 @@ export async function drainWorkspaceVerdictFallback(issueId: string): Promise<bo
     updatedAt: fallback.updatedAt,
     readyForMerge: false, // derived on read; the stored value is never consulted
   } as ReviewStatus;
-  const landed = await updateIssueRecordForIssue(issueId, status);
+  const landed = conflicted ? false : await updateIssueRecordForIssue(issueId, status);
   if (landed) {
     for (const claim of claims) rmSync(claim.claimPath, { force: true });
     return true;
   }
-  // The fold failed: superseded generations are dropped, and the winner is
+  // The fold failed or was withheld as conflicting: superseded generations are
+  // dropped, and the winner is
   // published back to the live path with ATOMIC no-replace semantics —
   // linkSync fails with EEXIST when a concurrent writer already created a
   // live file, so a newer verdict that arrived during the await can never be

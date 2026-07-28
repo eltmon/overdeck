@@ -19,6 +19,7 @@ import {
 } from './cloister/review-status-source.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
+import { carriesNewTerminalVerdict } from './pan-dir/pipeline-verdict-merge.js';
 import {
   reviewGatesPassedSync,
   verificationSatisfied,
@@ -333,7 +334,10 @@ export function setReviewStatusSync(
   // ${OVERDECK_HOME}/state/<project>/records/ — unwritable in a sandbox, so the writer falls back
   // to <workspace>/.overdeck/pipeline-verdict.json (PAN-2583). Fire-and-forget: a short-lived CLI
   // MUST drain via flushReviewStatusJournalWrites() before exit (PAN-2689). No xBRIEF mirror (PAN-1124).
-  updateIssueRecordForReviewStatusSync(issueId, updated);
+  // PAN-3092: a NEW terminal verdict is the write the agent cannot cheaply retry,
+  // so it gets the journal writer's backoff instead of an immediate fallback drop.
+  const verdictWrite = carriesNewTerminalVerdict(status as unknown as Record<string, unknown>, update);
+  updateIssueRecordForReviewStatusSync(issueId, updated, { verdictWrite });
 
   // The DB cache write is best-effort. A sandboxed agent's write throws SQLITE_READONLY, but
   // the verdict is already durable in the journal above, and the host reconciles the cache on
