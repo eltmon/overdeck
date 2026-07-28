@@ -55,17 +55,17 @@
     "recordedAt": "2026-07-28T20:46:26.914Z"
   },
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T21:05:05.336Z",
+  "updated": "2026-07-28T21:05:23.592Z",
   "pipeline": {
     "issueId": "PAN-3233",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:48:00.219Z",
-    "updatedAt": "2026-07-28T21:05:05.197Z",
+    "updatedAt": "2026-07-28T21:05:23.520Z",
     "reviewNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-28T20:22:39.328Z by deploy-patrol, flywheel-orchestrator, merge-step0). It re-runs automatically after the deploy.",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -78,6 +78,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3247",
     "reviewRequestedAt": "2026-07-28T20:48:00.219Z",
+    "reviewSpawnedAt": "2026-07-28T21:05:23.518Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/FLYWHEEL-STATE.md",
@@ -149,7 +150,7 @@
       },
       "costAtCloseOut": {
         "usd": 17.108087,
-        "pricingAsOf": "2026-07-28T21:05:05.291Z"
+        "pricingAsOf": "2026-07-28T21:05:23.564Z"
       }
     },
     "merges": [
