@@ -1,0 +1,246 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T06:50:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3212: Resume-contract delivery presses Enter into the session-resume gate, silently choosing \"Resume from summary\" over the operator's \"as-is\"",
+    "updated": "2026-07-28T06:49:39.640Z"
+  },
+  "plan": {
+    "id": "pan-3212",
+    "title": "Resume-contract delivery presses Enter into the session-resume gate, silently choosing \"Resume from summary\" over the operator's \"as-is\"",
+    "status": "proposed",
+    "uid": "c2e3b4aa-25af-4d9f-9ddf-8702c95152d5",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-28T06:50:00.000Z",
+    "updated": "2026-07-28T06:49:39.640Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3212",
+        "label": "PAN-3212",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "tmux",
+      "delivery",
+      "conversations",
+      "regression-guard",
+      "tests"
+    ],
+    "narratives": {
+      "Problem": "The issue's three-bullet fix is already merged to origin/main as fac085ef4e (paneHasBlockingChoiceMenu guard mode, sendKeys MessageDeliveryFailed abort, handleConversationResume gate skip), but the two new behavior branches have no branch-level tests, and one sibling Enter path — completeKeyedSubmit's if-shell transaction in src/lib/tmux-dedup.ts — still has no blocking-menu guard. A regression in any of these re-opens the incident: a stray Enter answering a harness modal (resume gate, permission prompt, plan approval) the operator never asked Overdeck to answer.",
+      "Proposal": "Residual hardening in three independent items: (1) unit-test the sendKeys blocking-menu guard with the established execFile-mock + fake-timers pattern; (2) extract the resume gate-skip into an exported seam (src/lib/overdeck/resume-contract-delivery.ts) and unit-test its four outcomes; (3) extend paneHasBlockingChoiceMenu to completeKeyedSubmit via a KeyedTmuxDeps.readPaneText seam, aborting before the if-shell Enter with the pending marker preserved, plus a one-sentence CLAUDE.md doc update.",
+      "NonGoals": "- Re-implementing the merged fix (fac085ef4e) — verified present on origin/main.\n- Guarding the summary-fork standalone-Enter nudge (src/lib/overdeck/conversation-forks.ts:368-369) — pane-verified, capped at two Enters by design.\n- Changing PTY supervisor delivery semantics — it already purges unconfirmed payloads rather than pressing Enter.\n- Guarding sendKeys's post-submit re-Enter (src/lib/tmux.ts:1262-1266) — fires only after a verified paste in an active composer.\n- Retroactive recovery of conv/1466 — its history is intact in a55576b8-538a-4056-b0bd-5e6bfc3cc4fb.jsonl per the issue.\n- Changing the keyed path's marker/poison/terminal transaction semantics (cycles 10-13) beyond the pre-transaction abort."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Plan residual hardening (tests + keyed-path guard) instead of implementing the issue's fix.",
+        "rationale": "The fix described in the issue body is already merged to origin/main as fac085ef4e — verified in code: guard mode in src/lib/pane-choice-menu.ts:270, MessageDeliveryFailed abort at src/lib/tmux.ts:1237-1243, gate skip at src/lib/overdeck/conversation-runtime.ts:906-912, 28 parser tests green. Re-implementing would be wasted work; the defensible residual is locking the behavior with tests."
+      },
+      {
+        "summary": "Extend the never-answer-a-menu guard to completeKeyedSubmit.",
+        "rationale": "The issue's root-cause section explicitly generalizes the blast radius to any delivery path that can confirm a modal's default, and the keyed path's if-shell Enter (src/lib/tmux-dedup.ts:434-439) was the only remaining path with no menu check. The abort-before-transaction design preserves the pending marker for retry, so availability is unaffected."
+      },
+      {
+        "summary": "Extract the resume gate-skip into a new module rather than unit-testing handleConversationResume in place.",
+        "rationale": "handleConversationResume calls same-module spawnConversationSession/waitForConversationRuntimeReady, which vi.mock cannot intercept without replacing the function under test. Extraction gives a clean seam, keeps behavior byte-equivalent, and shrinks the allowlisted god file conversation-runtime.ts instead of growing it."
+      }
+    ],
+    "items": [
+      {
+        "id": "test-sendkeys-blocking-menu-guard",
+        "title": "Unit-test the sendKeys blocking-menu guard (merged in fac085ef4e)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T06:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3212",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/lib/tmux-send-keys-blocking-menu.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/tmux-send-keys-blocking-menu.test.ts"
+          ],
+          "expected_outputs": [
+            "3 tests pass",
+            "menu-scenario test asserts zero send-keys C-m exec calls"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/lib/tmux-send-keys-blocking-menu.test.ts modeled on tests/lib/tmux-send-escape.test.ts: vi.hoisted execFileMock + vi.mock('child_process'), config-yaml mock with tmux.configMode 'inherit-user', vi.useFakeTimers(). The execFile mock dispatches on tmux subcommand: load-buffer/paste-buffer/delete-buffer succeed; capture-pane returns the scenario pane text (resume-gate menu fixture reused VERBATIM from tests/lib/pane-choice-menu.test.ts, or a clear composer, or text containing the verify line); send-keys calls are recorded. Drive Effect.runPromise(sendKeys('conv-test', '<3+ char verify line payload>')) and advance timers past VERIFY_TIMEOUT_MS 1500 × PASTE_MAX_ATTEMPTS 2 (src/lib/tmux.ts:1186-1188) with vi.advanceTimersByTimeAsync. Tests: (1) menu scenario → rejects with MessageDeliveryFailed and NO exec call with args ['send-keys','-t','conv-test','C-m']; (2) composer scenario, paste never verifies, no menu → resolves, exactly one C-m sent (fail-open preserved); (3) verify line visible → resolves, exactly one C-m, no error. See PRD WI-1 for the full dispatch spec."
+        },
+        "items": [
+          {
+            "id": "test-sendkeys-blocking-menu-guard.ac1",
+            "title": "Menu scenario: sendKeys rejects with MessageDeliveryFailed and no execFile call carries ['send-keys','-t','conv-test','C-m'] args",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-sendkeys-blocking-menu-guard.ac2",
+            "title": "Composer scenario (no menu, unverified paste): sendKeys resolves and sends exactly one C-m, preserving fail-open behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-sendkeys-blocking-menu-guard.ac3",
+            "title": "Verified-paste scenario: sendKeys resolves with exactly one C-m and no error; all tests use vi.useFakeTimers, no real setTimeout waits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-resume-gate-skip-seam",
+        "title": "Extract resume gate-skip into resume-contract-delivery.ts seam and unit-test it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T06:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3212",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/resume-contract-delivery.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "tests/unit/lib/overdeck/resume-contract-delivery.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/resume-contract-delivery.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "4 tests pass",
+            "typecheck completes without errors",
+            "handleConversationResume no longer contains the inline paneHasBlockingChoiceMenu block"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Move the gate-check + best-effort delivery block at src/lib/overdeck/conversation-runtime.ts:902-922 into a new exported function deliverResumeContractUnlessGated(tmuxSession, contract, caller, method) in new module src/lib/overdeck/resume-contract-delivery.ts, returning 'delivered' | 'skipped-gated' | 'failed'. Imports: capturePaneText from '../tmux.js', deliverAgentMessage from '../agents.js', paneHasBlockingChoiceMenu from '../pane-choice-menu.js'. Keep the exact log strings and catch semantics (capture failure → '' → delivery attempted; delivery failure → console.error + 'failed', never throws). Replace the block in handleConversationResume with a single await deliverResumeContractUnlessGated(conv.tmuxSession, `CONVERSATION RESUME: ${buildResumeContract(resumeCause)}`, 'conversation-resume', resolveConversationDeliveryMethod(conv)) and keep the operator-owns-the-gate comment. New test tests/unit/lib/overdeck/resume-contract-delivery.test.ts mocks ../../../../src/lib/tmux.js and ../../../../src/lib/agents.js (pattern: src/lib/overdeck/__tests__/conversation-delivery.test.ts:28-49): (1) gated pane → 'skipped-gated', deliverAgentMessage not called; (2) clear composer → deliverAgentMessage called with (session, contract, caller, method), 'delivered'; (3) capturePaneText rejects → delivery attempted, 'delivered' (fail-open); (4) deliverAgentMessage rejects → 'failed', no throw. Full before/after snippet in PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "extract-resume-gate-skip-seam.ac1",
+            "title": "deliverResumeContractUnlessGated returns 'skipped-gated' and never calls deliverAgentMessage when capturePaneText returns a blocking-menu pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-resume-gate-skip-seam.ac2",
+            "title": "Returns 'delivered' and calls deliverAgentMessage with (session, contract, caller, method) on a clear pane, and also when capturePaneText rejects (fail-open)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-resume-gate-skip-seam.ac3",
+            "title": "Returns 'failed' without throwing when deliverAgentMessage rejects; handleConversationResume calls the seam and its inline paneHasBlockingChoiceMenu block is removed; typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "guard-keyed-submit-blocking-menu",
+        "title": "Guard completeKeyedSubmit's if-shell Enter against blocking choice menus",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T06:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3212",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/tmux-dedup.ts",
+            "src/lib/__tests__/tmux-dedup.test.ts",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/tmux-dedup.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all tmux-dedup tests pass including the new menu-abort case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/tmux-dedup.ts: (1) extend the './tmux.js' import (line 40) with capturePaneText and MessageDeliveryFailed, and import paneHasBlockingChoiceMenu from './pane-choice-menu.js' (no cycle — pane-choice-menu imports nothing, tmux.ts does not import tmux-dedup). (2) Add `readPaneText?: (sessionName: string, lines: number) => Promise<string>` to KeyedTmuxDeps (lines 188-194). (3) In completeKeyedSubmit (line 401), after the preTarget/pendingBefore reads and BEFORE the if-shell exec (line 434): when pendingBefore is non-empty, read the pane via deps.readPaneText ?? capturePaneText with .catch(() => '') and throw MessageDeliveryFailed (message naming the menu, session, snapshot) if paneHasBlockingChoiceMenu is true — aborting before any Enter so the pending marker survives for retry. Do not touch the if-shell condition or marker logic (cycles 10-13 invariants). Tests in src/lib/__tests__/tmux-dedup.test.ts: (a) pure-unit — deps readMarker returns the pending send-id, readPaneTarget a live target, readPaneText the resume-gate fixture → rejects with MessageDeliveryFailed before any terminal write; (b) real-server — readPaneText returning busy-composer text → terminal marker set, proving legitimate submits are not blocked. Docs: append one sentence to the tmux-fallback paragraph of CLAUDE.md's 'PTY supervisor for orchestrator delivery' section noting the keyed dedup submit applies the same guard before its if-shell Enter. Exact code snippet in PRD WI-3."
+        },
+        "items": [
+          {
+            "id": "guard-keyed-submit-blocking-menu.ac1",
+            "title": "completeKeyedSubmit rejects with MessageDeliveryFailed before the if-shell exec when readPaneText returns a blocking-menu pane, leaving the pending marker intact for retry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-keyed-submit-blocking-menu.ac2",
+            "title": "completeKeyedSubmit sends the Enter and sets the terminal marker when readPaneText returns a normal busy composer or when the pane capture fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-keyed-submit-blocking-menu.ac3",
+            "title": "KeyedTmuxDeps exposes readPaneText; CLAUDE.md's delivery section now states the keyed dedup submit applies the same blocking-menu guard; typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-07-28-PAN-3212-resume-contract-delivery-presses-enter-into-the-session-resume-gate-silently-choosing-resume-from-summary-over-the-operator-s-as-is.xbrief.json"
+    }
+  },
+  "status": "proposed"
+}
