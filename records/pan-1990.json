@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T22:31:38.470Z",
+  "updated": "2026-07-28T22:32:00.367Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -93,8 +93,16 @@
     }
   ],
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "boot-seeding": {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 757732,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T22:32:00.366Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -160,6 +168,7 @@
     "doors-guard": "completed",
     "doors-guard.doors-guard.ac1": "completed",
     "doors-guard.doors-guard.ac2": "completed",
-    "doors-guard.doors-guard.ac3": "completed"
+    "doors-guard.doors-guard.ac3": "completed",
+    "boot-seeding": "running"
   }
 }
