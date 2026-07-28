@@ -177,10 +177,10 @@
     "recordedAt": "2026-07-28T19:16:09.927Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T21:20:05.302Z",
+  "updated": "2026-07-28T21:30:32.532Z",
   "pipeline": {
     "issueId": "PAN-3228",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -188,8 +188,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:17:21.407Z",
-    "updatedAt": "2026-07-28T21:20:04.947Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-3228-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-28T21:30:32.411Z",
+    "reviewNotes": "Graceful restart can leave a live decision-owned agent projected as stopped",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -217,9 +217,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6650905,
-            "output": 197355,
-            "cacheRead": 36985344,
+            "input": 7326606,
+            "output": 263692,
+            "cacheRead": 56723968,
             "cacheWrite": 0
           }
         },
@@ -240,15 +240,15 @@
           "cacheWrite": 121982
         },
         "openai/gpt-5.6-sol": {
-          "input": 9980056,
-          "output": 464756,
-          "cacheRead": 211739136,
+          "input": 10655757,
+          "output": 531093,
+          "cacheRead": 231477760,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 180.70215,
-        "pricingAsOf": "2026-07-28T21:20:05.202Z"
+        "usd": 195.940077,
+        "pricingAsOf": "2026-07-28T21:30:32.482Z"
       }
     },
     "merges": [
