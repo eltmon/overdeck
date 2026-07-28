@@ -77,6 +77,11 @@
       "reason": "feedback",
       "note": "[2026-07-28T17:55Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-28T17:55:05.077Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-28T17:58:42.131Z"
     }
   ],
   "feedback": [],
@@ -140,10 +145,10 @@
     "recordedAt": "2026-07-28T08:02:25.990Z"
   },
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T17:58:40.704Z",
+  "updated": "2026-07-28T17:58:42.724Z",
   "pipeline": {
     "issueId": "PAN-3049",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -151,12 +156,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:02:29.164Z",
-    "updatedAt": "2026-07-28T17:58:40.256Z",
+    "updatedAt": "2026-07-28T17:58:40.735Z",
     "reviewNotes": "Deacon's anchored container parser drops supported Rally issue IDs, so crashed Rally frontend/server containers are never restarted",
     "inspectNotes": "All 4 ACs met. AC1: declaredComposeFileProjectName parses top-level name: (stack-health.ts:52-57), verified against real MYN workspaces which declare 'name: myn-feature-min-XXX' at col 0. AC2: requireComposeProjectNameForWorkspace throws naming workspacePath + composeFilePath + both dev-script paths (stack-health.ts:135-137). AC3: both variants return overdeck-feature-<issue> when composeFilePath is null (lines 119, 134). AC4: assertDeclaredNameMatchesFeatureFolder reuses the exact 'Refusing workspace rebuild:' message for both sources (lines 59-70); dev-script rethrow guard preserved at line 91. COMPOSE_FILE_CANDIDATES and findDevcontainerComposeFile match rebuild-stack.ts:43-58 exactly, so no directory-scope drift. Tests cover all four plus dev-script-wins precedence.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3223",
     "lastVerifiedCommit": "f801aaadcc232a434e2cecf7e6cd9ad005a14076",
-    "reviewSpawnedAt": "2026-07-28T17:51:20.838Z",
+    "reviewSpawnedAt": "2026-07-28T17:58:40.734Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/cli/commands/__tests__/workspace-reap.test.ts",
@@ -273,7 +278,7 @@
       },
       "costAtCloseOut": {
         "usd": 128.3570672,
-        "pricingAsOf": "2026-07-28T17:58:40.291Z"
+        "pricingAsOf": "2026-07-28T17:58:42.715Z"
       }
     },
     "merges": [
