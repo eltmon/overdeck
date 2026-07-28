@@ -74,7 +74,7 @@ function QuestionCard({ item, subject, onOpen }: { item: SimpleIssueDerivation; 
   const agentsById = useDashboardStore((s) => s.agentsById);
   const [text, setText] = useState('');
   const subjectAgentId = subject?.agentId;
-  const isConversation = subjectAgentId && !agentsById?.[subjectAgentId];
+  const isConversation = !!(subjectAgentId && !agentsById?.[subjectAgentId]);
   const agentId = subjectAgentId ?? item.pendingInputAgent?.id;
   const question = subject?.pendingAskUserQuestion?.questions?.[0]?.question ?? item.display.sentence;
   const busy = actions.answer.isPending;
