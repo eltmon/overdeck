@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-3229",
   "schemaVersion": 2,
-  "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T17:17:56.894Z",
-  "pipeline": {
-    "issueId": "PAN-3229",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-28T17:07:17.610Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -26,8 +9,49 @@
       "timestamp": "2026-07-28T17:07:17.610Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-07-28T17:07:17.610Z",
+  "updated": "2026-07-28T17:18:01.216Z",
+  "pipeline": {
+    "issueId": "PAN-3229",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-28T17:18:01.189Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 202,
+            "output": 41987,
+            "cacheRead": 3628141,
+            "cacheWrite": 170493
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 202,
+          "output": 41987,
+          "cacheRead": 3628141,
+          "cacheWrite": 170493
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 7.860679,
+        "pricingAsOf": "2026-07-28T17:18:01.207Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
-  "model": "claude-fable-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3229",
