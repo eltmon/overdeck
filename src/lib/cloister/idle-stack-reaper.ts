@@ -49,8 +49,13 @@ const GRACE_MS = 10 * 60 * 1000; // 10 minutes
  */
 const FULL_STACK_GRACE_MS = 2 * 60 * 60 * 1000; // 2 hours
 
-/** `overdeck-feature-<issue>-server-1` / `-frontend-1`. */
-const UI_CONTAINER_RE = /^overdeck-feature-([a-z0-9]+-\d+)-(server|frontend)-1$/i;
+/**
+ * `<prefix->feature-<issue>-server-1` / `-frontend-1` — prefix-agnostic
+ * (PAN-3049) so a `myn-feature-*` UI container is matched the same as the
+ * `overdeck-feature-*` default, since the compose project name comes from
+ * whatever the workspace declares (see composeProjectNameForWorkspace).
+ */
+const UI_CONTAINER_RE = /^(?:[a-z0-9]+-)?feature-([a-z0-9]+-\d+)-(server|frontend)-1$/i;
 
 /** Compose project names end in `feature-<issue>` by construction (stack-health). */
 const FEATURE_PROJECT_RE = /(?:^|[-_])feature-([a-z0-9]+-\d+)$/i;

@@ -145,6 +145,51 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
     expect(actions).toEqual([]);
     expect(stopped).toEqual([]);
   });
+
+  // PAN-3049: UI_CONTAINER_RE must match any declared compose-project prefix
+  // (e.g. myn-), not just the overdeck- fallback.
+  it('reaps a myn-feature- UI stack after the grace window elapses', async () => {
+    let nowMs = 1_000_000;
+    const stopped: string[][] = [];
+    const deps: Partial<IdleStackReaperDeps> = {
+      listContainerNames: async () => ['myn-feature-min-901-server-1', 'myn-feature-min-901-frontend-1'],
+      listComposeContainers: async () => [],
+      listSessions: async () => [],
+      stopContainers: async (names) => { stopped.push(names); },
+      now: () => nowMs,
+      graceMs: 10_000,
+    };
+    expect(await reconcileIdleWorkspaceStacks(deps)).toEqual([]); // clock starts
+    nowMs += 11_000;
+    const actions = await reconcileIdleWorkspaceStacks(deps);
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toContain('MIN-901');
+    expect(stopped).toHaveLength(1);
+    expect(stopped[0].sort()).toEqual(['myn-feature-min-901-frontend-1', 'myn-feature-min-901-server-1'].sort());
+  });
+
+  it('never reaps a myn-feature- dev container — DEV_CONTAINER_RE still protects it', async () => {
+    let nowMs = 1_000_000;
+    const stopped: string[][] = [];
+    const deps: Partial<IdleStackReaperDeps> = {
+      listContainerNames: async () => [
+        'myn-feature-min-901-dev-1',
+        'myn-feature-min-901-server-1',
+        'myn-feature-min-901-frontend-1',
+      ],
+      listComposeContainers: async () => [],
+      listSessions: async () => [],
+      stopContainers: async (names) => { stopped.push(names); },
+      now: () => nowMs,
+      graceMs: 10_000,
+    };
+    await reconcileIdleWorkspaceStacks(deps);
+    nowMs += 11_000;
+    await reconcileIdleWorkspaceStacks(deps);
+    expect(stopped).toHaveLength(1);
+    expect(stopped[0]).not.toContain('myn-feature-min-901-dev-1');
+    expect(stopped[0].sort()).toEqual(['myn-feature-min-901-frontend-1', 'myn-feature-min-901-server-1'].sort());
+  });
 });
 
 describe('reconcileIdleWorkspaceStacks — full-stack tier (2026-07-25 container leak)', () => {
