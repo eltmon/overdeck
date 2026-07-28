@@ -1,6 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 
-import { waitForAcpHostReady, waitForCodexAppServerReady } from '../runtime-command.js';
+const tmuxMocks = vi.hoisted(() => ({
+  sessionExists: vi.fn(),
+  capturePane: vi.fn(),
+}));
+
+vi.mock('../../tmux.js', async () => {
+  const actual = await vi.importActual<typeof import('../../tmux.js')>('../../tmux.js');
+  return {
+    ...actual,
+    sessionExists: tmuxMocks.sessionExists,
+    capturePane: tmuxMocks.capturePane,
+  };
+});
+
+import { waitForAcpHostReady, waitForCodexAppServerReady, waitForPromptReady } from '../runtime-command.js';
 import { shouldUseSupervisorForConversation } from '../../overdeck/conversation-runtime.js';
 
 afterEach(() => {
@@ -78,6 +93,53 @@ describe('waitForAcpHostReady', () => {
     })).rejects.toThrow(
       'ACP host agent-auth-failed failed to start: Kimi authentication is required. Run `kimi`, then /login, and retry.',
     );
+  });
+});
+
+describe('waitForPromptReady — kimi-code TUI (PAN-1837)', () => {
+  afterEach(() => {
+    tmuxMocks.sessionExists.mockReset();
+    tmuxMocks.capturePane.mockReset();
+  });
+
+  const BOOTING_PANE = '  Welcome to Kimi Code!\n  Directory: /tmp\n';
+  const READY_PANE = [
+    '╰────────────────────────────────╯',
+    '│ >                                                                          │',
+    '╰────────────────────────────────╯',
+    ' yolo  K3 thinking: high  ~                                /model: switch model',
+    '                                                             context: 0% (0/1M)',
+  ].join('\n');
+
+  it('resolves true once the input box and status line render (real pane captured live, PAN-1837 wi14)', async () => {
+    vi.useFakeTimers();
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
+    tmuxMocks.capturePane
+      .mockReturnValueOnce(Effect.succeed(BOOTING_PANE))
+      .mockReturnValueOnce(Effect.succeed(READY_PANE));
+
+    const pending = waitForPromptReady('agent-kimi-ready', 'kimi-code', 5);
+    await vi.advanceTimersByTimeAsync(500);
+
+    await expect(pending).resolves.toBe(true);
+  });
+
+  it('resolves false when the session disappears before the TUI ever renders ready', async () => {
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(false));
+    tmuxMocks.capturePane.mockReturnValue(Effect.succeed(BOOTING_PANE));
+
+    await expect(waitForPromptReady('agent-kimi-gone', 'kimi-code', 1)).resolves.toBe(false);
+  });
+
+  it('resolves false on timeout when the TUI never shows its ready prompt', async () => {
+    vi.useFakeTimers();
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
+    tmuxMocks.capturePane.mockReturnValue(Effect.succeed(BOOTING_PANE));
+
+    const pending = waitForPromptReady('agent-kimi-stuck', 'kimi-code', 1);
+    await vi.advanceTimersByTimeAsync(1_500);
+
+    await expect(pending).resolves.toBe(false);
   });
 });
 

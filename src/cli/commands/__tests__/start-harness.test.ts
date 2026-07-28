@@ -96,6 +96,16 @@ describe('pan start --harness flag (PAN-636)', () => {
     expect(written).toMatch(/Invalid --harness value: cursor/)
   })
 
+  it('accepts --harness kimi-code with a Kimi model (PAN-1837)', async () => {
+    agentMocks.getProviderAuthMode.mockResolvedValueOnce('api-key')
+    const { __testInternals } = await import('../start.js')
+    await expect(
+      __testInternals.resolveExplicitHarnessFlag('kimi-code', 'kimi-code/k3'),
+    ).resolves.toBe('kimi-code')
+    expect(exitSpy).not.toHaveBeenCalled()
+    expect(stderrSpy).not.toHaveBeenCalled()
+  })
+
   it('rejects --harness pi (invalid value) with non-zero exit and reason on stderr', async () => {
     const { issueCommand } = await import('../start.js')
     await expect(

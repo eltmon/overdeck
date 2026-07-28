@@ -46,6 +46,15 @@ describe('getProviderEnvSync — kimi-code Anthropic-compat gate (PAN-1837 wi7a)
     expect(env.ANTHROPIC_BASE_URL).toBeUndefined();
     expect(env.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
     expect(env.KIMI_API_KEY).toBeUndefined();
+    // Claude Code subagent-routing vars (Explorer/Plan/general-purpose model
+    // picks) are meaningless to the native kimi binary — verified leaking live
+    // during wi14 e2e (the launcher exported ANTHROPIC_DEFAULT_OPUS_MODEL etc.
+    // into a kimi-code work agent before this gate existed).
+    expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBeUndefined();
+    expect(env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBeUndefined();
+    expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBeUndefined();
+    expect(env.ANTHROPIC_SMALL_FAST_MODEL).toBeUndefined();
+    expect(env.CLAUDE_CODE_SUBAGENT_MODEL).toBeUndefined();
   });
 
   it('AC2: still sets ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, and KIMI_API_KEY for {kimi, claude-code}', () => {

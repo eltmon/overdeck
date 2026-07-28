@@ -484,14 +484,16 @@ export function getProviderEnvSync(
 
   // Non-Anthropic providers don't support claude-haiku-4-5-20251001.
   // Tell Claude Code to use the provider's small/fast model instead
-  // for Explore agents and other haiku-dependent features.
-  if (provider.haikuModel) {
+  // for Explore agents and other haiku-dependent features. These are all
+  // Claude Code subagent-routing concepts (Explorer/Plan/general-purpose) —
+  // meaningless to the native kimi-code binary, so skip them too.
+  if (provider.haikuModel && !isKimiCode) {
     env.ANTHROPIC_DEFAULT_HAIKU_MODEL = provider.haikuModel;
   }
 
   // Inject subagent model env vars so Claude Code spawns subagents
   // (Explorer, Plan, general-purpose) with model IDs the provider knows.
-  if (provider.tierModels) {
+  if (provider.tierModels && !isKimiCode) {
     if (provider.tierModels.opus) {
       env.ANTHROPIC_DEFAULT_OPUS_MODEL = provider.tierModels.opus;
     }

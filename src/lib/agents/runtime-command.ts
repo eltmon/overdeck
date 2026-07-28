@@ -356,6 +356,35 @@ export function describeOhmypiSpawnFailure(agentId: string): string {
   return parts.length ? ` [${parts.join(' ')}]` : '';
 }
 
+/**
+ * PAN-1837: readinessKind 'kimi-session-signal' has no consumer of its own —
+ * without this branch, waitForPromptReady's default case waits for Claude
+ * Code's ready-signal file, which the native kimi binary never writes, so
+ * every kimi-code spawn times out after 30s (confirmed live: wi14 e2e run).
+ * Ready is defined the same way as the codex TUI branch above: the pane must
+ * show both the input box (a `>` inside its box-drawn border) and the bottom
+ * status line (verified live against installed kimi 0.29.2 — the status line
+ * always renders `context: N% (…)` regardless of --yolo/model).
+ */
+async function waitForKimiCodeTuiReady(agentId: string, timeoutSec = 30): Promise<boolean> {
+  const deadline = Date.now() + timeoutSec * 1000;
+  while (Date.now() < deadline) {
+    try {
+      if (!(await Effect.runPromise(sessionExists(agentId)))) return false;
+      const pane = await Effect.runPromise(capturePane(agentId, 80));
+      const hasInputPrompt = /[│|]\s*>\s*[│|]?/.test(pane);
+      const hasStatusLine = /context:\s*\d+%/.test(pane);
+      if (hasInputPrompt && hasStatusLine) {
+        return true;
+      }
+    } catch {
+      // The pane may not exist yet immediately after tmux session creation.
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return false;
+}
+
 async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<boolean> {
   const deadline = Date.now() + timeoutSec * 1000;
   while (Date.now() < deadline) {
@@ -563,6 +592,7 @@ export async function waitForPromptReady(agentId: string, harness: RuntimeName |
     return true;
   }
   if (readinessKind === 'codex-tui-prompt') return waitForCodexTuiReady(agentId, timeoutSec);
+  if (readinessKind === 'kimi-session-signal') return waitForKimiCodeTuiReady(agentId, timeoutSec);
   return waitForReadySignal(agentId, timeoutSec);
 }
 

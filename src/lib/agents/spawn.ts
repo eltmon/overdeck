@@ -278,8 +278,8 @@ async function spawnRunWithoutConsentClaim(
     }
   }
 
-  const providerExports = isAcp ? undefined : await getProviderExportsForModel(selectedModel);
-  const providerEnv = isAcp ? {} : await getProviderEnvForModel(selectedModel);
+  const providerExports = isAcp ? undefined : await getProviderExportsForModel(selectedModel, resolvedHarness);
+  const providerEnv = isAcp ? {} : await getProviderEnvForModel(selectedModel, resolvedHarness);
   // PAN-1048 review feedback 005 (S1): when the resolved harness is ohmypi, thread
   // the per-agent ohmypi launcher fields (--session-dir, --extension, FIFO
   // redirect) through generateLauncherScript so the role launcher emits the

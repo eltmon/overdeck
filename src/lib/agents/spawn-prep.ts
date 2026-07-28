@@ -470,7 +470,7 @@ export async function buildAgentLaunchConfig(opts: {
 
   const behavior = getHarnessBehavior(opts.harness);
   const isAcp = behavior.launchCommandKind === 'acp-host';
-  const providerEnv = isAcp ? {} : await getProviderEnvForModel(model);
+  const providerEnv = isAcp ? {} : await getProviderEnvForModel(model, opts.harness);
 
   if (!isAcp) {
     const provider = getProviderForModelSync(model as ModelId);
@@ -481,7 +481,7 @@ export async function buildAgentLaunchConfig(opts: {
     }
   }
 
-  const providerExports = isAcp ? undefined : await getProviderExportsForModel(model);
+  const providerExports = isAcp ? undefined : await getProviderExportsForModel(model, opts.harness);
 
   // PAN-1048: resume/restart launchers must respect the agent's role.
   // A resumed review/test/ship run loads the wrong frontmatter (and wrong
