@@ -172,7 +172,10 @@ export function closeOut(
     const allSteps: StepResult[] = [];
 
     // PAN-3025: idempotent short-circuit for already-completed close-out ceremony.
-    const closedOutAt = yield* Effect.promise(() => readCompletedCloseOut(ctx.issueId, ctx.projectPath));
+    // Fail closed: on any error, proceed to the gate (null = not-confirmed-complete).
+    const closedOutAt = yield* Effect.promise(() =>
+      readCompletedCloseOut(ctx.issueId, ctx.projectPath).catch(() => null)
+    );
     if (closedOutAt) {
       allSteps.push(stepSkipped('close-out:idempotent', [
         `Issue already closed out at ${closedOutAt} — skipping the Definition-of-Done gate and ceremony`,

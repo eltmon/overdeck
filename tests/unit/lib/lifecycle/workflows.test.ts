@@ -24,6 +24,7 @@ const {
   mockResolvePipelineTelemetryContext,
   mockGetReviewStatus,
   mockReadIssueRecord,
+  mockReadCompletedCloseOut,
 } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   mockClearReviewStatus: vi.fn(),
@@ -45,6 +46,7 @@ const {
   mockResolvePipelineTelemetryContext: vi.fn(async () => null),
   mockGetReviewStatus: vi.fn(),
   mockReadIssueRecord: vi.fn(),
+  mockReadCompletedCloseOut: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('../../../../src/lib/lifecycle/dod-gate.js', async (importOriginal) => {
@@ -52,6 +54,7 @@ vi.mock('../../../../src/lib/lifecycle/dod-gate.js', async (importOriginal) => {
   return {
     ...actual,
     evaluateDodGate: mockEvaluateDodGate,
+    readCompletedCloseOut: mockReadCompletedCloseOut,
   };
 });
 
@@ -977,6 +980,49 @@ describe('workflows', () => {
       expect(commands.some(command => command.includes('--add-label "closed-out"'))).toBe(true);
       expect(commands.some(command => command.includes('--remove-label "verifying-on-main"'))).toBe(true);
       expect(commands.some(command => command.includes('--remove-label "needs-close-out"'))).toBe(true);
+    });
+
+    it('short-circuits when already closed-out with live row absent (PAN-3025 WI-4 ac1)', async () => {
+      mockReadCompletedCloseOut.mockResolvedValueOnce('2026-07-28T08:00:00Z');
+
+      const result = await closeOut(
+        { issueId: 'PAN-3050', projectPath: testDir },
+        { tracker: successfulTracker() },
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.steps.find(step => step.step === 'close-out:idempotent')).toMatchObject({
+        skipped: true,
+        details: expect.arrayContaining([expect.stringContaining('already closed out at 2026-07-28T08:00:00Z')]),
+      });
+      // Gate and ceremony are not called when already closed-out
+      expect(mockEvaluateDodGate).not.toHaveBeenCalled();
+    });
+
+    it('falls through to the gate when closed-out guard does not trigger (PAN-3025 WI-4 ac2)', async () => {
+      mockReadCompletedCloseOut.mockResolvedValueOnce(null); // Not closed-out, or live row exists
+
+      const result = await closeOut(
+        { issueId: 'PAN-3051', projectPath: testDir },
+        { tracker: successfulTracker() },
+      );
+
+      expect(result.success).toBe(true);
+      // Gate runs normally because the guard did not short-circuit
+      expect(mockEvaluateDodGate).toHaveBeenCalledOnce();
+    });
+
+    it('does not short-circuit when close-out guard read fails (PAN-3025 WI-4 ac3)', async () => {
+      mockReadCompletedCloseOut.mockRejectedValueOnce(new Error('database read error'));
+
+      const result = await closeOut(
+        { issueId: 'PAN-3052', projectPath: testDir },
+        { tracker: successfulTracker() },
+      );
+
+      expect(result.success).toBe(true);
+      // On guard error, we conservatively do not short-circuit
+      expect(mockEvaluateDodGate).toHaveBeenCalledOnce();
     });
 
   });

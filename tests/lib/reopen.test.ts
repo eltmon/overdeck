@@ -57,14 +57,15 @@ function seedStatus(data: Record<string, unknown>) {
     const row = s as Record<string, unknown>;
     db.prepare(`
       INSERT OR REPLACE INTO review_status
-        (issue_id, review_status, test_status, merge_status, ready_for_merge,
+        (issue_id, review_status, test_status, verification_status, merge_status, ready_for_merge,
          pr_url, auto_requeue_count, stuck, stuck_reason, stuck_at,
          reviewed_at_commit, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       issueId,
       row.reviewStatus ?? 'pending',
       row.testStatus ?? 'pending',
+      row.verificationStatus ?? null,
       row.mergeStatus ?? null,
       row.readyForMerge ? 1 : 0,
       row.prUrl ?? null,
@@ -146,11 +147,15 @@ describe('reopenWorkspaceState', () => {
     });
     const wsDir = createWorkspace();
 
+    // Verify seeded state before reopen
+    let row = readStatus('PAN-999')!;
+    expect(row.verification_status).toBe('passed');
+
     const result = await Effect.runPromise(reopenWorkspaceState('PAN-999', wsDir));
 
     expect(result.specialistStatesReset).toBe(true);
 
-    const row = readStatus('PAN-999')!;
+    row = readStatus('PAN-999')!;
     expect(row.review_status).toBe('pending');
     expect(row.test_status).toBe('pending');
     expect(row.verification_status).toBe('pending');
