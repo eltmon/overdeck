@@ -26,7 +26,7 @@ vi.mock('../agents/messaging.js', () => ({
 
 import { handleCloisterDomainEvent } from '../cloister/service-reactive.js';
 import { AmbiguousKeyedDeliveryError } from '../agents/delivery.js';
-import { KeyedMarkerVerificationError, KeyedSubmitTargetDeadError } from '../tmux-dedup.js';
+import { KeyedMarkerVerificationError, KeyedSubmitBlockedMenuError, KeyedSubmitTargetDeadError } from '../tmux-dedup.js';
 import {
   LINEAR_MCP_AUTH_WAKE_COPY,
   _resetLinearMcpAuthProjectionCacheForTests,
@@ -441,6 +441,33 @@ describe('Linear MCP auth wake processor', () => {
 
     // A later pass in the same run re-drove the same keyed wake (by then the
     // agent has resumed) and exactly one completion was recorded.
+    expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
+    expect(mocks.messageAgent.mock.calls[1]).toEqual([
+      'agent-min-852',
+      LINEAR_MCP_AUTH_WAKE_COPY,
+      'linear-mcp-auth-wake',
+      { dedupKey: 'linear-mcp-auth-wake:seq-1' },
+    ]);
+    expect(notifiedEvents()).toHaveLength(1);
+    expect(notifiedEvents()[0]?.payload['outcome']).toBe('delivered');
+    expect(readOutbox('agent-min-852', 'seq-1')).toMatchObject({
+      state: 'acknowledged',
+      outcome: 'delivered',
+    });
+  });
+
+  it('leaves the wake pending and re-drives the same key after a blocking menu clears', async () => {
+    events.push(required(1, 'agent-min-852', 'MIN-852'), healthy(2));
+    mocks.messageAgent.mockRejectedValueOnce(
+      new KeyedSubmitBlockedMenuError(
+        'agent-min-852',
+        'linear-mcp-auth-wake:seq-1',
+        'Resume from summary\nEnter to confirm',
+      ),
+    );
+
+    await processLinearMcpAuthWake();
+
     expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
     expect(mocks.messageAgent.mock.calls[1]).toEqual([
       'agent-min-852',
