@@ -85,7 +85,7 @@
     "recordedAt": "2026-07-28T07:25:54.489Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T08:42:20.914Z",
+  "updated": "2026-07-28T08:42:26.526Z",
   "pipeline": {
     "issueId": "PAN-2882",
     "reviewStatus": "blocked",
@@ -95,9 +95,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:26:27.252Z",
-    "updatedAt": "2026-07-28T08:42:20.037Z",
+    "updatedAt": "2026-07-28T08:42:26.513Z",
     "reviewNotes": "Merged-MR glab failures are swallowed, producing false unmerged membership instead of forge_unavailable",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
+    "reviewedAtCommit": "b68a67e56eeca91f055135b583a9ca284a20c748",
     "lastVerifiedCommit": "b68a67e56eeca91f055135b583a9ca284a20c748",
     "reviewSpawnedAt": "2026-07-28T08:36:48.479Z",
     "scopeDrift": {
@@ -158,7 +159,7 @@
       },
       "costAtCloseOut": {
         "usd": 23.432347,
-        "pricingAsOf": "2026-07-28T08:42:20.056Z"
+        "pricingAsOf": "2026-07-28T08:42:26.520Z"
       }
     },
     "merges": [
