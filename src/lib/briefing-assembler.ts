@@ -148,7 +148,7 @@ function renderLocalWorkspaceSection(workspace: WorkspaceContext | null, status:
 function renderDashboardWorkspaceSection(snapshot: DashboardSnapshot): string[] {
   const runningAgents = snapshot.agents.filter((agent) => agent.status === 'running' || agent.hasLiveTmuxSession);
   const pausedAgents = snapshot.agents.filter((agent) => agent.paused);
-  const troubledAgents = snapshot.agents.filter((agent) => agent.troubled || (agent.consecutiveFailures ?? 0) > 0);
+  const troubledAgents = snapshot.agents.filter((agent) => agent.troubled === true);
   const activeIssues = new Set(snapshot.agents.map((agent) => agent.issueId).filter(Boolean));
   const failedReviews = snapshot.reviewStatuses.filter((status) =>
     status.testStatus === 'failed' ||
