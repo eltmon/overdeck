@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T06:35:52.620Z",
-  "updated": "2026-07-28T08:59:34.332Z",
+  "updated": "2026-07-28T08:59:44.812Z",
   "pipeline": {
     "issueId": "PAN-3215",
     "reviewStatus": "pending",
@@ -48,8 +48,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "polyrepo-verify-loop": {
+        "writerId": "agent-pan-3215",
+        "agentId": "agent-pan-3215",
+        "pid": 2722294,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T08:59:44.812Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3215",
@@ -94,6 +102,7 @@
     "gitlab-mr-oracle.gitlab-mr-oracle.ac1": "completed",
     "gitlab-mr-oracle.gitlab-mr-oracle.ac2": "completed",
     "gitlab-mr-oracle.gitlab-mr-oracle.ac3": "completed",
-    "gitlab-mr-oracle.gitlab-mr-oracle.ac4": "completed"
+    "gitlab-mr-oracle.gitlab-mr-oracle.ac4": "completed",
+    "polyrepo-verify-loop": "running"
   }
 }
