@@ -1,0 +1,607 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T18:24:12Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3232: Pending-input rendering drops the data the store already has: issue-view triangle structurally dead, prompt text rendered nowhere, wrong label, stale tree, specialists invisible",
+    "updated": "2026-07-28T18:30:07.172Z"
+  },
+  "plan": {
+    "id": "pan-3232",
+    "title": "Pending-input rendering drops the data the store already has: issue-view triangle structurally dead, prompt text rendered nowhere, wrong label, stale tree, specialists invisible",
+    "status": "proposed",
+    "uid": "ff697a7b-bc00-4640-8420-22fe989857f7",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-28T18:24:12Z",
+    "updated": "2026-07-28T18:30:07.172Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3232",
+        "label": "PAN-3232",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "pending-input",
+      "render-layer",
+      "session-tree",
+      "decisions"
+    ],
+    "narratives": {
+      "Problem": "PAN-3068/3070/3051 made pending-input detection and classification work end-to-end: the store's agentsById snapshots carry hasPendingQuestion, pendingQuestionPrompt, pendingQuestionReason, and pendingInputKinds for blocked agents. Five render-layer defects drop that data before display: (1) toSessionNode omits the awaitingInput fields so the issue-view triangle/waiting-dot/tooltip are structurally dead; (2) pendingQuestionPrompt has zero JSX render sites so Decisions cards show a constant label instead of the actual question; (3) SessionPanel derives its kind label from the Channels-only selector (empty under the PTY supervisor) so permission prompts read 'Question waiting'; (4) mapEventToDelta emits no tree delta for agent.enrichment_changed so the sidebar badge lags up to ~70s; (5) specialist nodes (review/reviewer/test/ship) never set awaitingInput/pendingInputKinds in either the session-tree or the activity route.",
+      "Proposal": "Fix each drop at the exact seam where the data is lost, per the PRD at drafts/pan-3232.md: copy the fields in toSessionNode and set pendingInputKinds in the activity route; thread pendingQuestionPrompt/Reason through PendingInputSubject → Decision → DecisionRow reviving getPendingQuestionTitle; prefer session.pendingInputKinds in SessionPanel; add an optional issueId to AgentEnrichmentChangedEvent and a new pending_input_changed SessionTreeDelta merged in place client-side; apply awaitingInputFromProjection to specialist nodes in both routes and buildReviewerNodes. Cleanups: remove the dead projectPendingInput and route the three direct selectPendingInputSubjects readers through usePendingInputSubjects.",
+      "NonGoals": "- No server-side classification changes (detection/classifier defects are filed separately per the issue)\n- No change to GodView/AgentCard.tsx — verified already merging enrichment kinds with the Channels-derived kind (AD-4)\n- No recovery-path changes (PAN-3228 owns 'recovery must not destroy needs_input agents')\n- No new shared module for awaitingInputFromProjection — keep the existing per-route duplication pattern\n- No new polling loops or refetchInterval additions; FR-4 is push-based only\n- No conversation-side prompt threading (conversation rows carry no enrichment prompt; AUQ payloads already render)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Remove projectPendingInput and its test instead of wiring an owner",
+        "rationale": "agentSnapshotFromOverdeck (read-model.ts:403) never populates pending-input fields, so the bootstrap-strip scenario the function guards is structurally impossible; the issue itself offers 'decide its owner or remove it'."
+      },
+      {
+        "summary": "Carry issueId as an optional field on AgentEnrichmentChangedEvent.payload rather than resolving agent→issue inside ws-rpc",
+        "rationale": "mapEventToDelta is pure and synchronous with an existing early-return on missing payload.issueId; the enrichment poller already holds agent.issueId at both emit sites, and Schema.optional preserves append-only replay compatibility."
+      },
+      {
+        "summary": "Introduce a new SessionTreeDelta kind 'pending_input_changed' that merges fields in place client-side",
+        "rationale": "The invalidate-refetch path used by session_added would refetch-storm because shouldForceReemitPendingInput re-emits every ~3s for idle-alive waiting agents; an idempotent in-place merge is the only shape that satisfies NFR-1."
+      },
+      {
+        "summary": "Scope defect 3 to CommandDeck/SessionView/SessionPanel.tsx; AgentCard unchanged",
+        "rationale": "Verified at HEAD that GodView/AgentCard.tsx:222-233 already gates on isAwaitingInput (fires from enrichment) and merges agent.pendingInputKinds into its tooltip; the issue's cited Channels-only pattern no longer exists there."
+      },
+      {
+        "summary": "DecisionRow prompt precedence: AUQ question → plan copy → enrichment prompt via getPendingQuestionTitle → describePendingInput",
+        "rationale": "getPendingQuestionTitle (pipeline-state.ts:35) was written exactly for this formatting and is currently dead code; reviving it avoids reimplementing first-line/prefix logic and keeps one formatting owner."
+      },
+      {
+        "summary": "Specialist fix covers both duplicated routes plus buildReviewerNodes, using projection-only reads",
+        "rationale": "Both routes/projects.ts and routes/command-deck.ts render specialist nodes with the same gap; specialists are registered agents covered by the enrichment poller, so the tmux-pane fallback used for work agents is unnecessary cost."
+      }
+    ],
+    "items": [
+      {
+        "id": "issue-view-awaiting-fields",
+        "title": "Issue view: thread awaitingInput fields through activity response and toSessionNode",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T18:24:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/command-deck.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
+            "src/dashboard/frontend/src/components/issue-view/useIssueView.ts",
+            "src/dashboard/frontend/src/components/issue-view/useIssueView.test.tsx",
+            "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/issue-view/useIssueView.test.tsx src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both issue-view test files exit 0 including the new awaiting-input cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-1: add pendingInputKinds?: string[] to the ActivitySection interface (queries.ts:68; the three awaitingInput* fields already exist at :81-83); in routes/command-deck.ts set pendingInputKinds from context.agentSnapshotsById on the work-branch sections.push (~:375, mirroring routes/projects.ts:321); in useIssueView.ts toSessionNode (:81-100) copy awaitingInput, awaitingInputPrompt, awaitingInputReason, pendingInputKinds onto the returned SessionNode (contracts SessionNode already declares all four at packages/contracts/src/types.ts:655-659)."
+        },
+        "items": [
+          {
+            "id": "issue-view-awaiting-fields.ac1",
+            "title": "toSessionNode returns a SessionNode that preserves awaitingInput, awaitingInputPrompt, awaitingInputReason, and pendingInputKinds from the activity section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-view-awaiting-fields.ac2",
+            "title": "The activity route emits pendingInputKinds on work-branch sections copied from the agent snapshot when the snapshot carries kinds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-view-awaiting-fields.ac3",
+            "title": "AgentStepRow renders the AwaitingInputIndicator and a status title containing the prompt text for a session with awaitingInput true and a prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "decisions-prompt-threading",
+        "title": "Decisions rail: thread pendingQuestionPrompt through subject, decision, and card",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T18:24:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/store.ts",
+            "src/dashboard/frontend/src/lib/useDecisions.ts",
+            "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useDecisions.test.ts exits 0 including new prompt-threading cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-2: add pendingQuestionPrompt?: string and pendingQuestionReason?: string to PendingInputSubject (store.ts:375-387) and copy both from the agent snapshot in selectPendingInputSubjects (store.ts:426+); add the same two fields to Decision (useDecisions.ts:42-64) and populate them for agent-sourced subjects (leave undefined for conversation rows); in DecisionsPanel.tsx DecisionRow (:26-28) extend the prompt chain to use getPendingQuestionTitle from lib/pipeline-state.ts (reviving the dead code, not reimplementing it) before the describePendingInput fallback, per decision D5."
+        },
+        "items": [
+          {
+            "id": "decisions-prompt-threading.ac1",
+            "title": "selectPendingInputSubjects returns subjects that preserve pendingQuestionPrompt and pendingQuestionReason from the agent snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decisions-prompt-threading.ac2",
+            "title": "useDecisions returns agent-sourced Decisions carrying pendingQuestionPrompt and pendingQuestionReason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decisions-prompt-threading.ac3",
+            "title": "DecisionRow renders 'Permission prompt: <first prompt line>' for a tool_permission decision that has a prompt and no AskUserQuestion payload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decisions-prompt-threading.ac4",
+            "title": "DecisionRow falls back to the describePendingInput kind label when the decision carries no prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-panel-kind-label",
+        "title": "SessionPanel: derive indicator kinds from enrichment instead of the Channels map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:24:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SessionPanel.test.tsx exits 0 including the new label cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3: at SessionPanel.tsx:338 replace the hardcoded ternary with kinds that prefer session.pendingInputKinds (set by the session-tree route at routes/projects.ts:321), then the Channels-derived ['permissionRequest'], then the historical ['askUserQuestion'] fallback. Keep the (session.awaitingInput || hasPendingPermission) mount gate at :333 unchanged so Channels-sourced requests still light the indicator. GodView/AgentCard.tsx requires no change (decision D4)."
+        },
+        "items": [
+          {
+            "id": "session-panel-kind-label.ac1",
+            "title": "SessionPanel renders the indicator labelled 'Permission pending' for a session with pendingInputKinds ['permissionRequest'] and an empty Channels map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-panel-kind-label.ac2",
+            "title": "SessionPanel renders 'Question waiting' for a session with awaitingInput true and no pendingInputKinds (fallback preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-panel-kind-label.ac3",
+            "title": "SessionPanel still renders the indicator when only a Channels permission request exists for the session (mount gate preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-tree-delta",
+        "title": "Push pending-input changes to the session tree via a new pending_input_changed delta",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T18:24:12Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/events.ts",
+            "packages/contracts/src/rpc.ts",
+            "src/dashboard/server/services/agent-enrichment-service.ts",
+            "src/dashboard/server/ws-rpc.ts",
+            "src/dashboard/server/__tests__/ws-rpc.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/ws-rpc.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ws-rpc.test.ts exits 0 including new pending_input_changed mapping cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4, one vertical slice producer→consumer: (1) add issueId: Schema.optional(IssueId) to AgentEnrichmentChangedEvent.payload in contracts events.ts — MUST be optional, the event store is append-only and required fields break replay decode (hazard H1); (2) emit issueId: agent.issueId at the poller emit site (agent-enrichment-service.ts:301) and thread issueId into buildPendingReapEvent (:120) via a new parameter, omitting when a caller lacks it (hazard H3); (3) extend SessionTreeDelta in contracts rpc.ts (:226-234) with the 'pending_input_changed' kind literal plus optional awaitingInput/awaitingInputPrompt/awaitingInputReason/pendingInputKinds fields; (4) add the agent.enrichment_changed case to mapEventToDelta in ws-rpc.ts (:577-648) returning that delta, keeping the shared early-return on missing issueId; (5) in CommandDeck/index.tsx export applySessionTreeDelta and add a pending_input_changed branch that OVERWRITES all four fields on the matched session even when a delta field is absent, so cleared prompts clear (hazard H4) — never invalidateQueries for this kind (hazard H2). Rebuild packages/contracts before typechecking dependents (hazard H6). Parallel-safe despite complexity: this slice owns contracts/events.ts, contracts/rpc.ts, agent-enrichment-service.ts, ws-rpc.ts, and CommandDeck/index.tsx exclusively — no other plan item touches any of these files (see file-overlap matrix)."
+        },
+        "items": [
+          {
+            "id": "live-tree-delta.ac1",
+            "title": "The AgentEnrichmentChangedEvent schema accepts payloads both with and without issueId, and decoding a legacy payload without the field returns a valid event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-tree-delta.ac2",
+            "title": "mapEventToDelta returns a pending_input_changed delta carrying awaitingInput, prompt, reason, and kinds for an enrichment event with issueId, and returns null when the payload lacks issueId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-tree-delta.ac3",
+            "title": "applySessionTreeDelta merges the four pending-input fields onto the matched session and clears them when the delta omits them, returning the same tree object when no session matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-tree-delta.ac4",
+            "title": "The enrichment poller emits issueId on agent.enrichment_changed events for agents with a known issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "specialist-pending-input",
+        "title": "Specialist nodes surface awaiting-input fields in both session-tree and activity routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T18:24:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/projects.ts",
+            "src/dashboard/server/routes/command-deck.ts",
+            "src/dashboard/server/routes/reviewer-tree.ts",
+            "src/dashboard/server/__tests__/session-tree-specialist-pending-input.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/session-tree-specialist-pending-input.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the new specialist pending-input test file exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5: in routes/projects.ts (review orchestrator ~:419, test ~:455, ship ~:478) and routes/command-deck.ts (review ~:557 and its test/ship counterparts), compute projected = awaitingInputFromProjection(sessionName, context.agentSnapshotsById) and set awaitingInput: projected != null, awaitingInputPrompt: projected?.prompt, awaitingInputReason: projected?.reason, pendingInputKinds from the snapshot — projection-only, no tmux-pane fallback (decision D6). Add optional agentSnapshotsById to BuildReviewerNodesOptions in routes/reviewer-tree.ts (:314) and set the same four fields per reviewer node from getReviewerSessionName(role, projectKey, issueId); pass the map from both call sites. Use a local awaitingInputFromProjection copy in reviewer-tree.ts matching the existing per-route duplication — do not create a new shared module (NonGoal)."
+        },
+        "items": [
+          {
+            "id": "specialist-pending-input.ac1",
+            "title": "Session-tree review orchestrator, test, and ship nodes carry the four awaiting-input fields when the agent snapshot reports hasPendingQuestion true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialist-pending-input.ac2",
+            "title": "buildReviewerNodes returns reviewer nodes that carry the four awaiting-input fields taken from the provided agentSnapshotsById map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialist-pending-input.ac3",
+            "title": "The activity route emits specialist sections carrying the same four fields for a pending specialist snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialist-pending-input.ac4",
+            "title": "A specialist node whose agent has no snapshot or no pending question renders with awaitingInput false and produces no prompt, reason, or kinds fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remove-project-pending-input",
+        "title": "Remove dead projectPendingInput and its orphan test",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-28T18:24:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/read-model.ts",
+            "src/dashboard/server/__tests__/read-model-pending-input.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -c projectPendingInput -- src || true",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "git grep finds zero projectPendingInput matches under src/",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6 and decision D1: delete projectPendingInput (read-model.ts:267-281), the PendingInputFields type alias (:246), and their explanatory comment block; delete src/dashboard/server/__tests__/read-model-pending-input.test.ts. Rationale on the page: agentSnapshotFromOverdeck (:403) never populates pending-input fields, so the bootstrap-strip invariant the function was written for holds structurally without it."
+        },
+        "items": [
+          {
+            "id": "remove-project-pending-input.ac1",
+            "title": "git grep projectPendingInput returns no matches under src/ (function, type alias, and imports removed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-project-pending-input.ac2",
+            "title": "The server test suite exits 0 with read-model-pending-input.test.ts deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "widen-direct-selector-surfaces",
+        "title": "Route NeedsYouStrip, SimpleHomePage, and ConversationDock through usePendingInputSubjects",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T18:24:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx",
+            "src/dashboard/frontend/src/components/simple/SimpleHomePage.tsx",
+            "src/dashboard/frontend/src/components/dock/ConversationDock.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/KanbanBoard src/dashboard/frontend/src/components/dock"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "affected component test files exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7 and the PAN-2765 rule: in each of the three files replace useDashboardStore(selectPendingInputSubjects) with usePendingInputSubjects() imported from lib/useDecisions, and remove the now-unused selectPendingInputSubjects import. The hook returns the identical PendingInputSubject[] shape widened with conversation rows, so downstream dedup/answered logic in these components is untouched. Call sites: NeedsYouStrip.tsx:107, SimpleHomePage.tsx:182, ConversationDock.tsx:60."
+        },
+        "items": [
+          {
+            "id": "widen-direct-selector-surfaces.ac1",
+            "title": "Each of the three surfaces renders a needs-you entry sourced from a conversation pending-input row while the agent store is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-direct-selector-surfaces.ac2",
+            "title": "None of the three files imports selectPendingInputSubjects (grep over the three paths returns no matches)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-direct-selector-surfaces.ac3",
+            "title": "Each of the three surfaces still renders its agent-sourced entries after the hook swap (agent coverage preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-askuserquestion-dashboard",
+        "title": "Document prompt threading, the pending_input_changed delta, and specialist coverage",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-28T18:24:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ASKUSERQUESTION-DASHBOARD.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'pending_input_changed' docs/ASKUSERQUESTION-DASHBOARD.md"
+          ],
+          "expected_outputs": [
+            "grep reports at least one pending_input_changed occurrence in the doc"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-8: update docs/ASKUSERQUESTION-DASHBOARD.md in its existing voice to describe (a) the prompt-threading chain agent.enrichment_changed → agentsById → PendingInputSubject.pendingQuestionPrompt → Decision → DecisionRow via getPendingQuestionTitle; (b) the pending_input_changed SessionTreeDelta kind and the optional issueId now carried on the enrichment event payload; (c) that review/reviewer/test/ship nodes carry the awaiting-input fields in both the session tree and the activity route; (d) the removal of projectPendingInput and why the bootstrap projection makes it unnecessary."
+        },
+        "items": [
+          {
+            "id": "docs-askuserquestion-dashboard.ac1",
+            "title": "The doc contains a section naming pendingQuestionPrompt and getPendingQuestionTitle that traces the prompt from the enrichment event to the Decisions card",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-askuserquestion-dashboard.ac2",
+            "title": "The doc states that the session tree applies a pending_input_changed SessionTreeDelta pushed from agent.enrichment_changed and that the event payload carries an optional issueId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-askuserquestion-dashboard.ac3",
+            "title": "The doc states that specialist nodes carry awaiting-input fields in both the session-tree and activity routes and records the projectPendingInput removal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "issue-view-awaiting-fields",
+        "to": "specialist-pending-input",
+        "type": "blocks"
+      },
+      {
+        "from": "decisions-prompt-threading",
+        "to": "docs-askuserquestion-dashboard",
+        "type": "informs"
+      },
+      {
+        "from": "live-tree-delta",
+        "to": "docs-askuserquestion-dashboard",
+        "type": "informs"
+      },
+      {
+        "from": "specialist-pending-input",
+        "to": "docs-askuserquestion-dashboard",
+        "type": "informs"
+      },
+      {
+        "from": "remove-project-pending-input",
+        "to": "docs-askuserquestion-dashboard",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "All eight items patch one feature plane — pending-input surfacing — and interlock on the same files (command-deck.ts appears in two items; contracts types feed three). Splitting into sibling issues would create cross-issue merge conflicts on identical hunks while each item here is independently reviewable and mergeable within one branch.",
+      "canonicalFilename": "2026-07-28-PAN-3232-pending-input-rendering-drops-the-data-the-store-already-has-issue-view-triangle-structurally-dead-prompt-text-rendered-nowhere-wrong-label-stale-tree-specialists-invisible.xbrief.json"
+    }
+  },
+  "status": "proposed"
+}
