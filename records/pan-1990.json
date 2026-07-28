@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T20:55:37.957Z",
+  "updated": "2026-07-28T20:55:43.938Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -88,18 +88,26 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "schema-v64": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-1990",
         "agentId": "agent-pan-1990",
         "pid": 3978556,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:38:38.619Z"
+        "claimedAt": "2026-07-28T20:38:38.619Z",
+        "itemId": "schema-v64",
+        "outcome": "completed",
+        "releasedAt": "2026-07-28T20:55:43.938Z"
       }
-    }
+    ]
   },
   "statusOverrides": {
-    "schema-v64": "running"
+    "schema-v64": "completed",
+    "schema-v64.schema-v64.ac1": "completed",
+    "schema-v64.schema-v64.ac2": "completed",
+    "schema-v64.schema-v64.ac3": "completed",
+    "schema-v64.schema-v64.ac4": "completed"
   }
 }
