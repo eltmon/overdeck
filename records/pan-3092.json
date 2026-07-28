@@ -84,15 +84,7 @@
       "timestamp": "2026-07-28T10:31:59.524Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T10:31:59Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3092\n\n# Review — PAN-3092 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED — the new episode ID does not make the activity warning idempotent, and the fire-and-forget write can also lose the only warning\n\n## Context\n- Branch: `feature/pan-3092`\n- HEAD reviewed: `1bec60c96e1fccf50d3343a2f79799958e70c164`\n- Prior reviewed HEAD: `51f15f597ae7b2b54c2e21b4f81ce496648728c9`\n- Cycle scope: rework commit `1bec60c96e1fccf50d3343a2f79799958e70c164` only; the blocking finding anchors to code changed since the prior verdict\n- Manifest: `.pan/review/agent-pan-3092-review-1bec60c9/context.json`\n- Dimensions reviewed: correctness/logic, security, requirements/acceptance criteria, performance\n\n## Blocking Finding\n\n### ! [requirements/correctness] Reusing an activity ID still emits a second warning event after restart, while a failed fire-and-forget append can suppress the warning indefinitely — `src/lib/cloister/deacon-verdict-fallback-sweep.ts:170`\n**Evidence tier:** Tier 1 — static\n\n**Requirement:** FR-4 requires one activity-log warning per fallback episode with no nag loop.\n\n**Changed code:** The sweep now derives `id: verdict-fallback:${episode}` and calls `emitActivityEntrySync()` after adding the episode to `warnedEpisodes` (`deacon-verdict-fallback-sweep.ts:170-183`). The new restart test explicitly accepts a second call after restart and checks only that both calls reuse the same ID (`tests/unit/lib/cloister/deacon-verdict-fallback-sweep.test.ts:305-334`).\n\n**Problem:** The ID is projection identity, not append idempotency. `emitActivityEntrySync()` calls `emitActivityEntryDurable()` fire-and-forget, and that function appends a fresh `activity.entry` domain event with a fresh timestamp every time (`src/lib/activity-logger.ts:111-142`). Reusing the payload ID makes the live/bootstrap reducers replace the visible row, but it does not prevent the second event: connected clients receive it, the row gets a new timestamp and moves to the front, and the durable event log contains another warning. That is still a repeat warning for the same episode, exactly what FR-4 forbids.\n\nThe same ordering also permits loss. `warnedEpisodes` is populated before the asynchronous append has succeeded, while `emitActivityEntrySync()` swallows persistence failures. If the activity append fails and the contended recovery-trip write also fails, later patrols in the same server process suppress every retry even though neither operator surface landed. The documentation's claim that the operator-visible warning “always lands” is therefore false (`docs/AGENT-STATE-PLANES.md:93-104`).\n\n**Runtime impact:** A dashboard restart during sustained contention re-surfaces the warning as a new activity event, while a transient event-store failure can leave the operator with no warning until another dashboard restart. The implementation provides neither at-most-once nor reliable at-least-once delivery for FR-4.\n\n**Fix:** Make the activity write door idempotent by the episode ID so a repeated durable call does not append or publish another event, and await the durable result before treating the episode as warned. Add two integration-level assertions against the activity store/publisher rather than the mocked function: after a module restart the event count and subscriber update count remain one, and a failed first append is retried on the next patrol instead of being suppressed by `warnedEpisodes`.\n\n## Previous Findings Rechecked\n- **Conflict remediation:** The generic invalid specialist command is gone. The message names every conflicting gate and both values, explains that waiting or re-signalling cannot clear the state, and points to a strictly newer review cycle.\n- **Per-patrol no-op record write:** Fixed. An already-open durable trip returns before `recordRecoveryFailure()`, while fallback draining still runs each patrol.\n- **Process-local key cleanup:** Fixed. Any successful trip write removes the episode key regardless of `emitNeedsYou`.\n\n## Advisory Findings — non-gating under the cycle-4 convergence rule\n- `src/cli/commands/specialists/done.ts:354` infers the current signal's outcome from any issue-level fallback, so an unrelated older gate can produce incorrect “do not re-run” guidance. This code predates the current rework commit and is not promotable in this cycle.\n- `src/lib/cloister/deacon.ts:1483` lets a rejected frozen-test escalation abort processing of the remaining statuses for that patrol. This code predates the current rework commit and is not promotable in this cycle.\n- `src/lib/cloister/test-agent-queue.ts:56` uses `curl -s`, which exits zero on HTTP 4xx/5xx and can cause the generated test prompt to report the wrong single-attempt outcome. This code predates the current rework commit and is not promotable in this cycle.\n- The conflict message should name the concrete existing recovery command, `pan review restart <issueId>`, so “dispatch a strictly newer review cycle” is fully actionable from the message alone. The current wording is truthful, so this is advisory rather than a shipping blocker.\n\n## Security\nNo blocking security findings. Conflict values remain constrained terminal-status strings, no operator text is executed, and the rework adds no lock bypass, cross-machine verdict transport, or direct canonical-state mutation.\n\n## Performance\nThe prior unbounded no-op write loop is fixed. Repeated same-ID activity appends are low-volume, but they are still unnecessary durable events and live publications; the blocking impact is the violated exactly-once operator contract rather than throughput.\n\n## Requirements Coverage\nThe rework fixes the prior conflict-remediation and record-write-loop blockers. FR-4 remains incomplete because the activity warning is appended again after restart and may be silently lost before restart; NFR-1 through NFR-5 and the other functional requirements have no new blocking regression in this cycle.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3092/.pan/review/agent-pan-3092-review-1bec60c9/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3092 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".overdeck/context/codebase/concerns.md",
@@ -150,10 +142,10 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T10:46:17.716Z",
+  "updated": "2026-07-28T10:46:42.174Z",
   "pipeline": {
     "issueId": "PAN-3092",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -161,13 +153,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T10:46:16.138Z",
+    "updatedAt": "2026-07-28T10:46:42.142Z",
     "reviewNotes": "Verification infrastructure error: Verification worker 1090123 exited before writing a result",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
     "reviewedAtCommit": "1bec60c96e1fccf50d3343a2f79799958e70c164",
     "lastVerifiedCommit": "51f15f597ae7b2b54c2e21b4f81ce496648728c9",
-    "reviewSpawnedAt": "2026-07-28T10:06:42.149Z",
+    "reviewSpawnedAt": "2026-07-28T10:46:42.141Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/concerns.md",
@@ -261,7 +253,7 @@
       },
       "costAtCloseOut": {
         "usd": 67.8845693,
-        "pricingAsOf": "2026-07-28T10:46:17.710Z"
+        "pricingAsOf": "2026-07-28T10:46:42.161Z"
       }
     },
     "merges": [
