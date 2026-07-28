@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T06:58:08.940Z",
+  "updated": "2026-07-28T07:03:39.036Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "deacon-crash-sweep-prefix-agnostic": {
-        "writerId": "agent-pan-3049",
-        "agentId": "agent-pan-3049",
-        "pid": 3450317,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T06:58:08.940Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -122,6 +114,17 @@
         "outcome": "completed",
         "reason": "Replaced the hardcoded overdeck- prefix and duplicate dev-script parsing in stopWorkspaceDockerPromise with a call to the canonical composeProjectNameForWorkspace resolver. Mismatch still throws (same protection). Added tests/unit/lib/workspace-manager/docker.test.ts (3 passing tests covering both ACs plus the mismatch-throw case). Existing docker.test.ts (11 tests) and full workspace-manager suite (30 tests) still pass; typecheck/lint clean.",
         "releasedAt": "2026-07-28T06:57:55.951Z"
+      },
+      {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 3450317,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T06:58:08.940Z",
+        "itemId": "deacon-crash-sweep-prefix-agnostic",
+        "outcome": "completed",
+        "reason": "Removed the hardcoded overdeck-feature- docker ps filter and widened the container-name regex from overdeck-feature-... to feature-..., so myn-feature-* (and any other declared prefix) crashed containers get the same auto-restart handling. Extended tests/lib/cloister/pan-464-container-health.test.ts (the existing test file for this function) with 3 new tests covering all 3 ACs, rather than creating a new file, per the item's own fallback instruction. Full cloister test suite (1312 tests) still passes; typecheck/lint clean.",
+        "releasedAt": "2026-07-28T07:03:39.036Z"
       }
     ],
     "statusReasons": {
@@ -136,6 +139,10 @@
       "stop-docker-via-resolver": {
         "reason": "Replaced the hardcoded overdeck- prefix and duplicate dev-script parsing in stopWorkspaceDockerPromise with a call to the canonical composeProjectNameForWorkspace resolver. Mismatch still throws (same protection). Added tests/unit/lib/workspace-manager/docker.test.ts (3 passing tests covering both ACs plus the mismatch-throw case). Existing docker.test.ts (11 tests) and full workspace-manager suite (30 tests) still pass; typecheck/lint clean.",
         "updatedAt": "2026-07-28T06:57:55.951Z"
+      },
+      "deacon-crash-sweep-prefix-agnostic": {
+        "reason": "Removed the hardcoded overdeck-feature- docker ps filter and widened the container-name regex from overdeck-feature-... to feature-..., so myn-feature-* (and any other declared prefix) crashed containers get the same auto-restart handling. Extended tests/lib/cloister/pan-464-container-health.test.ts (the existing test file for this function) with 3 new tests covering all 3 ACs, rather than creating a new file, per the item's own fallback instruction. Full cloister test suite (1312 tests) still passes; typecheck/lint clean.",
+        "updatedAt": "2026-07-28T07:03:39.036Z"
       }
     }
   },
@@ -152,6 +159,9 @@
     "stop-docker-via-resolver": "completed",
     "stop-docker-via-resolver.stop-docker-via-resolver.ac1": "completed",
     "stop-docker-via-resolver.stop-docker-via-resolver.ac2": "completed",
-    "deacon-crash-sweep-prefix-agnostic": "running"
+    "deacon-crash-sweep-prefix-agnostic": "completed",
+    "deacon-crash-sweep-prefix-agnostic.deacon-crash-sweep-prefix-agnostic.ac1": "completed",
+    "deacon-crash-sweep-prefix-agnostic.deacon-crash-sweep-prefix-agnostic.ac2": "completed",
+    "deacon-crash-sweep-prefix-agnostic.deacon-crash-sweep-prefix-agnostic.ac3": "completed"
   }
 }
