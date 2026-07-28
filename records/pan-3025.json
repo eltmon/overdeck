@@ -110,16 +110,16 @@
     "recordedAt": "2026-07-28T08:50:14.585Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T08:50:14.587Z",
+  "updated": "2026-07-28T08:50:15.511Z",
   "pipeline": {
     "issueId": "PAN-3025",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T08:48:52.833Z",
+    "updatedAt": "2026-07-28T08:50:15.509Z",
     "reviewNotes": "! [correctness] A live-status read failure is treated as proof that no live row exists — `src/lib/lifecycle/dod-gate.ts:678`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3221",
     "reviewedAtCommit": "6b218e665a20aeecd3e51dd3a9da4e695b49aa3e",
@@ -157,8 +157,9 @@
         "tests/unit/lib/lifecycle/workflows.test.ts",
         "tests/unit/lib/pan-dir/record-close-out.test.ts"
       ],
-      "recordedAt": "2026-07-28T07:42:23.831Z"
-    }
+      "recordedAt": "2026-07-28T08:50:14.585Z"
+    },
+    "reviewRequestedAt": "2026-07-28T08:50:15.509Z"
   },
   "closeOut": {
     "usage": {
