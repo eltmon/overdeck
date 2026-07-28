@@ -104,7 +104,7 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T21:24:52.462Z",
+  "updated": "2026-07-28T21:24:57.765Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -114,7 +114,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-28T21:24:51.710Z",
+    "updatedAt": "2026-07-28T21:24:57.750Z",
     "reviewNotes": "FR-4 live pending-input delta is incomplete: producer/schema/client paths are missing, so no tree update can occur",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -126,6 +126,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
+    "reviewedAtCommit": "259f40794fb23b60fe1a6148c3f83fa86e6543f7",
     "reviewSpawnedAt": "2026-07-28T21:15:10.984Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -253,7 +254,7 @@
       },
       "costAtCloseOut": {
         "usd": 31.461095,
-        "pricingAsOf": "2026-07-28T21:24:51.757Z"
+        "pricingAsOf": "2026-07-28T21:24:57.759Z"
       }
     },
     "merges": [
