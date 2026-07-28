@@ -80,7 +80,7 @@
     "recordedAt": "2026-07-28T17:49:31.882Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T17:49:42.263Z",
+  "updated": "2026-07-28T17:49:44.558Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "pending",
@@ -89,7 +89,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T17:49:37.880Z",
+    "panDoneRecoveredAt": "2026-07-28T17:49:41.828Z",
+    "updatedAt": "2026-07-28T17:49:42.798Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
     "reviewedAtCommit": "c644b617682a67f0afce3069793ee112e10ec4a7",
@@ -129,8 +130,7 @@
         "tests/unit/lib/overdeck/resume-contract-delivery.test.ts"
       ],
       "recordedAt": "2026-07-28T17:49:31.882Z"
-    },
-    "panDoneRecoveredAt": "2026-07-28T17:49:41.828Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -145,24 +145,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3597253,
-            "output": 272610,
-            "cacheRead": 62354944,
+            "input": 3604820,
+            "output": 273447,
+            "cacheRead": 63642624,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 4756168,
-          "output": 449211,
-          "cacheRead": 82994176,
+          "input": 4763735,
+          "output": 450048,
+          "cacheRead": 84281856,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 78.75425800000001,
-        "pricingAsOf": "2026-07-28T17:49:38.103Z"
+        "usd": 79.461043,
+        "pricingAsOf": "2026-07-28T17:49:44.554Z"
       }
     },
     "merges": [
