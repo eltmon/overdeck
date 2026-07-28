@@ -22,9 +22,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-28T21:24:16.086Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-28T21:28Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-28T21:28:10.834Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-28T21:28:10Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3242\n\n# Code Review — PAN-3242\n\n## Verdict: CHANGES REQUESTED\n\nThe two cycle-1 correctness blockers are fixed and covered by focused regressions. One cycle-2 requirement blocker remains: the rework changes a file that the approved plan explicitly marks as a must-not-touch NonGoal.\n\n## Context\n\n- PR: #3249\n- Branch: `feature/pan-3242`\n- HEAD reviewed: `7ab7097fdf630f7b166478bb5b02ac770cdbf4dc`\n- Previous HEAD: `ca0235d2e687538cc8f88cd0c79c77d1cf7083cf`\n- Review cycle: 2\n- Cycle diff: `RunSettingsPanel.tsx`, its focused test, and `OrderBookPage.tsx`\n- Verification run: focused `RunSettingsPanel.test.tsx` passed (22 tests); `npm run typecheck:frontend` passed; `git diff --check` passed\n\n## Blocking Findings\n\n### ⊗ The rework violates the explicit `OrderBookPage.tsx` must-not constraint — `src/dashboard/frontend/src/pages/OrderBookPage.tsx:241`\n\n**Dimension:** requirements / acceptance criteria\n**Scope:** in_pr_scope\n**Evidence tier:** Tier 1 — static\n**Requirement source:** The review manifest and canonical PRD NonGoals both state: `No change to OrderBookPage.tsx, including its drain-only posture banner, or any component other than RunSettingsPanel`.\n**Observed:** Commit `7ab7097f` changes the call site to `<RunSettingsPanel key={selected.id} ... />`.\n**Impact:** The keyed remount is a sound fix for the prior cross-book state leak, but it crosses an explicit approved implementation boundary. NonGoals are must-not requirements; a reviewer cannot silently amend them because the implementation needs a parent-level identity boundary.\n**Fix:** Formally revise the canonical scope/manifest to permit this exact one-line keying change, then regenerate or otherwise update the review context before re-requesting review. If the NonGoal must remain, the implementation needs an approved stable book-identity mechanism within the allowed surface; the current props do not provide one, so do not replace the key with value-based inference.\n\n## Prior Blocking Findings\n\n### Resolved — cross-book transaction state leakage\n\n`OrderBookPage` now keys `RunSettingsPanel` by `selected.id`, forcing all confirmation, debounce, save-chip, retry, and footer state to belong to one book instance. The new keyed-remount test proves a confirmation opened for book A is absent after rendering book B and cannot call A's mutation closure.\n\n### Resolved — reverted brief edit dropped during an in-flight save\n\n`briefCommittedRef` now tracks the component's latest queued brief intent rather than comparing against the stale server prop. The deferred-promise regression proves `old.md → new.md (in flight) → old.md` emits both patches, preserving the final operator edit.\n\n## Non-blocking Notes\n\n### ~ Save-state completions remain unguarded by a field generation — `src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx:134`\n\nThis was reviewed as advisory in cycle 1 and is not promotable now. If same-field promises resolve out of order, an older error or fade timer can replace a newer terminal state. The current orders writer serializes commits, but a future component hardening pass should use a per-field generation for terminal state and retry ownership.\n\n### ≉ Unrelated Flywheel run-log history remains in the PR — `docs/FLYWHEEL-STATE.md:8003`\n\nThis unchanged cycle-1 advisory does not block the feature, but the 121-line RUN-73 append is unrelated to the issue and expands the revert surface.\n\n## Security\n\nNo findings. The rework adds no endpoint or trust boundary, React continues to escape persisted text, and brief resolution remains server-side and project-root constrained.\n\n## Performance\n\nNo findings. Keyed remounts occur only when the operator selects another book, and the brief intent ref adds constant work without changing debounce frequency.\n\n## Requirements Checked\n\nFR-1 through FR-9 and NFR-1 through NFR-3 remain functionally covered. The cycle-2 code fixes both reported interaction failures and adds the requested fake-timer regressions. The verdict is blocked solely because the correct cross-book fix currently contradicts the still-active `OrderBookPage.tsx` NonGoal; the requirement source of truth must authorize that boundary change.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3242/.pan/review/agent-pan-3242-review-7ab7097f/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3242 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md"
@@ -44,7 +57,7 @@
     "recordedAt": "2026-07-28T20:52:11.749Z"
   },
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-28T21:28:10.072Z",
+  "updated": "2026-07-28T21:28:10.834Z",
   "pipeline": {
     "issueId": "PAN-3242",
     "reviewStatus": "blocked",
