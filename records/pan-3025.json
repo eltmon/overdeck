@@ -115,7 +115,7 @@
     "recordedAt": "2026-07-28T08:50:14.585Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T08:51:39.728Z",
+  "updated": "2026-07-28T08:51:43.819Z",
   "pipeline": {
     "issueId": "PAN-3025",
     "reviewStatus": "pending",
@@ -125,7 +125,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:50:42.357Z",
-    "updatedAt": "2026-07-28T08:51:39.449Z",
+    "updatedAt": "2026-07-28T08:51:43.721Z",
     "reviewNotes": "! [correctness] A live-status read failure is treated as proof that no live row exists — `src/lib/lifecycle/dod-gate.ts:678`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3221",
     "reviewedAtCommit": "6b218e665a20aeecd3e51dd3a9da4e695b49aa3e",
@@ -203,7 +203,7 @@
       },
       "costAtCloseOut": {
         "usd": 20.48407,
-        "pricingAsOf": "2026-07-28T08:51:39.698Z"
+        "pricingAsOf": "2026-07-28T08:51:43.766Z"
       }
     },
     "merges": [
