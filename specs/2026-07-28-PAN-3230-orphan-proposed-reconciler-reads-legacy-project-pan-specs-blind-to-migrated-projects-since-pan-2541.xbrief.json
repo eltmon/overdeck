@@ -1,0 +1,518 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T17:12:34Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3230: orphan-proposed-reconciler reads legacy <project>/.pan/specs — blind to migrated projects since PAN-2541 (79 proposed specs invisible in the state worktree)",
+    "updated": "2026-07-28T17:17:05.719Z"
+  },
+  "plan": {
+    "id": "pan-3230",
+    "title": "orphan-proposed-reconciler reads legacy <project>/.pan/specs — blind to migrated projects since PAN-2541",
+    "status": "proposed",
+    "uid": "9661a837-07ec-4d10-9016-5c4c8d83c088",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-28T17:12:34Z",
+    "updated": "2026-07-28T17:17:05.719Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3230",
+        "label": "PAN-3230",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3165",
+        "label": "PAN-3165 (same bug class, xbrief-index)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2541",
+        "label": "PAN-2541 (state migration that introduced the split)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "state-plane",
+      "cloister",
+      "reconciler",
+      "read-door",
+      "lint-guard"
+    ],
+    "metadata": {
+      "sizeJustification": "One bug class (hardcoded legacy .pan/specs|.pan/drafts joins bypassing getProjectPanPaths) fixed at every live call site plus the lint guard that proves the sweep is complete. Each caller fix is a 1-3 line substitution; splitting them into sibling issues would leave the guard unlandable (it fails while any caller remains unfixed) and cost more pipeline overhead than the changes themselves. 13 files, 7 counted subsystems only because scripts/, package.json, docs/, and tests/unit each count as one.",
+      "canonicalFilename": "2026-07-28-PAN-3230-orphan-proposed-reconciler-reads-legacy-project-pan-specs-blind-to-migrated-projects-since-pan-2541.xbrief.json"
+    },
+    "narratives": {
+      "Problem": "Eight live call sites derive spec/draft directories as join(projectRoot, '.pan', 'specs'|'drafts') instead of the state-branch-aware getProjectPanPaths (src/lib/pan-dir/paths.ts). For projects migrated to the overdeck-state worktree (PAN-2541), those directories are frozen pre-cutover snapshots, so the orphan-proposed reconciler has enumerated zero candidates for 18 days (79 proposed specs invisible), pan doctor under-reports, flywheel/backlog planned-and-PRD detection fails, --plan skip auto-start 422s (spec written to the wrong dir), and standing-tier supervisors read no PRD. Same class as PAN-3165, which fixed only xbrief-index.ts.",
+      "Proposal": "Substitute getProjectPanPaths(projectRoot).specsDir/.draftsDir at every live caller (reconciler, doctor, flywheel, backlog trio, auto-synthesize write path, tier-supervisor), add migrated-project regression tests following the xbrief-index.test.ts OVERDECK_HOME + migration-complete.json pattern, and add scripts/lint-state-paths.sh to the npm run lint chain so the hardcoded join shape can never land again outside an audited allowlist. Full details, before/after snippets, and the deliberate-legacy allowlist are in the PRD (drafts/pan-3230.md).",
+      "NonGoals": "- No changes to the pickup gate (autonomous-work-dispatch.ts) — the 79 newly visible candidates must stay behind the existing fail-closed dispatch predicate\n- No changes to deliberately dual-path/legacy-aware sites: pan-dir/**, state-read-home.ts, state-plane.ts, pan-dir/auto-commit.ts, orders/validate.ts, merge-agent.ts SYNC_MAIN_MAIN_PREFERRED_PATHS, planning-promotion.ts, admin/state-migrate.ts\n- No manual git add/commit/push of state-worktree files — persistence stays with the state write door and reconcileStatePlaneDrift\n- No migration of additional projects and no changes to the migration marker format\n- No refactor of the reconciler's candidate-filtering or spawn logic beyond path resolution"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix all audited live callers in this issue instead of filing sibling issues.",
+        "rationale": "The issue's Fix section mandates the caller audit; each fix is a 1-3 line substitution of an established pattern (PAN-3165 precedent) and the projected surface (~13 files, exactly 6 subsystems) fits the finalize decomposition caps."
+      },
+      {
+        "summary": "Include drafts-dir joins in the files already touched, and cover drafts in the lint guard.",
+        "rationale": "Drafts detection fails identically for migrated projects; the read door already exposes draftsDir; a specs-only guard would leave half the bug class unprotected."
+      },
+      {
+        "summary": "Include the write-side auto-synthesize.ts fix (directory substitution only).",
+        "rationale": "It produces the same invisible-spec symptom and breaks --plan skip auto-start on migrated projects because findPlan is already state-branch aware; git persistence remains owned by reconcileStatePlaneDrift so the change stays read-door-shaped."
+      },
+      {
+        "summary": "Guard matches the code join shape with a file allowlist rather than banning the substring everywhere.",
+        "rationale": "Prose mentions in comments and operator-message strings are legitimate; deliberately dual-path sites (migration tooling, sync-main conflict preferences, orders validation) must keep their legacy joins."
+      },
+      {
+        "summary": "requiresInspection: false on all items.",
+        "rationale": "Every item applies a mechanically established pattern with an existing precedent fix and existing test scaffolding; no item lays a foundation another item's internal structure depends on — the guard item depends only on the fixes having shipped, which its own lint run verifies."
+      }
+    ],
+    "items": [
+      {
+        "id": "fix-reconciler-spec-dir",
+        "title": "Route orphan-proposed reconciler spec-dir resolution through getProjectPanPaths",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:12:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3230",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/orphan-proposed-reconciler.ts",
+            "src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/orphan-proposed-reconciler.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "orphan-proposed-reconciler.test.ts passes including new migrated-project cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace join(projectPath, '.pan', 'specs') at orphan-proposed-reconciler.ts:123 (findSpecPathForIssue) and join(config.path, '.pan', 'specs') at :216 (findOrphanProposedSpecsForReconciler) with getProjectPanPaths(<projectRoot>).specsDir, importing getProjectPanPaths from '../pan-dir/paths.js'. Add migrated-project regression tests to the existing suite using its OVERDECK_HOME isolation (test file lines 161-162): write migration-complete.json ({version:1, sourceMainSha:'a'.repeat(40), stateBranchSha:'b'.repeat(40), completedAt: ISO}) into $OVERDECK_HOME/state/<basename(projectPath)>/ and place a proposed spec in <stateRoot>/specs/, per the pattern in src/lib/xbrief/__tests__/xbrief-index.test.ts:48-61. Existing unmigrated tests stay unmodified."
+        },
+        "items": [
+          {
+            "id": "fix-reconciler-spec-dir.ac1",
+            "title": "Given a migrated project whose state worktree specs/ contains a proposed spec and no agent is live, findOrphanProposedSpecsForReconciler returns that issue as a candidate with specPath under $OVERDECK_HOME/state/<key>/specs/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-reconciler-spec-dir.ac2",
+            "title": "Given the same migrated setup, the handleOrphanProposedSpec path re-resolves the spec via findSpecPathForIssue and returns the state-worktree path instead of null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-reconciler-spec-dir.ac3",
+            "title": "Given an unmigrated temp project with a proposed spec in <projectRoot>/.pan/specs, the pre-existing suite still enumerates it as a candidate (existing tests pass unmodified)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-doctor-orphan-scan",
+        "title": "Route pan doctor orphan-proposed scan through getProjectPanPaths",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T17:12:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3230",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/__tests__/doctor-orphan-proposed-specs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/doctor-orphan-proposed-specs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "doctor-orphan-proposed-specs.test.ts passes including a new migrated-project case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace join(config.path, '.pan', 'specs') at src/cli/commands/doctor.ts:611 with getProjectPanPaths(config.path).specsDir. Extend doctor-orphan-proposed-specs.test.ts with one migrated-project case (same marker pattern as item fix-reconciler-spec-dir) asserting the orphan listing includes a spec that exists only in the state worktree."
+        },
+        "items": [
+          {
+            "id": "fix-doctor-orphan-scan.ac1",
+            "title": "Given a migrated project with a proposed spec only in the state worktree, the doctor orphan-proposed scan returns that spec in its orphan list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-doctor-orphan-scan.ac2",
+            "title": "Given an unmigrated project with a proposed spec in <projectRoot>/.pan/specs, the existing doctor scan tests still list it (existing cases pass unmodified)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-flywheel-spec-drafts-scan",
+        "title": "Route flywheel planned-spec and PRD-draft detection through getProjectPanPaths",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T17:12:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3230",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/flywheel.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash -c \"! grep -n \\\"'.pan', 'specs'\\|'.pan', 'drafts'\\\" src/lib/cloister/flywheel.ts\""
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grep produces no hardcoded .pan join matches in flywheel.ts (command exits 0)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/flywheel.ts, hoist one const paths = getProjectPanPaths(projectRoot) beside the current specsDir declaration at line 186; use paths.specsDir for the spec scan and paths.draftsDir for the PRD existence check at line 211 (the per-id closure must reference the hoisted paths, not call the resolver per id — decision D5 in continue.json). No behavior change for unmigrated projects (resolver falls back to <legacyRoot>/.pan)."
+        },
+        "items": [
+          {
+            "id": "fix-flywheel-spec-drafts-scan.ac1",
+            "title": "flywheel.ts resolves both the spec scan directory and the PRD draft check through a single hoisted getProjectPanPaths(projectRoot) call, and grep finds no remaining '.pan', 'specs' or '.pan', 'drafts' joins in the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-flywheel-spec-drafts-scan.ac2",
+            "title": "npm run typecheck exits 0 after the substitution",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-backlog-spec-drafts-scan",
+        "title": "Route backlog planned/PRD detection (lookups, backlog-input, backlog route) through getProjectPanPaths",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T17:12:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3230",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/backlog/lookups.ts",
+            "src/lib/backlog/backlog-input.ts",
+            "src/dashboard/server/routes/backlog.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash -c \"! grep -n \\\"'.pan', 'specs'\\|'.pan', 'drafts'\\\" src/lib/backlog/lookups.ts src/lib/backlog/backlog-input.ts src/dashboard/server/routes/backlog.ts\""
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grep produces no hardcoded .pan join matches in the three files (command exits 0)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Substitute getProjectPanPaths(projectRoot).specsDir / .draftsDir for the hardcoded joins at src/lib/backlog/lookups.ts:39, src/lib/backlog/backlog-input.ts:124 (specs) and :144 (drafts existsSync check), and src/dashboard/server/routes/backlog.ts:66 (drafts) and :71 (specs). One resolver call per function scope (decision D5); the per-issue drafts existsSync at backlog-input.ts:144 joins onto the hoisted draftsDir."
+        },
+        "items": [
+          {
+            "id": "fix-backlog-spec-drafts-scan.ac1",
+            "title": "All five call sites across the three backlog files resolve their directories via getProjectPanPaths, and grep produces no remaining '.pan', 'specs' or '.pan', 'drafts' join matches in them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-backlog-spec-drafts-scan.ac2",
+            "title": "Existing backlog unit tests (unmigrated temp projects) remain green unmodified, so legacy-path resolution survives for unmigrated projects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-auto-synthesize-write-dir",
+        "title": "Write auto-synthesized proposed specs to the canonical specsDir so findPlan resolves them on migrated projects",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:12:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3230",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/auto-synthesize.ts",
+            "src/lib/xbrief/__tests__/auto-synthesize.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/xbrief/__tests__/auto-synthesize.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "auto-synthesize.test.ts passes including a new migrated-project case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/xbrief/auto-synthesize.ts:140, replace projectSpecsDir = join(projectRoot, '.pan', 'specs') with getProjectPanPaths(projectRoot).specsDir (import from '../pan-dir/paths.js'). Add a migrated-project case to src/lib/xbrief/__tests__/auto-synthesize.test.ts (marker pattern from xbrief-index.test.ts:48-61) asserting the written spec file exists under $OVERDECK_HOME/state/<key>/specs/ and that findPlanSync(workspacePath) resolves it. Do NOT add any git add/commit/push — state-worktree persistence is owned by reconcileStatePlaneDrift and the state write door (hazard H3)."
+        },
+        "items": [
+          {
+            "id": "fix-auto-synthesize-write-dir.ac1",
+            "title": "Given a migrated project, writeAutoStartXBrief persists the proposed spec under $OVERDECK_HOME/state/<key>/specs/ and findPlanSync(workspacePath) returns its path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-auto-synthesize-write-dir.ac2",
+            "title": "Given an unmigrated project, writeAutoStartXBrief still writes the spec to <projectRoot>/.pan/specs (existing test passes unmodified)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-auto-synthesize-write-dir.ac3",
+            "title": "The diff for this item contains no git command invocations and touches no code that stages or commits state-worktree files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-tier-supervisor-prd-read",
+        "title": "Route loadPrdDraft in tier-supervisor through the drafts read door",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-28T17:12:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3230",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/tier-supervisor.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "bash -c \"! grep -n \\\"'.pan', 'drafts'\\\" src/lib/agents/tier-supervisor.ts\""
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grep produces no hardcoded .pan drafts join in tier-supervisor.ts (command exits 0)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/agents/tier-supervisor.ts loadPrdDraft (line 342), replace join(projectRoot, '.pan', 'drafts', name) with join(getProjectPanPaths(projectRoot).draftsDir, name), hoisting the resolver call before the upper/lowercase filename loop. Keep the existing fallback loop and 'missing draft returns undefined' behavior. Update the function's doc comment (lines 336-338) to say the draft resolves via the state-branch-aware read door."
+        },
+        "items": [
+          {
+            "id": "fix-tier-supervisor-prd-read.ac1",
+            "title": "loadPrdDraft resolves draft filenames against getProjectPanPaths(projectRoot).draftsDir and still returns undefined when no draft exists in either casing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-tier-supervisor-prd-read.ac2",
+            "title": "npm run typecheck exits 0 and grep produces no remaining '.pan', 'drafts' join match in tier-supervisor.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-state-paths-lint-guard",
+        "title": "Add lint-state-paths guard to the lint chain and document the path authority",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:12:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3230",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-state-paths.sh",
+            "package.json",
+            "docs/AGENT-STATE-PLANES.md",
+            "tests/unit/scripts/lint-state-paths.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-state-paths.sh",
+            "npx vitest run tests/unit/scripts/lint-state-paths.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint-state-paths.sh exits 0 on the fixed tree",
+            "lint-state-paths.test.ts passes: guard exits 1 on a fixture with a hardcoded join, exits 0 on a comment-only fixture",
+            "npm run lint completes with the lint:state-paths step included and passing"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Create scripts/lint-state-paths.sh: greps src/ (optional scan-root argument, default src/, for testability) for the hardcoded join shapes — '.pan', 'specs' / '.pan', 'drafts' (single or double quotes) and the string forms '.pan/specs' / '.pan/drafts' — excluding the audited allowlist files (src/lib/pan-dir/**, src/lib/state-read-home.ts, src/lib/state-plane.ts, src/lib/orders/validate.ts, src/lib/cloister/merge-agent.ts, src/lib/overdeck/planning-promotion.ts, src/cli/commands/admin/state-migrate.ts, src/lib/cloister/verification-runner.ts) and comment-only/prose lines; prints offending file:line entries and exits 1 on any hit. Wire \"lint:state-paths\": \"bash scripts/lint-state-paths.sh\" into package.json scripts and append && npm run lint:state-paths to the lint chain (package.json:105). Add tests/unit/scripts/lint-state-paths.test.ts following tests/unit/scripts/lint-ratchet-audit.test.ts: fixture tree with one offending join (guard exits 1, names the file) and one prose/comment mention (guard exits 0). Docs: add a 'Path authority' subsection to docs/AGENT-STATE-PLANES.md stating that all spec/draft directory derivation goes through getProjectPanPaths in src/lib/pan-dir/paths.ts (state worktree for migrated projects, legacy .pan/ otherwise), citing PAN-3165/PAN-3230 as the recurrences, and naming scripts/lint-state-paths.sh as the CI enforcement."
+        },
+        "items": [
+          {
+            "id": "add-state-paths-lint-guard.ac1",
+            "title": "scripts/lint-state-paths.sh exits 1 and prints the offending file:line when a non-allowlisted src/ file contains a hardcoded '.pan', 'specs' or '.pan', 'drafts' join (proven by the fixture test), and exits 0 on the fixed working tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-state-paths-lint-guard.ac2",
+            "title": "The guard exits 0 on a fixture containing only a prose/comment mention of .pan/specs, and allowlisted files retain their legacy joins without tripping it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-state-paths-lint-guard.ac3",
+            "title": "package.json defines lint:state-paths and the npm run lint chain invokes it, so npm run lint fails when a new hardcoded join is introduced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-state-paths-lint-guard.ac4",
+            "title": "docs/AGENT-STATE-PLANES.md contains a Path authority subsection naming getProjectPanPaths as the single derivation point for spec/draft directories and scripts/lint-state-paths.sh as its enforcement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fix-reconciler-spec-dir",
+        "to": "add-state-paths-lint-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-doctor-orphan-scan",
+        "to": "add-state-paths-lint-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-flywheel-spec-drafts-scan",
+        "to": "add-state-paths-lint-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-backlog-spec-drafts-scan",
+        "to": "add-state-paths-lint-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-auto-synthesize-write-dir",
+        "to": "add-state-paths-lint-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-tier-supervisor-prd-read",
+        "to": "add-state-paths-lint-guard",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
