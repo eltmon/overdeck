@@ -132,7 +132,7 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T09:52:20.207Z",
+  "updated": "2026-07-28T09:52:22.263Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
@@ -143,8 +143,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T09:52:20.045Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues: conflict message no longer prescribes a specialist command it cannot honour (merge value mapping, inspect --item, review skipped, no verification specialist, re-signal writes no replacement fallback, multi-gate) and instead names every conflicting gate with both values plus the one universally correct action; activity warning now carries an episode-derived id so the activity.entry reducer merges repeats into one row, deduping even when the trip write never lands; an already-open trip skips recordRecoveryFailure entirely so a retained conflict no longer forces a no-op record write per patrol, and the in-process key is cleared after any successful trip write.",
+    "updatedAt": "2026-07-28T09:52:20.362Z",
+    "reviewNotes": "Verification infrastructure error: Verification worker 479795 exited before writing a result",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
     "reviewedAtCommit": "51f15f597ae7b2b54c2e21b4f81ce496648728c9",
@@ -243,7 +243,7 @@
       },
       "costAtCloseOut": {
         "usd": 50.3799603,
-        "pricingAsOf": "2026-07-28T09:52:20.125Z"
+        "pricingAsOf": "2026-07-28T09:52:22.261Z"
       }
     },
     "merges": [
