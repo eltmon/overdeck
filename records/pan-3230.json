@@ -75,18 +75,18 @@
     "recordedAt": "2026-07-28T18:59:19.959Z"
   },
   "created": "2026-07-28T17:07:50.465Z",
-  "updated": "2026-07-28T19:18:27.131Z",
+  "updated": "2026-07-28T19:25:57.499Z",
   "pipeline": {
     "issueId": "PAN-3230",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:00:36.689Z",
-    "updatedAt": "2026-07-28T19:18:25.990Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: auto-synthesis now uses writeSpecForIssue with a clean-and-pushed state-worktree durability test, and lint-state-paths detects multiline specs/drafts joins with adversarial fixtures.",
+    "updatedAt": "2026-07-28T19:25:57.467Z",
+    "reviewNotes": "Shared pan-dir writer changed outside scope, and template-literal state paths still bypass the lint guard",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3239",
     "reviewedAtCommit": "ce4feae7b06ca159b5967603f389d4919236fa01",
     "lastVerifiedCommit": "ce4feae7b06ca159b5967603f389d4919236fa01",
@@ -144,9 +144,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 743563,
-            "output": 71067,
-            "cacheRead": 11951104,
+            "input": 1742563,
+            "output": 151125,
+            "cacheRead": 23924224,
             "cacheWrite": 0
           }
         },
@@ -167,15 +167,15 @@
           "cacheWrite": 177096
         },
         "openai/gpt-5.6-sol": {
-          "input": 3014439,
-          "output": 206028,
-          "cacheRead": 109195264,
+          "input": 4013439,
+          "output": 286086,
+          "cacheRead": 121168384,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 84.322027,
-        "pricingAsOf": "2026-07-28T19:18:26.014Z"
+        "usd": 97.705327,
+        "pricingAsOf": "2026-07-28T19:25:57.486Z"
       }
     },
     "merges": [
