@@ -199,6 +199,7 @@ import { reapMergedStrikeWorkspaces } from './strike-workspace-reaper.js';
 import { cleanupOrphanedInspectSessions } from './inspect-session-reaper.js';
 import { isIssueClosed } from './issue-closed.js';
 import { decideUnsignaledTestAction, readTestVerdictArtifact, recordUnsignaledTestEscalation } from './test-verdict.js';
+import { sweepStrandedVerdictFallbacks } from './deacon-verdict-fallback-sweep.js';
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
 
 // ============================================================================
@@ -2872,6 +2873,12 @@ export async function runPatrol(): Promise<PatrolResult> {
   const unappliedReviewActions = await reconcileUnappliedReviewVerdicts();
   actions.push(...unappliedReviewActions);
   for (const a of unappliedReviewActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-3092: fold verdict fallbacks whose writing process died before its own
+  // drain timer fired, and surface the ones the record lock keeps stuck.
+  const verdictFallbackActions = await sweepStrandedVerdictFallbacks();
+  actions.push(...verdictFallbackActions);
+  for (const a of verdictFallbackActions) addLog('action', a, state.patrolCycle);
 
   // PAN-796: Bypass review for issues where verification passed but review infra keeps failing
   const verifContradictionActions = await checkVerificationReviewContradiction();

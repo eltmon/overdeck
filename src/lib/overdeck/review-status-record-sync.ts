@@ -389,7 +389,7 @@ export function readWorkspaceVerdictFallbackSync(issueId: string): WorkspaceVerd
   }
 }
 
-async function readWorkspaceVerdictFallback(issueId: string): Promise<WorkspaceVerdictFallback | null> {
+export async function readWorkspaceVerdictFallback(issueId: string): Promise<WorkspaceVerdictFallback | null> {
   try {
     const path = workspaceVerdictFallbackPath(issueId);
     if (!path) return null;
