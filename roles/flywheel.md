@@ -139,11 +139,12 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    coordinated deployer. Deploy only through `pan reload` — never use manual `npm run build` plus
    `pan restart` as a deploy path, and never rebuild `dist/` in place without an immediate restart,
    which wounds the live server.
-6. **Never block on the operator.** Do not halt for planning Q&A, "approach A or B", or any
-   decision. Surface it in `openQuestions[]`, pick the most defensible default, act, and let
-   the question persist as a non-blocking signal across ticks. The single exception is a
-   `vetoed` issue. Action-and-correct beats stop-and-wait; if a default proves wrong, file a
-   corrective issue and continue.
+6. **Never block on the operator.** Do not halt the fleet for planning Q&A, "approach A or B",
+   or any decision. Surface it in `openQuestions[]`, pick the most defensible default, act, and
+   let the question persist as a non-blocking signal across ticks. An agent holding a pending
+   operator decision is parked individually under the inert-agent rule below while the fleet
+   continues. The single exception is a `vetoed` issue. Action-and-correct beats stop-and-wait;
+   if a default proves wrong, file a corrective issue and continue.
 
 ## Read first
 
@@ -471,12 +472,15 @@ prior context — and then propose a default, never an open question. Record dec
 - **Strike harness routing.** Do not pass `--harness`/`--model` unless the operator asked —
   provider defaults route correctly (kimi→ohmypi, gpt-5.5/gpt-5.6→codex, claude-*→claude-code). Never
   force `--harness claude-code` on a kimi/gpt model: the 200k-window illusion deadlocks it (PAN-1865).
-- **Inert-but-alive agents: `pan start <id> --fresh` is your recovery door (PAN-3150).** An agent
-  whose harness process is alive but whose cost/output has not moved across several ticks while its
-  role still owes work is *inert*, not crashed. `--fresh` replaces the live session itself — it no
-  longer refuses and points you at the forbidden `pan kill`. Workspace, branch, commits, xBRIEF, and
-  `.pan/continue.json` all survive; only the harness process is cycled, and the new agent re-reads
-  that state. Use it instead of parking the issue as an operator decision.
+- **Inert-but-alive agents: check pending operator decisions before `--fresh` (PAN-3150/PAN-3228).**
+  Run `pan answer <id>` with no option (or inspect `pan show <id>`) before treating an unmoving live
+  agent as inert. If a pending operator decision exists, the agent is **parked-on-operator, not
+  stalled**: emit or refresh its needs-you escalation, move to the next issue, and keep the fleet
+  running. Never run `pan start <id> --fresh` for that agent and never pass `--force` to clear the
+  pending-decision gate; the mechanical refusal is the system protecting the unanswered decision,
+  not a blocker to route around. Only when no pending decision exists is `--fresh` the recovery door:
+  it replaces the live harness process while preserving the workspace, branch, commits, xBRIEF, and
+  `.pan/continue.json`, which the new agent re-reads.
 - **A lingering `strike-<id>` session does not block a re-strike (PAN-3150).** A strike that finished
   normally leaves its tmux session behind on purpose, so its transcript stays readable — that is a
   *completed* agent, not a stuck one. `pan strike <id>` now replaces such a session instead of
