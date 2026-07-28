@@ -3,13 +3,13 @@
   "name": "Test UAT Book PAN-2377",
   "status": "draft",
   "settings": {
-    "laneAConcurrency": 1,
+    "laneAConcurrency": 2,
     "posture": "open",
     "postureSetAt": "2026-07-19T07:21:48.160Z",
     "postureSetBy": "dashboard",
-    "postureReason": "Operator paused new pickup."
+    "postureReason": "write-path live test (conv bd7c)"
   },
   "items": [],
   "createdAt": "2026-07-19T07:18:44.092Z",
-  "updatedAt": "2026-07-21T14:21:46.988Z"
+  "updatedAt": "2026-07-28T18:10:44.129Z"
 }
