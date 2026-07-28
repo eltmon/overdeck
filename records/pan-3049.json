@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T07:12:06.943Z",
+  "updated": "2026-07-28T07:17:11.325Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "workspace-reap-prefix-agnostic": {
-        "writerId": "agent-pan-3049",
-        "agentId": "agent-pan-3049",
-        "pid": 4012313,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T07:12:06.943Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -155,6 +147,17 @@
         "outcome": "completed",
         "reason": "Added remainingNetworks?: string[] to WorkspaceDockerTeardownResult, populated it in teardownWorkspaceDockerByNamePromise from the already-computed remaining-networks list, and replaced close-out.ts's hardcoded overdeck-feature-<issue>_devnet warning message with one naming the actual remaining network(s) (falling back to generic phrasing when absent). Updated the one existing close-out test that asserted the old hardcoded message and added 3 new tests across docker.test.ts and close-out.test.ts. Full workspace-manager + close-out suite (41 tests) passes; typecheck/lint clean.",
         "releasedAt": "2026-07-28T07:11:57.544Z"
+      },
+      {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 4012313,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T07:12:06.943Z",
+        "itemId": "workspace-reap-prefix-agnostic",
+        "outcome": "completed",
+        "reason": "Replaced the hardcoded WORKSPACE_PROJECT_PREFIX ('overdeck-feature-') gate in workspace-reap.ts's docker ps filter, per-container candidacy check, and issue-id extraction with the existing inferIssueIdFromStackContainerName resolver applied to the compose-project label and container name. Any resolvable feature-<issue> token is now a candidate regardless of declared prefix. Extended src/cli/commands/__tests__/workspace-reap.test.ts with 3 new tests covering both ACs plus the no-token exclusion case (5 total tests pass). Typecheck/lint clean.",
+        "releasedAt": "2026-07-28T07:17:11.325Z"
       }
     ],
     "statusReasons": {
@@ -181,6 +184,10 @@
       "closeout-warning-actual-networks": {
         "reason": "Added remainingNetworks?: string[] to WorkspaceDockerTeardownResult, populated it in teardownWorkspaceDockerByNamePromise from the already-computed remaining-networks list, and replaced close-out.ts's hardcoded overdeck-feature-<issue>_devnet warning message with one naming the actual remaining network(s) (falling back to generic phrasing when absent). Updated the one existing close-out test that asserted the old hardcoded message and added 3 new tests across docker.test.ts and close-out.test.ts. Full workspace-manager + close-out suite (41 tests) passes; typecheck/lint clean.",
         "updatedAt": "2026-07-28T07:11:57.544Z"
+      },
+      "workspace-reap-prefix-agnostic": {
+        "reason": "Replaced the hardcoded WORKSPACE_PROJECT_PREFIX ('overdeck-feature-') gate in workspace-reap.ts's docker ps filter, per-container candidacy check, and issue-id extraction with the existing inferIssueIdFromStackContainerName resolver applied to the compose-project label and container name. Any resolvable feature-<issue> token is now a candidate regardless of declared prefix. Extended src/cli/commands/__tests__/workspace-reap.test.ts with 3 new tests covering both ACs plus the no-token exclusion case (5 total tests pass). Typecheck/lint clean.",
+        "updatedAt": "2026-07-28T07:17:11.325Z"
       }
     }
   },
@@ -207,6 +214,8 @@
     "closeout-warning-actual-networks": "completed",
     "closeout-warning-actual-networks.closeout-warning-actual-networks.ac1": "completed",
     "closeout-warning-actual-networks.closeout-warning-actual-networks.ac2": "completed",
-    "workspace-reap-prefix-agnostic": "running"
+    "workspace-reap-prefix-agnostic": "completed",
+    "workspace-reap-prefix-agnostic.workspace-reap-prefix-agnostic.ac1": "completed",
+    "workspace-reap-prefix-agnostic.workspace-reap-prefix-agnostic.ac2": "completed"
   }
 }
