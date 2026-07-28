@@ -123,6 +123,54 @@ function kimiHomeDefault(): string {
   return join(homedir(), '.kimi-code');
 }
 
+/**
+ * Poll a workspace's Kimi session bucket for a directory that did not exist
+ * in `existingBefore`, returning the newest such directory's name (the
+ * session id) once one appears. Standalone so both KimiCodeRuntimeSync.spawnAgent
+ * and the production `pan start` spawn path (spawn-prep.ts, which builds its
+ * own launcher/tmux session rather than delegating to this class) can capture
+ * the session id the same way — mirroring codex's standalone
+ * waitForCodexRollout/extractThreadIdFromRollout pair.
+ */
+export async function waitForNewKimiSession(
+  kimiHome: string,
+  workspace: string,
+  existingBefore: Set<string>,
+  timeoutMs: number = SPAWN_READY_TIMEOUT_MS,
+): Promise<string | null> {
+  const bucketDir = kimiSessionsRoot(kimiHome, workspace);
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    let entries: string[] = [];
+    try {
+      entries = readdirSync(bucketDir);
+    } catch {
+      entries = [];
+    }
+    const fresh = entries.filter((entry) => !existingBefore.has(entry));
+    if (fresh.length > 0) {
+      let newest: { name: string; mtimeMs: number } | null = null;
+      for (const name of fresh) {
+        let mtimeMs: number;
+        try {
+          mtimeMs = statSync(join(bucketDir, name)).mtimeMs;
+        } catch {
+          continue;
+        }
+        if (!newest || mtimeMs > newest.mtimeMs) newest = { name, mtimeMs };
+      }
+      if (newest) return newest.name;
+    }
+    await delay(POLL_INTERVAL_MS);
+  }
+  return null;
+}
+
+/** Persist the captured session id to `<overdeckHome>/agents/<id>/kimi-session-id` (mirrors codex's thread-id file). */
+export function writeKimiSessionId(agentId: string, sessionId: string, overdeckHome: string = getOverdeckHome()): void {
+  writeFileSync(join(overdeckHome, 'agents', agentId, 'kimi-session-id'), sessionId, 'utf-8');
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -390,7 +438,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   }
 
   private writeSessionId(agentId: string, sessionId: string): void {
-    writeFileSync(this.agentPath(agentId, 'kimi-session-id'), sessionId, 'utf-8');
+    writeKimiSessionId(agentId, sessionId, this.home());
   }
 
   /**
@@ -408,32 +456,7 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   }
 
   private async waitForNewSessionId(workspace: string, existingBefore: Set<string>): Promise<string | null> {
-    const bucketDir = kimiSessionsRoot(this.kimiHome(), workspace);
-    const deadline = Date.now() + SPAWN_READY_TIMEOUT_MS;
-    while (Date.now() < deadline) {
-      let entries: string[] = [];
-      try {
-        entries = readdirSync(bucketDir);
-      } catch {
-        entries = [];
-      }
-      const fresh = entries.filter((entry) => !existingBefore.has(entry));
-      if (fresh.length > 0) {
-        let newest: { name: string; mtimeMs: number } | null = null;
-        for (const name of fresh) {
-          let mtimeMs: number;
-          try {
-            mtimeMs = statSync(join(bucketDir, name)).mtimeMs;
-          } catch {
-            continue;
-          }
-          if (!newest || mtimeMs > newest.mtimeMs) newest = { name, mtimeMs };
-        }
-        if (newest) return newest.name;
-      }
-      await delay(POLL_INTERVAL_MS);
-    }
-    return null;
+    return waitForNewKimiSession(this.kimiHome(), workspace, existingBefore);
   }
 }
 

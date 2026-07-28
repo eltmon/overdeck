@@ -10,3 +10,4 @@
 1023 src/lib/config-yaml/schema.ts # PAN-1837
 1005 src/lib/launcher-generator.ts # PAN-1837
 1208 src/lib/sync.ts # PAN-1837
+1023 src/lib/agents/spawn.ts # PAN-1837

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs';
 import { mkdir, writeFile, writeFile as writeFileAsync } from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -811,6 +811,23 @@ async function spawnAgentWithoutConsentClaim(
 
   clearReadySignal(agentId);
 
+  // PAN-1837: Kimi generates its own session id and cannot be told one via a
+  // launch flag (D2/erratum E1) — it must be captured post-launch as whatever
+  // new directory appears under the workspace's session bucket. Snapshot the
+  // bucket's current contents BEFORE the tmux session exists so the
+  // post-launch poll (below, after prompt delivery) can diff against it
+  // instead of guessing from mtime alone, which would misfire on a workspace
+  // that already has prior kimi sessions (retries/resumes).
+  let kimiExistingSessionsBefore: Set<string> | undefined;
+  if (resolvedHarness === 'kimi-code') {
+    try {
+      const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
+      kimiExistingSessionsBefore = new Set(readdirSync(kimiSessionsRoot(join(homedir(), '.kimi-code'), options.workspace)));
+    } catch {
+      kimiExistingSessionsBefore = new Set();
+    }
+  }
+
   await Effect.runPromise(createSession(agentId, options.workspace, claudeCmd, {
     env: {
       ...BLANKED_PROVIDER_ENV, // Blank stale provider vars inherited by tmux server
@@ -917,6 +934,25 @@ async function spawnAgentWithoutConsentClaim(
           if (threadId) writeThreadId(agentId, threadId);
         }
       } catch { /* non-fatal — the latest-rollout fallback still resolves the transcript */ }
+    })();
+  }
+
+  // PAN-1837: same shape as the codex block above — poll for the new session
+  // directory Kimi writes under the workspace's bucket and persist its id so
+  // transcript/cost lookups (resolveKimiWirePath) hit the fast path instead of
+  // the newest-mtime fallback. Non-blocking: Kimi only creates the session dir
+  // once its TUI boots, which can race the kickoff prompt delivery above.
+  if (resolvedHarness === 'kimi-code' && kimiExistingSessionsBefore) {
+    void (async () => {
+      try {
+        const { waitForNewKimiSession, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+        const sessionId = await waitForNewKimiSession(
+          join(homedir(), '.kimi-code'),
+          options.workspace,
+          kimiExistingSessionsBefore,
+        );
+        if (sessionId) writeKimiSessionId(agentId, sessionId);
+      } catch { /* non-fatal — the newest-session fallback still resolves the transcript */ }
     })();
   }
 

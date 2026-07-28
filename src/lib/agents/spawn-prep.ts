@@ -35,6 +35,7 @@ import {
   getAcpLauncherFields,
   getAgentRuntimeBaseCommand,
   getCodexLauncherFields,
+  getKimiCodeLauncherFields,
   getOhmypiLauncherFields,
   inferMemoryProjectId,
   roleAgentDefinitionPath,
@@ -497,6 +498,11 @@ export async function buildAgentLaunchConfig(opts: {
   const codexLauncherFields = behavior.usesCodexHome
     ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole)
     : {};
+  // PAN-1837: kimi-code needs kimiCodeModel/kimiCodeYolo threaded into the
+  // launcher — buildKimiCodeCommand() throws without kimiCodeModel set.
+  const kimiCodeLauncherFields = behavior.launchCommandKind === 'kimi-code-tui'
+    ? getKimiCodeLauncherFields(model)
+    : {};
   if (isAcp && !opts.harnessBinaryPath) {
     throw new Error('ACP launch requires the executable path resolved by preflight');
   }
@@ -560,6 +566,7 @@ export async function buildAgentLaunchConfig(opts: {
       ...piLauncherFields,
       ...codexLauncherFields,
       ...acpLauncherFields,
+      ...kimiCodeLauncherFields,
     });
     return { launcherContent, providerEnv };
   }
@@ -598,6 +605,7 @@ export async function buildAgentLaunchConfig(opts: {
     ...piLauncherFields,
     ...codexLauncherFields,
     ...acpLauncherFields,
+    ...kimiCodeLauncherFields,
     ...(opts.channelsBridgeMcpConfig
       ? {
           channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,
