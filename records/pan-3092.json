@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T07:20:08.171Z",
+  "updated": "2026-07-28T07:20:11.437Z",
   "pipeline": {
     "issueId": "PAN-3092",
     "reviewStatus": "pending",
@@ -65,8 +65,16 @@
     }
   ],
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "role-prompt-stop-signal": {
+        "writerId": "agent-pan-3092",
+        "agentId": "agent-pan-3092",
+        "pid": 41909,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T07:20:11.437Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3092",
@@ -170,6 +178,7 @@
     "stranded-verdict-sweep.stranded-verdict-sweep.ac1": "completed",
     "stranded-verdict-sweep.stranded-verdict-sweep.ac2": "completed",
     "stranded-verdict-sweep.stranded-verdict-sweep.ac3": "completed",
-    "stranded-verdict-sweep.stranded-verdict-sweep.ac4": "completed"
+    "stranded-verdict-sweep.stranded-verdict-sweep.ac4": "completed",
+    "role-prompt-stop-signal": "running"
   }
 }
