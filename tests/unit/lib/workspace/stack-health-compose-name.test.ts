@@ -1,13 +1,18 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 import {
   composeProjectNameForWorkspace,
   requireComposeProjectNameForWorkspace,
 } from '../../../../src/lib/workspace/stack-health.js';
+import { renderDevcontainerSync } from '../../../../src/lib/workspace/devcontainer-renderer.js';
+import type { ProjectConfig } from '../../../../src/lib/workspace-config.js';
 
 let tmpRoot: string | null = null;
 
@@ -98,5 +103,32 @@ describe('requireComposeProjectNameForWorkspace', () => {
     expect(() => requireComposeProjectNameForWorkspace(workspacePath, 'MIN-901')).toThrow(
       'declares name=victim-project, expected a name ending in feature-min-901',
     );
+  });
+});
+
+describe('the real Overdeck devcontainer template declares a compose `name:` (PAN-3049)', () => {
+  function renderOverdeckTemplate(workspacePath: string, featureName: string): void {
+    const projectConfig: ProjectConfig = {
+      name: 'overdeck',
+      path: join(__dirname, '../../../..'),
+      workspace: { docker: { compose_template: 'infra/.devcontainer-template' } },
+    };
+    renderDevcontainerSync({ workspacePath, projectConfig, featureName });
+  }
+
+  it('ac1: resolves overdeck-feature-<issue> from the rendered compose file alone (no dev script)', () => {
+    const workspacePath = makeWorkspace({});
+    renderOverdeckTemplate(workspacePath, 'min-901');
+    unlinkSync(join(workspacePath, '.devcontainer', 'dev'));
+
+    expect(composeProjectNameForWorkspace(workspacePath, 'MIN-901')).toBe('overdeck-feature-min-901');
+  });
+
+  it('ac2: with the dev script present, both sources agree on overdeck-feature-<issue>', () => {
+    const workspacePath = makeWorkspace({});
+    renderOverdeckTemplate(workspacePath, 'min-901');
+
+    expect(composeProjectNameForWorkspace(workspacePath, 'MIN-901')).toBe('overdeck-feature-min-901');
+    expect(requireComposeProjectNameForWorkspace(workspacePath, 'MIN-901')).toBe('overdeck-feature-min-901');
   });
 });
