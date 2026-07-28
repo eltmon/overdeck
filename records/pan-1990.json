@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-28T20:50:14.359Z",
+  "updated": "2026-07-28T20:51:31.601Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T20:50:14.341Z",
-    "inspectNotes": "Inspecting item schema-v64",
+    "updatedAt": "2026-07-28T20:51:31.240Z",
+    "inspectNotes": "Prior two defects are FIXED and verified: the fixture at tests/unit/lib/database/schema-workspaces.test.ts:79-85 now genuinely strips the four tables and both workspace_id columns before setting user_version=63, the pre-migration sanity assert at :88-91 proves the migration really executes, and moving agents.workspace_id last in the base CREATE TABLE (src/lib/database/schema.ts:473) correctly matches where ALTER TABLE ADD COLUMN places it so PRAGMA table_info cid ordering agrees. Suite runs green: 4/4 passed. ONE REMAINING AC-2 GAP. schemaSnapshot() at tests/unit/lib/database/schema-workspaces.test.ts:9-24 compares only PRAGMA table_info (tables) and PRAGMA index_info (indexes). Neither pragma exposes CHECK constraints, index uniqueness, or a partial-index WHERE predicate, so the comparison cannot establish that the migrated schema is IDENTICAL to fresh - it establishes only that object names and column lists/order agree. Verified empirically: two DBs where one has CHECK (kind IN ('main','issue','scratch')) plus CREATE UNIQUE INDEX ... WHERE is_primary = 1 and the other has neither the CHECK, nor UNIQUE, nor the predicate produce BYTE-IDENTICAL snapshots under this function (diff detected: false), while PRAGMA index_list distinguishes them (diff detected: true, via its 'unique' and 'partial' columns). This matters concretely here because the v63->v64 migration DDL at src/lib/database/schema.ts:1817-1874 is a hand-copied duplicate of the fresh-init DDL at src/lib/database/schema.ts:531-586; silent constraint drift between the two copies is precisely the failure mode AC-2 exists to catch, and ACs 3 and 4 only assert the CHECK and the partial unique index against the FRESH database, never the migrated one. A migration that dropped the kind CHECK or the WHERE is_primary = 1 predicate would pass all four tests today. REQUIRED FIX (small, either one suffices): (a) add PRAGMA index_list(<table>) per table to schemaSnapshot so unique/partial/origin are compared, and additionally compare sqlite_master.sql with leading whitespace normalized for the nine new objects - I verified those two DDL blocks are identical modulo indentation (diff of both blocks with leading whitespace stripped shows only the comment header and the db.exec wrapper), so normalized-text parity IS attainable for them even though it is not for the ALTER-added conversations/agents columns; or (b) re-run the existing AC-3 and AC-4 constraint assertions against the migrated fixture DB, not just the fresh one. Either way the new check must fail if the migration copy loses the CHECK or the partial-unique predicate.",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
       "detectedAt": "2026-07-28T19:59:33.733Z",
@@ -46,10 +46,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 304,
-            "output": 75300,
-            "cacheRead": 33794778,
-            "cacheWrite": 279400
+            "input": 306,
+            "output": 75435,
+            "cacheRead": 34101558,
+            "cacheWrite": 279639
           }
         }
       },
@@ -61,15 +61,15 @@
           "cacheWrite": 194048
         },
         "anthropic/claude-sonnet-5": {
-          "input": 304,
-          "output": 75300,
-          "cacheRead": 33794778,
-          "cacheWrite": 279400
+          "input": 306,
+          "output": 75435,
+          "cacheRead": 34101558,
+          "cacheWrite": 279639
         }
       },
       "costAtCloseOut": {
-        "usd": 16.667693,
-        "pricingAsOf": "2026-07-28T20:50:14.353Z"
+        "usd": 16.731001,
+        "pricingAsOf": "2026-07-28T20:51:31.486Z"
       }
     },
     "merges": [],
