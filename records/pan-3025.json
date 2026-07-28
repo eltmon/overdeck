@@ -74,15 +74,7 @@
       "timestamp": "2026-07-28T09:04:15.771Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T09:04:15Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3025\n\n# Code Review — PAN-3025 — Cycle 2\n\n## Verdict: CHANGES REQUESTED\n\nTwo requirements blockers remain. The production correctness defect from cycle 1 is fixed safely, and the reopen fixture now proves the intended verdict transition, but the row-5 regression tests remain vacuous and the idempotency tests mock away the two-condition completion witness they are required to prove.\n\n## Context\n\n- Branch: `feature/pan-3025`\n- Pull request: https://github.com/eltmon/overdeck/pull/3221\n- HEAD reviewed: `b7d6b3390b56aa3f4d698ee69491cd6fe6af0a52`\n- Prior reviewed HEAD: `6b218e665a20aeecd3e51dd3a9da4e695b49aa3e`\n- Dimensions reviewed: correctness, security, requirements/acceptance criteria, performance\n\n## Findings\n\n### P1 (Major) — Row-5 tests still do not verify the production fallback behavior — `tests/unit/lib/lifecycle/dod-gate-journal-fallback.test.ts:27`\n\n**RFC 2119 severity:** `!` MUST\n**Scope:** `in_pr_scope`\n**Evidence tier:** Tier 1 — static\n\n**Requirement:** FR-2/AC-3 requires deterministic tests of the real `defaultPostMergeRowDeps.readMergeStatus` path: live absent + journal merged must pass, journal missing must miss, and live merged must win without reading the journal.\n\n**Observed:** The replacement tests do call `checkPostMergeRow` without custom dependencies, but they do not mock `getReviewStatus`, `readIssueRecord`, canonical state, or running agents. They therefore read process-global state and accept every possible result: the assertions only require generic fields to exist or be defined. Two calls also pass the string `'verifying_on_main'` as the second argument, but that parameter is a `MergedDodRowResult`, so the value does not set canonical state and is effectively ignored. The file contains no assertion for `mergeStatus: merged`, `mergeStatus: missing`, `status: pass`, `status: miss`, or journal-not-called live precedence.\n\n**Impact:** The tests pass if the production journal fallback is deleted, reversed, or returns the wrong verdict. AC-3 remains unmet, and this regression has no meaningful protection.\n\n**Fix:** Mock the production dependencies named in the xBRIEF, call `checkPostMergeRow(ctx, undefined)` with default deps, and assert the three required outcomes plus `readIssueRecord` not being called when live status exists.\n\n### P1 (Major) — Idempotency tests mock away the completion-witness invariant — `tests/unit/lib/lifecycle/workflows.test.ts:985`\n\n**RFC 2119 severity:** `!` MUST\n**Scope:** `in_pr_scope`\n**Evidence tier:** Tier 1 — static\n\n**Requirement:** FR-3/NFR-1/AC-4 requires proof that `pipeline.closedOut === true` plus no live row short-circuits, while `pipeline.closedOut === true` plus a live row falls through and completes the ceremony.\n\n**Observed:** All three new workflow tests replace `readCompletedCloseOut()` itself with a mock and return a timestamp, `null`, or a rejection. No test invokes the production helper with a durable record and controllable `getReviewStatus`. The `null` case explicitly conflates “not closed out” with “closed out but live row present,” so it cannot prove the two-condition guard. The short-circuit case also omits the required assertions that the result has exactly one step and that `markRecordPipelineClosedOutSync` and `clearReviewStatus` were not called.\n\n**Impact:** The helper can regress to checking only `closedOut`, only live-row absence, or the wrong project record while every added test remains green. The mid-ceremony recovery invariant that motivated NFR-1 is still untested.\n\n**Fix:** Exercise the real helper through controllable `readIssueRecord` and `getReviewStatus` dependencies, or add focused helper tests and keep only a small workflow-wiring test. Assert both combinations explicitly, the exact one-step idempotent result, no ceremony mutations for completed close-out, and terminal-mark invocation for the live-row case.\n\n## P2 (Minor)\n\nNone.\n\n## Observations\n\n- The cycle-1 production blocker is resolved: a live-status read failure no longer produces an idempotent success. The helper and caller return to the normal DoD gate when completion cannot be confirmed.\n- The reopen fixture now persists `verification_status: 'passed'`, asserts the precondition, and proves the transition to `'pending'`.\n- FR-1 remains correctly implemented: terminal journal marking preserves the full verdict data while setting `closedOut`, `closedOutAt`, and `mergeStatus: 'merged'`.\n- The documented non-goals remain intact: no historical backfill, row-5 source annotation, ceremony reordering, route guard removal, merged-row change, or projection-chain change.\n\n## Security\n\nNo security findings. The diff introduces no new attacker-controlled command, query, HTML, authentication, authorization, secret, network, or unsafe path-handling surface.\n\n## Performance\n\nNo performance findings. The added record/status reads occur on the close-out administrative path and remain bounded single-item operations; the row-5 journal read occurs only when live status is absent.\n\n## Validation\n\n- `npm run typecheck` — passed.\n- `npm run lint` — passed.\n- Focused Vitest run over all six changed test suites — 6 files passed, 96 tests passed, 1 skipped. The two blockers concern vacuous/mocked-away acceptance coverage, so the green run does not demonstrate the required behavior.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3025/.pan/review/agent-pan-3025-review-b7d6b339/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3025 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/__tests__/close-out-terminal.test.ts",
@@ -118,20 +110,19 @@
     "recordedAt": "2026-07-28T08:50:14.585Z"
   },
   "created": "2026-07-28T04:02:43.803Z",
-  "updated": "2026-07-28T09:04:21.447Z",
+  "updated": "2026-07-28T09:11:09.835Z",
   "pipeline": {
     "issueId": "PAN-3025",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T08:50:42.357Z",
-    "updatedAt": "2026-07-28T09:04:21.439Z",
+    "updatedAt": "2026-07-28T09:11:09.327Z",
     "reviewNotes": "Row-5 regression tests still accept any result and do not verify the production live-to-journal fallback",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3221",
-    "reviewedAtCommit": "b7d6b3390b56aa3f4d698ee69491cd6fe6af0a52",
     "lastVerifiedCommit": "6b218e665a20aeecd3e51dd3a9da4e695b49aa3e",
     "reviewSpawnedAt": "2026-07-28T08:51:49.529Z",
     "scopeDrift": {
@@ -174,38 +165,38 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2709211,
-            "output": 91931,
-            "cacheRead": 14030336,
+            "input": 2716717,
+            "output": 94903,
+            "cacheRead": 14765568,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1786,
-            "output": 84172,
-            "cacheRead": 41170988,
-            "cacheWrite": 2284230
+            "input": 1866,
+            "output": 91595,
+            "cacheRead": 42960724,
+            "cacheWrite": 2297434
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2709211,
-          "output": 91931,
-          "cacheRead": 14030336,
+          "input": 2716717,
+          "output": 94903,
+          "cacheRead": 14765568,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1786,
-          "output": 84172,
-          "cacheRead": 41170988,
-          "cacheWrite": 2284230
+          "input": 1866,
+          "output": 91595,
+          "cacheRead": 42960724,
+          "cacheWrite": 2297434
         }
       },
       "costAtCloseOut": {
-        "usd": 30.714194,
-        "pricingAsOf": "2026-07-28T09:04:21.444Z"
+        "usd": 31.441174,
+        "pricingAsOf": "2026-07-28T09:11:09.419Z"
       }
     },
     "merges": [
