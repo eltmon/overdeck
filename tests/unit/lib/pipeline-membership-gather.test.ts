@@ -56,6 +56,7 @@ function deps(): PipelineMembershipGatherDeps {
     }]),
     listOpenMergeRequests: vi.fn().mockResolvedValue([]),
     listMergedPullRequestHeads: vi.fn().mockResolvedValue(['feature/pan-1']),
+    listMergedMergeRequestHeads: vi.fn().mockResolvedValue([]),
     listIssueStates: vi.fn().mockImplementation(async (_owner, _repo, numbers: number[]) =>
       numbers.map((number) => ({ number, state: number === 4 ? 'open' as const : 'closed' as const }))),
     listTrackerIssues: vi.fn().mockResolvedValue([]),
@@ -772,6 +773,147 @@ describe('gatherProjectLensSignals', () => {
       reason: 'forge_unavailable',
       message: expect.stringContaining('glab unavailable'),
     });
+  });
+
+  it('sets hasMergedPr for open GitLab issues with merged MRs, yielding post_merge_limbo', async () => {
+    const mocked = deps();
+    mocked.listTrackerIssues = vi.fn().mockResolvedValue([
+      { issueId: 'MIN-896', state: 'open', labels: [] },
+    ]);
+    mocked.listOpenMergeRequests = vi.fn().mockResolvedValue([]);
+    mocked.listMergedMergeRequestHeads = vi.fn().mockResolvedValue(['feature/min-896']);
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
+    const gitlabPolyrepo: ProjectConfig = {
+      name: 'test',
+      path: '/test',
+      issue_prefix: 'MIN',
+      gitlab_repo: 'test/test',
+      workspace: {
+        type: 'polyrepo',
+        repos: [
+          { name: 'fe', path: 'frontend' },
+          { name: 'api', path: 'api' },
+        ],
+      },
+    };
+
+    const result = await gatherProjectLensSignals(gitlabPolyrepo, mocked);
+
+    const issue = result.find((r) => r.issueId === 'MIN-896');
+    expect(issue).toMatchObject({
+      issueOpen: true,
+      hasMergedPr: true,
+    });
+    // Verify post_merge_limbo classification
+    const membership = resolvePipelineMembership(issue!);
+    expect(membership).toEqual(expect.objectContaining({
+      bucket: 'post_merge_limbo',
+    }));
+    // Verify both repos were queried
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not query merged MRs for closed issues (they\'re already terminal)', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockResolvedValue([]);
+    mocked.listTrackerIssues = vi.fn().mockResolvedValue([
+      { issueId: 'MIN-908', state: 'closed', labels: ['in-review'] },
+    ]);
+    mocked.listOpenMergeRequests = vi.fn().mockResolvedValue([]);
+    mocked.listMergedMergeRequestHeads = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
+    const gitlabProject: ProjectConfig = {
+      name: 'test',
+      path: '/test',
+      issue_prefix: 'MIN',
+      gitlab_repo: 'test/test',
+    };
+
+    const result = await gatherProjectLensSignals(gitlabProject, mocked);
+
+    const issue = result.find((r) => r.issueId === 'MIN-908');
+    expect(issue).toMatchObject({
+      issueOpen: false,
+      hasMergedPr: false,
+    });
+    // Closed issues are terminal regardless of merged-PR state
+    const membership = resolvePipelineMembership(issue!);
+    expect(membership).toEqual(expect.objectContaining({
+      bucket: 'clean_terminal',
+    }));
+  });
+
+  it('unions merged MRs across polyrepo repos (multiple repos in merge set)', async () => {
+    const mocked = deps();
+    mocked.listTrackerIssues = vi.fn().mockResolvedValue([
+      { issueId: 'MIN-900', state: 'open', labels: [] },
+    ]);
+    mocked.listOpenMergeRequests = vi.fn().mockResolvedValue([]);
+    // Only return merged for the api repo, not fe
+    mocked.listMergedMergeRequestHeads = vi.fn().mockImplementation(async (repoPath: string) => {
+      if (repoPath.includes('api')) {
+        return ['feature/min-900'];
+      }
+      return [];
+    });
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
+    const gitlabPolyrepo: ProjectConfig = {
+      name: 'test',
+      path: '/test',
+      issue_prefix: 'MIN',
+      gitlab_repo: 'test/test',
+      workspace: {
+        type: 'polyrepo',
+        repos: [
+          { name: 'fe', path: 'frontend' },
+          { name: 'api', path: 'api' },
+        ],
+      },
+    };
+
+    const result = await gatherProjectLensSignals(gitlabPolyrepo, mocked);
+
+    // Even though only api repo returned merged, the union should mark it as merged
+    const issue = result.find((r) => r.issueId === 'MIN-900');
+    expect(issue).toMatchObject({
+      hasMergedPr: true,
+    });
+  });
+
+  it('does not query merged MRs for github repos in polyrepo', async () => {
+    const mocked = deps();
+    mocked.listTrackerIssues = vi.fn().mockResolvedValue([
+      { issueId: 'TEST-1', state: 'open', labels: [] },
+    ]);
+    // This config is a polyrepo with one gitlab repo and other repos with different forges
+    const mixedPolyrepo: ProjectConfig = {
+      name: 'test',
+      path: '/test',
+      issue_prefix: 'TEST',
+      gitlab_repo: 'gitlab/test',
+      workspace: {
+        type: 'polyrepo',
+        repos: [
+          { name: 'fe', path: 'frontend', remote: 'github' },
+          { name: 'api', path: 'api' },
+        ],
+      },
+    };
+
+    mocked.listOpenMergeRequests = vi.fn().mockResolvedValue([]);
+    mocked.listMergedMergeRequestHeads = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
+
+    await gatherProjectLensSignals(mixedPolyrepo, mocked);
+
+    // Only the api repo (gitlab forge) should be queried, not fe (github forge)
+    // The mock was called once, meaning only one repo was queried (the gitlab one)
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(1);
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', expect.any(Array));
   });
 
   it('does not query issue states or merged history for closed spec-only candidates', async () => {
