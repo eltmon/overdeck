@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-28T20:45:45.657Z",
+  "updated": "2026-07-28T20:45:57.836Z",
   "pipeline": {
     "issueId": "PAN-3242",
     "reviewStatus": "pending",
@@ -72,8 +72,16 @@
     }
   ],
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "docs-order-books": {
+        "writerId": "agent-pan-3242",
+        "agentId": "agent-pan-3242",
+        "pid": 276452,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:45:57.835Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3242",
@@ -162,6 +170,7 @@
     "brief-overlay.brief-overlay.ac3": "completed",
     "offbook-policy-row": "completed",
     "offbook-policy-row.offbook-policy-row.ac1": "completed",
-    "offbook-policy-row.offbook-policy-row.ac2": "completed"
+    "offbook-policy-row.offbook-policy-row.ac2": "completed",
+    "docs-order-books": "running"
   }
 }
