@@ -110,6 +110,7 @@ export async function listGitLabMergedMergeRequestHeads(
       const cacheKey = `${repoPath.toLowerCase()}:${head}`;
       const hasMerged = await cachedMergedMergeRequestHeads(cacheKey, async () => {
         let page = 1;
+        let found = false;
 
         while (true) {
           const stdout = await runner(
@@ -117,18 +118,16 @@ export async function listGitLabMergedMergeRequestHeads(
             repoPath,
           );
 
-          if (!stdout.trim()) {
-            return false; // No merged MRs found
-          }
+          if (!stdout.trim()) return found;
 
           const pageRows = JSON.parse(stdout) as GitLabMergeRequestRow[];
           if (!Array.isArray(pageRows)) {
             throw new Error(`Expected array from glab mr list, got ${typeof pageRows}`);
           }
-          if (pageRows.length > 0) return true; // Found at least one merged MR
+          if (pageRows.length > 0) found = true;
 
-          // If we got fewer than 100 rows, we're on the last page with no results
-          if (pageRows.length < 100) return false;
+          // A short page is the final page; return whether any page contained a merged MR.
+          if (pageRows.length < 100) return found;
 
           page++;
         }
