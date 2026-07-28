@@ -2352,8 +2352,13 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
 
       // Init containers are one-shot by design — they run setup, exit, and stay exited.
       // Restarting them is meaningless and floods agents with bogus "container crashed" alerts.
-      // Match service containers only (frontend/server), not init.
-      const match = name.match(/feature-([\w-]+?)-(frontend|server)-/);
+      // Match service containers only (frontend/server), not init. Anchored to the
+      // final `-<index>` at the end of the name, with the issue token constrained
+      // to the same `word-digits` shape used elsewhere (e.g. FEATURE_PROJECT_RE in
+      // idle-stack-reaper.ts) — a loose `[\w-]+?` capture could misattribute a name
+      // like `tenant-feature-foo-1-server-feature-pan-464-server-1` to `FOO-1`
+      // instead of the real `PAN-464` crash (review finding).
+      const match = name.match(/feature-([a-z0-9]+-\d+)-(frontend|server)-\d+$/i);
       if (!match) continue;
 
       // Skip clean shutdowns (exit code 0). Status format: "Exited (N) X minutes ago".

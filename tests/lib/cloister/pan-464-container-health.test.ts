@@ -514,4 +514,39 @@ describe('checkWorkspaceContainerHealth', () => {
     const restartCalled = (mockExec.mock.calls as Array<[string]>).some(([cmd]) => cmd.includes('docker restart'));
     expect(restartCalled).toBe(false);
   });
+
+  // Review finding: a loose issue-token capture could misattribute a name
+  // embedding a second `feature-...-(frontend|server)-` segment to the wrong
+  // issue. The match must anchor to the final `-<index>` at the end of the
+  // name with a strict word-digits issue token, matching the real crashed
+  // container (PAN-464), not an earlier decoy segment (FOO-1).
+  it('(k) attributes an ambiguous name to the final feature-<issue>-<service>-<index> segment, not an earlier decoy', async () => {
+    writeState({ containerRestarts: {} });
+
+    setupExec({
+      'docker ps -a': {
+        stdout: 'tenant-feature-foo-1-server-feature-pan-464-server-1|Exited (1) 2 minutes ago\n',
+      },
+      'tmux has-session': { stdout: '' },
+      'docker restart': { stdout: '' },
+      'lsof': { stdout: '' },
+    });
+
+    const actions = await checkWorkspaceContainerHealth();
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatch(/attempt 1\/5/);
+    const state = readState();
+    expect(state.containerRestarts!['tenant-feature-foo-1-server-feature-pan-464-server-1']).toBeDefined();
+    expect(mockSendKeysAsync).toHaveBeenCalledWith(
+      'agent-pan-464',
+      expect.anything(),
+      'deacon:container-restarted',
+    );
+    expect(mockSendKeysAsync).not.toHaveBeenCalledWith(
+      'agent-foo-1',
+      expect.anything(),
+      expect.anything(),
+    );
+  });
 });

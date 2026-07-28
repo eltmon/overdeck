@@ -1,41 +1,38 @@
 import { describe, it, expect } from 'vitest';
 import {
   diagnoseDuplicateComposeStacks,
-  type CanonicalProjectInfo,
   type DuplicateStackContainerRow,
 } from '../../../src/cli/commands/doctor-duplicate-stacks.js';
 
-function resolver(map: Record<string, string | null>, workspacePath: string | null = '/repo/workspaces/feature-min-901') {
-  return (issueId: string): CanonicalProjectInfo => ({
-    project: map[issueId] ?? null,
-    workspacePath,
-  });
+function resolver(map: Record<string, string | null>) {
+  return (issueId: string): string | null => map[issueId] ?? null;
 }
 
 describe('diagnoseDuplicateComposeStacks (PAN-3049)', () => {
-  it('ac1: reports a duplicate with myn- as canonical and overdeck- as foreign, with a cwd-independent fix command', () => {
+  // PAN-3049 review fix (cycle 3): no container-name heuristic (init-only,
+  // non-support-container, etc.) can substitute for a real application
+  // health check — `docker ps` only proves a container is running, never
+  // that it is serving correctly. This check therefore never emits an
+  // automatic teardown command for >=2 running projects, regardless of
+  // which project is canonical or what's running under it.
+  it('ac1: reports a duplicate and always emits diagnosis-only guidance, never a down command', () => {
     const containers: DuplicateStackContainerRow[] = [
       { name: 'myn-feature-min-901-api-1', composeProject: 'myn-feature-min-901' },
-      { name: 'myn-feature-min-901-dev-1', composeProject: 'myn-feature-min-901' },
+      { name: 'myn-feature-min-901-server-1', composeProject: 'myn-feature-min-901' },
       { name: 'overdeck-feature-min-901-api-1', composeProject: 'overdeck-feature-min-901' },
-      { name: 'overdeck-feature-min-901-dev-1', composeProject: 'overdeck-feature-min-901' },
+      { name: 'overdeck-feature-min-901-frontend-1', composeProject: 'overdeck-feature-min-901' },
     ];
 
-    const results = diagnoseDuplicateComposeStacks(
-      containers,
-      resolver({ 'MIN-901': 'myn-feature-min-901' }, '/repo/workspaces/feature-min-901'),
-    );
+    const results = diagnoseDuplicateComposeStacks(containers, resolver({ 'MIN-901': 'myn-feature-min-901' }));
 
     expect(results).toHaveLength(1);
     expect(results[0].status).toBe('warn');
     expect(results[0].message).toContain('MIN-901');
     expect(results[0].message).toContain('myn-feature-min-901');
     expect(results[0].message).toContain('overdeck-feature-min-901');
-    expect(results[0].fix).toContain('foreign stack overdeck-feature-min-901 is a duplicate');
-    expect(results[0].fix).toContain('docker compose -p "overdeck-feature-min-901" down');
-    // The command must not depend on the operator's current directory.
-    expect(results[0].fix).toContain('cd "/repo/workspaces/feature-min-901/.devcontainer"');
-    expect(results[0].fix).not.toContain('myn-feature-min-901" down');
+    expect(results[0].fix).not.toContain('docker compose');
+    expect(results[0].fix).not.toContain('down');
+    expect(results[0].fix).toContain('pan workspace rebuild MIN-901');
   });
 
   it('ac2: emits the rebuild-first guidance when only the non-canonical stack is running, with no down command', () => {
@@ -91,8 +88,6 @@ describe('diagnoseDuplicateComposeStacks (PAN-3049)', () => {
     expect(results).toEqual([]);
   });
 
-  // PAN-3049 review fix: never recommend stopping every running project when
-  // ownership cannot be confirmed — that includes the live/canonical stack.
   it('emits diagnosis-only guidance (no down commands) when canonical resolution fails for >=2 running projects', () => {
     const containers: DuplicateStackContainerRow[] = [
       { name: 'myn-feature-min-901-api-1', composeProject: 'myn-feature-min-901' },
@@ -109,26 +104,6 @@ describe('diagnoseDuplicateComposeStacks (PAN-3049)', () => {
     expect(results[0].fix).toContain('pan workspace rebuild MIN-901');
   });
 
-  it('emits diagnosis-only guidance when a canonical name is known but not among the running projects', () => {
-    const containers: DuplicateStackContainerRow[] = [
-      { name: 'overdeck-feature-min-901-api-1', composeProject: 'overdeck-feature-min-901' },
-      { name: 'legacy-feature-min-901-api-1', composeProject: 'legacy-feature-min-901' },
-    ];
-
-    const results = diagnoseDuplicateComposeStacks(containers, resolver({ 'MIN-901': 'myn-feature-min-901' }));
-
-    expect(results).toHaveLength(1);
-    expect(results[0].status).toBe('warn');
-    expect(results[0].message).toContain('none matching its canonical name myn-feature-min-901');
-    expect(results[0].fix).not.toContain('docker compose');
-    expect(results[0].fix).not.toContain('down');
-    expect(results[0].fix).toContain('pan workspace rebuild MIN-901');
-  });
-
-  // PAN-3049 review fix (cycle 2): a canonical project with only an
-  // init/setup container running is not confirmed healthy — recommending a
-  // foreign-stack teardown here can remove the only working stack while the
-  // canonical one is still initializing.
   it('emits diagnosis-only guidance when the canonical project has only an init container running, even with a complete foreign stack', () => {
     const containers: DuplicateStackContainerRow[] = [
       { name: 'myn-feature-min-901-init-1', composeProject: 'myn-feature-min-901' },
@@ -140,24 +115,29 @@ describe('diagnoseDuplicateComposeStacks (PAN-3049)', () => {
     const results = diagnoseDuplicateComposeStacks(containers, resolver({ 'MIN-901': 'myn-feature-min-901' }));
 
     expect(results).toHaveLength(1);
-    expect(results[0].status).toBe('warn');
-    expect(results[0].message).toContain('no running service container yet');
     expect(results[0].fix).not.toContain('docker compose');
     expect(results[0].fix).not.toContain('down');
     expect(results[0].fix).toContain('pan workspace rebuild MIN-901');
   });
 
-  it('emits a down command when the canonical project has a real running service, not just init', () => {
+  // PAN-3049 review fix (cycle 3): the previous "not init/setup" exclusion
+  // heuristic treated a running dev/database/cache container as proof the
+  // canonical application was healthy. It is not — no container-name
+  // heuristic is, so no down command is ever emitted here regardless of
+  // which containers are running under the canonical project.
+  it('never emits a down command even when the canonical project has running dev/database/cache containers (no app service)', () => {
     const containers: DuplicateStackContainerRow[] = [
-      { name: 'myn-feature-min-901-init-1', composeProject: 'myn-feature-min-901' },
-      { name: 'myn-feature-min-901-server-1', composeProject: 'myn-feature-min-901' },
+      { name: 'myn-feature-min-901-dev-1', composeProject: 'myn-feature-min-901' },
+      { name: 'myn-feature-min-901-postgres-1', composeProject: 'myn-feature-min-901' },
       { name: 'overdeck-feature-min-901-api-1', composeProject: 'overdeck-feature-min-901' },
+      { name: 'overdeck-feature-min-901-frontend-1', composeProject: 'overdeck-feature-min-901' },
     ];
 
     const results = diagnoseDuplicateComposeStacks(containers, resolver({ 'MIN-901': 'myn-feature-min-901' }));
 
     expect(results).toHaveLength(1);
-    expect(results[0].fix).toContain('foreign stack overdeck-feature-min-901 is a duplicate');
-    expect(results[0].fix).toContain('docker compose -p "overdeck-feature-min-901" down');
+    expect(results[0].fix).not.toContain('docker compose');
+    expect(results[0].fix).not.toContain('down');
+    expect(results[0].fix).toContain('pan workspace rebuild MIN-901');
   });
 });

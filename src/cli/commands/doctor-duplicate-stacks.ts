@@ -6,6 +6,15 @@
  * fallback when a caller resolves the name before the devcontainer name has
  * a chance to be declared/rendered. This check is read-only: it stops
  * nothing itself, only reports what a human/agent should run.
+ *
+ * This check never emits an automatic teardown command when >=2 projects
+ * are running for one issue. `docker ps` proves a container is running, not
+ * that it is serving correctly, and no container-name heuristic (init-only,
+ * excluding known support-container names, etc.) can substitute for a real
+ * application health check — three review cycles each found a different
+ * false positive that kind of heuristic let through. Reconciling which
+ * duplicate is safe to stop is always left to `pan workspace rebuild` plus
+ * an operator decision, never inferred here.
  */
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -34,19 +43,6 @@ export interface DuplicateStackContainerRow {
   composeProject?: string;
 }
 
-/** Canonical compose project name for an issue, plus where to run compose commands from. */
-export interface CanonicalProjectInfo {
-  project: string | null;
-  workspacePath: string | null;
-}
-
-// One-shot/setup containers (init, migrations, test runners) can be
-// "running" (mid-execution) without the canonical stack actually serving
-// anything yet. Recommending a foreign-stack teardown on the strength of an
-// init container alone can remove the only working stack while the
-// canonical one is still initializing (review finding).
-const NON_SERVICE_CONTAINER_RE = /(?:^|[-_])(?:init|setup|migrate|test-unit)(?:$|[-_])/i;
-
 /**
  * Group running containers by issue (via `inferIssueIdFromStackContainerName`)
  * and flag any issue whose running stack doesn't match its canonical
@@ -58,27 +54,24 @@ const NON_SERVICE_CONTAINER_RE = /(?:^|[-_])(?:init|setup|migrate|test-unit)(?:$
  */
 export function diagnoseDuplicateComposeStacks(
   containers: DuplicateStackContainerRow[],
-  resolveCanonicalProject: (issueId: string) => CanonicalProjectInfo,
+  resolveCanonicalProject: (issueId: string) => string | null,
 ): CheckResult[] {
-  const projectsByIssue = new Map<string, Map<string, string[]>>();
+  const projectsByIssue = new Map<string, Set<string>>();
   for (const container of containers) {
     if (!container.composeProject) continue;
     const issueId =
       inferIssueIdFromStackContainerName(container.composeProject) ??
       inferIssueIdFromStackContainerName(container.name);
     if (!issueId) continue;
-    const projects = projectsByIssue.get(issueId) ?? new Map<string, string[]>();
-    const names = projects.get(container.composeProject) ?? [];
-    names.push(container.name);
-    projects.set(container.composeProject, names);
+    const projects = projectsByIssue.get(issueId) ?? new Set<string>();
+    projects.add(container.composeProject);
     projectsByIssue.set(issueId, projects);
   }
 
   const results: CheckResult[] = [];
   for (const issueId of [...projectsByIssue.keys()].sort()) {
-    const projectContainers = projectsByIssue.get(issueId)!;
-    const runningProjects = [...projectContainers.keys()].sort();
-    const { project: canonical, workspacePath } = resolveCanonicalProject(issueId);
+    const runningProjects = [...projectsByIssue.get(issueId)!].sort();
+    const canonical = resolveCanonicalProject(issueId);
 
     if (runningProjects.length === 1) {
       // Healthy: the single running stack IS the canonical one. Silent.
@@ -97,54 +90,32 @@ export function diagnoseDuplicateComposeStacks(
     }
 
     // ≥2 distinct running compose projects for the same issue — a duplicate.
-    // Only recommend stopping a project when the canonical one is confirmed
-    // running AND has at least one real service container up (not just an
-    // init/setup container) — otherwise we cannot safely tell whether the
-    // canonical stack is actually serving anything yet, and must not point
-    // the operator at stopping the foreign stack that might be the only one
-    // actually working.
-    const canonicalNames = canonical ? projectContainers.get(canonical) ?? [] : [];
-    const canonicalHasRunningService = canonicalNames.some((name) => !NON_SERVICE_CONTAINER_RE.test(name));
-    const canonicalConfirmedHealthy = canonical !== null && canonicalHasRunningService;
-    if (!canonicalConfirmedHealthy) {
-      const canonicalPresentButNotHealthy = canonical !== null && runningProjects.includes(canonical);
-      results.push({
-        name: `Duplicate Docker stack (${issueId})`,
-        status: 'warn',
-        message: canonicalPresentButNotHealthy
-          ? `${issueId}'s canonical project ${canonical} is present but has no running service container yet (only init/setup): ${runningProjects.join(', ')}`
-          : canonical
-            ? `${issueId} has ${runningProjects.length} running compose projects, none matching its canonical name ${canonical}: ${runningProjects.join(', ')}`
-            : `${issueId} has ${runningProjects.length} running compose projects and no resolvable canonical name: ${runningProjects.join(', ')}`,
-        fix: `Run \`pan workspace rebuild ${issueId}\` to bring the canonical stack up, then run \`pan doctor\` again once it is healthy to see which of the running projects is safe to stop.`,
-      });
-      continue;
-    }
-
-    const foreign = runningProjects.filter((project) => project !== canonical);
-    const composeDir = workspacePath ? `${workspacePath}/.devcontainer` : null;
+    // This check has no application-health signal — `docker ps` presence
+    // proves a container is running, not that it is serving correctly, and
+    // no container-name heuristic (init-only, non-support-container, etc.)
+    // can substitute for a real health check (three review cycles each
+    // found a different false-positive this kind of heuristic let through).
+    // Always emit diagnosis-only guidance here; never a teardown command.
+    // Reconciling which duplicate is safe to stop is an operator/`pan
+    // workspace rebuild`-guided action, not something this check infers.
     results.push({
       name: `Duplicate Docker stack (${issueId})`,
       status: 'warn',
-      message: `${issueId} has ${runningProjects.length} running compose projects (canonical: ${canonical}): ${runningProjects.join(', ')}`,
-      fix: foreign
-        .map((name) =>
-          composeDir
-            ? `foreign stack ${name} is a duplicate: (cd "${composeDir}" && docker compose -p "${name}" down -v --remove-orphans)`
-            : `foreign stack ${name} is a duplicate: docker compose -p "${name}" down -v --remove-orphans (run from the workspace's .devcontainer directory)`,
-        )
-        .join('\n'),
+      message: canonical
+        ? `${issueId} has ${runningProjects.length} running compose projects (canonical: ${canonical}): ${runningProjects.join(', ')}`
+        : `${issueId} has ${runningProjects.length} running compose projects and no resolvable canonical name: ${runningProjects.join(', ')}`,
+      fix: `Run \`pan workspace rebuild ${issueId}\` to confirm the canonical stack is healthy, then use \`docker ps\`/\`pan doctor\` output to decide which of the running projects (${runningProjects.join(', ')}) is safe to stop manually — this check does not have enough information to name one automatically.`,
     });
   }
 
   return results;
 }
 
-function resolveCanonicalComposeProjectForDoctor(issueId: string): CanonicalProjectInfo {
+function resolveCanonicalComposeProjectForDoctor(issueId: string): string | null {
   const resolvedProject = resolveProjectFromIssueSync(issueId);
   const projectConfig = resolvedProject ? getProjectSync(resolvedProject.projectKey) : null;
   const workspacePath = defaultWorkspacePath(issueId, projectConfig);
-  return { project: tryComposeProjectNameForWorkspace(workspacePath, issueId), workspacePath };
+  return tryComposeProjectNameForWorkspace(workspacePath, issueId);
 }
 
 export async function checkDuplicateComposeStacks(): Promise<CheckResult[]> {
