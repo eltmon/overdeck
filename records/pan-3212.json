@@ -122,18 +122,18 @@
     "recordedAt": "2026-07-28T17:49:31.882Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T18:40:15.540Z",
+  "updated": "2026-07-28T18:40:43.841Z",
   "pipeline": {
     "issueId": "PAN-3212",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:49:41.828Z",
-    "updatedAt": "2026-07-28T18:40:15.531Z",
-    "reviewNotes": "! Scrollback text is accepted as proof that the pending payload is in the active composer — `src/lib/tmux-dedup.ts:187`",
+    "updatedAt": "2026-07-28T18:40:43.682Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: pending keyed payload proof now inspects only the active composer, treats empty or failed captures as unproven, and re-pastes only after positive absence.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
     "reviewedAtCommit": "72d3b812b0d38b8a05441f6dd8f478386595c690",
     "lastVerifiedCommit": "72d3b812b0d38b8a05441f6dd8f478386595c690",
@@ -178,32 +178,32 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2329121,
-            "output": 236026,
-            "cacheRead": 31748096,
+            "input": 2335709,
+            "output": 236396,
+            "cacheRead": 32613376,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4319869,
-            "output": 328075,
-            "cacheRead": 87523328,
+            "input": 4321913,
+            "output": 328385,
+            "cacheRead": 88659968,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 6648990,
-          "output": 564101,
-          "cacheRead": 119271424,
+          "input": 6657622,
+          "output": 564781,
+          "cacheRead": 121273344,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 109.803692,
-        "pricingAsOf": "2026-07-28T18:40:15.537Z"
+        "usd": 110.868212,
+        "pricingAsOf": "2026-07-28T18:40:43.747Z"
       }
     },
     "merges": [
