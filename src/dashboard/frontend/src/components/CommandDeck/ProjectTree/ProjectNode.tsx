@@ -6,7 +6,7 @@ import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './Fea
 import type { Harness } from '../../shared/ModelPicker';
 import styles from '../styles/command-deck.module.css';
 
-export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'tasks' | 'docker' | 'remote-agent' | 'conversation';
+export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'prd' | 'vbrief' | 'tasks' | 'docker' | 'remote-agent' | 'conversation';
 
 export interface ProjectFeatureResourceDetails {
   hasWorkspace: boolean;
@@ -21,6 +21,7 @@ export interface ProjectFeatureResourceDetails {
   }>;
   hasXbrief: boolean;
   hasTasks: boolean;
+  hasPrd: boolean;
   dockerContainerCount: number;
   /** PAN-1523: actual HEAD of the agent's workspace, or null when workspace is missing. */
   actualBranch?: string | null;
