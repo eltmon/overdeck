@@ -2,7 +2,7 @@
   "issueId": "PAN-3233",
   "schemaVersion": 2,
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-28T18:18:59.531Z",
+  "updated": "2026-07-28T18:19:01.813Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3233: Enrichment classification defects hide genuinely frozen agents: specialist suppression zeroes the work agent's permission prompt, user_question yields empty kinds (35 agents invisible + unreapable), count semantics exclude pane prompts",
       "timestamp": "2026-07-28T18:18:59.531Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
