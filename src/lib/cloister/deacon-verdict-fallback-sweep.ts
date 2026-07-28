@@ -17,26 +17,56 @@
 import { loadReviewStatuses } from '../review-status.js';
 import {
   drainWorkspaceVerdictFallback,
+  findWorkspaceVerdictConflicts,
   readWorkspaceVerdictFallback,
 } from '../overdeck/review-status-record-sync.js';
+import type { VerdictConflict } from '../pan-dir/pipeline-verdict-merge.js';
 import { resolveProjectFromIssueSync, getProjectSync } from '../projects.js';
 import { readOwner, recordLockPath } from '../pan-dir/fs-lock.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
-import { recordRecoveryFailure } from './recovery-trip.js';
+import { findRecoveryTrip, recordRecoveryFailure } from './recovery-trip.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 
 /** How long a fallback may stay undrained before the operator hears about it. */
 export const VERDICT_CONTENTION_SURFACE_MS = 10 * 60 * 1000;
 
 /**
- * Contention episodes already warned about, keyed by issue + the fallback's own
- * `updatedAt`. This dedupe is deliberately in-process and lock-free: the thing
- * being reported IS contention on the per-issue record lock, so the immediate
- * operator signal must not depend on taking that lock. The durable
- * recovery-trip record is the cross-restart dedupe; this map only stops one
- * long-running server from warning on every patrol cycle.
+ * Episodes warned about whose durable recovery trip is not yet on disk, keyed by
+ * recovery path + issue + the fallback's own `updatedAt`.
+ *
+ * The durable trip is the cross-restart dedupe and is consulted first. This set
+ * covers only the window where the trip write itself keeps losing to the
+ * contended record lock — precisely when the durable plane cannot help — and
+ * entries are dropped as soon as the trip lands, so it does not grow for the
+ * lifetime of the server.
  */
-const warnedContentionEpisodes = new Set<string>();
+const warnedEpisodes = new Set<string>();
+
+/** Which specialist owns each gate, for the "apply the right verdict" instruction. */
+const GATE_SPECIALIST: Record<string, string> = {
+  reviewStatus: 'review',
+  testStatus: 'test',
+  uatStatus: 'uat',
+  inspectStatus: 'inspect',
+  mergeStatus: 'merge',
+};
+
+function conflictMessage(issueId: string, conflicts: VerdictConflict[], ageMinutes: number): string {
+  const detail = conflicts
+    .map((c) => `${c.gate}: the record holds "${c.journalValue}" and the workspace fallback holds "${c.fallbackValue}"`)
+    .join('; ');
+  const specialist = GATE_SPECIALIST[conflicts[0]!.gate];
+  const apply = specialist
+    ? `pan admin specialists done ${specialist} ${issueId} --status <the correct value>`
+    : `re-signal the correct verdict for that gate`;
+  return (
+    `${issueId} — two different verdicts have been written for the same gate and Overdeck cannot tell which `
+    + `is newer, so it will not choose: ${detail}. This has been unresolved for ${ageMinutes}min and will NOT `
+    + `clear on its own — the fold is withheld on every patrol, by design, to avoid destroying the losing `
+    + `verdict. An operator must decide. To apply the verdict you believe is correct, run: ${apply}. `
+    + `To discard both and start over, dispatch a new review cycle for ${issueId}.`
+  );
+}
 
 async function lockOwnerDescription(issueId: string): Promise<string> {
   try {
@@ -89,40 +119,60 @@ export async function sweepStrandedVerdictFallbacks(now = Date.now()): Promise<s
       if (!workspacePath) continue;
 
       const ageMinutes = Math.round(ageMs / 60_000);
-      const owner = await lockOwnerDescription(issueId);
-      const episode = `${issueId}:${fallback.updatedAt}`;
+      // Two different failures land here. Contention clears on its own; a
+      // verdict conflict never does, because every later drain withholds the
+      // same fold. Telling an operator to wait for the second one would be
+      // false remediation, so name which it is before saying anything.
+      const conflicts = await findWorkspaceVerdictConflicts(issueId, fallback);
+      const conflicted = conflicts.length > 0;
+      const recoveryPath = conflicted ? 'verdict-fallback-conflict' : 'verdict-fallback-contention';
+      const episode = `${recoveryPath}:${issueId}:${fallback.updatedAt}`;
 
-      // The activity warning goes out FIRST and never touches the record lock.
-      // Ordering it after the recovery-trip write would put the only immediate
-      // operator signal behind the very lock whose contention it is reporting —
-      // so a genuine >10min episode could produce no signal at all.
-      if (!warnedContentionEpisodes.has(episode)) {
-        warnedContentionEpisodes.add(episode);
-        emitActivityEntrySync({
-          source: 'cloister',
-          level: 'warn',
-          issueId,
-          message:
-            `${issueId} — verdict fallback undrained for ${ageMinutes}min; the per-issue record lock is `
-            + `contended (current owner: ${owner}). The verdict is durable in the workspace fallback and `
-            + `folds automatically once the lock frees.`,
-        });
-        actions.push(`${issueId}: verdict contended ${ageMinutes}min (lock owner: ${owner})`);
+      let message: string;
+      let summary: string;
+      if (conflicted) {
+        message = conflictMessage(issueId, conflicts, ageMinutes);
+        summary = `${issueId}: verdict conflict on ${conflicts.map((c) => c.gate).join(', ')} — needs operator adjudication`;
+      } else {
+        const owner = await lockOwnerDescription(issueId);
+        message =
+          `${issueId} — verdict fallback undrained for ${ageMinutes}min; the per-issue record lock is `
+          + `contended (current owner: ${owner}). The verdict is durable in the workspace fallback and `
+          + `folds automatically once the lock frees.`;
+        summary = `${issueId}: verdict contended ${ageMinutes}min (lock owner: ${owner})`;
+      }
+
+      // Dedupe across restarts by consulting the durable trip, which is the
+      // canonical record of "already surfaced". An unreadable record returns
+      // undefined and we warn — losing a first warning is worse than repeating
+      // one. The in-process set then covers the window where the trip write
+      // itself keeps losing to the contended lock.
+      const openTrip = await findRecoveryTrip(issueId, recoveryPath, fallback.updatedAt);
+      const alreadySurfaced = openTrip?.open === true || warnedEpisodes.has(episode);
+
+      // The warning goes out BEFORE the trip write and never touches the record
+      // lock. Ordering it after would put the only immediate operator signal
+      // behind the very lock whose contention it is reporting.
+      if (!alreadySurfaced) {
+        warnedEpisodes.add(episode);
+        emitActivityEntrySync({ source: 'cloister', level: 'warn', issueId, message });
+        actions.push(summary);
       }
 
       // The durable trip is best-effort and retried on later patrols: it writes
-      // through the contended lock, so a failure here is expected during the
-      // episode and must never suppress the warning above.
+      // through the contended lock, so a failure here is expected during a
+      // contention episode and must never suppress the warning above.
       try {
         const { emitNeedsYou } = await recordRecoveryFailure(
-          workspacePath, issueId, 'verdict-fallback-contention', fallback.updatedAt, 1,
+          workspacePath, issueId, recoveryPath, fallback.updatedAt, 1,
         );
-        if (emitNeedsYou) {
-          actions.push(`needs-you ${issueId}: verdict contended ${ageMinutes}min (lock owner: ${owner})`);
-        }
+        // The durable trip now carries this episode, so the in-process entry is
+        // redundant — drop it rather than growing the set for the server's life.
+        if (!emitNeedsYou) warnedEpisodes.delete(episode);
+        else actions.push(`needs-you ${summary}`);
       } catch {
         actions.push(
-          `${issueId}: verdict-contention needs-you trip could not be recorded (record lock contended) — retrying next patrol`,
+          `${issueId}: ${recoveryPath} needs-you trip could not be recorded (record lock contended) — retrying next patrol`,
         );
       }
     } catch {

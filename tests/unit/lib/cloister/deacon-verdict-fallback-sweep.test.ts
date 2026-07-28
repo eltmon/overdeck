@@ -14,7 +14,9 @@ const mocks = vi.hoisted(() => ({
   loadReviewStatuses: vi.fn(),
   readWorkspaceVerdictFallback: vi.fn(),
   drainWorkspaceVerdictFallback: vi.fn(),
+  findWorkspaceVerdictConflicts: vi.fn(),
   recordRecoveryFailure: vi.fn(),
+  findRecoveryTrip: vi.fn(),
   emitActivityEntrySync: vi.fn(),
   readOwner: vi.fn(),
   findWorkspacePath: vi.fn(),
@@ -27,6 +29,7 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
 vi.mock('../../../../src/lib/overdeck/review-status-record-sync.js', () => ({
   readWorkspaceVerdictFallback: mocks.readWorkspaceVerdictFallback,
   drainWorkspaceVerdictFallback: mocks.drainWorkspaceVerdictFallback,
+  findWorkspaceVerdictConflicts: mocks.findWorkspaceVerdictConflicts,
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -46,6 +49,7 @@ vi.mock('../../../../src/lib/lifecycle/archive-planning.js', () => ({
 
 vi.mock('../../../../src/lib/cloister/recovery-trip.js', () => ({
   recordRecoveryFailure: mocks.recordRecoveryFailure,
+  findRecoveryTrip: mocks.findRecoveryTrip,
 }));
 
 vi.mock('../../../../src/lib/activity-logger.js', () => ({
@@ -69,14 +73,41 @@ function fallbackWrittenMsAgo(ms: number): { issueId: string; updatedAt: string;
 }
 
 describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
+  /**
+   * The durable recovery trips, as they would exist in the per-issue record.
+   * Modelling them statefully is what makes the restart simulation meaningful:
+   * module-local state can be cleared while this survives, exactly as a
+   * dashboard restart leaves the record on disk.
+   */
+  let durableTrips: Map<string, { open: boolean; tripCount: number }>;
+  const tripKey = (issueId: string, path: string, generation: string) => `${issueId}|${path}|${generation}`;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    durableTrips = new Map();
     mocks.loadReviewStatuses.mockReturnValue({ [ISSUE]: { issueId: ISSUE, reviewStatus: 'reviewing' } });
     mocks.readWorkspaceVerdictFallback.mockResolvedValue(null);
     mocks.drainWorkspaceVerdictFallback.mockResolvedValue(true);
     mocks.readOwner.mockResolvedValue({ description: 'pan-cli pid=4242 acquiredAt=2026-07-27T00:45:00.000Z' });
     mocks.findWorkspacePath.mockReturnValue('/project/workspaces/feature-pan-9999');
-    mocks.recordRecoveryFailure.mockResolvedValue({ emitNeedsYou: true, trip: { tripCount: 1 } });
+    mocks.findWorkspaceVerdictConflicts.mockResolvedValue([]);
+
+    mocks.findRecoveryTrip.mockImplementation(
+      async (issueId: string, path: string, generation: string) =>
+        durableTrips.get(tripKey(issueId, path, generation)),
+    );
+    // Mirrors recordRecoveryFailure at threshold 1: the first call opens the
+    // trip and emits, every later call for the same generation is a no-op.
+    mocks.recordRecoveryFailure.mockImplementation(
+      async (_ws: string, issueId: string, path: string, generation: string) => {
+        const key = tripKey(issueId, path, generation);
+        const prior = durableTrips.get(key);
+        if (prior?.open) return { trip: prior, emitNeedsYou: false };
+        const trip = { open: true, tripCount: (prior?.tripCount ?? 0) + 1 };
+        durableTrips.set(key, trip);
+        return { trip, emitNeedsYou: true };
+      },
+    );
   });
 
   it('folds a stranded fallback whose writing process is long gone', async () => {
@@ -101,10 +132,6 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
       fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 60_000),
     );
     mocks.drainWorkspaceVerdictFallback.mockResolvedValue(false);
-    // The trip dedups by the fallback's updatedAt: only the first sweep opens it.
-    mocks.recordRecoveryFailure
-      .mockResolvedValueOnce({ emitNeedsYou: true, trip: { tripCount: 1 } })
-      .mockResolvedValue({ emitNeedsYou: false, trip: { tripCount: 1 } });
 
     const first = await sweepStrandedVerdictFallbacks(NOW);
     const second = await sweepStrandedVerdictFallbacks(NOW + 60_000);
@@ -156,6 +183,63 @@ describe('sweepStrandedVerdictFallbacks (PAN-3092)', () => {
     expect(mocks.recordRecoveryFailure).toHaveBeenCalledTimes(2);
     // ...but the warning itself does not repeat for the same episode.
     expect(second.some((a) => a.includes('verdict contended'))).toBe(false);
+  });
+
+  it('names a verdict conflict as needing adjudication, never as transient contention (PAN-3092)', async () => {
+    // A withheld fold and a lost lock race both surface as a failed drain, but
+    // only contention clears on its own. Telling the operator to wait for an
+    // automatic fold that is structurally forbidden is false remediation.
+    mocks.readWorkspaceVerdictFallback.mockResolvedValue(
+      fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 60_000),
+    );
+    mocks.drainWorkspaceVerdictFallback.mockResolvedValue(false);
+    mocks.findWorkspaceVerdictConflicts.mockResolvedValue([
+      { gate: 'reviewStatus', journalValue: 'blocked', fallbackValue: 'passed' },
+    ]);
+
+    const actions = await sweepStrandedVerdictFallbacks(NOW);
+
+    const message = String(
+      (mocks.emitActivityEntrySync.mock.calls[0]![0] as Record<string, unknown>).message,
+    );
+    // Names the gate and BOTH written values, so the operator can adjudicate.
+    expect(message).toContain('reviewStatus');
+    expect(message).toContain('"blocked"');
+    expect(message).toContain('"passed"');
+    // Says plainly that waiting will not help, and how to resolve it.
+    expect(message).toContain('will NOT');
+    expect(message).toContain('pan admin specialists done review PAN-9999 --status');
+    // And never claims the lock will free itself.
+    expect(message).not.toContain('folds automatically');
+    expect(message).not.toContain('record lock is contended');
+
+    // A distinct recovery path, so conflicts and contention dedupe separately.
+    const [, , recoveryPath] = mocks.recordRecoveryFailure.mock.calls[0] as [string, string, string];
+    expect(recoveryPath).toBe('verdict-fallback-conflict');
+    expect(actions.some((a) => a.includes('needs operator adjudication'))).toBe(true);
+  });
+
+  it('does not repeat the warning after a dashboard restart clears module state (PAN-3092)', async () => {
+    mocks.readWorkspaceVerdictFallback.mockResolvedValue(
+      fallbackWrittenMsAgo(VERDICT_CONTENTION_SURFACE_MS + 60_000),
+    );
+    mocks.drainWorkspaceVerdictFallback.mockResolvedValue(false);
+
+    await sweepStrandedVerdictFallbacks(NOW);
+    expect(mocks.emitActivityEntrySync).toHaveBeenCalledTimes(1);
+
+    // Simulate a dashboard restart: module-local dedupe is gone, but the durable
+    // recovery trip written above survives in the per-issue record.
+    vi.resetModules();
+    const { sweepStrandedVerdictFallbacks: afterRestart } =
+      await import('../../../../src/lib/cloister/deacon-verdict-fallback-sweep.js');
+    expect(durableTrips.size).toBe(1);
+
+    const actions = await afterRestart(NOW + 60_000);
+
+    // The durable trip is consulted before warning, so the episode stays quiet.
+    expect(mocks.emitActivityEntrySync).toHaveBeenCalledTimes(1);
+    expect(actions.some((a) => a.includes('verdict contended'))).toBe(false);
   });
 
   it('stays quiet about a fallback younger than the contention threshold', async () => {

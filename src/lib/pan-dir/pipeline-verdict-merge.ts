@@ -162,9 +162,16 @@ export function pipelineCoversFallbackVerdicts(
   return true;
 }
 
+/** One gate holding two different written terminal verdicts. */
+export interface VerdictConflict {
+  gate: string;
+  journalValue: string;
+  fallbackValue: string;
+}
+
 /**
- * Do the journal and the fallback hold DIFFERENT terminal verdicts for the same
- * gate, within the same review cycle?
+ * Which gates hold DIFFERENT terminal verdicts in the journal and the fallback,
+ * within the same review cycle?
  *
  * This is the one case the drain cannot resolve: two written terminal verdicts
  * for one gate, and no per-gate timestamp to order them by. The whole-pipeline
@@ -173,23 +180,34 @@ export function pipelineCoversFallbackVerdicts(
  * fallback and let the stranded-fallback sweep put the conflict in front of an
  * operator rather than picking a winner.
  */
-export function pipelineConflictsWithFallbackVerdicts(
+export function findFallbackVerdictConflicts(
   journal: PanIssuePipelineRecord,
   fallback: { updatedAt: string; pipeline: PipelineFields },
-): boolean {
+): VerdictConflict[] {
   const journalCycle = cycleMs(journal.reviewSpawnedAt);
   const fallbackWrittenMs = cycleMs(fallback.updatedAt);
   // A newer review cycle legitimately resets the previous cycle's verdicts.
   if (journalCycle !== undefined && fallbackWrittenMs !== undefined && journalCycle > fallbackWrittenMs) {
-    return false;
+    return [];
   }
 
   const journalFields = fields(journal);
   const fallbackFields = fields(fallback.pipeline);
-  return GATE_NAMES.some((gate) => {
+  const conflicts: VerdictConflict[] = [];
+  for (const gate of GATE_NAMES) {
     const held = fallbackFields[gate];
-    if (!isTerminal(gate, held)) return false;
+    if (!isTerminal(gate, held)) continue;
     const settled = journalFields[gate];
-    return isTerminal(gate, settled) && settled !== held;
-  });
+    if (!isTerminal(gate, settled) || settled === held) continue;
+    conflicts.push({ gate, journalValue: String(settled), fallbackValue: String(held) });
+  }
+  return conflicts;
+}
+
+/** Boolean form of {@link findFallbackVerdictConflicts} for the drain's withhold decision. */
+export function pipelineConflictsWithFallbackVerdicts(
+  journal: PanIssuePipelineRecord,
+  fallback: { updatedAt: string; pipeline: PipelineFields },
+): boolean {
+  return findFallbackVerdictConflicts(journal, fallback).length > 0;
 }

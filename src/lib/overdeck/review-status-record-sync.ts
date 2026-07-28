@@ -4,7 +4,12 @@ import { basename, dirname, join } from 'node:path';
 import type { ReviewStatus } from '../review-status.js';
 import { updateIssueRecordForIssue, type PanIssuePipelineRecord } from '../pan-dir/records.js';
 import { readIssueRecord, readIssueRecordSync } from '../pan-dir/record.js';
-import { pipelineConflictsWithFallbackVerdicts, pipelineCoversFallbackVerdicts } from '../pan-dir/pipeline-verdict-merge.js';
+import {
+  findFallbackVerdictConflicts,
+  pipelineConflictsWithFallbackVerdicts,
+  pipelineCoversFallbackVerdicts,
+  type VerdictConflict,
+} from '../pan-dir/pipeline-verdict-merge.js';
 import { resolveProjectFromIssueSync, getProjectSync } from '../projects.js';
 
 // PAN-2689: fire-and-forget journal writes die with the process in a short-lived
@@ -434,6 +439,25 @@ const drainTimers = new Map<string, NodeJS.Timeout>();
  * write was in flight stays at the live path for its own drain schedule, and
  * no step ever renames onto a path another process may have just created.
  */
+/**
+ * PAN-3092: why is a fallback still pending? A failed drain returns `false` for
+ * two materially different reasons — the record write lost to a contended lock,
+ * or the fold was deliberately withheld because the journal and the fallback
+ * hold different terminal verdicts for one gate. Only the first clears on its
+ * own; the second is permanent until an operator picks a verdict, so the sweep
+ * must be able to tell them apart before it tells anyone to wait.
+ *
+ * Read-only and lock-free: the caller is already reporting lock contention.
+ */
+export async function findWorkspaceVerdictConflicts(
+  issueId: string,
+  fallback: { updatedAt: string; pipeline: DurableStatusFields },
+): Promise<VerdictConflict[]> {
+  const journal = await readPipeline(issueId);
+  if (!journal?.updatedAt || journal.updatedAt < fallback.updatedAt) return [];
+  return findFallbackVerdictConflicts(journal, fallback);
+}
+
 export async function drainWorkspaceVerdictFallback(issueId: string): Promise<boolean> {
   const claims = claimWorkspaceVerdictFallbackSync(issueId);
   if (!claims) return true;

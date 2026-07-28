@@ -53,10 +53,15 @@ write-recency from verdict-truth:
   carries the same terminal value for every gate the fallback holds one for, or
   belongs to a newer cycle. A newer-but-verdict-free journal no longer consumes
   an unlanded verdict. When the two hold *different* terminal values for one
-  gate, `pipelineConflictsWithFallbackVerdicts()` sees it: nothing can order two
-  written verdicts from a whole-pipeline timestamp that bookkeeping restamps, so
-  the drain withholds the fold, keeps the fallback, and lets the sweep put the
-  conflict in front of an operator.
+  gate, `findFallbackVerdictConflicts()` sees it: nothing can order two written
+  verdicts from a whole-pipeline timestamp that bookkeeping restamps, so the
+  drain withholds the fold, keeps the fallback, and lets the sweep put the
+  conflict in front of an operator. That state is permanent by design — every
+  later drain withholds the same fold — so the sweep reports it under its own
+  `verdict-fallback-conflict` recovery path, naming the gate and both written
+  values and saying plainly that it will not clear on its own. The
+  `verdict-fallback-contention` path is reserved for an actual write failure,
+  which does clear when the lock frees.
 - **Every merge-gating verdict is projected durably.** `uatStatus`/`uatNotes`
   join the pipeline block, `projectPipeline()`, and `durableSubset()` — UAT
   gates merge eligibility, so a contended UAT verdict that the fallback silently
@@ -75,7 +80,11 @@ write-recency from verdict-truth:
   activity warning is emitted before, and independently of, the recovery-trip
   write: that write goes through the very lock whose contention is being
   reported, so it is best-effort and retried on later patrols while the
-  operator-visible warning always lands.
+  operator-visible warning always lands. Dedupe consults the durable trip first
+  (`findRecoveryTrip()`, a lock-free record read), so a dashboard restart does
+  not re-warn about an episode already surfaced; a small in-process set covers
+  only the window where the trip write itself keeps losing the lock, and its
+  entries are dropped once the trip lands.
 - **A frozen test agent escalates.** A live, idle test session that was already
   nudged and wrote no `.pan/test/result.json` now yields `escalate` from
   `decideUnsignaledTestAction()` instead of being ignored forever; the deacon
