@@ -18,6 +18,12 @@ const blockedReviewDriftObservations = new Map<
   string,
   { reviewedAnchor: string; currentAnchor: string }
 >();
+// PAN-3254: the current anchor recorded at each issue's most recent reset. A
+// drift verdict against the SAME anchor a second time means the workspace has
+// not moved since we already reset for it — a repeating producer artifact,
+// not a new push (MIN-901: 425 resets, one distinct current anchor).
+const lastResetAnchors = new Map<string, string>();
+const resetLoopEscalated = new Set<string>();
 
 function uniformReviewerVerdictAnchor(status: ReviewStatus): string | undefined {
   const verdicts = Object.values(status.reviewerVerdicts ?? {});
@@ -50,6 +56,8 @@ export async function checkPostReviewCommits(): Promise<string[]> {
 
       if (status.mergeStatus === 'merged') {
         blockedReviewDriftObservations.delete(issueId);
+        lastResetAnchors.delete(issueId);
+        resetLoopEscalated.delete(issueId);
         continue;
       }
       if (!isBlocked && status.reviewStatus !== 'passed' && !status.readyForMerge) continue;
@@ -105,6 +113,22 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       }
 
       const currentHead = verdict.currentAnchor;
+
+      // PAN-3254: bound repeat resets. If this exact current anchor already
+      // triggered a reset, the branch has not moved since — re-resetting
+      // produces an identical "unchanged" review cycle every patrol (~100 s)
+      // and never converges. Escalate once instead of looping silently.
+      if (lastResetAnchors.get(issueId) === currentHead) {
+        if (!resetLoopEscalated.has(issueId)) {
+          resetLoopEscalated.add(issueId);
+          const message = `${issueId} — review reset suppressed: drift against ${formatAnchorShort(currentHead)} already caused a reset and the workspace has not moved since. This indicates an anchor-producer disagreement, not new commits; review will not re-dispatch until the workspace head actually changes.`;
+          logDeaconEventSync(`checkPostReviewCommits: ${message}`);
+          const { recordDeadEndNeedsYou } = await import('./dead-end-trip.js');
+          await recordDeadEndNeedsYou(issueId, 'review-reset-loop', currentHead, message);
+        }
+        continue;
+      }
+
       if (isBlocked) {
         const priorObservation = blockedReviewDriftObservations.get(issueId);
         if (
@@ -125,6 +149,8 @@ export async function checkPostReviewCommits(): Promise<string[]> {
         `[deacon] Post-review commit detected for ${issueId}: ` +
         `was ${formatAnchorShort(reviewedAnchor)}, now ${formatAnchorShort(currentHead)} — resetting review`,
       );
+      lastResetAnchors.set(issueId, currentHead);
+      resetLoopEscalated.delete(issueId);
       if (isBlocked) {
         setReviewStatusSync(issueId, {
           reviewStatus: 'pending',

@@ -30,13 +30,15 @@ import { teardownWorkspace } from './teardown-workspace.js';
 import { loadCloisterConfig } from '../cloister/config.js';
 import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
+import { getForgeAdapter } from '../forge.js';
+import { resolveProjectReposForIssueSync } from '../project-repos.js';
 import {
   getProjectConfigFromWorkspacePath,
   markRecordPipelineClosedOutSync,
   writeCloseOutDodGate,
 } from '../pan-dir/record.js';
 import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
-import { evaluateDodGate } from './dod-gate.js';
+import { evaluateDodGate, readCompletedCloseOut } from './dod-gate.js';
 import {
   capturePipelineStage,
   resolvePipelineTelemetryContext,
@@ -170,6 +172,18 @@ export function closeOut(
   return Effect.gen(function* () {
     const start = Date.now();
     const allSteps: StepResult[] = [];
+
+    // PAN-3025: idempotent short-circuit for already-completed close-out ceremony.
+    // Fail closed: on any error, proceed to the gate (null = not-confirmed-complete).
+    const closedOutAt = yield* Effect.promise(() =>
+      readCompletedCloseOut(ctx.issueId, ctx.projectPath).catch(() => null)
+    );
+    if (closedOutAt) {
+      allSteps.push(stepSkipped('close-out:idempotent', [
+        `Issue already closed out at ${closedOutAt} — skipping the Definition-of-Done gate and ceremony`,
+      ]));
+      return buildResult('close-out', ctx.issueId, allSteps, start);
+    }
 
     // Recover UAT-promotion evidence before the gate reads the verification verdict.
     const uatEvidenceStep = yield* Effect.promise(async () => {
@@ -515,11 +529,26 @@ function verifyBranchMerged(ctx: LifecycleContext): Effect.Effect<StepResult> {
   );
 }
 
+export interface MergeVerificationRoot { repoKey: string; dir: string; sourceBranch: string; targetBranch: string; forge: 'github' | 'gitlab' }
+
+async function verifyRootConventionBranches(ctx: LifecycleContext, root: MergeVerificationRoot, issueLower: string): Promise<StepResult | null> {
+  const featureResult = await verifyConventionBranchMerged(ctx, root);
+  if (featureResult?.success) return featureResult;
+
+  const strikeResult = await verifyConventionBranchMerged(ctx, { ...root, sourceBranch: `strike/${issueLower}` });
+  if (strikeResult?.success && !strikeResult.skipped) {
+    return stepOk('close-out:verify-merged', [
+      ...(strikeResult.details ?? []),
+      `Superseded ${root.sourceBranch} residual: ${featureResult?.error ?? BRANCH_ABSENT_MERGE_ERROR}`,
+    ]);
+  }
+  return featureResult;
+}
+
 export async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-out:verify-merged';
   const issueLower = ctx.issueId.toLowerCase();
-  const featureBranchName = `feature/${issueLower}`;
-  const strikeBranchName = `strike/${issueLower}`;
+  const defaultRoot: MergeVerificationRoot = { repoKey: issueLower, dir: ctx.projectPath, sourceBranch: `feature/${issueLower}`, targetBranch: 'main', forge: 'github' };
 
   try {
     // Check review-status first — the merge specialist validates before marking merged
@@ -534,50 +563,85 @@ export async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<Ste
       // review-status.json may not exist, continue with git checks
     }
 
-    const featureResult = await verifyConventionBranchMerged(ctx, featureBranchName);
-    if (featureResult?.success) return featureResult;
-
-    const strikeResult = await verifyConventionBranchMerged(ctx, strikeBranchName);
-    if (strikeResult?.success && !strikeResult.skipped) {
-      return stepOk(step, [
-        ...(strikeResult.details ?? []),
-        `Superseded ${featureBranchName} residual: ${featureResult?.error ?? BRANCH_ABSENT_MERGE_ERROR}`,
-      ]);
+    const resolvedRoots = resolveProjectReposForIssueSync(ctx.issueId)
+      ?.filter((repo) => repo.required)
+      .map((repo): MergeVerificationRoot => ({
+        repoKey: repo.repoKey,
+        dir: repo.repoPath,
+        sourceBranch: repo.sourceBranch,
+        targetBranch: repo.targetBranch,
+        forge: repo.forge,
+      }));
+    const roots = resolvedRoots?.length ? resolvedRoots : [defaultRoot];
+    if (roots.length === 1) {
+      return await verifyRootConventionBranches(ctx, roots[0], issueLower)
+        ?? stepFailed(step, BRANCH_ABSENT_MERGE_ERROR);
     }
 
-    if (featureResult) return featureResult;
+    const results = await Promise.all(roots.map(async (root) => ({
+      root,
+      result: await verifyRootConventionBranches(ctx, root, issueLower),
+    })));
+    const failures = results.filter(({ result }) => result && !result.success);
+    if (failures.length > 0) {
+      return stepFailed(step, failures.map(({ root, result }) => `${root.repoKey}: ${result?.error}`).join('; '));
+    }
+    const successes = results.filter(({ result }) => result?.success);
+    if (successes.length > 0) {
+      return stepOk(step, successes.flatMap(({ root, result }) =>
+        (result?.details ?? []).map((detail) => `${root.repoKey}: ${detail}`)));
+    }
     return stepFailed(step, BRANCH_ABSENT_MERGE_ERROR);
   } catch (err) {
     return stepFailed(step, `Could not verify merge: ${(err as Error).message}`);
   }
 }
 
-async function verifyConventionBranchMerged(ctx: LifecycleContext, branchName: string): Promise<StepResult | null> {
+interface GitLabMergeLookupCache {
+  attempted: boolean;
+  headSha?: string;
+  artifact?: { id?: string; url?: string } | null;
+}
+
+interface GitLabMergeMatch {
+  result: StepResult;
+  reused: boolean;
+}
+
+export async function verifyConventionBranchMerged(ctx: LifecycleContext, root: MergeVerificationRoot): Promise<StepResult | null> {
   const step = 'close-out:verify-merged';
+  const gitlabLookup: GitLabMergeLookupCache = { attempted: false };
   const { stdout: branchExists } = await execAsync(
-    `git branch --list "${branchName}" 2>/dev/null || true`,
-    { cwd: ctx.projectPath, encoding: 'utf-8' },
+    `git branch --list "${root.sourceBranch}" 2>/dev/null || true`,
+    { cwd: root.dir, encoding: 'utf-8' },
   );
 
   if (branchExists.trim()) {
     // Use merge-base --is-ancestor: checks if the branch tip is reachable from main
     try {
       await execAsync(
-        `git merge-base --is-ancestor ${branchName} main`,
-        { cwd: ctx.projectPath, encoding: 'utf-8' },
+        `git merge-base --is-ancestor ${root.sourceBranch} ${root.targetBranch}`,
+        { cwd: root.dir, encoding: 'utf-8' },
       );
-      const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+      const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, gitlabLookup);
       if (remoteCheck && !remoteCheck.success) return remoteCheck;
       return stepOk(step, ['All commits merged to main', ...(remoteCheck?.details ?? [])]);
     } catch {
       // --is-ancestor fails for squash merges where the branch still exists.
+      const gitlabMerged = await verifySquashMergedMrByBranch(root, root.sourceBranch, gitlabLookup);
+      if (gitlabMerged) {
+        const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, gitlabLookup);
+        if (remoteCheck && !remoteCheck.success) return remoteCheck;
+        return stepOk(step, [...(gitlabMerged.result.details ?? []), ...(remoteCheck?.details ?? [])]);
+      }
+
       try {
         const { stdout: codeDiff } = await execAsync(
-          `git diff main...${branchName} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
-          { cwd: ctx.projectPath, encoding: 'utf-8' },
+          `git diff ${root.targetBranch}...${root.sourceBranch} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
+          { cwd: root.dir, encoding: 'utf-8' },
         );
         if (!codeDiff.trim()) {
-          const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+          const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, gitlabLookup);
           if (remoteCheck && !remoteCheck.success) return remoteCheck;
           return stepOk(step, [
             'Code changes squash-merged to main (only planning artifacts remain on branch)',
@@ -588,9 +652,11 @@ async function verifyConventionBranchMerged(ctx: LifecycleContext, branchName: s
         // diff failed — fall through to unmerged report
       }
 
-      const githubMerged = await verifySquashMergedPrByBranch(ctx, branchName, branchName);
+      const githubMerged = root.forge === 'github'
+        ? await verifySquashMergedPrByBranch(ctx, root, root.sourceBranch)
+        : null;
       if (githubMerged?.success) {
-        const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+        const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, gitlabLookup);
         if (remoteCheck && !remoteCheck.success) return remoteCheck;
         return stepOk(step, [
           ...(githubMerged.details ?? []),
@@ -600,42 +666,75 @@ async function verifyConventionBranchMerged(ctx: LifecycleContext, branchName: s
       if (githubMerged) return githubMerged;
 
       const { stdout: unmerged } = await execAsync(
-        `git log main..${branchName} --oneline 2>/dev/null || true`,
-        { cwd: ctx.projectPath, encoding: 'utf-8' },
+        `git log ${root.targetBranch}..${root.sourceBranch} --oneline 2>/dev/null || true`,
+        { cwd: root.dir, encoding: 'utf-8' },
       );
       const count = unmerged.trim() ? unmerged.trim().split('\n').length : 0;
 
-      if (ctx.github) {
+      if (ctx.github && root.forge === 'github') {
         try {
           const { stdout: issueState } = await execAsync(
             `gh issue view ${ctx.github.number} --repo ${ctx.github.owner}/${ctx.github.repo} --json state --jq '.state'`,
-            { cwd: ctx.projectPath, encoding: 'utf-8' },
+            { cwd: root.dir, encoding: 'utf-8' },
           );
           if (issueState.trim().toUpperCase() === 'CLOSED') {
-            return stepSkipped(step, [`Issue already closed on GitHub; ${count} unmerged commit(s) remain on ${branchName}`]);
+            return stepSkipped(step, [`Issue already closed on GitHub; ${count} unmerged commit(s) remain on ${root.sourceBranch}`]);
           }
         } catch {
           // gh check failed — fall through to hard fail
         }
       }
 
-      return stepFailed(step, `${count} unmerged commit(s) on ${branchName}. Merge before closing out.`);
+      return stepFailed(step, `${count} unmerged commit(s) on ${root.sourceBranch}. Merge before closing out.`);
     }
   }
 
   // Check remote
   const { stdout: remoteBranch } = await execAsync(
-    `git ls-remote --heads origin "${branchName}" 2>/dev/null || true`,
-    { cwd: ctx.projectPath, encoding: 'utf-8' },
+    `git ls-remote --heads origin "${root.sourceBranch}" 2>/dev/null || true`,
+    { cwd: root.dir, encoding: 'utf-8' },
   );
 
   if (remoteBranch.trim()) {
-    await execAsync(`git fetch origin ${branchName}`, { cwd: ctx.projectPath }).catch(() => {});
-    const remoteCheck = await verifyRemoteBranchIfPresent(ctx, branchName);
+    await execAsync(`git fetch origin ${root.sourceBranch}`, { cwd: root.dir }).catch(() => {});
+    const remoteCheck = await verifyRemoteBranchIfPresent(ctx, root, gitlabLookup);
     if (remoteCheck) return remoteCheck;
   }
 
   return null;
+}
+
+async function verifySquashMergedMrByBranch(
+  root: MergeVerificationRoot,
+  branchRef: string,
+  lookup: GitLabMergeLookupCache,
+): Promise<GitLabMergeMatch | null> {
+  if (root.forge !== 'gitlab') return null;
+  try {
+    const { stdout } = await execAsync(`git rev-parse ${branchRef} 2>/dev/null`, { cwd: root.dir, encoding: 'utf-8' });
+    const headSha = stdout.trim();
+    if (!headSha) return null;
+    const reused = lookup.attempted;
+    if (!reused) {
+      lookup.attempted = true;
+      lookup.headSha = headSha;
+      lookup.artifact = await getForgeAdapter('gitlab').findMergedArtifact({
+        sourceBranch: root.sourceBranch,
+        targetBranch: root.targetBranch,
+        headSha,
+        cwd: root.dir,
+      });
+    }
+    if (!lookup.artifact || lookup.headSha !== headSha) return null;
+    const label = lookup.artifact.id ? `MR !${lookup.artifact.id}` : 'GitLab MR';
+    const url = lookup.artifact.url ? ` (${lookup.artifact.url})` : '';
+    return {
+      result: stepOk('close-out:verify-merged', [`${label} is merged and ${branchRef} matches the merged MR head${url}`]),
+      reused,
+    };
+  } catch {
+    return null;
+  }
 }
 
 type GitHubMergedPr = {
@@ -647,31 +746,32 @@ type GitHubMergedPr = {
 
 async function verifyRemoteBranchIfPresent(
   ctx: LifecycleContext,
-  branchName: string,
+  root: MergeVerificationRoot,
+  gitlabLookup: GitLabMergeLookupCache,
 ): Promise<StepResult | null> {
   const step = 'close-out:verify-merged';
-  const remoteRef = `origin/${branchName}`;
+  const remoteRef = `origin/${root.sourceBranch}`;
 
   const { stdout: remoteBranch } = await execAsync(
-    `git ls-remote --heads origin "${branchName}" 2>/dev/null || true`,
-    { cwd: ctx.projectPath, encoding: 'utf-8' },
+    `git ls-remote --heads origin "${root.sourceBranch}" 2>/dev/null || true`,
+    { cwd: root.dir, encoding: 'utf-8' },
   );
   if (!remoteBranch.trim()) return null;
 
-  await execAsync(`git fetch origin ${branchName}`, { cwd: ctx.projectPath }).catch(() => {});
+  await execAsync(`git fetch origin ${root.sourceBranch}`, { cwd: root.dir }).catch(() => {});
 
   try {
     await execAsync(
-      `git merge-base --is-ancestor ${remoteRef} main`,
-      { cwd: ctx.projectPath, encoding: 'utf-8' },
+      `git merge-base --is-ancestor ${remoteRef} ${root.targetBranch}`,
+      { cwd: root.dir, encoding: 'utf-8' },
     );
     return stepOk(step, ['Remote branch fully merged']);
   } catch {
     // Squash-merge detection for remote branch
     try {
       const { stdout: codeDiff } = await execAsync(
-        `git diff main...${remoteRef} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
-        { cwd: ctx.projectPath, encoding: 'utf-8' },
+        `git diff ${root.targetBranch}...${remoteRef} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
+        { cwd: root.dir, encoding: 'utf-8' },
       );
       if (!codeDiff.trim()) {
         return stepOk(step, ['Remote code changes squash-merged to main (only planning artifacts remain on branch)']);
@@ -680,47 +780,57 @@ async function verifyRemoteBranchIfPresent(
       // diff failed — fall through
     }
 
-    const githubMerged = await verifySquashMergedPrByBranch(ctx, branchName, remoteRef);
+    const gitlabMerged = await verifySquashMergedMrByBranch(root, remoteRef, gitlabLookup);
+    if (gitlabMerged) {
+      return gitlabMerged.reused
+        ? stepOk(step, [`Remote ${remoteRef} matches the merged MR head`])
+        : gitlabMerged.result;
+    }
+
+    const githubMerged = root.forge === 'github'
+      ? await verifySquashMergedPrByBranch(ctx, root, remoteRef)
+      : null;
     if (githubMerged) return githubMerged;
 
     const { stdout: remoteUnmerged } = await execAsync(
-      `git log main..${remoteRef} --oneline 2>/dev/null || true`,
-      { cwd: ctx.projectPath, encoding: 'utf-8' },
+      `git log ${root.targetBranch}..${remoteRef} --oneline 2>/dev/null || true`,
+      { cwd: root.dir, encoding: 'utf-8' },
     );
     const count = remoteUnmerged.trim() ? remoteUnmerged.trim().split('\n').length : 0;
 
-    if (ctx.github) {
+    if (ctx.github && root.forge === 'github') {
       try {
         const { stdout: issueState } = await execAsync(
           `gh issue view ${ctx.github.number} --repo ${ctx.github.owner}/${ctx.github.repo} --json state --jq '.state'`,
-          { cwd: ctx.projectPath, encoding: 'utf-8' },
+          { cwd: root.dir, encoding: 'utf-8' },
         );
         if (issueState.trim().toUpperCase() === 'CLOSED') {
-          return stepSkipped(step, [`Issue already closed on GitHub; ${count} unmerged commit(s) remain on remote ${branchName}`]);
+          return stepSkipped(step, [`Issue already closed on GitHub; ${count} unmerged commit(s) remain on remote ${root.sourceBranch}`]);
         }
       } catch {
         // gh check failed — fall through to hard fail
       }
     }
 
-    return stepFailed(step, `${count} unmerged commit(s) on remote ${branchName}.`);
+    return stepFailed(step, `${count} unmerged commit(s) on remote ${root.sourceBranch}.`);
   }
 }
 
 async function verifySquashMergedPrByBranch(
   ctx: LifecycleContext,
-  branchName: string,
+  root: MergeVerificationRoot,
   branchRef: string,
 ): Promise<StepResult | null> {
   if (!ctx.github) return null;
 
   const step = 'close-out:verify-merged';
   const { owner, repo } = ctx.github;
+  const remoteTargetRef = `origin/${root.targetBranch}`;
 
   try {
     const { stdout: prJson } = await execAsync(
-      `gh pr list --repo ${owner}/${repo} --state merged --head ${JSON.stringify(branchName)} --json number,mergedAt,headRefOid,url`,
-      { cwd: ctx.projectPath, encoding: 'utf-8' },
+      `gh pr list --repo ${owner}/${repo} --state merged --head ${JSON.stringify(root.sourceBranch)} --json number,mergedAt,headRefOid,url`,
+      { cwd: root.dir, encoding: 'utf-8' },
     );
     const prs = JSON.parse(prJson) as GitHubMergedPr[];
     const mergedPr = prs
@@ -735,7 +845,7 @@ async function verifySquashMergedPrByBranch(
 
     const { stdout: tipShaRaw } = await execAsync(
       `git rev-parse ${branchRef} 2>/dev/null`,
-      { cwd: ctx.projectPath, encoding: 'utf-8' },
+      { cwd: root.dir, encoding: 'utf-8' },
     );
     const tipSha = tipShaRaw.trim();
     if (!tipSha) return null;
@@ -745,22 +855,22 @@ async function verifySquashMergedPrByBranch(
       return stepOk(step, [`${prLabel} is squash-merged and ${branchRef} matches the merged PR head`]);
     }
 
-    // A workspace may merge a newer main after its PR head was pushed. Ignore
-    // those merge commits and allow close-out when every post-PR commit is
-    // already on origin/main; only branch-unique work is unsafe to discard.
-    let commitsNotOnMain: string[] | null = null;
+    // A workspace may merge a newer target branch after its PR head was pushed.
+    // Ignore those merge commits and allow close-out when every post-PR commit
+    // is already on the configured remote target; only branch-unique work is unsafe.
+    let commitsNotOnTarget: string[] | null = null;
     try {
       const { stdout: commitsRaw } = await execAsync(
         `git log --no-merges --format=%H ${mergedPr.headRefOid}..${tipSha}`,
-        { cwd: ctx.projectPath, encoding: 'utf-8' },
+        { cwd: root.dir, encoding: 'utf-8' },
       );
       const commits = commitsRaw.split('\n').map((sha) => sha.trim()).filter(Boolean);
       const unmerged: string[] = [];
       for (const commit of commits) {
         try {
           await execAsync(
-            `git merge-base --is-ancestor ${commit} origin/main`,
-            { cwd: ctx.projectPath, encoding: 'utf-8' },
+            `git merge-base --is-ancestor ${commit} ${remoteTargetRef}`,
+            { cwd: root.dir, encoding: 'utf-8' },
           );
         } catch {
           unmerged.push(commit);
@@ -769,11 +879,11 @@ async function verifySquashMergedPrByBranch(
       if (unmerged.length === 0) {
         const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
         return stepOk(step, [
-          `${prLabel} is squash-merged; all ${commits.length} post-PR non-merge commit(s) on ${branchRef} are already on origin/main`,
+          `${prLabel} is squash-merged; all ${commits.length} post-PR non-merge commit(s) on ${branchRef} are already on ${remoteTargetRef}`,
         ]);
       }
 
-      commitsNotOnMain = unmerged;
+      commitsNotOnTarget = unmerged;
     } catch { /* containment check failure falls through to the state-plane policy */ }
 
     // PAN-2406 / state-plane policy rule 3: commits after the merged head that
@@ -782,19 +892,19 @@ async function verifySquashMergedPrByBranch(
     try {
       const { stdout: deltaRaw } = await execAsync(
         `git diff --name-only ${mergedPr.headRefOid}..${tipSha}`,
-        { cwd: ctx.projectPath, encoding: 'utf-8' },
+        { cwd: root.dir, encoding: 'utf-8' },
       );
       let deltaFiles = deltaRaw.split('\n').map((f) => f.trim()).filter(Boolean);
       let statePlaneOnly = deltaFiles.length > 0 && deltaFiles.every((f) =>
         f.startsWith('.pan/'));
       if (!statePlaneOnly) {
-        // Branch may have merged main INTO itself after the PR merged — the
-        // two-dot delta then contains main's own files. Judge only changes
-        // UNIQUE to the branch (three-dot vs origin/main): if those are
-        // state-plane-only, everything real is already on main.
+        // Branch may have merged its target INTO itself after the PR merged —
+        // the two-dot delta then contains target-branch files. Judge only changes
+        // UNIQUE to the branch (three-dot vs the remote target): if those are
+        // state-plane-only, everything real is already on the target.
         const { stdout: uniqueRaw } = await execAsync(
-          `git diff --name-only origin/main...${tipSha}`,
-          { cwd: ctx.projectPath, encoding: 'utf-8' },
+          `git diff --name-only ${remoteTargetRef}...${tipSha}`,
+          { cwd: root.dir, encoding: 'utf-8' },
         );
         deltaFiles = uniqueRaw.split('\n').map((f) => f.trim()).filter(Boolean);
         statePlaneOnly = deltaFiles.every((f) =>
@@ -809,8 +919,8 @@ async function verifySquashMergedPrByBranch(
     } catch { /* diff failure falls through to the strict rejection below */ }
 
     const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'merged GitHub PR';
-    if (commitsNotOnMain) {
-      return stepFailed(step, `${branchRef} has ${commitsNotOnMain.length} commit(s) after merged ${prLabel} that are not on origin/main: ${commitsNotOnMain.join(', ')}`);
+    if (commitsNotOnTarget) {
+      return stepFailed(step, `${branchRef} has ${commitsNotOnTarget.length} commit(s) after merged ${prLabel} that are not on ${remoteTargetRef}: ${commitsNotOnTarget.join(', ')}`);
     }
     return stepFailed(step, `${branchRef} does not match the head commit of merged ${prLabel}; inspect before closing out.`);
   } catch {

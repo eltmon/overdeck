@@ -19,7 +19,6 @@ import {
 import { computeBuildStaleness, type BuildStaleness } from '../deploy/staleness.js';
 import { OVERDECK_HOME } from '../paths.js';
 import { loadCloisterConfigSync, type DeployConfig } from './config.js';
-import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 
 const OBSERVATION_INTERVAL_MS = 30 * 60 * 1000;
 const DEPLOY_SPAWN_COOLDOWN_MS = 10 * 60 * 1000;
@@ -77,7 +76,6 @@ export interface DeployPatrolContext {
   readonly clearQueue?: typeof clearPendingDeploy;
   readonly recordIntent?: typeof recordDeployIntent;
   readonly markQueueEscalated?: typeof markPendingDeployEscalated;
-  readonly recordNeedsYou?: typeof recordDeadEndNeedsYou;
   readonly spawnReload?: (request: ReloadRequest) => Promise<void>;
   readonly emitEntry?: EmitEntry;
   readonly emitTts?: EmitTts;
@@ -289,7 +287,6 @@ function emitDeferral(reason: string, now: number, emitEntry: EmitEntry): void {
 async function escalateOverdueQueue(
   queuedDeploy: PendingDeploy | null,
   blockReason: string,
-  currentVerifyingIssues: string[],
   context: DeployPatrolContext,
   now: number,
   emitEntry: EmitEntry,
@@ -302,8 +299,7 @@ async function escalateOverdueQueue(
   ) return;
 
   const ageMinutes = Math.floor((now - Date.parse(queuedDeploy.requestedAt)) / 60_000);
-  const blockers = queuedDeploy.blockedBy.length > 0 ? queuedDeploy.blockedBy.join(', ') : 'none';
-  const message = `Queued dashboard deploy has waited ${ageMinutes} minutes; current block: ${blockReason} Stored verification blockers: ${blockers}.`;
+  const message = `Queued dashboard deploy has waited ${ageMinutes} minutes; current block: ${blockReason}`;
   if (
     state.lastEscalationReason !== blockReason
     || now - state.lastEscalationAt >= OBSERVATION_INTERVAL_MS
@@ -319,14 +315,6 @@ async function escalateOverdueQueue(
     state.lastEscalationAt = now;
   }
 
-  const currentVerifier = currentVerifyingIssues[0];
-  if (!currentVerifier) return;
-  await (context.recordNeedsYou ?? recordDeadEndNeedsYou)(
-    currentVerifier,
-    'deploy-queue',
-    queuedDeploy.requestedAt,
-    message,
-  );
   await (context.markQueueEscalated ?? markPendingDeployEscalated)();
 }
 
@@ -350,7 +338,7 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
       });
       state.unknownObserved = true;
     }
-    await escalateOverdueQueue(queuedDeploy, reason, [], context, now, emitEntry, emitTts);
+    await escalateOverdueQueue(queuedDeploy, reason, context, now, emitEntry, emitTts);
     return;
   }
 
@@ -381,19 +369,19 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
     && now - staleness.originMainLastBuildInputCommitAt < context.config.debounce_minutes * 60 * 1000
   ) {
     const reason = 'Automatic deployment deferred because the merge debounce has not elapsed.';
-    await escalateOverdueQueue(queuedDeploy, reason, [], context, now, emitEntry, emitTts);
+    await escalateOverdueQueue(queuedDeploy, reason, context, now, emitEntry, emitTts);
     return;
   }
   if (state.lastDeploySpawnAt > 0 && now - state.lastDeploySpawnAt < DEPLOY_SPAWN_COOLDOWN_MS) {
     const reason = 'Automatic deployment deferred because a recent deploy is still inside the spawn cooldown.';
-    await escalateOverdueQueue(queuedDeploy, reason, [], context, now, emitEntry, emitTts);
+    await escalateOverdueQueue(queuedDeploy, reason, context, now, emitEntry, emitTts);
     return;
   }
 
   if (!staleness.originMainSha) {
     const reason = 'Automatic deployment deferred because the origin/main commit is unknown.';
     emitDeferral(reason, now, emitEntry);
-    await escalateOverdueQueue(queuedDeploy, reason, [], context, now, emitEntry, emitTts);
+    await escalateOverdueQueue(queuedDeploy, reason, context, now, emitEntry, emitTts);
     return;
   }
   const ciState = await (context.getCiState ?? ((sha) => getDeployCiState(context.repoRoot, sha)))(staleness.originMainSha);
@@ -401,7 +389,7 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
     const reason = ciState.reason
       ?? `Automatic deployment deferred because CI is ${ciState.status} for origin/main ${shortSha(staleness.originMainSha)}.`;
     emitDeferral(reason, now, emitEntry);
-    await escalateOverdueQueue(queuedDeploy, reason, [], context, now, emitEntry, emitTts);
+    await escalateOverdueQueue(queuedDeploy, reason, context, now, emitEntry, emitTts);
     return;
   }
 
@@ -412,13 +400,12 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
       await (context.recordIntent ?? recordDeployIntent)({
         requestedBy: DEPLOY_PATROL_INITIATOR,
         reason: assessment.reason,
-        blockedBy: assessment.verifyingIssues,
+        blockedBy: [],
       });
     }
     await escalateOverdueQueue(
       queuedDeploy,
       assessment.reason,
-      assessment.verifyingIssues,
       context,
       now,
       emitEntry,

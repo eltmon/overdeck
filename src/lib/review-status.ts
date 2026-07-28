@@ -19,12 +19,14 @@ import {
 } from './cloister/review-status-source.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
+import { carriesNewTerminalVerdict } from './pan-dir/pipeline-verdict-merge.js';
 import {
   reviewGatesPassedSync,
   verificationSatisfied,
   type BlockerReason, type ReviewStatus, type StatusHistoryEntry,
 } from './review-status-reconcile.js';
 import { isReviewRequestStale, needsReviewDispatch } from './review-dispatch-decision.js';
+import { REVIEW_STATUS_HISTORY_LIMIT } from './review-status-reconcile.js';
 import { resolveJournalReconciledReviewStatusSync } from './review-status-read.js';
 import { capturePipelineStageForIssue } from './telemetry/pipeline.js';
 import type { ReviewStatusUpdate } from './workspace-anchor-drift.js';
@@ -247,7 +249,7 @@ export function setReviewStatusSync(
     merged.reviewRequestedAt = undefined;
   }
 
-  // Track status transitions in history (last 10 entries)
+  // Track status transitions in history (bounded tail — PAN-3253)
   const history = [...(status.history || [])];
   const now = new Date().toISOString();
   if (update.reviewStatus && update.reviewStatus !== status.reviewStatus) {
@@ -265,7 +267,7 @@ export function setReviewStatusSync(
   if (update.releaseStatus && update.releaseStatus !== status.releaseStatus) {
     history.push({ type: 'release', status: update.releaseStatus, timestamp: now, notes: update.releaseNotes });
   }
-  while (history.length > 10) history.shift();
+  while (history.length > REVIEW_STATUS_HISTORY_LIMIT) history.shift();
 
   // PAN-1650: readyForMerge is EVENT-DRIVEN — derived from the gate state on every
   // write, so it flips the instant review+test+verification pass instead of waiting
@@ -332,7 +334,10 @@ export function setReviewStatusSync(
   // ${OVERDECK_HOME}/state/<project>/records/ — unwritable in a sandbox, so the writer falls back
   // to <workspace>/.overdeck/pipeline-verdict.json (PAN-2583). Fire-and-forget: a short-lived CLI
   // MUST drain via flushReviewStatusJournalWrites() before exit (PAN-2689). No xBRIEF mirror (PAN-1124).
-  updateIssueRecordForReviewStatusSync(issueId, updated);
+  // PAN-3092: a NEW terminal verdict is the write the agent cannot cheaply retry,
+  // so it gets the journal writer's backoff instead of an immediate fallback drop.
+  const verdictWrite = carriesNewTerminalVerdict(status as unknown as Record<string, unknown>, update);
+  updateIssueRecordForReviewStatusSync(issueId, updated, { verdictWrite });
 
   // The DB cache write is best-effort. A sandboxed agent's write throws SQLITE_READONLY, but
   // the verdict is already durable in the journal above, and the host reconciles the cache on

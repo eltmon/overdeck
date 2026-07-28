@@ -7,6 +7,7 @@ import type { FlywheelRunId } from '@overdeck/contracts';
 import type { AgentState } from '../agents.js';
 import type { FlywheelScope, RoleEffort } from '../config-yaml.js';
 import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
+import { getProjectPanPaths } from '../pan-dir/paths.js';
 import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { computePredictedConflictSignals, declaredIssueFootprint, pickFromSequence, type IssueFileFootprint } from '../flywheel-merge-order.js';
@@ -183,7 +184,8 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
             return assigneeName === 'eltmon';
           };
 
-          const specsDir = join(projectRoot, '.pan', 'specs');
+          const paths = getProjectPanPaths(projectRoot);
+          const specsDir = paths.specsDir;
           const issuesWithSpecs = new Set<string>();
           const declaredFootprints: IssueFileFootprint[] = [];
           if (existsSync(specsDir)) {
@@ -208,7 +210,7 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
           const isReadyOrHasPrd = (issueId: string): boolean => {
             const id = issueId.toUpperCase();
             if (issuesWithSpecs.has(id)) return true;
-            return existsSync(join(projectRoot, '.pan', 'drafts', `${id}.md`));
+            return existsSync(join(paths.draftsDir, `${id}.md`));
           };
           const membershipAvailable = Boolean(projectConfig?.github_repo);
           const memberships = projectConfig?.github_repo

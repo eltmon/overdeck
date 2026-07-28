@@ -23,6 +23,7 @@ import { readOhmypiCodexCredential } from '../../lib/ohmypi-codex-auth.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
+import { getProjectPanPaths } from '../../lib/pan-dir/paths.js';
 import { getMainDivergence, type MainDivergence } from '../../lib/state-plane.js';
 import {
   checkSystemPrerequisite,
@@ -31,6 +32,7 @@ import {
 } from '../../lib/system-prerequisites.js';
 import { checkInotify } from './doctor-inotify.js';
 import { checkStateWorktrees } from './doctor-state-worktree.js';
+import { checkDuplicateComposeStacks } from './doctor-duplicate-stacks.js';
 import {
   assessBridgePoolPressure,
   bridgePoolLimitFromPools,
@@ -44,7 +46,6 @@ import {
 import { isXBriefFilename } from '../../lib/xbrief/lifecycle.js';
 // Minimum supported omp harness version (PAN-1989); its lineage differs from pi and was baselined at 16.1.16.
 export const SUPPORTED_OMP_VERSION_MIN = '16.1.0';
-
 const execAsync = promisify(exec);
 
 function compareSemver(a: string, b: string): number {
@@ -608,7 +609,7 @@ export function findOrphanProposedSpecs(options: {
   const orphans: OrphanProposedSpec[] = [];
 
   for (const { key, config } of projects) {
-    const specsDir = join(config.path, '.pan', 'specs');
+    const specsDir = getProjectPanPaths(config.path).specsDir;
     if (!existsSync(specsDir)) continue;
 
     for (const entry of readdirSync(specsDir, { withFileTypes: true })) {
@@ -902,6 +903,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Check Docker devnet network pool exhaustion (PAN-2510)
   for (const c of await checkDockerBridgeNetworkPool()) checks.push(c);
+  for (const c of await checkDuplicateComposeStacks()) checks.push(c); // PAN-3049
 
   // Check inotify watch budget and persistence (PAN-3063)
   for (const c of await checkInotify()) checks.push(c);

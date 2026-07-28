@@ -55,6 +55,21 @@ export interface EventStore {
   readFrom(fromSequence: number): StoredEvent[];
   /** Return events of a given type, most recent first, capped at limit. */
   queryByType(type: string, limit?: number): StoredEvent[];
+  /**
+   * PAN-3092: append AT MOST ONCE for `idempotencyKey`, in one transaction.
+   *
+   * The key is claimed and the event inserted together, so two concurrent
+   * callers cannot both observe absence and append — a check-then-append pair
+   * has no such guarantee. Returns only after the transaction settles, and
+   * throws if it does not commit, so a caller can distinguish "durably
+   * appended" from "already there" from "not written at all". Projection-time
+   * id reuse cannot provide this: it replaces the visible row but still appends
+   * and re-publishes a second event.
+   */
+  appendOnce(
+    event: Omit<DomainEvent, 'sequence'>,
+    idempotencyKey: string,
+  ): { outcome: 'appended' | 'duplicate'; sequence: number };
   /** Return the latest event per payload.issueId for a given event type. */
   queryLatestPerIssue(type: string): StoredEvent[];
   /**
@@ -146,6 +161,43 @@ export async function openEventDb(): Promise<DbAdapter> {
   return db as unknown as DbAdapter;
 }
 
+// ─── One-shot payload trim (PAN-3253) ─────────────────────────────────────────
+
+const REVIEW_HISTORY_TRIM_LIMIT = 20;
+const OVERSIZED_REVIEW_PAYLOAD_CHARS = 16 * 1024;
+
+/**
+ * PAN-3253: older review.status_changed rows embed the full unbounded
+ * `status.history` array — on one machine that single event type was 80% of a
+ * 1.3 GB overdeck.db. Rewrite each oversized payload keeping only the bounded
+ * history tail. New emissions are already bounded at hydration
+ * (REVIEW_STATUS_HISTORY_LIMIT), so this converges to a no-op.
+ */
+export function trimReviewStatusHistoryPayloads(
+  db: DbAdapter,
+): { trimmed: number; savedChars: number } {
+  const rows = db.prepare<{ sequence: number; payload: string }>(
+    `SELECT sequence, payload FROM events WHERE type = 'review.status_changed' AND length(payload) > ?`,
+  ).all([OVERSIZED_REVIEW_PAYLOAD_CHARS]);
+  const update = db.prepare<void>('UPDATE events SET payload = ? WHERE sequence = ?');
+
+  let trimmed = 0;
+  let savedChars = 0;
+  for (const row of rows) {
+    try {
+      const parsed = JSON.parse(row.payload) as { status?: { history?: unknown } };
+      const history = parsed.status?.history;
+      if (!Array.isArray(history) || history.length <= REVIEW_HISTORY_TRIM_LIMIT) continue;
+      parsed.status!.history = history.slice(-REVIEW_HISTORY_TRIM_LIMIT);
+      const next = JSON.stringify(parsed);
+      update.run([next, row.sequence]);
+      trimmed += 1;
+      savedChars += row.payload.length - next.length;
+    } catch { /* leave unparseable rows untouched */ }
+  }
+  return { trimmed, savedChars };
+}
+
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
 /**
@@ -194,6 +246,37 @@ export function createEventStore(db: DbAdapter): EventStore {
   const purgeTypeStmt = db.prepare<void>(
     `DELETE FROM events WHERE type = ?`,
   );
+  // PAN-3092: at-most-once append. The INSERT hits event_idempotency's PRIMARY
+  // KEY, so a duplicate is detected by the uniqueness constraint rather than by
+  // a preceding read — no check-then-append race, and an indexed lookup rather
+  // than a json_extract scan.
+  //
+  // Prepared lazily, unlike the hot-path statements above: `appendOnce` is a
+  // low-frequency path, and every store built against a narrower schema (tests,
+  // fixtures) would otherwise fail at construction on a table it never uses.
+  let idempotencyStmts: {
+    claim: PreparedStatement<void>;
+    read: PreparedStatement<{ sequence: number }>;
+    setSeq: PreparedStatement<void>;
+    compact: PreparedStatement<void>;
+  } | null = null;
+  function getIdempotencyStmts(): NonNullable<typeof idempotencyStmts> {
+    idempotencyStmts ??= {
+      claim: db.prepare<void>(
+        `INSERT OR IGNORE INTO event_idempotency (key, sequence, created_at) VALUES (?, ?, ?)`,
+      ),
+      read: db.prepare<{ sequence: number }>(
+        `SELECT sequence FROM event_idempotency WHERE key = ?`,
+      ),
+      setSeq: db.prepare<void>(
+        `UPDATE event_idempotency SET sequence = ? WHERE key = ?`,
+      ),
+      compact: db.prepare<void>(
+        `DELETE FROM event_idempotency WHERE created_at < ?`,
+      ),
+    };
+    return idempotencyStmts;
+  }
 
   // ─── Async write queue ───────────────────────────────────────────────────────
   // Batches events and flushes them in a single transaction on the next tick.
@@ -330,6 +413,17 @@ export function createEventStore(db: DbAdapter): EventStore {
     if (result.changes > 0) {
       console.log(`[event-store] Compacted ${result.changes} events older than 7 days`);
     }
+    // PAN-3092: idempotency keys age out with the events they guard. Retaining
+    // them past compaction would grow the table forever AND leave orphaned keys
+    // that permanently suppress re-appending a warning whose event is gone.
+    try {
+      const claims = getIdempotencyStmts().compact.run([sevenDaysAgo]);
+      if (claims.changes > 0) {
+        console.log(`[event-store] Compacted ${claims.changes} idempotency keys older than 7 days`);
+      }
+    } catch {
+      // The table is absent on narrower schemas (tests, fixtures) — nothing to compact.
+    }
   }
 
   function purgeType(type: string): number {
@@ -350,6 +444,52 @@ export function createEventStore(db: DbAdapter): EventStore {
 
   function queryLatestPerIssue(type: string): StoredEvent[] {
     return queryLatestPerIssueStmt.all([type]).map(rowToStored);
+  }
+
+  function appendOnce(
+    event: Omit<DomainEvent, 'sequence'>,
+    idempotencyKey: string,
+  ): { outcome: 'appended' | 'duplicate'; sequence: number } {
+    const stmts = getIdempotencyStmts();
+    const timestamp = eventTimestampMillis(event);
+    const payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
+    let sequence = 0;
+    let duplicate = false;
+
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      // INSERT OR IGNORE + a read-back is the duplicate test: if the row was
+      // already there, the stored sequence is the winner's.
+      stmts.claim.run([idempotencyKey, 0, Date.now()]);
+      const claimed = stmts.read.get([idempotencyKey]);
+      if (claimed && claimed.sequence !== 0) {
+        duplicate = true;
+        sequence = claimed.sequence;
+      } else {
+        insertStmt.run([event.type, timestamp, payload]);
+        sequence = lastRowIdStmt.get()?.sequence ?? 0;
+        stmts.setSeq.run([sequence, idempotencyKey]);
+      }
+      db.exec('COMMIT');
+    } catch (err) {
+      try { db.exec('ROLLBACK'); } catch { /* no active transaction */ }
+      // Drop the cached statements: the failure may be a schema problem, and a
+      // later retry must be free to re-prepare rather than reuse a dead handle.
+      idempotencyStmts = null;
+      throw err;
+    }
+
+    // Publish only what this call actually wrote — a duplicate must not
+    // re-notify subscribers, which is the repeat the caller is avoiding.
+    if (!duplicate) {
+      emitter.emit('event', {
+        sequence,
+        type: event.type,
+        timestamp: new Date(timestamp).toISOString(),
+        payload: JSON.parse(payload),
+      } satisfies StoredEvent);
+    }
+    return { outcome: duplicate ? 'duplicate' : 'appended', sequence };
   }
 
   function queryByTypesSince(types: string[], afterSequence: number): StoredEvent[] {
@@ -376,6 +516,7 @@ export function createEventStore(db: DbAdapter): EventStore {
     readFrom,
     queryByType,
     queryLatestPerIssue,
+    appendOnce,
     queryByTypesSince,
     subscribe,
     compact,
@@ -424,6 +565,26 @@ export async function initEventStore(): Promise<EventStore> {
         // is the backstop for returning freed pages to the OS.
         console.error('[event-store] incremental_vacuum failed (non-fatal):', err);
       }
+    }
+
+    // One-shot migration (PAN-3253): shrink historical review.status_changed
+    // payloads that embed the unbounded history array. VACUUM only when the
+    // trim freed real space — it rewrites the whole file, and SQLite never
+    // returns freed pages to the filesystem on its own.
+    try {
+      const trim = trimReviewStatusHistoryPayloads(db);
+      if (trim.trimmed > 0) {
+        const savedMb = Math.round(trim.savedChars / (1024 * 1024));
+        console.log(`[event-store] Trimmed history in ${trim.trimmed} review.status_changed payloads (~${savedMb} MB reclaimed)`);
+        if (trim.savedChars > 64 * 1024 * 1024) {
+          db.exec('VACUUM');
+          console.log('[event-store] VACUUM completed after review-history trim');
+        } else {
+          db.exec('PRAGMA incremental_vacuum');
+        }
+      }
+    } catch (err) {
+      console.error('[event-store] review-history payload trim failed (non-fatal):', err);
     }
 
     _store = store;

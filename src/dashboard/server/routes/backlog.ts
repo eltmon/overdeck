@@ -21,6 +21,7 @@ import {
   type ForecastNode, type LaneBlock,
 } from '../../../lib/backlog/pickup.js';
 import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
+import { getProjectPanPaths } from '../../../lib/pan-dir/paths.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getBacklogSequenceForRoot, clearBacklogSequence } from '../../../lib/overdeck/backlog.js';
 import { isFlywheelAutoPickupBacklog } from '../../../lib/overdeck/control-settings.js';
@@ -63,12 +64,13 @@ const getBacklogSequenceRoute = HttpRouter.add(
 
         // Enrich cached rows with live per-issue status (not stored in the cache).
         // Mirrors the join logic in src/lib/backlog/backlog-input.ts for consistency.
-        const draftsDir = join(projectRoot, '.pan', 'drafts');
+        const paths = getProjectPanPaths(projectRoot);
+        const draftsDir = paths.draftsDir;
         const prdFiles = existsSync(draftsDir)
           ? new Set(readdirSync(draftsDir).map((f) => f.replace(/\.md$/, '').toUpperCase()))
           : new Set<string>();
 
-        const specsDir = join(projectRoot, '.pan', 'specs');
+        const specsDir = paths.specsDir;
         const specIssues = new Set<string>();
         if (existsSync(specsDir)) {
           for (const f of readdirSync(specsDir)) {

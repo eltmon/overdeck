@@ -1,11 +1,13 @@
-import { existsSync, readFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { join } from 'path';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import type { DockerCleanupResult, WorkspaceDockerTeardownResult } from './types.js';
 import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
+import { composeProjectNameForWorkspace } from '../workspace/stack-health.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export async function getContainersReferencingWorkspacePathPromise(
   workspacePath: string,
@@ -68,35 +70,21 @@ export async function stopWorkspaceDockerPromise(
     }
   }
 
-  const featureFolder = `feature-${featureName}`;
-  const composeProjectName = `overdeck-${featureFolder}`;
-  const devScriptPaths = [
-    join(workspacePath, DEVCONTAINER_DIRNAME, 'dev'),
-    join(workspacePath, 'dev'),
-  ];
-  for (const devPath of devScriptPaths) {
-    try {
-      if (!existsSync(devPath)) continue;
-      const content = readFileSync(devPath, 'utf-8');
-      const templatedMatch = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
-      const declared = templatedMatch
-        ? `${templatedMatch[1]}${featureFolder}`
-        : content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/)?.[1];
-      if (declared && declared !== composeProjectName) {
-        throw new Error(`${devPath} declares COMPOSE_PROJECT_NAME=${declared}, expected ${composeProjectName}`);
-      }
-    } catch (error: any) {
-      if (error?.message?.includes('declares COMPOSE_PROJECT_NAME=')) throw error;
-    }
-  }
+  // Canonical resolver (PAN-3049): a mismatched declared name still throws
+  // ('Refusing workspace rebuild: ...'), protecting against tearing down the
+  // wrong stack — same behavior as before, now via the single shared resolver.
+  const composeProjectName = composeProjectNameForWorkspace(workspacePath, featureName);
 
   if (composeFiles.length > 0) {
     result.containersFound = true;
     try {
-      const fileFlags = composeFiles.map(f => `-f "${f}"`).join(' ');
       const cwd = existsSync(devcontainerDir) ? devcontainerDir : workspacePath;
-
-      await execAsync(`docker compose ${fileFlags} -p "${composeProjectName}" down -v --remove-orphans`, {
+      // PAN-3049: composeProjectName comes from workspace-controlled content
+      // (a compose `name:` field or dev-script declaration) — pass it and the
+      // compose file paths as argv entries via execFile, never interpolate
+      // into a shell string, so no declared value can reach a shell.
+      const fileArgs = composeFiles.flatMap((f) => ['-f', f]);
+      await execFileAsync('docker', ['compose', ...fileArgs, '-p', composeProjectName, 'down', '-v', '--remove-orphans'], {
         cwd,
         timeout: 60000,
       });
@@ -113,7 +101,7 @@ export async function stopWorkspaceDockerPromise(
       result.containersFound = true;
       try {
         // Try project-name-based down first (Docker Compose can discover containers by label)
-        await execAsync(`docker compose -p "${composeProjectName}" down -v --remove-orphans`, {
+        await execFileAsync('docker', ['compose', '-p', composeProjectName, 'down', '-v', '--remove-orphans'], {
           cwd: workspacePath,
           timeout: 60000,
         });
@@ -293,6 +281,7 @@ export async function teardownWorkspaceDockerByNamePromise(
         name.endsWith(`-${featureFolder}_devnet`),
     );
     result.networkRemoved = remaining.length === 0;
+    if (remaining.length > 0) result.remainingNetworks = remaining;
     result.steps.push(
       result.networkRemoved
         ? `Verified networks for ${featureFolder} are absent`

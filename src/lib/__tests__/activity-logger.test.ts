@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   emitActivityEntryDurable,
+  emitActivityEntryOnce,
   emitActivityEntrySync,
   emitActivityTtsSync,
   emitDashboardLifecycleSync,
@@ -92,5 +93,105 @@ describe('activity logger', () => {
         issueId: 'PAN-1744',
       },
     });
+  });
+});
+
+/**
+ * PAN-3092: FR-4 wants ONE operator warning per episode. Neither append path
+ * can back that on its own — the deacon client resolves on local enqueue and
+ * the in-process store resolves a failed batch with sequence 0 — so the write
+ * door delegates to a settled, transactional `appendOnce`.
+ */
+describe('emitActivityEntryOnce (PAN-3092)', () => {
+  /** A store whose appendOnce behaves like the real transactional one. */
+  function createStore(options: { fail?: boolean } = {}) {
+    const events: Array<{ type: string; payload: { id?: string } }> = [];
+    const published: Array<{ type: string }> = [];
+    const claimed = new Set<string>();
+    return {
+      events,
+      published,
+      append: vi.fn(() => 1),
+      appendAsync: vi.fn(async () => 1),
+      appendOnce: vi.fn((event: { type: string; payload: { id?: string } }, key: string) => {
+        if (options.fail) throw new Error('transaction did not commit');
+        if (claimed.has(key)) return { outcome: 'duplicate' as const };
+        claimed.add(key);
+        events.push(event);
+        published.push(event);
+        return { outcome: 'appended' as const };
+      }),
+    };
+  }
+
+  const warning = {
+    id: 'verdict-fallback:verdict-fallback-contention:PAN-3092:2026-07-28T00:00:00.000Z',
+    source: 'cloister' as const,
+    level: 'warn' as const,
+    message: 'verdict fallback undrained',
+    issueId: 'PAN-3092',
+  };
+
+  afterEach(() => {
+    setActivityEventStoreProvider(null);
+  });
+
+  it('appends once and then neither appends nor publishes the same episode again', async () => {
+    const store = createStore();
+    setActivityEventStoreProvider(() => store);
+
+    expect(await emitActivityEntryOnce(warning)).toBe('appended');
+    // A restart is just another call with no in-memory state behind it.
+    expect(await emitActivityEntryOnce(warning)).toBe('duplicate');
+    expect(await emitActivityEntryOnce(warning)).toBe('duplicate');
+
+    expect(store.events).toHaveLength(1);
+    expect(store.published).toHaveLength(1);
+    // The unbatched, non-durable path is never used for this.
+    expect(store.appendAsync).not.toHaveBeenCalled();
+  });
+
+  it('passes the caller id through as the idempotency key', async () => {
+    const store = createStore();
+    setActivityEventStoreProvider(() => store);
+
+    await emitActivityEntryOnce(warning);
+
+    expect(store.appendOnce.mock.calls[0]![1]).toBe(warning.id);
+  });
+
+  it('reports failed when the transaction does not commit, so the caller retries', async () => {
+    setActivityEventStoreProvider(() => createStore({ fail: true }));
+    expect(await emitActivityEntryOnce(warning)).toBe('failed');
+
+    const healthy = createStore();
+    setActivityEventStoreProvider(() => healthy);
+    expect(await emitActivityEntryOnce(warning)).toBe('appended');
+    expect(healthy.events).toHaveLength(1);
+  });
+
+  it('relays a failed outcome from an async (deacon-client) appendOnce', async () => {
+    setActivityEventStoreProvider(() => ({
+      append: vi.fn(() => 1),
+      appendAsync: vi.fn(async () => 1),
+      appendOnce: vi.fn(async () => 'failed' as const),
+    }));
+
+    expect(await emitActivityEntryOnce(warning)).toBe('failed');
+  });
+
+  it('reports failure when no event store is wired at all', async () => {
+    setActivityEventStoreProvider(null);
+    expect(await emitActivityEntryOnce(warning)).toBe('failed');
+  });
+
+  it('reports unconfirmed — never appended — when the store offers no settled path', async () => {
+    // A narrow stub cannot guarantee anything; saying "appended" here is the
+    // false-success this whole change exists to remove.
+    const stub = { append: vi.fn(() => 1), appendAsync: vi.fn(async () => 1) };
+    setActivityEventStoreProvider(() => stub);
+
+    expect(await emitActivityEntryOnce(warning)).toBe('unconfirmed');
+    expect(stub.appendAsync).toHaveBeenCalledTimes(1);
   });
 });

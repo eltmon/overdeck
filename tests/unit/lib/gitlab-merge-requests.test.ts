@@ -1,8 +1,7 @@
-import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   listOpenGitLabMergeRequests,
   listGitLabMergedMergeRequestHeads,
-  resetCachesWithClockFn,
   type GitLabMergeRequestRow,
   type GitLabRunner,
 } from '../../../src/lib/gitlab-merge-requests.js';
@@ -110,30 +109,30 @@ describe('gitlab-merge-requests', () => {
 
     it('caches results by repo for 30s and dedupes concurrent calls', async () => {
       vi.useFakeTimers();
-      resetCachesWithClockFn(vi.now);
       try {
+        vi.resetModules();
+        const { listOpenGitLabMergeRequests: listOpenWithFreshCache } =
+          await import('../../../src/lib/gitlab-merge-requests.js');
         const runner: GitLabRunner = vi.fn(async () =>
           JSON.stringify([{ source_branch: 'feature/min-1' } as GitLabMergeRequestRow]),
         );
 
-        // First call invokes runner
-        const result1 = await listOpenGitLabMergeRequests('/test/open-7', runner);
+        const first = listOpenWithFreshCache('/test/open-7', runner);
+        const concurrent = listOpenWithFreshCache('/test/open-7', runner);
         expect(runner).toHaveBeenCalledTimes(1);
-        expect(result1).toHaveLength(1);
-
-        // Concurrent call within TTL reuses cached result without invoking runner again
-        const result2 = await listOpenGitLabMergeRequests('/test/open-7', runner);
-        expect(runner).toHaveBeenCalledTimes(1);
+        const [result1, result2] = await Promise.all([first, concurrent]);
         expect(result2).toEqual(result1);
 
-        // After 30s TTL expires, next call re-invokes runner
-        vi.advanceTimersByTime(31_000);
-        const result3 = await listOpenGitLabMergeRequests('/test/open-7', runner);
+        const cached = await listOpenWithFreshCache('/test/open-7', runner);
+        expect(runner).toHaveBeenCalledTimes(1);
+        expect(cached).toEqual(result1);
+
+        await vi.advanceTimersByTimeAsync(31_000);
+        const reloaded = await listOpenWithFreshCache('/test/open-7', runner);
         expect(runner).toHaveBeenCalledTimes(2);
-        expect(result3).toEqual(result1);
+        expect(reloaded).toEqual(result1);
       } finally {
         vi.useRealTimers();
-        resetCachesWithClockFn();
       }
     });
   });
@@ -182,58 +181,36 @@ describe('gitlab-merge-requests', () => {
       expect(result).toEqual(['feature/min-1', 'feature/min-3']);
     });
 
-    it('continues pagination even with results when page 1 has exactly 100 rows', async () => {
-      let callCount = 0;
+    it('requests page N+1 when a merged-MR page contains exactly 100 rows', async () => {
       const runner: GitLabRunner = vi.fn(async (args) => {
-        callCount++;
-        if (args[args.length - 1] === '1') {
-          // Page 1: exactly 100 rows (must continue to page 2)
+        if (args.at(-1) === '1') {
           return JSON.stringify(Array.from({ length: 100 }, (_, i) => ({
             source_branch: 'feature/min-multipage',
             iid: i,
           } as GitLabMergeRequestRow)));
-        } else if (args[args.length - 1] === '2') {
-          // Page 2: short page (stop here)
+        }
+        if (args.at(-1) === '2') {
           return JSON.stringify([{
             source_branch: 'feature/min-multipage',
             iid: 100,
           } as GitLabMergeRequestRow]);
         }
-        return '';
+        throw new Error(`Unexpected page: ${args.at(-1)}`);
       });
 
-      const result = await listGitLabMergedMergeRequestHeads('/test/merged-3', ['feature/min-multipage'], runner);
+      const result = await listGitLabMergedMergeRequestHeads(
+        '/test/merged-3',
+        ['feature/min-multipage'],
+        runner,
+      );
 
-      // Should correctly identify that the head has merged MRs
       expect(result).toEqual(['feature/min-multipage']);
-      // Should have paginated to page 2 since page 1 had exactly 100 rows
-      expect(callCount).toBe(2);
-    });
-
-    it('paginates through pages when page 1 has exactly 100 rows', async () => {
-      let callCount = 0;
-      const runner: GitLabRunner = vi.fn(async (args) => {
-        callCount++;
-        if (args[args.length - 1] === '1') {
-          // Page 1: exactly 100 rows (continue to page 2)
-          return JSON.stringify(Array.from({ length: 100 }, (_, i) => ({
-            source_branch: 'feature/multi',
-            iid: i,
-          } as GitLabMergeRequestRow)));
-        } else if (args[args.length - 1] === '2') {
-          // Page 2: short page with results (found, stop)
-          return JSON.stringify([{ source_branch: 'feature/multi', iid: 100 } as GitLabMergeRequestRow]);
-        }
-        return '';
-      });
-
-      const result = await listGitLabMergedMergeRequestHeads('/test/merged-4', ['feature/multi'], runner);
-
-      // Should identify head as merged
-      expect(result).toEqual(['feature/multi']);
-      // Should have paginated to page 2
-      expect(callCount).toBe(2);
-      expect(runner).toHaveBeenNthCalledWith(2, expect.arrayContaining(['--page', '2']), '/test/merged-4');
+      expect(runner).toHaveBeenCalledTimes(2);
+      expect(runner).toHaveBeenNthCalledWith(
+        2,
+        ['mr', 'list', '--merged', '--source-branch', 'feature/min-multipage', '--output', 'json', '--per-page', '100', '--page', '2'],
+        '/test/merged-3',
+      );
     });
 
     it('returns empty array when no heads are provided', async () => {
@@ -268,8 +245,10 @@ describe('gitlab-merge-requests', () => {
 
     it('caches results by (repoPath, head) for 30s and dedupes concurrent calls', async () => {
       vi.useFakeTimers();
-      resetCachesWithClockFn(vi.now);
       try {
+        vi.resetModules();
+        const { listGitLabMergedMergeRequestHeads: listMergedWithFreshCache } =
+          await import('../../../src/lib/gitlab-merge-requests.js');
         const runner: GitLabRunner = vi.fn(async (args) => {
           if (args.includes('feature/min-1')) {
             return JSON.stringify([{ source_branch: 'feature/min-1' } as GitLabMergeRequestRow]);
@@ -277,24 +256,23 @@ describe('gitlab-merge-requests', () => {
           return '';
         });
 
-        // First call invokes runner
-        const result1 = await listGitLabMergedMergeRequestHeads('/test/merged-8', ['feature/min-1'], runner);
+        const first = listMergedWithFreshCache('/test/merged-8', ['feature/min-1'], runner);
+        const concurrent = listMergedWithFreshCache('/test/merged-8', ['feature/min-1'], runner);
         expect(runner).toHaveBeenCalledTimes(1);
+        const [result1, result2] = await Promise.all([first, concurrent]);
         expect(result1).toEqual(['feature/min-1']);
-
-        // Concurrent call within TTL reuses cached result
-        const result2 = await listGitLabMergedMergeRequestHeads('/test/merged-8', ['feature/min-1'], runner);
-        expect(runner).toHaveBeenCalledTimes(1);
         expect(result2).toEqual(result1);
 
-        // After 30s TTL expires, next call re-invokes runner
-        vi.advanceTimersByTime(31_000);
-        const result3 = await listGitLabMergedMergeRequestHeads('/test/merged-8', ['feature/min-1'], runner);
+        const cached = await listMergedWithFreshCache('/test/merged-8', ['feature/min-1'], runner);
+        expect(runner).toHaveBeenCalledTimes(1);
+        expect(cached).toEqual(result1);
+
+        await vi.advanceTimersByTimeAsync(31_000);
+        const reloaded = await listMergedWithFreshCache('/test/merged-8', ['feature/min-1'], runner);
         expect(runner).toHaveBeenCalledTimes(2);
-        expect(result3).toEqual(result1);
+        expect(reloaded).toEqual(result1);
       } finally {
         vi.useRealTimers();
-        resetCachesWithClockFn();
       }
     });
   });

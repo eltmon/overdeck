@@ -19,6 +19,16 @@ export interface StatusHistoryEntry {
   notes?: string;
 }
 
+/**
+ * PAN-3253: bound on the `history` tail carried by an in-memory ReviewStatus —
+ * enforced at DB hydration and on every status write. The status_history TABLE
+ * keeps the full record; the hydrated object must stay bounded because every
+ * review.status_changed event embeds the full status for replay, and an
+ * unbounded history made that one event type 80% of a 1.3 GB overdeck.db
+ * (MIN-901: 2,140 entries re-serialized into 3,390 payloads).
+ */
+export const REVIEW_STATUS_HISTORY_LIMIT = 20;
+
 export interface BlockerReason {
   type: 'failing_checks' | 'merge_conflict' | 'unresolved_conversations' | 'changes_requested' | 'draft_pr' | 'not_mergeable' | 'unmerged_sibling_repo';
   summary: string;

@@ -50,7 +50,11 @@ describe('auto-commit', () => {
     execSync('git remote add origin .', { cwd: tmp });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Cancel queued writers and let in-flight ones settle before removing the
+    // temp repo. Deleting `.git` out from under a running git process surfaced
+    // as an ENOTEMPTY teardown failure on CI (PAN-3238).
+    await __testInternals.settleAllFlushes();
     rmSync(tmp, { recursive: true, force: true });
   });
 
@@ -248,19 +252,18 @@ describe('auto-commit', () => {
       queueAutoCommit({ projectRoot: tmp, paths: [p1], subject: 'chore(state): immediate write-through' });
       expect(execSync('git log --oneline', { cwd: tmp, encoding: 'utf-8' })).not.toContain('immediate write-through');
       await vi.advanceTimersByTimeAsync(0);
+      // The timer turn — not an explicit flush call — must have started the
+      // write. Capture that flush so the assertions below can await it instead
+      // of polling Git history, which raced teardown on CI.
+      const started = __testInternals.getActiveFlush(tmp);
       vi.useRealTimers();
+      expect(started).toBeDefined();
 
-      for (let attempt = 0; attempt < 20; attempt += 1) {
-        const log = execSync('git log --oneline', { cwd: tmp, encoding: 'utf-8' });
-        if (log.includes('chore(state): immediate write-through')) {
-          expect(log.split('\n').filter(Boolean).length).toBe(2);
-          return;
-        }
-        await new Promise<void>((resolve) => setImmediate(resolve));
-      }
+      await started!.promise;
 
       const log = execSync('git log --oneline', { cwd: tmp, encoding: 'utf-8' });
       expect(log).toContain('chore(state): immediate write-through');
+      expect(log.split('\n').filter(Boolean).length).toBe(2);
     } finally {
       vi.useRealTimers();
     }
