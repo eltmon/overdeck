@@ -72,10 +72,10 @@
     "recordedAt": "2026-07-28T07:32:57.208Z"
   },
   "created": "2026-07-28T03:13:30.841Z",
-  "updated": "2026-07-28T07:48:48.156Z",
+  "updated": "2026-07-28T07:48:48.799Z",
   "pipeline": {
     "issueId": "PAN-3092",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -83,11 +83,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:33:26.963Z",
-    "updatedAt": "2026-07-28T07:48:47.018Z",
+    "updatedAt": "2026-07-28T07:48:47.451Z",
     "inspectNotes": "All 4 ACs verified. AC1: MIN-902 repro preserves passed+reviewNotes+reviewedAtCommit while keeping fresh prUrl/updatedAt, and asserts inputs unmutated. AC2: strictly-newer reviewSpawnedAt returns identity .toBe(fresh). AC3: PAN-2587 describe block and fixture byte-identical across 9109baea~1..9109baea (only an added import in that region); suite 13/13, exit 0. AC4: false-on-uncovered, true-on-same-terminal, true-on-newer-cycle all present plus 2 extra cases. Non-blocking note for FR-2: readyForMerge is a stored field (records.ts:103) not in GATE_COMPANIONS, so a restored terminal reviewStatus can pair with fresh's readyForMerge=false.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3222",
     "lastVerifiedCommit": "566db378cb92103431348231524716843b9cf751",
     "reviewRequestedAt": "2026-07-28T07:33:26.963Z",
+    "reviewSpawnedAt": "2026-07-28T07:48:47.450Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/concerns.md",
@@ -167,7 +168,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.0181193,
-        "pricingAsOf": "2026-07-28T07:48:47.039Z"
+        "pricingAsOf": "2026-07-28T07:48:48.797Z"
       }
     },
     "merges": [
@@ -176,7 +177,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3092",
