@@ -49,7 +49,7 @@ function getRepoTargetBranch(
   );
 }
 
-function getRepoForge(repo: Partial<RepoConfig> | undefined, projectConfig: ProjectConfig): ForgeType {
+export function getRepoForge(repo: Partial<RepoConfig> | undefined, projectConfig: ProjectConfig): ForgeType {
   return (
     normalizeForgeSync(repo?.forge) ||
     normalizeForgeSync(repo?.remote) ||
