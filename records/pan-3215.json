@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T06:35:52.620Z",
-  "updated": "2026-07-28T09:38:43.739Z",
+  "updated": "2026-07-28T09:38:47.050Z",
   "pipeline": {
     "issueId": "PAN-3215",
     "reviewStatus": "pending",
@@ -153,5 +153,27 @@
     "dod-docs-update": "completed",
     "dod-docs-update.dod-docs-update.ac1": "completed",
     "dod-docs-update.dod-docs-update.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/DEFINITION-OF-DONE.md",
+      "src/lib/lifecycle/dod-gate.ts",
+      "src/lib/lifecycle/workflows.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts",
+      "tests/unit/lib/lifecycle/workflows.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DEFINITION-OF-DONE.md",
+      "scripts/file-size-allowlist.txt",
+      "src/lib/lifecycle/dod-gate.ts",
+      "src/lib/lifecycle/workflows.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts",
+      "tests/unit/lib/lifecycle/workflows.test.ts"
+    ],
+    "recordedAt": "2026-07-28T09:38:47.050Z"
   }
 }
