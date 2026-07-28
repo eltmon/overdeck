@@ -145,7 +145,7 @@
     "recordedAt": "2026-07-28T17:49:31.882Z"
   },
   "created": "2026-07-28T06:35:27.186Z",
-  "updated": "2026-07-28T20:22:32.863Z",
+  "updated": "2026-07-28T20:23:01.668Z",
   "pipeline": {
     "issueId": "PAN-3212",
     "reviewStatus": "passed",
@@ -153,10 +153,10 @@
     "verificationStatus": "passed",
     "mergeStatus": "merged",
     "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T17:49:41.828Z",
-    "updatedAt": "2026-07-28T20:22:14.720Z",
+    "updatedAt": "2026-07-28T20:22:58.404Z",
     "reviewNotes": "All review dimensions pass; explicit strict payload states close the menu-swallow, legacy, read-failure, and rollback recovery gaps.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3227",
     "reviewedAtCommit": "23cbd0fba049ce6cd8bb6d16ae8f14690d53d688",
@@ -241,7 +241,7 @@
       },
       "costAtCloseOut": {
         "usd": 191.827392,
-        "pricingAsOf": "2026-07-28T20:22:17.105Z"
+        "pricingAsOf": "2026-07-28T20:23:00.221Z"
       }
     },
     "merges": [
@@ -250,7 +250,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3212",
