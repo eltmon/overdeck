@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T03:13:08.645Z",
-  "updated": "2026-07-28T07:30:02.325Z",
+  "updated": "2026-07-28T07:33:18.285Z",
   "pipeline": {
     "issueId": "PAN-3049",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "overdeck-template-compose-name": {
-        "writerId": "agent-pan-3049",
-        "agentId": "agent-pan-3049",
-        "pid": 312838,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T07:27:42.384Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3049",
@@ -177,6 +169,17 @@
         "outcome": "completed",
         "reason": "Added a read-only pan doctor check (checkDuplicateComposeStacks / diagnoseDuplicateComposeStacks) that groups running containers by issue via inferIssueIdFromStackContainerName and flags issues whose running stack doesn't match its canonical compose-project name, with distinct guidance for the duplicate case (>=2 projects) vs the invisible-single-non-canonical-stack case (1 project, wrong name). First pass added this inline to doctor.ts, which pushed it to 1102 lines and tripped the 1000-line file-size ceiling on push; extracted it to a new src/cli/commands/doctor-duplicate-stacks.ts module (same pattern as doctor-inotify.ts) in a follow-up commit, landing doctor.ts at exactly 1000 lines. Also exported defaultWorkspacePath from stack-health.ts (was internal-only) since the check needs it — outside this item's declared files_scope but a minimal, safe one-line change. 5 new tests pass; full doctor+cli+workspace test suite (604 tests) unaffected; typecheck/lint clean.",
         "releasedAt": "2026-07-28T07:27:33.853Z"
+      },
+      {
+        "writerId": "agent-pan-3049",
+        "agentId": "agent-pan-3049",
+        "pid": 312838,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T07:27:42.384Z",
+        "itemId": "overdeck-template-compose-name",
+        "outcome": "completed",
+        "reason": "Added name: overdeck-{{FEATURE_FOLDER}} to docker-compose.devcontainer.yml.template, mirroring the dev script's existing overdeck-${FEATURE_FOLDER} declaration, so the compose file alone (no dev script needed) resolves the canonical name. Extended tests/unit/lib/workspace/stack-health-compose-name.test.ts to render the real template via renderDevcontainerSync and verify both ACs (compose-name-alone and dev-script-present agreement). All 10 tests in that file, plus the broader workspace/workspace-manager suite (90 tests), pass. Typecheck/lint clean.",
+        "releasedAt": "2026-07-28T07:33:18.285Z"
       }
     ],
     "statusReasons": {
@@ -211,6 +214,10 @@
       "doctor-duplicate-stack-check": {
         "reason": "Added a read-only pan doctor check (checkDuplicateComposeStacks / diagnoseDuplicateComposeStacks) that groups running containers by issue via inferIssueIdFromStackContainerName and flags issues whose running stack doesn't match its canonical compose-project name, with distinct guidance for the duplicate case (>=2 projects) vs the invisible-single-non-canonical-stack case (1 project, wrong name). First pass added this inline to doctor.ts, which pushed it to 1102 lines and tripped the 1000-line file-size ceiling on push; extracted it to a new src/cli/commands/doctor-duplicate-stacks.ts module (same pattern as doctor-inotify.ts) in a follow-up commit, landing doctor.ts at exactly 1000 lines. Also exported defaultWorkspacePath from stack-health.ts (was internal-only) since the check needs it — outside this item's declared files_scope but a minimal, safe one-line change. 5 new tests pass; full doctor+cli+workspace test suite (604 tests) unaffected; typecheck/lint clean.",
         "updatedAt": "2026-07-28T07:27:33.853Z"
+      },
+      "overdeck-template-compose-name": {
+        "reason": "Added name: overdeck-{{FEATURE_FOLDER}} to docker-compose.devcontainer.yml.template, mirroring the dev script's existing overdeck-${FEATURE_FOLDER} declaration, so the compose file alone (no dev script needed) resolves the canonical name. Extended tests/unit/lib/workspace/stack-health-compose-name.test.ts to render the real template via renderDevcontainerSync and verify both ACs (compose-name-alone and dev-script-present agreement). All 10 tests in that file, plus the broader workspace/workspace-manager suite (90 tests), pass. Typecheck/lint clean.",
+        "updatedAt": "2026-07-28T07:33:18.285Z"
       }
     }
   },
@@ -244,6 +251,8 @@
     "doctor-duplicate-stack-check.doctor-duplicate-stack-check.ac1": "completed",
     "doctor-duplicate-stack-check.doctor-duplicate-stack-check.ac2": "completed",
     "doctor-duplicate-stack-check.doctor-duplicate-stack-check.ac3": "completed",
-    "overdeck-template-compose-name": "running"
+    "overdeck-template-compose-name": "completed",
+    "overdeck-template-compose-name.overdeck-template-compose-name.ac1": "completed",
+    "overdeck-template-compose-name.overdeck-template-compose-name.ac2": "completed"
   }
 }
