@@ -43,16 +43,16 @@
     "recordedAt": "2026-07-28T09:38:47.050Z"
   },
   "created": "2026-07-28T06:35:52.620Z",
-  "updated": "2026-07-28T10:46:25.588Z",
+  "updated": "2026-07-28T10:46:31.369Z",
   "pipeline": {
     "issueId": "PAN-3215",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T10:46:24.675Z",
+    "updatedAt": "2026-07-28T10:46:31.362Z",
     "reviewNotes": "Cycle-1 blockers fixed; all requirements covered and focused tests, typecheck, and lint pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3226",
@@ -86,9 +86,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2257118,
-            "output": 125956,
-            "cacheRead": 15061504,
+            "input": 2333076,
+            "output": 146966,
+            "cacheRead": 17356800,
             "cacheWrite": 0
           }
         },
@@ -103,15 +103,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 4168874,
-          "output": 317107,
-          "cacheRead": 108056064,
+          "input": 4244832,
+          "output": 338117,
+          "cacheRead": 110351360,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 84.385612,
-        "pricingAsOf": "2026-07-28T10:46:24.721Z"
+        "usd": 86.54335,
+        "pricingAsOf": "2026-07-28T10:46:31.366Z"
       }
     },
     "merges": [
@@ -120,7 +120,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3215",
