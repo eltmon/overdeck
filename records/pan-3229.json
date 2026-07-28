@@ -2,7 +2,7 @@
   "issueId": "PAN-3229",
   "schemaVersion": 2,
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T17:07:17.610Z",
+  "updated": "2026-07-28T17:07:18.571Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3229: Planning promotion has no recovery owner: a finalized-but-unpromoted plan stalls forever if the dashboard is down at finalize time (PAN-3212 sat 9.5h)",
       "timestamp": "2026-07-28T17:07:17.610Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
