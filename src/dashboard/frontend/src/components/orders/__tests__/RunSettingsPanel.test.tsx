@@ -315,6 +315,32 @@ describe('RunSettingsPanel', () => {
     expect(screen.getByText('None — items run with their PRDs alone.')).toBeInTheDocument();
   });
 
+  it('renders the off-book lock-glyph policy line', () => {
+    render(<RunSettingsPanel
+      settings={{ laneAConcurrency: 2, posture: 'open' }}
+      onChange={vi.fn(async () => {})}
+    />);
+
+    expect(screen.getByText('🔒 Blocked while this book runs — fixed policy, not a preference.')).toBeInTheDocument();
+  });
+
+  it('toggles the off-book expander and renders the audited-exception copy', () => {
+    render(<RunSettingsPanel
+      settings={{ laneAConcurrency: 2, posture: 'open' }}
+      onChange={vi.fn(async () => {})}
+    />);
+
+    const toggle = screen.getByRole('button', { name: 'how the override works' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('pan start <id> --off-book')).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('pan start <id> --off-book')).toBeInTheDocument();
+    expect(screen.getByText(/an audited exception, not a setting\./)).toBeInTheDocument();
+  });
+
   it('does not render a global saving/error line', () => {
     render(<RunSettingsPanel
       settings={{ laneAConcurrency: 2, posture: 'open' }}

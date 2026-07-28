@@ -102,6 +102,7 @@ export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) 
   const [concurrency, setConcurrency] = useState(settings.laneAConcurrency);
   const [briefOverlay, setBriefOverlay] = useState(settings.briefOverlay ?? '');
   const [pendingTo, setPendingTo] = useState<OrderBookPosture | null>(null);
+  const [offbookExpanded, setOffbookExpanded] = useState(false);
   const [confirmReason, setConfirmReason] = useState('');
   const [saves, setSaves] = useState<Record<FieldId, SaveState>>({
     posture: { state: 'idle' },
@@ -296,9 +297,26 @@ export function RunSettingsPanel({ settings, onChange }: RunSettingsPanelProps) 
             </div>
           )}
         </div>
-        <div className="flex items-start gap-3">
-          <span className="flex-1 text-muted-foreground">Off-book policy</span>
-          <span className="max-w-72 text-right text-[11px] text-muted-foreground">Blocked by default; an operator must use the explicit logged <span className="font-mono text-foreground">--off-book</span> override.</span>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <span className="flex-1 text-muted-foreground">Off-book pickup</span>
+            <button
+              type="button"
+              aria-expanded={offbookExpanded}
+              onClick={() => setOffbookExpanded((expanded) => !expanded)}
+              className="text-[11px] text-muted-foreground underline"
+            >
+              how the override works
+            </button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">🔒 Blocked while this book runs — fixed policy, not a preference.</p>
+          {offbookExpanded && (
+            <p className="text-[11px] text-muted-foreground">
+              While a run is active the flywheel only starts issues that are in this book. Starting anything else requires{' '}
+              <span className="font-mono text-foreground">pan start &lt;id&gt; --off-book</span>, which succeeds but is written to
+              the run record with who ran it and when — an audited exception, not a setting.
+            </p>
+          )}
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-[10px] text-muted-foreground">
