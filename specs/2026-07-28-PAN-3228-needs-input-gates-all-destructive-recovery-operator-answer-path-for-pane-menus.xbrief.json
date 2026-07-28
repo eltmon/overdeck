@@ -4,7 +4,7 @@
     "created": "2026-07-28T17:14:38Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3228: Autonomous recovery destroys pending operator decisions: agent frozen on a permission prompt was --fresh-restarted instead of escalated (needs_input must gate all destructive recovery)",
-    "updated": "2026-07-28T17:21:13.819Z"
+    "updated": "2026-07-28T17:21:16.390Z"
   },
   "plan": {
     "id": "pan-3228",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "78a7ed67-fca4-41a7-92d3-663ef806ddd6",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-07-28T17:14:38Z",
-    "updated": "2026-07-28T17:21:13.819Z",
+    "updated": "2026-07-28T17:21:16.390Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3228",
