@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T20:03:59.353Z",
+  "updated": "2026-07-28T20:14:32.140Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "wi8b-wire-parser-cost": {
-        "writerId": "agent-pan-1837",
-        "agentId": "agent-pan-1837",
-        "pid": 2074497,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T19:49:51.491Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -188,6 +180,17 @@
         "outcome": "completed",
         "reason": "Added resolveKimiWirePath to jsonl-resolver.ts, delegating to wi5 findKimiWirePath/kimiSessionsRoot (mirrors the codex findRolloutPath reuse pattern): fast path via captured kimi-session-id, fallback to newest session dir under the workDirKey bucket. Wired kimi-code into resolveAgentHarness's trusted list and stale-default correction chain, and the kimi-wire-jsonl dispatch branch in resolveJsonlPath. Added kimiHomeOverride test hook. Extended jsonl-resolver.test.ts with all 3 ACs plus a no-bucket null case; 53/53 tests pass, no other harness path changed.",
         "releasedAt": "2026-07-28T19:49:39.774Z"
+      },
+      {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 2074497,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T19:49:51.491Z",
+        "itemId": "wi8b-wire-parser-cost",
+        "outcome": "completed",
+        "reason": "Added kimi-parser.ts (SessionUsage summed across every usage.record, ac1/ac2/ac3) and kimi-conversation-parser.ts (ParseResult for the chat panel, ac4: user turns from turn.prompt, assistant text from content.part, tool calls matched by toolCallId, think parts hidden). Wired kimi-code.ts getTokenUsage/getSessionCost to the real parser (replacing the wi5 stub). Wired kimi-wire-jsonl dispatch into activity-summary.ts, and 3 dispatch points in conversation-reads.ts (resolveSessionFile, getCachedMessages via new isKimiWireSessionFile, resolveSpecialistSessionFile). conversation-message.ts needed no changes -- its harness checks are all claude-jsonl-specific and kimi-code already falls through correctly. All 8+4 new tests pass against the pinned wi-fixture; 658 tests pass across cost-parsers/dashboard-conversation-services with no regressions. Deviation: did not extend cost.ts's separate bulk historical-reconcile sweep (~805) since it is structurally ohmypi/codex-only today and ACP -- a sibling harness -- isn't wired into it either; the live per-agent getSessionCost surface (AC3's literal ask) is fully wired.",
+        "releasedAt": "2026-07-28T20:14:32.140Z"
       }
     ],
     "statusReasons": {
@@ -226,6 +229,10 @@
       "wi8a-wire-resolver": {
         "reason": "Added resolveKimiWirePath to jsonl-resolver.ts, delegating to wi5 findKimiWirePath/kimiSessionsRoot (mirrors the codex findRolloutPath reuse pattern): fast path via captured kimi-session-id, fallback to newest session dir under the workDirKey bucket. Wired kimi-code into resolveAgentHarness's trusted list and stale-default correction chain, and the kimi-wire-jsonl dispatch branch in resolveJsonlPath. Added kimiHomeOverride test hook. Extended jsonl-resolver.test.ts with all 3 ACs plus a no-bucket null case; 53/53 tests pass, no other harness path changed.",
         "updatedAt": "2026-07-28T19:49:39.774Z"
+      },
+      "wi8b-wire-parser-cost": {
+        "reason": "Added kimi-parser.ts (SessionUsage summed across every usage.record, ac1/ac2/ac3) and kimi-conversation-parser.ts (ParseResult for the chat panel, ac4: user turns from turn.prompt, assistant text from content.part, tool calls matched by toolCallId, think parts hidden). Wired kimi-code.ts getTokenUsage/getSessionCost to the real parser (replacing the wi5 stub). Wired kimi-wire-jsonl dispatch into activity-summary.ts, and 3 dispatch points in conversation-reads.ts (resolveSessionFile, getCachedMessages via new isKimiWireSessionFile, resolveSpecialistSessionFile). conversation-message.ts needed no changes -- its harness checks are all claude-jsonl-specific and kimi-code already falls through correctly. All 8+4 new tests pass against the pinned wi-fixture; 658 tests pass across cost-parsers/dashboard-conversation-services with no regressions. Deviation: did not extend cost.ts's separate bulk historical-reconcile sweep (~805) since it is structurally ohmypi/codex-only today and ACP -- a sibling harness -- isn't wired into it either; the live per-agent getSessionCost surface (AC3's literal ask) is fully wired.",
+        "updatedAt": "2026-07-28T20:14:32.140Z"
       }
     }
   },
@@ -271,6 +278,10 @@
     "wi8a-wire-resolver.wi8a-wire-resolver.ac1": "completed",
     "wi8a-wire-resolver.wi8a-wire-resolver.ac2": "completed",
     "wi8a-wire-resolver.wi8a-wire-resolver.ac3": "completed",
-    "wi8b-wire-parser-cost": "running"
+    "wi8b-wire-parser-cost": "completed",
+    "wi8b-wire-parser-cost.wi8b-wire-parser-cost.ac1": "completed",
+    "wi8b-wire-parser-cost.wi8b-wire-parser-cost.ac2": "completed",
+    "wi8b-wire-parser-cost.wi8b-wire-parser-cost.ac3": "completed",
+    "wi8b-wire-parser-cost.wi8b-wire-parser-cost.ac4": "completed"
   }
 }
