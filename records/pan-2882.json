@@ -72,21 +72,20 @@
     "recordedAt": "2026-07-28T07:25:54.489Z"
   },
   "created": "2026-07-28T03:38:47.524Z",
-  "updated": "2026-07-28T08:36:49.697Z",
+  "updated": "2026-07-28T08:42:20.066Z",
   "pipeline": {
     "issueId": "PAN-2882",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:26:27.252Z",
-    "updatedAt": "2026-07-28T08:36:48.480Z",
-    "reviewNotes": "Agent re-review request (1/25): Work complete, PR #3220 open; review agent was lost in the dashboard crash-restore. Please review.",
+    "updatedAt": "2026-07-28T08:42:20.037Z",
+    "reviewNotes": "Merged-MR glab failures are swallowed, producing false unmerged membership instead of forge_unavailable",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3220",
     "lastVerifiedCommit": "b68a67e56eeca91f055135b583a9ca284a20c748",
-    "reviewRequestedAt": "2026-07-28T07:26:27.252Z",
     "reviewSpawnedAt": "2026-07-28T08:36:48.479Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -115,9 +114,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 833195,
-            "output": 32400,
-            "cacheRead": 4307456,
+            "input": 2511036,
+            "output": 99766,
+            "cacheRead": 6974464,
             "cacheWrite": 0
           }
         },
@@ -132,9 +131,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 833195,
-          "output": 32400,
-          "cacheRead": 4307456,
+          "input": 2511036,
+          "output": 99766,
+          "cacheRead": 6974464,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -145,8 +144,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 11.688658,
-        "pricingAsOf": "2026-07-28T08:36:48.500Z"
+        "usd": 23.432347,
+        "pricingAsOf": "2026-07-28T08:42:20.056Z"
       }
     },
     "merges": [
@@ -155,7 +154,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-2882",
