@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T19:59:52.600Z",
+  "updated": "2026-07-28T20:03:15.330Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "pending",
@@ -26,24 +26,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T19:59:52.572Z",
-    "inspectNotes": "All 4 ACs met. Blocking ENOENT fixed: plan-finalize.ts:180 now mkdirSync(dirname(markerPath),{recursive:true}) before the temp write, so the marker lands regardless of whether the workspace has .overdeck/, and the new '.pan-only legacy workspace' regression test in tests/unit/cli/plan-finalize-pending-promotion.test.ts covers it (createWorkspace('.pan') writes only .pan/spec.vbrief.json, asserts no marker pre-run, then asserts the marker after 5 failed attempts). Secondary wording note also addressed at plan-finalize.ts:387 — 'the dashboard did not complete promotion' now covers non-2xx as well as unreachable. AC-1 marker fields + patrolAttempts:0, AC-2 'deferred'/deacon named/promotionDeferred:true/exit 1 at plan-finalize.ts:392, AC-3 !noPromote && !promoted guard, AC-4 .gitignore entry all verified in tree at 5b93276e.",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since b9820a5 (3 paths): src/lib/gitlab-merge-requests.ts, tests/unit/lib/gitlab-merge-requests.test.ts, tests/unit/lib/pipeline-membership-gather.test.ts",
-        "detectedAt": "2026-07-28T19:59:33.733Z"
-      }
-    ],
-    "conflictsSince": {
-      "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
-      "detectedAt": "2026-07-28T19:59:33.733Z",
-      "paths": [
-        "src/lib/gitlab-merge-requests.ts",
-        "tests/unit/lib/gitlab-merge-requests.test.ts",
-        "tests/unit/lib/pipeline-membership-gather.test.ts"
-      ]
-    }
+    "updatedAt": "2026-07-28T20:03:15.310Z",
+    "inspectNotes": "All 4 ACs met. Blocking ENOENT fixed: plan-finalize.ts:180 now mkdirSync(dirname(markerPath),{recursive:true}) before the temp write, so the marker lands regardless of whether the workspace has .overdeck/, and the new '.pan-only legacy workspace' regression test in tests/unit/cli/plan-finalize-pending-promotion.test.ts covers it (createWorkspace('.pan') writes only .pan/spec.vbrief.json, asserts no marker pre-run, then asserts the marker after 5 failed attempts). Secondary wording note also addressed at plan-finalize.ts:387 — 'the dashboard did not complete promotion' now covers non-2xx as well as unreachable. AC-1 marker fields + patrolAttempts:0, AC-2 'deferred'/deacon named/promotionDeferred:true/exit 1 at plan-finalize.ts:392, AC-3 !noPromote && !promoted guard, AC-4 .gitignore entry all verified in tree at 5b93276e."
   },
   "closeOut": {
     "usage": {
@@ -58,9 +42,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3632579,
-            "output": 207739,
-            "cacheRead": 77581824,
+            "input": 3702487,
+            "output": 217208,
+            "cacheRead": 88357888,
             "cacheWrite": 0
           }
         }
@@ -73,15 +57,15 @@
           "cacheWrite": 170493
         },
         "openai/gpt-5.6-sol": {
-          "input": 3632579,
-          "output": 207739,
-          "cacheRead": 77581824,
+          "input": 3702487,
+          "output": 217208,
+          "cacheRead": 88357888,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 71.046656,
-        "pricingAsOf": "2026-07-28T19:59:52.582Z"
+        "usd": 77.068298,
+        "pricingAsOf": "2026-07-28T20:03:15.324Z"
       }
     },
     "merges": [],
