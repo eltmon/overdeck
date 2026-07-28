@@ -20,6 +20,7 @@ at read time) enumerates the active blocking surfaces. Labels live in one map:
 | `permissionRequest` | Two sources. (a) Channel permission event stream (server-side), merged at read time by `selectPendingInputSubjects` / `selectPendingPermissionAgentIds`. (b) PAN-3070: pane/runtime detection with `pendingQuestionReason === 'tool_permission'`, folded into `pendingInputKinds` by `appendPaneDetectionKind` — the only source that fires when the Channels bridge is off (the default under the PTY supervisor) | request details (source a only) | `ChannelPermissionDialog` → permission response route; terminal otherwise |
 | `sessionResume` | Pane pattern detection | — | terminal only |
 | `rateLimit` | Pane pattern detection (PAN-1834) | — | auto-dismissed by the deacon modal handler; terminal otherwise |
+| `paneQuestion` | PAN-3233: pane/runtime detection with `pendingQuestionReason` in `user_question` \| `confirmation` \| `disambiguation` \| `planning_done`, folded into `pendingInputKinds` by `appendPaneDetectionKind`. Guarded against double-representing a JSONL-backed `askUserQuestion` | — | terminal only |
 
 ## The surfaces
 
@@ -73,6 +74,23 @@ at read time) enumerates the active blocking surfaces. Labels live in one map:
   by the stop hook and stays at whatever it last was while the agent sits frozen.
   The predicate deliberately excludes `pendingQuestionReason: 'other'` — PAN-1591
   showed the generic fallbacks set it with no answerable prompt behind them.
+- **PAN-3233: specialist suppression exempts blocking pane detections.** PAN-1834
+  suppression (`shouldSuppressPendingInput`) hides a parked work/plan agent's
+  pending-input surfaces while a review/test specialist is active on the same
+  issue — but only its JSONL-derived (`askUserQuestion`, plan-mode), runtime,
+  fallback, and turn-end surfaces. A live blocking pane detection (`tool_permission`
+  foremost, any reason in `BLOCKING_AWAITING_INPUT_REASONS`) always surfaces,
+  because it is fresh evidence the agent is frozen right now, not the stale
+  parked-agent state PAN-1834 suppression was built for. When suppression does
+  apply, the whole fingerprint is suppressed together: `hasPendingQuestion`,
+  `pendingQuestionCount`, `pendingQuestionPrompt`, and `pendingQuestionReason`
+  all flip to their empty values — never a partial/contradictory mix.
+- **PAN-3233: `pendingQuestionCount` counts every blocking detection, not just
+  JSONL questions.** It equals the JSONL `AskUserQuestion` count when JSONL
+  questions are pending; otherwise it is `1` when the (unsuppressed) detection
+  has a blocking reason, and `0` when suppressed or when the reason is the
+  non-blocking `other` fallback. This keeps `hasPendingQuestion: true` from ever
+  pairing with `pendingQuestionCount: 0` for a real pane/runtime prompt.
 
 ## Data flow (plan approval)
 
