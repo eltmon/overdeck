@@ -64,17 +64,18 @@
     "recordedAt": "2026-07-28T06:40:20.292Z"
   },
   "created": "2026-07-28T04:43:34.296Z",
-  "updated": "2026-07-28T08:25:33.166Z",
+  "updated": "2026-07-28T08:30:35.910Z",
   "pipeline": {
     "issueId": "PAN-3216",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T07:08:58.012Z",
-    "updatedAt": "2026-07-28T07:25:42.780Z",
+    "updatedAt": "2026-07-28T08:30:35.872Z",
     "reviewNotes": "Agent re-review request (1/25): Narrowed briefing troubled-agents filter to gate alone; tests pass; GitHub checks passing",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -102,9 +103,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 685305,
-            "output": 16717,
-            "cacheRead": 2344960,
+            "input": 695559,
+            "output": 20863,
+            "cacheRead": 2970624,
             "cacheWrite": 0
           }
         },
@@ -119,9 +120,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 685305,
-          "output": 16717,
-          "cacheRead": 2344960,
+          "input": 695559,
+          "output": 20863,
+          "cacheRead": 2970624,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -132,8 +133,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 6.433209,
-        "pricingAsOf": "2026-07-28T07:25:44.816Z"
+        "usd": 6.921691,
+        "pricingAsOf": "2026-07-28T08:30:35.908Z"
       }
     },
     "merges": [
