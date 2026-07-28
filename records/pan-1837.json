@@ -234,7 +234,7 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T23:21:10.562Z",
+  "updated": "2026-07-28T23:21:40.622Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -245,8 +245,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-28T23:21:10.481Z",
-    "reviewNotes": "Verification infrastructure error: Verification worker 3679584 exited before writing a result",
+    "updatedAt": "2026-07-28T23:21:40.489Z",
+    "reviewNotes": "Verification infrastructure error: Verification worker 3708093 exited before writing a result",
     "inspectNotes": "Both prior blocking findings fixed and verified. FIX 1: kimi-code.ts:278 now awaits writePtyTokenFor(config.agentId) before tmuxCreateSession at :296, so the supervisor tier of deliverAgentMessage (delivery.ts:377-381) and pty-supervisor.ts:107 can authenticate instead of failing 'pty-token-missing' and degrading to tmux paste; markSupervisorEnabled() at :383-393 sets state.supervisorEnabled so prepareSupervisorForRelaunch (supervisor-channels.ts:179-188) re-supervises on relaunch rather than returning useSupervisor:false, and correctly no-ops when no state exists yet. FIX 2: kimi-code.ts:279 uses resolvePtySupervisorScriptPath() (packageRoot import dropped), picking up all three candidate locations plus the unresolvedSupervisorImports() check, so desktop packaging and pan-reload generations no longer exec a missing/unloadable script (PAN-3172); it is called before tmuxCreateSession so a build/packaging defect fails the spawn loudly instead of leaving an unsupervised session. FIX 3: kimi-code.test.ts asserts the pty-token file exists with the expected contents, asserts write-before-tmux via invocationCallOrder, asserts saveAgentStateSync received supervisorEnabled:true, and asserts the launcher actually emits \"node '<script>'\". ALL FIVE ACs NOW MET: AC1 registry-dispatch kimi-code case + index.ts:114-116/144 wiring; AC2 existingBefore snapshot taken before launch distinguishes a fresh session from pre-existing ones in the same bucket, id persisted to kimi-session-id; AC3 supervisor tier is now functional end-to-end with async tmux paste as fallback, no execSync/sendKeysSync in the module, sendMessage still correctly delegates to the single delivery door; AC4 killAgent/isRunning/listSessions mirror the acp/codex analogs, all tmux calls on -L overdeck; AC5 ran the full src/lib/runtimes/ suite — 129/129 across 9 files, acp suite unchanged and green. Observation only, not blocking and not in scope for this item: the default writePtyToken/getAgentStateSync resolve paths from getOverdeckHome() rather than the adapter's overdeckHome override, so the override is only honored for launcher/session-id files — harmless in production (override unset) and tests inject, but worth knowing if a future caller relies on that override. Separately still unowned: spawn.ts's per-harness launcher-fields switch has no kimi-code branch, so pan start does not route here yet — needs an owner before wi14's end-to-end verification.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
     "reviewRequestedAt": "2026-07-28T23:19:08.283Z",
@@ -478,9 +478,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 621651,
-            "output": 45355,
-            "cacheRead": 23214080,
+            "input": 631072,
+            "output": 46741,
+            "cacheRead": 24367616,
             "cacheWrite": 0
           }
         },
@@ -501,9 +501,9 @@
           "cacheWrite": 187167
         },
         "openai/gpt-5.6-sol": {
-          "input": 621651,
-          "output": 45355,
-          "cacheRead": 23214080,
+          "input": 631072,
+          "output": 46741,
+          "cacheRead": 24367616,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -514,8 +514,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 151.055255,
-        "pricingAsOf": "2026-07-28T23:21:10.560Z"
+        "usd": 151.720708,
+        "pricingAsOf": "2026-07-28T23:21:40.519Z"
       }
     },
     "merges": [
