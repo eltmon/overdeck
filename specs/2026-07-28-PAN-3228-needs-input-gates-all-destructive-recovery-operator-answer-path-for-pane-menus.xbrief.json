@@ -1,0 +1,685 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T17:14:38Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3228: Autonomous recovery destroys pending operator decisions: agent frozen on a permission prompt was --fresh-restarted instead of escalated (needs_input must gate all destructive recovery)",
+    "updated": "2026-07-28T17:20:10.585Z"
+  },
+  "plan": {
+    "id": "pan-3228",
+    "title": "needs_input gates all destructive recovery; operator answer path for pane menus",
+    "status": "proposed",
+    "uid": "78a7ed67-fca4-41a7-92d3-663ef806ddd6",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-28T17:14:38Z",
+    "updated": "2026-07-28T17:20:10.585Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3228",
+        "label": "PAN-3228",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3235",
+        "label": "PAN-3235 (sibling: dashboard card UI)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3150",
+        "label": "PAN-3150 (closed recovery loop)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "recovery",
+      "pending-input",
+      "deacon",
+      "flywheel",
+      "safety"
+    ],
+    "metadata": {
+      "sizeJustification": "The independently shippable slice (dashboard decision-card UI, ~10 files of contracts/read-model/store plumbing) is already split out as sibling PAN-3235. What remains is one behavioral contract: every destructive-recovery refusal instructs the operator to use the non-destructive answer verb this same plan introduces, so the gate items and the answer-path items are not separately shippable without leaving either a gate that points at a missing verb or a verb no gate directs anyone to. File count is 22 (under the 25 limit); the subsystem count of 7 reflects that the gate must touch every destructive chokepoint (CLI, lib/agents, lib/cloister, server routes) plus the doctrine and docs surfaces the repo requires in the same change.",
+      "canonicalFilename": "2026-07-28-PAN-3228-needs-input-gates-all-destructive-recovery-operator-answer-path-for-pane-menus.xbrief.json"
+    },
+    "narratives": {
+      "Problem": "An agent frozen on a tool-permission prompt is operator-owned state (resolution: needs_input), but no destructive-recovery path consults it: pan start --fresh cycles the live session, restartAgent()/REST restarts kill it, and the deacon/redrive gates check only persisted paused/troubled/stopped flags. On 2026-07-28 the flywheel --fresh-restarted agent-pan-2882 while it held an unanswered permission menu, destroying the pending decision and the session context. There is also no non-destructive verb to answer such a prompt (PAN-987's Channels relay is dead), so the only available 'recovery' destroys the thing needing recovery (PAN-3150 shape).",
+      "Proposal": "Add a lib-side live detector (detectPendingOperatorDecision: pane detection + JSONL AUQ scan, fail-open on capture errors) and gate every destructive chokepoint on it — prepareFreshWorkAgentSession, restartAgent() and the REST restart family, and decideAgentAutonomousRedrive/the deacon dead-end respawn branch — with explicit --force/{force:true} as the only override and needs-you trips on autonomous deferrals. Add the non-destructive answer path by extracting the PAN-3113 conversation pane-choice answer core into a shared session-scoped module and exposing it as GET/POST /api/agents/:id/pane-choice and a new pan answer CLI verb. Amend flywheel doctrine: needs_input agents are parked-on-operator, never --fresh candidates. Full PRD: .pan/drafts/PAN-3228.md.",
+      "NonGoals": "- No dashboard decision-card answer UI or pendingPaneChoice read-model/contracts plumbing — split to sibling PAN-3235\n- No new PTY-supervisor keystroke endpoint; the supervisor's text-injection protocol is unchanged (D4)\n- No revival of Channels-based permission relay (PAN-987 superseded)\n- No change to non-destructive nudge paths — the pane-choice-menu delivery guard already protects them\n- No fix for the separate 'Decisions surface showed no triangle for the frozen agent' UI bug (being traced independently)\n- No gating on rate_limit detections (D2) and no auto-answering of any menu — the answer path is operator-initiated only"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Gate at destructive chokepoints via a new async helper; keep getAgentResumeGateBlockReason pure over persisted fields",
+        "rationale": "Pending input is live pane/JSONL state; folding it into the sync persisted-state classifier would break its purity and its many callers. Chokepoint gating covers every path the incident and issue enumerate."
+      },
+      {
+        "summary": "Blocking set = tool_permission, user_question, disambiguation, confirmation, planning_done, session_resume, plus JSONL AUQ pending; rate_limit excluded",
+        "rationale": "Those reasons are answerable operator decisions destroyed by a restart; a rate-limit wait is not, and gating it would park legitimate recovery. JSONL AUQ makes the gate meaningful for dead sessions where a respawn abandons the unanswered question."
+      },
+      {
+        "summary": "Override is explicit force only (pan start --force, {force:true} body); flywheel forbidden from force by doctrine",
+        "rationale": "Actor-identity sniffing is fragile; a uniform mechanical gate with a deliberate operator escape matches existing --force semantics for the paused gate."
+      },
+      {
+        "summary": "Answer path reuses PAN-3113 tmux keystroke mechanism via a shared core instead of a new PTY-supervisor endpoint",
+        "rationale": "The supervisor only injects text; menus need arrow/enter keystrokes. sendRawKeystroke + signature verification is already shipped for conversations and codex approvals, is harness-agnostic, and adds no new protocol surface."
+      },
+      {
+        "summary": "Dashboard card UI split to sibling PAN-3235",
+        "rationale": "The card needs ~10 more files of contracts/read-model/store plumbing, pushing this plan past the 25-file finalize lint; pan answer + the agent route already provide the non-destructive verb that closes PAN-3150. The slice is independently shippable and blocked on this issue's core."
+      }
+    ],
+    "items": [
+      {
+        "id": "gate-helper",
+        "title": "Add detectPendingOperatorDecision helper in src/lib/agents/pending-decision-gate.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:14:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3228",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "gate-fresh",
+            "gate-restart",
+            "gate-redrive"
+          ],
+          "files_scope": [
+            "src/lib/agents/pending-decision-gate.ts",
+            "src/lib/agents/__tests__/pending-decision-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/pending-decision-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pending-decision-gate.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/agents/pending-decision-gate.ts exporting DESTRUCTIVE_RECOVERY_BLOCKING_REASONS (tool_permission, user_question, disambiguation, confirmation, planning_done, session_resume — no rate_limit) and async detectPendingOperatorDecision(agentId): when the tmux session exists, run detectAwaitingInputForAgent (src/lib/agent-input-detection.ts:337) via Effect.runPromise, catching TmuxError as fail-open (log warning, treat as no pane detection); a detection whose reason is in the set returns {source:'pane', reason, prompt}. Then run countPendingAskUserQuestionsForAgent (src/lib/agent-enrichment.ts:305); count > 0 returns {source:'jsonl-auq', reason:'ask_user_question'}. Otherwise return null. Detectors injectable via a deps parameter for tests. See PRD Work Item 1 for the exact interface."
+        },
+        "items": [
+          {
+            "id": "gate-helper.ac1",
+            "title": "Given a live session whose pane detector reports tool_permission, detectPendingOperatorDecision returns a pane-source decision carrying that reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-helper.ac2",
+            "title": "Given a pane detection with reason rate_limit or no detection at all, the helper returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-helper.ac3",
+            "title": "Given no tmux session but a JSONL scan with one unanswered AskUserQuestion, the helper returns a jsonl-auq decision",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-helper.ac4",
+            "title": "Given a pane detector that throws TmuxError, the helper falls back to the JSONL check and returns null when that is empty (fail-open), emitting a logged warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-fresh",
+        "title": "Gate pan start --fresh on pending operator decisions with --force override",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:14:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/start-fresh-session.ts",
+            "src/cli/commands/start.ts",
+            "src/cli/index.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__ --silent 2>/dev/null || npx vitest run src/cli",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "start-fresh-session tests pass including the new gate cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend prepareFreshWorkAgentSession(issueId) (src/cli/commands/start-fresh-session.ts:38) with an options?: {force?: boolean} parameter. Before stopAgentSync for live sessions AND before wipeAgentStateDirs for dead ones, call detectPendingOperatorDecision(agentId); on a detection without force, return ok:false with an error naming the pending prompt reason and instructing: answer it with 'pan answer <issue>' or the Decisions panel, or pass --force to discard it deliberately. Thread options.force from start.ts:943 and update the --force option description in src/cli/index.ts:515 to mention the pending-decision gate. Unit-test with an injected fake detector: refusal leaves the session unstopped; force proceeds."
+        },
+        "items": [
+          {
+            "id": "gate-fresh.ac1",
+            "title": "Given a fake pending tool_permission decision, prepareFreshWorkAgentSession returns ok:false, never calls stopAgentSync or wipeAgentStateDirs, and its error message names 'pan answer'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-fresh.ac2",
+            "title": "Given the same pending decision with force:true, prepareFreshWorkAgentSession proceeds to cycle the session as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-fresh.ac3",
+            "title": "pan start --help produces help text whose --force description contains the pending-operator-decision gate override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-restart",
+        "title": "Gate restartAgent() and the REST restart family with force pass-through",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:14:38Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-3228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/recovery.ts",
+            "src/dashboard/server/routes/agents/lifecycle-restart.ts",
+            "src/lib/agents/__tests__/recovery-pending-decision.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/recovery-pending-decision.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "recovery-pending-decision.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In restartAgent() (src/lib/agents/recovery.ts:67), after the existing decideResumeGate check (:79), call detectPendingOperatorDecision and refuse with a typed failure unless a new force option is set. In src/dashboard/server/routes/agents/lifecycle-restart.ts thread force from the request body for POST /api/agents/:id/restart (:229), /recover's compact kill-respawn path (:161), /restart-fresh (:400, before wipeAgentStateDirs so a dead session with pending AUQ is covered), and /restart-all (:577 — skip gated agents per-agent and report skipped ids in the response instead of failing the whole call). Refusals return 409 with the same actionable message shape as gate-fresh. Async primitives only — no execSync in server-reachable code."
+        },
+        "items": [
+          {
+            "id": "gate-restart.ac1",
+            "title": "restartAgent without force rejects with a pending-decision failure when the detector reports tool_permission, and proceeds when the detector returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-restart.ac2",
+            "title": "POST /api/agents/:id/restart on a gated agent returns 409 whose body names the pending reason and the pan answer verb; retrying with {force:true} proceeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-restart.ac3",
+            "title": "POST /api/agents/restart-all returns a response body that contains the skipped gated agent ids with their pending-decision reasons, and restarts only the ungated agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-restart.ac4",
+            "title": "POST /api/agents/:id/restart-fresh on a dead session with an unanswered JSONL AskUserQuestion returns 409 without wiping state dirs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-redrive",
+        "title": "Gate autonomous redrive and the deacon dead-end respawn branch; emit needs-you",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:14:38Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/redrive-gate.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/__tests__/redrive-gate.test.ts",
+            "src/lib/cloister/__tests__/dead-end-pending-decision.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/redrive-gate.test.ts src/lib/cloister/__tests__/dead-end-pending-decision.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both cloister test files pass, including the issue-named regression case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Make decideAgentAutonomousRedrive (src/lib/cloister/redrive-gate.ts:45) async: after the existing resume-gate and memory checks, derive the agent id from the agentDir basename, call detectPendingOperatorDecision, and on detection return {decision:'defer', reason:'agent is waiting on an operator decision (<reason>)', needsYou:true}. Await the call at deacon.ts:1813 and the swarm-slot-requeue caller (the async signature change forces every caller through typecheck — this is deliberate, see continue.json H2). The deacon's existing needsYou branch (:1816) already records a durable trip via recordDeadEndNeedsYou; extend its message to name the pending-decision case. Regression test (issue-named): with a fake detector reporting tool_permission, the dead-end pass never calls spawnWorkAgentThroughAgentsEndpoint and records a needs-you action; with a null detection, prior behavior is unchanged."
+        },
+        "items": [
+          {
+            "id": "gate-redrive.ac1",
+            "title": "decideAgentAutonomousRedrive returns defer with needsYou:true when the injected detector reports a blocking pending decision, and proceed when it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-redrive.ac2",
+            "title": "Given a detected pending permission prompt, the deacon dead-end pass produces zero calls to spawnWorkAgentThroughAgentsEndpoint and emits a needs-you action for the issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-redrive.ac3",
+            "title": "Given no pending decision detected, the dead-end pass still produces exactly one respawn call for a dead work agent, preserving prior recovery behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "answer-core",
+        "title": "Extract shared session-scoped pane-choice answer core (behavior-preserving refactor)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:14:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3228",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "answer-route",
+            "answer-cli"
+          ],
+          "files_scope": [
+            "src/lib/session-pane-choice.ts",
+            "src/lib/overdeck/conversation-pane-choice.ts",
+            "src/lib/__tests__/session-pane-choice.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/session-pane-choice.test.ts",
+            "npx vitest run src/lib/overdeck",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "session-pane-choice.test.ts passes; existing conversation pane-choice tests pass unmodified",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/session-pane-choice.ts exporting answerSessionPaneChoice(sessionName, {selectedIndex, signature}, deps) — the session-scoped body currently at src/lib/overdeck/conversation-pane-choice.ts:129-165 (liveness check, uncached capture, parsePaneChoiceMenu, signature compare, range check, buildChoiceKeystrokes loop with KEYSTROKE_GAP_MS gaps, dismissal confirm) — returning the identical {body, status} shape and error codes (menu-gone, menu-changed, delivery-unconfirmed). Also export captureSessionPaneChoice(sessionName, capture?) building the PendingPaneChoice payload currently inlined at :77-87. handleConversationPaneChoiceAnswer keeps its conversation resolution/validation (:110-128) and delegates to the core. Keystrokes stay on async sendRawKeystroke; sleeps stay deps-injectable so tests never wait real timers."
+        },
+        "items": [
+          {
+            "id": "answer-core.ac1",
+            "title": "answerSessionPaneChoice reproduces the conversation contract in unit tests: 400 on bad index/missing signature, 409 menu-gone, 409 menu-changed on signature drift, 409 delivery-unconfirmed when the menu survives, 200 body with answeredLabel on success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-core.ac2",
+            "title": "Existing conversation pane-choice tests pass without modification, proving the delegation preserves behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-core.ac3",
+            "title": "captureSessionPaneChoice returns the parsed menu payload (signature, title, options, recommended flags) for a pane containing a choice menu and null otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "answer-route",
+        "title": "Add GET/POST /api/agents/:id/pane-choice",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-28T17:14:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/permissions.ts",
+            "src/dashboard/server/routes/__tests__/agents-pane-choice.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/agents-pane-choice.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agents-pane-choice.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/agents/permissions.ts, beside the existing answer surfaces, add GET /api/agents/:id/pane-choice returning captureSessionPaneChoice output for the agent's tmux session (the agent id IS the session name) or {pending:false}, and POST /api/agents/:id/pane-choice validating the agent exists via getAgentState (404 otherwise) then delegating the body to answerSessionPaneChoice. On a successful answer, emitActivityEntrySync an info entry naming the agent, its issueId, and the answered label. Register both routes wherever the sibling permission routes are composed. Route tests mirror the conversation contract."
+        },
+        "items": [
+          {
+            "id": "answer-route.ac1",
+            "title": "POST with a matching signature answers the menu and returns 200 with answeredLabel; an activity entry is emitted for the agent's issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-route.ac2",
+            "title": "POST returns 409 with code menu-changed when the pane signature drifted, and 404 for an unknown agent id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-route.ac3",
+            "title": "GET returns the parsed pending menu payload for a blocked agent and {pending:false} when no menu is on screen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "answer-cli",
+        "title": "Add pan answer <id> [option#] CLI verb",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T17:14:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/answer.ts",
+            "src/cli/index.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node dist/index.js answer --help 2>/dev/null || npx tsx src/cli/index.ts answer --help",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pan answer --help prints usage describing list and answer modes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/answer.ts and register 'answer <id> [option]' in src/cli/index.ts. Normalize <id> to agent-<issue-lowercase> when it is not already a session/agent id. Without an option number: call captureSessionPaneChoice and print the menu (title, context lines, numbered options with the recommended marker) or 'No pending choice menu for <id>' and exit 1. With a 1-based option number matching the on-screen numbering: call answerSessionPaneChoice directly through the lib (no dashboard dependency), map menu-gone/menu-changed/delivery-unconfirmed to plain operator messages, exit 0 only on confirmed dismissal. Also handle a plain issue id (PAN-123) by lowercasing."
+        },
+        "items": [
+          {
+            "id": "answer-cli.ac1",
+            "title": "pan answer <id> with no option prints the live menu's title and numbered options, or exits 1 with 'No pending choice menu' when none is on screen",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-cli.ac2",
+            "title": "pan answer <id> 2 sends the keystrokes for option 2 and exits 0 only after the menu's dismissal is confirmed by re-capture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-cli.ac3",
+            "title": "When the menu changed between listing and answering, the command exits non-zero and prints the menu-changed explanation instead of sending keystrokes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-doctrine",
+        "title": "Flywheel doctrine: needs_input agents are parked-on-operator, never --fresh candidates",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T17:14:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/flywheel.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'pending operator decision' roles/flywheel.md"
+          ],
+          "expected_outputs": [
+            "grep finds the new doctrine text in the inert-agent section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Amend the inert-but-alive doctrine at roles/flywheel.md:474-479: before treating an agent as inert, check for a pending operator decision (pan answer <id> with no option, or pan show <id>); if one exists the agent is parked-on-operator, not stalled — emit/refresh the needs-you escalation and move to the next issue. Never pan start --fresh such an agent and never pass --force to clear the pending-decision gate; the gate's mechanical refusal is the system working, not a blocker to route around. Cross-reference the 'Never block on the operator' section (:142-146) so the two rules read consistently: park the single agent, keep the fleet moving."
+        },
+        "items": [
+          {
+            "id": "flywheel-doctrine.ac1",
+            "title": "roles/flywheel.md's inert-agent section contains a pending-operator-decision check that precedes any --fresh use and prescribes emitting/refreshing needs-you then moving to the next issue for parked agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-doctrine.ac2",
+            "title": "roles/flywheel.md contains an explicit prohibition on passing --force to clear the pending-decision gate, and its 'Never block on the operator' section contains a cross-reference scoping the park to the single agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Update PENDING-INPUT.md, RECOVERY-NET.md, and SKILLS-CONVENTION.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T17:14:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3228",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PENDING-INPUT.md",
+            "docs/RECOVERY-NET.md",
+            "docs/SKILLS-CONVENTION.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'pane-choice' docs/PENDING-INPUT.md",
+            "grep -n 'pending' docs/RECOVERY-NET.md",
+            "grep -n 'answer' docs/SKILLS-CONVENTION.md"
+          ],
+          "expected_outputs": [
+            "each grep finds the new content in its doc"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "docs/PENDING-INPUT.md: update the permissionRequest row's Responder column — pane-detected prompts are answerable via GET/POST /api/agents/:id/pane-choice and pan answer — and add a section describing the destructive-recovery gate with the D2 blocking set and the force override. docs/RECOVERY-NET.md: insert the pending-operator-decision gate as a numbered step in the recovery-obligation list after gate classification, naming detectPendingOperatorDecision. docs/SKILLS-CONVENTION.md: add pan answer to the wrapper-skill exclusion list with the standard '--help is sufficient' rationale."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/PENDING-INPUT.md's permissionRequest row contains the agent pane-choice route and pan answer as responders, and a new section contains the destructive-recovery gate's blocking-reason set and force override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/RECOVERY-NET.md's recovery-obligation list contains a pending-operator-decision gate step that names detectPendingOperatorDecision",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "docs/SKILLS-CONVENTION.md's exclusion list contains pan answer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "gate-helper",
+        "to": "gate-fresh",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-helper",
+        "to": "gate-restart",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-helper",
+        "to": "gate-redrive",
+        "type": "blocks"
+      },
+      {
+        "from": "answer-core",
+        "to": "answer-route",
+        "type": "blocks"
+      },
+      {
+        "from": "answer-core",
+        "to": "answer-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "answer-cli",
+        "to": "gate-fresh",
+        "type": "informs"
+      },
+      {
+        "from": "answer-route",
+        "to": "docs",
+        "type": "informs"
+      },
+      {
+        "from": "gate-redrive",
+        "to": "flywheel-doctrine",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
