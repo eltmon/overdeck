@@ -296,6 +296,69 @@ describe('Definition-of-Done merged row', () => {
     expect(forge).toMatchObject({ status: 'pass', mergedAt: '2026-07-15T12:00:00Z' });
   });
 
+  it('records a merged GitLab MR as branch-absence evidence', async () => {
+    const row = await checkMergedRow({ issueId, projectPath: '/tmp/mind-your-now' }, {
+      verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
+      readPullRequest: async () => ({}),
+      readDurableMerges: async () => [],
+      readMergedForgeArtifacts: async () => [{
+        forge: 'gitlab',
+        id: '75',
+        url: 'https://gitlab.com/acme/app/-/merge_requests/75',
+      }],
+    });
+
+    expect(row.status).toBe('pass');
+    expect(row.evidence).toBeUndefined();
+    expect(row.observed).toContain('MR !75 merged (https://gitlab.com/acme/app/-/merge_requests/75)');
+    expect(row.observed).not.toContain('non-PR landing');
+    expect(row.observed).not.toContain('no merged forge artifact');
+  });
+
+  it('preserves MR details already returned by the merge verifier', async () => {
+    const row = await checkMergedRow({ issueId, projectPath: '/tmp/mind-your-now' }, {
+      verifyMerged: async () => stepOk('close-out:verify-merged', [
+        'fe: MR !75 is merged and feature/min-908 matches the merged MR head',
+      ]),
+      readPullRequest: async () => ({}),
+    });
+
+    expect(row).toMatchObject({
+      status: 'pass',
+      observed: expect.stringContaining('MR !75'),
+    });
+  });
+
+  it('keeps branch-containment evidence when no merged forge artifact exists', async () => {
+    const row = await checkMergedRow({ issueId, projectPath: '/tmp/mind-your-now' }, {
+      verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
+      readPullRequest: async () => ({}),
+      readDurableMerges: async () => [],
+      readMergedForgeArtifacts: async () => [],
+      readBranchContainment: async () => ({
+        mergedWorkRefs: ['fe:feature/min-908'],
+        unmergedRefs: [],
+        pointerRefs: [],
+      }),
+    });
+
+    expect(row.evidence).toBe('branch-containment');
+    expect(row.observed).toContain('non-PR landing (membership L2-work lens): fe:feature/min-908');
+  });
+
+  it('reports unavailable merged-forge evidence without throwing', async () => {
+    const row = await checkMergedRow({ issueId, projectPath: '/tmp/mind-your-now' }, {
+      verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
+      readPullRequest: async () => ({}),
+      readDurableMerges: async () => [],
+      readMergedForgeArtifacts: async () => { throw new Error('glab unavailable'); },
+      readBranchContainment: async () => ({ mergedWorkRefs: [], unmergedRefs: [], pointerRefs: [] }),
+    });
+
+    expect(row.status).toBe('miss');
+    expect(row.observed).toContain('forge artifact evidence unavailable: glab unavailable');
+  });
+
   it('treats the existing idempotent skip as a pass', async () => {
     const row = await checkMergedRow({ issueId, projectPath: '/tmp/overdeck' }, {
       verifyMerged: async () => stepSkipped('close-out:verify-merged', ['Issue already closed on forge']),

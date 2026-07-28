@@ -19,6 +19,8 @@ import {
 import { getAutoCloseOutCanonicalState } from '../cloister/deacon-canonical-state.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
 import { fetchCommitCheckRuns, fetchIssuePullRequest } from '../overdeck/pull-requests.js';
+import { getForgeAdapter } from '../forge.js';
+import { resolveProjectReposForIssueSync } from '../project-repos.js';
 import {
   gatherIssueBranchContainment,
   type IssueBranchContainment,
@@ -53,6 +55,12 @@ export interface MergedDodRowResult extends DodRowResult {
   evidence?: 'branch-containment';
 }
 
+interface MergedForgeArtifact {
+  forge: string;
+  url?: string;
+  id?: string;
+}
+
 interface MergedRowDeps {
   verifyMerged: (ctx: LifecycleContext) => Promise<StepResult>;
   readPullRequest: (ctx: LifecycleContext, branchName: string) => Promise<{
@@ -62,6 +70,7 @@ interface MergedRowDeps {
     mergeCommit?: { oid?: string } | string | null;
   }>;
   readDurableMerges?: (ctx: LifecycleContext) => Promise<string[]>;
+  readMergedForgeArtifacts?: (ctx: LifecycleContext) => Promise<MergedForgeArtifact[]>;
   readBranchContainment?: (ctx: LifecycleContext) => Promise<IssueBranchContainment>;
 }
 
@@ -83,6 +92,15 @@ const defaultMergedRowDeps: MergedRowDeps = {
     const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
     return (await readIssueRecord(project, ctx.issueId))?.closeOut.merges ?? [];
   },
+  readMergedForgeArtifacts: async ctx => {
+    const repos = resolveProjectReposForIssueSync(ctx.issueId)?.filter(repo => repo.required) ?? [];
+    const artifacts = await Promise.all(repos.map(repo => getForgeAdapter(repo.forge).findMergedArtifact({
+      sourceBranch: repo.sourceBranch,
+      targetBranch: repo.targetBranch,
+      cwd: repo.repoPath,
+    })));
+    return artifacts.filter((artifact): artifact is NonNullable<typeof artifact> => artifact !== null);
+  },
   readBranchContainment: async ctx => {
     const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
     if (!project) return { unmergedRefs: [], mergedWorkRefs: [], pointerRefs: [] };
@@ -102,7 +120,9 @@ const defaultPostMergeRowDeps: PostMergeRowDeps = {
   readCanonicalState: async ctx => {
     return getAutoCloseOutCanonicalState(ctx.issueId) as Promise<CanonicalState | null>;
   },
-  readMergeStatus: async issueId => (await Effect.runPromise(getReviewStatus(issueId)))?.mergeStatus,
+  // PAN-3025: same live→journal fallback as the verdict rows — after close-out
+  // clears live status, the durable record is the only place mergeStatus survives.
+  readMergeStatus: async issueId => (await loadStatus(issueId, defaultDeps))?.status.mergeStatus,
   listAgents: async () => Effect.runPromise(listRunningAgents()),
 };
 
@@ -359,6 +379,7 @@ export async function checkMergedRow(
   const merged = result('merged', verified.success || verified.skipped ? 'pass' : 'miss', observed) as MergedDodRowResult;
   const branchAbsent = verified.error === BRANCH_ABSENT_MERGE_ERROR;
   let durableMerges: string[] = [];
+  let forgeArtifacts: MergedForgeArtifact[] = [];
 
   if (branchAbsent) {
     try {
@@ -366,6 +387,21 @@ export async function checkMergedRow(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       merged.observed = `${merged.observed}; durable merge evidence unavailable: ${message}`;
+    }
+    if (!ctx.github && deps.readMergedForgeArtifacts) {
+      try {
+        forgeArtifacts = await deps.readMergedForgeArtifacts(ctx);
+        const labels = forgeArtifacts.map(artifact => {
+          const label = artifact.forge === 'gitlab'
+            ? (artifact.id ? `MR !${artifact.id}` : 'GitLab MR')
+            : (artifact.id ? `PR #${artifact.id}` : 'GitHub PR');
+          return `${label} merged${artifact.url ? ` (${artifact.url})` : ''}`;
+        });
+        if (labels.length > 0) merged.observed = `${merged.observed}; ${labels.join('; ')}`;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        merged.observed = `${merged.observed}; forge artifact evidence unavailable: ${message}`;
+      }
     }
   }
 
@@ -391,7 +427,7 @@ export async function checkMergedRow(
 
   if (branchAbsent) {
     const forgeMerged = pullRequestState?.toUpperCase() === 'MERGED';
-    if (durableMerges.length > 0 || forgeMerged) {
+    if (durableMerges.length > 0 || forgeMerged || forgeArtifacts.length > 0) {
       merged.status = 'pass';
       if (durableMerges.length > 0) {
         merged.observed = `${merged.observed}; durable close-out record contains ${durableMerges.length} merge artifact(s)`;
@@ -661,4 +697,25 @@ export async function evaluateDodGate(
     accepted,
     passed: rows.every(row => row.status !== 'miss' || Boolean(row.acceptedBy)),
   };
+}
+
+/**
+ * PAN-3025: completion witness for the close-out ceremony. Returns closedOutAt
+ * only when the journal is terminal AND the live row is gone (the ceremony's
+ * final mutating step). closedOut with live status present means a prior run
+ * aborted mid-ceremony and must fall through to complete it.
+ */
+export async function readCompletedCloseOut(issueId: string, projectPath: string): Promise<string | null> {
+  try {
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(projectPath);
+    const record = await readIssueRecord(project, issueId.toUpperCase());
+    if (!record?.pipeline.closedOut) return null;
+    // Fail closed: a read error means we cannot confirm absence, so return null (incomplete)
+    const live = await Effect.runPromise(getReviewStatus(issueId)).catch(() => 'unknown');
+    if (live === 'unknown') return null; // Reject the idempotent path on any read failure
+    return live ? null : (record.pipeline.closedOutAt ?? 'unknown');
+  } catch {
+    // On any error (record read, etc.), fail closed
+    return null;
+  }
 }
