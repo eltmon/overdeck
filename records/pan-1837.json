@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-28T20:40:43.510Z",
+  "updated": "2026-07-28T20:52:46.642Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 27,
-    "claims": {
-      "wi12-docs": {
-        "writerId": "agent-pan-1837",
-        "agentId": "agent-pan-1837",
-        "pid": 4107896,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T20:40:43.510Z"
-      }
-    },
+    "sequence": 28,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1837",
@@ -232,6 +224,17 @@
         "outcome": "completed",
         "reason": "Added kimi-code to HARNESS_OPTIONS/HARNESS_BRANDS/HARNESS_LABELS/TieredExecutionSection/CrewRow. This closes the LAST remaining typecheck gap left open since wi1 -- npm run typecheck is now 100% clean across root/hooks/evals/dashboard/frontend for the first time this issue. Widening ModelPicker.tsx's own local Harness type surfaced 4 more orphaned hand-rolled unions (PlanDialog.tsx, RolesPanel.tsx, FlywheelConversationPane.tsx, useConversationMutations.ts 9x) not named in the PRD, all fixed. wi11.ac3 (policy-lock) needed no new code -- canUsePickerHarness already dispatches generically on the wi4 policyDecisions map; added a test proving it. ContextPage.tsx had no harness code to widen; TalkItThrough.tsx's narrowing is deliberately left alone per the PRD. 2561 frontend tests pass; full typecheck clean.",
         "releasedAt": "2026-07-28T20:40:29.888Z"
+      },
+      {
+        "writerId": "agent-pan-1837",
+        "agentId": "agent-pan-1837",
+        "pid": 4107896,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T20:40:43.510Z",
+        "itemId": "wi12-docs",
+        "outcome": "completed",
+        "reason": "Added kimi-code to harnesses.mdx (Info box + table, five harnesses; full native-Kimi section: install path/kimi login, Kimi-only gate, native-vs-acp-vs-claude-code+Kimi-endpoint comparison table) and harness-landscape.mdx (marked Supported, distinguished from acp). Updated CLAUDE.md's Harnesses section. Fixed a source-introspection lint violation my own wi5 test introduced (reading its own source file and regexing it) by replacing with a comment pointing at the existing runtime-behavior tests. npm run lint exits 0 including the skills/docs cross-check chain.",
+        "releasedAt": "2026-07-28T20:52:46.642Z"
       }
     ],
     "statusReasons": {
@@ -286,6 +289,10 @@
       "wi11-frontend": {
         "reason": "Added kimi-code to HARNESS_OPTIONS/HARNESS_BRANDS/HARNESS_LABELS/TieredExecutionSection/CrewRow. This closes the LAST remaining typecheck gap left open since wi1 -- npm run typecheck is now 100% clean across root/hooks/evals/dashboard/frontend for the first time this issue. Widening ModelPicker.tsx's own local Harness type surfaced 4 more orphaned hand-rolled unions (PlanDialog.tsx, RolesPanel.tsx, FlywheelConversationPane.tsx, useConversationMutations.ts 9x) not named in the PRD, all fixed. wi11.ac3 (policy-lock) needed no new code -- canUsePickerHarness already dispatches generically on the wi4 policyDecisions map; added a test proving it. ContextPage.tsx had no harness code to widen; TalkItThrough.tsx's narrowing is deliberately left alone per the PRD. 2561 frontend tests pass; full typecheck clean.",
         "updatedAt": "2026-07-28T20:40:29.888Z"
+      },
+      "wi12-docs": {
+        "reason": "Added kimi-code to harnesses.mdx (Info box + table, five harnesses; full native-Kimi section: install path/kimi login, Kimi-only gate, native-vs-acp-vs-claude-code+Kimi-endpoint comparison table) and harness-landscape.mdx (marked Supported, distinguished from acp). Updated CLAUDE.md's Harnesses section. Fixed a source-introspection lint violation my own wi5 test introduced (reading its own source file and regexing it) by replacing with a comment pointing at the existing runtime-behavior tests. npm run lint exits 0 including the skills/docs cross-check chain.",
+        "updatedAt": "2026-07-28T20:52:46.642Z"
       }
     }
   },
@@ -348,6 +355,9 @@
     "wi11-frontend.wi11-frontend.ac2": "completed",
     "wi11-frontend.wi11-frontend.ac3": "completed",
     "wi11-frontend.wi11-frontend.ac4": "completed",
-    "wi12-docs": "running"
+    "wi12-docs": "completed",
+    "wi12-docs.wi12-docs.ac1": "completed",
+    "wi12-docs.wi12-docs.ac2": "completed",
+    "wi12-docs.wi12-docs.ac3": "completed"
   }
 }
