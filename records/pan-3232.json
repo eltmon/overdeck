@@ -29,15 +29,7 @@
       "timestamp": "2026-07-28T21:46:07.460Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T21:46:07Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3232\n\n# Review — PAN-3232 — Cycle 2\n\n## Verdict: CHANGES REQUESTED — conversation-only decisions remain broken on the widened surfaces\n\n## Context\n- Branch: `feature/pan-3232`\n- HEAD reviewed: `9e141517f08ac792f4e44160415734d20fed0a08`\n- Prior reviewed HEAD: `259f40794fb23b60fe1a6148c3f83fa86e6543f7`\n- PR: `#3251`\n- Dimensions reviewed: correctness, security, requirements/acceptance criteria, performance\n- Review scope is committed HEAD. The working tree contained an uncommitted `src/dashboard/frontend/src/lib/simple/useSimpleActions.ts` change, which was not treated as part of this review.\n\n## Blocking Findings\n\n### ! [correctness/requirements] Conversation-only decisions are still invisible or sent through the wrong write door — `src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx:105`\n**Scope:** in_pr_scope  \n**Evidence tier:** Tier 1 — direct consumer-flow trace  \n**Requirement:** FR-7 and `widen-direct-selector-surfaces.ac1` require NeedsYouStrip, SimpleHomePage, and ConversationDock to surface conversation pending-input rows when `agentsById` is empty.\n\n**Problem:** No committed code changed this path after the prior verdict, so the same main-path failures remain:\n\n- `NeedsYouStrip` builds rows only from `bucketSimpleHome(derivations)`. `deriveSimpleIssue` marks a question only when an agent has pending input; a conversation subject is used merely as prompt text for a row that already exists. A conversation-only decision still creates no strip item.\n- `ConversationDock` only annotates and sorts pre-existing `useConvoDock().items`. It neither creates a conversation item nor renders the pending conversation, because `DockPanel` is an issue/agent `DrawerAgentSession`.\n- `SimpleHomePage` creates an extra conversation question, but `QuestionCard` sends the conversation name to `/api/agents/:id/answer-question`. The agent route calls `getAgentPendingQuestions(id)` and returns 404 for a conversation-only subject.\n\n**Impact:** Two required surfaces remain blind to conversation-only input, and the third presents an Answer action that cannot succeed.\n\n**Fix:** Make each surface consume the agent/conversation union deliberately. Synthesize conversation-only rows where required, navigate/open the actual conversation, and route answers through the conversation write door. Preserve the existing shared query key and do not add polling.\n\n### ! [correctness] The specialist fix adds fields that `ReviewerNode` does not declare — `src/dashboard/server/routes/reviewer-tree.ts:456`\n**Scope:** in_pr_scope  \n**Evidence tier:** Tier 1 — compiler-confirmed changed-line defect  \n**Changed code:** `buildReviewerNodes` now assigns `awaitingInput`, `awaitingInputPrompt`, `awaitingInputReason`, and `pendingInputKinds` to an object explicitly typed as `ReviewerNode`.\n\n**Problem:** `ReviewerNode` at `src/dashboard/server/routes/reviewer-tree.ts:128-142` was not extended with those fields. After rebuilding `@overdeck/contracts`, a raw dashboard TypeScript check reports:\n\n`src/dashboard/server/routes/reviewer-tree.ts(456,9): error TS2353: 'awaitingInput' does not exist in type 'ReviewerNode'.`\n\nThe existing `as unknown as SessionNode[]` at the projects-route call site masks the contract mismatch from downstream consumers, while the dashboard type-error ratchet can hide the newly introduced error behind reductions elsewhere.\n\n**Impact:** The specialist node contract is internally false and the changed source does not typecheck cleanly. This defeats the xBRIEF's named typecheck acceptance gate and makes future typed consumers omit or reject the new fields.\n\n**Fix:** Add the four optional pending-input properties to `ReviewerNode` with types matching `SessionNode`, then verify the changed files introduce no new raw TypeScript diagnostics.\n\n### ! [requirements] The xBRIEF-promised regression tests are still absent — `PAN-3232 xBRIEF items WI-1 through WI-5 and WI-7`\n**Scope:** in_pr_scope  \n**Evidence tier:** Tier 1 — changed-file and test inventory  \n**Requirement:** The xBRIEF explicitly names tests for issue-view projection, Decisions prompt threading, SessionPanel labels, event schema/producer/delta/client merging, specialist projection, and conversation-backed surfaces.\n\n**Problem:** The two fix commits add no test changes. The full PR still modifies only the unrelated `SubagentTranscript.test.tsx` and deletes `read-model-pending-input.test.ts`; the planned `session-tree-specialist-pending-input.test.ts` does not exist. `applySessionTreeDelta` also remains module-local rather than exported as the plan specified, preventing the planned direct reducer test.\n\n**Impact:** The first review cycle's incomplete FR-4/FR-5 work passed verification because there was no executable acceptance gate, and cycle 2 has now introduced a compiler-visible `ReviewerNode` contract error for the same reason.\n\n**Fix:** Add the named regression cases, including legacy enrichment-event decoding, producer issue IDs, delta mapping and clearing, client in-place merging, specialist nodes in both routes plus reviewer children, Decisions prompt precedence, SessionPanel labels, issue-view projection, and conversation-only rendering/action routing on all three widened surfaces.\n\n## Resolved Prior Blockers\n\n- FR-4's producer-to-consumer slice is now present: optional event `issueId`, producer/reap threading, RPC delta schema, server mapping, and client in-place merge are all wired. The stale contract error disappears after rebuilding `packages/contracts`.\n- FR-5's runtime projection is now wired for review, reviewer, test, and ship nodes in both route families. The remaining blocker is the missing `ReviewerNode` type contract and tests, not the runtime map lookups.\n\n## Non-blocking Notes\n\n### ~ The deleted test still removes an independent reducer assertion\nThe deleted `read-model-pending-input.test.ts` included a useful assertion that a clearing `agent.enrichment_changed` event removes pending payloads. Removing `projectPendingInput` is correct, but relocating that reducer assertion would preserve coverage for the same event path.\n\n### ≉ Unrelated changes remain in the PR\nThe SubagentTranscript UI/CSS/test and large `docs/FLYWHEEL-STATE.md` update do not trace to PAN-3232. They appear coherent, but they increase review and revert scope for an already broad requirements change.\n\n## Security Review\nNo blocking security issue found. The added prompt fields remain React-rendered text rather than HTML, event payloads contain no new secret-bearing transport, and no authorization, destructive endpoint, filesystem boundary, or code-execution primitive changed.\n\n## Performance Review\nNo blocking performance regression found in the cycle-2 fixes. Specialist projection adds bounded map lookups only. `pending_input_changed` merges cached tree state without query invalidation, so forced enrichment re-emits do not cause network refetch storms. The merge does allocate a new feature/session array per event, but the work is bounded by one project feature and one session list.\n\n## Clean Requirements Checked\n- FR-1: activity fields reach `toSessionNode` for primary sessions.\n- FR-2: enrichment prompt/reason reach Decisions with the specified precedence.\n- FR-3: SessionPanel prefers enrichment kinds and preserves the Channels fallback.\n- FR-4: event producer, contract, RPC mapper, and client merge are now connected.\n- FR-5: specialist projection is present at runtime in activity and session-tree paths.\n- FR-6: dead `projectPendingInput` code is removed.\n- FR-8: documentation covers the intended prompt, delta, and specialist paths.\n- No forbidden classifier, GodView/AgentCard, recovery-path, shared-helper, or new polling-loop change was introduced.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3232/.pan/review/agent-pan-3232-review-9e141517/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3232 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -114,17 +106,17 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-28T21:46:12.689Z",
+  "updated": "2026-07-28T21:52:14.711Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-28T21:46:12.676Z",
+    "updatedAt": "2026-07-28T21:52:14.012Z",
     "reviewNotes": "FR-7 conversation-only decisions remain invisible or use the agent-only answer endpoint; required regression tests are still absent",
     "conflictsSince": {
       "sha": "b9820a501e1fa13ad0ca3050abd1ce2b1e06a8dc",
@@ -136,7 +128,6 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "51eda43167f429023a692c8fe961f1c1d664eec9",
     "reviewSpawnedAt": "2026-07-28T21:40:25.651Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -219,10 +210,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 399,
-            "output": 26228,
-            "cacheRead": 8975459,
-            "cacheWrite": 305385
+            "input": 434,
+            "output": 27873,
+            "cacheRead": 10121203,
+            "cacheWrite": 309813
           }
         },
         "plan": {
@@ -235,27 +226,27 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1929879,
-            "output": 118546,
-            "cacheRead": 29638144,
+            "input": 1936681,
+            "output": 118756,
+            "cacheRead": 30112256,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1446,
-            "output": 50343,
-            "cacheRead": 33125110,
-            "cacheWrite": 1228137
+            "input": 1483,
+            "output": 51683,
+            "cacheRead": 33740896,
+            "cacheWrite": 1357303
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1845,
-          "output": 76571,
-          "cacheRead": 42100569,
-          "cacheWrite": 1533522
+          "input": 1917,
+          "output": 79556,
+          "cacheRead": 43862099,
+          "cacheWrite": 1667116
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -264,15 +255,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 1929879,
-          "output": 118546,
-          "cacheRead": 29638144,
+          "input": 1936681,
+          "output": 118756,
+          "cacheRead": 30112256,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 44.744995,
-        "pricingAsOf": "2026-07-28T21:46:12.682Z"
+        "usd": 45.380504,
+        "pricingAsOf": "2026-07-28T21:52:14.087Z"
       }
     },
     "merges": [
