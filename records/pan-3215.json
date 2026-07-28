@@ -33,19 +33,18 @@
     "recordedAt": "2026-07-28T09:38:47.050Z"
   },
   "created": "2026-07-28T06:35:52.620Z",
-  "updated": "2026-07-28T09:38:55.527Z",
+  "updated": "2026-07-28T09:38:57.741Z",
   "pipeline": {
     "issueId": "PAN-3215",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T09:38:53.519Z",
-    "reviewNotes": "Verification infrastructure error: Verification worker 114040 exited before writing a result",
+    "updatedAt": "2026-07-28T09:38:57.718Z",
+    "reviewNotes": "Verification error: Verification worker 120037 exited before writing a result",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3226",
-    "reviewRequestedAt": "2026-07-28T09:38:49.689Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt"
@@ -91,7 +90,7 @@
       },
       "costAtCloseOut": {
         "usd": 38.278014,
-        "pricingAsOf": "2026-07-28T09:38:55.523Z"
+        "pricingAsOf": "2026-07-28T09:38:57.738Z"
       }
     },
     "merges": [
