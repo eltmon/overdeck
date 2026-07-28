@@ -2,9 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { completeKeyedSubmit, KeyedMarkerVerificationError, KeyedSubmitTargetDeadError, sendKeysDedup } from '../tmux-dedup.js';
+import { completeKeyedSubmit, KeyedMarkerVerificationError, KeyedSubmitBlockedMenuError, KeyedSubmitTargetDeadError, sendKeysDedup } from '../tmux-dedup.js';
 
 const socket = `dedup-test-${process.pid}`;
 const session = 'agent-dedup';
@@ -48,6 +48,18 @@ function occurrences(haystack: string, needle: string): number {
 function typeWithoutSubmit(text: string): void {
   execFileSync('tmux', ['-L', socket, 'send-keys', '-t', session, '-l', text]);
 }
+
+const RESUME_GATE_MENU = [
+  'This session is 4h 5m old and 146.9k tokens.',
+  '',
+  'Resuming the full session will consume a substantial portion of your usage limits. We recommend resuming from a summary.',
+  '',
+  '❯ 1. Resume from summary (recommended)',
+  '  2. Resume full session as-is',
+  "  3. Don't ask me again",
+  '',
+  'Enter to confirm · Esc to cancel',
+].join('\n');
 
 /**
  * Real throwaway tmux server — the dedup record is a pair of tmux session
@@ -97,6 +109,168 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     const second = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
     expect(second).toBe('deduplicated');
     expect(capturePane()).toBe(afterSubmit);
+  });
+
+  it('reuses pending text in the live Claude composer layout without re-pasting', async () => {
+    const payload = 'pending wake payload';
+    expect(await sendKeysDedup(session, payload, 'live-layout-key')).toBe('pasted');
+    const repasteSpy = vi.fn(async () => {});
+
+    const phase = await sendKeysDedup(session, payload, 'live-layout-key', 'test', {
+      readPaneViewport: () => Promise.resolve({
+        text: [
+          'older terminal output',
+          '───────────────────────────── agent-pan-3212 ──',
+          `❯ ${payload}`,
+          'Use your Rea5m) o7d 21% (127h45m)',
+          '78% e 2.7k/372.0k  out 113  cost $25.3668',
+          '                              · ← for agents',
+        ].join('\n'),
+        cursorY: 2,
+      }),
+      runTmuxCommand: repasteSpy,
+    });
+
+    expect(phase).toBe('submit-pending');
+    expect(repasteSpy).not.toHaveBeenCalled();
+  });
+
+  it('re-pastes after a menu-aborted submit clears without replacing the pane', async () => {
+    const payload = 'menu-blocked delivery';
+    const paneBefore = await readPaneTargetReal(session);
+    expect(await sendKeysDedup(session, payload, 'menu-key')).toBe('pasted');
+    const pendingBefore = showOption('@overdeck-dedup-pending-menu-key');
+    expect(pendingBefore).not.toBe('');
+    expect(showOption('@overdeck-dedup-payload-state-menu-key')).toBe('unverified');
+
+    vi.useFakeTimers();
+    try {
+      const completion = completeKeyedSubmit(session, 'menu-key', {
+        readPaneText: () => Promise.resolve(RESUME_GATE_MENU),
+      });
+      const rejection = expect(completion).rejects.toThrow(KeyedSubmitBlockedMenuError);
+      await vi.advanceTimersByTimeAsync(300);
+      await rejection;
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(showOption('@overdeck-dedup-pending-menu-key')).toBe(pendingBefore);
+    expect(showOption('@overdeck-dedup-target-menu-key')).toBe(paneBefore.pid);
+    expect(showOption('@overdeck-dedup-menu-key')).toBe('');
+    expect(showOption('@overdeck-dedup-payload-state-menu-key')).toBe('unverified');
+
+    // A selective read failure on the stored payload state is fail-closed: it
+    // cannot be mistaken for the explicit enter-attempted phase.
+    const payloadStateOption = '@overdeck-dedup-payload-state-menu-key';
+    const stateReadRepasteSpy = vi.fn(async () => {});
+    await expect(sendKeysDedup(session, payload, 'menu-key', 'test', {
+      readMarkerStrict: (_name, option) => (
+        option === payloadStateOption
+          ? Promise.reject(new Error('payload-state read unavailable'))
+          : Promise.resolve(showOption(option))
+      ),
+      readPaneViewport: () => Promise.resolve({ text: `❯ ${payload}`, cursorY: 0 }),
+      runTmuxCommand: stateReadRepasteSpy,
+    })).rejects.toThrow(KeyedMarkerVerificationError);
+    expect(stateReadRepasteSpy).not.toHaveBeenCalled();
+    expect(showOption(payloadStateOption)).toBe('unverified');
+
+    // An unreadable viewport is unproven, not evidence that the payload is
+    // absent. Recovery must leave the original paste and markers untouched.
+    const repasteSpy = vi.fn(async () => {});
+    await expect(sendKeysDedup(session, payload, 'menu-key', 'test', {
+      readPaneViewport: () => Promise.reject(new Error('capture unavailable')),
+      runTmuxCommand: repasteSpy,
+    })).rejects.toThrow(KeyedMarkerVerificationError);
+    expect(repasteSpy).not.toHaveBeenCalled();
+    expect(showOption('@overdeck-dedup-pending-menu-key')).toBe(pendingBefore);
+    expect(showOption('@overdeck-dedup-target-menu-key')).toBe(paneBefore.pid);
+
+    // Model the harness consuming the menu without accepting the earlier paste:
+    // clear the terminal input line while keeping the same pane process alive.
+    execFileSync('tmux', ['-L', socket, 'send-keys', '-t', session, 'C-u']);
+    expect((await readPaneTargetReal(session)).pid).toBe(paneBefore.pid);
+
+    const oldPayloadAboveEmptyComposer = {
+      text: [
+        payload,
+        'older terminal output',
+        '───────────────────────────── agent-pan-3212 ──',
+        '❯ ',
+        'usage 21% · cost $25.00',
+        '                              · ← for agents',
+      ].join('\n'),
+      cursorY: 3,
+    };
+
+    // Fault injection: the first recovery cannot execute its atomic re-paste.
+    // The stale matching target remains, but the next retry still cannot reuse
+    // it because the matching scrollback text is outside the active composer.
+    await expect(sendKeysDedup(session, payload, 'menu-key', 'test', {
+      readPaneViewport: () => Promise.resolve(oldPayloadAboveEmptyComposer),
+      runTmuxCommand: () => Promise.reject(new Error('tmux command unavailable')),
+    })).rejects.toThrow(KeyedMarkerVerificationError);
+    expect(showOption('@overdeck-dedup-pending-menu-key')).toBe(pendingBefore);
+    expect(showOption('@overdeck-dedup-target-menu-key')).toBe(paneBefore.pid);
+    expect(showOption('@overdeck-dedup-menu-key')).toBe('');
+
+    const retry = await sendKeysDedup(session, payload, 'menu-key', 'test', {
+      readPaneViewport: () => Promise.resolve(oldPayloadAboveEmptyComposer),
+    });
+    expect(retry).toBe('pasted');
+    expect(showOption('@overdeck-dedup-target-menu-key')).toBe(paneBefore.pid);
+
+    vi.useFakeTimers();
+    try {
+      const completion = completeKeyedSubmit(session, 'menu-key', {
+        readPaneText: () => Promise.resolve('busy composer'),
+      });
+      await vi.advanceTimersByTimeAsync(300);
+      await completion;
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(showOption('@overdeck-dedup-menu-key')).toBe('1');
+    expect(showOption('@overdeck-dedup-pending-menu-key')).toBe('');
+    expect(showOption('@overdeck-dedup-payload-state-menu-key')).toBe('enter-attempted');
+  });
+
+  it('fails closed for a legacy pending claim with no explicit payload state', async () => {
+    const payload = 'legacy swallowed delivery';
+    expect(await sendKeysDedup(session, payload, 'legacy-key')).toBe('pasted');
+    const pendingBefore = showOption('@overdeck-dedup-pending-legacy-key');
+    execFileSync('tmux', [
+      '-L', socket,
+      'set-option', '-u', '-t', session,
+      '@overdeck-dedup-payload-state-legacy-key',
+    ]);
+    execFileSync('tmux', ['-L', socket, 'send-keys', '-t', session, 'C-u']);
+
+    const repasteSpy = vi.fn(async () => {});
+    await expect(sendKeysDedup(session, payload, 'legacy-key', 'test', {
+      readPaneViewport: () => Promise.resolve({ text: '❯ ', cursorY: 0 }),
+      runTmuxCommand: repasteSpy,
+    })).rejects.toThrow(KeyedMarkerVerificationError);
+
+    expect(repasteSpy).not.toHaveBeenCalled();
+    expect(showOption('@overdeck-dedup-pending-legacy-key')).toBe(pendingBefore);
+    expect(showOption('@overdeck-dedup-legacy-key')).toBe('');
+  });
+
+  it('submits normal composer content when pane capture is busy or unavailable', async () => {
+    expect(await sendKeysDedup(session, 'busy composer delivery', 'busy-key')).toBe('pasted');
+    await completeKeyedSubmit(session, 'busy-key', {
+      readPaneText: () => Promise.resolve('busy composer delivery'),
+    });
+    expect(showOption('@overdeck-dedup-busy-key')).toBe('1');
+
+    expect(await sendKeysDedup(session, 'capture failure delivery', 'capture-failure-key')).toBe('pasted');
+    await completeKeyedSubmit(session, 'capture-failure-key', {
+      readPaneText: () => Promise.reject(new Error('capture unavailable')),
+    });
+    expect(showOption('@overdeck-dedup-capture-failure-key')).toBe('1');
   });
 
   it('completes a crashed attempt from the pending marker WITHOUT pasting a second copy', async () => {
@@ -327,10 +501,12 @@ describe.skipIf(!hasTmux)('sendKeysDedup two-phase protocol', () => {
     ).rejects.toThrow(KeyedSubmitTargetDeadError);
     expect(showOption('@overdeck-dedup-test-key-1')).toBe('');
     expect(showOption('@overdeck-dedup-pending-test-key-1')).not.toBe('');
-    // The rollback was verified, so the poison breadcrumb was lifted.
+    // The rollback was verified, so the poison breadcrumb was lifted. The
+    // explicit payload state records that Enter may already have landed.
     expect(showOption('@overdeck-dedup-poison-test-key-1')).toBe('');
+    expect(showOption('@overdeck-dedup-payload-state-test-key-1')).toBe('enter-attempted');
 
-    // Recovery completes the preserved claim.
+    // Recovery completes the preserved claim without re-pasting.
     const replay = await sendKeysDedup(session, 'wake up agent', 'test-key-1');
     expect(replay).toBe('submit-pending');
     await completeKeyedSubmit(session, 'test-key-1');
