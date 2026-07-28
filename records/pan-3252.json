@@ -82,7 +82,7 @@
     "recordedAt": "2026-07-28T23:54:25.516Z"
   },
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-28T23:54:33.029Z",
+  "updated": "2026-07-28T23:54:34.819Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "pending",
@@ -92,7 +92,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T23:54:30.960Z",
+    "updatedAt": "2026-07-28T23:54:34.771Z",
     "reviewNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-28T23:41:22.136Z by deploy-patrol). It re-runs automatically after the deploy.",
     "inspectNotes": "All 3 ACs met: getProviderForModelSync resolves ql-reason-70b/ql-swift-8b/ql-nano-1b to PROVIDERS.quantumllama (providers.ts:392-395, reached — no earlier branch matches ql-* ids); getProviderEnvSync emits ANTHROPIC_BASE_URL=https://api.quantumllama.ai/v1 via provider.baseUrl and QUANTUMLLAMA_API_KEY (providers.ts:469-470); defaultHarness 'claude-code' declared and EXPECTED_DEFAULT_HARNESSES updated. NFR-1 respected: registry/env only, no HTTP, request, or streaming code and no agent-spawn changes. Verified locally: tests/unit/lib/providers.test.ts + tests/lib/providers.test.ts, 23 passed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3258",
@@ -205,7 +205,7 @@
       },
       "costAtCloseOut": {
         "usd": 17.63544,
-        "pricingAsOf": "2026-07-28T23:54:33.027Z"
+        "pricingAsOf": "2026-07-28T23:54:34.800Z"
       }
     },
     "merges": [
