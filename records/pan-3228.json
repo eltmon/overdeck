@@ -39,15 +39,7 @@
       "timestamp": "2026-07-28T19:38:29.437Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-28T19:38:29Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3228\n\n# Review — PAN-3228 — 2026-07-28\n\n## Verdict: CHANGES REQUESTED — the grace-period recheck works, but its dashboard caller now leaves a live agent projected as stopped, and two prior blockers remain\n\n## Context\n- Manifest: `.pan/review/agent-pan-3228-review-24455ea1/context.json`\n- Branch: `feature/pan-3228`\n- PR: https://github.com/eltmon/overdeck/pull/3241\n- HEAD reviewed: `24455ea1759d163b1cdca6b2f20871262c9c5735`\n- Cycle number: 3\n- Prior cycle SHA: `6f5cd82fcf86789301625462a3bbdaf66f2efb76`\n- Cycle diff: one commit changing `src/lib/agents/recovery.ts` and `src/lib/agents/__tests__/recovery-pending-decision.test.ts`\n- Dimensions reviewed: correctness/logic, security, requirements/acceptance criteria, performance\n- Verification: focused recovery suite passed, 4 tests; cycle diff passes `git diff --check`\n- Scope note: the workspace has uncommitted changes in the pending-decision/agent-enrichment files. This verdict evaluates only the committed HEAD named by the run manifest.\n\n## Cycle-3 Finding Disposition\n\n| Prior finding | Disposition at committed HEAD |\n| --- | --- |\n| Pane-choice POST omitted origin/authentication guard | **Fixed in cycle 2.** |\n| Graceful restart can destroy a decision appearing during its grace period | **Core race fixed this cycle.** The new fake-timer test proves a decision appearing during the grace wait prevents `stopAgent()`. The dashboard projection defect below remains at the caller boundary. |\n| Forced discard is rediscovered from historical workspace JSONLs | **Still blocking; committed file unchanged since cycle 2.** |\n| Failed swarm slot drops the required needs-you escalation | **Still blocking; committed file unchanged since cycle 2.** |\n\n## Blocking Findings\n\n### ! [correctness] A grace-period refusal leaves the live agent permanently projected as stopped — `src/lib/agents/recovery.ts:174`\n**Evidence tier:** Tier 1\n**Changed code:** The new post-warning recheck returns a typed failure without stopping the live session when a decision appears. Its dashboard caller, however, writes `agent.stopped` at `src/dashboard/server/routes/agents/lifecycle-restart.ts:311-315` before calling `restartAgent()`, and only writes `agent.started` when `result.success` is true.\n**Failure scenario:** A dashboard graceful restart is accepted while no decision is pending. The async route immediately projects the agent as stopped, the agent reaches a permission prompt during the 60-second grace period, and the new recheck returns `pending-operator-decision` without calling `stopAgent()`. The route logs the failure but never restores a running projection.\n**Runtime impact:** Tmux and the harness remain live and operator-owned, while the canonical agent read model says the agent is stopped. Dashboard state, autonomous lifecycle decisions, and operator controls can then act on the wrong lifecycle state. This contradicts the cycle-2 fix requirement to leave the session and projection untouched when the recheck blocks.\n**Fix:** Do not emit `agent.stopped` before the graceful operation has actually stopped the agent. Move the stopped/started projection pair to the confirmed-success path, or explicitly restore the running projection on the typed pending-decision result. Add a route-level fake-timer regression that drives the late-decision result and asserts no stopped event survives while the session remains running.\n\n### ! [correctness] A forced discard is rediscovered forever from historical workspace JSONLs — `src/lib/agents/pending-decision-gate.ts:70`\n**Evidence tier:** Tier 1\n**Changed code:** The gate calls `countPendingAskUserQuestionsForAgent(agentId)`, which scans every JSONL in the workspace project directory without limiting detection to the current agent session/generation.\n**Problem:** A forced fresh restart preserves the sacred historical JSONL containing the deliberately discarded AUQ. Every later restart, recovery, or autonomous re-drive scans that old file and recreates the gate; `pan answer` cannot answer a dead historical session.\n**Runtime impact:** The documented force escape hatch bypasses only its current call. The replacement agent is subsequently parked by stale state from the discarded session generation.\n**Fix:** Make the fallback session-generation-aware or persist a durable discard boundary/tombstone. Add a regression that force-discards an old AUQ, creates the replacement session, and proves the next gate check does not rediscover it.\n\n### ! [requirements] Failed swarm slots defer silently instead of emitting the required needs-you trip — `src/lib/cloister/swarm-failed-slot.ts:103`\n**Scope:** in_pr_scope\n**Evidence tier:** Tier 1\n**Requirement:** FR-4 and the issue body require autonomous destructive recovery to defer with a needs-you escalation when the agent owns a pending decision.\n**Expected:** A `{ decision: 'defer', needsYou: true }` result must persist/emit the canonical operator escalation and avoid requeueing.\n**Observed:** `requeueFailedSwarmSlots()` records only an action string and ignores `admission.needsYou`. Its recovery-trip call occurs after successful admission, so the pending-decision branch never reaches a durable needs-you writer.\n**Impact:** The slot is protected from replacement but can remain parked indefinitely without an actionable operator decision, contradicting the recovery contract and flywheel doctrine.\n**Fix:** Route `needsYou: true` through the canonical deduplicated needs-you writer before continuing, and add a failed-slot regression proving one escalation and no archive/requeue.\n\n## Non-blocking Finding\n\n### ~ [performance] The JSONL fallback performs an uncached workspace-wide scan on every gate evaluation — `src/lib/agents/pending-decision-gate.ts:70`\nEach evaluation can sequentially read and parse the last 512 KB of every transcript in the workspace. The new graceful flow can invoke the detector three times per restart, increasing this cost. It remains advisory because restarts are infrequent, but the required session-generation correction should narrow or cache the scan.\n\n## Clean Cycle-Diff Review\n- The recovery core now checks before warning keystrokes and after the grace wait, so a late decision prevents the destructive stop.\n- `force` still bypasses every recheck consistently.\n- The injected dependencies are test seams around existing operations rather than alternate production paths.\n- The new delay-based test correctly uses Vitest fake timers.\n- No new security vulnerability or non-goal violation was introduced by this cycle diff.\n\n## Requirement Coverage\n\n| Requirement | Status at committed HEAD |\n| --- | --- |\n| FR-1 / NFR-2 pending-decision helper | Partial — historical-session semantics remain blocking |\n| FR-2 fresh-start gate and force | Partial — force discard is not durable |\n| FR-3 / NFR-1 restart-family gate | Partial — core recheck is fixed, dashboard projection remains wrong on late refusal |\n| FR-4 autonomous redrive + needs-you | Partial — failed swarm slots still drop needs-you |\n| FR-5 shared session pane-choice core | Implemented |\n| FR-6 agent GET/POST pane-choice routes | Implemented and origin-guarded |\n| FR-7 `pan answer` CLI | Implemented |\n| FR-8 flywheel doctrine | Implemented |\n| Documentation | Present, but still overstates durable force discard and universal needs-you behavior |\n\n## Non-goal Audit\nAll six must-not constraints remain satisfied: no decision-card UI/read-model plumbing, no supervisor protocol endpoint, no Channels revival, no nudge-path change, no unrelated Decisions indicator fix, and no rate-limit gating or auto-answer behavior.\n\n## Coverage\nCycle 1 reviewed the complete PR across all four dimensions. Cycle 2 reviewed the authentication delta. Cycle 3 reviewed the full recovery delta, verified the prior race fix, traced its dashboard caller, and re-checked the two unresolved prior blockers against committed HEAD. Unchanged clean areas from the prior full pass were not re-read.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3228/.pan/review/agent-pan-3228-review-24455ea1/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3228 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -145,10 +137,10 @@
     "recordedAt": "2026-07-28T19:16:09.927Z"
   },
   "created": "2026-07-28T17:06:31.947Z",
-  "updated": "2026-07-28T19:38:35.130Z",
+  "updated": "2026-07-28T19:41:38.710Z",
   "pipeline": {
     "issueId": "PAN-3228",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -156,11 +148,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T19:17:21.407Z",
-    "updatedAt": "2026-07-28T19:38:35.118Z",
+    "updatedAt": "2026-07-28T19:41:38.254Z",
     "reviewNotes": "Late-decision restart leaves a live agent projected stopped; historical-AUQ and swarm needs-you blockers also remain",
     "inspectNotes": "All 3 ACs met. AC1: new src/lib/__tests__/session-pane-choice.test.ts covers 400 bad index, 400 missing signature, 409 menu-gone, 409 menu-changed, 409 delivery-unconfirmed, and 200 {ok,answeredLabel} with Down/Down/Enter keystrokes. AC2: tests/unit/lib/overdeck/conversation-pane-choice.test.ts is untouched by this commit (last touched by PAN-3113 commit 4d65ad1c) and its 12 cases pass through the delegating handler; 47/47 across the 4 pane-choice test files. AC3: captureSessionPaneChoice returns signature/title/options/recommended/selectedIndex and null on no-menu or capture throw. Delegation preserves defaults (conversation still passes tmuxSessionExists; core defaults to capturePaneText + Effect.runPromise(sessionExists)) and the validation ordering (400s before conv lookup).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3241",
-    "reviewedAtCommit": "24455ea1759d163b1cdca6b2f20871262c9c5735",
     "reviewSpawnedAt": "2026-07-28T19:36:33.729Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -272,17 +263,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3656172,
-            "output": 145862,
-            "cacheRead": 25917440,
+            "input": 3680416,
+            "output": 155136,
+            "cacheRead": 27390976,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2653941,
-            "output": 229312,
-            "cacheRead": 141999616,
+            "input": 2720378,
+            "output": 241035,
+            "cacheRead": 150660608,
             "cacheWrite": 0
           }
         }
@@ -295,15 +286,15 @@
           "cacheWrite": 121982
         },
         "openai/gpt-5.6-sol": {
-          "input": 6310113,
-          "output": 375174,
-          "cacheRead": 167917056,
+          "input": 6400794,
+          "output": 396171,
+          "cacheRead": 178051584,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 137.753935,
-        "pricingAsOf": "2026-07-28T19:38:35.125Z"
+        "usd": 143.904514,
+        "pricingAsOf": "2026-07-28T19:41:38.306Z"
       }
     },
     "merges": [
