@@ -216,55 +216,16 @@ export function SimpleHomePage() {
   }, [pendingSubjects]);
 
   // Pending-input subjects whose issue didn't bucket as needs-you still show as questions.
-  // Also include conversation-only subjects (no issue) that have pending questions.
   const extraQuestions = useMemo(() => {
     const covered = new Set(buckets.needsYou.map((n) => n.derivation.issue.identifier.toLowerCase()));
     const out: { derivation: SimpleIssueDerivation; subject: PendingInputSubject }[] = [];
-    const coveredSubjects = new Set<string>();
     for (const [key, subject] of subjectByIssue) {
-      if (covered.has(key)) {
-        coveredSubjects.add(subject.agentId);
-        continue;
-      }
+      if (covered.has(key)) continue;
       const d = byIdentifier.get(key);
-      if (d) {
-        out.push({ derivation: d, subject });
-        coveredSubjects.add(subject.agentId);
-      }
-    }
-    // Add conversation-only subjects (no matching issue) that have pending questions
-    for (const subject of (pendingSubjects ?? [])) {
-      if (!subject.issueId && !coveredSubjects.has(subject.agentId)) {
-        // Create a synthetic derivation for conversation-only subjects
-        const syntheticIssue: Issue = {
-          id: subject.agentId,
-          identifier: subject.agentId,
-          title: subject.agentId,
-          createdAt: subject.since,
-          status: 'open',
-        };
-        const syntheticDerivation: SimpleIssueDerivation = {
-          issue: syntheticIssue,
-          pipelineState: { phase: 'waiting' as any },
-          rail: { canStartPlanning: true, canStartWork: false, canRequestReview: false, canMerge: false, canClose: false },
-          display: { state: 'question', sentence: 'Conversation waiting for your response', primaryAction: 'Answer', title: '', level: 'warn' },
-          primaryAgent: undefined,
-          pendingInputAgent: undefined,
-          agentStuck: false,
-          reviewStuck: false,
-          agents: [],
-          taskProgress: null,
-          costSoFar: null,
-          prUrl: null,
-          expectation: null,
-          activityAt: null,
-        };
-        out.push({ derivation: syntheticDerivation, subject });
-        coveredSubjects.add(subject.agentId);
-      }
+      if (d) out.push({ derivation: d, subject });
     }
     return out;
-  }, [buckets.needsYou, subjectByIssue, byIdentifier, pendingSubjects]);
+  }, [buckets.needsYou, subjectByIssue, byIdentifier]);
 
   const needsCount = buckets.needsYou.length + extraQuestions.length;
   const filed = useMemo(() => justFiled(derivations), [derivations]);
