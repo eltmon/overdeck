@@ -262,11 +262,12 @@ describe('overdeck review status sync', () => {
     // Call setReviewStatusSync() with a long testNotes to exercise the composition path
     // This triggers the dbStatus/updated split in review-status.ts
     // Signature: setReviewStatusSync(issueId: string, update: ReviewStatusUpdate, existing?: ReviewStatus)
+    // Change testStatus from 'pending' to 'passed' to create the test transition that carries testNotes
     const updated = setReviewStatusSync(
       'PAN-COMPOSITION-TEST',
       {
-        reviewStatus: 'passed',
-        testStatus: 'pending',
+        reviewStatus: 'pending', // Keep at pending to only create test transition
+        testStatus: 'passed', // Change from pending to passed to create the transition
         testNotes: longTestNote, // 10,000 chars - should NOT be truncated in returned status
         updatedAt: new Date().toISOString(),
         readyForMerge: false,
