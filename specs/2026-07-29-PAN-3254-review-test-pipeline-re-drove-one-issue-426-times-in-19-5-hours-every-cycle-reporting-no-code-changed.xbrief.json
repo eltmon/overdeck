@@ -4,17 +4,17 @@
     "created": "2026-07-29T00:22:29Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3254: Review/test pipeline re-drove one issue 426 times in 19.5 hours, every cycle reporting 'no code changed'",
-    "updated": "2026-07-29T03:25:59.441Z"
+    "updated": "2026-07-29T05:06:27.011Z"
   },
   "plan": {
     "id": "pan-3254",
     "title": "Review/test pipeline re-drove one issue 426 times in 19.5 hours, every cycle reporting 'no code changed'",
-    "status": "running",
+    "status": "completed",
     "uid": "94f9a7f2-63f4-48a3-928c-d49f746e2288",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-29T00:22:29Z",
-    "updated": "2026-07-29T03:25:59.441Z",
+    "updated": "2026-07-29T05:06:27.011Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3254",
@@ -138,5 +138,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
