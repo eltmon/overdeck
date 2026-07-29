@@ -120,18 +120,19 @@
     "recordedAt": "2026-07-28T20:15:30.548Z"
   },
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-29T00:01:16.428Z",
+  "updated": "2026-07-29T00:02:34.310Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:16:31.872Z",
-    "updatedAt": "2026-07-29T00:01:16.354Z",
+    "updatedAt": "2026-07-29T00:02:34.257Z",
     "reviewNotes": "Approved: prior transcript regression restored; pending-promotion feature remains requirements-complete with focused tests green",
     "testNotes": "Reconciled from green GitHub Actions CI on f9aca64e: Non-blocking flake lane (https://github.com/eltmon/overdeck/actions/runs/30408866917/job/90440371417)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -191,7 +192,7 @@
       },
       "costAtCloseOut": {
         "usd": 188.073036,
-        "pricingAsOf": "2026-07-29T00:01:16.404Z"
+        "pricingAsOf": "2026-07-29T00:02:34.308Z"
       }
     },
     "merges": [
