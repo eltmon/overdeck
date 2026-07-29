@@ -38,6 +38,16 @@
       "reason": "feedback",
       "note": "[2026-07-29T07:35Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-29T07:35:19.460Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-29T07:39Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-07-29T07:39:07.983Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-07-29T07:39:08.100Z"
     }
   ],
   "feedback": [
@@ -47,6 +57,13 @@
       "outcome": "changes-requested",
       "timestamp": "2026-07-29T07:35:19Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-3253\n\n# Code Review — PAN-3253 — 2026-07-29\n\n## Verdict: CHANGES REQUESTED — the new trim-only helper leaves the append door unbounded\n\n## Context\n- Branch: `feature/pan-3253`\n- HEAD reviewed: `cccc58288bf35005e46072c242c4bef78cbd8791`\n- PR: `#3279`\n- Cycle: 4\n- Prior blocker: resolved; the focused event-store suite now passes all 11 tests.\n- Convergence gate: the blocker below is anchored in code newly added since the previous reviewed HEAD `c1eb06e8cbf6ac7ca7669a293a980374ae64fcf7`.\n\n## Blocking Findings\n\n### ! [correctness / requirements / performance] The bounding logic is local to boot trim instead of enforcing the append-door invariant — `src/dashboard/server/event-store.ts:166`\n\nThe new code duplicates the history and note limits and implements truncation only inside `trimReviewStatusHistoryPayloads()`. It does not implement the plan's shared `boundReviewStatusPayload()` helper, does not apply bounding in `append()`, and does not apply bounding in `appendOnce()`. Those two persistence paths still serialize the caller's raw payload with `JSON.stringify(...)` at `src/dashboard/server/event-store.ts:376` and `src/dashboard/server/event-store.ts:483`.\n\nThis violates FR-1 and the explicit W2/W3 design: every `review.status_changed` payload must be bounded at the append door, and boot trim must delegate to that same helper. Without the append-door enforcement, a stale-build emitter can reinsert an unbounded full-history payload immediately after boot migration, recreating the database-growth failure this issue exists to prevent. The duplicated `20` and `500` constants can also drift from the canonical limits used by composition and hydration.\n\nExtract one bounding helper using the canonical imported limits, apply it to `review.status_changed` payloads before persistence in both `append()` and `appendOnce()`, and make `trimReviewStatusHistoryPayloads()` call that helper and update only when the returned serialization differs. Add the planned append-door tests for oversized review history, non-review byte identity, and unparseable review payloads.\n\n## Security\n\nNo security vulnerability was found in the changed code. JSON parsing remains inside the existing non-fatal migration boundary, and the diff does not touch authentication, authorization, command execution, or secrets.\n\n## Requirements / Acceptance Criteria\n\n- FR-3 / `boot-trim-notes`: **behaviorally fixed** for the covered oversized row; the focused test confirms history and note truncation plus second-run convergence.\n- FR-1 / `append-door-bound`: **not satisfied** — `append()` and `appendOnce()` still persist raw `review.status_changed` payloads.\n- The required single helper and canonical imported limits are **not satisfied**; the cycle adds a second, trim-only implementation instead.\n- No listed NonGoal is violated.\n\n## Performance\n\nThe new loop is bounded to the retained history tail and is not itself a performance concern. The blocking issue is that unbounded payloads can still enter through the persistence doors, so stale emitters can resume quadratic event-storage growth after the one-shot trim.\n\n## Verification\n\n- `npx vitest run tests/unit/event-store.test.ts --reporter=verbose`: **11 passed**.\n- `npx eslint src/dashboard/server/event-store.ts tests/unit/event-store.test.ts`: **passed**.\n- `git diff --check origin/main...HEAD`: **passed**.\n\n## Non-blocking Findings\n\nNone newly introduced in this cycle.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253/.pan/review/agent-pan-3253-review-cccc5828/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3253 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-29T07:39:07Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-3253 (attempt 3/3):\n\nFailed check: vbrief-ac\n\nAcceptance criteria check FAILED — 3/12 AC incomplete:\n\n### Extend trimReviewStatusHistoryPayloads to delegate to the bounding helper (3/3 incomplete)\n  - [ ] Given a seeded oversized row with 25 entries carrying 3,697-char notes, the trim persists a smaller payload that parses back to <= 20 entries with <= 500-char notes\n  - [ ] Running the trim a second time over already-trimmed rows returns trimmed: 0 (converges to a no-op)\n  - [ ] An oversized row of a non-review event type survives the trim byte-identically\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3253 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
     }
   ],
   "scopeDrift": {
@@ -77,7 +94,7 @@
     "recordedAt": "2026-07-29T06:18:50.753Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T07:39:07.371Z",
+  "updated": "2026-07-29T07:39:08.101Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "blocked",
