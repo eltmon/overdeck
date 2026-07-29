@@ -9,3 +9,4 @@
 1315 src/lib/tmux.ts # PAN-3212
 1116 src/lib/lifecycle/workflows.ts # PAN-3215
 849 src/lib/overdeck/planning-promotion.ts # PAN-3229
+1311 src/dashboard/server/ws-rpc.ts # PAN-3260
