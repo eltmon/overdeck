@@ -227,7 +227,7 @@
     "recordedAt": "2026-07-29T15:41:58.832Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T15:42:07.532Z",
+  "updated": "2026-07-29T15:42:36.499Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -236,16 +236,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T15:42:07.495Z",
-    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
-    "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since ffc4ec7 (1 path): src/dashboard/server/event-store.ts",
-        "detectedAt": "2026-07-29T15:25:25.726Z"
-      }
-    ],
+    "updatedAt": "2026-07-29T15:42:36.461Z",
     "conflictsSince": {
       "sha": "ffc4ec7f593609a737880ff7027b3c4277205230",
       "detectedAt": "2026-07-29T15:25:25.726Z",
@@ -255,43 +246,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "lastVerifiedCommit": "7d4c9e95bfe58d87dd42e7b33ced7901a8bf6503",
-    "reviewRequestedAt": "2026-07-29T15:42:01.446Z",
-    "reviewSpawnedAt": "2026-07-29T10:10:29.425Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "scripts/file-size-allowlist.txt",
-        "src/lib/overdeck/review-status-sync.ts",
-        "src/lib/review-status-limits.ts",
-        "tests/dashboard/event-store.test.ts",
-        "tests/unit/lib/overdeck/review-status-sync.test.ts"
-      ],
-      "declaredScopeUntouched": [
-        "tests/unit/lib/database/review-status-history-cap.test.ts"
-      ],
-      "declaredScope": [
-        "docs/AGENT-STATE-PLANES.md",
-        "src/dashboard/server/event-store.ts",
-        "src/lib/database/review-status-db.ts",
-        "src/lib/review-status-reconcile.ts",
-        "src/lib/review-status.ts",
-        "tests/unit/event-store.test.ts",
-        "tests/unit/lib/database/review-status-history-cap.test.ts"
-      ],
-      "actualChangedFiles": [
-        "docs/AGENT-STATE-PLANES.md",
-        "scripts/file-size-allowlist.txt",
-        "src/dashboard/server/event-store.ts",
-        "src/lib/database/review-status-db.ts",
-        "src/lib/overdeck/review-status-sync.ts",
-        "src/lib/review-status-limits.ts",
-        "src/lib/review-status-reconcile.ts",
-        "src/lib/review-status.ts",
-        "tests/dashboard/event-store.test.ts",
-        "tests/unit/event-store.test.ts",
-        "tests/unit/lib/overdeck/review-status-sync.test.ts"
-      ],
-      "recordedAt": "2026-07-29T15:41:58.832Z"
-    }
+    "reviewSpawnedAt": "2026-07-29T10:10:29.425Z"
   },
   "closeOut": {
     "usage": {
@@ -314,10 +269,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3647,
-            "output": 170743,
-            "cacheRead": 83179251,
-            "cacheWrite": 4141305
+            "input": 3659,
+            "output": 171062,
+            "cacheRead": 83512152,
+            "cacheWrite": 4142164
           }
         }
       },
@@ -335,15 +290,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3647,
-          "output": 170743,
-          "cacheRead": 83179251,
-          "cacheWrite": 4141305
+          "input": 3659,
+          "output": 171062,
+          "cacheRead": 83512152,
+          "cacheWrite": 4142164
         }
       },
       "costAtCloseOut": {
-        "usd": 122.741591,
-        "pricingAsOf": "2026-07-29T15:42:07.525Z"
+        "usd": 122.777561,
+        "pricingAsOf": "2026-07-29T15:42:36.475Z"
       }
     },
     "merges": [
