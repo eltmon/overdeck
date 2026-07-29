@@ -192,6 +192,11 @@
       "timestamp": "2026-07-29T02:59:01.797Z",
       "reason": "end",
       "note": "FR-7 frontend conversation-only surfaces complete. Test suite expanded with AC-1 (conversation-only rendering) and AC-3 (agent-backed routing) coverage. 8 backend items (live-tree-delta, specialist-pending-input) deferred as separate work outside frontend scope."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-29T02:59:06.205Z"
     }
   ],
   "feedback": [],
@@ -269,7 +274,7 @@
     "recordedAt": "2026-07-29T02:58:56.941Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T02:59:05.084Z",
+  "updated": "2026-07-29T02:59:06.231Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "reviewing",
@@ -432,7 +437,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3232",
