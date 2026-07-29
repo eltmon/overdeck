@@ -117,6 +117,23 @@ vi.mock('../../../../lib/tmux.js', () => ({
   listSessionNames: vi.fn(() => Effect.succeed(listedSessionNames)),
 }));
 
+// PAN-1837 review fix (cycle 8): waitForNewKimiSessionAsync defaults to the
+// real implementation (kept real for the existing happy-path resume test
+// below) — individual tests override it with mockResolvedValueOnce(null) or
+// mockRejectedValueOnce(...) to exercise the capture-failure paths without
+// waiting out the real 60s timeout.
+const kimiCodeMocks = vi.hoisted(() => ({
+  waitForNewKimiSessionAsync: vi.fn(),
+}));
+vi.mock('../../../../lib/runtimes/kimi-code.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/runtimes/kimi-code.js')>();
+  kimiCodeMocks.waitForNewKimiSessionAsync.mockImplementation(actual.waitForNewKimiSessionAsync);
+  return {
+    ...actual,
+    waitForNewKimiSessionAsync: kimiCodeMocks.waitForNewKimiSessionAsync,
+  };
+});
+
 function conversationDir(session: string): string {
   return join(overdeckHome, 'conversations', session);
 }
@@ -452,6 +469,72 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
       if (previousHome === undefined) delete process.env.HOME;
       else process.env.HOME = previousHome;
     }
+  });
+
+  it('tears down a fresh Kimi Code conversation when session capture times out (PAN-1837)', async () => {
+    createSupervisorSocket = true;
+    resolvedHarnessBinary = '/opt/kimi/bin/kimi';
+    resolvedConversationHarness = 'kimi-code';
+    resolvedProviderName = 'kimi';
+    kimiCodeMocks.waitForNewKimiSessionAsync.mockResolvedValueOnce(null);
+    const tmux = await import('../../../../lib/tmux.js');
+    vi.mocked(tmux.killSession).mockClear();
+    const { handleConversationCreate } = await import('../../../../lib/overdeck/conversation-runtime.js');
+    const conversations = await import('../../../../lib/overdeck/conversations.js');
+
+    const response = await handleConversationCreate(
+      {
+        message: 'start the kimi-code conversation',
+        model: 'kimi-code/k3',
+        harness: 'kimi-code',
+      },
+      { generateAiTitle: vi.fn().mockResolvedValue(undefined) },
+    );
+    const created = decodeJsonResponse(response);
+    const name = created['name'] as string;
+    const session = created['tmuxSession'] as string;
+
+    await vi.waitFor(() => {
+      expect(conversations.getConversationByName(name)?.spawnError).toContain(
+        'kimi-code session capture timed out',
+      );
+    });
+    // The whole point of the fix: a failed capture must not leave a running
+    // tmux session presented as a healthy conversation, and must not leave
+    // the newest-session-by-mtime fallback free to attribute a different
+    // session's transcript/cost to this identity.
+    expect(tmux.killSession).toHaveBeenCalledWith(session);
+    expect(existsSync(join(overdeckHome, 'agents', session, 'kimi-session-id'))).toBe(false);
+  });
+
+  it('tears down a fresh Kimi Code conversation when session capture throws (PAN-1837)', async () => {
+    createSupervisorSocket = true;
+    resolvedHarnessBinary = '/opt/kimi/bin/kimi';
+    resolvedConversationHarness = 'kimi-code';
+    resolvedProviderName = 'kimi';
+    kimiCodeMocks.waitForNewKimiSessionAsync.mockRejectedValueOnce(new Error('bucket read failed'));
+    const tmux = await import('../../../../lib/tmux.js');
+    vi.mocked(tmux.killSession).mockClear();
+    const { handleConversationCreate } = await import('../../../../lib/overdeck/conversation-runtime.js');
+    const conversations = await import('../../../../lib/overdeck/conversations.js');
+
+    const response = await handleConversationCreate(
+      {
+        message: 'start the kimi-code conversation',
+        model: 'kimi-code/k3',
+        harness: 'kimi-code',
+      },
+      { generateAiTitle: vi.fn().mockResolvedValue(undefined) },
+    );
+    const created = decodeJsonResponse(response);
+    const name = created['name'] as string;
+    const session = created['tmuxSession'] as string;
+
+    await vi.waitFor(() => {
+      expect(conversations.getConversationByName(name)?.spawnError).toContain('bucket read failed');
+    });
+    expect(tmux.killSession).toHaveBeenCalledWith(session);
+    expect(existsSync(join(overdeckHome, 'agents', session, 'kimi-session-id'))).toBe(false);
   });
 
   it('tears down ACP creation when the initial protocol prompt fails', async () => {

@@ -27,7 +27,7 @@
 import { exec } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { mkdir as mkdirAsync, readdir as readdirAsync, readFile as readFileAsync, rm as rmAsync, stat as statAsync, writeFile as writeFileAsync } from 'node:fs/promises';
+import { mkdir as mkdirAsync, readdir as readdirAsync, readFile as readFileAsync, rename as renameAsync, rm as rmAsync, stat as statAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -283,6 +283,20 @@ export function writeKimiSessionId(agentId: string, sessionId: string, overdeckH
  */
 const KIMI_CAPTURE_LOCK_POLL_MS = 250;
 const KIMI_CAPTURE_LOCK_MAX_WAIT_MS = 90_000; // > SPAWN_READY_TIMEOUT_MS, so a single holder's worst case never starves a waiter
+// PAN-1837 review fix (cycle 8): bounded age fallback for an ownerless lock
+// (owner.json missing, corrupt, or never durably written — e.g. the holder
+// died between mkdir succeeding and the write/rename completing). isPidDead
+// deliberately returns false for an unreadable pid, so without this fallback
+// such a lock is NEVER reclaimed and every future launch for that bucket
+// waits out the full budget and fails, forever. 75s comfortably exceeds the
+// legitimate worst-case single hold (~60-65s: snapshot + createSession +
+// SPAWN_READY_TIMEOUT_MS capture poll + persist) while staying under
+// KIMI_CAPTURE_LOCK_MAX_WAIT_MS so a waiter's own budget doesn't expire
+// first. This age check applies ONLY when a live PID could not be
+// determined — a lock whose owner.json names a confirmed-alive PID is never
+// reclaimed by age, preserving the "never delete a lock held by a live
+// process" invariant.
+const KIMI_CAPTURE_LOCK_STALE_AGE_MS = 75_000;
 
 interface KimiCaptureLockOwner {
   pid: number;
@@ -304,9 +318,32 @@ function kimiCaptureLockPath(bucketKey: string): string {
 
 async function readKimiCaptureLockOwner(lockPath: string): Promise<Partial<KimiCaptureLockOwner>> {
   try {
-    return JSON.parse(await readFileAsync(join(lockPath, 'owner.json'), 'utf8')) as Partial<KimiCaptureLockOwner>;
+    const parsed = JSON.parse(await readFileAsync(join(lockPath, 'owner.json'), 'utf8')) as Partial<KimiCaptureLockOwner>;
+    // A corrupt/partial write can still parse as valid JSON missing pid, or
+    // with a pid of the wrong type — treat anything that isn't a genuine
+    // positive integer pid as "no usable owner", same as a read failure.
+    if (typeof parsed.pid !== 'number' || !Number.isInteger(parsed.pid) || parsed.pid <= 0) return {};
+    return parsed;
   } catch {
     return {};
+  }
+}
+
+/**
+ * True once the lock directory itself (not owner.json) is older than the
+ * stale-age bound. mkdir sets this directory's mtime at creation, and it is
+ * never touched again once owner.json (a fresh directory entry) — if ever
+ * written — settles, so this is trustworthy even when owner.json itself
+ * never made it to disk.
+ */
+async function isKimiCaptureLockDirStale(lockPath: string): Promise<boolean> {
+  try {
+    const dirStat = await statAsync(lockPath);
+    return Date.now() - dirStat.mtimeMs > KIMI_CAPTURE_LOCK_STALE_AGE_MS;
+  } catch {
+    // The lock directory vanished between our failed mkdir and this stat —
+    // the holder already released it; the next acquire attempt will succeed.
+    return true;
   }
 }
 
@@ -318,9 +355,16 @@ async function acquireKimiCaptureLock(lockPath: string): Promise<void> {
     try {
       await mkdirAsync(lockPath, { mode: 0o700 });
       const owner: KimiCaptureLockOwner = { pid: process.pid, acquiredAt: new Date().toISOString() };
+      // Atomic write: write to a per-process temp file, then rename into
+      // place. rename() is atomic on POSIX, so owner.json is either fully
+      // absent or fully valid — never a partial write left behind by a
+      // process that died mid-write.
+      const tmpPath = join(lockPath, `owner.${process.pid}.${Date.now()}.tmp`);
       try {
-        await writeFileAsync(join(lockPath, 'owner.json'), JSON.stringify(owner, null, 2), 'utf8');
+        await writeFileAsync(tmpPath, JSON.stringify(owner, null, 2), 'utf8');
+        await renameAsync(tmpPath, join(lockPath, 'owner.json'));
       } catch (error) {
+        try { await rmAsync(tmpPath, { force: true }); } catch { /* best effort */ }
         try { await rmAsync(lockPath, { recursive: true, force: true }); } catch { /* best effort */ }
         throw error;
       }
@@ -328,10 +372,20 @@ async function acquireKimiCaptureLock(lockPath: string): Promise<void> {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       const owner = await readKimiCaptureLockOwner(lockPath);
-      if (isPidDead(owner.pid)) {
-        // The process that held this lock is gone (crashed CLI invocation,
-        // killed Deacon child, …) — reclaim rather than wait out the full
-        // budget for a holder that will never release it.
+      if (owner.pid !== undefined) {
+        if (isPidDead(owner.pid)) {
+          // The process that held this lock is gone (crashed CLI invocation,
+          // killed Deacon child, …) — reclaim rather than wait out the full
+          // budget for a holder that will never release it.
+          await rmAsync(lockPath, { recursive: true, force: true });
+          continue;
+        }
+        // A confirmed-alive pid holds this lock — keep waiting; never
+        // reclaim by age when liveness is actually known.
+      } else if (await isKimiCaptureLockDirStale(lockPath)) {
+        // No usable owner record (missing/corrupt/never durably written) and
+        // the lock directory itself is old enough that no legitimate holder
+        // could still be mid-capture — reclaim.
         await rmAsync(lockPath, { recursive: true, force: true });
         continue;
       }

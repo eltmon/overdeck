@@ -824,12 +824,22 @@ export async function spawnConversationSession(
       // stays held until this conversation's session directory is captured —
       // that's what makes the next queued launch's snapshot see it as
       // "existing" rather than racing to claim it too.
-      try {
-        const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
-        const sessionId = await waitForNewKimiSessionAsync(join(homedir(), '.kimi-code'), cwd, kimiExistingSessionsBefore);
-        if (sessionId) writeKimiSessionId(tmuxSession, sessionId);
-      } catch {
+      //
+      // PAN-1837 review fix (cycle 8): a null capture or a thrown error here
+      // used to be silently absorbed, so the conversation was still reported
+      // healthy with no kimi-session-id pointer — transcript/cost resolution
+      // then falls back to the newest session in the shared cwd bucket, which
+      // can render a DIFFERENT conversation's or agent's prompts/transcript
+      // under this identity. Require a real captured id or fail the launch,
+      // same fail-closed contract as spawnAgent/restartAgent/recoverAgent.
+      const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+      const sessionId = await waitForNewKimiSessionAsync(join(homedir(), '.kimi-code'), cwd, kimiExistingSessionsBefore);
+      if (!sessionId) {
+        throw new Error(
+          `kimi-code session capture timed out for ${tmuxSession} — no new session directory appeared under the workspace bucket`,
+        );
       }
+      writeKimiSessionId(tmuxSession, sessionId);
     }
   };
 
@@ -912,7 +922,10 @@ export async function handleConversationCreate(
       } catch (spawnErr: unknown) {
         const msg = spawnErr instanceof Error ? spawnErr.message : String(spawnErr);
         console.error(`[conversations] background spawn failed for ${tmuxSession}: ${msg}`);
-        if (harness === 'acp') await stopConversationRuntime(conv, name);
+        // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
+        // acp — a failed capture must not leave a running tmux session with
+        // no owned native identity presented as a healthy conversation.
+        if (harness === 'acp' || harness === 'kimi-code') await stopConversationRuntime(conv, name);
         updateSpawnError(name, msg);
         getEventStore().emitOnly({ type: 'conversation.created', timestamp: new Date().toISOString(), payload: { conversationName: name } });
       }
@@ -994,7 +1007,10 @@ export async function handleConversationResume(
       markConversationActive(name);
       return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });
     } catch (error) {
-      if (harness === 'acp') await stopConversationRuntime(conv, name);
+      // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
+      // acp — a failed capture must not leave a running tmux session with no
+      // owned native identity presented as a healthy conversation.
+      if (harness === 'acp' || harness === 'kimi-code') await stopConversationRuntime(conv, name);
       throw error;
     } finally {
       respawn.done();
@@ -1053,7 +1069,10 @@ export async function handleConversationRestartAll(
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[conversations] Failed to restart ${conv.name}:`, msg);
-        if (attemptedHarness === 'acp') await stopConversationRuntime(conv, conv.name);
+        // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
+        // acp — a failed capture must not leave a running tmux session with no
+        // owned native identity presented as a healthy conversation.
+        if (attemptedHarness === 'acp' || attemptedHarness === 'kimi-code') await stopConversationRuntime(conv, conv.name);
         results.push({ name: conv.name, model: conv.model, status: 'failed' });
       } finally {
         respawn.done();
