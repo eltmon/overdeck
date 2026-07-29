@@ -554,6 +554,15 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/workspaces/:issueId/containers/:containerName/:action', kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Docker ops; outside 8 remodel domains' },
   { surface: 'POST /api/workspaces/:issueId/memory-summary',         kind: 'http', disposition: 'WRITE',       door: 'MemoryWriter.generateSummary' },
   { surface: 'POST /api/workspaces/:issueId/refresh-db',             kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'DB refresh; outside 8 remodel domains' },
+
+  // ── workspace-registry.ts (PAN-1990, distinct from workspaces.ts above) ────
+  { surface: 'GET /api/workspace-registry',                          kind: 'http', disposition: 'READ',        door: 'workspaces/resolver.ts (listWorkspaces + review-status badge)' },
+  { surface: 'GET /api/workspace-registry/:id',                      kind: 'http', disposition: 'READ',        door: 'workspaces/resolver.ts (getWorkspaceById)' },
+  { surface: 'GET /api/workspace-registry/:id/memory',                kind: 'http', disposition: 'READ',        door: 'MemoryResolver (readCurrentStatus + readRecentObservations)' },
+  { surface: 'POST /api/workspace-registry/:id/activate',             kind: 'http', disposition: 'WRITE',       door: 'workspaces/writer.ts (touchWorkspaceAccessed)' },
+  { surface: 'POST /api/workspace-registry/:id/archive',              kind: 'http', disposition: 'WRITE',       door: 'workspaces/writer.ts (archiveWorkspace/unarchiveWorkspace)' },
+  { surface: 'POST /api/workspace-registry/:id/favorite',             kind: 'http', disposition: 'WRITE',       door: 'workspaces/writer.ts (setWorkspaceFavorite)' },
+  { surface: 'PUT /api/workspace-registry/:id/layout',                kind: 'http', disposition: 'WRITE',       door: 'workspaces/writer.ts (updateWorkspaceLayout)' },
   { surface: 'GET /api/review/:issueId/status',                      kind: 'http', disposition: 'READ',        door: 'IssuesResolver.get (reviewOutcome + testOutcome + verificationOutcome)' },
   { surface: 'POST /api/review/:issueId/status',                     kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance (verdict edge)' },
   { surface: 'POST /api/review/:issueId/trigger',                    kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("in_review")' },

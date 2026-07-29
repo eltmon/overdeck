@@ -25,6 +25,7 @@ import { assertMemorySafeSegment } from '../../../lib/memory/paths.js';
 import { hasDashboardInternalToken } from './dashboard-auth.js';
 import { ReadModelService } from '../read-model.js';
 import { getConversationByClaudeSessionId, updateConversationTitle, type LegacyConversation } from '../../../lib/overdeck/conversations.js';
+import { getWorkspaceById } from '../../../lib/workspaces/resolver.js';
 import { derivePromptTitle } from '../../../lib/conversations/transcript-summary.js';
 import { generateAiTitle, resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
 import { handleTurnComplete } from '../../../lib/overdeck/title-refinement.js';
@@ -130,7 +131,8 @@ export async function handleMemoryTurnBody(
   let agentState: AgentState | null = null;
   const trustedTranscriptPath = options.resolveTranscriptPath
     ? await options.resolveTranscriptPath(body, sessionId)
-    : resolveTrustedTranscriptPathFromState(agentState = await resolveAgentState(body, sessionId, options.resolveAgentIdBySessionId), sessionId);
+    : resolveTrustedTranscriptPathFromState(agentState = await resolveAgentState(body, sessionId, options.resolveAgentIdBySessionId), sessionId)
+      ?? resolveTrustedTranscriptPathFromConversation(sessionId);
   if (!trustedTranscriptPath || resolve(transcriptPath) !== trustedTranscriptPath) {
     return { status: 'error', statusCode: 422, error: 'transcript path could not be verified' };
   }
@@ -141,7 +143,7 @@ export async function handleMemoryTurnBody(
   const identity = payloadIdentity
     ?? (options.resolveIdentity
       ? await options.resolveIdentity(body, sessionId)
-      : resolveMemoryIdentityFromState(agentState, sessionId));
+      : resolveMemoryIdentityFromState(agentState, sessionId) ?? resolveMemoryIdentityFromConversation(sessionId));
   if (!identity) {
     return { status: 'error', statusCode: 422, error: 'memory identity could not be resolved' };
   }
@@ -595,7 +597,8 @@ async function resolveMemoryIdentity(
   sessionId: string,
   resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>,
 ): Promise<MemoryIdentity | null> {
-  return resolveMemoryIdentityFromState(await resolveAgentState(body, sessionId, resolveAgentIdBySessionId), sessionId);
+  const state = await resolveAgentState(body, sessionId, resolveAgentIdBySessionId);
+  return resolveMemoryIdentityFromState(state, sessionId) ?? resolveMemoryIdentityFromConversation(sessionId);
 }
 
 function resolveMemoryIdentityFromState(state: AgentState | null, sessionId: string): MemoryIdentity | null {
@@ -611,16 +614,44 @@ function resolveMemoryIdentityFromState(state: AgentState | null, sessionId: str
   };
 }
 
+/**
+ * PAN-1990: a conversation (no work agent, no issue) still has a memory
+ * identity when its row carries workspace_id — a main/scratch workspace
+ * turn (PRD D-6). issueId is null; runId is the conversation's tmux session
+ * name (mirrors how the agent-state path uses the agent's own id).
+ */
+function resolveMemoryIdentityFromConversation(sessionId: string): MemoryIdentity | null {
+  const conversation = getConversationByClaudeSessionId(sessionId);
+  if (!conversation?.workspaceId) return null;
+  const workspace = getWorkspaceById(conversation.workspaceId);
+  if (!workspace) return null;
+  return {
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    issueId: null,
+    runId: conversation.tmuxSession,
+    sessionId,
+    agentRole: 'conversation',
+    agentHarness: conversation.harness ?? 'claude-code',
+  };
+}
+
 async function resolveTrustedTranscriptPath(
   body: Record<string, unknown>,
   sessionId: string,
   resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>,
 ): Promise<string | null> {
-  return resolveTrustedTranscriptPathFromState(await resolveAgentState(body, sessionId, resolveAgentIdBySessionId), sessionId);
+  const state = await resolveAgentState(body, sessionId, resolveAgentIdBySessionId);
+  return resolveTrustedTranscriptPathFromState(state, sessionId) ?? resolveTrustedTranscriptPathFromConversation(sessionId);
 }
 
 function resolveTrustedTranscriptPathFromState(state: AgentState | null, sessionId: string): string | null {
   return state ? resolve(sessionFilePath(state.workspace, sessionId)) : null;
+}
+
+function resolveTrustedTranscriptPathFromConversation(sessionId: string): string | null {
+  const conversation = getConversationByClaudeSessionId(sessionId);
+  return conversation ? resolve(sessionFilePath(conversation.cwd, sessionId)) : null;
 }
 
 async function resolveAgentState(

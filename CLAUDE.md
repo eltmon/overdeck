@@ -463,6 +463,31 @@ Key rules:
 
 See [`docs/AGENT-STATE-PLANES.md`](docs/AGENT-STATE-PLANES.md) for the full model.
 
+## Workspaces & Projects (PAN-1990)
+
+The `projects`/`workspaces`/`project_targets`/`pinned_docs` tables are a
+first-class domain in the runtime plane above: one row per registered project
+and one row per git worktree Overdeck knows about (`kind`: `main` — exactly
+one per project — `issue`, or `scratch`). Reads go through
+`src/lib/workspaces/resolver.ts`, writes through
+`src/lib/workspaces/writer.ts` — no other module may touch these tables
+directly (`scripts/guard-workspace-doors.sh` enforces this in `npm run lint`).
+`pan admin db rebuild-workspaces` reconstructs them from `projects.yaml`, a
+worktree scan, and memory-home identity records, the same disposable-cache
+pattern `rebuild-agents` uses for the `agents` table. Full model, cardinalities,
+and the polyrepo wrapper-repo git posture: [`docs/WORKSPACES-AND-PROJECTS.md`](docs/WORKSPACES-AND-PROJECTS.md).
+
+**Memory is keyed by workspace UUID, not issue id**: observations, pending
+turns, status, and summaries live under
+`~/.overdeck/memory/{projectId}/{workspaceId}/…`. A conversation with no
+spawned agent (a main/scratch workspace turn) still gets a full
+`MemoryIdentity` — `issueId` is nullable and `agentRole` accepts
+`'conversation'` precisely so a non-issue turn has somewhere to attribute its
+observations. `pan memory search --global` and `pan memory pin/unpin/pins`
+read/write through the same two doors; `pan memory backfill` retroactively
+extracts observations from historical Claude Code JSONL transcripts, matching
+each session's cwd to a workspace via `resolveWorkspaceForCwd()`.
+
 ## Project Resolution from Issue IDs
 
 Issue IDs are resolved to projects via `resolveProjectFromIssue()` in `src/lib/projects.ts`

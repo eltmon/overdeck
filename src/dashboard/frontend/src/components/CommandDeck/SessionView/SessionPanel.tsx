@@ -335,7 +335,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
           // dismissed or lost, and the operator needs a way back to the
           // question without hunting for it.
           <AwaitingInputIndicator
-            kinds={hasPendingPermission ? ['permissionRequest'] : ['askUserQuestion']}
+            kinds={session.pendingInputKinds ?? (hasPendingPermission ? ['permissionRequest'] : ['askUserQuestion'])}
             onClick={() => requestAskUserQuestionReopen(session.sessionId)}
           />
         )}

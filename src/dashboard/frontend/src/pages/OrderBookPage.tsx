@@ -238,7 +238,7 @@ export function OrderBookPage() {
             </section>
 
             <section className="grid gap-3 lg:grid-cols-2">
-              <RunSettingsPanel settings={selected.settings} onChange={patchSettings} />
+              <RunSettingsPanel key={selected.id} settings={selected.settings} onChange={patchSettings} />
               <ValidationPanel
                 status={selected.status}
                 blocks={selected.validation?.blocks ?? []}

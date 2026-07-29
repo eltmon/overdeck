@@ -20,8 +20,24 @@ import {
   runDestructiveIssueLifecycle,
 } from './issue-transitions.js';
 import { resolveIssueProjectPathSync } from './issue-reads.js';
+import { getWorkspaceForIssue } from '../workspaces/resolver.js';
+import { archiveWorkspace } from '../workspaces/writer.js';
 
 const execAsync = promisify(exec);
+
+/**
+ * PAN-1990: archive (never delete) the issue's workspace row. Row and memory
+ * home survive directory/stack teardown on both the cleanup and deep-wipe
+ * paths; only is_archived flips. Non-fatal — a missing row (not yet
+ * backfilled) or a write failure must never block the destructive teardown
+ * this function is called alongside.
+ */
+export async function archiveIssueWorkspaceRow(issueId: string): Promise<void> {
+  try {
+    const row = getWorkspaceForIssue(issueId);
+    if (row) await archiveWorkspace(row.id);
+  } catch { /* non-fatal */ }
+}
 
 type EventStoreLike = {
   append(event: Record<string, unknown>): Effect.Effect<unknown, unknown>;
@@ -89,6 +105,8 @@ export async function cleanupWorkspaceForIssue(rawId: string, eventStore: EventS
     cleanupLog.push(`Removed agent state: ${agentDir}`);
   }
 
+  await archiveIssueWorkspaceRow(id);
+
   await Effect.runPromise(eventStore.append({
     type: 'workspace.deleted',
     timestamp: new Date().toISOString(),
@@ -140,6 +158,7 @@ export async function deepWipeIssue(
       });
 
       if (result.success) {
+        await archiveIssueWorkspaceRow(id.toUpperCase());
         await Effect.runPromise(eventStore.appendAsync(operatorInterventionEvent({
           issueId: id.toUpperCase(),
           kind: 'deep_wipe',

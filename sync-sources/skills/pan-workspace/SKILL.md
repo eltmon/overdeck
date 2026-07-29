@@ -1,0 +1,54 @@
+---
+name: pan-workspace
+description: "pan workspace new/main/get/activate/archive — the PAN-1990 projects/workspaces domain: kinds, doors, memory homes"
+triggers:
+  - pan workspace new
+  - pan workspace main
+  - scratch workspace
+  - workspace kind
+allowed-tools:
+  - Bash
+  - Read
+---
+
+# Pan Workspace (PAN-1990 domain)
+
+`pan workspace` is overloaded — it also carries the older PAN-428 issue/git-worktree
+lifecycle (`create`, `migrate`, `ssh`, `destroy`, …), which this skill does **not**
+cover. This skill wraps only the newer projects/workspaces domain: every registered
+project has exactly one `main` workspace plus any number of `issue` (one per tracked
+issue) and `scratch` (ad-hoc, unattached to an issue) workspaces, all rows in the
+`workspaces` table read through `src/lib/workspaces/resolver.ts` and written through
+`src/lib/workspaces/writer.ts` — see `docs/WORKSPACES-AND-PROJECTS.md` for the full
+model.
+
+## Commands
+
+```bash
+pan workspace new <name> [--project <key>] [--isolated] [--parent-branch <branch>]
+pan workspace main [--project <key>]
+pan workspace get <ws>
+pan workspace activate <ws>
+pan workspace archive <ws>
+pan workspace list [--kind <main|issue|scratch>] [--archived] [--json] [--all]
+```
+
+## Notes
+
+- `new <name>` creates a **scratch** workspace. By default it shares the project's
+  primary directory (same worktree, no new branch); pass `--isolated` to create a
+  separate git worktree instead, with `--parent-branch` overriding the inferred
+  parent (defaults to the project's current branch).
+- `main [--project <key>]` resolves the project's singleton main workspace, creating
+  it if it doesn't exist yet. There is exactly one `main` workspace per project —
+  `archive` refuses to touch it.
+- `--project <key>` on `new`/`main` defaults to the sole registered project, or the
+  one resolved from the current working directory, when omitted.
+- `get <ws>` prints the full row (id, kind, project, path, branch, issue, archived,
+  favorite, lastAccess) for a workspace id.
+- `activate <ws>` bumps `lastAccessedAt` (drives most-recent-first ordering in the
+  Sidebar and Cmd-K switcher) and prints a hint to restore `layoutConfig` if the
+  workspace has a saved dashboard pane arrangement.
+- `archive <ws>` is reversible and refuses `kind=main`.
+- `list --kind <kind>` reads through the resolver the same way the dashboard does;
+  add `--archived` to include archived rows (only meaningful together with `--kind`).

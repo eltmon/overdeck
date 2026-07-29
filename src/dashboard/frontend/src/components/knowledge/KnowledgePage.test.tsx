@@ -81,6 +81,7 @@ describe('KnowledgePage', () => {
       deacon: '/deacon',
       sessions: '/sessions',
       'awaiting-merge': '/awaiting-merge',
+      workspace: '/workspace',
     });
   });
 

@@ -62,9 +62,11 @@ These are narrow add actions. Editing, validation, settings, ordering, and lifec
 
 ### Pickup posture
 
-**OPEN** permits eligible book items to dispatch. It is neutral because an open gate is the normal rest state.
+**OPEN** permits eligible book items to dispatch and renders blue-tinted — dispatch is live, machine working.
 
-**DRAIN** blocks every new book dispatch and appears in amber with who set it, when, and why. Work already in the pipeline continues toward a terminal state.
+**DRAIN** blocks every new book dispatch and renders amber — a human paused pickup. Work already in the pipeline continues toward a terminal state.
+
+Run settings always show posture attribution — who set it, when, and why — beneath the posture control, regardless of which posture is active. If the recorded reason predates the current posture (for example, a leftover "Operator paused new pickup." reason after reopening), an amber stale-reason flag calls that out.
 
 ### Lane A
 
@@ -92,7 +94,7 @@ Use **Preview brief** to inspect the scope that the Flywheel will receive before
 
 ### Setup and Progress
 
-**Setup** contains the book editor, run settings, add rails, and validation.
+**Setup** contains the book editor, run settings, add rails, and validation. Run settings save automatically per field: each field shows its own saved or error state beside its label, and a failed save offers Retry rather than silently discarding the change.
 
 **Progress** turns the book into a live checklist. For held issues it shows the same mechanical conditions used by the server dispatch gate:
 

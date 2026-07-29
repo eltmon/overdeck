@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
+import { ChevronLeft, X } from 'lucide-react';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import type { SubagentSummary } from './chat-types';
+
+/** Mirrors the Awareness rail's collapse persistence (PAN-1591 pattern). */
+const AGENTS_RAIL_COLLAPSED_KEY = 'overdeck.ui.agentsRailCollapsed';
 
 interface SubagentRailProps {
   conversation: Conversation;
@@ -41,8 +45,32 @@ export function useSubagentSelection(subagents: readonly SubagentSummary[]) {
 
 export function SubagentRail({ conversation, subagents, selectedAgentId }: SubagentRailProps) {
   const select = useCallback((agentId: string | null) => updateSelectedSubagent(agentId), []);
+  const [collapsed, setCollapsed] = useState(
+    () => typeof window !== 'undefined' && localStorage.getItem(AGENTS_RAIL_COLLAPSED_KEY) === 'true',
+  );
+  const toggleCollapsed = useCallback((next: boolean) => {
+    setCollapsed(next);
+    try { localStorage.setItem(AGENTS_RAIL_COLLAPSED_KEY, String(next)); } catch { /* ignore */ }
+  }, []);
 
   if (subagents.length === 0) return null;
+
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        className="flex w-[30px] min-w-[30px] shrink-0 cursor-pointer flex-col items-center gap-2.5 border-l border-border bg-card pt-2.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        onClick={() => toggleCollapsed(false)}
+        title="Show Agents"
+        aria-label="Show agents rail"
+      >
+        <ChevronLeft size={16} />
+        <span className="text-[10px] font-medium uppercase tracking-[0.08em] [writing-mode:vertical-rl]">
+          Agents
+        </span>
+      </button>
+    );
+  }
 
   return (
     <aside
@@ -51,6 +79,14 @@ export function SubagentRail({ conversation, subagents, selectedAgentId }: Subag
     >
       <header className="flex h-11 shrink-0 items-center border-b border-border px-3 text-xs font-medium text-muted-foreground">
         Agents
+        <button
+          type="button"
+          className="ml-auto rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          aria-label="Collapse agents rail"
+          onClick={() => toggleCollapsed(true)}
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <AgentRow

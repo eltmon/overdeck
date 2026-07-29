@@ -11,16 +11,9 @@ import { extractFromTranscriptDelta } from '../../../src/lib/memory/pipeline.js'
 import { commitStatusRollup } from '../../../src/lib/memory/rollup.js';
 import { recordExtractionCost } from '../../../src/lib/memory/providers/types.js';
 import { readPendingTurns } from '../../../src/lib/memory/pending.js';
+import { createWorkspace, upsertProjectFromConfig } from '../../../src/lib/workspaces/writer.js';
 
-const identity: MemoryIdentity = {
-  projectId: 'overdeck',
-  workspaceId: 'feature-pan-1052',
-  issueId: 'PAN-1052',
-  runId: 'run-1',
-  sessionId: 'session-1',
-  agentRole: 'work',
-  agentHarness: 'claude-code',
-};
+let identity: MemoryIdentity;
 
 let tempDir: string | null = null;
 let originalHome: string | undefined;
@@ -33,6 +26,24 @@ beforeEach(async () => {
   // Use odb.home as tempDir so memory files and overdeck DB share the same root.
   odb = setupOverdeckTestDb();
   tempDir = odb.home;
+
+  upsertProjectFromConfig('overdeck', { name: 'Overdeck', path: join(odb.home, 'overdeck') });
+  const workspaceId = await createWorkspace({
+    projectId: 'overdeck',
+    kind: 'issue',
+    name: 'feature-pan-1052',
+    path: join(odb.home, 'workspaces', 'feature-pan-1052'),
+    issueId: 'PAN-1052',
+  });
+  identity = {
+    projectId: 'overdeck',
+    workspaceId,
+    issueId: 'PAN-1052',
+    runId: 'run-1',
+    sessionId: 'session-1',
+    agentRole: 'work',
+    agentHarness: 'claude-code',
+  };
 });
 
 afterEach(async () => {
@@ -96,7 +107,7 @@ describe('PAN-1052 memory extraction end-to-end flow', () => {
       agentRole: observation.agentRole,
     }))).toEqual(Array.from({ length: 6 }, () => ({
       projectId: 'overdeck',
-      workspaceId: 'feature-pan-1052',
+      workspaceId: identity.workspaceId,
       issueId: 'PAN-1052',
       sessionId: 'session-1',
       agentRole: 'work',
@@ -105,7 +116,7 @@ describe('PAN-1052 memory extraction end-to-end flow', () => {
     expect(rollupJobs).toHaveLength(1);
     expect(rollupJobs[0]!.map((turn) => turn.id)).toHaveLength(4);
     expect(rollupJobs[0]!.every((turn) => turn.id.startsWith('pending-'))).toBe(true);
-    expect(await readPendingTurns(identity.projectId, identity.issueId)).toHaveLength(2);
+    expect(await readPendingTurns(identity.projectId, identity.workspaceId)).toHaveLength(2);
 
     expect((await searchMemoryCli('6', { project: identity.projectId, issue: identity.issueId })).map((hit) => hit.observation.id))
       .toEqual(['obs-6']);
@@ -203,7 +214,7 @@ async function fileSize(path: string): Promise<number> {
 }
 
 async function readPersistedObservations(): Promise<MemoryObservation[]> {
-  const path = join(tempDir!, 'memory/overdeck/PAN-1052/observations/2026-05-16.jsonl');
+  const path = join(tempDir!, 'memory/overdeck', identity.workspaceId, 'observations/2026-05-16.jsonl');
   const raw = await readFile(path, 'utf8');
   return raw.trim().split('\n').map((line) => JSON.parse(line) as MemoryObservation);
 }

@@ -71,6 +71,9 @@ beforeEach(() => {
     if (method === 'GET' && url === '/api/palette/commands') {
       return Response.json({ commands: [] });
     }
+    if (method === 'GET' && url === '/api/workspace-registry') {
+      return Response.json({ workspaces: [] });
+    }
     if (method === 'GET' && url.startsWith('/api/palette/search')) {
       return Response.json({ observations: [], conversations: [], memory: [], summaries: [] });
     }
@@ -142,6 +145,9 @@ describe('CommandPalette conversation results', () => {
     fetchControl = installStrictFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') {
         return Response.json({ commands: [] });
+      }
+      if (method === 'GET' && url === '/api/workspace-registry') {
+        return Response.json({ workspaces: [] });
       }
       if (method === 'GET' && url.startsWith('/api/palette/search')) {
         return Response.json({
@@ -287,5 +293,70 @@ describe('CommandPalette navigation actions', () => {
     await waitFor(() => {
       expect(onNavigate).toHaveBeenCalledWith('context');
     });
+  });
+});
+
+describe('CommandPalette workspaces switcher (PAN-1990)', () => {
+  const WORKSPACES = [
+    { id: 'ws-old', projectId: 'overdeck', kind: 'scratch', name: 'old-scratch', issueId: null, isFavorite: false, isArchived: false, title: null, lastAccessedAt: 100 },
+    { id: 'ws-fav', projectId: 'overdeck', kind: 'scratch', name: 'fav-scratch', issueId: null, isFavorite: true, isArchived: false, title: null, lastAccessedAt: 50 },
+    { id: 'ws-issue', projectId: 'overdeck', kind: 'issue', name: 'feature-pan-9001', issueId: 'PAN-9001', isFavorite: false, isArchived: false, title: null, lastAccessedAt: 200 },
+  ];
+
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/');
+    useDashboardStore.setState({ issuesRaw: [], agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: WORKSPACES });
+      if (method === 'POST' && url === '/api/workspace-registry/ws-issue/activate') return Response.json({});
+      return undefined;
+    });
+  });
+
+  function renderPaletteWithWorkspace() {
+    const onSelectWorkspace = vi.fn();
+    render(<CommandPalette isOpen onClose={vi.fn()} onNavigate={vi.fn()} onSelectWorkspace={onSelectWorkspace} />);
+    return { onSelectWorkspace };
+  }
+
+  it('ac1: lists workspaces favorites-first then most-recent-first on open', async () => {
+    renderPaletteWithWorkspace();
+
+    await waitFor(() => expect(getOptionByValue('workspace-ws-fav')).toBeInTheDocument());
+    const options = [
+      getOptionByValue('workspace-ws-fav'),
+      getOptionByValue('workspace-ws-issue'),
+      getOptionByValue('workspace-ws-old'),
+    ];
+    const order = options.map((o) => o.getAttribute('data-value'));
+    expect(order).toEqual(['workspace-ws-fav', 'workspace-ws-issue', 'workspace-ws-old']);
+  });
+
+  it('ac2: typed input shows only matching workspaces', async () => {
+    const user = userEvent.setup();
+    renderPaletteWithWorkspace();
+    await waitFor(() => expect(getOptionByValue('workspace-ws-fav')).toBeInTheDocument());
+
+    await user.type(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), 'feature-pan-9001');
+
+    await waitFor(() => expect(getOptionByValue('workspace-ws-issue')).toBeInTheDocument());
+    expect(document.querySelector('[data-value="workspace-ws-old"]')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-value="workspace-ws-fav"]')).not.toBeInTheDocument();
+  });
+
+  it('ac3: selecting a workspace activates it and opens its view', async () => {
+    const { onSelectWorkspace } = renderPaletteWithWorkspace();
+    await waitFor(() => expect(getOptionByValue('workspace-ws-issue')).toBeInTheDocument());
+
+    fireEvent.click(getOptionByValue('workspace-ws-issue'));
+
+    await waitFor(() => {
+      expect(onSelectWorkspace).toHaveBeenCalledWith('ws-issue');
+    });
+    expect(fetchControl.fetchMock).toHaveBeenCalledWith(
+      '/api/workspace-registry/ws-issue/activate',
+      expect.objectContaining({ method: 'POST' }),
+    );
   });
 });
