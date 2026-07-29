@@ -309,10 +309,10 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T03:26:02.604Z",
+  "updated": "2026-07-29T03:27:13.484Z",
   "pipeline": {
     "issueId": "PAN-1837",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -320,8 +320,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T03:26:02.240Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-29T03:27:13.444Z",
+    "reviewNotes": "Kimi session capture is mutexed only for conversations; concurrent same-cwd work spawn/restart/recovery can pin another process's session and expose the wrong transcript/cost. See .pan/review/agent-pan-1837-review-aa65ccfa/review.md.",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
       "detectedAt": "2026-07-29T00:03:35.975Z",
@@ -385,7 +385,7 @@
       },
       "costAtCloseOut": {
         "usd": 356.287282,
-        "pricingAsOf": "2026-07-29T03:26:02.495Z"
+        "pricingAsOf": "2026-07-29T03:27:13.463Z"
       }
     },
     "merges": [
