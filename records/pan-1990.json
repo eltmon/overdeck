@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T03:54:18.709Z",
+  "updated": "2026-07-29T04:10:31.216Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
     }
   ],
   "tasks": {
-    "sequence": 43,
-    "claims": {
-      "dashboard-api": {
-        "writerId": "agent-pan-1990",
-        "agentId": "agent-pan-1990",
-        "pid": 329691,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T03:54:18.709Z"
-      }
-    },
+    "sequence": 44,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -305,6 +297,16 @@
         "itemId": "memory-backfill",
         "outcome": "completed",
         "releasedAt": "2026-07-29T03:54:07.319Z"
+      },
+      {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 329691,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T03:54:18.709Z",
+        "itemId": "dashboard-api",
+        "outcome": "completed",
+        "releasedAt": "2026-07-29T04:10:31.216Z"
       }
     ],
     "statusReasons": {
@@ -401,6 +403,10 @@
     "memory-backfill.memory-backfill.ac2": "completed",
     "memory-backfill.memory-backfill.ac3": "completed",
     "memory-backfill.memory-backfill.ac4": "completed",
-    "dashboard-api": "running"
+    "dashboard-api": "completed",
+    "dashboard-api.dashboard-api.ac1": "completed",
+    "dashboard-api.dashboard-api.ac2": "completed",
+    "dashboard-api.dashboard-api.ac3": "completed",
+    "dashboard-api.dashboard-api.ac4": "completed"
   }
 }
