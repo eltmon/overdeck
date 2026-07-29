@@ -318,23 +318,23 @@
     "recordedAt": "2026-07-29T05:44:27.078Z"
   },
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T08:55:14.446Z",
+  "updated": "2026-07-29T09:00:29.163Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T05:45:20.146Z",
-    "updatedAt": "2026-07-29T08:55:14.396Z",
+    "updatedAt": "2026-07-29T09:00:29.125Z",
     "reviewNotes": "mirror retries can falsely report durability after git add or commit failures",
     "inspectNotes": "AC1: MemoryIdentity/MemoryObservation issueId -> Schema.NullOr(IssueId) in packages/contracts/src/memory.ts; new contracts memory.test.ts passes 4/4 (decodes null and a real PAN-1990 for both structs). AC2: src/lib/memory/injection.ts:110 replaces the sibling search with Promise.resolve([]) when issueId is null, so the branch is skipped rather than widened; tests/lib/memory/injection.test.ts 18/18 pass including the new null-issueId case, which seeds the same PAN-999 sibling row the positive test retrieves and asserts hitCounts.sibling===0 and no sibling docType. AC3: npm run typecheck exits 0 - contracts dts rebuild, root tsc --noEmit, hooks, evals, dashboard ratchet (61 known, none new), frontend ratchet (0). New imports verified real: getProjectSync src/lib/projects.ts:601, resolveProjectPath src/lib/projects.ts:508. Non-blocking note: the ?? workspaceId fallbacks for paths/event keys are documented as deferred to memory-paths-rekey and events-workspaceid, but updateMemoryHealth returning EMPTY_HEALTH on a null issueId drops health tracking for main/scratch turns rather than relocating it - confirm a follow-on bead owns that.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3277",
     "reviewedAtCommit": "cc815c9f3bd3ae61b20e78caf6a82a0a44f2eb77",
-    "lastVerifiedCommit": "c19e3b1084c00539feda613993f59a7eacee125a",
+    "lastVerifiedCommit": "cc815c9f3bd3ae61b20e78caf6a82a0a44f2eb77",
     "reviewSpawnedAt": "2026-07-29T08:44:44.514Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -599,18 +599,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6081571,
-            "output": 260550,
-            "cacheRead": 76971008,
+            "input": 6090037,
+            "output": 263946,
+            "cacheRead": 77911040,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 5308,
-            "output": 1309154,
-            "cacheRead": 1382306196,
-            "cacheWrite": 10512531
+            "input": 5340,
+            "output": 1327118,
+            "cacheRead": 1395465467,
+            "cacheWrite": 10544295
           }
         }
       },
@@ -622,21 +622,21 @@
           "cacheWrite": 194048
         },
         "openai/gpt-5.6-sol": {
-          "input": 6081571,
-          "output": 260550,
-          "cacheRead": 76971008,
+          "input": 6090037,
+          "output": 263946,
+          "cacheRead": 77911040,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 5308,
-          "output": 1309154,
-          "cacheRead": 1382306196,
-          "cacheWrite": 10512531
+          "input": 5340,
+          "output": 1327118,
+          "cacheRead": 1395465467,
+          "cacheWrite": 10544295
         }
       },
       "costAtCloseOut": {
-        "usd": 401.011297,
-        "pricingAsOf": "2026-07-29T08:55:14.417Z"
+        "usd": 404.516491,
+        "pricingAsOf": "2026-07-29T09:00:29.152Z"
       }
     },
     "merges": [
