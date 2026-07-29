@@ -16,18 +16,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T00:29:49.262Z",
+  "updated": "2026-07-29T00:29:56.197Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "passed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T23:34:38.914Z",
-    "inspectNotes": "All 5 ACs met and covered: resolver by-id/by-issue/by-cwd-longest-prefix (resolver.test.ts:33,43,93-122), deleteWorkspace nulls conversations.workspace_id preserving the row (writer.ts:133, test:95), refuses kind=main and drops only workspace-scoped pins (writer.ts:129-134, tests:87,114), createWorkspace main-singleton throw (writer.ts:69-71, test:48), addProjectTarget demotes prior primary in a transaction (writer.ts:39-46, test:127). FR-3 guard-workspace-doors.sh is wired into npm run lint, exits 0 on the real repo, and self-tests both directions (21/21 pass). Non-blocking: deleteWorkspace leaves agents.workspace_id dangling (FR-4 only mandates conversations); guard uses bare-word table matching so a table alias or SQL split across template lines could evade it, same limitation as lint-state-writes.sh."
+    "updatedAt": "2026-07-29T00:29:56.178Z",
+    "inspectNotes": "Inspecting item memory-contracts-nullable"
   },
   "closeOut": {
     "usage": {
@@ -42,10 +42,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 1304,
-            "output": 336700,
-            "cacheRead": 337172571,
-            "cacheWrite": 2253062
+            "input": 1796,
+            "output": 424161,
+            "cacheRead": 436550745,
+            "cacheWrite": 2823996
           }
         }
       },
@@ -57,22 +57,22 @@
           "cacheWrite": 194048
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1304,
-          "output": 336700,
-          "cacheRead": 337172571,
-          "cacheWrite": 2253062
+          "input": 1796,
+          "output": 424161,
+          "cacheRead": 436550745,
+          "cacheWrite": 2823996
         }
       },
       "costAtCloseOut": {
-        "usd": 84.893426,
-        "pricingAsOf": "2026-07-28T23:34:38.920Z"
+        "usd": 107.072005,
+        "pricingAsOf": "2026-07-29T00:29:56.190Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-1990",
