@@ -69,15 +69,7 @@
       "timestamp": "2026-07-29T09:22:35.761Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T09:22:35Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1990\n\n# Review — PAN-1990 — cycle 5 — 2026-07-29\n\n## Verdict: CHANGES REQUESTED — the corrected retry cannot reach its push fallback after a committed deletion because `git add` fails on the now-untracked path\n\n## Context\n- Branch: `feature/pan-1990`\n- PR: `#3277`\n- HEAD reviewed: `32d9670e0783cbb846633e49c8edbf111809dd06`\n- Prior cycle SHA: `cc815c9f3bd3ae61b20e78caf6a82a0a44f2eb77`\n- Cycle diff: 5 files, 170 additions, 32 deletions\n- Full PR diff: 127 files\n- Coverage: all four high-risk and five medium-risk files were covered in preceding cycles; this pass reviewed every source and test change in `cc815c9f..32d9670e` across correctness, security, requirements, and performance. No high- or medium-risk file is uncovered. The blocker is anchored in cycle-five code under the convergence gate.\n\n## Blocking Finding\n\n### ! [durability/correctness] A committed-but-unpushed deletion now fails at `git add` and never reaches the push-only retry — `src/lib/memory/state-mirror.ts:88-103`, `src/lib/pan-dir/auto-commit.ts:563-580`\nThe target-absent branch unconditionally calls `flushMirrorCommit()` before `pushPendingStateCommits()`. That repairs a prior add/commit failure while the deleted file is still tracked by `HEAD`, but it breaks the other required case: after the first attempt successfully committed the deletion and only the push failed, the file is absent from the working tree, index, and current `HEAD`. `git add -- <deleted-path>` then exits 128 with `fatal: pathspec '<path>' did not match any files`; `flushMirrorCommit()` returns `errored`, and line 90 throws before the already-created local commit can be pushed. A local real-git reproduction confirmed this exact behavior. The same error occurs for a mirror that genuinely never existed, so no-op unpins and cleanup of missing descriptors also fail instead of reaching the documented fallback. The tests mock `flushAutoCommits()` as `{ committed: false, reason: 'no diff' }`, which is not what real git returns for a path absent from `HEAD`. Distinguish tracked/staged deletions from already-committed or never-tracked paths before choosing commit retry versus push-only retry, and add a real-git regression test for the committed-deletion case.\n\n## Convergence Note\n\nThis blocker is introduced by `32d9670e`: cycle 4 added the push-only retry, while cycle 5 inserted the unconditional add/commit attempt ahead of it. The previous cycle could not flag that ordering because `flushMirrorCommit()` was not called for an absent target then.\n\n## Non-blocking Findings\n\n### ~ [correctness/requirements] Polyrepo compensation now preserves the row even when every child worktree fails — `src/lib/workspace-manager/create.ts:278-290`\nSetting `worktreeCreated = true` immediately after creating the empty container correctly preserves rows for partial polyrepo success, but it also preserves an active issue row when the first and every child worktree/symlink fails. The empty directory is retryable because the pre-worktree staging helper accepts an empty directory, so this does not block the cycle, but the registry temporarily advertises an unusable workspace. Tracking whether any child was actually created would preserve partial work while still compensating a total failure.\n\n### ~ [security] `O_NOFOLLOW` protects only the final pathname component — `src/lib/memory/pin-path.ts:83-104`\nThe changed open now fails closed if the final `realTarget` component is swapped for a symlink, resolving the concrete final-component race from cycle 4. A concurrent local writer can still replace an ancestor directory between `realpath()` and `open()`, as the code comment acknowledges. This remains a narrow local-filesystem advisory rather than a remotely exploitable blocker.\n\n### ~ [performance/availability] Every absent mirror first invokes the full commit flush path — `src/lib/memory/state-mirror.ts:88-100`\nEven a never-created descriptor now queues a commit, fetches the branch, and attempts `git add` before deciding whether a push retry is needed. Besides the blocking pathspec behavior, this adds avoidable Git/network work to no-op unpins and workspace cleanup. A concrete deletion-intent check should select the recovery path without running both flows speculatively.\n\n## Resolved From Cycle 4\n\n- Retry correctly re-runs add/commit when the first attempt removed the file but failed before creating a commit.\n- Partial polyrepo creation now retains the workspace row once the polyrepo container is materialized.\n- `O_NOFOLLOW` closes the final-component symlink replacement race during pinned-document reads.\n\n## Verification Performed\n\n- `git diff --check origin/main...HEAD` passed.\n- `npm run typecheck` passed, including contracts, hooks, evals, dashboard ratchet, and frontend.\n- Focused cycle-five verification passed: 4 test files, 32 tests.\n- Real-git reproduction: after committing a file deletion, `git add -- <deleted-path>` returned exit 128 with `pathspec did not match any files`, contradicting the mocked retry test's `no diff` assumption.\n- Reviewed the complete `cc815c9f..32d9670e` source/test delta and confirmed the blocker is in cycle-five changed code.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1990/.pan/review/agent-pan-1990-review-32d9670e/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1990 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".gitignore",
@@ -328,10 +320,10 @@
     "recordedAt": "2026-07-29T05:44:27.078Z"
   },
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T09:31:44.535Z",
+  "updated": "2026-07-29T09:31:46.650Z",
   "pipeline": {
     "issueId": "PAN-1990",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -339,13 +331,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T05:45:20.146Z",
-    "updatedAt": "2026-07-29T09:31:44.481Z",
+    "updatedAt": "2026-07-29T09:31:45.168Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "AC1: MemoryIdentity/MemoryObservation issueId -> Schema.NullOr(IssueId) in packages/contracts/src/memory.ts; new contracts memory.test.ts passes 4/4 (decodes null and a real PAN-1990 for both structs). AC2: src/lib/memory/injection.ts:110 replaces the sibling search with Promise.resolve([]) when issueId is null, so the branch is skipped rather than widened; tests/lib/memory/injection.test.ts 18/18 pass including the new null-issueId case, which seeds the same PAN-999 sibling row the positive test retrieves and asserts hitCounts.sibling===0 and no sibling docType. AC3: npm run typecheck exits 0 - contracts dts rebuild, root tsc --noEmit, hooks, evals, dashboard ratchet (61 known, none new), frontend ratchet (0). New imports verified real: getProjectSync src/lib/projects.ts:601, resolveProjectPath src/lib/projects.ts:508. Non-blocking note: the ?? workspaceId fallbacks for paths/event keys are documented as deferred to memory-paths-rekey and events-workspaceid, but updateMemoryHealth returning EMPTY_HEALTH on a null issueId drops health tracking for main/scratch turns rather than relocating it - confirm a follow-on bead owns that.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3277",
     "reviewedAtCommit": "32d9670e0783cbb846633e49c8edbf111809dd06",
     "lastVerifiedCommit": "32d9670e0783cbb846633e49c8edbf111809dd06",
-    "reviewSpawnedAt": "2026-07-29T09:16:37.161Z",
+    "reviewSpawnedAt": "2026-07-29T09:31:45.166Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".gitignore",
@@ -646,7 +638,7 @@
       },
       "costAtCloseOut": {
         "usd": 431.614656,
-        "pricingAsOf": "2026-07-29T09:31:44.530Z"
+        "pricingAsOf": "2026-07-29T09:31:46.634Z"
       }
     },
     "merges": [
