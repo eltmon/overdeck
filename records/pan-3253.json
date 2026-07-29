@@ -89,17 +89,17 @@
     "recordedAt": "2026-07-29T07:45:29.088Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T08:00:52.985Z",
+  "updated": "2026-07-29T08:00:55.405Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T07:47:05.835Z",
-    "updatedAt": "2026-07-29T08:00:52.942Z",
+    "updatedAt": "2026-07-29T08:00:53.576Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed all review findings: canonical limits module, FR-2 note truncation, append-door tests, and documentation",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewedAtCommit": "cde48b2488a78f423607d229f8a86c0c7d286085",
@@ -180,7 +180,7 @@
       },
       "costAtCloseOut": {
         "usd": 39.260366,
-        "pricingAsOf": "2026-07-29T08:00:52.980Z"
+        "pricingAsOf": "2026-07-29T08:00:55.401Z"
       }
     },
     "merges": [
