@@ -219,6 +219,7 @@ __pycache__/
 .pan/
 .beads/
 .overdeck/continue.json
+.overdeck/pending-promotion.json
 .overdeck/spec.vbrief.json
 .overdeck/sessions.jsonl
 .overdeck/pipeline-verdict.json

@@ -37,7 +37,7 @@ export async function shouldRestartForPostMerge(
     await recordIntent({
       requestedBy: 'merge-step0',
       reason: assessment.reason,
-      blockedBy: assessment.verifyingIssues,
+      blockedBy: [],
     });
     (dependencies.log ?? console.log)(
       `Deploy window unsafe (${assessment.reason}) — deferring deploy to the staleness patrol`,

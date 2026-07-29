@@ -57,6 +57,12 @@ describe('hasReapablePendingInput', () => {
   it('returns false when no pending input remains', () => {
     expect(hasReapablePendingInput(makeEnrichment(0))).toBe(false)
   })
+
+  // PAN-3233 — a paneQuestion-only enrichment (no structured payload) must be
+  // reapable, or an agent parked on a prose/pane question is never cleared.
+  it('returns true for a paneQuestion-only enrichment', () => {
+    expect(hasReapablePendingInput(makeEnrichment(1, ['paneQuestion']))).toBe(true)
+  })
 })
 
 describe('buildPendingReapEvent', () => {

@@ -365,3 +365,29 @@ describe('app-server delivery tier', () => {
     }
   });
 });
+
+describe('keyedSupervisorFailureKind (PAN-1837)', () => {
+  it('classifies connect-phase failures as definitive, never ambiguous', async () => {
+    const { keyedSupervisorFailureKind } = await import('../delivery.js');
+    // A stale socket file left by a crashed supervisor refuses every connection.
+    expect(keyedSupervisorFailureKind(
+      Object.assign(new Error('connect ECONNREFUSED /home/x/.overdeck/sockets/pty-agent-a.sock'), { code: 'ECONNREFUSED' }),
+    )).toBe('connect-failed');
+    expect(keyedSupervisorFailureKind(
+      Object.assign(new Error('connect ENOENT /gone.sock'), { code: 'ENOENT' }),
+    )).toBe('connect-failed');
+    expect(keyedSupervisorFailureKind(
+      Object.assign(new Error('connect EACCES /root.sock'), { code: 'EACCES' }),
+    )).toBe('connect-failed');
+  });
+
+  it('classifies an answered non-2xx as status and everything else as ambiguous', async () => {
+    const { keyedSupervisorFailureKind, SocketPostStatusError } = await import('../delivery.js');
+    expect(keyedSupervisorFailureKind(new SocketPostStatusError(502, 'socket POST: status 502'))).toBe('status');
+    expect(keyedSupervisorFailureKind(new Error('socket POST timeout'))).toBe('ambiguous');
+    expect(keyedSupervisorFailureKind(
+      Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }),
+    )).toBe('ambiguous');
+    expect(keyedSupervisorFailureKind(undefined)).toBe('ambiguous');
+  });
+});

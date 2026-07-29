@@ -835,15 +835,17 @@ describe('gatherProjectLensSignals', () => {
     expect(membership).toEqual(expect.objectContaining({
       bucket: 'post_merge_limbo',
     }));
-    // Both convention heads are queried in both GitLab repos.
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(4);
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/frontend', ['feature/min-896']);
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/frontend', ['strike/min-896']);
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['feature/min-896']);
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['strike/min-896']);
+    // PAN-3267: one call per GitLab repo carrying every convention head, not one
+    // call per (repo × head) — the per-head fan-out stalled membership refresh
+    // and failed it outright somewhere in the fan-out on every cycle.
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(2);
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/frontend', ['feature/min-896', 'strike/min-896']);
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['feature/min-896', 'strike/min-896']);
   });
 
   it('limits merged-MR lookups to five concurrent calls across GitLab repos', async () => {
+    // PAN-3267: lookups are one-per-repo now, so the concurrency cap only binds
+    // once a project has more GitLab repos than the limit.
     const mocked = deps();
     mocked.listTrackerIssues = vi.fn().mockResolvedValue([
       { issueId: 'MIN-1', state: 'open', labels: [] },
@@ -877,8 +879,13 @@ describe('gatherProjectLensSignals', () => {
       workspace: {
         type: 'polyrepo',
         repos: [
-          { name: 'fe', path: 'frontend' },
-          { name: 'api', path: 'api' },
+          { name: 'r1', path: 'r1' },
+          { name: 'r2', path: 'r2' },
+          { name: 'r3', path: 'r3' },
+          { name: 'r4', path: 'r4' },
+          { name: 'r5', path: 'r5' },
+          { name: 'r6', path: 'r6' },
+          { name: 'r7', path: 'r7' },
           { name: 'docs', path: 'docs', remote: 'github' },
         ],
       },
@@ -892,7 +899,8 @@ describe('gatherProjectLensSignals', () => {
     releaseLookups();
     await gatherPromise;
 
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(12);
+    // One lookup per GitLab repo — the github-remote repo is never queried.
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(7);
     expect(maxActive).toBe(5);
     expect(mocked.listMergedMergeRequestHeads).not.toHaveBeenCalledWith('/test/docs', expect.any(Array));
   });
@@ -993,10 +1001,9 @@ describe('gatherProjectLensSignals', () => {
 
     await gatherProjectLensSignals(mixedPolyrepo, mocked);
 
-    // Only the api repo (GitLab forge) is queried, once for each convention head.
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(2);
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['feature/test-1']);
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['strike/test-1']);
+    // Only the api repo (GitLab forge) is queried, once, carrying both convention heads.
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(1);
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['feature/test-1', 'strike/test-1']);
     expect(mocked.listMergedMergeRequestHeads).not.toHaveBeenCalledWith('/test/frontend', expect.any(Array));
   });
 
@@ -1190,6 +1197,65 @@ describe('gatherProjectLensSignals', () => {
     const result = await gatherProjectLensSignals(project, deps());
     expect(resolvePipelineMembership(result.find((signal) => signal.issueId === 'PAN-1')!).bucket)
       .toBe('post_merge_limbo');
+  });
+
+  it('respects global concurrency limit of 5 for merged-MR lookups across multiple repos', async () => {
+    let maxConcurrentCalls = 0;
+    const callTimings: Array<{ start: number; end: number }> = [];
+
+    const mocked = deps();
+    mocked.listTrackerIssues = vi.fn().mockResolvedValue(
+      // 10 open issues → 10 × 2 = 20 candidate heads
+      Array.from({ length: 10 }, (_, i) => ({
+        issueId: `MIN-${i + 1}`,
+        state: 'open',
+        labels: [],
+      })),
+    );
+    mocked.listOpenMergeRequests = vi.fn().mockResolvedValue([]);
+    mocked.listMergedMergeRequestHeads = vi.fn().mockImplementation(async () => {
+      const startTime = Date.now();
+      const currentIndex = callTimings.length;
+      callTimings[currentIndex] = { start: startTime, end: 0 };
+
+      // Count concurrent calls at this start time
+      const concurrentNow = callTimings.filter((t) => t.start <= startTime && (t.end === 0 || t.end > startTime)).length;
+      maxConcurrentCalls = Math.max(maxConcurrentCalls, concurrentNow);
+
+      // Simulate a quick async operation (5ms)
+      await new Promise((r) => setTimeout(r, 5));
+      callTimings[currentIndex].end = Date.now();
+      return [];
+    });
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
+
+    const gitlabPolyrepo: ProjectConfig = {
+      name: 'test',
+      path: '/test',
+      issue_prefix: 'MIN',
+      gitlab_repo: 'test/test',
+      workspace: {
+        type: 'polyrepo',
+        repos: [
+          { name: 'api', path: '/test/api' },
+          { name: 'services', path: '/test/services' },
+          { name: 'workers', path: '/test/workers' },
+        ],
+      },
+    };
+
+    await gatherProjectLensSignals(gitlabPolyrepo, mocked);
+
+    // PAN-3267: 10 issues × 2 convention heads = 20 heads, but they ride one
+    // lookup per repo — 3 calls, not the 60 (repo, head) pairs this used to cost.
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(3);
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith(
+      '/test/test/api', // this fixture's repo.path is absolute, so it joins under project.path
+      expect.arrayContaining(['feature/min-1', 'strike/min-1', 'feature/min-10', 'strike/min-10']),
+    );
+    // Concurrency limit is 5, so max concurrent calls should not exceed 5
+    expect(maxConcurrentCalls).toBeLessThanOrEqual(5);
   });
 
   it('keeps forbidden disposable-state and synchronous process imports out of the gatherer', async () => {

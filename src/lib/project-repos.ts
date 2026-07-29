@@ -133,6 +133,12 @@ export interface WorkspaceRepoRoot {
   sourceBranch: string;
   targetBranch: string;
   isPolyrepo: boolean;
+  /**
+   * PAN-3254: set when a >1-repo project resolved zero sub-repo roots and the
+   * fallback points at the polyrepo wrapper. Head snapshots treat this root as
+   * unreadable rather than fabricating an anchor from the wrapper HEAD.
+   */
+  degradedPolyrepo?: boolean;
 }
 
 /** Pure mapping from resolved repos + workspace path to on-disk repo roots. */
@@ -144,14 +150,24 @@ export function computeWorkspaceRepoRootsSync(
   if (repos && repos.length > 1) {
     const roots = repos
       .filter(repo => repo.required)
-      .map(repo => ({
-        repoKey: repo.repoKey,
-        dir: join(workspacePath, repo.repoKey),
-        sourceBranch: repo.sourceBranch,
-        targetBranch: repo.targetBranch,
-        isPolyrepo: true,
-      }))
-      .filter(root => existsSync(join(root.dir, '.git')));
+      .flatMap(repo => {
+        // PAN-3254: workspaces may be laid out by repo key OR by the repo's
+        // path name (MYN declares `name: fe` / `path: frontend`); resolving by
+        // key alone left zero polyrepo roots, degrading every head snapshot to
+        // the never-moving wrapper HEAD.
+        const candidates = [...new Set([repo.repoKey, repo.repoPath].filter(Boolean))];
+        const dir = candidates
+          .map(candidate => join(workspacePath, candidate))
+          .find(candidateDir => existsSync(join(candidateDir, '.git')));
+        if (!dir) return [];
+        return [{
+          repoKey: repo.repoKey,
+          dir,
+          sourceBranch: repo.sourceBranch,
+          targetBranch: repo.targetBranch,
+          isPolyrepo: true,
+        }];
+      });
     if (roots.length > 0) return roots;
   }
 
@@ -162,6 +178,10 @@ export function computeWorkspaceRepoRootsSync(
     sourceBranch: single?.sourceBranch ?? `feature/${issueId.toLowerCase()}`,
     targetBranch: single?.targetBranch ?? 'main',
     isPolyrepo: false,
+    // PAN-3254: a >1-repo config that resolved zero sub-repo roots means this
+    // fallback points at the polyrepo WRAPPER, whose HEAD never moves — head
+    // snapshots must refuse to fabricate an anchor from it.
+    ...(repos && repos.length > 1 ? { degradedPolyrepo: true } : {}),
   }];
 }
 

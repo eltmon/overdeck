@@ -1163,9 +1163,19 @@ export const sendKeys = (
       try {
         await writeFile(tmpFile, keys, 'utf-8');
         await tmuxExecAsync(['load-buffer', '-b', bufferName, tmpFile], { encoding: 'utf-8' });
-        await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
 
         const verifyLine = deliveryVerifyLine(keys);
+        // PAN-3261: sample the choice-menu detector BEFORE our own paste lands.
+        // paneHasBlockingChoiceMenu() only recognises a menu that is still the
+        // bottom-of-pane surface, and pasted text renders below it — so every
+        // snapshot taken after we paste can report a live gate as absent, and
+        // the fail-open Enter further down then answers it. This pre-paste
+        // observation is the only uncontaminated one the tier gets. Skipped for
+        // short key sequences, which never reach that guard.
+        const menuBeforePaste = verifyLine.length >= 3
+          && paneHasBlockingChoiceMenu(await capturePaneText(sessionName, 90).catch(() => ''));
+
+        await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
         // 1.5s per attempt × 2 attempts = 3s worst case. The previous 8s × 2 = 16s
         // caused user-visible "Enter not sent" lag whenever the 10-line tail check
         // missed the verify line (e.g. tall Claude input box or wrapped paste).
@@ -1219,8 +1229,10 @@ export const sendKeys = (
           // A blocking menu swallowed the paste, and Enter would confirm ITS
           // highlighted row — at the resume gate, "Resume from summary" over
           // the operator's "as-is" (PAN-3212). Never answer a menu we did not
-          // open; see the delivery-cascade section in CLAUDE.md.
-          if (paneHasBlockingChoiceMenu(snapshot)) {
+          // open; see the delivery-cascade section in CLAUDE.md. The pre-paste
+          // observation carries the verdict whenever our own paste has since
+          // pushed the menu off the bottom of the pane (PAN-3261).
+          if (menuBeforePaste || paneHasBlockingChoiceMenu(snapshot)) {
             throw new MessageDeliveryFailed(
               `Delivery to ${sessionName} aborted: the pane is blocked on a choice menu, so the paste never reached the composer and Enter would answer that menu`,
               sessionName,

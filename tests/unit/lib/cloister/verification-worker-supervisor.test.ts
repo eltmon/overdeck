@@ -126,24 +126,24 @@ describe('verification worker supervisor', () => {
     });
   });
 
-  it('defers a new worker while a dashboard deploy is queued', async () => {
+  it('spawns a worker even while a dashboard deploy is queued (PAN-3244)', async () => {
     useFixture();
-    const queued = await recordDeployIntent({
+    await recordDeployIntent({
       requestedBy: 'agent-pan-3135',
-      reason: 'Verification is running',
-      blockedBy: ['PAN-10'],
+      reason: 'Deployment deferred because a merge specialist session is active.',
+      blockedBy: [],
     });
 
+    // Detached workers survive dashboard restarts, so a queued deploy must not
+    // defer verification admission — the old drain gate froze every project's
+    // pipeline whenever a deploy sat queued behind a busy flywheel run.
     await expect(runSupervisedVerification(
       'PAN-2597',
       '/tmp/workspace',
       { isRemote: false },
       'test',
-    )).resolves.toEqual({
-      outcome: 'deferred',
-      reason: `Verification deferred: a dashboard deploy is queued (requested ${queued.requestedAt} by agent-pan-3135). It re-runs automatically after the deploy.`,
-    });
-    expect(readVerificationWorkerState('PAN-2597')).toBeNull();
+    )).resolves.toEqual({ outcome: 'passed' });
+    expect(readVerificationWorkerState('PAN-2597')?.pid).toBeGreaterThan(0);
   });
 
   it('joins one live worker instead of starting duplicate verification', async () => {

@@ -396,6 +396,11 @@ export async function snapshotWorkspaceHeadsPromise(issueId: string, workspacePa
   // in the layering; a static edge here would risk a require cycle.
   const { resolveWorkspaceRepoRootsSync } = await import('./project-repos.js');
   const roots = resolveWorkspaceRepoRootsSync(issueId, workspacePath);
+  // PAN-3254: a degraded polyrepo resolution would snapshot the wrapper repo,
+  // whose HEAD never moves — every drift comparison against a real composite
+  // anchor then false-drifts forever (426 review cycles on MIN-901). No
+  // snapshot → consumers take their conservative unreadable/skip path.
+  if (roots.some(root => root.degradedPolyrepo)) return undefined;
   const isPolyrepo = roots.some(root => root.isPolyrepo);
   const heads: string[] = [];
   for (const root of roots) {

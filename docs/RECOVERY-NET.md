@@ -5,13 +5,16 @@ The Deacon treats recovery as a durable obligation, not a one-shot event:
 1. Derive the owed action from permanent records, tracker state, agent state,
    tmux liveness, and pane content.
 2. Classify agent gates with `getAgentResumeGateBlockReason()`.
-3. Apply `decideResumeGate(gate, intent)` for `autonomous`, `operator-start`, or
+3. Check live operator ownership with `detectPendingOperatorDecision()`. A
+   positive decision parks autonomous recovery with needs-you; only explicit
+   operator `--force` / `{ force: true }` may discard it.
+4. Apply `decideResumeGate(gate, intent)` for `autonomous`, `operator-start`, or
    `message-delivery` intent.
-4. Admit autonomous work through `decideAutonomousRedrive()`: cached memory
+5. Admit autonomous work through `decideAutonomousRedrive()`: cached memory
    verdict first, then the role concurrency reservation.
-5. Re-drive through the existing door: review obligation, planning-to-work,
+6. Re-drive through the existing door: review obligation, planning-to-work,
    stack rebuild, dead-session respawn, or swarm redispatch.
-6. Persist breaker identity `{ issue, recoveryPath, obligationGeneration,
+7. Persist breaker identity `{ issue, recoveryPath, obligationGeneration,
    tripCount }`; emit needs-you once per open trip.
 
 The recovery net also reconciles durable verdicts, terminal agent rows, and

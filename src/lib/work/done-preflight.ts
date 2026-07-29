@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import { ProcessSpawnError } from '../errors.js';
-import { isStatePlaneOnlyStatus } from '../state-plane.js';
+import { isOverdeckOwnedOnlyStatus } from '../state-plane.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { subItemsOf } from '../xbrief/types.js';
 import { runTestRequirementCheck } from './test-requirement-gate.js';
@@ -46,10 +46,10 @@ function isGeneratedHarnessStatus(porcelain: string): boolean {
   return GENERATED_HARNESS_PATHS.some((p) => path === p || path.startsWith(p.endsWith('/') ? p : `${p}/`));
 }
 
-/** Pure, exported for tests: drop state-plane and generated-harness lines from `git status --porcelain`. */
+/** Pure, exported for tests: drop Overdeck-owned (state-plane + `.pan/`/`.overdeck/` runtime) and generated-harness lines from `git status --porcelain`. */
 export function filterUncommittedPorcelainLines(porcelain: string): string[] {
   return porcelain.split('\n').map((line) => line.trimEnd()).filter(Boolean)
-    .filter((line) => !isStatePlaneOnlyStatus(line))
+    .filter((line) => !isOverdeckOwnedOnlyStatus(line))
     .filter((line) => !isGeneratedHarnessStatus(line));
 }
 

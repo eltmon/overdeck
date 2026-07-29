@@ -49,13 +49,25 @@ const CLEAR_COMPOSER = [
   '─────────────────────────────',
 ].join('\n');
 
+/**
+ * PAN-3261: the live gate is still up, but transcript output has rendered below
+ * it, so the bottom-anchored detector no longer recognises the menu. This is
+ * what every post-paste snapshot looked like during the conv/1599 incident.
+ */
+const MENU_BURIED_UNDER_OUTPUT = [
+  RESUME_GATE_MENU,
+  '',
+  '● Monitor "web deploy after 6GB memory bump" stream ended',
+].join('\n');
+
 const PAYLOAD = 'CONVERSATION RESUME:\nverify-line-payload';
 const VERIFY_LINE = 'verify-line-payload';
 
-type Scenario = 'menu' | 'composer' | 'verified';
+type Scenario = 'menu' | 'composer' | 'verified' | 'menu-buried-after-paste';
 
 function installTmuxScenario(scenario: Scenario): void {
   let submitted = false;
+  let pasted = false;
 
   execFileMock.mockImplementation(
     (_command: string, args: string[], _options: unknown, callback: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
@@ -63,12 +75,16 @@ function installTmuxScenario(scenario: Scenario): void {
       if (subcommand === 'send-keys' && args.at(-1) === 'C-m') {
         submitted = true;
       }
+      if (subcommand === 'paste-buffer') {
+        pasted = true;
+      }
 
       let stdout = '';
       if (subcommand === 'capture-pane') {
         if (scenario === 'menu') stdout = RESUME_GATE_MENU;
         if (scenario === 'composer') stdout = CLEAR_COMPOSER;
         if (scenario === 'verified') stdout = submitted ? CLEAR_COMPOSER : `${CLEAR_COMPOSER}\n${VERIFY_LINE}`;
+        if (scenario === 'menu-buried-after-paste') stdout = pasted ? MENU_BURIED_UNDER_OUTPUT : RESUME_GATE_MENU;
       }
 
       callback(null, { stdout, stderr: '' });
@@ -100,6 +116,19 @@ describe('sendKeys blocking-menu guard', () => {
 
   it('rejects without pressing Enter when a blocking menu swallowed the paste', async () => {
     installTmuxScenario('menu');
+    const { MessageDeliveryFailed, sendKeys } = await import('../../src/lib/tmux.js');
+
+    const delivery = Effect.runPromise(sendKeys('conv-test', PAYLOAD));
+    await vi.advanceTimersByTimeAsync(0);
+    const rejection = expect(delivery).rejects.toBeInstanceOf(MessageDeliveryFailed);
+    await vi.advanceTimersByTimeAsync(3_500);
+
+    await rejection;
+    expect(enterCalls()).toHaveLength(0);
+  });
+
+  it('rejects when the menu was live before the paste but output has since buried it (PAN-3261)', async () => {
+    installTmuxScenario('menu-buried-after-paste');
     const { MessageDeliveryFailed, sendKeys } = await import('../../src/lib/tmux.js');
 
     const delivery = Effect.runPromise(sendKeys('conv-test', PAYLOAD));

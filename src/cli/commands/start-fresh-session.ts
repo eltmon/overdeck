@@ -26,6 +26,11 @@
  * `pan reset-session <id>` directly — it's intentionally non-destructive and is
  * used by the harness-policy subsystem as a building block.
  */
+import {
+  detectPendingOperatorDecision,
+  type PendingOperatorDecision,
+} from '../../lib/agents/pending-decision-gate.js';
+
 export interface FreshSessionResult {
   /** False when the live session could not be cycled; `error` explains why. */
   ok: boolean;
@@ -35,14 +40,39 @@ export interface FreshSessionResult {
   error?: string;
 }
 
-export async function prepareFreshWorkAgentSession(issueId: string): Promise<FreshSessionResult> {
+export interface FreshSessionOptions {
+  force?: boolean;
+}
+
+export interface FreshSessionDeps {
+  detectPendingOperatorDecision?: (agentId: string) => Promise<PendingOperatorDecision | null>;
+}
+
+export async function prepareFreshWorkAgentSession(
+  issueId: string,
+  options: FreshSessionOptions = {},
+  deps: FreshSessionDeps = {},
+): Promise<FreshSessionResult> {
   const agentId = `agent-${issueId.toLowerCase()}`;
   const messages: string[] = [];
 
   const { getAgentStateSync, stopAgentSync, wipeAgentStateDirs } = await import('../../lib/agents.js');
   const { sessionExistsSync } = await import('../../lib/tmux.js');
+  const detectPendingDecision = deps.detectPendingOperatorDecision ?? detectPendingOperatorDecision;
 
   const priorState = getAgentStateSync(agentId);
+
+  if (!options.force) {
+    const pendingDecision = await detectPendingDecision(agentId);
+    if (pendingDecision) {
+      const reason = pendingDecision.reason.replaceAll('_', ' ');
+      return {
+        ok: false,
+        messages,
+        error: `Agent ${agentId} is waiting on an operator decision (${reason}). Answer it with 'pan answer ${issueId}' or open the Decisions panel; pass --force to discard it deliberately.`,
+      };
+    }
+  }
 
   if (sessionExistsSync(agentId)) {
     messages.push(`  --fresh: replacing the live session for ${agentId} (workspace, branch, and commits preserved)`);

@@ -180,6 +180,7 @@ export const AgentEnrichmentChangedEvent = Schema.Struct({
   timestamp: Schema.String,
   payload: Schema.Struct({
     agentId: AgentId,
+    issueId: Schema.optional(IssueId),
     role: Schema.optional(Role),
     // Optional because this event type predates these fields (PAN-440). The event
     // store is append-only, so older persisted events lack them — a required schema
