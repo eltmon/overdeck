@@ -94,7 +94,7 @@
     "recordedAt": "2026-07-29T06:18:50.753Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T07:39:36.095Z",
+  "updated": "2026-07-29T07:39:42.455Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -208,16 +208,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "boot-trim-notes": {
-        "writerId": "agent-pan-3253",
-        "agentId": "agent-pan-3253",
-        "pid": 431544,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T06:59:47.470Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3253",
@@ -262,6 +254,17 @@
         "outcome": "completed",
         "reason": "Implementation complete",
         "releasedAt": "2026-07-29T06:59:54.728Z"
+      },
+      {
+        "writerId": "agent-pan-3253",
+        "agentId": "agent-pan-3253",
+        "pid": 431544,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T06:59:47.470Z",
+        "itemId": "boot-trim-notes",
+        "outcome": "completed",
+        "reason": "Implemented note truncation in trimReviewStatusHistoryPayloads with shared bounding helper; all tests pass",
+        "releasedAt": "2026-07-29T07:39:42.455Z"
       }
     ],
     "statusReasons": {
@@ -276,6 +279,10 @@
       "docs-bounds": {
         "reason": "Implementation complete",
         "updatedAt": "2026-07-29T06:59:54.728Z"
+      },
+      "boot-trim-notes": {
+        "reason": "Implemented note truncation in trimReviewStatusHistoryPayloads with shared bounding helper; all tests pass",
+        "updatedAt": "2026-07-29T07:39:42.455Z"
       }
     }
   },
@@ -289,9 +296,12 @@
     "append-door-bound.append-door-bound.ac2": "completed",
     "append-door-bound.append-door-bound.ac3": "completed",
     "append-door-bound.append-door-bound.ac4": "completed",
-    "boot-trim-notes": "running",
+    "boot-trim-notes": "completed",
     "docs-bounds": "completed",
     "docs-bounds.docs-bounds.ac1": "completed",
-    "docs-bounds.docs-bounds.ac2": "completed"
+    "docs-bounds.docs-bounds.ac2": "completed",
+    "boot-trim-notes.boot-trim-notes.ac1": "completed",
+    "boot-trim-notes.boot-trim-notes.ac2": "completed",
+    "boot-trim-notes.boot-trim-notes.ac3": "completed"
   }
 }
