@@ -44,7 +44,7 @@
     "recordedAt": "2026-07-29T06:18:50.753Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T06:19:03.284Z",
+  "updated": "2026-07-29T06:19:53.870Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "failed",
@@ -141,16 +141,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "append-door-bound": {
-        "writerId": "agent-pan-3253",
-        "agentId": "agent-pan-3253",
-        "pid": 3347334,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T06:07:20.238Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3253",
@@ -162,12 +154,27 @@
         "outcome": "completed",
         "reason": "Added REVIEW_STATUS_NOTE_LIMIT constant and truncateHistoryNote() helper; applied truncation at 5 push sites in review-status.ts and 3 hydration mappings in review-status-db.ts; added comprehensive test coverage",
         "releasedAt": "2026-07-29T06:07:07.511Z"
+      },
+      {
+        "writerId": "agent-pan-3253",
+        "agentId": "agent-pan-3253",
+        "pid": 3347334,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T06:07:20.238Z",
+        "itemId": "append-door-bound",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-3253 dead)",
+        "releasedAt": "2026-07-29T06:19:53.822Z"
       }
     ],
     "statusReasons": {
       "notes-cap": {
         "reason": "Added REVIEW_STATUS_NOTE_LIMIT constant and truncateHistoryNote() helper; applied truncation at 5 push sites in review-status.ts and 3 hydration mappings in review-status-db.ts; added comprehensive test coverage",
         "updatedAt": "2026-07-29T06:07:07.511Z"
+      },
+      "append-door-bound": {
+        "reason": "stale claim released (agent-pan-3253 dead)",
+        "updatedAt": "2026-07-29T06:19:53.822Z"
       }
     }
   },
@@ -176,6 +183,6 @@
     "notes-cap.notes-cap.ac1": "completed",
     "notes-cap.notes-cap.ac2": "completed",
     "notes-cap.notes-cap.ac3": "completed",
-    "append-door-bound": "running"
+    "append-door-bound": "pending"
   }
 }
