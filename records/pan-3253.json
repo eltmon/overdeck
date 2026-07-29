@@ -91,7 +91,7 @@
     "recordedAt": "2026-07-29T07:45:29.088Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T07:45:30.001Z",
+  "updated": "2026-07-29T07:45:33.841Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -100,7 +100,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T07:45:30.000Z",
+    "updatedAt": "2026-07-29T07:45:33.772Z",
     "reviewNotes": "Verification failed at lint",
     "verificationNotes": "Verification FAILED at lint (84054ms):\n\n\n> @overdeck/core@0.47.1 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.47.1 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.47.1 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.47.1 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.47.1 lint:state-paths\n> bash scripts/lint-state-paths.sh\n\n✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)\n\n> @overdeck/core@0.47.1 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.47.1 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.47.1 prelint:skills\n> npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli\n\n\n> @overdeck/core@0.47.1 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.47.1 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m \n…(58721 chars elided)…\n0.74 kB\u001b[22m \u001b[2m│ gzip:   2.36 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mcodex-app-server-host.d.ts\u001b[22m\u001b[39m                     \u001b[2m  3.16 kB\u001b[22m \u001b[2m│ gzip:   1.09 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mpty-supervisor.d.ts\u001b[22m\u001b[39m                            \u001b[2m  2.20 kB\u001b[22m \u001b[2m│ gzip:   0.97 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mcli/index.d.ts\u001b[22m\u001b[39m                                 \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mlib/memory/fts-worker.d.ts\u001b[22m\u001b[39m                     \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1msupervisor/server.d.ts\u001b[22m\u001b[39m                         \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mverification-worker.d.ts\u001b[22m\u001b[39m                       \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 470 files, total: 15.59 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m4718ms\u001b[39m\n\n> @overdeck/core@0.47\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
@@ -153,10 +153,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1275,
-            "output": 58834,
-            "cacheRead": 27639746,
-            "cacheWrite": 1108729
+            "input": 1347,
+            "output": 61039,
+            "cacheRead": 29428994,
+            "cacheWrite": 1265892
           }
         }
       },
@@ -174,15 +174,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1275,
-          "output": 58834,
-          "cacheRead": 27639746,
-          "cacheWrite": 1108729
+          "input": 1347,
+          "output": 61039,
+          "cacheRead": 29428994,
+          "cacheWrite": 1265892
         }
       },
       "costAtCloseOut": {
-        "usd": 32.537423,
-        "pricingAsOf": "2026-07-29T07:43:21.829Z"
+        "usd": 32.923898,
+        "pricingAsOf": "2026-07-29T07:45:33.830Z"
       }
     },
     "merges": [
