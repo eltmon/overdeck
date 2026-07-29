@@ -35,7 +35,7 @@
     "recordedAt": "2026-07-29T03:31:46.073Z"
   },
   "created": "2026-07-29T00:18:00.558Z",
-  "updated": "2026-07-29T03:37:35.922Z",
+  "updated": "2026-07-29T03:37:41.554Z",
   "pipeline": {
     "issueId": "PAN-3254",
     "reviewStatus": "blocked",
@@ -45,9 +45,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T03:37:35.274Z",
+    "updatedAt": "2026-07-29T03:37:41.541Z",
     "reviewNotes": "Docs name a nonexistent implementation module and an invalid pan unstick recovery path",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3275",
+    "reviewedAtCommit": "da1261f22317b63e8f210b3882ae836ba32aac50",
     "reviewSpawnedAt": "2026-07-29T03:34:40.708Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -111,7 +112,7 @@
       },
       "costAtCloseOut": {
         "usd": 13.158167,
-        "pricingAsOf": "2026-07-29T03:37:35.292Z"
+        "pricingAsOf": "2026-07-29T03:37:41.550Z"
       }
     },
     "merges": [
