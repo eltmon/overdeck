@@ -47,9 +47,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-29T05:44:03.380Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-29T05:48Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-29T05:48:56.932Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-29T05:48:56Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3242\n\n# Code Review — PAN-3242\n\n## Verdict: CHANGES REQUESTED\n\nThe feature behavior and focused verification remain sound, but the branch still changes `OrderBookPage.tsx` even though the canonical PRD, xBRIEF, and this run's manifest all explicitly prohibit that file change. The prior scope blocker is unresolved.\n\n## Context\n\n- PR: #3249\n- Branch: `feature/pan-3242`\n- HEAD reviewed: `a9bc5c2daf170c16e32e2cfa54344fa958b97162`\n- Previous completed review HEAD: `7ab7097fdf630f7b166478bb5b02ac770cdbf4dc`\n- Current HEAD is a merge of newer `origin/main`; none of the four PAN-3242 feature files changed since the previous completed review.\n- PR diff: `configuration/order-books.mdx`, `RunSettingsPanel.tsx`, its focused test, and `OrderBookPage.tsx`\n- Verification: focused `RunSettingsPanel.test.tsx` passed (22 tests); `npm run typecheck:frontend` passed; `git diff --check` passed.\n\n## Blocking Findings\n\n### ⊗ The branch still violates the explicit `OrderBookPage.tsx` must-not constraint — `src/dashboard/frontend/src/pages/OrderBookPage.tsx:241`\n\n**Dimension:** requirements / acceptance criteria  \n**Scope:** in_pr_scope  \n**Evidence tier:** Tier 1 — static  \n**Requirement source:** The canonical PRD NonGoals, xBRIEF `plan.narratives.NonGoals`, and current review manifest all state: `No change to OrderBookPage.tsx, including its drain-only posture banner, or any component other than RunSettingsPanel`.\n\n**Observed:** The PR changes the call site to `<RunSettingsPanel key={selected.id} ... />`.\n\n**Impact:** The key is a correct identity boundary for preventing confirmation, debounce, save-chip, and retry state from leaking between books, but it remains outside the approved implementation surface. Review cannot silently amend a must-not requirement because the correct fix needs the parent identity.\n\n**Required resolution:** Formally revise the canonical PRD/xBRIEF scope to permit this exact one-line keying change and regenerate the review context, or remove the parent change and provide another explicitly approved stable book-identity mechanism. The current props do not expose an identity, so value-based inference inside `RunSettingsPanel` is not an acceptable substitute.\n\n## Correctness\n\nThe two original blockers remain fixed:\n\n- Keying the panel by `selected.id` prevents pending posture transactions and field state from crossing books.\n- `briefCommittedRef` ensures `old.md → new.md (in flight) → old.md` emits both intended patches instead of dropping the final edit.\n\n### ~ Same-book prop refreshes can desynchronize the brief intent ref — `src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx:117`\n\n**Demotion:** previously reviewed code, not promotable under the convergence gate.\n\n`briefCommittedRef` is initialized once, while the effect at line 120 continues to accept later `settings.briefOverlay` values. If the detail fetch or another full-book response changes the brief from `old.md` to `new.md`, the input updates to `new.md` but the ref remains `old.md`. Typing `old.md` then compares equal to the stale ref and emits no patch, leaving the UI and persisted setting divergent until remount. Future hardening should reconcile server props, local intent, and in-flight revisions through one per-field generation rather than updating either value independently.\n\n### ~ Save-state completions remain unguarded by a field generation — `src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx:134`\n\nThis unchanged advisory remains non-blocking. If same-field promises resolve out of order, an older failure or fade timer can replace a newer terminal state and expose Retry for a stale patch. The current writer serializes commits, but the component contract itself does not guarantee ordered promise completion.\n\n## Security\n\nNo findings. The change adds no endpoint or authorization boundary, React escapes persisted attribution and reason text, and brief paths continue through the existing server-side project-root constraint before use.\n\n## Performance\n\nNo findings. Render work is constant-size, lane and brief writes are debounced, and the keyed remount occurs only when the selected order book changes.\n\n## Requirements Checked\n\nFR-1 through FR-9 and NFR-1 through NFR-3 are functionally represented: atomic posture/reason confirmation, active-state styling, attribution and stale-reason detection, per-field save feedback and Retry, bounded debounced lane control, brief validation, off-book policy copy, fake-timer coverage, and documentation. Approval remains blocked solely because the correct cross-book state fix still contradicts the unrevised must-not scope.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3242/.pan/review/agent-pan-3242-review-a9bc5c2d/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3242 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md"
@@ -69,7 +82,7 @@
     "recordedAt": "2026-07-28T20:52:11.749Z"
   },
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-29T05:48:56.185Z",
+  "updated": "2026-07-29T05:48:56.932Z",
   "pipeline": {
     "issueId": "PAN-3242",
     "reviewStatus": "blocked",
