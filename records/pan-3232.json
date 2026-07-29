@@ -344,18 +344,18 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:29:25.974Z",
+  "updated": "2026-07-29T05:31:03.116Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:29:25.950Z",
-    "reviewNotes": "Agent re-review request (6/25): Fixed review issues",
+    "updatedAt": "2026-07-29T05:31:03.082Z",
+    "reviewNotes": "FR-7 tests still fail: SimpleHomePage leaks unrelated requests and the DrawerAgentSession mock omits pickDefaultDrawerAgent",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
       "detectedAt": "2026-07-29T05:03:44.105Z",
@@ -388,9 +388,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 30541939,
-            "output": 899245,
-            "cacheRead": 170546176,
+            "input": 31177836,
+            "output": 906674,
+            "cacheRead": 174538240,
             "cacheWrite": 0
           }
         },
@@ -417,15 +417,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 30541939,
-          "output": 899245,
-          "cacheRead": 170546176,
+          "input": 31177836,
+          "output": 906674,
+          "cacheRead": 174538240,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 296.284329,
-        "pricingAsOf": "2026-07-29T05:29:25.971Z"
+        "usd": 301.682716,
+        "pricingAsOf": "2026-07-29T05:31:03.104Z"
       }
     },
     "merges": [
