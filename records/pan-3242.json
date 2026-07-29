@@ -89,17 +89,17 @@
     "recordedAt": "2026-07-28T20:52:11.749Z"
   },
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-29T08:11:18.146Z",
+  "updated": "2026-07-29T08:52:26.828Z",
   "pipeline": {
     "issueId": "PAN-3242",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:52:32.420Z",
-    "updatedAt": "2026-07-29T07:41:00.053Z",
+    "updatedAt": "2026-07-29T08:52:26.597Z",
     "conflictsSince": {
       "sha": "3e981e26c497dc13d6dad0f66cd114112ce68983",
       "detectedAt": "2026-07-29T01:16:19.128Z",
@@ -112,7 +112,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3249",
     "reviewedAtCommit": "a9bc5c2daf170c16e32e2cfa54344fa958b97162",
     "lastVerifiedCommit": "a9bc5c2daf170c16e32e2cfa54344fa958b97162",
-    "reviewSpawnedAt": "2026-07-29T07:25:35.265Z"
+    "reviewSpawnedAt": "2026-07-29T08:52:26.595Z"
   },
   "closeOut": {
     "usage": {
@@ -164,7 +164,7 @@
       },
       "costAtCloseOut": {
         "usd": 64.475846,
-        "pricingAsOf": "2026-07-29T07:41:00.280Z"
+        "pricingAsOf": "2026-07-29T08:52:26.727Z"
       }
     },
     "merges": [
@@ -173,7 +173,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3242",
