@@ -154,17 +154,17 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T00:29:28.202Z",
+  "updated": "2026-07-29T00:31:10.909Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T00:29:28.173Z",
+    "updatedAt": "2026-07-29T00:31:10.859Z",
     "reviewNotes": "This cycle changes only the allowlist; FR-7 still uses an unregistered conversation route and prior blockers remain",
     "blockerReasons": [
       {
@@ -181,7 +181,6 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "e44c92fa4615961df1add72e466b132ad9ea4f1e",
     "reviewSpawnedAt": "2026-07-29T00:11:57.105Z"
   },
   "closeOut": {
@@ -213,19 +212,19 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2528,
-            "output": 70162,
-            "cacheRead": 43576934,
-            "cacheWrite": 2157805
+            "input": 2615,
+            "output": 72153,
+            "cacheRead": 45038421,
+            "cacheWrite": 2169570
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2962,
-          "output": 98035,
-          "cacheRead": 53698137,
-          "cacheWrite": 2467618
+          "input": 3049,
+          "output": 100026,
+          "cacheRead": 55159624,
+          "cacheWrite": 2479383
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -241,8 +240,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 80.62962,
-        "pricingAsOf": "2026-07-29T00:29:28.192Z"
+        "usd": 80.80052,
+        "pricingAsOf": "2026-07-29T00:31:10.903Z"
       }
     },
     "merges": [
