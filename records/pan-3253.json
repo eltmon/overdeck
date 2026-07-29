@@ -67,7 +67,7 @@
     "recordedAt": "2026-07-29T06:18:50.753Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T07:28:25.193Z",
+  "updated": "2026-07-29T07:28:30.773Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "blocked",
@@ -76,11 +76,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T07:28:24.508Z",
+    "updatedAt": "2026-07-29T07:28:30.766Z",
     "reviewNotes": "Boot-time trim still leaves 1,000-character notes unbounded; the new focused test and GitHub CI test check fail, so boot-trim-notes.ac1/ac2 are not satisfied.",
     "verificationNotes": "Acceptance criteria check FAILED — 3/12 AC incomplete:\n\n### Extend trimReviewStatusHistoryPayloads to delegate to the bounding helper (3/3 incomplete)\n  - [ ] Given a seeded oversized row with 25 entries carrying 3,697-char notes, the trim persists a smaller payload that parses back to <= 20 entries with <= 500-char notes\n  - [ ] Running the trim a second time over already-trimmed rows returns trimmed: 0 (converges to a no-op)\n  - [ ] An oversized row of a non-review event type survives the trim byte-identically",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
-    "reviewedAtCommit": "ee73b706cf17d7bd988552a04ccc822341f05546",
+    "reviewedAtCommit": "c1eb06e8cbf6ac7ca7669a293a980374ae64fcf7",
     "reviewSpawnedAt": "2026-07-29T07:26:34.963Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -160,7 +160,7 @@
       },
       "costAtCloseOut": {
         "usd": 25.328577,
-        "pricingAsOf": "2026-07-29T07:28:24.526Z"
+        "pricingAsOf": "2026-07-29T07:28:30.770Z"
       }
     },
     "merges": [
