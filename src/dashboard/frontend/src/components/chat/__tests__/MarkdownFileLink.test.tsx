@@ -354,4 +354,90 @@ describe('MarkdownFileLink', () => {
       expect(openOrFocusEditorPane).not.toHaveBeenCalled();
     });
   });
+
+  describe('markdown chip right-click menu (PAN-3260)', () => {
+    // wsTransportMock.getAvailableEditors resolves ['cursor', 'vscode'] per
+    // the outer beforeEach; MarkdownFileLink caches that fetch module-wide
+    // (same pattern as the Quickview highlighter cache), so every test in
+    // this block sees the same two external editors.
+    it('lists the internal editor, then each available external editor, then the copy actions, in that order', async () => {
+      renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane: vi.fn() });
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+
+      await waitFor(() => {
+        expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+          'Open in internal editor',
+          'Open in Cursor',
+          'Open in VS Code',
+          'Copy relative path',
+          'Copy full path',
+        ]);
+      });
+
+      // showContextMenu appends its menu directly to document.body, outside
+      // React's tree, so RTL's automatic per-test cleanup does not remove it
+      // — dismiss it explicitly or a later test's role queries can match
+      // this leftover menu instead of its own.
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+    });
+
+    it('choosing an external editor launches it and persists the choice for a later left click', async () => {
+      const openOrFocusEditorPane = vi.fn();
+      const { unmount } = renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+      const vscodeItem = await screen.findByRole('menuitem', { name: 'Open in VS Code' });
+      fireEvent.click(vscodeItem);
+
+      await waitFor(() => {
+        expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({
+          cwd: markdownMeta.targetPath,
+          editor: 'vscode',
+        });
+      });
+      expect(localStorage.getItem('overdeck:markdown-open-target')).toBe('vscode');
+
+      // A later left click (even a fresh mount) reuses the persisted choice.
+      unmount();
+      wsTransportMock.shellOpenInEditor.mockClear();
+      renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+      fireEvent.click(screen.getByRole('link'));
+
+      await waitFor(() => {
+        expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({
+          cwd: markdownMeta.targetPath,
+          editor: 'vscode',
+        });
+      });
+      expect(openOrFocusEditorPane).not.toHaveBeenCalled();
+    });
+
+    it('choosing "Open in internal editor" opens/focuses the pane and persists the internal target', async () => {
+      localStorage.setItem('overdeck:markdown-open-target', 'vscode');
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+      const internalItem = await screen.findByRole('menuitem', { name: 'Open in internal editor' });
+      fireEvent.click(internalItem);
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.targetPath, markdownMeta.basename);
+      expect(localStorage.getItem('overdeck:markdown-open-target')).toBe('internal');
+      expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
+    });
+
+    it('renders exactly the three original items for a non-markdown chip', () => {
+      render(<MarkdownFileLink {...meta} />);
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+
+      expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+        'Open in editor',
+        'Copy relative path',
+        'Copy full path',
+      ]);
+    });
+  });
 });

@@ -13,8 +13,8 @@ import { EDITORS, type EditorId, WS_METHODS } from '@overdeck/contracts';
 import { toast } from 'sonner';
 import type { DiffsThemeNames } from '@pierre/diffs';
 
-import { showContextMenu } from '../../contextMenuFallback';
-import { getMarkdownOpenTarget, getPreferredEditor, setPreferredEditor } from '../../editorPreferences';
+import { showContextMenu, type ContextMenuFallbackItem } from '../../contextMenuFallback';
+import { getMarkdownOpenTarget, getPreferredEditor, setMarkdownOpenTarget, setPreferredEditor } from '../../editorPreferences';
 import { cn } from '../../lib/utils';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import type { MarkdownFileLinkMeta } from '../../markdown-links';
@@ -74,6 +74,26 @@ const ARCHIVE_EXTENSIONS = new Set(['7z', 'gz', 'rar', 'tar', 'tgz', 'zip']);
 const CONFIG_EXTENSIONS = new Set(['env', 'toml', 'yaml', 'yml']);
 
 let sharedQuickviewHighlighterPromise: Promise<unknown> | null = null;
+
+// PAN-3260 — module-level cache for the right-click menu's external-editor
+// list, same pattern as sharedQuickviewHighlighterPromise above. On fetch
+// failure the cache is cleared (so the next open retries) and the menu
+// proceeds with an empty external list rather than blocking.
+let sharedAvailableEditorsPromise: Promise<readonly EditorId[]> | null = null;
+
+async function fetchAvailableEditors(): Promise<readonly EditorId[]> {
+  try {
+    if (!sharedAvailableEditorsPromise) {
+      sharedAvailableEditorsPromise = getTransport()
+        .request((client) => (client as PanRpcProtocolClient)[WS_METHODS.getAvailableEditors]())
+        .then((result) => (result as { editors: readonly EditorId[] }).editors);
+    }
+    return await sharedAvailableEditorsPromise;
+  } catch {
+    sharedAvailableEditorsPromise = null;
+    return [];
+  }
+}
 
 function extensionOfPath(path: string): string {
   const basename = path.replace(/\\/g, '/').split('/').at(-1) ?? '';
@@ -289,6 +309,35 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
       });
   }, []);
 
+  // PAN-3260 — markdown right-click menu: internal editor, one entry per
+  // available external editor, then the existing copy actions. Choosing
+  // any open action persists it as the markdown open target so a later
+  // left click reuses the choice.
+  const openMarkdownContextMenu = useCallback((x: number, y: number) => {
+    void fetchAvailableEditors().then((availableEditors) => {
+      const items: ContextMenuFallbackItem[] = [
+        {
+          label: 'Open in internal editor',
+          onClick: () => {
+            setMarkdownOpenTarget('internal');
+            if (deck) deck.openOrFocusEditorPane(targetPath, basename);
+            else handleOpen();
+          },
+        },
+        ...EDITORS.filter((entry) => availableEditors.includes(entry.id)).map((entry) => ({
+          label: `Open in ${entry.label}`,
+          onClick: () => {
+            setMarkdownOpenTarget(entry.id);
+            openWithExternalEditor(entry.id);
+          },
+        })),
+        { label: 'Copy relative path', onClick: () => copyPath(displayPath, 'relative path') },
+        { label: 'Copy full path', onClick: () => copyPath(targetPath, 'full path') },
+      ];
+      showContextMenu({ x, y, items });
+    });
+  }, [deck, targetPath, basename, handleOpen, openWithExternalEditor, displayPath, copyPath]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Shift' && hoveredRef.current && !quickviewOpen) {
@@ -341,6 +390,10 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
         onContextMenu={(event) => {
           event.preventDefault();
           event.stopPropagation();
+          if (isMarkdown) {
+            openMarkdownContextMenu(event.clientX, event.clientY);
+            return;
+          }
           showContextMenu({
             x: event.clientX,
             y: event.clientY,
