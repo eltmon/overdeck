@@ -68,10 +68,10 @@
     "recordedAt": "2026-07-29T01:09:34.738Z"
   },
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T01:24:21.353Z",
+  "updated": "2026-07-29T01:35:38.198Z",
   "pipeline": {
     "issueId": "PAN-3260",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -79,8 +79,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T01:11:05.562Z",
-    "updatedAt": "2026-07-29T01:24:21.338Z",
-    "reviewNotes": "Line-addressed markdown chips pass invalid paths to the internal editor; four additional blockers are documented.",
+    "updatedAt": "2026-07-29T01:35:38.154Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "AC1-3 verified: WS_METHODS.readFileAtPath/writeFileAtPath exported and both Rpcs registered in PanRpcGroup (36 requests, both present in dist .d.ts as literal-typed Rpc members); ReadFileAtPathResult rejects decode when mtimeMs or totalLines is missing and accepts the full struct; WriteFileAtPathInput decodes with and without expectedMtimeMs; contracts build + workspace root npm run typecheck exit 0 with no new dashboard/frontend ratchet errors.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3268",
     "reviewedAtCommit": "d53875d75409a9dfd7cad0f9294517c28bd2180d",
@@ -143,18 +143,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1649656,
-            "output": 93352,
-            "cacheRead": 17043456,
+            "input": 1656988,
+            "output": 93760,
+            "cacheRead": 17758208,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 494,
-            "output": 119404,
-            "cacheRead": 72454335,
-            "cacheWrite": 749584
+            "input": 626,
+            "output": 153310,
+            "cacheRead": 102370987,
+            "cacheWrite": 812200
           }
         }
       },
@@ -166,21 +166,21 @@
           "cacheWrite": 184960
         },
         "openai/gpt-5.6-sol": {
-          "input": 1649656,
-          "output": 93352,
-          "cacheRead": 17043456,
+          "input": 1656988,
+          "output": 93760,
+          "cacheRead": 17758208,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 494,
-          "output": 119404,
-          "cacheRead": 72454335,
-          "cacheWrite": 749584
+          "input": 626,
+          "output": 153310,
+          "cacheRead": 102370987,
+          "cacheWrite": 812200
         }
       },
       "costAtCloseOut": {
-        "usd": 46.660528,
-        "pricingAsOf": "2026-07-29T01:24:21.345Z"
+        "usd": 53.546,
+        "pricingAsOf": "2026-07-29T01:35:38.194Z"
       }
     },
     "merges": [
