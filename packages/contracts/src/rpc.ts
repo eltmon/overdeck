@@ -52,6 +52,11 @@ export const WS_METHODS = {
   getWorkspaceDetail: "pan.getWorkspaceDetail",
   readWorkspaceFile: "pan.readWorkspaceFile",
 
+  // Absolute-path markdown file door (PAN-3260) — read/write a single
+  // allowlisted markdown file by absolute path, independent of issueId.
+  readFileAtPath: "pan.readFileAtPath",
+  writeFileAtPath: "pan.writeFileAtPath",
+
   // File-path existence (PAN-1457) — used by MarkdownFileLink to decide
   // whether a path candidate in chat markdown should render as a chip.
   resolveFilePathExists: "pan.resolveFilePathExists",
@@ -335,6 +340,58 @@ export type ReadWorkspaceFileResult = typeof ReadWorkspaceFileResult.Type
 export const ReadWorkspaceFileRpc = Rpc.make(WS_METHODS.readWorkspaceFile, {
   payload: ReadWorkspaceFileInput,
   success: ReadWorkspaceFileResult,
+  error: PanRpcError,
+})
+
+export const ReadFileAtPathInput = Schema.Struct({
+  path: Schema.String,
+})
+export type ReadFileAtPathInput = typeof ReadFileAtPathInput.Type
+
+export const ReadFileAtPathResult = Schema.Struct({
+  text: Schema.String,
+  lang: Schema.String,
+  mtimeMs: Schema.Number,
+  totalLines: Schema.Number,
+})
+export type ReadFileAtPathResult = typeof ReadFileAtPathResult.Type
+
+/**
+ * 10b-2. Read an allowlisted markdown file by absolute path (PAN-3260).
+ *
+ * Unlike ReadWorkspaceFileRpc this takes no issueId — the internal markdown
+ * editor pane opens files reached from surfaces with no workspace context
+ * (e.g. a repo-root file chip inside a conversation). The server validates
+ * `path` against registered project roots + OVERDECK_HOME before reading.
+ */
+export const ReadFileAtPathRpc = Rpc.make(WS_METHODS.readFileAtPath, {
+  payload: ReadFileAtPathInput,
+  success: ReadFileAtPathResult,
+  error: PanRpcError,
+})
+
+export const WriteFileAtPathInput = Schema.Struct({
+  path: Schema.String,
+  content: Schema.String,
+  expectedMtimeMs: Schema.optional(Schema.Number),
+})
+export type WriteFileAtPathInput = typeof WriteFileAtPathInput.Type
+
+export const WriteFileAtPathResult = Schema.Struct({
+  mtimeMs: Schema.Number,
+})
+export type WriteFileAtPathResult = typeof WriteFileAtPathResult.Type
+
+/**
+ * 10b-3. Write an allowlisted markdown file by absolute path (PAN-3260).
+ *
+ * `expectedMtimeMs` enables optimistic concurrency: a stale value is
+ * rejected with a PanRpcError code of WRITE_CONFLICT and nothing is
+ * written. Omitting it (e.g. an explicit Overwrite action) skips the check.
+ */
+export const WriteFileAtPathRpc = Rpc.make(WS_METHODS.writeFileAtPath, {
+  payload: WriteFileAtPathInput,
+  success: WriteFileAtPathResult,
   error: PanRpcError,
 })
 
@@ -633,6 +690,8 @@ export const PanRpcGroup = RpcGroup.make(
   ReplayEventsRpc,
   GetWorkspaceDetailRpc,
   ReadWorkspaceFileRpc,
+  ReadFileAtPathRpc,
+  WriteFileAtPathRpc,
   ResolveFilePathExistsRpc,
   TerminalOpenRpc,
   TerminalWriteRpc,
