@@ -85,10 +85,10 @@
     "recordedAt": "2026-07-29T01:09:34.738Z"
   },
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T16:30:16.250Z",
+  "updated": "2026-07-29T16:30:18.219Z",
   "pipeline": {
     "issueId": "PAN-3260",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -96,7 +96,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T01:11:05.562Z",
-    "updatedAt": "2026-07-29T16:30:15.629Z",
+    "updatedAt": "2026-07-29T16:30:16.261Z",
     "conflictsSince": {
       "sha": "3e6036dbd60fcbcd83d9577006279e03103cc0e7",
       "detectedAt": "2026-07-29T04:37:09.427Z",
@@ -105,7 +105,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3268",
-    "reviewSpawnedAt": "2026-07-29T04:44:38.210Z"
+    "reviewSpawnedAt": "2026-07-29T16:30:16.260Z"
   },
   "closeOut": {
     "usage": {
@@ -174,7 +174,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-fable-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3260",
