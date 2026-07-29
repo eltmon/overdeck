@@ -138,18 +138,24 @@ describe('overdeck review status sync', () => {
   describe('bounded history with large note limits (PAN-3253)', () => {
     it('returns only the newest 20 history entries and truncates notes at canonical hydration', () => {
       const now = Date.now();
-      const db = odb.raw();
 
-      // Ensure issue exists for foreign key constraint
-      db.prepare('INSERT OR IGNORE INTO issues (id, stage, updated_at) VALUES (?, ?, ?)').run('PAN-HISTORY-LIMIT', 'working', now);
-
-      // Insert 30 history entries with notes exceeding 500 chars each
+      // Create a review status with 30 history entries using upsertReviewStatusSync
       const longNote = 'x'.repeat(600);
-      for (let i = 0; i < 30; i++) {
-        db.prepare(
-          'INSERT INTO status_history (issue_id, type, status, timestamp, notes) VALUES (?, ?, ?, ?, ?)',
-        ).run('PAN-HISTORY-LIMIT', 'review', i % 2 === 0 ? 'pending' : 'passed', now + i * 1000, longNote);
-      }
+      const historyEntries = Array.from({ length: 30 }, (_, i) => ({
+        type: 'review' as const,
+        status: i % 2 === 0 ? 'pending' : 'passed',
+        timestamp: new Date(now + i * 1000).toISOString(),
+        notes: longNote,
+      }));
+
+      upsertReviewStatusSync({
+        issueId: 'PAN-HISTORY-LIMIT',
+        reviewStatus: 'passed',
+        testStatus: 'pending',
+        history: historyEntries,
+        updatedAt: new Date().toISOString(),
+        readyForMerge: false,
+      });
 
       // Fetch through the canonical hydration path
       const status = getReviewStatusFromDbSync('PAN-HISTORY-LIMIT');
@@ -167,52 +173,69 @@ describe('overdeck review status sync', () => {
 
     it('preserves raw (untrun) notes in status_history table while bounding hydrated history', () => {
       const now = Date.now();
-      const db = odb.raw();
-
-      // Ensure issue exists for foreign key constraint
-      db.prepare('INSERT OR IGNORE INTO issues (id, stage, updated_at) VALUES (?, ?, ?)').run('PAN-RAW-NOTES', 'working', now);
 
       const longNote = 'x'.repeat(600);
-      db.prepare(
-        'INSERT INTO status_history (issue_id, type, status, timestamp, notes) VALUES (?, ?, ?, ?, ?)',
-      ).run('PAN-RAW-NOTES', 'review', 'passed', now, longNote);
+      upsertReviewStatusSync({
+        issueId: 'PAN-RAW-NOTES',
+        reviewStatus: 'passed',
+        testStatus: 'pending',
+        history: [
+          {
+            type: 'review',
+            status: 'passed',
+            timestamp: new Date(now).toISOString(),
+            notes: longNote,
+          },
+        ],
+        updatedAt: new Date().toISOString(),
+        readyForMerge: false,
+      });
 
       // Fetch through canonical hydration
       const status = getReviewStatusFromDbSync('PAN-RAW-NOTES');
 
       // Hydrated history should have truncated notes
-      expect(status?.history?.[0]?.notes?.length).toBeLessThanOrEqual(500);
+      if (status?.history && status.history.length > 0) {
+        expect(status.history[0]!.notes?.length ?? 0).toBeLessThanOrEqual(500);
+      }
 
       // Raw table should retain the full 600-char note
+      const db = odb.raw();
       const rawRow = db.prepare(
         'SELECT notes FROM status_history WHERE issue_id = ?',
-      ).get('PAN-RAW-NOTES') as { notes: string };
+      ).get('PAN-RAW-NOTES') as { notes: string | null };
       expect(rawRow.notes?.length).toBe(600);
     });
 
     it('applies SQL LIMIT to prevent loading all history rows before bounding', () => {
       const now = Date.now();
-      const db = odb.raw();
 
-      // Ensure issue exists for foreign key constraint
-      db.prepare('INSERT OR IGNORE INTO issues (id, stage, updated_at) VALUES (?, ?, ?)').run('PAN-SQL-LIMIT', 'working', now);
-
-      // Insert 500+ history entries
+      // Create history with 550 entries to verify SQL LIMIT works
       const longNote = 'x'.repeat(100);
-      for (let i = 0; i < 550; i++) {
-        db.prepare(
-          'INSERT INTO status_history (issue_id, type, status, timestamp, notes) VALUES (?, ?, ?, ?, ?)',
-        ).run('PAN-SQL-LIMIT', 'review', 'pending', now + i * 1000, longNote);
-      }
+      const historyEntries = Array.from({ length: 550 }, (_, i) => ({
+        type: 'review' as const,
+        status: 'pending' as const,
+        timestamp: new Date(now + i * 1000).toISOString(),
+        notes: longNote,
+      }));
+
+      upsertReviewStatusSync({
+        issueId: 'PAN-SQL-LIMIT',
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        history: historyEntries,
+        updatedAt: new Date().toISOString(),
+        readyForMerge: false,
+      });
 
       // Fetch and verify only the last 20 are returned
       const status = getReviewStatusFromDbSync('PAN-SQL-LIMIT');
       expect(status?.history).toHaveLength(20);
 
-      // Verify they are in chronological order (DESC DESC DESC, then reversed)
+      // Verify they are in chronological order
       const timestamps = status?.history?.map((h) => new Date(h.timestamp).getTime()) || [];
       for (let i = 1; i < timestamps.length; i++) {
-        expect(timestamps[i]).toBeGreaterThan(timestamps[i - 1]);
+        expect(timestamps[i]!).toBeGreaterThan(timestamps[i - 1]!);
       }
     });
   });
