@@ -220,7 +220,7 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T15:39:11.583Z",
+  "updated": "2026-07-29T15:39:36.625Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -230,7 +230,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T15:39:02.204Z",
-    "updatedAt": "2026-07-29T15:39:11.401Z",
+    "updatedAt": "2026-07-29T15:39:36.578Z",
     "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch; conflict resolver dispatch throttled",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "blockerReasons": [
@@ -306,10 +306,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3539,
-            "output": 165216,
-            "cacheRead": 79984234,
-            "cacheWrite": 4121995
+            "input": 3569,
+            "output": 167423,
+            "cacheRead": 80906823,
+            "cacheWrite": 4132057
           }
         }
       },
@@ -327,15 +327,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3539,
-          "output": 165216,
-          "cacheRead": 79984234,
-          "cacheWrite": 4121995
+          "input": 3569,
+          "output": 167423,
+          "cacheRead": 80906823,
+          "cacheWrite": 4132057
         }
       },
       "costAtCloseOut": {
-        "usd": 122.37021,
-        "pricingAsOf": "2026-07-29T15:39:11.420Z"
+        "usd": 122.486111,
+        "pricingAsOf": "2026-07-29T15:39:36.611Z"
       }
     },
     "merges": [
