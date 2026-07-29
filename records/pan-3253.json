@@ -118,18 +118,19 @@
     "recordedAt": "2026-07-29T08:37:08.059Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T08:38:48.052Z",
+  "updated": "2026-07-29T08:47:31.769Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T08:38:45.029Z",
-    "updatedAt": "2026-07-29T08:38:45.411Z",
+    "updatedAt": "2026-07-29T08:47:31.694Z",
     "reviewNotes": "Verification failed at lint — fix and resubmit",
+    "verificationNotes": "Verification FAILED at test (369041ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253\n\nNo test files found, exiting with code 0\n\n ❯ |root| tests/unit/event-store.test.ts (19 tests | 4 failed) 45ms\n     × bounds oversized review.status_changed at appendOnce door (FR-1) 6ms (retry x1)\n     × preserves raw notes in status_history table while bounding event payload (FR-2) 2ms (retry x1)\n     × handles malformed stored JSON gracefully through trimReviewStatusHistoryPayloads 1ms (retry x1)\n     × appendAsync bounding produces subscriber-visible bounded payload 2ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-TYmk4q/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to da\n…(850 chars elided)…\n/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-x6Gjcq/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-x6Gjcq/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-conte\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewedAtCommit": "26fa1a17a368b0cadf6507e4d903cb990073e923",
     "lastVerifiedCommit": "58b23fbb019a2efab08d55a90124d0b4615a0b9f",
@@ -190,10 +191,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2125,
-            "output": 98590,
-            "cacheRead": 49455148,
-            "cacheWrite": 1699462
+            "input": 2181,
+            "output": 102960,
+            "cacheRead": 50860687,
+            "cacheWrite": 1833773
           }
         }
       },
@@ -211,15 +212,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2125,
-          "output": 98590,
-          "cacheRead": 49455148,
-          "cacheWrite": 1699462
+          "input": 2181,
+          "output": 102960,
+          "cacheRead": 50860687,
+          "cacheWrite": 1833773
         }
       },
       "costAtCloseOut": {
-        "usd": 70.589982,
-        "pricingAsOf": "2026-07-29T08:38:48.044Z"
+        "usd": 70.92033,
+        "pricingAsOf": "2026-07-29T08:47:31.725Z"
       }
     },
     "merges": [
