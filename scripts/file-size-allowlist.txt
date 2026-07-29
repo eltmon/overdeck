@@ -8,3 +8,4 @@
 3541 src/lib/cloister/deacon.ts # PAN-3228
 1315 src/lib/tmux.ts # PAN-3212
 1116 src/lib/lifecycle/workflows.ts # PAN-3215
+849 src/lib/overdeck/planning-promotion.ts # PAN-3229
