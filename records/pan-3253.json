@@ -109,7 +109,7 @@
     "recordedAt": "2026-07-29T07:45:29.088Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T08:36:35.636Z",
+  "updated": "2026-07-29T08:36:37.727Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -148,7 +148,9 @@
         "tests/unit/event-store.test.ts"
       ],
       "recordedAt": "2026-07-29T07:45:29.088Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-29T08:36:37.191Z",
+    "panDoneRecoveredAt": "2026-07-29T08:36:37.191Z"
   },
   "closeOut": {
     "usage": {
