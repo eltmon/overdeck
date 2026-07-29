@@ -190,18 +190,25 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T15:38:00.754Z",
+  "updated": "2026-07-29T15:38:06.456Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T15:37:57.518Z",
-    "updatedAt": "2026-07-29T15:37:57.925Z",
+    "updatedAt": "2026-07-29T15:38:06.422Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since ffc4ec7 (1 path): src/dashboard/server/event-store.ts",
+        "detectedAt": "2026-07-29T15:25:25.726Z"
+      }
+    ],
     "conflictsSince": {
       "sha": "ffc4ec7f593609a737880ff7027b3c4277205230",
       "detectedAt": "2026-07-29T15:25:25.726Z",
@@ -268,10 +275,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3457,
-            "output": 162637,
-            "cacheRead": 78312879,
-            "cacheWrite": 3876405
+            "input": 3462,
+            "output": 162789,
+            "cacheRead": 78441514,
+            "cacheWrite": 3877664
           }
         }
       },
@@ -289,15 +296,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3457,
-          "output": 162637,
-          "cacheRead": 78312879,
-          "cacheWrite": 3876405
+          "input": 3462,
+          "output": 162789,
+          "cacheRead": 78441514,
+          "cacheWrite": 3877664
         }
       },
       "costAtCloseOut": {
-        "usd": 121.88311,
-        "pricingAsOf": "2026-07-29T15:38:00.750Z"
+        "usd": 121.898312,
+        "pricingAsOf": "2026-07-29T15:38:06.449Z"
       }
     },
     "merges": [
