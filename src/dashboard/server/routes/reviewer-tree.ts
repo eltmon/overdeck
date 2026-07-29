@@ -139,6 +139,10 @@ export interface ReviewerNode {
   presence: SessionNodePresence;
   hasJsonl?: boolean;
   roundMetadata?: ReviewerRoundMetadata;
+  awaitingInput?: boolean;
+  awaitingInputPrompt?: string;
+  awaitingInputReason?: string;
+  pendingInputKinds?: string[];
 }
 
 export interface BuildReviewerNodesOptions {

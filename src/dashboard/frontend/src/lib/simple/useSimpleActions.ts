@@ -58,10 +58,10 @@ export function useSimpleActions() {
 
   const answer = useMutation({
     mutationFn: ({ agentId, text, isConversation }: { agentId: string; text: string; isConversation?: boolean }) => {
-      const endpoint = isConversation
-        ? `/api/conversations/${encodeURIComponent(agentId)}/answer-question`
-        : `/api/agents/${encodeURIComponent(agentId)}/answer-question`;
-      return postJson(endpoint, { answers: [text] });
+      if (isConversation) {
+        return postJson(`/api/conversations/${encodeURIComponent(agentId)}/message`, { message: text });
+      }
+      return postJson(`/api/agents/${encodeURIComponent(agentId)}/answer-question`, { answers: [text] });
     },
     onSuccess,
     onError,
