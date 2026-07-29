@@ -42,6 +42,7 @@ vi.mock('../lib/simple/derive', () => ({
 // Now import after all mocks are in place
 import { NeedsYouStrip } from '../components/KanbanBoard/NeedsYouStrip';
 import { ConversationDock } from '../components/dock/ConversationDock';
+import { SimpleHomePage } from '../components/simple/SimpleHomePage';
 import * as store from '../lib/store';
 import * as decisions from '../lib/useDecisions';
 import * as simpleActions from '../lib/simple/useSimpleActions';
@@ -323,6 +324,100 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
       // Issue panel should not render twice (no empty issue entry)
       const issueTitles = screen.queryAllByText(/PAN-1.*Test Issue/);
       expect(issueTitles.length).toBe(2); // One per conversation panel
+    });
+  });
+
+  describe('SimpleHomePage: AC-1', () => {
+    it('AC-1: renders conversation-only pending subject in SimpleHomePage', () => {
+      // Set up SimpleHomePage with a conversation-only pending subject
+      vi.mocked(decisions.usePendingInputSubjects).mockReturnValue([
+        {
+          agentId: 'conv-simple-001',
+          issueId: 'PAN-1',
+          since: new Date().toISOString(),
+          pendingAskUserQuestion: {
+            questions: [{ question: 'SimpleHomePage conversation question' }],
+          },
+        } as any,
+      ]);
+
+      vi.mocked(derive.bucketSimpleHome).mockReturnValue({
+        needsYou: [
+          {
+            source: 'conversation' as const,
+            subjectId: 'conv-simple-001',
+            kind: 'question' as const,
+          },
+        ],
+      } as any);
+
+      render(<SimpleHomePage />);
+
+      // Verify conversation question appears as actionable card
+      expect(screen.getByText('SimpleHomePage conversation question')).toBeInTheDocument();
+      expect(screen.getByText('PAN-1')).toBeInTheDocument();
+    });
+  });
+
+  describe('ConversationDock: AC-3', () => {
+    it('AC-3: preserves agent-backed dock panel with conversation subjects present', () => {
+      // Set up docked issue with both agent and conversation pending
+      vi.mocked(convoDock.useConvoDock).mockReturnValue({
+        items: [{ issueId: 'PAN-1', addedAt: Date.now() }],
+        expanded: true,
+        remove: vi.fn(),
+        setExpanded: vi.fn(),
+      });
+
+      // Agent snapshot for the docked issue
+      const mockAgentDerivation = {
+        issue: mockIssue,
+        primaryAgent: mockAgent,
+        pendingInputAgent: mockAgent,
+        display: { sentence: 'Agent waiting' },
+        agentStuck: false,
+        reviewStuck: false,
+      };
+
+      // Agent-backed pending subject
+      vi.mocked(decisions.usePendingInputSubjects).mockReturnValue([
+        {
+          agentId: 'agent-test-1',
+          issueId: 'PAN-1',
+          since: new Date().toISOString(),
+          pendingAskUserQuestion: {
+            questions: [{ question: 'Agent input needed' }],
+          },
+        } as any,
+        // Also a conversation on the same issue
+        {
+          agentId: 'conv-dock-paired',
+          issueId: 'PAN-1',
+          since: new Date().toISOString(),
+          pendingAskUserQuestion: {
+            questions: [{ question: 'Conversation paired with agent' }],
+          },
+        } as any,
+      ]);
+
+      vi.mocked(store.useDashboardStore).mockImplementation((selector) => {
+        const state = {
+          issuesRaw: [mockIssue],
+          agentsById: { 'agent-test-1': mockAgent },
+          reviewStatusByIssueId: {},
+        };
+        return selector(state as any);
+      });
+
+      vi.mocked(derive.deriveSimpleIssue).mockReturnValue(mockAgentDerivation as any);
+
+      render(<ConversationDock />);
+
+      // Both agent-backed and conversation-backed subjects should appear
+      expect(screen.getByText(/Agent input needed|agent-test-1/)).toBeInTheDocument();
+      expect(screen.getByText('Conversation paired with agent')).toBeInTheDocument();
+      // Verify the issue is still actionable in the dock
+      expect(screen.getByText(/PAN-1.*Test Issue/)).toBeInTheDocument();
     });
   });
 });
