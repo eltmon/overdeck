@@ -8,7 +8,7 @@ import { expandMemoryQuery, type QueryExpansionCall, type QueryExpansionResult }
 import { searchMemory, type MemorySearchHit } from './search.js';
 import { isMemoryKnowledgeIndexEnabled, isMemoryPromptTimeInjectionEnabled } from './settings.js';
 import { findProjectByPathSync, getProjectSync, loadProjectsConfigSync, resolveProjectFromIssueSync, resolveProjectPath } from '../projects.js';
-import { getProjectByKey, getWorkspaceById, listPinnedDocs } from '../workspaces/resolver.js';
+import { getProjectByKey, listPinnedDocs } from '../workspaces/resolver.js';
 
 export const PROMPT_TIME_MEMORY_BUDGETS = {
   status: 2000,
@@ -476,11 +476,16 @@ async function readKnowledgeIndex(identity: MemoryIdentity): Promise<string | nu
 /**
  * PAN-1990: pinned docs (workspace- and project-scoped) read through the
  * workspaces resolver, injected under the same knowledgeIndex budget as the
- * OKF knowledge bundle. A missing or unreadable pin is skipped silently —
- * pins are a convenience, never a reason to fail injection.
+ * OKF knowledge bundle. docPath is always project-relative (memory-pins),
+ * regardless of pin scope — a workspace is one worktree of the same project
+ * repo, so a project-relative path resolves identically from any of them. A
+ * missing or unreadable pin is skipped silently — pins are a convenience,
+ * never a reason to fail injection.
  */
 async function readPinnedDocCandidates(identity: MemoryIdentity): Promise<CandidateContext[]> {
-  const workspace = getWorkspaceById(identity.workspaceId);
+  const projectPath = getProjectByKey(identity.projectId)?.primaryPath;
+  if (!projectPath) return [];
+
   const pins = [
     ...listPinnedDocs('workspace', identity.workspaceId),
     ...listPinnedDocs('project', identity.projectId),
@@ -488,11 +493,8 @@ async function readPinnedDocCandidates(identity: MemoryIdentity): Promise<Candid
 
   const candidates: CandidateContext[] = [];
   for (const pin of pins) {
-    const basePath = pin.scope === 'workspace' ? workspace?.path : getProjectByKey(pin.scopeId)?.primaryPath;
-    if (!basePath) continue;
-
     try {
-      const text = await readFile(resolve(basePath, pin.docPath), 'utf8');
+      const text = await readFile(resolve(projectPath, pin.docPath), 'utf8');
       candidates.push({
         key: 'knowledgeIndex',
         title: `Pinned doc: ${pin.docPath}`,

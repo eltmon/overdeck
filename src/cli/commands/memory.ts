@@ -1,3 +1,4 @@
+import { isAbsolute, relative } from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import {
@@ -8,6 +9,10 @@ import {
   runMemoryDoctor,
   searchMemory,
 } from '../../lib/memory/cli.js';
+import { getProjectByKey, getWorkspaceById, listPinnedDocs } from '../../lib/workspaces/resolver.js';
+import { pinDoc, unpinDoc } from '../../lib/workspaces/writer.js';
+import type { PinScope, ProjectRow } from '../../lib/workspaces/types.js';
+import { exitCli } from '../exit.js';
 
 export function createMemoryCommand(): Command {
   const memory = new Command('memory')
@@ -123,6 +128,30 @@ export function createMemoryCommand(): Command {
     });
 
   memory
+    .command('pin <doc-path>')
+    .description('Pin a doc for prompt-time memory injection (path is stored project-relative)')
+    .option('--project <id>', 'Project key to pin at project scope', 'overdeck')
+    .option('--workspace <id>', 'Workspace id to pin at workspace scope (overrides --project)')
+    .option('--json', 'Output JSON')
+    .action(memoryPinCommand);
+
+  memory
+    .command('unpin <doc-path>')
+    .description('Remove a pinned doc')
+    .option('--project <id>', 'Project key the pin was made at project scope', 'overdeck')
+    .option('--workspace <id>', 'Workspace id the pin was made at workspace scope (overrides --project)')
+    .option('--json', 'Output JSON')
+    .action(memoryUnpinCommand);
+
+  memory
+    .command('pins')
+    .description('List pinned docs for a project or workspace')
+    .option('--project <id>', 'Project key to list project-scoped pins for', 'overdeck')
+    .option('--workspace <id>', 'Workspace id to list workspace-scoped pins for (overrides --project)')
+    .option('--json', 'Output JSON')
+    .action(memoryPinsCommand);
+
+  memory
     .command('config')
     .description('Show memory provider and rollup configuration')
     .option('--json', 'Output JSON')
@@ -136,4 +165,78 @@ export function createMemoryCommand(): Command {
     });
 
   return memory;
+}
+
+export interface MemoryPinOptions {
+  workspace?: string;
+  project?: string;
+  json?: boolean;
+}
+
+export async function memoryPinCommand(docPath: string, options: MemoryPinOptions): Promise<void> {
+  const resolved = resolvePinTarget(options);
+  if (!resolved) return exitCli(1);
+  const { scope, scopeId, project } = resolved;
+  const projectRelativePath = isAbsolute(docPath) ? relative(project.primaryPath, docPath) : docPath;
+
+  pinDoc(scope, scopeId, projectRelativePath);
+  if (options.json) console.log(JSON.stringify({ scope, scopeId, docPath: projectRelativePath }, null, 2));
+  else console.log(chalk.green(`Pinned ${projectRelativePath} for ${scope} ${scopeId}`));
+}
+
+export async function memoryUnpinCommand(docPath: string, options: MemoryPinOptions): Promise<void> {
+  const resolved = resolvePinTarget(options);
+  if (!resolved) return exitCli(1);
+  const { scope, scopeId, project } = resolved;
+  const projectRelativePath = isAbsolute(docPath) ? relative(project.primaryPath, docPath) : docPath;
+
+  unpinDoc(scope, scopeId, projectRelativePath);
+  if (options.json) console.log(JSON.stringify({ scope, scopeId, docPath: projectRelativePath }, null, 2));
+  else console.log(chalk.green(`Unpinned ${projectRelativePath} for ${scope} ${scopeId}`));
+}
+
+export async function memoryPinsCommand(options: MemoryPinOptions): Promise<void> {
+  const resolved = resolvePinTarget(options);
+  if (!resolved) return exitCli(1);
+  const { scope, scopeId } = resolved;
+  const pins = listPinnedDocs(scope, scopeId);
+  if (options.json) {
+    console.log(JSON.stringify(pins, null, 2));
+    return;
+  }
+  if (pins.length === 0) {
+    console.log(chalk.yellow(`No pinned docs for ${scope} ${scopeId}.`));
+    return;
+  }
+  for (const pin of pins) console.log(pin.docPath);
+}
+
+/**
+ * Resolves pin/unpin/pins scope+scopeId from --workspace|--project, plus the
+ * owning project (needed to make an absolute doc-path project-relative —
+ * memory-pins stores paths project-relative regardless of pin scope, since a
+ * workspace is one worktree of the same project repo).
+ */
+function resolvePinTarget(options: { workspace?: string; project?: string }): { scope: PinScope; scopeId: string; project: ProjectRow } | null {
+  if (options.workspace) {
+    const workspace = getWorkspaceById(options.workspace);
+    if (!workspace) {
+      console.error(chalk.red(`No workspace found with id '${options.workspace}'`));
+      return null;
+    }
+    const project = getProjectByKey(workspace.projectId);
+    if (!project) {
+      console.error(chalk.red(`No project registered for workspace '${options.workspace}' (project key '${workspace.projectId}')`));
+      return null;
+    }
+    return { scope: 'workspace', scopeId: workspace.id, project };
+  }
+
+  const projectKey = options.project ?? 'overdeck';
+  const project = getProjectByKey(projectKey);
+  if (!project) {
+    console.error(chalk.red(`No project registered with key '${projectKey}'`));
+    return null;
+  }
+  return { scope: 'project', scopeId: projectKey, project };
 }
