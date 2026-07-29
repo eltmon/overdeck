@@ -190,7 +190,7 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T15:26:54.368Z",
+  "updated": "2026-07-29T15:36:48.642Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -199,7 +199,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-29T09:16:42.721Z",
     "updatedAt": "2026-07-29T15:26:53.958Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "blockerReasons": [
