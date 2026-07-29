@@ -33,6 +33,9 @@ import {
   validateFeatureName,
 } from './worktree-ops.js';
 import type { WorkspaceCreateOptions, WorkspaceCreateResult } from './types.js';
+import { getProjectByPath, getWorkspaceForIssue } from '../workspaces/resolver.js';
+import { createWorkspace, deleteWorkspace, upsertProjectFromConfig } from '../workspaces/writer.js';
+import { listProjectsSync } from '../projects.js';
 import {
   createWorkspacePlaceholdersSync as createPlaceholders,
   sanitizeComposeFileSync,
@@ -199,6 +202,58 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     return result;
   }
 
+  // PAN-1990 FR-6/AC-4: create the kind='issue' workspace row before any git
+  // worktree operation — never skipped and never swallowed. Idempotent
+  // (getWorkspaceForIssue check). If the project row hasn't been boot-seeded
+  // yet, seed it here from the same projects.yaml entry the worktree is about
+  // to be created under (the same idempotent upsert boot-seeding uses), so the
+  // row always exists ahead of the worktree rather than waiting on a later
+  // backfill to retroactively guess it from the directory.
+  const issueId = featureName.toUpperCase();
+  // Non-blocking review fix: track the row WE created here so it can be
+  // compensated (deleted) if the worktree itself never gets created —
+  // otherwise a failed worktree creation leaves an active-looking issue
+  // workspace row whose path was never actually created.
+  //
+  // Review fix (cycle 3): compensation must NOT fire for a failure that
+  // happens AFTER the worktree already exists on disk (port assignment,
+  // devcontainer rendering, tunnel/Hume setup, Docker startup all add
+  // `result.errors` post-worktree) — deleting the row at that point would
+  // stroke the registry blind to a real, on-disk worktree until a later boot
+  // backfill, and a retry would collide with the existing non-metadata path.
+  //
+  // Review fix (cycle 4): `worktreeCreated` must be set true as soon as ANY
+  // durable content exists on disk, not only once the ENTIRE worktree step
+  // succeeds — for polyrepo, that's the container directory itself (set
+  // right after `mkdirSync`, below), since a later sub-repo failing after an
+  // earlier one succeeded still leaves real worktrees/symlinks under it. For
+  // monorepo, `createWorktree` either creates the whole thing atomically or
+  // not, so the single post-loop checkpoint is correct there.
+  let createdWorkspaceRowId: string | null = null;
+  let worktreeCreated = false;
+  if (!getWorkspaceForIssue(issueId)) {
+    let project = getProjectByPath(projectConfig.path);
+    if (!project) {
+      const projectKey = listProjectsSync().find((p) => p.config.path === projectConfig.path)?.key;
+      if (!projectKey) {
+        result.success = false;
+        result.errors.push(`No projects.yaml entry found for path ${projectConfig.path}; cannot create workspace row for ${issueId}.`);
+        return result;
+      }
+      upsertProjectFromConfig(projectKey, projectConfig);
+      project = getProjectByPath(projectConfig.path);
+    }
+    createdWorkspaceRowId = await createWorkspace({
+      projectId: project!.id,
+      kind: 'issue',
+      name: featureFolder,
+      path: workspacePath,
+      branchName: `feature/${featureName}`,
+      issueId,
+    });
+  }
+
+  const outcome = await (async (): Promise<WorkspaceCreateResult> => {
   // A failed auto-plan/start can leave only orchestration metadata at the
   // future workspace path. Stage it so `git worktree add` sees a clean target,
   // then merge it back into the real worktree after creation.
@@ -225,6 +280,14 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     // symlinks. Monorepo worktrees must let git create the target directory.
     mkdirSync(workspacePath, { recursive: true });
     result.steps.push('Created workspace directory');
+    // Review fix (cycle 4): mark preservation as soon as the polyrepo
+    // container directory exists, not only after every sub-repo succeeds.
+    // If repo A's worktree (or a symlink) is created before repo B fails,
+    // `result.success` becomes false and the function returns before the
+    // single post-loop checkpoint below ever runs — real content already
+    // exists on disk at this path regardless of how many repos ultimately
+    // succeed, so compensation must never delete the row for it.
+    worktreeCreated = true;
 
     // Determine which repos to create: in progressive mode, only always_include repos
     const reposToCreate = workspaceConfig.progressive && workspaceConfig.always_include
@@ -281,6 +344,9 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     return result;
   }
 
+  // The worktree (or every polyrepo sub-repo worktree/symlink) now exists on
+  // disk — any failure from here on must not delete the workspace row.
+  worktreeCreated = true;
   restorePreWorktreeMetadataSync(stagedMetadataPath, workspacePath);
 
   if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
@@ -733,4 +799,14 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
 
   result.success = result.errors.length === 0;
   return result;
+  })();
+
+  if (!outcome.success && createdWorkspaceRowId && !worktreeCreated) {
+    try {
+      await deleteWorkspace(createdWorkspaceRowId);
+    } catch (err) {
+      outcome.errors.push(`Also failed to compensate the pre-created workspace row: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return outcome;
 }

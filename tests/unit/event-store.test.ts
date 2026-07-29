@@ -127,6 +127,42 @@ describe('EventStore', () => {
   });
 });
 
+describe('workspaceId stamping resolver injection (PAN-1990 review fix, non-blocking)', () => {
+  it('uses the injected resolveWorkspaceId instead of the real global resolver', () => {
+    const store = createEventStore(db as unknown as DbAdapter, {
+      resolveWorkspaceId: (issueId) => (issueId === 'PAN-1' ? 'ws-injected' : undefined),
+    });
+
+    store.append({ type: 'agent.started', timestamp: new Date().toISOString(), payload: { agentId: 'a1', issueId: 'PAN-1' } } as any);
+
+    const [event] = store.readFrom(0);
+    expect((event!.payload as { workspaceId?: string }).workspaceId).toBe('ws-injected');
+  });
+
+  it('never overwrites a payload that already carries a workspaceId, even with an injected resolver', () => {
+    const store = createEventStore(db as unknown as DbAdapter, {
+      resolveWorkspaceId: () => 'ws-should-not-appear',
+    });
+
+    store.append({ type: 'agent.started', timestamp: new Date().toISOString(), payload: { agentId: 'a1', issueId: 'PAN-1', workspaceId: 'ws-explicit' } } as any);
+
+    const [event] = store.readFrom(0);
+    expect((event!.payload as { workspaceId?: string }).workspaceId).toBe('ws-explicit');
+  });
+
+  it('degrades to "no stamp" instead of failing the append when the resolver throws', () => {
+    const store = createEventStore(db as unknown as DbAdapter, {
+      resolveWorkspaceId: () => { throw new Error('resolver unavailable in this test context'); },
+    });
+
+    const seq = store.append({ type: 'agent.started', timestamp: new Date().toISOString(), payload: { agentId: 'a1', issueId: 'PAN-1' } } as any);
+
+    expect(seq).toBeGreaterThan(0);
+    const [event] = store.readFrom(0);
+    expect((event!.payload as { workspaceId?: string }).workspaceId).toBeUndefined();
+  });
+});
+
 describe('trimReviewStatusHistoryPayloads (PAN-3253)', () => {
   function insertReviewEvent(historyLength: number, issueId = 'MIN-901'): number {
     const history = Array.from({ length: historyLength }, (_, i) => ({

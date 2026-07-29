@@ -26,6 +26,7 @@ export const TAB_PATHS: Record<Tab, string> = {
   deacon: '/deacon',
   sessions: '/sessions',
   'awaiting-merge': '/awaiting-merge',
+  workspace: '/workspace',
 };
 
 const PATH_TO_TAB: Record<string, Tab> = {
@@ -56,6 +57,8 @@ function getTabFromPath(): Tab {
   // Cockpit deep-link: /command-deck/<project>/<issue> (PAN-2005). The bare
   // /command-deck is matched by PATH_TO_TAB below; the nested form needs the prefix.
   if (path.startsWith('/command-deck/')) return 'command-deck';
+  // PAN-1990: /workspace/<id> deep-link into the Workspace view.
+  if (path.startsWith('/workspace/')) return 'workspace';
   return PATH_TO_TAB[path] || 'home';
 }
 
@@ -88,6 +91,21 @@ export function getCockpitRouteFromPath(path = window.location.pathname): { proj
  */
 export function getCommandDeckProjectRouteFromPath(path = window.location.pathname): string | null {
   const m = path.match(/^\/command-deck\/([^/]+)$/);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1] ?? '');
+  } catch {
+    return m[1] ?? null;
+  }
+}
+
+/**
+ * Parse a workspace deep-link `/workspace/<id>` (PAN-1990). Mirrors the
+ * cockpit deep-link pattern so a reload/bookmark restores the exact
+ * workspace view.
+ */
+export function getWorkspaceRouteFromPath(path = window.location.pathname): string | null {
+  const m = path.match(/^\/workspace\/([^/]+)$/);
   if (!m) return null;
   try {
     return decodeURIComponent(m[1] ?? '');

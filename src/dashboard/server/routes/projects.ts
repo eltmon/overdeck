@@ -416,6 +416,8 @@ async function collectSessionTreeNodes(
         ? (latestReview.status === 'reviewing' ? 'active' : 'idle')
         : 'ended';
       const orchestratorJsonlPath = await resolveJsonlPath(orchestratorSessionName, workspacePath);
+      const orchestratorAwaitingInput = awaitingInputFromProjection(orchestratorSessionName, context.agentSnapshotsById);
+      const orchestratorSnapshot = context.agentSnapshotsById?.get(orchestratorSessionName);
       sections.push({
         type: 'review',
         sessionId: orchestratorSessionName,
@@ -426,6 +428,10 @@ async function collectSessionTreeNodes(
         status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
         presence: orchestratorPresence,
         roundMetadata: synthesisRoundMetadata as SessionNode['roundMetadata'],
+        awaitingInput: orchestratorAwaitingInput !== undefined ? (orchestratorAwaitingInput !== null) : false,
+        awaitingInputPrompt: orchestratorAwaitingInput?.prompt,
+        awaitingInputReason: orchestratorAwaitingInput?.reason,
+        pendingInputKinds: orchestratorSnapshot?.pendingInputKinds ? [...orchestratorSnapshot.pendingInputKinds] : undefined,
         hasJsonl: !!orchestratorJsonlPath,
         tmuxSession: orchestratorSessionName,
         ...await readSessionGateFields(orchestratorSessionName),
@@ -439,6 +445,7 @@ async function collectSessionTreeNodes(
         startedAt: latestReview.timestamp,
         endedAt: undefined,
         status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
+        agentSnapshotsById: context.agentSnapshotsById,
       });
       sections.push(...(reviewerNodes as unknown as SessionNode[]));
     }
@@ -452,6 +459,8 @@ async function collectSessionTreeNodes(
       const testSessionName = `agent-${issueLower}-test`;
       const testIsLive = context.tmuxSessionNames.has(testSessionName);
       const testJsonlPath = await resolveJsonlPath(testSessionName, workspacePath);
+      const testAwaitingInput = awaitingInputFromProjection(testSessionName, context.agentSnapshotsById);
+      const testSnapshot = context.agentSnapshotsById?.get(testSessionName);
       sections.push({
         type: 'test',
         sessionId: testSessionName,
@@ -461,6 +470,10 @@ async function collectSessionTreeNodes(
         duration: 0,
         status: normalizeAgentStatus(latestTest.status === 'testing' ? 'running' : latestTest.status),
         presence: testIsLive ? (latestTest.status === 'testing' ? 'active' : 'idle') : 'ended',
+        awaitingInput: testAwaitingInput !== undefined ? (testAwaitingInput !== null) : false,
+        awaitingInputPrompt: testAwaitingInput?.prompt,
+        awaitingInputReason: testAwaitingInput?.reason,
+        pendingInputKinds: testSnapshot?.pendingInputKinds ? [...testSnapshot.pendingInputKinds] : undefined,
         hasJsonl: !!testJsonlPath,
         tmuxSession: testIsLive ? testSessionName : undefined,
         ...await readSessionGateFields(testSessionName),
@@ -475,6 +488,8 @@ async function collectSessionTreeNodes(
       const shipState = getAgentStateSync(shipSessionName);
       const shipJsonlPath = shipIsLive || shipState ? await resolveJsonlPath(shipSessionName, workspacePath) : null;
       if (shipIsLive || shipJsonlPath) {
+        const shipAwaitingInput = awaitingInputFromProjection(shipSessionName, context.agentSnapshotsById);
+        const shipSnapshot = context.agentSnapshotsById?.get(shipSessionName);
         sections.push({
           type: 'ship',
           sessionId: shipSessionName,
@@ -484,6 +499,10 @@ async function collectSessionTreeNodes(
           duration: 0,
           status: normalizeAgentStatus(latestMerge.status === 'merging' ? 'running' : latestMerge.status),
           presence: shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended',
+          awaitingInput: shipAwaitingInput !== undefined ? (shipAwaitingInput !== null) : false,
+          awaitingInputPrompt: shipAwaitingInput?.prompt,
+          awaitingInputReason: shipAwaitingInput?.reason,
+          pendingInputKinds: shipSnapshot?.pendingInputKinds ? [...shipSnapshot.pendingInputKinds] : undefined,
           hasJsonl: !!shipJsonlPath,
           tmuxSession: shipIsLive ? shipSessionName : undefined,
           ...await readSessionGateFields(shipSessionName),

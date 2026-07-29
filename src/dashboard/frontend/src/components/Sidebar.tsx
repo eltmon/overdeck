@@ -141,9 +141,39 @@ interface SidebarProps {
   onNewProject?: () => void;
   /** Open the shared updater dialog from the version affordance. */
   onOpenUpdater?: () => void;
+  /** PAN-1990: open a workspace's view from the Workspaces rail. */
+  onSelectWorkspace?: (workspaceId: string) => void;
 }
 
-export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject = null, onSelectProject, onNewProject, onOpenUpdater }: SidebarProps) {
+/** PAN-1990: a GET /api/workspace-registry row (src/dashboard/server/routes/workspace-registry.ts). */
+export interface WorkspaceRegistryRow {
+  id: string;
+  projectId: string;
+  kind: 'main' | 'issue' | 'scratch';
+  name: string;
+  issueId: string | null;
+  isFavorite: boolean;
+  isArchived: boolean;
+  title: string | null;
+  lastAccessedAt: number;
+}
+
+const WORKSPACE_KIND_ICONS: Record<WorkspaceRegistryRow['kind'], LucideIcon> = {
+  main: Home,
+  issue: GitBranch,
+  scratch: FileText,
+};
+
+const WORKSPACES_GROUPED_KEY = 'overdeck.ui.sidebarWorkspacesGrouped';
+
+export function sortWorkspaces(rows: WorkspaceRegistryRow[]): WorkspaceRegistryRow[] {
+  return [...rows].sort((a, b) => {
+    if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+    return b.lastAccessedAt - a.lastAccessedAt;
+  });
+}
+
+export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject = null, onSelectProject, onNewProject, onOpenUpdater, onSelectWorkspace }: SidebarProps) {
   const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
@@ -192,9 +222,76 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     [sidebarConversations, registeredProjects],
   );
 
+  // PAN-1990: Workspaces rail — first-class workspaces/projects domain, distinct
+  // from the "Projects" rail above (registered pan.projects.yaml entries).
+  const { data: workspacesRaw } = useQuery({
+    queryKey: ['workspace-registry'],
+    queryFn: async (): Promise<WorkspaceRegistryRow[]> => {
+      const res = await fetch('/api/workspace-registry');
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data?.workspaces) ? data.workspaces : [];
+    },
+    refetchInterval: 10000,
+  });
+  const workspaces = Array.isArray(workspacesRaw) ? workspacesRaw : [];
+  const [workspacesGrouped, setWorkspacesGrouped] = useState(() => localStorage.getItem(WORKSPACES_GROUPED_KEY) === 'true');
+  const toggleWorkspacesGrouped = useCallback(() => {
+    setWorkspacesGrouped((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(WORKSPACES_GROUPED_KEY, String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+  const [workspacesArchivedExpanded, setWorkspacesArchivedExpanded] = useState(false);
+
+  const projectNameByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of registeredProjects) map.set(p.key, p.name ?? p.key);
+    return map;
+  }, [registeredProjects]);
+
+  const activeWorkspaces = useMemo(() => sortWorkspaces(workspaces.filter((w) => !w.isArchived)), [workspaces]);
+  const archivedWorkspaceCount = useMemo(() => workspaces.filter((w) => w.isArchived).length, [workspaces]);
+  const archivedWorkspaces = useMemo(() => sortWorkspaces(workspaces.filter((w) => w.isArchived)), [workspaces]);
+
+  const groupedWorkspaces = useMemo(() => {
+    const groups = new Map<string, WorkspaceRegistryRow[]>();
+    for (const ws of activeWorkspaces) {
+      const list = groups.get(ws.projectId) ?? [];
+      list.push(ws);
+      groups.set(ws.projectId, list);
+    }
+    return Array.from(groups.entries())
+      .map(([projectId, items]) => ({ projectId, name: projectNameByKey.get(projectId) ?? projectId, items }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [activeWorkspaces, projectNameByKey]);
+
   const issues = useDashboardStore(selectIssues) as Issue[];
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
+
+  // PAN-1990 ac2: issue-kind workspace rows get a pipeline-phase badge derived
+  // from getPipelineIssuePhase, the same helper the "Filter phase" group below
+  // uses — joined by issueId against the already-loaded issues/agents store.
+  const workspacePhaseByIssueId = useMemo(() => {
+    const map = new Map<string, PipelineIssuePhase>();
+    if (issues.length === 0) return map;
+    const agentByIssueId = new Map<string, Agent>();
+    for (const agent of agents) {
+      const key = agent.issueId?.toLowerCase();
+      if (key && !agentByIssueId.has(key)) agentByIssueId.set(key, agent);
+    }
+    for (const issue of issues) {
+      const key = issue.identifier.toLowerCase();
+      const agent = agentByIssueId.get(key) ?? null;
+      const reviewStatus = reviewStatusByIssueId[issue.identifier] ?? reviewStatusByIssueId[issue.identifier.toUpperCase()];
+      const rawPhase = getPipelineIssuePhase(issue, reviewStatus, agent);
+      map.set(key, rawPhase === 'ready' || rawPhase === 'verifying' ? 'work' : rawPhase);
+    }
+    return map;
+  }, [issues, agents, reviewStatusByIssueId]);
+
   const [pipelineFilter, setPipelineFilter] = useState(readPipelineFilterState);
 
   useEffect(() => {
@@ -331,6 +428,29 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     );
   };
 
+  const renderWorkspaceRow = (ws: WorkspaceRegistryRow) => {
+    const Icon = WORKSPACE_KIND_ICONS[ws.kind];
+    const phase = ws.kind === 'issue' && ws.issueId ? workspacePhaseByIssueId.get(ws.issueId.toLowerCase()) : undefined;
+    return (
+      <button
+        key={ws.id}
+        onClick={() => { onSelectWorkspace?.(ws.id); setMobileOpen(false); }}
+        title={ws.title ?? ws.name}
+        data-testid={`sidebar-workspace-${ws.id}`}
+        className="w-full flex items-center gap-3 px-3 py-1.5 transition-colors duration-150 text-sm font-medium border-l-2 text-muted-foreground hover:bg-accent hover:text-foreground border-transparent"
+      >
+        <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+        <span className="truncate">{ws.name}</span>
+        {phase && (
+          <span className="ml-auto flex items-center gap-1.5 shrink-0">
+            <span className={`h-2 w-2 rounded-full shrink-0 ${PHASE_DOT_CLASSES[phase]}`} aria-hidden="true" />
+            <span className="text-[10px] text-muted-foreground">{PHASE_LABELS[phase]}</span>
+          </span>
+        )}
+      </button>
+    );
+  };
+
   return (
     <>
       {/* Mobile hamburger button — only visible on small screens */}
@@ -403,6 +523,59 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
           <div className={collapsed ? 'mb-2' : 'mb-1'}>
             {PRIMARY_ITEMS.map(renderNavItem)}
           </div>
+
+          {/* ─── Workspaces (PAN-1990) ─── */}
+          {!collapsed ? (
+            <div className="mb-1" data-testid="sidebar-workspaces">
+              <div className="flex items-center justify-between px-3 mt-4 mb-1">
+                <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                  Workspaces
+                </p>
+                {activeWorkspaces.length > 0 && (
+                  <button
+                    data-testid="sidebar-workspaces-toggle-grouped"
+                    onClick={toggleWorkspacesGrouped}
+                    title={workspacesGrouped ? 'Show as flat list' : 'Group by project'}
+                    className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  >
+                    {workspacesGrouped ? 'Flat' : 'Group'}
+                  </button>
+                )}
+              </div>
+              {activeWorkspaces.length === 0 ? (
+                <p className="px-3 py-1.5 text-xs text-muted-foreground/70">No workspaces</p>
+              ) : workspacesGrouped ? (
+                groupedWorkspaces.map((group) => (
+                  <div key={group.projectId} className="mb-1">
+                    <p className="px-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70 mt-2 mb-1">
+                      {group.name}
+                    </p>
+                    {group.items.map(renderWorkspaceRow)}
+                  </div>
+                ))
+              ) : (
+                activeWorkspaces.map(renderWorkspaceRow)
+              )}
+              {archivedWorkspaceCount > 0 && (
+                <div>
+                  <button
+                    data-testid="sidebar-workspaces-archived-toggle"
+                    onClick={() => setWorkspacesArchivedExpanded((prev) => !prev)}
+                    aria-expanded={workspacesArchivedExpanded}
+                    className="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {workspacesArchivedExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                    <span>Archived</span>
+                    <span className="ml-auto text-[11px] text-muted-foreground">{archivedWorkspaceCount}</span>
+                  </button>
+                  {workspacesArchivedExpanded && archivedWorkspaces.map(renderWorkspaceRow)}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="h-px mx-2 bg-border my-2" />
+          )}
 
           {/* ─── Projects ─── */}
           {!collapsed ? (

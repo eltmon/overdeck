@@ -195,9 +195,21 @@ read door; agents mutate that state only through `pan task …`.
 ## Runtime plane — local SQLite
 
 `~/.overdeck/overdeck.db` contains machine-local projections: agents, review
-status, lifecycle events, and conversations. It is a disposable cache rebuilt
-from Git state, JSONL transcripts, tracker data, and tmux through the canonical
-domain resolvers.
+status, lifecycle events, conversations, and — since PAN-1990 — the
+`projects`/`workspaces`/`project_targets`/`pinned_docs` tables (one row per
+registered project and per git worktree Overdeck knows about; see
+`docs/WORKSPACES-AND-PROJECTS.md`). It is a disposable cache rebuilt from Git
+state, JSONL transcripts, tracker data, and tmux through the canonical domain
+resolvers — for the workspaces/projects domain, that's
+`src/lib/workspaces/resolver.ts` (read) and `src/lib/workspaces/writer.ts`
+(write), the same two-doors shape every other table in this plane follows.
+
+`pan admin db rebuild-workspaces` reconstructs the `projects`/`workspaces`
+tables the same way `pan admin db rebuild-agents` reconstructs `agents`:
+re-seeding from `projects.yaml`, backfilling `issue`-kind rows from existing
+`feature-*` worktrees, recreating `main`/`scratch` rows from their memory-home
+identity mirrors, and migrating pre-PAN-1990 issue-keyed memory homes onto
+their workspace UUID.
 
 ### Bounded review-status history (PAN-3253)
 

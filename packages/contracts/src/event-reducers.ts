@@ -822,7 +822,10 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
 
     case 'memory.observation_created': {
       const observation = event.payload.observation
-      const existing = state.observationsByIssueId[observation.issueId] ?? []
+      // A null issueId (main/scratch workspace turn, PRD D-6) falls back to
+      // workspaceId as the read-model key until events-workspaceid widens this.
+      const observationKey = observation.issueId ?? observation.workspaceId
+      const existing = state.observationsByIssueId[observationKey] ?? []
       const index = existing.findIndex(entry => entry.id === observation.id)
       const updated = trimMemoryObservations(index === -1
         ? [...existing, observation]
@@ -832,7 +835,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         sequence: Math.max(state.sequence, event.sequence),
         observationsByIssueId: {
           ...state.observationsByIssueId,
-          [observation.issueId]: updated,
+          [observationKey]: updated,
         },
       }
     }

@@ -283,7 +283,13 @@ export function trimReviewStatusHistoryPayloads(
  * Create an EventStore from a pre-opened DbAdapter.
  * Call openEventDb() first to get the adapter.
  */
-export function createEventStore(db: DbAdapter): EventStore {
+export interface CreateEventStoreOptions {
+  /** Override the workspaceId lookup used by withWorkspaceId — defaults to the real resolver against the global overdeck.db. Pass a stub in unit tests to avoid touching it. */
+  resolveWorkspaceId?: (issueId: string) => string | undefined;
+}
+
+export function createEventStore(db: DbAdapter, options?: CreateEventStoreOptions): EventStore {
+  const resolveWorkspaceId = options?.resolveWorkspaceId ?? defaultResolveWorkspaceId;
   const emitter = new EventEmitter();
   // Allow many subscribers (one per WebSocket connection)
   emitter.setMaxListeners(0);
@@ -423,23 +429,26 @@ export function createEventStore(db: DbAdapter): EventStore {
   }
 
   function append(event: Omit<DomainEvent, 'sequence'>): number {
-    const eventWithWorkspace = withWorkspaceId(event, defaultResolveWorkspaceId);
-    const timestamp = eventTimestampMillis(eventWithWorkspace);
-    let payload = JSON.stringify((eventWithWorkspace as Record<string, unknown>)['payload'] ?? {});
+    event = withWorkspaceId(event, resolveWorkspaceId);
+    const timestamp = eventTimestampMillis(event);
+    let payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
 
     // Enforce bounds on review.status_changed payloads at the append door
-    if (eventWithWorkspace.type === 'review.status_changed') {
+    if (event.type === 'review.status_changed') {
       payload = boundReviewStatusPayload(payload);
     }
 
-    insertStmt.run([eventWithWorkspace.type, timestamp, payload]);
+    insertStmt.run([event.type, timestamp, payload]);
+
+    const row = lastRowIdStmt.get();
+    const sequence = row?.sequence ?? 0;
 
     const row = lastRowIdStmt.get();
     const sequence = row?.sequence ?? 0;
 
     const stored: StoredEvent = {
       sequence,
-      type: eventWithWorkspace.type,
+      type: event.type,
       timestamp: new Date(timestamp).toISOString(),
       // PAN-2225: distribute the persisted JSON round-trip, not the raw object.
       // A raw payload can carry undefined-valued keys (dropped by stringify),
@@ -452,18 +461,18 @@ export function createEventStore(db: DbAdapter): EventStore {
   }
 
   function appendAsync(event: Omit<DomainEvent, 'sequence'>): Promise<number> {
+    event = withWorkspaceId(event, resolveWorkspaceId);
     return new Promise((resolve) => {
-      const eventWithWorkspace = withWorkspaceId(event, defaultResolveWorkspaceId);
-      const timestamp = eventTimestampMillis(eventWithWorkspace);
-      let payload = JSON.stringify((eventWithWorkspace as Record<string, unknown>)['payload'] ?? {});
+      const timestamp = eventTimestampMillis(event);
+      let payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
 
       // Enforce bounds on review.status_changed payloads at the append door
-      if (eventWithWorkspace.type === 'review.status_changed') {
+      if (event.type === 'review.status_changed') {
         payload = boundReviewStatusPayload(payload);
       }
 
       writeQueue.push({
-        type: eventWithWorkspace.type,
+        type: event.type,
         timestamp,
         payload,
         // PAN-2225: subscribers get the persisted JSON round-trip (see append).
@@ -476,6 +485,7 @@ export function createEventStore(db: DbAdapter): EventStore {
   }
 
   function emitOnly(event: Omit<DomainEvent, 'sequence'>): void {
+    event = withWorkspaceId(event, resolveWorkspaceId);
     const timestamp = eventTimestampMillis(event);
     const stored: StoredEvent = {
       sequence: -1, // sentinel: in-memory only, not persisted
@@ -541,14 +551,14 @@ export function createEventStore(db: DbAdapter): EventStore {
     event: Omit<DomainEvent, 'sequence'>,
     idempotencyKey: string,
   ): { outcome: 'appended' | 'duplicate'; sequence: number } {
+    event = withWorkspaceId(event, resolveWorkspaceId);
     const stmts = getIdempotencyStmts();
-    const eventWithWorkspace = withWorkspaceId(event, defaultResolveWorkspaceId);
-    const timestamp = eventTimestampMillis(eventWithWorkspace);
-    let payload = JSON.stringify((eventWithWorkspace as Record<string, unknown>)['payload'] ?? {});
+    const timestamp = eventTimestampMillis(event);
+    let payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
 
     // Enforce bounds on review.status_changed payloads at the append door,
     // before the dedup check so the bounded form is used for idempotency.
-    if (eventWithWorkspace.type === 'review.status_changed') {
+    if (event.type === 'review.status_changed') {
       payload = boundReviewStatusPayload(payload);
     }
 
@@ -565,7 +575,7 @@ export function createEventStore(db: DbAdapter): EventStore {
         duplicate = true;
         sequence = claimed.sequence;
       } else {
-        insertStmt.run([eventWithWorkspace.type, timestamp, payload]);
+        insertStmt.run([event.type, timestamp, payload]);
         sequence = lastRowIdStmt.get()?.sequence ?? 0;
         stmts.setSeq.run([sequence, idempotencyKey]);
       }
@@ -583,7 +593,7 @@ export function createEventStore(db: DbAdapter): EventStore {
     if (!duplicate) {
       emitter.emit('event', {
         sequence,
-        type: eventWithWorkspace.type,
+        type: event.type,
         timestamp: new Date(timestamp).toISOString(),
         payload: JSON.parse(payload),
       } satisfies StoredEvent);

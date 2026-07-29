@@ -7,7 +7,8 @@
  * Data: dashboard store (issues, agents, review status, pending input).
  */
 import { useMemo, useState } from 'react';
-import { useDashboardStore, selectPendingInputSubjects, type PendingInputSubject } from '../../lib/store';
+import { useDashboardStore, type PendingInputSubject } from '../../lib/store';
+import { usePendingInputSubjects } from '../../lib/useDecisions';
 import type { Issue } from '../../types';
 import type { AgentSnapshot } from '@overdeck/contracts';
 import { bucketSimpleHome, deriveSimpleIssue, type SimpleIssueDerivation, type NeedsYouKind } from '../../lib/simple/derive';
@@ -70,8 +71,11 @@ function formatAge(iso?: string): string {
 /* ── Needs-you cards ─────────────────────────────────────────────────── */
 function QuestionCard({ item, subject, onOpen }: { item: SimpleIssueDerivation; subject?: PendingInputSubject; onOpen: () => void }) {
   const actions = useSimpleActions();
+  const agentsById = useDashboardStore((s) => s.agentsById);
   const [text, setText] = useState('');
-  const agentId = subject?.agentId ?? item.pendingInputAgent?.id;
+  const subjectAgentId = subject?.agentId;
+  const isConversation = !!(subjectAgentId && !agentsById?.[subjectAgentId]);
+  const agentId = subjectAgentId ?? item.pendingInputAgent?.id;
   const question = subject?.pendingAskUserQuestion?.questions?.[0]?.question ?? item.display.sentence;
   const busy = actions.answer.isPending;
   return (
@@ -85,11 +89,11 @@ function QuestionCard({ item, subject, onOpen }: { item: SimpleIssueDerivation; 
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && text.trim() && agentId) actions.answer.mutate({ agentId, text: text.trim() }); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && text.trim() && agentId) actions.answer.mutate({ agentId, text: text.trim(), isConversation }); }}
           placeholder={SIMPLE_STRINGS.issue.answerPlaceholder}
           className="h-9 flex-1 rounded-lg border border-input bg-muted px-3 text-[13px] text-foreground outline-none focus:border-ring"
         />
-        <PrimaryButton disabled={!text.trim() || !agentId || busy} onClick={() => agentId && actions.answer.mutate({ agentId, text: text.trim() })}>
+        <PrimaryButton disabled={!text.trim() || !agentId || busy} onClick={() => agentId && actions.answer.mutate({ agentId, text: text.trim(), isConversation })}>
           {item.display.primaryAction ?? 'Answer'}
         </PrimaryButton>
       </div>
@@ -179,7 +183,7 @@ export function SimpleHomePage() {
   const issuesRaw = useDashboardStore((s) => s.issuesRaw);
   const agentsById = useDashboardStore((s) => s.agentsById);
   const reviewByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
-  const pendingSubjects = useDashboardStore(selectPendingInputSubjects);
+  const pendingSubjects = usePendingInputSubjects();
   const openSimpleIssue = useUiMode((s) => s.openSimpleIssue);
 
   const { derivations, buckets, byIdentifier } = useMemo(() => {

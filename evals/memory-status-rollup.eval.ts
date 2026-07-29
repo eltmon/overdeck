@@ -252,7 +252,7 @@ evalite<RollupEvalInput, RollupEvalOutput, RollupEvalExpected>('memory status ro
     const promptSink = { value: '' };
     const result = await synthesizeStatusRollup({
       projectId: identity.projectId,
-      issueId: identity.issueId,
+      workspaceId: identity.workspaceId,
       pendingTurns: input.pendingTurns,
       observations: input.observations,
       archivedStatuses: input.archivedStatuses,

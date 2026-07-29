@@ -1,0 +1,85 @@
+---
+title: Workspaces
+description: Managing per-project git worktrees and their memory
+---
+
+# Workspaces
+
+A workspace is one git worktree Overdeck knows about for a registered
+project — the checkout a planning, work, review, or scratch session actually
+runs in. Every workspace has a `kind`: `main` (the project's primary
+checkout, exactly one per project), `issue` (one per tracked issue), or
+`scratch` (ad-hoc, not tied to an issue).
+
+## Overview
+
+Workspaces are reachable from three places in the dashboard:
+
+- **Sidebar → Workspaces** — favorites first, then most-recently-accessed;
+  archived workspaces collapse into a count row, and a flat/grouped-by-project
+  toggle persists across sessions.
+- **Cmd-K / Ctrl-K** — the command palette's "Workspaces" section lists every
+  workspace across every project, filterable by name; selecting one activates
+  it and opens its view.
+- **`/workspace/:id`** — a dedicated view with a terminal (issue-kind
+  workspaces, when an agent is running), workspace-filtered conversations,
+  and the workspace's memory surface (status headline, phase, and observation
+  timeline). Issue-kind workspaces additionally show the xBRIEF plan and
+  verification gates.
+
+## CLI
+
+```bash
+# Create a scratch workspace (shares the project directory by default)
+pan workspace new my-scratch-notes
+
+# --isolated creates a separate git worktree instead
+pan workspace new my-experiment --isolated --parent-branch main
+
+# Resolve (or lazily create) the project's singleton main workspace
+pan workspace main
+
+# Inspect, activate, or archive a workspace by id
+pan workspace get <id>
+pan workspace activate <id>
+pan workspace archive <id>
+
+# List, filtered through the same door the dashboard reads
+pan workspace list --kind scratch --archived
+```
+
+<Note>
+  `pan workspace` also carries an older set of subcommands (`create`,
+  `migrate`, `ssh`, `destroy`, …) for the separate issue/git-worktree
+  lifecycle that predates this domain. `new`/`main`/`get`/`activate`/`archive`
+  are the ones documented here.
+</Note>
+
+## Memory scopes
+
+Memory is keyed by workspace, not by issue: observations, status, and
+summaries for a workspace live under
+`~/.overdeck/memory/{project}/{workspaceId}/`. This means a scratch or main
+workspace — one with no spawned agent — still accumulates memory from
+whatever conversations run in it.
+
+```bash
+# Search within one workspace, one project, or across every registered project
+pan memory search "auth refactor" --workspace <id>
+pan memory search "auth refactor" --project myproject
+pan memory search "auth refactor" --global
+
+# Pin a doc into every prompt for a workspace or a whole project
+pan memory pin docs/ARCHITECTURE.md --workspace <id>
+pan memory pin docs/ARCHITECTURE.md --project myproject
+pan memory pins --workspace <id>
+pan memory unpin docs/ARCHITECTURE.md --workspace <id>
+
+# Backfill historical Claude Code sessions into memory, matched by cwd
+pan memory backfill --dry-run
+pan memory backfill --workspace <id>
+```
+
+A pin's scope determines its lifetime: a project-scoped pin survives every
+workspace under that project, while a workspace-scoped pin is deleted when
+its workspace is.
