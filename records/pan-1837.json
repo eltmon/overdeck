@@ -74,15 +74,7 @@
       "timestamp": "2026-07-29T02:00:47.916Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T02:00:47Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1837\n\n# Code Review — PAN-1837\n\n## Verdict: CHANGES REQUESTED\n\nReviewed `feature/pan-1837` at local HEAD `c6d2ddc5596539e9ef4dbaebf6a435697a86df90` across correctness, security, requirements, and performance. The current rework fixes concurrent fresh-session capture, restart-wipe ordering, canonical planning/conversation harness validation, agent resume/recovery, transcript adapters, and the previous async polling concern. Focused regression tests (141 tests), the file-size gate, and `git diff --check` pass. Two lifecycle defects remain, however: stopped Kimi conversations still restart in a new native session rather than resume their captured one, and an invalid planning pair is rejected only after the issue and agent state have already been mutated. The reviewed local merge is also not pushed to the PR.\n\n## Blocking findings\n\n### P1 — Kimi conversation resume still launches a fresh session and replaces the pinned transcript\n\n**Locations:** `src/lib/overdeck/conversation-runtime.ts:646-663`, `src/lib/overdeck/conversation-runtime.ts:799-815`, `src/lib/overdeck/conversation-runtime.ts:941-972`, `src/lib/launcher-generator.ts:790-809`\n\nThis is not a new late-cycle finding: the previous review explicitly required native Kimi conversations to preserve their captured session on resume. The current rework adds `-S <resumeSessionId>` support to the Kimi launcher and wires it for work-agent recovery, but the conversation branch still constructs:\n\n```ts\nkimiCodeFields = { harness: 'kimi-code', kimiCodeModel: model, kimiCodeYolo: true };\n```\n\nIt never reads the conversation’s persisted `kimi-session-id` and never sets `resumeSessionId`, even when `handleConversationResume()` calls `spawnConversationSession(..., canResume, 'kimi-code')`. The new capture lock then treats the relaunch as fresh, waits for a new directory, and overwrites the pinned ID. The Conversation tab loses the old transcript and Kimi loses its native context/cache continuity after every stop/resume, despite the installed CLI supporting `kimi -S <existing-id>`.\n\nRead the captured Kimi ID when `resume === true`, pass it through `kimiCodeFields.resumeSessionId`, and skip fresh-session snapshot/capture for that path. If the pinned wire is missing, use the existing explicit fresh-session fallback and capture a replacement. Add a conversation-runtime test proving a stopped Kimi conversation’s launcher contains `-S '<captured-id>'` and does not create or pin a new session.\n\n### P1 — Denied planning selections mutate issue and agent state before policy validation runs\n\n**Locations:** `src/lib/overdeck/planning-sessions.ts:128-148`, `src/lib/overdeck/planning-sessions.ts:316-375`, `src/lib/overdeck/planning-sessions.ts:411-449`, `src/lib/overdeck/__tests__/planning-harness-gate.test.ts:4-33`\n\nThe silent-coercion fix now throws for `{ harness: 'kimi-code', model: 'claude-sonnet-5' }`, but `resolvePlanningEffectiveHarness()` is called only inside the SSE stream after the route has:\n\n- created and saved a `planning-*` AgentState placeholder,\n- transitioned the issue to `in_planning`,\n- emitted `workspace.created` and `planning.started`, and\n- patched the issue data service to In Planning.\n\nThe stream then emits an error without rolling any of that state back. An invalid request therefore leaves an issue stuck in Planning with a starting agent record but no planning process—the same validate-after-mutation failure mode fixed in `restart-fresh` this cycle.\n\nResolve and validate the explicit model/harness pair before creating the preliminary state, changing lifecycle status, or emitting events. The current test exercises only the pure helper; add a `startPlanningForIssue` route/service test that asserts denied policy performs none of those mutations.\n\n### P1 — The reviewed HEAD is not on PR #3255\n\n**Pipeline state:** local HEAD `c6d2ddc5596539e9ef4dbaebf6a435697a86df90`; remote PR head `8a4605cfd23538edf11c9bdff19838fd9c43938e`\n\nThe local branch is four commits ahead of `origin/feature/pan-1837`. Those commits merge the current `origin/main` changes into the review workspace, but the open PR still points at the pre-merge rework SHA. Passing this run would approve a local tree different from the merge surface and violate the managed-work requirement that each completed item be pushed before pipeline advancement. Push the feature branch and verify PR #3255 advances to the reviewed SHA before requesting the next review.\n\n## Non-blocking findings\n\n### P2 — Fresh Kimi restart can permanently retain the old transcript pointer when asynchronous capture fails\n\n**Location:** `src/lib/agents/recovery.ts:208-247`\n\n`restartAgent()` intentionally fresh-launches Kimi, then captures the new session ID in a fire-and-forget task. If `waitForNewKimiSession()` times out or writing the ID fails, the error/null result is ignored and the old `kimi-session-id` remains. `findKimiWirePath()` sees that old wire still exists and returns it, so its newest-session fallback never runs; the dashboard can show the pre-restart transcript and cost indefinitely while the new agent works.\n\nClear or atomically replace the stale pointer around a fresh launch, and surface capture failure instead of marking restart fully successful. This capture should also use the async poller because restart runs in the dashboard process.\n\n### P2 — New concurrency tests use real timer delays\n\n**Location:** `src/lib/runtimes/__tests__/kimi-code.test.ts:410-466`\n\nThe session-capture lock tests use real 5 ms and 30 ms `setTimeout` delays. Repository policy requires fake timers for delay-based tests so parallel workers do not accumulate live timers or turn scheduler variance into flakes. Use `vi.useFakeTimers()` with `vi.advanceTimersByTimeAsync()` while preserving the two-bucket ordering assertions.\n\n## Security review\n\nNo command-injection, authentication-bypass, or credential-exposure blocker survived review. Kimi arguments are shell-quoted, native auth stays isolated from the Anthropic-compatible environment, the restart mutation-order safety defect is fixed, and no new synchronous tmux delivery or `execSync` primitive was introduced. The planning validate-after-mutation defect above is the remaining state-integrity concern.\n\n## Verification and coverage\n\nReviewed the five high-risk spawn owners, all medium-risk surfaces, the full `6a313cf9..8a4605cf` PAN-1837 rework, and merge-adjacent lifecycle code needed to verify the previous blockers. Focused Vitest coverage passed: 8 files and 141 tests covering restart ordering, planning policy, conversation normalization, Kimi runtime capture/resume primitives, transcript adapters, agent resume, and launcher generation. `npm run lint:file-size` and `git diff --check origin/main...HEAD` passed, and the worktree is clean. PR #3255 is mergeable; build, smoke, state-plane guard, and prompt-trailer checks are green, while CI lint/test/flake jobs were still running during review. No test role was queued.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1837/.pan/review/agent-pan-1837-review-c6d2ddc5/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1837 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -297,10 +289,10 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T02:25:40.011Z",
+  "updated": "2026-07-29T02:26:08.135Z",
   "pipeline": {
     "issueId": "PAN-1837",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -308,7 +300,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T02:25:38.785Z",
+    "updatedAt": "2026-07-29T02:26:08.079Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
@@ -321,7 +313,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
     "reviewedAtCommit": "c6d2ddc5596539e9ef4dbaebf6a435697a86df90",
-    "reviewSpawnedAt": "2026-07-29T01:56:52.989Z"
+    "reviewSpawnedAt": "2026-07-29T02:26:08.078Z"
   },
   "closeOut": {
     "usage": {
@@ -373,7 +365,7 @@
       },
       "costAtCloseOut": {
         "usd": 309.828666,
-        "pricingAsOf": "2026-07-29T02:25:40.007Z"
+        "pricingAsOf": "2026-07-29T02:26:08.129Z"
       }
     },
     "merges": [
