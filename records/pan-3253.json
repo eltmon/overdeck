@@ -148,21 +148,21 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T09:16:45.290Z",
+  "updated": "2026-07-29T09:34:51.537Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T09:16:42.721Z",
-    "updatedAt": "2026-07-29T09:16:43.788Z",
+    "updatedAt": "2026-07-29T09:34:51.479Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3253-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewedAtCommit": "902ef5c2c866310648762b466c9d39d6fef2ea42",
-    "lastVerifiedCommit": "902ef5c2c866310648762b466c9d39d6fef2ea42",
+    "lastVerifiedCommit": "14703dbb3871a0e90db6fb10d370b144c231ac3a",
     "reviewRequestedAt": "2026-07-29T09:16:42.721Z",
     "reviewSpawnedAt": "2026-07-29T09:08:48.318Z",
     "scopeDrift": {
@@ -220,10 +220,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2433,
-            "output": 117330,
-            "cacheRead": 57371221,
-            "cacheWrite": 2656574
+            "input": 2710,
+            "output": 129901,
+            "cacheRead": 62023568,
+            "cacheWrite": 2759361
           }
         }
       },
@@ -241,15 +241,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2433,
-          "output": 117330,
-          "cacheRead": 57371221,
-          "cacheWrite": 2656574
+          "input": 2710,
+          "output": 129901,
+          "cacheRead": 62023568,
+          "cacheWrite": 2759361
         }
       },
       "costAtCloseOut": {
-        "usd": 92.044863,
-        "pricingAsOf": "2026-07-29T09:16:45.287Z"
+        "usd": 92.701713,
+        "pricingAsOf": "2026-07-29T09:34:51.521Z"
       }
     },
     "merges": [
