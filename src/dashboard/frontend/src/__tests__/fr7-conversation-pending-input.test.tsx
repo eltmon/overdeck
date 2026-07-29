@@ -47,7 +47,7 @@ vi.mock('../components/drawer/DrawerAgentSession', () => ({
       <div>{agentId}</div>
     </div>
   ),
-  pickDefaultDrawerAgent: vi.fn((agent: any) => agent),
+  pickDefaultDrawerAgent: vi.fn((agents: any) => agents?.[0] ?? null),
 }));
 
 // Mock TalkItThrough to avoid unrelated requests
