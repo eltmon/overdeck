@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-29T23:10:31.873Z",
+  "updated": "2026-07-29T23:33:39.078Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -35,5 +35,15 @@
     "ranOn": "Edwards-MacBook-Air.local"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "claude-sonnet-5",
+  "recoveryTrips": [
+    {
+      "issue": "PAN-3286",
+      "recoveryPath": "orphan-proposed-pickup-gate",
+      "obligationGeneration": "proposed",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-29T23:33:39.077Z"
+    }
+  ]
 }
