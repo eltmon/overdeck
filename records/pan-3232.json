@@ -175,26 +175,20 @@
   ],
   "scopeDrift": {
     "outsideDeclaredScope": [
-      "docs/FLYWHEEL-STATE.md",
       "scripts/dashboard-types-baseline.txt",
       "scripts/file-size-allowlist.txt",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
-      "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx"
+      "src/dashboard/frontend/src/__tests__/fr7-conversation-pending-input.test.tsx",
+      "src/dashboard/frontend/src/lib/simple/useSimpleActions.ts"
     ],
     "declaredScopeUntouched": [
       "packages/contracts/src/events.ts",
       "packages/contracts/src/rpc.ts",
       "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
       "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
       "src/dashboard/frontend/src/components/issue-view/useIssueView.test.tsx",
       "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
       "src/dashboard/server/__tests__/session-tree-specialist-pending-input.test.ts",
-      "src/dashboard/server/__tests__/ws-rpc.test.ts",
-      "src/dashboard/server/routes/projects.ts",
-      "src/dashboard/server/routes/reviewer-tree.ts",
-      "src/dashboard/server/services/agent-enrichment-service.ts"
+      "src/dashboard/server/__tests__/ws-rpc.test.ts"
     ],
     "declaredScope": [
       "docs/ASKUSERQUESTION-DASHBOARD.md",
@@ -226,30 +220,32 @@
     ],
     "actualChangedFiles": [
       "docs/ASKUSERQUESTION-DASHBOARD.md",
-      "docs/FLYWHEEL-STATE.md",
       "scripts/dashboard-types-baseline.txt",
       "scripts/file-size-allowlist.txt",
+      "src/dashboard/frontend/src/__tests__/fr7-conversation-pending-input.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
       "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
       "src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx",
-      "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
-      "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx",
       "src/dashboard/frontend/src/components/dock/ConversationDock.tsx",
       "src/dashboard/frontend/src/components/issue-view/useIssueView.ts",
       "src/dashboard/frontend/src/components/simple/SimpleHomePage.tsx",
+      "src/dashboard/frontend/src/lib/simple/useSimpleActions.ts",
       "src/dashboard/frontend/src/lib/store.ts",
       "src/dashboard/frontend/src/lib/useDecisions.ts",
       "src/dashboard/server/__tests__/read-model-pending-input.test.ts",
       "src/dashboard/server/read-model.ts",
       "src/dashboard/server/routes/command-deck.ts",
+      "src/dashboard/server/routes/projects.ts",
+      "src/dashboard/server/routes/reviewer-tree.ts",
+      "src/dashboard/server/services/agent-enrichment-service.ts",
       "src/dashboard/server/ws-rpc.ts"
     ],
-    "recordedAt": "2026-07-28T21:11:50.152Z"
+    "recordedAt": "2026-07-29T02:17:34.123Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T02:17:31.551Z",
+  "updated": "2026-07-29T02:17:34.125Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
