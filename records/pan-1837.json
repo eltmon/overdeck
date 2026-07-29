@@ -369,7 +369,7 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T15:28:38.126Z",
+  "updated": "2026-07-29T15:30:38.269Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "reviewing",
@@ -380,7 +380,19 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T15:28:36.552Z",
+    "updatedAt": "2026-07-29T15:30:38.053Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-29T15:30:38.051Z"
+      },
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-29T15:30:38.051Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
     "lastVerifiedCommit": "62879baf9058e9812fa2818ec0f41147059117ce",
     "reviewSpawnedAt": "2026-07-29T15:28:36.550Z"
@@ -406,10 +418,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 4546,
-            "output": 1053401,
-            "cacheRead": 1211526798,
-            "cacheWrite": 6726191
+            "input": 4550,
+            "output": 1053648,
+            "cacheRead": 1211909218,
+            "cacheWrite": 6727297
           }
         }
       },
@@ -427,15 +439,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 4546,
-          "output": 1053401,
-          "cacheRead": 1211526798,
-          "cacheWrite": 6726191
+          "input": 4550,
+          "output": 1053648,
+          "cacheRead": 1211909218,
+          "cacheWrite": 6727297
         }
       },
       "costAtCloseOut": {
-        "usd": 470.661971,
-        "pricingAsOf": "2026-07-29T15:28:38.016Z"
+        "usd": 470.743698,
+        "pricingAsOf": "2026-07-29T15:30:38.178Z"
       }
     },
     "merges": [
@@ -444,7 +456,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-1837",
