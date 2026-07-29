@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   writeActiveDashboardBundle: vi.fn(),
   fsMkdir: vi.fn(),
   supervisorDeploymentFailure: vi.fn(),
+  dashboardServerBootFailure: vi.fn(),
 }));
 
 // reloadCommand refuses to run when a `pan dev` supervisor marker is present.
@@ -52,6 +53,10 @@ vi.mock('../../../lib/deploy/agent-restart-gate.js', () => ({
 
 vi.mock('../../../lib/channels/pty-supervisor-locate.js', () => ({
   supervisorDeploymentFailure: mocks.supervisorDeploymentFailure,
+}));
+
+vi.mock('../../../lib/deploy/dashboard-bundle-integrity.js', () => ({
+  dashboardServerBootFailure: mocks.dashboardServerBootFailure,
 }));
 
 vi.mock('../../../lib/deploy/active-dashboard-bundle.js', () => ({
@@ -203,6 +208,7 @@ describe('reloadCommand', () => {
     mocks.readActiveDashboardBundle.mockReturnValue(null);
     mocks.writeActiveDashboardBundle.mockResolvedValue(undefined);
     mocks.supervisorDeploymentFailure.mockReturnValue(null);
+    mocks.dashboardServerBootFailure.mockReturnValue(null);
     mocks.fsAccess.mockImplementation(async (path: string) => {
       if (path === '/usr/bin/bun') return;
       throw Object.assign(new Error(`ENOENT: ${path}`), { code: 'ENOENT' });
@@ -388,6 +394,30 @@ describe('reloadCommand', () => {
     );
     expect(mocks.writeRestartStatus).toHaveBeenCalledWith(
       expect.objectContaining({ success: false, error: expect.stringContaining('@lydell/node-pty') }),
+    );
+    expect(process.exitCode).toBe(1);
+  });
+
+  // PAN-3264: the same trap one layer down. A generation whose own externals
+  // cannot resolve serves nothing at all — the server dies on
+  // ERR_MODULE_NOT_FOUND at boot — so traffic must never move onto it.
+  it('fails the reload when the built server bundle cannot resolve its externals', async () => {
+    mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
+    mocks.dashboardServerBootFailure.mockReturnValue(
+      'Deployment cannot resolve effect from /dist/dashboard/server.js',
+    );
+    mockSpawnExits();
+
+    await reloadCommand({});
+
+    expect(mocks.dashboardServerBootFailure).toHaveBeenCalledWith(`${DEFAULT_BUILD_WORKTREE}/dist/dashboard/server.js`);
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+    expect(mocks.exec).toHaveBeenCalledWith(
+      `git 'worktree' 'remove' '--force' '${DEFAULT_BUILD_WORKTREE}'`,
+      expect.objectContaining({ cwd: DEFAULT_REPO_ROOT }),
+    );
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false, error: expect.stringContaining('effect') }),
     );
     expect(process.exitCode).toBe(1);
   });
