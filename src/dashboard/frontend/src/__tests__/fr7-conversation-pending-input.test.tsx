@@ -10,6 +10,7 @@
  */
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Set up all mocks BEFORE any imports to ensure hoisted vi.mock works
 vi.mock('../lib/store', () => ({
@@ -37,6 +38,15 @@ vi.mock('../lib/convoDock', () => ({
 vi.mock('../lib/simple/derive', () => ({
   bucketSimpleHome: vi.fn(),
   deriveSimpleIssue: vi.fn(),
+}));
+
+// Mock DrawerAgentSession to avoid nested React Query context issues
+vi.mock('../components/dock/DrawerAgentSession', () => ({
+  DrawerAgentSession: ({ sessionId, agentId }: any) => (
+    <div data-testid="drawer-agent-session">
+      <div>{agentId}</div>
+    </div>
+  ),
 }));
 
 // Now import after all mocks are in place
@@ -350,9 +360,13 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
         } as any,
       ]);
 
-      // bucketSimpleHome with empty needsYou; conversation is routed via extraQuestions
+      // Complete bucket structure with all required arrays
+      // Conversation subjects route via extraQuestions, not needsYou
       vi.mocked(derive.bucketSimpleHome).mockReturnValue({
         needsYou: [],
+        working: [],
+        ready: [],
+        finished: [],
       } as any);
 
       vi.mocked(derive.deriveSimpleIssue).mockReturnValue(convSimpleDerivation as any);
@@ -367,12 +381,6 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
 
   describe('ConversationDock: AC-3', () => {
     it('AC-3: preserves agent-backed dock panel when agent exists for docked issue', () => {
-      // Import QueryClientProvider at the top, then use it in the render
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { QueryClientProvider } = require('@tanstack/react-query');
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { QueryClient } = require('@tanstack/react-query');
-
       // Set up docked issue with agent pending input
       vi.mocked(convoDock.useConvoDock).mockReturnValue({
         items: [{ issueId: 'PAN-1', addedAt: Date.now() }],
@@ -414,7 +422,7 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
 
       vi.mocked(derive.deriveSimpleIssue).mockReturnValue(mockAgentDerivation as any);
 
-      // Wrap with QueryClientProvider to avoid "No QueryClient set" error
+      // Wrap with QueryClientProvider using ESM import to match DrawerAgentSession's React Query context
       const queryClient = new QueryClient();
       render(
         <QueryClientProvider client={queryClient}>
@@ -424,7 +432,8 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
 
       // Verify agent panel is rendered for the docked issue
       expect(screen.getByText(/PAN-1.*Test Issue/)).toBeInTheDocument();
-      // Agent identity should be present in the dock (not testing the conversation coexistence behavior here)
+      // DrawerAgentSession mock renders agent identity; verify it appears
+      expect(screen.getByTestId('drawer-agent-session')).toBeInTheDocument();
       expect(screen.getByText('agent-test-1')).toBeInTheDocument();
     });
   });
