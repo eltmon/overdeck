@@ -124,18 +124,18 @@
     "recordedAt": "2026-07-29T02:53:51.344Z"
   },
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-29T03:52:25.773Z",
+  "updated": "2026-07-29T03:56:19.356Z",
   "pipeline": {
     "issueId": "PAN-3231",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-29T03:52:22.008Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed test",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-29T03:56:19.141Z",
+    "reviewNotes": "Prior blockers are fixed with regression coverage; no new correctness, security, requirements, or performance findings.",
     "inspectNotes": "All 5 ACs met. AC5 gaps from the prior review are closed: identity block with 'xBRIEF · active plan' eyebrow + mono issue id + plan title (XBriefFullscreen.tsx:154-171), controlled List/DAG/Raw tablist moved into the topbar per mockup lines 332-345 (XBriefFullscreen.tsx:173-196), summary strip with N/M complete + progress track + happening-now/ready/waiting-on-edges + execution lanes per mockup lines 358-369 (XBriefFullscreen.tsx:211-247), and the esc-hinted close per mockup lines 351-354. AC1/AC2 intact: role=dialog + aria-modal=true, focus on the panel, Escape and scrim close, inner clicks stopPropagation; the toggle is preserved, relocated to the shell, and XBriefViewer's own bar is suppressed via showTabBar=false. AC3 unchanged - useWorkspacePlanQuery plus the same canonical ['workspace-plan', issueId] key for setQueryData. AC4 unchanged - DAG pane still flex-1 min-h-0 with a 400px floor, and the three pre-existing mounts keep the uncontrolled path (showTabBar defaults true, initialTab honored, selectTab only writes internal state when activeTab is undefined). Non-blocking observations: the third tab is labelled 'Raw' (matches the approved mockup; FR-1 prose says 'Raw JSON'); the mockup's 'Click any item for its acceptance criteria and file scope' hint line is not rendered; and the shared localStorage tab key now also records the shell-controlled tab, so a fullscreen tab change seeds other mounts' initial tab.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3273",
     "reviewedAtCommit": "3044cb7fcbf9e61618eef8eae63acd1ba469cd77",
@@ -241,10 +241,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 214,
-            "output": 43313,
-            "cacheRead": 24362056,
-            "cacheWrite": 277594
+            "input": 216,
+            "output": 43497,
+            "cacheRead": 24670320,
+            "cacheWrite": 278789
           }
         },
         "work": {
@@ -270,15 +270,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 214,
-          "output": 43313,
-          "cacheRead": 24362056,
-          "cacheWrite": 277594
+          "input": 216,
+          "output": 43497,
+          "cacheRead": 24670320,
+          "cacheWrite": 278789
         }
       },
       "costAtCloseOut": {
-        "usd": 246.173104,
-        "pricingAsOf": "2026-07-29T03:52:25.769Z"
+        "usd": 246.239588,
+        "pricingAsOf": "2026-07-29T03:56:19.343Z"
       }
     },
     "merges": [
