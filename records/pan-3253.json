@@ -85,12 +85,13 @@
     }
   ],
   "scopeDrift": {
-    "outsideDeclaredScope": [],
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt",
+      "src/lib/overdeck/review-status-sync.ts",
+      "src/lib/review-status-limits.ts",
+      "tests/unit/lib/overdeck/review-status-sync.test.ts"
+    ],
     "declaredScopeUntouched": [
-      "docs/AGENT-STATE-PLANES.md",
-      "src/lib/database/review-status-db.ts",
-      "src/lib/review-status-reconcile.ts",
-      "src/lib/review-status.ts",
       "tests/unit/lib/database/review-status-history-cap.test.ts"
     ],
     "declaredScope": [
@@ -103,13 +104,21 @@
       "tests/unit/lib/database/review-status-history-cap.test.ts"
     ],
     "actualChangedFiles": [
+      "docs/AGENT-STATE-PLANES.md",
+      "scripts/file-size-allowlist.txt",
       "src/dashboard/server/event-store.ts",
-      "tests/unit/event-store.test.ts"
+      "src/lib/database/review-status-db.ts",
+      "src/lib/overdeck/review-status-sync.ts",
+      "src/lib/review-status-limits.ts",
+      "src/lib/review-status-reconcile.ts",
+      "src/lib/review-status.ts",
+      "tests/unit/event-store.test.ts",
+      "tests/unit/lib/overdeck/review-status-sync.test.ts"
     ],
-    "recordedAt": "2026-07-29T07:45:29.088Z"
+    "recordedAt": "2026-07-29T08:36:43.407Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T08:36:40.415Z",
+  "updated": "2026-07-29T08:36:43.409Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
