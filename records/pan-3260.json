@@ -78,11 +78,11 @@
     "recordedAt": "2026-07-29T01:09:34.738Z"
   },
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T02:52:58.752Z",
+  "updated": "2026-07-29T02:53:00.905Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
@@ -200,7 +200,7 @@
       },
       "costAtCloseOut": {
         "usd": 77.253175,
-        "pricingAsOf": "2026-07-29T02:52:58.741Z"
+        "pricingAsOf": "2026-07-29T02:53:00.262Z"
       }
     },
     "merges": [
