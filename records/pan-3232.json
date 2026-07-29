@@ -144,7 +144,7 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T00:03:58.028Z",
+  "updated": "2026-07-29T00:04:06.115Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -154,16 +154,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T00:03:58.008Z",
-    "reviewNotes": "FR-7 sends conversation answers to an unregistered route and still cannot surface conversation-only strip entries",
-    "verificationNotes": "Checklist completion check FAILED — 8 incomplete item(s) remain:\n\n  Incomplete plan items (8):\n    - live-tree-delta.live-tree-delta.ac1 The AgentEnrichmentChangedEvent schema accepts payloads both with and without issueId, and decoding a legacy payload without the field returns a valid event (pending)\n    - live-tree-delta.live-tree-delta.ac2 mapEventToDelta returns a pending_input_changed delta carrying awaitingInput, prompt, reason, and kinds for an enrichment event with issueId, and returns null when the payload lacks issueId (pending)\n    - live-tree-delta.live-tree-delta.ac3 applySessionTreeDelta merges the four pending-input fields onto the matched session and clears them when the delta omits them, returning the same tree object when no session matches (pending)\n    - live-tree-delta.live-tree-delta.ac4 The enrichment poller emits issueId on agent.enrichment_changed events for agents with a known issue (pending)\n    - specialist-pending-input.specialist-pending-input.ac1 Session-tree review orchestrator, test, and ship nodes carry the four awaiting-input fields when the agent snapshot reports hasPendingQuestion true (pending)\n    - specialist-pending-input.specialist-pending-input.ac2 buildReviewerNodes returns reviewer nodes that carry the four awaiting-input fields taken from the provided agentSnapshotsById map (pending)\n    - specialist-pending-input.specialist-pending-input.ac3 The activity route emits specialist sections carrying the same four fields for a pending specialist snapshot (pending)\n    - specialist-pending-input.specialist-pending-input.ac4 A specialist node whose agent has no snapshot or no pending question renders with awaitingInput false and produces no prompt, reason, or kinds fields (pending)",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since c109ed6 (1 path): scripts/file-size-allowlist.txt",
-        "detectedAt": "2026-07-29T00:03:35.975Z"
-      }
-    ],
+    "updatedAt": "2026-07-29T00:04:06.087Z",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
       "detectedAt": "2026-07-29T00:03:35.975Z",
@@ -173,82 +164,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
     "reviewedAtCommit": "f2a3bffa861b4553e52947b3be0df57ec50aa888",
-    "reviewSpawnedAt": "2026-07-28T23:54:23.683Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "docs/FLYWHEEL-STATE.md",
-        "scripts/dashboard-types-baseline.txt",
-        "scripts/file-size-allowlist.txt",
-        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-        "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
-        "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx"
-      ],
-      "declaredScopeUntouched": [
-        "packages/contracts/src/events.ts",
-        "packages/contracts/src/rpc.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-        "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
-        "src/dashboard/frontend/src/components/issue-view/useIssueView.test.tsx",
-        "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
-        "src/dashboard/server/__tests__/session-tree-specialist-pending-input.test.ts",
-        "src/dashboard/server/__tests__/ws-rpc.test.ts",
-        "src/dashboard/server/routes/projects.ts",
-        "src/dashboard/server/routes/reviewer-tree.ts",
-        "src/dashboard/server/services/agent-enrichment-service.ts"
-      ],
-      "declaredScope": [
-        "docs/ASKUSERQUESTION-DASHBOARD.md",
-        "packages/contracts/src/events.ts",
-        "packages/contracts/src/rpc.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-        "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
-        "src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx",
-        "src/dashboard/frontend/src/components/dock/ConversationDock.tsx",
-        "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
-        "src/dashboard/frontend/src/components/issue-view/useIssueView.test.tsx",
-        "src/dashboard/frontend/src/components/issue-view/useIssueView.ts",
-        "src/dashboard/frontend/src/components/simple/SimpleHomePage.tsx",
-        "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
-        "src/dashboard/frontend/src/lib/store.ts",
-        "src/dashboard/frontend/src/lib/useDecisions.ts",
-        "src/dashboard/server/__tests__/read-model-pending-input.test.ts",
-        "src/dashboard/server/__tests__/session-tree-specialist-pending-input.test.ts",
-        "src/dashboard/server/__tests__/ws-rpc.test.ts",
-        "src/dashboard/server/read-model.ts",
-        "src/dashboard/server/routes/command-deck.ts",
-        "src/dashboard/server/routes/projects.ts",
-        "src/dashboard/server/routes/reviewer-tree.ts",
-        "src/dashboard/server/services/agent-enrichment-service.ts",
-        "src/dashboard/server/ws-rpc.ts"
-      ],
-      "actualChangedFiles": [
-        "docs/ASKUSERQUESTION-DASHBOARD.md",
-        "docs/FLYWHEEL-STATE.md",
-        "scripts/dashboard-types-baseline.txt",
-        "scripts/file-size-allowlist.txt",
-        "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-        "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
-        "src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx",
-        "src/dashboard/frontend/src/components/chat/SubagentTranscript.test.tsx",
-        "src/dashboard/frontend/src/components/chat/SubagentTranscript.tsx",
-        "src/dashboard/frontend/src/components/dock/ConversationDock.tsx",
-        "src/dashboard/frontend/src/components/issue-view/useIssueView.ts",
-        "src/dashboard/frontend/src/components/simple/SimpleHomePage.tsx",
-        "src/dashboard/frontend/src/lib/store.ts",
-        "src/dashboard/frontend/src/lib/useDecisions.ts",
-        "src/dashboard/server/__tests__/read-model-pending-input.test.ts",
-        "src/dashboard/server/read-model.ts",
-        "src/dashboard/server/routes/command-deck.ts",
-        "src/dashboard/server/ws-rpc.ts"
-      ],
-      "recordedAt": "2026-07-28T21:11:50.152Z"
-    }
+    "reviewSpawnedAt": "2026-07-28T23:54:23.683Z"
   },
   "closeOut": {
     "usage": {
@@ -308,7 +224,7 @@
       },
       "costAtCloseOut": {
         "usd": 71.361499,
-        "pricingAsOf": "2026-07-29T00:03:58.017Z"
+        "pricingAsOf": "2026-07-29T00:04:06.110Z"
       }
     },
     "merges": [
