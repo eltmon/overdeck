@@ -367,7 +367,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:36:59.069Z",
+  "updated": "2026-07-29T05:37:04.655Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -377,7 +377,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:36:58.387Z",
+    "updatedAt": "2026-07-29T05:37:04.643Z",
     "reviewNotes": "FR-7 remains red: pickDefaultDrawerAgent mock returns the agents array, so ConversationDock cannot preserve/select agent-test-1",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -387,7 +387,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "0450d10a8eaea980d8372554534ccd905fb42aae",
+    "reviewedAtCommit": "b3c3ac68c5aa216f13672f8c34df277014636caf",
     "reviewSpawnedAt": "2026-07-29T05:31:46.611Z"
   },
   "closeOut": {
@@ -448,7 +448,7 @@
       },
       "costAtCloseOut": {
         "usd": 309.368688,
-        "pricingAsOf": "2026-07-29T05:36:58.416Z"
+        "pricingAsOf": "2026-07-29T05:37:04.650Z"
       }
     },
     "merges": [
