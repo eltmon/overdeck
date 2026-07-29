@@ -607,6 +607,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'pan.getWorkspaceDetail',         kind: 'rpc', disposition: 'AGGREGATE',   door: 'IssuesResolver.get + AgentsResolver + workspace details' },
   { surface: 'pan.readWorkspaceFile',          kind: 'rpc', disposition: 'RELOCATE',    door: 'Workspace (file read)' },
   { surface: 'pan.resolveFilePathExists',      kind: 'rpc', disposition: 'RELOCATE',    door: 'Workspace (path probe)' },
+  { surface: 'pan.readFileAtPath',             kind: 'rpc', disposition: 'RELOCATE',    door: 'File-at-path door (src/dashboard/server/services/file-at-path.ts, PAN-3260)' },
+  { surface: 'pan.writeFileAtPath',            kind: 'rpc', disposition: 'RELOCATE',    door: 'File-at-path door (src/dashboard/server/services/file-at-path.ts, PAN-3260)' },
 
   // Terminal control
   { surface: 'pan.terminalOpen',               kind: 'rpc', disposition: 'RELOCATE',    door: 'Terminal RPC (ws-terminal.ts)' },
