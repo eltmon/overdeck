@@ -135,17 +135,17 @@
     "recordedAt": "2026-07-29T08:48:54.415Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T09:06:59.279Z",
+  "updated": "2026-07-29T09:07:14.456Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T08:49:35.497Z",
-    "updatedAt": "2026-07-29T09:06:50.155Z",
+    "updatedAt": "2026-07-29T09:07:14.432Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (366081ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253\n\nNo test files found, exiting with code 0\n\n ❯ |root| tests/unit/event-store.test.ts (19 tests | 2 failed) 36ms\n     × bounds oversized review.status_changed at appendOnce door (FR-1) 4ms (retry x1)\n     × handles malformed stored JSON gracefully through trimReviewStatusHistoryPayloads 1ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-1QJShq/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapse\n…(661 chars elided)…\n/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-sy9NnV/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-sy9NnV/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-conte\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
@@ -237,7 +237,7 @@
       },
       "costAtCloseOut": {
         "usd": 71.802153,
-        "pricingAsOf": "2026-07-29T09:06:59.273Z"
+        "pricingAsOf": "2026-07-29T09:07:14.449Z"
       }
     },
     "merges": [
