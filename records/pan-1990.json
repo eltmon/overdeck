@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T02:16:10.243Z",
+  "updated": "2026-07-29T02:16:17.351Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -84,8 +84,16 @@
     }
   ],
   "tasks": {
-    "sequence": 30,
-    "claims": {},
+    "sequence": 31,
+    "claims": {
+      "memory-home-migration": {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 1530606,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T02:16:17.351Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -306,6 +314,7 @@
     "rebuild-workspaces-cmd": "completed",
     "rebuild-workspaces-cmd.rebuild-workspaces-cmd.ac1": "completed",
     "rebuild-workspaces-cmd.rebuild-workspaces-cmd.ac2": "completed",
-    "rebuild-workspaces-cmd.rebuild-workspaces-cmd.ac3": "completed"
+    "rebuild-workspaces-cmd.rebuild-workspaces-cmd.ac3": "completed",
+    "memory-home-migration": "running"
   }
 }
