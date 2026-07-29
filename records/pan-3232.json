@@ -174,7 +174,7 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T00:59:52.333Z",
+  "updated": "2026-07-29T00:59:58.000Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -184,7 +184,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T00:59:51.558Z",
+    "updatedAt": "2026-07-29T00:59:57.976Z",
     "reviewNotes": "The replacement test executes no production code or default gate, and NeedsYouStrip/ConversationDock still fail FR-7",
     "blockerReasons": [
       {
@@ -201,6 +201,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
+    "reviewedAtCommit": "1336e7d15b1a20af89686fd12769883a8554f7c4",
     "reviewSpawnedAt": "2026-07-29T00:55:49.219Z"
   },
   "closeOut": {
@@ -261,7 +262,7 @@
       },
       "costAtCloseOut": {
         "usd": 107.519196,
-        "pricingAsOf": "2026-07-29T00:59:51.586Z"
+        "pricingAsOf": "2026-07-29T00:59:57.987Z"
       }
     },
     "merges": [
