@@ -31,7 +31,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-29T01:11:13.089Z",
+  "updated": "2026-07-29T01:18:05.340Z",
   "pipeline": {
     "issueId": "PAN-3231",
     "reviewStatus": "pending",
@@ -98,16 +98,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "mockups": {
-        "writerId": "agent-pan-3231",
-        "agentId": "agent-pan-3231",
-        "pid": 2195330,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T01:11:13.089Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3231",
@@ -174,12 +166,23 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3231 dead)",
         "releasedAt": "2026-07-28T23:33:20.940Z"
+      },
+      {
+        "writerId": "agent-pan-3231",
+        "agentId": "agent-pan-3231",
+        "pid": 2195330,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T01:11:13.089Z",
+        "itemId": "mockups",
+        "outcome": "completed",
+        "reason": "Operator explicitly approved the committed, browser-verified List/DAG/Raw mockup; approval is recorded as decision D9 in workspace continue state.",
+        "releasedAt": "2026-07-29T01:18:05.339Z"
       }
     ],
     "statusReasons": {
       "mockups": {
-        "reason": "stale claim released (agent-pan-3231 dead)",
-        "updatedAt": "2026-07-28T23:33:20.940Z"
+        "reason": "Operator explicitly approved the committed, browser-verified List/DAG/Raw mockup; approval is recorded as decision D9 in workspace continue state.",
+        "updatedAt": "2026-07-29T01:18:05.339Z"
       },
       "tasks-viewer": {
         "reason": "Replaced the legacy self-fetching dialog with TasksPanel, added store-driven issue-row chip opening, explicit xBRIEF status buckets, and focused frontend tests; typecheck, lint, and 62 targeted tests pass.",
@@ -200,7 +203,7 @@
     }
   },
   "statusOverrides": {
-    "mockups": "running",
+    "mockups": "completed",
     "tasks-viewer": "completed",
     "tasks-viewer.tasks-viewer.ac1": "completed",
     "tasks-viewer.tasks-viewer.ac2": "completed",
@@ -219,6 +222,10 @@
     "prd-chip-viewer.prd-chip-viewer.ac1": "completed",
     "prd-chip-viewer.prd-chip-viewer.ac2": "completed",
     "prd-chip-viewer.prd-chip-viewer.ac3": "completed",
-    "prd-chip-viewer.prd-chip-viewer.ac4": "completed"
+    "prd-chip-viewer.prd-chip-viewer.ac4": "completed",
+    "mockups.mockups.ac1": "completed",
+    "mockups.mockups.ac2": "completed",
+    "mockups.mockups.ac3": "completed",
+    "mockups.mockups.ac4": "completed"
   }
 }
