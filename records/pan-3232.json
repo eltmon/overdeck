@@ -284,10 +284,10 @@
       "src/dashboard/server/services/agent-enrichment-service.ts",
       "src/dashboard/server/ws-rpc.ts"
     ],
-    "recordedAt": "2026-07-29T02:58:56.941Z"
+    "recordedAt": "2026-07-29T03:14:07.085Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T03:14:04.037Z",
+  "updated": "2026-07-29T03:14:07.087Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "failed",
