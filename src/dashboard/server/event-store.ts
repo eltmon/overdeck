@@ -21,7 +21,6 @@ import { getOverdeckHome } from '../../lib/paths.js';
 import { setActivityEventStoreProvider } from '../../lib/activity-logger.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { getOverdeckDatabaseSync } from '../../lib/overdeck/infra.js';
-import { REVIEW_STATUS_HISTORY_LIMIT } from '../../lib/review-status-reconcile.js';
 import type { DomainEvent } from '@overdeck/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -164,6 +163,7 @@ export async function openEventDb(): Promise<DbAdapter> {
 
 // ─── Review status payload bounding (PAN-3253) ────────────────────────────────
 
+const REVIEW_STATUS_HISTORY_LIMIT = 20;
 const REVIEW_STATUS_NOTE_LIMIT = 500;
 const OVERSIZED_REVIEW_PAYLOAD_CHARS = 16 * 1024;
 
