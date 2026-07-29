@@ -65,7 +65,7 @@
     "recordedAt": "2026-07-29T01:09:34.738Z"
   },
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T01:48:01.756Z",
+  "updated": "2026-07-29T02:32:21.550Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "passed",
@@ -76,7 +76,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T01:11:05.562Z",
-    "updatedAt": "2026-07-29T01:48:01.683Z",
+    "updatedAt": "2026-07-29T02:32:21.515Z",
     "reviewNotes": "All five prior blockers are fixed with regression coverage; no new blocking findings remain.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "AC1-3 verified: WS_METHODS.readFileAtPath/writeFileAtPath exported and both Rpcs registered in PanRpcGroup (36 requests, both present in dist .d.ts as literal-typed Rpc members); ReadFileAtPathResult rejects decode when mtimeMs or totalLines is missing and accepts the full struct; WriteFileAtPathInput decodes with and without expectedMtimeMs; contracts build + workspace root npm run typecheck exit 0 with no new dashboard/frontend ratchet errors.",
@@ -147,6 +147,14 @@
             "cacheWrite": 0
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 300,
+            "output": 62853,
+            "cacheRead": 36416804,
+            "cacheWrite": 286895
+          }
+        },
         "work": {
           "anthropic/claude-sonnet-5": {
             "input": 626,
@@ -170,15 +178,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 626,
-          "output": 153310,
-          "cacheRead": 102370987,
-          "cacheWrite": 812200
+          "input": 926,
+          "output": 216163,
+          "cacheRead": 138787791,
+          "cacheWrite": 1099095
         }
       },
       "costAtCloseOut": {
-        "usd": 65.078255,
-        "pricingAsOf": "2026-07-29T01:48:01.748Z"
+        "usd": 73.707994,
+        "pricingAsOf": "2026-07-29T02:32:21.533Z"
       }
     },
     "merges": [
