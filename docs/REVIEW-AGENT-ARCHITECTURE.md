@@ -188,7 +188,7 @@ comment naming that storage boundary. The pairing rule is: **a compare site may 
 
 The five converted stamp/compare sites are:
 
-1. `checkPostReviewCommits()` in `cloister/deacon-post-review-commits.ts`
+1. `checkPostReviewCommits()` in `cloister/deacon-post-blocked-review-commits.ts`
    compares `reviewedAtCommit` through the composite-aware drift evaluator.
    Passed reviews reset immediately on real drift. Blocked reviews also detect
    pushed rework: legacy rows without `reviewedAtCommit` may derive an anchor
@@ -196,6 +196,18 @@ The five converted stamp/compare sites are:
    must remain unchanged for two consecutive patrol ticks before review is
    reset and re-dispatched. The debounce prevents per-item pushes from starting
    review while the work agent is still committing the rest of the rework.
+   
+   A repeat-reset bound prevents review from cycling indefinitely on an unchanged
+   commit. When a drifted verdict is recorded against a specific anchor, a second
+   patrol cycle that evaluates the *same* anchor as drifted is suppressed (no new
+   reset): instead, `recordDeadEndNeedsYou` escalates one `review-reset-loop`
+   needs-you to the operator, who can investigate or run `pan unstick` to clear
+   the gate and resume the issue for rework. A genuinely new anchor (different
+   from the prior drifted anchor) still resets review normally. Bound state is
+   process-local in-memory, cleared when the issue merges or when the dashboard
+   restarts. The locking tests are `tests/unit/lib/workspace-anchor-drift.test.ts`
+   (shape mismatch → unreadable) and `tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts`
+   (reset-once-then-suppress-then-escalate; new-anchor-still-resets).
 2. Role-run liveness stamps in `agents/spawn.ts` and compares in
    `cloister/service-reactive.ts` using the same full `roleRunHead` anchor.
 3. `POST /api/review/:issueId/status` in `routes/workspaces.ts` stamps
@@ -205,12 +217,15 @@ The five converted stamp/compare sites are:
 5. The verification/review contradiction bypass in `cloister/deacon.ts` stamps
    `reviewedAtCommit` from the producer.
 
-A legacy wrapper SHA compared with a current composite anchor is intentionally
-reported as drift once. That conservative reset writes the new producer shape,
-so subsequent patrols stabilize instead of repeating. The historical failure
-signature was MIN-901 logging 56 resets like `(fe@52d65 → 7492ae82)`: the first
-value was a composite truncated with `substring(0, 8)`, while the second was the
-wrapper SHA. Logs now render every token as `repoKey@<8-char sha>`.
+A composite/bare anchor **shape disagreement** (e.g., composite `fe@<sha> api@<sha>`
+vs bare wrapper SHA) indicates a producer disagreement, not a code change.
+`evaluateWorkspaceAnchorDrift()` returns `unreadable` for shape mismatches and
+the existing review verdict is preserved — no review reset fires. This prevents
+the repeat-reset loops (PAN-3254) that occurred when a wrapper HEAD never moves
+but the evaluator repeatedly compared bare vs composite shapes. The historical
+incident signature was MIN-901's 426 identical review cycles in 19.5 hours —
+wrapper always `7492ae82`, composite always `fe@52d65 api@…`. Logs now render
+every token as `repoKey@<8-char sha>` for clarity.
 
 ---
 
