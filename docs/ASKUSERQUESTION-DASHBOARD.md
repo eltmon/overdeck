@@ -327,7 +327,7 @@ The enrichment poller captures three pieces of pending-input metadata:
 The **prompt text** is carried through the full render-to-display chain so the
 Decisions card shows the actual question, not a generic label:
 
-```
+```text
 agent.enrichment_changed event
     │ payload.pendingQuestionPrompt, pendingQuestionReason
     ▼
