@@ -47,6 +47,11 @@
       "reason": "feedback",
       "note": "[2026-07-29T16:50Z] review-agent → CHANGES-REQUESTED — seq 4",
       "timestamp": "2026-07-29T16:50:29.895Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-29T16:53:02.806Z"
     }
   ],
   "feedback": [],
@@ -95,10 +100,10 @@
     "recordedAt": "2026-07-29T01:09:34.738Z"
   },
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T16:53:01.218Z",
+  "updated": "2026-07-29T16:53:02.962Z",
   "pipeline": {
     "issueId": "PAN-3260",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -106,7 +111,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T01:11:05.562Z",
-    "updatedAt": "2026-07-29T16:53:00.831Z",
+    "updatedAt": "2026-07-29T16:53:01.240Z",
     "reviewNotes": "Workspace branch drifted to a main-tip SHA (ffc4ec7f) with zero PAN-3260 changes; real work is PR #3268 head 21db0cd — restore local feature/pan-3260 to origin and re-run review. Code itself reviewed clean.",
     "conflictsSince": {
       "sha": "3e6036dbd60fcbcd83d9577006279e03103cc0e7",
@@ -116,7 +121,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3268",
-    "reviewSpawnedAt": "2026-07-29T16:30:16.260Z"
+    "reviewSpawnedAt": "2026-07-29T16:53:01.240Z"
   },
   "closeOut": {
     "usage": {
@@ -176,7 +181,7 @@
       },
       "costAtCloseOut": {
         "usd": 97.965893,
-        "pricingAsOf": "2026-07-29T16:53:00.876Z"
+        "pricingAsOf": "2026-07-29T16:53:02.954Z"
       }
     },
     "merges": [
