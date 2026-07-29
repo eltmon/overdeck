@@ -190,7 +190,7 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T15:37:57.934Z",
+  "updated": "2026-07-29T15:38:00.754Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -199,15 +199,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T15:26:53.958Z",
+    "panDoneRecoveredAt": "2026-07-29T15:37:57.518Z",
+    "updatedAt": "2026-07-29T15:37:57.925Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since ffc4ec7 (1 path): src/dashboard/server/event-store.ts",
-        "detectedAt": "2026-07-29T15:25:25.726Z"
-      }
-    ],
     "conflictsSince": {
       "sha": "ffc4ec7f593609a737880ff7027b3c4277205230",
       "detectedAt": "2026-07-29T15:25:25.726Z",
@@ -217,6 +211,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "lastVerifiedCommit": "7d4c9e95bfe58d87dd42e7b33ced7901a8bf6503",
+    "reviewRequestedAt": "2026-07-29T15:37:57.518Z",
     "reviewSpawnedAt": "2026-07-29T10:10:29.425Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -250,9 +245,7 @@
         "tests/unit/lib/overdeck/review-status-sync.test.ts"
       ],
       "recordedAt": "2026-07-29T09:08:42.655Z"
-    },
-    "reviewRequestedAt": "2026-07-29T15:37:57.518Z",
-    "panDoneRecoveredAt": "2026-07-29T15:37:57.518Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -275,10 +268,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3157,
-            "output": 147229,
-            "cacheRead": 72065067,
-            "cacheWrite": 3604412
+            "input": 3457,
+            "output": 162637,
+            "cacheRead": 78312879,
+            "cacheWrite": 3876405
           }
         }
       },
@@ -296,15 +289,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3157,
-          "output": 147229,
-          "cacheRead": 72065067,
-          "cacheWrite": 3604412
+          "input": 3457,
+          "output": 162637,
+          "cacheRead": 78312879,
+          "cacheWrite": 3876405
         }
       },
       "costAtCloseOut": {
-        "usd": 120.840997,
-        "pricingAsOf": "2026-07-29T15:26:54.360Z"
+        "usd": 121.88311,
+        "pricingAsOf": "2026-07-29T15:38:00.750Z"
       }
     },
     "merges": [
