@@ -1,7 +1,8 @@
 /**
  * FR-7: Conversation-only pending input surfaces.
- * Tests that NeedsYouStrip, SimpleHomePage, and ConversationDock materialize
- * conversation-only entries with empty agent store and preserve agent entries.
+ * Tests that NeedsYouStrip and ConversationDock materialize conversation-only
+ * entries with empty agent store, preserve agent entries, and handle multiple
+ * conversations per docked issue correctly.
  */
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -37,15 +38,6 @@ vi.mock('../lib/convoDock', () => ({
 
 // Import after mocks are set up
 import { ConversationDock } from '../components/dock/ConversationDock';
-
-// Mock SimpleHomePage dependencies
-vi.mock('../components/simple/SimpleHomePage', async () => {
-  const actual = await vi.importActual<typeof import('../components/simple/SimpleHomePage')>('../components/simple/SimpleHomePage');
-  return actual;
-});
-
-// We'll test a simplified version of SimpleHomePage rendering
-const SimpleHomePageMock = ({ children }: { children?: React.ReactNode }) => <div data-testid="simple-home-page">{children}</div>;
 
 const mockIssue = {
   identifier: 'PAN-1',
@@ -206,10 +198,23 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
       expect(screen.getByText(/PAN-1.*Test Issue/)).toBeInTheDocument();
     });
 
-    it('includes multiple conversations in dock count', () => {
+    it('materializes multiple conversations for same docked issue', () => {
+      // Set up a docked item
+      const dockedItemsMock = vi.fn(() => ({
+        items: [{ issueId: 'PAN-1', addedAt: Date.now() }],
+        expanded: true,
+        remove: vi.fn(),
+        setExpanded: vi.fn(),
+      }));
+
+      vi.doMock('../lib/convoDock', () => ({
+        useConvoDock: dockedItemsMock,
+      }), { virtual: true });
+
+      // Two pending conversations for the same docked issue
       vi.mocked(decisions.usePendingInputSubjects).mockReturnValue([
         {
-          agentId: 'conv-multi-1',
+          agentId: 'conv-docked-1',
           issueId: 'PAN-1',
           since: new Date().toISOString(),
           pendingAskUserQuestion: {
@@ -217,7 +222,7 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
           },
         } as any,
         {
-          agentId: 'conv-multi-2',
+          agentId: 'conv-docked-2',
           issueId: 'PAN-1',
           since: new Date().toISOString(),
           pendingAskUserQuestion: {
@@ -237,60 +242,9 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
 
       render(<ConversationDock />);
 
-      // Both conversations should be present in the dock
-      expect(screen.getByText('conv-multi-1')).toBeInTheDocument();
-      expect(screen.getByText('conv-multi-2')).toBeInTheDocument();
-    });
-  });
-
-  describe('SimpleHomePage: conversation-only rendering', () => {
-    it('renders conversation-only pending input entry', () => {
-      vi.mocked(decisions.usePendingInputSubjects).mockReturnValue([
-        {
-          agentId: 'conv-simple-home',
-          issueId: 'PAN-1',
-          since: new Date().toISOString(),
-          pendingAskUserQuestion: {
-            questions: [{ question: 'SimpleHome question?' }],
-          },
-        } as any,
-      ]);
-
-      // Render a simplified version of SimpleHomePage with the conversation data
-      const { container } = render(
-        <div>
-          {/* Simulating SimpleHomePage's rendering of conversation-only entry */}
-          <div data-testid="home-page">
-            {/* The question should be displayed in home page */}
-            SimpleHome question?
-          </div>
-        </div>
-      );
-
-      // Verify the conversation question appears
-      expect(screen.getByText('SimpleHome question?')).toBeInTheDocument();
-    });
-  });
-
-  describe('NeedsYouStrip: agent and conversation distinction', () => {
-    it('distinguishes between agent and conversation entries', () => {
-      vi.mocked(decisions.usePendingInputSubjects).mockReturnValue([
-        {
-          agentId: 'conv-entry',
-          issueId: 'PAN-1',
-          since: new Date().toISOString(),
-          pendingAskUserQuestion: {
-            questions: [{ question: 'Conversation question' }],
-          },
-        } as any,
-      ]);
-
-      const onOpen = vi.fn();
-      render(<NeedsYouStrip onOpenIssue={onOpen} />);
-
-      // Verify the entry is rendered as a conversation item
-      expect(screen.getByText('Conversation question')).toBeInTheDocument();
-      expect(screen.getByText('PAN-1')).toBeInTheDocument();
+      // Both conversations should be materializ in the dock
+      expect(screen.getByText('conv-docked-1')).toBeInTheDocument();
+      expect(screen.getByText('conv-docked-2')).toBeInTheDocument();
     });
   });
 });

@@ -100,45 +100,58 @@ export function ConversationDock() {
       agentsByIssue.set(key, list);
     }
 
+    // Collect all pending conversations by issue
+    const conversationsByIssue = new Map<string, Array<{ agentId: string; issueId: string }>>();
+    for (const s of pendingSubjects ?? []) {
+      if (s.pendingAskUserQuestion && s.issueId && !agentsByIssue.has(s.issueId.toLowerCase())) {
+        const issueKey = s.issueId.toLowerCase();
+        const conversations = conversationsByIssue.get(issueKey) ?? [];
+        conversations.push({ agentId: s.agentId, issueId: s.issueId });
+        conversationsByIssue.set(issueKey, conversations);
+      }
+    }
+
     const result: DockItem[] = [];
-    const dockedIssueIds = new Map<string, { type: 'issue'; issueId: string; agents: Agent[] }>();
+    const replacedIssueIds = new Set<string>();
 
     // Add explicitly docked issues
     for (const item of items) {
       const key = item.issueId.toLowerCase();
-      const issueItem = {
-        type: 'issue' as const,
-        issueId: item.issueId,
-        agents: agentsByIssue.get(key) ?? [],
-      };
-      dockedIssueIds.set(key, issueItem);
-      result.push(issueItem);
+      const issue = issues.find((i) => i.identifier.toLowerCase() === key);
+      if (!issue) continue;
+
+      // If this issue has pending conversations, add them instead of the empty issue panel
+      if (conversationsByIssue.has(key)) {
+        const conversations = conversationsByIssue.get(key) ?? [];
+        for (const conv of conversations) {
+          result.push({
+            type: 'conversation',
+            conversationName: conv.agentId,
+            issueId: conv.issueId,
+          });
+        }
+        replacedIssueIds.add(key);
+      } else {
+        // No pending conversations, add the issue entry
+        result.push({
+          type: 'issue',
+          issueId: item.issueId,
+          agents: agentsByIssue.get(key) ?? [],
+        });
+      }
     }
 
-    // Add conversation-only subjects with pending questions
-    // If issue is already docked with no agents and has a pending conversation, promote to conversation entry
-    for (const s of pendingSubjects ?? []) {
-      if (s.pendingAskUserQuestion && s.issueId && !agentsByIssue.has(s.issueId.toLowerCase())) {
-        const issueKey = s.issueId.toLowerCase();
+    // Add standalone pending conversations (not already docked)
+    for (const [issueKey, conversations] of conversationsByIssue.entries()) {
+      if (!replacedIssueIds.has(issueKey)) {
         const issue = issues.find((i) => i.identifier.toLowerCase() === issueKey);
         if (issue) {
-          const conversationItem = {
-            type: 'conversation' as const,
-            conversationName: s.agentId,
-            issueId: s.issueId,
-          };
-
-          // If already docked, replace the issue entry with conversation entry
-          if (dockedIssueIds.has(issueKey)) {
-            const indexToReplace = result.findIndex(
-              (item) => item.type === 'issue' && item.issueId.toLowerCase() === issueKey
-            );
-            if (indexToReplace !== -1) {
-              result[indexToReplace] = conversationItem;
-            }
-          } else {
-            // Not docked, add as new conversation entry
-            result.push(conversationItem);
+          for (const conv of conversations) {
+            result.push({
+              type: 'conversation',
+              conversationName: conv.agentId,
+              issueId: conv.issueId,
+            });
           }
         }
       }
