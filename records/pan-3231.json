@@ -17,11 +17,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-28T22:08:35.798Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-29T00:03:49.963Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-28T23:33:20.983Z",
+  "updated": "2026-07-29T00:03:49.963Z",
   "pipeline": {
     "issueId": "PAN-3231",
     "reviewStatus": "pending",
@@ -30,7 +35,21 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T20:06:28.909Z"
+    "updatedAt": "2026-07-29T00:03:49.914Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since c109ed6 (1 path): scripts/file-size-allowlist.txt",
+        "detectedAt": "2026-07-29T00:03:35.975Z"
+      }
+    ],
+    "conflictsSince": {
+      "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
+      "detectedAt": "2026-07-29T00:03:35.975Z",
+      "paths": [
+        "scripts/file-size-allowlist.txt"
+      ]
+    }
   },
   "closeOut": {
     "usage": {
@@ -45,9 +64,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1143542,
-            "output": 112460,
-            "cacheRead": 19627008,
+            "input": 4371631,
+            "output": 234273,
+            "cacheRead": 100467200,
             "cacheWrite": 0
           }
         }
@@ -60,15 +79,15 @@
           "cacheWrite": 379189
         },
         "openai/gpt-5.6-sol": {
-          "input": 1143542,
-          "output": 112460,
-          "cacheRead": 19627008,
+          "input": 4371631,
+          "output": 234273,
+          "cacheRead": 100467200,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 34.231543,
-        "pricingAsOf": "2026-07-28T20:06:28.916Z"
+        "usd": 94.446474,
+        "pricingAsOf": "2026-07-29T00:03:49.922Z"
       }
     },
     "merges": [],
