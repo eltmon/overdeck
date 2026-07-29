@@ -382,17 +382,17 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T06:03:21.363Z",
+  "updated": "2026-07-29T06:09:30.737Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-29T05:58:28.102Z",
-    "testNotes": "Gates run from workspace feature-pan-3232 (HEAD d814ebec88): npm run typecheck PASSED (root, hooks, evals, dashboard, frontend). npm run lint PASSED (eslint + all custom guards, exit 0). npm test FAILED: root vitest suite passed cleanly (1285 files / 12044 tests, 3 skipped), but the frontend targeted subset failed 1 of 59 tests. FAILING TEST: src/__tests__/fr7-conversation-pending-input.test.tsx > FR-7: Conversation-only pending input surfaces > ConversationDock: AC-3 > 'AC-3: preserves agent-backed dock panel when agent exists for docked issue' (line 450). TestingLibraryElementError: screen.getByText('agent-test-1') matches two elements - the panel header's agent-id label (div.truncate.font-mono) and the mocked DrawerAgentSession component body, which also renders the literal text 'agent-test-1'. This is a query-ambiguity bug in the test itself (needs getAllByText or a scoped query), introduced by this branch's own fix(fr7) commits at HEAD (d814ebec88, b3c3ac68c5, 0450d10a8e). No browser UAT was performed: the PRD (drafts/PAN-3232.md) and GitHub issue #3232 do not request live/browser verification, verify_commands across all xBRIEF items specify only vitest/typecheck/grep, and the two items requiring live runtime behavior (live-tree-delta, specialist-pending-input) were explicitly cancelled/deferred per PR comments as out of this branch's shipped scope - the shipped rendering fixes are fully covered by component-level unit tests mocking the exact prop shapes in the issue's acceptance criteria. Blocking this failure: work agent must fix the ambiguous query in fr7-conversation-pending-input.test.tsx:450 (e.g. scope to within(screen.getByTestId('drawer-agent-session')) or use getAllByText) and re-run npm test.",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-29T06:09:30.368Z",
+    "testNotes": "Gates run from workspace feature-pan-3232 (HEAD 3f05c046f6, review passed, reviewedAtCommit matches). npm run typecheck PASSED (root, hooks, evals, dashboard-types guard 58 known/0 new, frontend-types guard 0 known/0 new). npm run lint PASSED (eslint + all custom guards, exit 0). npm test PASSED: root vitest suite 1285 files / 12044 tests passed (3 skipped); frontend targeted subset (issueActions.test.ts, issueActions.no-actions-lost.test.ts, issueActions.parity.test.tsx, fr7-conversation-pending-input.test.tsx) 4 files / 59 tests passed, including the previously-failing AC-3 ConversationDock case in fr7-conversation-pending-input.test.tsx, now fixed by commit 3f05c046f6 (scoped the ambiguous 'agent-test-1' query). No browser UAT performed: the PRD (drafts/PAN-3232.md) and GitHub issue #3232 do not request live/browser verification; verify_commands across all xBRIEF items specify only vitest/typecheck/grep; the two items requiring live runtime behavior (live-tree-delta, specialist-pending-input) were deliberately cancelled/deferred as out of this branch's shipped scope, and the shipped rendering-layer fixes are fully covered by component-level unit tests mocking the exact prop shapes named in the issue's acceptance criteria.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -434,27 +434,27 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 84,
-            "output": 10743,
-            "cacheRead": 3750015,
-            "cacheWrite": 137628
+            "input": 108,
+            "output": 15157,
+            "cacheRead": 5548228,
+            "cacheWrite": 290608
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 5387,
-            "output": 260204,
-            "cacheRead": 105836448,
-            "cacheWrite": 6547946
+            "input": 5492,
+            "output": 263036,
+            "cacheRead": 107680788,
+            "cacheWrite": 6557076
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 5821,
-          "output": 288077,
-          "cacheRead": 115957651,
-          "cacheWrite": 6857759
+          "input": 5926,
+          "output": 290909,
+          "cacheRead": 117801991,
+          "cacheWrite": 6866889
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -469,15 +469,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 84,
-          "output": 10743,
-          "cacheRead": 3750015,
-          "cacheWrite": 137628
+          "input": 108,
+          "output": 15157,
+          "cacheRead": 5548228,
+          "cacheWrite": 290608
         }
       },
       "costAtCloseOut": {
-        "usd": 320.194031,
-        "pricingAsOf": "2026-07-29T05:58:28.114Z"
+        "usd": 321.190425,
+        "pricingAsOf": "2026-07-29T06:09:30.661Z"
       }
     },
     "merges": [
