@@ -364,19 +364,17 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:55:50.263Z",
+  "updated": "2026-07-29T05:56:22.563Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:55:50.109Z",
-    "reviewNotes": "Cycle change correctly fixes the pickDefaultDrawerAgent mock contract; no blocking finding remains in the cycle diff",
-    "testNotes": "npm run typecheck PASSED. npm run lint PASSED. npm test FAILED: root vitest suite passed (1285 files/12044 tests), but frontend targeted subset failed src/__tests__/fr7-conversation-pending-input.test.tsx > FR-7 > ConversationDock: AC-3 (line 450). screen.getByText('agent-test-1') matches two elements - the panel header agent-id label and the mocked DrawerAgentSession body, which both render 'agent-test-1'. Ambiguous query bug in the test itself, introduced by this branch's own fix(fr7) commits at HEAD (d814ebec88). Fix: scope the query (e.g. within(getByTestId('drawer-agent-session'))) or use getAllByText, then re-run npm test. No UAT performed: PRD/issue/xBRIEF verify_commands request only vitest/typecheck/grep; the two items needing live runtime behavior (live-tree-delta, specialist-pending-input) were explicitly cancelled/deferred as out of this branch's shipped scope.",
+    "updatedAt": "2026-07-29T05:56:22.135Z",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -386,7 +384,6 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "d814ebec887c2a1b7985e0d477e2c742558aeb37",
     "reviewSpawnedAt": "2026-07-29T05:37:31.963Z"
   },
   "closeOut": {
@@ -418,27 +415,27 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 82,
-            "output": 9350,
-            "cacheRead": 3583305,
-            "cacheWrite": 136040
+            "input": 84,
+            "output": 10743,
+            "cacheRead": 3750015,
+            "cacheWrite": 137628
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 5347,
-            "output": 258295,
-            "cacheRead": 104653601,
-            "cacheWrite": 6470261
+            "input": 5377,
+            "output": 259827,
+            "cacheRead": 105613128,
+            "cacheWrite": 6482233
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 5781,
-          "output": 286168,
-          "cacheRead": 114774804,
-          "cacheWrite": 6780074
+          "input": 5811,
+          "output": 287700,
+          "cacheRead": 115734331,
+          "cacheWrite": 6792046
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -453,15 +450,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 82,
-          "output": 9350,
-          "cacheRead": 3583305,
-          "cacheWrite": 136040
+          "input": 84,
+          "output": 10743,
+          "cacheRead": 3750015,
+          "cacheWrite": 137628
         }
       },
       "costAtCloseOut": {
-        "usd": 315.119365,
-        "pricingAsOf": "2026-07-29T05:55:50.220Z"
+        "usd": 315.289219,
+        "pricingAsOf": "2026-07-29T05:56:22.166Z"
       }
     },
     "merges": [
