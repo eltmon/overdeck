@@ -214,7 +214,7 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T01:54:04.005Z",
+  "updated": "2026-07-29T01:54:09.593Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -224,7 +224,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T01:54:03.204Z",
+    "updatedAt": "2026-07-29T01:54:09.571Z",
     "reviewNotes": "The new FR-7 component suite fails 4 of 7 tests, and ConversationDock still renders an inert placeholder instead of a usable pending conversation",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
@@ -235,7 +235,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "2841ef193b958693270f58b12b6354c78436f44b",
+    "reviewedAtCommit": "26dc21125433a3a92c4135de0a5c629e33df89e3",
     "reviewSpawnedAt": "2026-07-29T01:45:55.056Z"
   },
   "closeOut": {
@@ -296,7 +296,7 @@
       },
       "costAtCloseOut": {
         "usd": 192.319133,
-        "pricingAsOf": "2026-07-29T01:54:03.237Z"
+        "pricingAsOf": "2026-07-29T01:54:09.580Z"
       }
     },
     "merges": [
