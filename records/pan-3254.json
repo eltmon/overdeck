@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:18:00.558Z",
-  "updated": "2026-07-29T03:31:43.419Z",
+  "updated": "2026-07-29T03:31:46.074Z",
   "pipeline": {
     "issueId": "PAN-3254",
     "reviewStatus": "pending",
@@ -91,5 +91,16 @@
     "docs-anchor-drift-semantics.docs-anchor-drift-semantics.ac2": "completed",
     "docs-anchor-drift-semantics.docs-anchor-drift-semantics.ac3": "completed",
     "docs-anchor-drift-semantics.docs-anchor-drift-semantics.ac4": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/REVIEW-AGENT-ARCHITECTURE.md"
+    ],
+    "actualChangedFiles": [
+      "docs/REVIEW-AGENT-ARCHITECTURE.md"
+    ],
+    "recordedAt": "2026-07-29T03:31:46.073Z"
   }
 }
