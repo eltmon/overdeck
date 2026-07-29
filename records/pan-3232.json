@@ -187,6 +187,11 @@
       "reason": "resume",
       "agentModel": "claude-haiku-4-5",
       "timestamp": "2026-07-29T02:58:25.686Z"
+    },
+    {
+      "timestamp": "2026-07-29T02:59:01.797Z",
+      "reason": "end",
+      "note": "FR-7 frontend conversation-only surfaces complete. Test suite expanded with AC-1 (conversation-only rendering) and AC-3 (agent-backed routing) coverage. 8 backend items (live-tree-delta, specialist-pending-input) deferred as separate work outside frontend scope."
     }
   ],
   "feedback": [
@@ -279,7 +284,7 @@
     "recordedAt": "2026-07-29T02:58:56.941Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T02:59:01.033Z",
+  "updated": "2026-07-29T02:59:01.798Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
