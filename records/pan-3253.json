@@ -67,16 +67,12 @@
     }
   ],
   "scopeDrift": {
-    "outsideDeclaredScope": [
-      ".husky/_/pre-rebase"
-    ],
+    "outsideDeclaredScope": [],
     "declaredScopeUntouched": [
       "docs/AGENT-STATE-PLANES.md",
-      "src/dashboard/server/event-store.ts",
       "src/lib/database/review-status-db.ts",
       "src/lib/review-status-reconcile.ts",
       "src/lib/review-status.ts",
-      "tests/unit/event-store.test.ts",
       "tests/unit/lib/database/review-status-history-cap.test.ts"
     ],
     "declaredScope": [
@@ -89,12 +85,13 @@
       "tests/unit/lib/database/review-status-history-cap.test.ts"
     ],
     "actualChangedFiles": [
-      ".husky/_/pre-rebase"
+      "src/dashboard/server/event-store.ts",
+      "tests/unit/event-store.test.ts"
     ],
-    "recordedAt": "2026-07-29T06:18:50.753Z"
+    "recordedAt": "2026-07-29T07:39:51.971Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T07:39:48.975Z",
+  "updated": "2026-07-29T07:39:51.973Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
