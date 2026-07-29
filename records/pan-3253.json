@@ -96,17 +96,17 @@
     "recordedAt": "2026-07-29T07:45:29.088Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T08:29:07.573Z",
+  "updated": "2026-07-29T08:29:10.166Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T07:47:05.835Z",
-    "updatedAt": "2026-07-29T08:29:07.485Z",
+    "updatedAt": "2026-07-29T08:29:08.166Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed all review findings: canonical hydration path, raw-notes preservation, unified constants, comprehensive test coverage",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "lastVerifiedCommit": "58b23fbb019a2efab08d55a90124d0b4615a0b9f",
@@ -186,7 +186,7 @@
       },
       "costAtCloseOut": {
         "usd": 69.606164,
-        "pricingAsOf": "2026-07-29T08:29:07.552Z"
+        "pricingAsOf": "2026-07-29T08:29:10.162Z"
       }
     },
     "merges": [
