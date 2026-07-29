@@ -260,18 +260,18 @@
     "recordedAt": "2026-07-29T02:17:34.123Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T02:46:50.956Z",
+  "updated": "2026-07-29T02:49:52.584Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T02:18:08.580Z",
-    "updatedAt": "2026-07-29T02:46:50.939Z",
-    "reviewNotes": "FR-7 still lacks conversation-only SimpleHomePage coverage and agent-preservation coverage for NeedsYouStrip and ConversationDock.",
+    "updatedAt": "2026-07-29T02:49:52.540Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review findings: expanded test coverage to include agent-backed routing tests (AC-3); all 5 tests pass",
     "verificationNotes": "Checklist completion check FAILED — 8 incomplete item(s) remain:\n\n  Incomplete plan items (8):\n    - live-tree-delta.live-tree-delta.ac1 The AgentEnrichmentChangedEvent schema accepts payloads both with and without issueId, and decoding a legacy payload without the field returns a valid event (pending)\n    - live-tree-delta.live-tree-delta.ac2 mapEventToDelta returns a pending_input_changed delta carrying awaitingInput, prompt, reason, and kinds for an enrichment event with issueId, and returns null when the payload lacks issueId (pending)\n    - live-tree-delta.live-tree-delta.ac3 applySessionTreeDelta merges the four pending-input fields onto the matched session and clears them when the delta omits them, returning the same tree object when no session matches (pending)\n    - live-tree-delta.live-tree-delta.ac4 The enrichment poller emits issueId on agent.enrichment_changed events for agents with a known issue (pending)\n    - specialist-pending-input.specialist-pending-input.ac1 Session-tree review orchestrator, test, and ship nodes carry the four awaiting-input fields when the agent snapshot reports hasPendingQuestion true (pending)\n    - specialist-pending-input.specialist-pending-input.ac2 buildReviewerNodes returns reviewer nodes that carry the four awaiting-input fields taken from the provided agentSnapshotsById map (pending)\n    - specialist-pending-input.specialist-pending-input.ac3 The activity route emits specialist sections carrying the same four fields for a pending specialist snapshot (pending)\n    - specialist-pending-input.specialist-pending-input.ac4 A specialist node whose agent has no snapshot or no pending question renders with awaitingInput false and produces no prompt, reason, or kinds fields (pending)",
     "conflictsSince": {
       "sha": "701cbb21f1deb79f90c821db2bf23db7d02d4886",
@@ -376,27 +376,27 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 26555072,
-            "output": 799698,
-            "cacheRead": 134361088,
+            "input": 26578186,
+            "output": 809832,
+            "cacheRead": 135310336,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3817,
-            "output": 170140,
-            "cacheRead": 71583880,
-            "cacheWrite": 4145716
+            "input": 3897,
+            "output": 187701,
+            "cacheRead": 73924769,
+            "cacheWrite": 4178515
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 4251,
-          "output": 198013,
-          "cacheRead": 81705083,
-          "cacheWrite": 4455529
+          "input": 4331,
+          "output": 215574,
+          "cacheRead": 84045972,
+          "cacheWrite": 4488328
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -405,15 +405,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 26555072,
-          "output": 799698,
-          "cacheRead": 134361088,
+          "input": 26578186,
+          "output": 809832,
+          "cacheRead": 135310336,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 248.889576,
-        "pricingAsOf": "2026-07-29T02:46:50.950Z"
+        "usd": 250.146764,
+        "pricingAsOf": "2026-07-29T02:49:52.580Z"
       }
     },
     "merges": [
