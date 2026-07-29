@@ -440,4 +440,74 @@ describe('append() bounding of review.status_changed (PAN-3253 append-door-bound
     const dbRows = db.prepare('SELECT notes FROM status_history WHERE issue_id = ?').all(['PAN-3264']) as Array<{ notes: string | null }>;
     expect(dbRows[0]?.notes?.length).toBe(600);
   });
+
+  it('handles malformed stored JSON gracefully through trimReviewStatusHistoryPayloads', () => {
+    const store = createEventStore(db as unknown as DbAdapter);
+
+    // Insert a review.status_changed event with invalid JSON payload
+    const invalidJson = '{"status": {"history": [{"notes": "x'.repeat(100) + '}'; // Malformed JSON
+    db.prepare('INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)').run(
+      'review.status_changed',
+      Date.now(),
+      invalidJson
+    );
+
+    // trimReviewStatusHistoryPayloads should handle this gracefully
+    const result = trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
+
+    // Should not error; malformed events are skipped
+    expect(result.trimmed).toBeGreaterThanOrEqual(0);
+
+    // The malformed row should remain in the database unchanged
+    const rows = db.prepare('SELECT payload FROM events WHERE type = ?').all(['review.status_changed']) as Array<{ payload: string }>;
+    expect(rows.length).toBeGreaterThan(0);
+    // The malformed payload should still be there
+    expect(rows.some((r) => r.payload === invalidJson)).toBe(true);
+  });
+
+  it('appendAsync bounding produces subscriber-visible bounded payload', async () => {
+    const store = createEventStore(db as unknown as DbAdapter);
+
+    const longNote = 'x'.repeat(1000);
+    const largeHistory = Array.from({ length: 40 }, (_, i) => ({
+      type: 'review',
+      status: i % 2 === 0 ? 'pending' : 'passed',
+      timestamp: new Date(1_753_000_000_000 + i * 1000).toISOString(),
+      notes: longNote,
+    }));
+
+    // Track subscriber notifications
+    const notifications: Array<any> = [];
+    store.events$.subscribe((evt) => notifications.push(evt));
+
+    // Append via async path
+    await store.appendAsync({
+      type: 'review.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: {
+        status: {
+          history: largeHistory,
+          issueId: 'PAN-3265',
+          reviewStatus: 'passed',
+        },
+      },
+    } as any);
+
+    // Find the event in subscriber notifications
+    const boundedEvent = notifications.find((e) => e.payload?.status?.issueId === 'PAN-3265');
+    expect(boundedEvent).toBeDefined();
+
+    // Verify bounded in subscriber
+    expect(boundedEvent?.payload?.status?.history).toHaveLength(20);
+    for (const entry of boundedEvent?.payload?.status?.history || []) {
+      if (entry.notes) {
+        expect(entry.notes.length).toBeLessThanOrEqual(500);
+      }
+    }
+
+    // Verify bounded in persisted data
+    const persisted = db.prepare('SELECT payload FROM events WHERE type = ?').all(['review.status_changed']) as Array<{ payload: string }>;
+    const parsed = JSON.parse(persisted[persisted.length - 1]!.payload) as { status?: { history?: any[] } };
+    expect(parsed.status?.history).toHaveLength(20);
+  });
 });

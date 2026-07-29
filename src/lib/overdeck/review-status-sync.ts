@@ -161,20 +161,22 @@ function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewSta
 
 function getHistorySync(issueId: string): StatusHistoryEntry[] {
   const db = getOverdeckDatabaseSync();
+  // Fetch the most recent REVIEW_STATUS_HISTORY_LIMIT entries directly in SQL (PAN-3253)
+  // Use DESC + LIMIT + reverse to keep allocation and hydration work bounded
   const rows = db
     .prepare(
       `SELECT type, status, timestamp, notes FROM status_history
-       WHERE issue_id = ? ORDER BY timestamp ASC`,
+       WHERE issue_id = ? ORDER BY timestamp DESC LIMIT ?`,
     )
-    .all(issueId.toUpperCase()) as Array<{
+    .all(issueId.toUpperCase(), REVIEW_STATUS_HISTORY_LIMIT) as Array<{
     type: string;
     status: string;
     timestamp: number;
     notes: string | null;
   }>;
-  // Return the last REVIEW_STATUS_HISTORY_LIMIT entries with truncated notes (PAN-3253)
-  const tail = rows.slice(-REVIEW_STATUS_HISTORY_LIMIT);
-  return tail.map((r) => ({
+  // Reverse to restore chronological order
+  rows.reverse();
+  return rows.map((r) => ({
     type: r.type as StatusHistoryEntry['type'],
     status: r.status,
     timestamp: new Date(r.timestamp).toISOString(),

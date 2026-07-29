@@ -255,8 +255,9 @@ export function setReviewStatusSync(
     merged.reviewRequestedAt = undefined;
   }
 
-  // Track status transitions in history — store raw notes in database (PAN-3253)
-  // Truncation happens at hydration time and in event payloads, not at composition.
+  // Track status transitions in history — preserve raw notes for database storage (PAN-3253)
+  // rawHistory starts with the already-hydrated bounded tail and receives one new transition
+  // Truncation happens at hydration time and in event payloads, not here at composition.
   const now = new Date().toISOString();
   const rawHistory = [...(status.history || [])];
   if (update.reviewStatus && update.reviewStatus !== status.reviewStatus) {
