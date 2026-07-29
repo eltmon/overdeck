@@ -203,18 +203,19 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T15:38:07.108Z",
+  "updated": "2026-07-29T15:38:10.201Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T15:37:57.518Z",
-    "updatedAt": "2026-07-29T15:38:06.422Z",
+    "updatedAt": "2026-07-29T15:38:07.089Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/event-store.ts",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -317,7 +318,7 @@
       },
       "costAtCloseOut": {
         "usd": 121.898312,
-        "pricingAsOf": "2026-07-29T15:38:06.449Z"
+        "pricingAsOf": "2026-07-29T15:38:10.197Z"
       }
     },
     "merges": [
