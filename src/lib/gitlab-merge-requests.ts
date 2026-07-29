@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { createSettledTtlPromiseCache, withConcurrencyLimitPromise } from './concurrency.js';
+import { createSettledTtlPromiseCache } from './concurrency.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -19,8 +19,8 @@ const OPEN_MR_CACHE_TTL_MS = 30_000;
 const cachedOpenMergeRequests = createSettledTtlPromiseCache<string, GitLabMergeRequestRow[]>(OPEN_MR_CACHE_TTL_MS);
 
 const MERGED_MR_CACHE_TTL_MS = 30_000;
-// Cache stores (repoPath:head) -> boolean (whether head has merged MRs)
-const cachedMergedMergeRequestHeads = createSettledTtlPromiseCache<string, boolean>(MERGED_MR_CACHE_TTL_MS);
+// Cache stores repoPath -> the set of source branches with at least one merged MR.
+const cachedMergedSourceBranches = createSettledTtlPromiseCache<string, Set<string>>(MERGED_MR_CACHE_TTL_MS);
 
 /**
  * Runner function type for executing glab commands.
@@ -90,8 +90,16 @@ export async function listOpenGitLabMergeRequests(
 
 /**
  * Get the subset of heads that have at least one merged merge request.
- * Queries are made per head with --merged flag and cached for 30 seconds.
- * Multiple heads are queried concurrently (limit 5).
+ * Results are paginated (100 per page) and cached per repository for 30 seconds.
+ *
+ * PAN-3267: this used to run one `glab mr list --merged --source-branch <head>`
+ * per head, so a polyrepo project cost one subprocess per (repo × head) —
+ * mind-your-now spawned on the order of 240 glab processes per membership
+ * refresh. That was slow enough to stall the dashboard's issue list, and
+ * unreliable enough that something failed every cycle; a single failure aborts
+ * the whole gather as `forge_unavailable`, so membership never refreshed. One
+ * repo-wide list answers every head from the same data, matching how
+ * listOpenGitLabMergeRequests already reads open MRs.
  *
  * @param repoPath - Path to the git repository (used as cwd for glab)
  * @param heads - Array of branch names to check for merged MRs
@@ -105,38 +113,39 @@ export async function listGitLabMergedMergeRequestHeads(
 ): Promise<string[]> {
   if (!heads.length) return [];
 
-  const results = await withConcurrencyLimitPromise(
-    heads.map((head) => async () => {
-      const cacheKey = `${repoPath.toLowerCase()}:${head}`;
-      const hasMerged = await cachedMergedMergeRequestHeads(cacheKey, async () => {
-        let page = 1;
-        let found = false;
+  const cacheKey = repoPath.toLowerCase();
+  const mergedSourceBranches = await cachedMergedSourceBranches(cacheKey, async () => {
+    const branches = new Set<string>();
+    let page = 1;
 
-        while (true) {
-          const stdout = await runner(
-            ['mr', 'list', '--merged', '--source-branch', head, '--output', 'json', '--per-page', '100', '--page', String(page)],
-            repoPath,
-          );
+    while (true) {
+      const stdout = await runner(
+        ['mr', 'list', '--merged', '--output', 'json', '--per-page', '100', '--page', String(page)],
+        repoPath,
+      );
 
-          if (!stdout.trim()) return found;
+      if (!stdout.trim()) {
+        break; // Empty page signals end of results
+      }
 
-          const pageRows = JSON.parse(stdout) as GitLabMergeRequestRow[];
-          if (!Array.isArray(pageRows)) {
-            throw new Error(`Expected array from glab mr list, got ${typeof pageRows}`);
-          }
-          if (pageRows.length > 0) found = true;
+      const pageRows = JSON.parse(stdout) as GitLabMergeRequestRow[];
+      if (!Array.isArray(pageRows)) {
+        throw new Error(`Expected array from glab mr list, got ${typeof pageRows}`);
+      }
+      if (pageRows.length === 0) break;
 
-          // A short page is the final page; return whether any page contained a merged MR.
-          if (pageRows.length < 100) return found;
+      for (const row of pageRows) {
+        if (row.source_branch) branches.add(row.source_branch);
+      }
 
-          page++;
-        }
-      });
-      // Return head if merged, null otherwise
-      return hasMerged ? head : null;
-    }),
-    5, // Concurrency limit of 5
-  );
+      // If we got fewer than 100 rows, we're on the last page
+      if (pageRows.length < 100) break;
 
-  return results.filter((head) => head !== null) as string[];
+      page++;
+    }
+
+    return branches;
+  });
+
+  return heads.filter((head) => mergedSourceBranches.has(head));
 }
