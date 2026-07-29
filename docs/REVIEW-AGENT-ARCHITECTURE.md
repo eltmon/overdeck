@@ -188,7 +188,7 @@ comment naming that storage boundary. The pairing rule is: **a compare site may 
 
 The five converted stamp/compare sites are:
 
-1. `checkPostReviewCommits()` in `cloister/deacon-post-blocked-review-commits.ts`
+1. `checkPostReviewCommits()` in `cloister/deacon-post-review-commits.ts`
    compares `reviewedAtCommit` through the composite-aware drift evaluator.
    Passed reviews reset immediately on real drift. Blocked reviews also detect
    pushed rework: legacy rows without `reviewedAtCommit` may derive an anchor
@@ -196,17 +196,18 @@ The five converted stamp/compare sites are:
    must remain unchanged for two consecutive patrol ticks before review is
    reset and re-dispatched. The debounce prevents per-item pushes from starting
    review while the work agent is still committing the rest of the rework.
-   
+
    A repeat-reset bound prevents review from cycling indefinitely on an unchanged
    commit. When a drifted verdict is recorded against a specific anchor, a second
    patrol cycle that evaluates the *same* anchor as drifted is suppressed (no new
    reset): instead, `recordDeadEndNeedsYou` escalates one `review-reset-loop`
-   needs-you to the operator, who can investigate or run `pan unstick` to clear
-   the gate and resume the issue for rework. A genuinely new anchor (different
-   from the prior drifted anchor) still resets review normally. Bound state is
-   process-local in-memory, cleared when the issue merges or when the dashboard
-   restarts. The locking tests are `tests/unit/lib/workspace-anchor-drift.test.ts`
-   (shape mismatch → unreadable) and `tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts`
+   needs-you to the operator for investigation. The repeat-reset suppression
+   persists until the workspace HEAD changes to a new, genuine anchor; the
+   module-local state (`lastResetAnchors`, `resetLoopEscalated`) clears only on
+   issue merge or dashboard restart. A genuinely new anchor (different from the
+   prior drifted anchor) still resets review normally. The locking tests are
+   `tests/unit/lib/workspace-anchor-drift.test.ts` (shape mismatch → unreadable)
+   and `tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts`
    (reset-once-then-suppress-then-escalate; new-anchor-still-resets).
 2. Role-run liveness stamps in `agents/spawn.ts` and compares in
    `cloister/service-reactive.ts` using the same full `roleRunHead` anchor.
