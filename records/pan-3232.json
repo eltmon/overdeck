@@ -156,7 +156,7 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T00:52:09.890Z",
+  "updated": "2026-07-29T00:52:11.934Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -166,7 +166,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T00:52:04.981Z",
+    "updatedAt": "2026-07-29T00:52:11.278Z",
     "reviewNotes": "The new regression suite tests only hand-written literals while NeedsYouStrip and ConversationDock still fail FR-7",
     "blockerReasons": [
       {
@@ -183,6 +183,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
+    "reviewedAtCommit": "bba5dfc5e38d555b08626ec4b25ca9691a7bba11",
     "reviewSpawnedAt": "2026-07-29T00:48:46.454Z"
   },
   "closeOut": {
@@ -243,7 +244,7 @@
       },
       "costAtCloseOut": {
         "usd": 94.676378,
-        "pricingAsOf": "2026-07-29T00:52:09.887Z"
+        "pricingAsOf": "2026-07-29T00:52:11.286Z"
       }
     },
     "merges": [
