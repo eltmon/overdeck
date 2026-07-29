@@ -382,7 +382,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T06:17:31.164Z",
+  "updated": "2026-07-29T06:18:01.273Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -392,8 +392,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T06:12:06.508Z",
-    "updatedAt": "2026-07-29T06:17:31.110Z",
-    "reviewNotes": "Verification infrastructure error: Verification worker 3851500 exited before writing a result",
+    "updatedAt": "2026-07-29T06:18:01.157Z",
+    "reviewNotes": "Verification infrastructure error: Verification worker 3875489 exited before writing a result",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
     "reviewRequestedAt": "2026-07-29T06:12:06.508Z",
     "reviewSpawnedAt": "2026-07-29T05:56:22.577Z"
@@ -470,7 +470,7 @@
       },
       "costAtCloseOut": {
         "usd": 321.506767,
-        "pricingAsOf": "2026-07-29T06:17:31.161Z"
+        "pricingAsOf": "2026-07-29T06:18:01.262Z"
       }
     },
     "merges": [
