@@ -287,19 +287,20 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T00:57:18.553Z",
+  "updated": "2026-07-29T01:19:18.253Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T00:57:18.534Z",
+    "updatedAt": "2026-07-29T01:19:17.921Z",
     "reviewNotes": "The new Kimi conversation capture races concurrent same-cwd launches, fresh restart validates only after wiping state, and planning/conversation/recovery no-loss paths still drop kimi-code.",
+    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
       "detectedAt": "2026-07-29T00:03:35.975Z",
@@ -325,18 +326,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5070473,
-            "output": 278340,
-            "cacheRead": 96115200,
+            "input": 5078897,
+            "output": 278570,
+            "cacheRead": 96624128,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 2944,
-            "output": 606455,
-            "cacheRead": 778878422,
-            "cacheWrite": 3875537
+            "input": 3128,
+            "output": 675378,
+            "cacheRead": 843731374,
+            "cacheWrite": 4086648
           }
         }
       },
@@ -348,21 +349,21 @@
           "cacheWrite": 187167
         },
         "openai/gpt-5.6-sol": {
-          "input": 5070473,
-          "output": 278340,
-          "cacheRead": 96115200,
+          "input": 5078897,
+          "output": 278570,
+          "cacheRead": 96624128,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2944,
-          "output": 606455,
-          "cacheRead": 778878422,
-          "cacheWrite": 3875537
+          "input": 3128,
+          "output": 675378,
+          "cacheRead": 843731374,
+          "cacheWrite": 4086648
         }
       },
       "costAtCloseOut": {
-        "usd": 260.968215,
-        "pricingAsOf": "2026-07-29T00:57:18.545Z"
+        "usd": 275.459672,
+        "pricingAsOf": "2026-07-29T01:19:18.011Z"
       }
     },
     "merges": [
