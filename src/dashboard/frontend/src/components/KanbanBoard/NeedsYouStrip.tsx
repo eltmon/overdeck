@@ -107,7 +107,7 @@ function NeedsYouRow({
 }
 
 type NeedsYouItem =
-  | { source: 'agent'; derivation: SimpleIssueDerivation; kind: NeedsYouKind }
+  | { source: 'agent'; derivation: SimpleIssueDerivation; kind: NeedsYouKind; subjectId: string }
   | { source: 'conversation'; derivation: SimpleIssueDerivation; kind: NeedsYouKind; conversationName: string; subjectId: string };
 
 export function NeedsYouStrip({ onOpenIssue }: { onOpenIssue: (id: string) => void }) {
@@ -132,7 +132,7 @@ export function NeedsYouStrip({ onOpenIssue }: { onOpenIssue: (id: string) => vo
     );
     const needs = bucketSimpleHome(derivations).needsYou;
     const questionBySubject = new Map<string, string>();
-    const allItems: NeedsYouItem[] = [...needs.map((n) => ({ source: 'agent' as const, ...n }))];
+    const allItems: NeedsYouItem[] = [...needs.map((n) => ({ source: 'agent' as const, ...n, subjectId: n.derivation.pendingInputAgent?.id ?? '' }))];
 
     for (const s of pendingSubjects ?? []) {
       const q = s.pendingAskUserQuestion?.questions?.[0]?.question;
@@ -167,10 +167,10 @@ export function NeedsYouStrip({ onOpenIssue }: { onOpenIssue: (id: string) => vo
       </div>
       {items.slice(0, 6).map((item) => (
         <NeedsYouRow
-          key={item.source === 'conversation' ? `${item.subjectId}` : item.derivation.issue.identifier}
+          key={item.subjectId}
           item={item.derivation}
           kind={item.kind}
-          question={item.source === 'conversation' ? questions.get(item.subjectId) : questions.get(item.derivation.issue.identifier.toLowerCase())}
+          question={questions.get(item.subjectId)}
           onOpen={onOpenIssue}
           isConversation={item.source === 'conversation'}
           conversationName={item.source === 'conversation' ? item.conversationName : undefined}

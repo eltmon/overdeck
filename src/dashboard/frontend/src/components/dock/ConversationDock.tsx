@@ -16,28 +16,46 @@ import type { Agent } from '../../types';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from '../drawer/DrawerAgentSession';
 import { cn } from '../../lib/utils';
 
-function DockPanel({ issueId, needsYou, onClose }: { issueId: string; needsYou: boolean; onClose: () => void }) {
+function DockPanel({ item, needsYou, onClose }: { item: { type: 'issue'; issueId: string; agents: Agent[] } | { type: 'conversation'; conversationName: string; issueId: string }; needsYou: boolean; onClose: () => void }) {
   const issuesRaw = useDashboardStore((s) => s.issuesRaw);
-  const agentsById = useDashboardStore((s) => s.agentsById);
-  const agents = useMemo(
-    () => (Object.values(agentsById ?? {}) as Agent[]).filter((a) => a.issueId?.toLowerCase() === issueId.toLowerCase()),
-    [agentsById, issueId],
-  );
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+
+  if (item.type === 'conversation') {
+    const issue = ((issuesRaw as Issue[]) ?? []).find((i) => i.identifier.toLowerCase() === item.issueId.toLowerCase());
+    return (
+      <div className={cn('rounded-xl border bg-card shadow-sm', needsYou ? 'border-warning/40' : 'border-border')} data-dock-panel={`conv-${item.conversationName}`}>
+        <div className="flex items-center gap-2 px-3 py-2">
+          {needsYou && <span className="h-1.5 w-1.5 flex-none animate-pulse rounded-full bg-warning" />}
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-mono text-[11px]">{item.conversationName}</div>
+            <div className="truncate text-[10.5px] text-muted-foreground">{item.issueId}{issue ? ` · ${issue.title}` : ''}</div>
+          </div>
+          <button onClick={onClose} className="flex-none text-muted-foreground hover:text-foreground" aria-label={`Close ${item.conversationName}`}>
+            <X size={13} />
+          </button>
+        </div>
+        <div className="h-[420px] border-t border-border p-2">
+          <div className="text-center text-xs text-muted-foreground pt-2">Conversation pending input — answer from Needs You strip</div>
+        </div>
+      </div>
+    );
+  }
+
+  const agents = item.agents;
   const effectiveAgentId = selectedAgentId && agents.some((a) => a.id === selectedAgentId)
     ? selectedAgentId
     : pickDefaultDrawerAgent(agents)?.id ?? null;
-  const issue = ((issuesRaw as Issue[]) ?? []).find((i) => i.identifier.toLowerCase() === issueId.toLowerCase());
+  const issue = ((issuesRaw as Issue[]) ?? []).find((i) => i.identifier.toLowerCase() === item.issueId.toLowerCase());
 
   return (
-    <div className={cn('rounded-xl border bg-card shadow-sm', needsYou ? 'border-warning/40' : 'border-border')} data-dock-panel={issueId}>
+    <div className={cn('rounded-xl border bg-card shadow-sm', needsYou ? 'border-warning/40' : 'border-border')} data-dock-panel={item.issueId}>
       <div className="flex items-center gap-2 px-3 py-2">
         {needsYou && <span className="h-1.5 w-1.5 flex-none animate-pulse rounded-full bg-warning" />}
         <div className="min-w-0 flex-1">
           <div className="truncate font-mono text-[11px]">{effectiveAgentId ?? 'no agent'}</div>
-          <div className="truncate text-[10.5px] text-muted-foreground">{issueId}{issue ? ` · ${issue.title}` : ''}</div>
+          <div className="truncate text-[10.5px] text-muted-foreground">{item.issueId}{issue ? ` · ${issue.title}` : ''}</div>
         </div>
-        <button onClick={onClose} className="flex-none text-muted-foreground hover:text-foreground" aria-label={`Close ${issueId}`}>
+        <button onClick={onClose} className="flex-none text-muted-foreground hover:text-foreground" aria-label={`Close ${item.issueId}`}>
           <X size={13} />
         </button>
       </div>
@@ -49,24 +67,73 @@ function DockPanel({ issueId, needsYou, onClose }: { issueId: string; needsYou: 
           agents={agents}
           agentId={effectiveAgentId}
           onSelectAgent={setSelectedAgentId}
-          issueId={issueId}
+          issueId={item.issueId}
         />
       </div>
     </div>
   );
 }
 
+type DockItem = { type: 'issue'; issueId: string; agents: Agent[] } | { type: 'conversation'; conversationName: string; issueId: string };
+
 export function ConversationDock() {
   const { items, expanded, remove, setExpanded } = useConvoDock();
   const pendingSubjects = usePendingInputSubjects();
+  const agentsById = useDashboardStore((s) => s.agentsById);
+  const issuesRaw = useDashboardStore((s) => s.issuesRaw);
+
   const needsYouIds = useMemo(
     () => new Set((pendingSubjects ?? []).map((s) => s.issueId?.toLowerCase()).filter(Boolean)),
     [pendingSubjects],
   );
 
+  const allDockItems = useMemo(() => {
+    const issues = (issuesRaw as Issue[]) ?? [];
+    const agents = Object.values(agentsById ?? {}) as Agent[];
+    const agentsByIssue = new Map<string, Agent[]>();
+    for (const a of agents) {
+      const key = a.issueId?.toLowerCase();
+      if (!key) continue;
+      const list = agentsByIssue.get(key) ?? [];
+      list.push(a);
+      agentsByIssue.set(key, list);
+    }
+
+    const result: DockItem[] = [];
+
+    // Add explicitly docked issues
+    for (const item of items) {
+      result.push({
+        type: 'issue',
+        issueId: item.issueId,
+        agents: agentsByIssue.get(item.issueId.toLowerCase()) ?? [],
+      });
+    }
+
+    // Add conversation-only subjects with pending questions
+    for (const s of pendingSubjects ?? []) {
+      if (s.pendingAskUserQuestion && s.issueId && !agentsByIssue.has(s.issueId.toLowerCase())) {
+        const issue = issues.find((i) => i.identifier.toLowerCase() === s.issueId?.toLowerCase());
+        if (issue) {
+          result.push({
+            type: 'conversation',
+            conversationName: s.agentId,
+            issueId: s.issueId,
+          });
+        }
+      }
+    }
+
+    return result;
+  }, [items, pendingSubjects, agentsById, issuesRaw]);
+
   const ordered = useMemo(
-    () => [...items].sort((a, b) => Number(needsYouIds.has(b.issueId.toLowerCase())) - Number(needsYouIds.has(a.issueId.toLowerCase())) || b.addedAt - a.addedAt),
-    [items, needsYouIds],
+    () => [...allDockItems].sort((a, b) => {
+      const aIssue = a.type === 'issue' ? a.issueId : a.issueId;
+      const bIssue = b.type === 'issue' ? b.issueId : b.issueId;
+      return Number(needsYouIds.has(bIssue.toLowerCase())) - Number(needsYouIds.has(aIssue.toLowerCase())) || (a.type === 'conversation' ? 1 : 0) - (b.type === 'conversation' ? 1 : 0);
+    }),
+    [allDockItems, needsYouIds],
   );
 
   if (!expanded) {
@@ -78,7 +145,7 @@ export function ConversationDock() {
         className="fixed bottom-6 right-0 z-40 flex items-center gap-1.5 rounded-l-lg border border-r-0 border-border bg-card px-2.5 py-2 text-[11px] text-muted-foreground shadow-lg hover:text-foreground"
       >
         <MessageSquare size={13} />
-        {items.length > 0 && <span className="font-mono text-[10px]">{items.length}</span>}
+        {allDockItems.length > 0 && <span className="font-mono text-[10px]">{allDockItems.length}</span>}
       </button>
     );
   }
@@ -105,14 +172,23 @@ export function ConversationDock() {
             Nothing docked. Hover an issue and "pop into dock" — conversations stay with you while you navigate.
           </div>
         )}
-        {ordered.map((item) => (
-          <DockPanel
-            key={item.issueId}
-            issueId={item.issueId}
-            needsYou={needsYouIds.has(item.issueId.toLowerCase())}
-            onClose={() => remove(item.issueId)}
-          />
-        ))}
+        {ordered.map((item) => {
+          const issueId = item.type === 'issue' ? item.issueId : item.issueId;
+          const key = item.type === 'conversation' ? `${item.issueId}-${item.conversationName}` : item.issueId;
+          return (
+            <DockPanel
+              key={key}
+              item={item}
+              needsYou={needsYouIds.has(issueId.toLowerCase())}
+              onClose={() => {
+                if (item.type === 'issue') {
+                  remove(item.issueId);
+                }
+                // Conversation-only items are removed by NeedsYouStrip answer action
+              }}
+            />
+          );
+        })}
       </div>
     </aside>
   );
