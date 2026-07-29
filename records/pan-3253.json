@@ -49,21 +49,21 @@
     "recordedAt": "2026-07-29T06:18:50.753Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T07:13:01.673Z",
+  "updated": "2026-07-29T07:26:35.001Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T07:12:59.716Z",
+    "updatedAt": "2026-07-29T07:26:34.964Z",
     "reviewNotes": "Verification infrastructure error: Verification worker 663761 exited before writing a result",
     "verificationNotes": "Acceptance criteria check FAILED — 3/12 AC incomplete:\n\n### Extend trimReviewStatusHistoryPayloads to delegate to the bounding helper (3/3 incomplete)\n  - [ ] Given a seeded oversized row with 25 entries carrying 3,697-char notes, the trim persists a smaller payload that parses back to <= 20 entries with <= 500-char notes\n  - [ ] Running the trim a second time over already-trimmed rows returns trimmed: 0 (converges to a no-op)\n  - [ ] An oversized row of a non-review event type survives the trim byte-identically",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewedAtCommit": "ee73b706cf17d7bd988552a04ccc822341f05546",
-    "reviewSpawnedAt": "2026-07-29T07:11:03.844Z",
+    "reviewSpawnedAt": "2026-07-29T07:26:34.963Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".husky/_/pre-rebase"
@@ -105,9 +105,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 866224,
-            "output": 42024,
-            "cacheRead": 4296192,
+            "input": 1042868,
+            "output": 53507,
+            "cacheRead": 8421888,
             "cacheWrite": 0
           }
         },
@@ -128,9 +128,9 @@
           "cacheWrite": 269290
         },
         "openai/gpt-5.6-sol": {
-          "input": 866224,
-          "output": 42024,
-          "cacheRead": 4296192,
+          "input": 1042868,
+          "output": 53507,
+          "cacheRead": 8421888,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -141,8 +141,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 20.681644,
-        "pricingAsOf": "2026-07-29T07:13:01.669Z"
+        "usd": 23.972202,
+        "pricingAsOf": "2026-07-29T07:26:34.986Z"
       }
     },
     "merges": [
