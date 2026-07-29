@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { openDatabase, type SqliteDatabase } from '../../src/lib/database/driver.js';
-import { createEventStore, type DbAdapter } from '../../src/dashboard/server/event-store.js';
+import { createEventStore, type DbAdapter, trimReviewStatusHistoryPayloads } from '../../src/dashboard/server/event-store.js';
 
 let db: SqliteDatabase;
 
