@@ -87,7 +87,7 @@
     "recordedAt": "2026-07-29T00:22:24.082Z"
   },
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-29T04:37:29.462Z",
+  "updated": "2026-07-29T04:44:30.391Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "passed",
@@ -98,7 +98,7 @@
     "mergeStep": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T04:37:25.162Z",
+    "updatedAt": "2026-07-29T04:44:30.373Z",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
       "detectedAt": "2026-07-29T00:03:35.975Z",
@@ -108,7 +108,9 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3258",
     "reviewedAtCommit": "2611ea449029ffcbcb7ebc1ab8efaf0d77a5d7ca",
-    "reviewSpawnedAt": "2026-07-29T00:06:49.785Z"
+    "reviewSpawnedAt": "2026-07-29T00:06:49.785Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-29T04:44:30.373Z"
   },
   "closeOut": {
     "usage": {
@@ -174,7 +176,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3258"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-29T04:44:30.390Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed (no lastVerifiedCommit recorded)",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3258 MERGED at 2026-07-29T04:37:01Z",
+          "status": "pass",
+          "mergedAt": "2026-07-29T04:37:01Z",
+          "mergeCommit": "8f96b760c2f4c737213fb4159065f7669f8450f3"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "1 check-runs concluded successfully on 8f96b760c2f4c737213fb4159065f7669f8450f3",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 3e6036db contains merge 8f96b760",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 5 agent state directories; No strike branch strike/pan-3252 found; Pruned 75 checkpoint ref(s) for agent-pan-3252, planning-pan-3252, strike-pan-3252; No specialist registry entries for PAN-3252"
+        }
+      ],
+      "accepted": []
+    }
   },
   "workModel": "kimi-code/k3",
   "harness": "claude-code",
