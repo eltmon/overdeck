@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-29T23:48:30.532Z",
+  "updated": "2026-07-29T23:48:34.403Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -36,19 +36,14 @@
   },
   "harness": "claude-code",
   "model": "claude-sonnet-5",
-  "tasks": {
-    "sequence": 1,
-    "claims": {
-      "ws-new-target-path": {
-        "writerId": "agent-pan-3286",
-        "agentId": "agent-pan-3286",
-        "pid": 33513,
-        "host": "Edwards-MacBook-Air.local",
-        "claimedAt": "2026-07-29T23:48:30.532Z"
-      }
+  "recoveryTrips": [
+    {
+      "issue": "PAN-3286",
+      "recoveryPath": "orphan-proposed-pickup-gate",
+      "obligationGeneration": "proposed",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-29T23:33:39.077Z"
     }
-  },
-  "statusOverrides": {
-    "ws-new-target-path": "running"
-  }
+  ]
 }
