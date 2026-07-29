@@ -41,8 +41,8 @@ vi.mock('../lib/simple/derive', () => ({
 }));
 
 // Mock DrawerAgentSession to avoid nested React Query context issues
-vi.mock('../components/dock/DrawerAgentSession', () => ({
-  DrawerAgentSession: ({ sessionId, agentId }: any) => (
+vi.mock('../components/drawer/DrawerAgentSession', () => ({
+  DrawerAgentSession: ({ agentId }: any) => (
     <div data-testid="drawer-agent-session">
       <div>{agentId}</div>
     </div>
@@ -371,7 +371,13 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
 
       vi.mocked(derive.deriveSimpleIssue).mockReturnValue(convSimpleDerivation as any);
 
-      render(<SimpleHomePage />);
+      // Wrap with QueryClientProvider because SimpleHomePage calls useQuery
+      const queryClient = new QueryClient();
+      render(
+        <QueryClientProvider client={queryClient}>
+          <SimpleHomePage />
+        </QueryClientProvider>
+      );
 
       // Verify conversation question appears as actionable card in SimpleHomePage
       expect(screen.getByText('SimpleHomePage conversation question')).toBeInTheDocument();
