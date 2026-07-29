@@ -299,17 +299,17 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:12:59.208Z",
+  "updated": "2026-07-29T05:13:02.843Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:12:59.128Z",
+    "updatedAt": "2026-07-29T05:12:59.804Z",
     "reviewNotes": "Agent re-review request (2/25): FR-7 test coverage complete. Branch has 3 auto-commits for file-size-allowlist sync. Ready for review.",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -343,9 +343,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 28457927,
-            "output": 865240,
-            "cacheRead": 153122304,
+            "input": 28467470,
+            "output": 866011,
+            "cacheRead": 153704448,
             "cacheWrite": 0
           }
         },
@@ -372,15 +372,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 28457927,
-          "output": 865240,
-          "cacheRead": 153122304,
+          "input": 28467470,
+          "output": 866011,
+          "cacheRead": 153704448,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 274.806928,
-        "pricingAsOf": "2026-07-29T05:12:59.182Z"
+        "usd": 275.168845,
+        "pricingAsOf": "2026-07-29T05:13:02.839Z"
       }
     },
     "merges": [
