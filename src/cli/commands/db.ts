@@ -22,6 +22,7 @@ import {
 } from '../../lib/db-provisioners/index.js';
 import {
   backfillIssueWorkspaces,
+  migrateMemoryHomesToWorkspaces,
   rebuildMainAndScratchWorkspaces,
   seedProjectsFromYaml,
 } from '../../lib/workspaces/rebuild.js';
@@ -510,12 +511,17 @@ async function rebuildWorkspacesCommand(options: {
   const spinner = ora('Rebuilding projects/workspaces tables...').start();
 
   try {
-    // seedProjectsFromYaml/backfillIssueWorkspaces have no dry-run mode of
-    // their own (they're idempotent upserts), so a true --dry-run — zero rows
-    // persisted — only previews the memory-home identity-record scan.
+    // seedProjectsFromYaml/backfillIssueWorkspaces/migrateMemoryHomesToWorkspaces
+    // have no dry-run mode of their own (they're idempotent upserts/renames),
+    // so a true --dry-run — zero rows persisted — only previews the
+    // memory-home identity-record scan for main/scratch.
     if (!options.dryRun) {
       seedProjectsFromYaml();
       await backfillIssueWorkspaces();
+      const migration = await migrateMemoryHomesToWorkspaces();
+      if (options.verbose || migration.unresolvable.length > 0) {
+        console.log(`[rebuild-workspaces] migrated ${migration.migrated} legacy memory homes, ${migration.unresolvable.length} unresolvable`);
+      }
     }
 
     const result = await rebuildMainAndScratchWorkspaces({ dryRun: options.dryRun, verbose: options.verbose });
