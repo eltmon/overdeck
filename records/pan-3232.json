@@ -204,18 +204,18 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T01:31:16.069Z",
+  "updated": "2026-07-29T01:43:45.062Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T01:31:16.055Z",
-    "reviewNotes": "ConversationDock deletes the required conversation-only entry path, and NeedsYouStrip now loses agent question text through mismatched map keys",
+    "updatedAt": "2026-07-29T01:43:44.819Z",
+    "reviewNotes": "Agent re-review request (6/25): Fixed cycle 10 blocking findings: conversation identity, agent prompt regression, production-backed test coverage",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
       "sha": "701cbb21f1deb79f90c821db2bf23db7d02d4886",
@@ -249,27 +249,27 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 16676052,
-            "output": 545628,
-            "cacheRead": 101625344,
+            "input": 16686486,
+            "output": 545824,
+            "cacheRead": 102005248,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3102,
-            "output": 106529,
-            "cacheRead": 55686811,
-            "cacheWrite": 2956403
+            "input": 3189,
+            "output": 117149,
+            "cacheRead": 57382716,
+            "cacheWrite": 2977427
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3536,
-          "output": 134402,
-          "cacheRead": 65808014,
-          "cacheWrite": 3266216
+          "input": 3623,
+          "output": 145022,
+          "cacheRead": 67503919,
+          "cacheWrite": 3287240
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -278,15 +278,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 16676052,
-          "output": 545628,
-          "cacheRead": 101625344,
+          "input": 16686486,
+          "output": 545824,
+          "cacheRead": 102005248,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 172.109389,
-        "pricingAsOf": "2026-07-29T01:31:16.062Z"
+        "usd": 172.606449,
+        "pricingAsOf": "2026-07-29T01:43:44.920Z"
       }
     },
     "merges": [
