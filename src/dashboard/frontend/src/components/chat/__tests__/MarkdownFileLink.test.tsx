@@ -29,6 +29,7 @@ vi.mock('@pierre/diffs', () => ({
 }));
 
 import { MarkdownFileLink, fileLinkIconForPath } from '../MarkdownFileLink';
+import { StageDeckProvider, type StageDeckContextValue } from '../../Stage/StageDeckContext';
 
 const meta = {
   filePath: '/home/eltmon/project/src/App.tsx',
@@ -38,6 +39,27 @@ const meta = {
   line: 12,
   column: 5,
 };
+
+const markdownMeta = {
+  filePath: '/home/eltmon/project/docs/README.md',
+  targetPath: '/home/eltmon/project/docs/README.md',
+  displayPath: 'project/docs/README.md',
+  basename: 'README.md',
+};
+
+// PAN-3260 — the reported case: a repo-root markdown chip inside a
+// conversation with no workspace, so no issueId prop and no
+// /workspaces/feature-<issue>/ path segment for issueIdFromPath to match.
+const flywheelBriefMeta = {
+  filePath: '/home/eltmon/Projects/overdeck/docs/flywheel-brief.md',
+  targetPath: '/home/eltmon/Projects/overdeck/docs/flywheel-brief.md',
+  displayPath: 'overdeck/docs/flywheel-brief.md',
+  basename: 'flywheel-brief.md',
+};
+
+function renderWithDeck(ui: React.ReactElement, deck: StageDeckContextValue | null) {
+  return render(<StageDeckProvider value={deck}>{ui}</StageDeckProvider>);
+}
 
 describe('MarkdownFileLink', () => {
   beforeEach(() => {
@@ -263,5 +285,73 @@ describe('MarkdownFileLink', () => {
     expect(fileLinkIconForPath('/tmp/photo.png').displayName ?? fileLinkIconForPath('/tmp/photo.png').name).toBe('FileImage');
     expect(fileLinkIconForPath('/tmp/archive.zip').displayName ?? fileLinkIconForPath('/tmp/archive.zip').name).toBe('FileArchive');
     expect(fileLinkIconForPath('/tmp/unknown').displayName ?? fileLinkIconForPath('/tmp/unknown').name).toBe('File');
+  });
+
+  describe('markdown chip default-to-internal (PAN-3260)', () => {
+    it('opens/focuses the internal editor pane by default and never calls shellOpenInEditor', () => {
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.click(screen.getByRole('link'));
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.targetPath, markdownMeta.basename);
+      expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
+    });
+
+    it('opens the internal editor pane for a repo-root chip with no issueId and no workspace path segment (the flywheel-brief case)', () => {
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...flywheelBriefMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.click(screen.getByRole('link'));
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(flywheelBriefMeta.targetPath, flywheelBriefMeta.basename);
+      expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
+    });
+
+    it('launches a persisted external editor target instead of opening a pane', async () => {
+      localStorage.setItem('overdeck:markdown-open-target', 'vscode');
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.click(screen.getByRole('link'));
+
+      await waitFor(() => {
+        expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({
+          cwd: markdownMeta.targetPath,
+          editor: 'vscode',
+        });
+      });
+      expect(openOrFocusEditorPane).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the external flow when the internal target has no deck context', async () => {
+      localStorage.setItem('overdeck:last-editor', 'vscode');
+      render(<MarkdownFileLink {...markdownMeta} />);
+
+      fireEvent.click(screen.getByRole('link'));
+
+      await waitFor(() => {
+        expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({
+          cwd: markdownMeta.targetPath,
+          editor: 'vscode',
+        });
+      });
+    });
+
+    it('leaves non-markdown chips on the external flow even inside a deck', async () => {
+      localStorage.setItem('overdeck:last-editor', 'vscode');
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...meta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.click(screen.getByRole('link'));
+
+      await waitFor(() => {
+        expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({
+          cwd: meta.targetPath,
+          editor: 'vscode',
+        });
+      });
+      expect(openOrFocusEditorPane).not.toHaveBeenCalled();
+    });
   });
 });

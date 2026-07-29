@@ -14,10 +14,11 @@ import { toast } from 'sonner';
 import type { DiffsThemeNames } from '@pierre/diffs';
 
 import { showContextMenu } from '../../contextMenuFallback';
-import { getPreferredEditor, setPreferredEditor } from '../../editorPreferences';
+import { getMarkdownOpenTarget, getPreferredEditor, setPreferredEditor } from '../../editorPreferences';
 import { cn } from '../../lib/utils';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import type { MarkdownFileLinkMeta } from '../../markdown-links';
+import { useStageDeck } from '../Stage/StageDeckContext';
 import { usePickerPosition } from './usePickerPosition';
 
 type FileLinkIcon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -78,6 +79,12 @@ function extensionOfPath(path: string): string {
   const basename = path.replace(/\\/g, '/').split('/').at(-1) ?? '';
   const dotIndex = basename.lastIndexOf('.');
   return dotIndex > 0 ? basename.slice(dotIndex + 1).toLowerCase() : '';
+}
+
+const MARKDOWN_EXTENSIONS = new Set(['md', 'mdx', 'markdown']);
+
+function isMarkdownPath(path: string): boolean {
+  return MARKDOWN_EXTENSIONS.has(extensionOfPath(path));
 }
 
 export function fileLinkIconForPath(path: string): FileLinkIcon {
@@ -159,6 +166,8 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
 }: MarkdownFileLinkProps) {
   const Icon = fileLinkIconForPath(filePath);
   const label = displayLabel({ filePath, targetPath, displayPath, basename, line, column });
+  const isMarkdown = isMarkdownPath(filePath);
+  const deck = useStageDeck();
   const containerRef = useRef<HTMLSpanElement>(null);
   const requestIdRef = useRef(0);
   const hoveredRef = useRef(false);
@@ -186,6 +195,41 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
         toast.error(`Failed to open file: ${error instanceof Error ? error.message : String(error)}`);
       });
   }, [targetPath]);
+
+  // PAN-3260 — launches a *specific* external editor (the persisted markdown
+  // open target), unlike handleOpen which resolves the general last-used
+  // preference and falls back to the first available editor.
+  const openWithExternalEditor = useCallback((editor: EditorId) => {
+    void getTransport()
+      .request((client) => (client as PanRpcProtocolClient)[WS_METHODS.shellOpenInEditor]({
+        cwd: targetPath,
+        editor,
+      }))
+      .then(() => {
+        toast.success('Opened in editor');
+      })
+      .catch((error) => {
+        toast.error(`Failed to open file: ${error instanceof Error ? error.message : String(error)}`);
+      });
+  }, [targetPath]);
+
+  // PAN-3260 — markdown chips default to the internal editor pane; the
+  // persisted overdeck:markdown-open-target preference (set from the
+  // right-click menu) can override to a specific external editor. Outside a
+  // Stage deck (popouts, ConversationDock, drawers) there is nowhere to open
+  // an internal pane, so 'internal' falls back to the external flow.
+  const handleMarkdownClick = useCallback(() => {
+    const target = getMarkdownOpenTarget();
+    if (target === 'internal') {
+      if (deck) {
+        deck.openOrFocusEditorPane(targetPath, basename);
+        return;
+      }
+      handleOpen();
+      return;
+    }
+    openWithExternalEditor(target);
+  }, [deck, targetPath, basename, handleOpen, openWithExternalEditor]);
 
   const closeQuickview = useCallback(() => {
     requestIdRef.current++;
@@ -288,7 +332,11 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          handleOpen();
+          if (isMarkdown) {
+            handleMarkdownClick();
+          } else {
+            handleOpen();
+          }
         }}
         onContextMenu={(event) => {
           event.preventDefault();
