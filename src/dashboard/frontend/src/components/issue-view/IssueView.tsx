@@ -45,6 +45,14 @@ export function RailShipProgress({ issueId, onClick }: { issueId: string; onClic
   return <ShipProgress ship={deriveShip(data)} compact onClick={onClick} />;
 }
 
-export function IssueViewFullscreenButton({ onClick, className }: { onClick: () => void; className?: string }) {
-  return <button type="button" className={className} aria-label="Expand issue full screen" title="Expand issue full screen" onClick={(event) => { event.stopPropagation(); onClick(); }}>⛶</button>;
+export function IssueViewFullscreenButton({
+  onClick,
+  className,
+  ariaLabel = 'Expand issue full screen',
+}: {
+  onClick: () => void;
+  className?: string;
+  ariaLabel?: string;
+}) {
+  return <button type="button" className={className} aria-label={ariaLabel} title={ariaLabel} onClick={(event) => { event.stopPropagation(); onClick(); }}>⛶</button>;
 }
