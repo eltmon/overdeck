@@ -1,0 +1,12 @@
+#!/bin/sh
+# OVERDECK MANAGED PRE-REBASE GUARD
+if [ "$OVERDECK_PAN_GIT_OP" != "1" ] && [ -n "$OVERDECK_AGENT_ID" ]; then
+  echo "Overdeck agents must not run git rebase directly." >&2
+  echo "Use pan sync-main <ISSUE-ID> to sync main or pan done <ISSUE-ID> to submit." >&2
+  exit 1
+fi
+
+if [ -x "${0}.overdeck-original" ]; then
+  exec "${0}.overdeck-original" "$@"
+fi
+exit 0
