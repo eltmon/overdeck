@@ -191,6 +191,7 @@ import { pruneTerminalStoppedAgents } from './agent-gc.js';
 import { shouldRunRecoveryJanitor } from './patrol-cadence.js';
 import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { reconcileOrphanProposedSpecs, spawnWorkAgentThroughAgentsEndpoint, triggerRebuildAndStart } from './orphan-proposed-reconciler.js';
+import { reconcilePendingPromotions } from './pending-promotion-reconciler.js';
 import { reconcileTestStatusFromGreenCiWithDeps } from './test-status-green-ci-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
 import { reconcileIdleWorkspaceStacks } from './idle-stack-reaper.js';
@@ -2690,9 +2691,8 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...livenessActions);
   for (const a of livenessActions) addLog('action', a, state.patrolCycle);
 
-  const orphanProposedActions = await reconcileOrphanProposedSpecs();
-  actions.push(...orphanProposedActions);
-  for (const a of orphanProposedActions) addLog('action', a, state.patrolCycle);
+  for (const a of await reconcileOrphanProposedSpecs()) { actions.push(a); addLog('action', a, state.patrolCycle); }
+  for (const a of await reconcilePendingPromotions()) { actions.push(a); addLog('action', a, state.patrolCycle); }
 
   const closedIssueAgentActions = await reconcileClosedIssueAgents();
   actions.push(...closedIssueAgentActions);
