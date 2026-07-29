@@ -10,8 +10,19 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/REVIEW-AGENT-ARCHITECTURE.md"
+    ],
+    "actualChangedFiles": [
+      "docs/REVIEW-AGENT-ARCHITECTURE.md"
+    ],
+    "recordedAt": "2026-07-29T03:31:46.073Z"
+  },
   "created": "2026-07-29T00:18:00.558Z",
-  "updated": "2026-07-29T03:31:48.579Z",
+  "updated": "2026-07-29T03:31:51.832Z",
   "pipeline": {
     "issueId": "PAN-3254",
     "reviewStatus": "pending",
@@ -20,7 +31,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T03:31:48.578Z",
+    "updatedAt": "2026-07-29T03:31:51.799Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3275",
     "reviewRequestedAt": "2026-07-29T03:31:48.578Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -32,8 +44,7 @@
         "docs/REVIEW-AGENT-ARCHITECTURE.md"
       ],
       "recordedAt": "2026-07-29T03:31:46.073Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3275"
+    }
   },
   "closeOut": {
     "usage": {
@@ -45,6 +56,14 @@
             "cacheRead": 2150606,
             "cacheWrite": 129386
           }
+        },
+        "work": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 551,
+            "output": 15345,
+            "cacheRead": 11073949,
+            "cacheWrite": 171829
+          }
         }
       },
       "totals": {
@@ -53,14 +72,22 @@
           "output": 23585,
           "cacheRead": 2150606,
           "cacheWrite": 129386
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 551,
+          "output": 15345,
+          "cacheRead": 11073949,
+          "cacheWrite": 171829
         }
       },
       "costAtCloseOut": {
-        "usd": 4.959385,
-        "pricingAsOf": "2026-07-29T03:25:51.432Z"
+        "usd": 6.3588450000000005,
+        "pricingAsOf": "2026-07-29T03:31:51.825Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3275"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -104,16 +131,5 @@
     "docs-anchor-drift-semantics.docs-anchor-drift-semantics.ac2": "completed",
     "docs-anchor-drift-semantics.docs-anchor-drift-semantics.ac3": "completed",
     "docs-anchor-drift-semantics.docs-anchor-drift-semantics.ac4": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/REVIEW-AGENT-ARCHITECTURE.md"
-    ],
-    "actualChangedFiles": [
-      "docs/REVIEW-AGENT-ARCHITECTURE.md"
-    ],
-    "recordedAt": "2026-07-29T03:31:46.073Z"
   }
 }
