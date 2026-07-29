@@ -142,17 +142,14 @@
       "reason": "feedback",
       "note": "[2026-07-29T04:51Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-29T04:51:18.884Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T04:51:18Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1837\n\n# Code Review — PAN-1837\n\n## Verdict: CHANGES REQUESTED\n\nReviewed `feature/pan-1837` at local HEAD `7ca8f65fa1dbda57bbd6650681b38bf9f2c84dcf` across correctness, security, requirements, and performance. The eighth-cycle code fixes the prior conversation-capture blocker: fresh Kimi conversations now require an owned native session ID, propagate capture failure, tear down the tmux runtime, and persist `spawnError`. The new ownerless-lock recovery also uses an atomic owner write and restricts age-based reclamation to locks without a usable PID. The review cannot pass because the reviewed code is not the pull request's merge candidate, and the new high-risk stale-lock behavior has no regression coverage committed at the reviewed SHA.\n\n## Blocking findings\n\n### P1 — The reviewed SHA is not pushed to the PR, so the merge candidate still contains the previously blocked bug\n\n**Scope:** branch/PR delivery state; local HEAD `7ca8f65fa1dbda57bbd6650681b38bf9f2c84dcf`, PR head `aff1bd008a4920ceb373869e5ee301fc64332bb7`\n\nThe local branch is 40 commits ahead of `origin/feature/pan-1837`, while PR #3255 still points to the prior reviewed SHA `aff1bd008a...` and is reported `CONFLICTING`. The actual eighth-cycle fix is commit `be38ecae28`, followed by the local merge from `origin/main`; neither commit exists on the PR head.\n\nThis is blocking because the PR's current merge candidate still has the exact P1 defect from the preceding review: dashboard Kimi conversation capture can fail open and leave an unowned running session. A passed verdict would therefore approve code different from the SHA reviewed here and could advance a known-bad merge candidate. Push the exact reviewed feature head, verify PR #3255 resolves to that SHA and is mergeable, then rerun review against the remote-backed commit.\n\nThe workspace is also not clean: `src/lib/runtimes/kimi-code.ts` and `src/lib/runtimes/__tests__/kimi-code.test.ts` contain active uncommitted follow-up work, and the test-file diff grew during this review. Those changes are not part of HEAD or the PR and cannot count toward implementation or coverage.\n\n### P1 — The new stale-lock reclamation path has no committed regression coverage\n\n**Locations:** `src/lib/runtimes/kimi-code.ts:319-397`, `src/lib/runtimes/__tests__/kimi-code.test.ts` at HEAD\n\nThis cycle adds the concurrency-sensitive recovery behavior that was requested in the previous review: `owner.json` is written through temp-file plus rename, missing/corrupt owner metadata falls back to lock-directory age, and a readable PID bypasses age-based reclamation. The commit adds conversation capture tests, but it adds no committed test for any of those lock branches. The existing cross-process slow test proves normal mutual exclusion only; it does not prove that an ownerless or corrupt stale lock is reclaimed, or that an old lock naming a live PID is preserved.\n\nThis is a blocking coverage gap because a mistake in this path either wedges every Kimi launch for a cwd or removes a live holder's lock and reopens cross-process session misattribution. The user explicitly requires unreviewed or inadequately covered high-risk code to block approval. Commit focused fake-timer tests for missing-owner recovery, corrupt-owner recovery, and live-owner non-reclamation, then run them from a clean tree at the pushed review SHA. The uncommitted workspace currently contains the beginnings of exactly these tests, but uncommitted code is not durable or reviewable.\n\nThis finding could not have been raised in cycle 1 because the age-based stale-lock implementation was introduced only in commit `be38ecae28` after the previous review identified the ownerless-lock weakness.\n\n## Correctness review\n\nThe committed conversation fix itself is correct in the reviewed paths. `spawnConversationSession()` now throws on a null capture result and propagates filesystem/capture exceptions. Fresh create catches that failure, calls `stopConversationRuntime()`, records `spawnError`, and emits the updated conversation event. Resume and bulk restart also tear down a newly attempted Kimi runtime on failure. Successful native resume remains separate because it uses the verified persisted session ID and does not take a fresh-session snapshot.\n\nThe lock logic is internally coherent: atomic `mkdir` remains the ownership primitive, the owner record is written atomically, dead positive PIDs are reclaimed immediately, and directory age is consulted only when no usable PID exists. The missing committed tests prevent approval of those concurrency guarantees, but no additional code-level blocker survived the manual analysis.\n\n## Security review\n\nNo command injection, authentication bypass, credential exposure, JSONL deletion, duplicate prerequisite, `execSync`, synchronous `sendKeys`, or headless Kimi launch was introduced in the cycle diff. Model and session values remain shell-quoted, the binary still resolves through the canonical resolver, and the lock path remains hash-derived beneath Overdeck's mode-`0700` lock root.\n\nThe delivery-state blocker is security-relevant because the remote PR still lacks the fix that prevents one same-cwd native session's prompts, transcript, usage, and cost from being attributed to another conversation identity. The stale-lock coverage gap protects the same ownership boundary.\n\n## Requirements and no-loss review\n\nThe new local commit satisfies the prior FR-5/FR-7 requirement gap in code: a fresh dashboard conversation no longer remains healthy without its own `kimi-session-id`. ACP remains separate, only the main Kimi wire is used, policy coercion is unchanged, and no duplicate prerequisite or prohibited process primitive appears. As delivered through PR #3255, however, the requirement remains unsatisfied because the PR head is still the prior SHA.\n\nAll previously reviewed harness-union, behavior-matrix, binary-resolution, policy, provider-environment, launcher, work/strike/planning/recovery, transcript/cost, context, frontend, prerequisite, and documentation surfaces remain within the PR diff after the main merge. The merge conflict resolutions were limited to `scripts/file-size-allowlist.txt` and `src/lib/cost.ts`; no combined-diff resolution altered the cycle's conversation or lock fix.\n\n## Performance review\n\nThe lock continues to use asynchronous filesystem operations and 250 ms polling, and it is scoped by the exact Kimi cwd bucket so unrelated workspaces remain parallel. Ownerless recovery completes before the 90-second waiter budget, while readable live PIDs are never reclaimed by age. The dedicated real-process mutual-exclusion test stays in the excluded `@slow` suite. No event-loop blocking, unbounded scan, or algorithmic performance blocker survived review.\n\n## Verification and coverage\n\n- Focused Kimi conversation/runtime tests passed: 2 files, 39 tests.\n- The real cross-process lock test passed: 1 file, 1 test.\n- `npm run typecheck` passed, including dashboard and frontend ratchets.\n- ESLint passed when fed the three committed eighth-cycle source/test files directly from HEAD.\n- `npm run lint:file-size` and both committed-diff whitespace checks passed.\n- GitHub build, lint, test, smoke, state-plane, prompt-trailer, flake-lane, CodeRabbit, and `overdeck/test` checks are green only for remote SHA `aff1bd008a...`; they do not verify local reviewed SHA `7ca8f65f...`.\n- A clean-tree full lint/test run for the exact reviewed SHA was not possible because the workspace contains concurrent uncommitted changes. Those changes were not modified or discarded by the reviewer.\n- No test role was queued.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1837/.pan/review/agent-pan-1837-review-7ca8f65f/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1837 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-29T05:00:45.342Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -367,10 +364,10 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T05:00:43.626Z",
+  "updated": "2026-07-29T05:00:45.550Z",
   "pipeline": {
     "issueId": "PAN-1837",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -378,7 +375,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T05:00:43.479Z",
+    "updatedAt": "2026-07-29T05:00:44.144Z",
     "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "conflictsSince": {
       "sha": "3e6036dbd60fcbcd83d9577006279e03103cc0e7",
@@ -391,7 +388,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
     "reviewedAtCommit": "7ca8f65fa1dbda57bbd6650681b38bf9f2c84dcf",
     "lastVerifiedCommit": "62879baf9058e9812fa2818ec0f41147059117ce",
-    "reviewSpawnedAt": "2026-07-29T04:45:32.755Z"
+    "reviewSpawnedAt": "2026-07-29T05:00:44.143Z"
   },
   "closeOut": {
     "usage": {
@@ -443,7 +440,7 @@
       },
       "costAtCloseOut": {
         "usd": 460.170202,
-        "pricingAsOf": "2026-07-29T05:00:43.496Z"
+        "pricingAsOf": "2026-07-29T05:00:45.526Z"
       }
     },
     "merges": [
