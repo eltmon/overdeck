@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, readdirSync } from 'fs';
 import { join } from 'path';
+import { homedir } from 'os';
 import { Effect } from 'effect';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { getLatestSessionIdSync } from './activity.js';
@@ -84,7 +85,7 @@ export interface RestartAgentDeps {
 }
 
 export function resolveRecoveryResumeSessionId(agentId: string, harness: RuntimeName): string | undefined {
-  if (harness !== 'codex' && harness !== 'acp') return undefined;
+  if (harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') return undefined;
   return getLatestSessionIdSync(agentId) ?? undefined;
 }
 
@@ -204,6 +205,21 @@ export async function restartAgent(
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
     const claudeCmd = `bash ${launcherScript}`;
 
+    // PAN-1837: restartAgent always kills and fresh-launches (no resumeSessionId
+    // above), so a kimi-code relaunch always starts a brand-new Kimi session —
+    // snapshot the bucket before the tmux session exists so the post-launch poll
+    // below can capture that new session id for the next resume/recovery
+    // (mirrors spawnAgent's fresh-launch capture in spawn.ts).
+    let kimiExistingSessionsBefore: Set<string> | undefined;
+    if (effectiveHarness === 'kimi-code') {
+      try {
+        const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
+        kimiExistingSessionsBefore = new Set(readdirSync(kimiSessionsRoot(join(homedir(), '.kimi-code'), agentState.workspace)));
+      } catch {
+        kimiExistingSessionsBefore = new Set();
+      }
+    }
+
     await Effect.runPromise(createSession(normalizedId, agentState.workspace, claudeCmd, {
       env: {
         ...BLANKED_PROVIDER_ENV,
@@ -216,6 +232,20 @@ export async function restartAgent(
         ...providerEnv,
       },
     }));
+
+    if (kimiExistingSessionsBefore) {
+      void (async () => {
+        try {
+          const { waitForNewKimiSession, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+          const sessionId = await waitForNewKimiSession(
+            join(homedir(), '.kimi-code'),
+            agentState.workspace,
+            kimiExistingSessionsBefore!,
+          );
+          if (sessionId) writeKimiSessionId(normalizedId, sessionId);
+        } catch { /* non-fatal — the newest-session fallback still resolves the transcript */ }
+      })();
+    }
 
     // PAN-2974 (root cause B): the fallback continue-prompt is phase-aware —
     // a handed-off agent (completed marker) gets a passive restore, not a
@@ -237,7 +267,10 @@ export async function restartAgent(
         throw new Error(`${getHarnessBehavior(effectiveHarness).displayName} did not become ready within 30s for ${normalizedId}`);
       }
       await new Promise(r => setTimeout(r, 500));
-      if (effectiveHarness === 'codex' || effectiveHarness === 'acp') {
+      if (effectiveHarness === 'codex' || effectiveHarness === 'acp' || effectiveHarness === 'kimi-code') {
+        // PAN-1837: kimi-code's deliveryKind is pty-supervisor, same as codex/acp —
+        // it must not fall through to the legacy sync sendKeys() branch below,
+        // which bypasses the supervisor cascade entirely.
         const delivery = await deliverAgentMessage(
           normalizedId,
           prompt,
@@ -478,6 +511,79 @@ export async function recoverAgent(
     markAgentRunning(state);
     saveAgentStateSync(state);
     logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (acp)`);
+    return state;
+  }
+
+  if (recoveryHarness === 'kimi-code') {
+    // PAN-1837: kimi-code has no launcher-writable session.id — its resume id
+    // comes from resolveRecoveryResumeSessionId (kimi-session-newest source)
+    // and buildAgentLaunchConfig threads kimiCodeLauncherFields (model/yolo)
+    // that buildKimiCodeCommand() requires; the generic default branch below
+    // never sets those and would throw "kimi-code launcher requires kimiCodeModel".
+    const resumeSessionId = resolveRecoveryResumeSessionId(normalizedId, recoveryHarness);
+    // When there is no captured session id to resume, this recovery is a fresh
+    // Kimi launch — snapshot the workspace's session bucket BEFORE the tmux
+    // session exists so the post-launch poll below (mirrors spawn.ts) can
+    // diff against it and capture the new session id for the NEXT recovery.
+    let kimiExistingSessionsBefore: Set<string> | undefined;
+    if (!resumeSessionId) {
+      try {
+        const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
+        kimiExistingSessionsBefore = new Set(readdirSync(kimiSessionsRoot(join(homedir(), '.kimi-code'), state.workspace)));
+      } catch {
+        kimiExistingSessionsBefore = new Set();
+      }
+    }
+    const { launcherContent, providerEnv: kimiProviderEnv } = await buildAgentLaunchConfig({
+      agentId: normalizedId,
+      model: state.model,
+      workspace: state.workspace,
+      role: recoveryRole,
+      isPlanning: recoveryRole === 'plan',
+      ...(resumeSessionId ? { spawnMode: 'resume' as const, resumeSessionId } : {}),
+      harness: 'kimi-code',
+      harnessBinaryPath: harnessLaunch.binaryPath,
+      extraEnvExports: [harnessLaunch.pathExport],
+    });
+    const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
+    await writeLauncherScriptAtomic(launcherScript, launcherContent);
+    await Effect.runPromise(createSession(normalizedId, state.workspace, `bash ${launcherScript}`, {
+      env: {
+        ...BLANKED_PROVIDER_ENV,
+        OVERDECK_AGENT_ID: normalizedId,
+        OVERDECK_ISSUE_ID: state.issueId || '',
+        OVERDECK_SESSION_TYPE: recoveryRole,
+        CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
+        ...kimiProviderEnv,
+      },
+    }));
+    const delivery = await deliverInitialPromptWithRetry(
+      normalizedId,
+      recoveryPrompt,
+      'recoverAgent:kimi-code-recovery-prompt',
+    );
+    if (!delivery.ok) {
+      await Effect.runPromise(stopAgent(normalizedId));
+      throw new Error(
+        `Kimi Code recovery prompt delivery failed for ${normalizedId}: ${delivery.failure ?? 'unknown failure'}`,
+      );
+    }
+    if (kimiExistingSessionsBefore) {
+      void (async () => {
+        try {
+          const { waitForNewKimiSession, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+          const sessionId = await waitForNewKimiSession(
+            join(homedir(), '.kimi-code'),
+            state.workspace,
+            kimiExistingSessionsBefore!,
+          );
+          if (sessionId) writeKimiSessionId(normalizedId, sessionId);
+        } catch { /* non-fatal — the newest-session fallback still resolves the transcript */ }
+      })();
+    }
+    markAgentRunning(state);
+    saveAgentStateSync(state);
+    logAgentLifecycleSync(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (kimi-code)`);
     return state;
   }
 

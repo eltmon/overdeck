@@ -695,117 +695,126 @@ export async function spawnConversationSession(
     writeBridgeTokenSync(tmuxSession);
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, tmuxSession);
   }
-  // PAN-1837 review fix: conversations have no AgentState row, so the
-  // dashboard can't resolve their wire.jsonl without a conversation-owned
-  // captured session id — snapshot the bucket now (before the tmux session
-  // exists) so the post-launch discovery below can diff against it instead
-  // of guessing from mtime, which would misfire when multiple Kimi
-  // conversations share one cwd.
-  let kimiExistingSessionsBefore: Set<string> | undefined;
-  if (kimiCodeFields) {
-    try {
-      const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
-      kimiExistingSessionsBefore = new Set(await readdir(kimiSessionsRoot(join(homedir(), '.kimi-code'), cwd)));
-    } catch {
-      kimiExistingSessionsBefore = new Set();
-    }
-  }
-
-  const launcherTmp = `${launcherScript}.${randomUUID()}.tmp`;
-  await writeFile(
-    launcherTmp,
-    generateLauncherScriptSync({
-      role: 'work',
-      spawnMode: 'conversation',
-      workingDir: cwd,
-      setTerminalEnv: true,
-      unsetProviderEnv: true,
-      overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
-      extraEnvExports: [
-        harnessLaunch.pathExport,
-        `export OVERDECK_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
-      ],
-      providerExports: providerExportsStr || undefined,
-      trapHup: true,
-      baseCommand: runtimeCommand,
-      appendSystemPromptFiles: piFields
-        ? await piConversationSystemPromptFiles(cwd)
-        : codexFields || acpFields || kimiCodeFields
-          ? []
-          : await claudeConversationSystemPromptFiles(cwd),
-      model: launcherModel,
-      ...(piFields ?? codexFields ?? acpFields ?? kimiCodeFields ?? {
-        resumeSessionId: resume ? claudeSessionId : undefined,
-        sessionId: resume ? undefined : claudeSessionId,
-      }),
-      extraArgs: !piFields && !acpFields && !kimiCodeFields && effort ? `--effort "${effort}"` : undefined,
-      keepAlive: true,
-      fileMode: 0o700,
-      channelsBridgeMcpConfig,
-      useSupervisor,
-      supervisorScriptPath,
-    }),
-    { mode: 0o700 },
-  );
-  await rename(launcherTmp, launcherScript);
-  try {
-    await Effect.runPromise(killSession(tmuxSession));
-  } catch {
-  }
-  console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | command="${runtimeCommand}"`);
-  try {
-    const { preTrustDirectory } = await import('../workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
-    preTrustDirectory(cwd);
-  } catch { /* non-fatal */ }
-  try {
-    await Effect.runPromise(createSession(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
-      env: {
-        ...BLANKED_PROVIDER_ENV,
-        TERM: 'xterm-256color',
-      },
-    }));
-  } catch (err) {
-    if ((err as { code?: string })?.code === 'ENOENT') {
-      throw new Error(
-        'tmux is not installed. Install it with: brew install tmux (macOS) or sudo apt-get install tmux (Linux)',
-      );
-    }
-    throw err;
-  }
-  if (useSupervisor) {
-    await waitForPtySupervisorSocket(tmuxSession);
-  }
-  if (behavior.usesCodexHome && codexFields?.codexHome && codexTransport === 'tui') {
-    const codexHomeDir = codexFields.codexHome;
-    void (async () => {
+  // PAN-1837 review fix: the tmux-create + session-capture sequence below is
+  // wrapped per-bucket (withKimiSessionCaptureLock) for kimi-code conversations
+  // and genuinely awaited — not fire-and-forget — so two conversations sharing
+  // one cwd never snapshot the same "existing sessions" set and race for the
+  // same newest directory. Non-kimi harnesses run this closure directly,
+  // unaffected by the lock.
+  const launchTmuxAndCaptureSession = async (): Promise<void> => {
+    // Conversations have no AgentState row, so the dashboard can't resolve
+    // their wire.jsonl without a conversation-owned captured session id —
+    // snapshot the bucket now (before the tmux session exists, and — for
+    // kimi-code — inside the per-bucket lock) so the capture below can diff
+    // against it instead of guessing from mtime.
+    let kimiExistingSessionsBefore: Set<string> | undefined;
+    if (kimiCodeFields) {
       try {
-        const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId } =
-          await import('../runtimes/codex.js');
-        const rollout = await waitForCodexRollout(codexHomeDir, 120_000);
-        if (rollout) {
-          const threadId = extractThreadIdFromRollout(rollout);
-          if (threadId) writeThreadId(tmuxSession, threadId);
-        }
+        const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
+        kimiExistingSessionsBefore = new Set(await readdir(kimiSessionsRoot(join(homedir(), '.kimi-code'), cwd)));
       } catch {
+        kimiExistingSessionsBefore = new Set();
       }
-    })();
-  }
-  if (kimiCodeFields && kimiExistingSessionsBefore) {
-    // PAN-1837 review fix: same shape as the codex block above — poll for the
-    // new session directory Kimi writes under this conversation's cwd bucket
-    // and persist its id (into the shared per-id `~/.overdeck/agents/<id>/`
-    // scratch dir codex's writeThreadId already uses for conversations) so
-    // resolveKimiWirePath's fast path finds it instead of relying on the
-    // newest-mtime fallback, which would misattribute the transcript when
-    // multiple Kimi conversations share one cwd.
-    void (async () => {
+    }
+
+    const launcherTmp = `${launcherScript}.${randomUUID()}.tmp`;
+    await writeFile(
+      launcherTmp,
+      generateLauncherScriptSync({
+        role: 'work',
+        spawnMode: 'conversation',
+        workingDir: cwd,
+        setTerminalEnv: true,
+        unsetProviderEnv: true,
+        overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
+        extraEnvExports: [
+          harnessLaunch.pathExport,
+          `export OVERDECK_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
+        ],
+        providerExports: providerExportsStr || undefined,
+        trapHup: true,
+        baseCommand: runtimeCommand,
+        appendSystemPromptFiles: piFields
+          ? await piConversationSystemPromptFiles(cwd)
+          : codexFields || acpFields || kimiCodeFields
+            ? []
+            : await claudeConversationSystemPromptFiles(cwd),
+        model: launcherModel,
+        ...(piFields ?? codexFields ?? acpFields ?? kimiCodeFields ?? {
+          resumeSessionId: resume ? claudeSessionId : undefined,
+          sessionId: resume ? undefined : claudeSessionId,
+        }),
+        extraArgs: !piFields && !acpFields && !kimiCodeFields && effort ? `--effort "${effort}"` : undefined,
+        keepAlive: true,
+        fileMode: 0o700,
+        channelsBridgeMcpConfig,
+        useSupervisor,
+        supervisorScriptPath,
+      }),
+      { mode: 0o700 },
+    );
+    await rename(launcherTmp, launcherScript);
+    try {
+      await Effect.runPromise(killSession(tmuxSession));
+    } catch {
+    }
+    console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | command="${runtimeCommand}"`);
+    try {
+      const { preTrustDirectory } = await import('../workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
+      preTrustDirectory(cwd);
+    } catch { /* non-fatal */ }
+    try {
+      await Effect.runPromise(createSession(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
+        env: {
+          ...BLANKED_PROVIDER_ENV,
+          TERM: 'xterm-256color',
+        },
+      }));
+    } catch (err) {
+      if ((err as { code?: string })?.code === 'ENOENT') {
+        throw new Error(
+          'tmux is not installed. Install it with: brew install tmux (macOS) or sudo apt-get install tmux (Linux)',
+        );
+      }
+      throw err;
+    }
+    if (useSupervisor) {
+      await waitForPtySupervisorSocket(tmuxSession);
+    }
+    if (behavior.usesCodexHome && codexFields?.codexHome && codexTransport === 'tui') {
+      const codexHomeDir = codexFields.codexHome;
+      void (async () => {
+        try {
+          const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId } =
+            await import('../runtimes/codex.js');
+          const rollout = await waitForCodexRollout(codexHomeDir, 120_000);
+          if (rollout) {
+            const threadId = extractThreadIdFromRollout(rollout);
+            if (threadId) writeThreadId(tmuxSession, threadId);
+          }
+        } catch {
+        }
+      })();
+    }
+    if (kimiCodeFields && kimiExistingSessionsBefore) {
+      // Genuinely awaited (not fire-and-forget) so the per-bucket lock below
+      // stays held until this conversation's session directory is captured —
+      // that's what makes the next queued launch's snapshot see it as
+      // "existing" rather than racing to claim it too.
       try {
-        const { waitForNewKimiSession, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
-        const sessionId = await waitForNewKimiSession(join(homedir(), '.kimi-code'), cwd, kimiExistingSessionsBefore);
+        const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+        const sessionId = await waitForNewKimiSessionAsync(join(homedir(), '.kimi-code'), cwd, kimiExistingSessionsBefore);
         if (sessionId) writeKimiSessionId(tmuxSession, sessionId);
       } catch {
       }
-    })();
+    }
+  };
+
+  if (kimiCodeFields) {
+    const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
+    await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), cwd, launchTmuxAndCaptureSession);
+  } else {
+    await launchTmuxAndCaptureSession();
   }
   if (channelsBridgeMcpConfig) {
     void dismissDevChannelsDialog(tmuxSession).catch((err: unknown) => {

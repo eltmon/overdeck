@@ -214,6 +214,17 @@ export function getLatestSessionIdSync(agentId: string): string | null {
     if (ohmypiSessionId) return ohmypiSessionId;
   }
 
+  // 6. kimi-code — the native Kimi Code CLI has no launcher-writable session.id
+  //    equivalent; the id is captured post-launch from its own wire.jsonl
+  //    session directory and persisted to `<agentDir>/kimi-session-id`
+  //    (writeKimiSessionId, mirrors codex's thread-id file above).
+  if (agentState?.harness && getHarnessBehavior(agentState.harness).sessionIdSource === 'kimi-session-newest') {
+    try {
+      const kimiSessionId = readFileSync(join(getAgentDir(agentId), 'kimi-session-id'), 'utf-8').trim();
+      if (kimiSessionId) return kimiSessionId;
+    } catch { /* non-fatal */ }
+  }
+
   return null;
 }
 

@@ -26,6 +26,8 @@ import { requireModelOverrideSync } from '../model-validation.js';
 import { resolveGitHubIssueSync, resolveTrackerTypeSync } from '../tracker-utils.js';
 import { killSession, listSessionNames, sessionExists } from '../tmux.js';
 import { canUseHarnessSync } from '../harness-policy.js';
+import type { RuntimeName } from '../runtimes/types.js';
+import type { AuthMode } from '../subscription-types.js';
 import { saveAgentStateAndEmitEventProgram } from '../../dashboard/server/services/agent-projection.js';
 import { TrackerApiError } from '../../dashboard/server/services/typed-errors.js';
 import type { GitHubClientError, GitHubClientShape, GitHubIssue } from '../../dashboard/server/services/github-client.js';
@@ -123,6 +125,28 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
   return join(homedir(), 'Projects');
 }
 
+/**
+ * Resolve the harness a planning session actually launches with, given the
+ * requested harness and an optional model override. Fails loudly (throws)
+ * when the pair is denied by harness policy instead of silently substituting
+ * `claude-code` — a silent substitute would make an explicit kimi-code (or
+ * any other harness) selection unreachable whenever the model changes the
+ * policy decision (PAN-1837 review fix).
+ */
+export function resolvePlanningEffectiveHarness(
+  requestedHarness: RuntimeName,
+  modelOverride: string | undefined,
+  authMode: AuthMode | undefined,
+): RuntimeName {
+  if (typeof modelOverride === 'string' && modelOverride.trim()) {
+    const decision = canUseHarnessSync(requestedHarness, modelOverride.trim(), authMode);
+    if (!decision.allowed) {
+      throw new Error(decision.reason ?? `Harness "${requestedHarness}" is not allowed for model "${modelOverride.trim()}".`);
+    }
+  }
+  return requestedHarness;
+}
+
 export function startPlanningForIssue(options: {
   id: string;
   body: any;
@@ -149,7 +173,7 @@ export function startPlanningForIssue(options: {
     } = body as any;
     void skipWorkspace;
     void startDocker;
-    const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' || harness === 'acp' ? harness : 'claude-code';
+    const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' ? harness : 'claude-code';
 
     // Role-scoped model selection (PAN-2997 flow): `workModel` targets the WORK
     // agent only. It persists to the issue record — the staffing resolver
@@ -385,11 +409,12 @@ export function startPlanningForIssue(options: {
         });
 
         try {
-          let effectiveHarness = requestedHarness;
-          if (typeof modelOverride === 'string' && modelOverride.trim()) {
-            const decision = canUseHarnessSync(requestedHarness, modelOverride.trim(), await getProviderAuthMode(modelOverride.trim()));
-            if (!decision.allowed) effectiveHarness = 'claude-code';
-          }
+          const trimmedModelOverride = typeof modelOverride === 'string' && modelOverride.trim() ? modelOverride.trim() : undefined;
+          const effectiveHarness = resolvePlanningEffectiveHarness(
+            requestedHarness,
+            trimmedModelOverride,
+            trimmedModelOverride ? await getProviderAuthMode(trimmedModelOverride) : undefined,
+          );
           const result = await spawnPlanningSession({
             issue: issue as PlanningIssue,
             workspacePath,

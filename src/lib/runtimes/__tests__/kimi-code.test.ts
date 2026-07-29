@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readdir as readdirAsync } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -31,6 +32,9 @@ import {
   kimiSessionsRoot,
   kimiWorkDirKey,
   KimiCodeRuntimeSync,
+  waitForNewKimiSessionAsync,
+  withKimiSessionCaptureLock,
+  writeKimiSessionId,
 } from '../kimi-code.js';
 
 const tempHomes: string[] = [];
@@ -400,5 +404,64 @@ describe('KimiCodeRuntimeSync', () => {
     const runtime = createKimiCodeRuntimeSync();
     expect(runtime.name).toBe('kimi-code');
     expect(runtime.getHarnessBehavior().transcriptKind).toBe('kimi-wire-jsonl');
+  });
+});
+
+describe('withKimiSessionCaptureLock (PAN-1837 review fix — concurrent same-cwd conversations)', () => {
+  it('serializes two concurrent launches sharing one cwd so each captures its own distinct session id', async () => {
+    const kimiHome = makeHome();
+    const workDir = '/tmp/concurrent-conversations-workspace';
+    const bucketDir = kimiSessionsRoot(kimiHome, workDir);
+
+    // Mirrors the real conversation-runtime.ts usage: the "existing sessions"
+    // snapshot is taken freshly INSIDE the locked callback, right before the
+    // new session directory is created — not shared/precomputed across
+    // launches. That is what makes serialization correct: launch B's snapshot
+    // (which only runs once launch A's callback has fully released the lock)
+    // already contains launch A's captured directory, so only launch B's own
+    // new directory is ever "fresh" for it.
+    const launch = (sessionId: string) =>
+      withKimiSessionCaptureLock(kimiHome, workDir, async () => {
+        let existingBefore: Set<string>;
+        try {
+          existingBefore = new Set(await readdirAsync(bucketDir));
+        } catch {
+          existingBefore = new Set();
+        }
+        // Simulate the real gap between "tmux session created" and "Kimi's
+        // own process has written its session directory" — this delay is
+        // exactly what let two unlocked launches both observe both
+        // directories as fresh in the pre-fix implementation.
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        writeWireFixture(kimiHome, workDir, sessionId);
+        return waitForNewKimiSessionAsync(kimiHome, workDir, existingBefore, 2_000);
+      });
+
+    const [captured1, captured2] = await Promise.all([launch('session_alpha'), launch('session_beta')]);
+
+    expect(captured1).not.toBeNull();
+    expect(captured2).not.toBeNull();
+    expect(captured1).not.toBe(captured2);
+    expect(new Set([captured1, captured2])).toEqual(new Set(['session_alpha', 'session_beta']));
+  });
+
+  it('lets a second bucket proceed immediately — the lock is per-workDirKey, not global', async () => {
+    const kimiHome = makeHome();
+    const order: string[] = [];
+
+    const slow = withKimiSessionCaptureLock(kimiHome, '/tmp/workspace-one', async () => {
+      order.push('slow-start');
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      order.push('slow-end');
+    });
+    const fast = withKimiSessionCaptureLock(kimiHome, '/tmp/workspace-two', async () => {
+      order.push('fast-start');
+      order.push('fast-end');
+    });
+
+    await Promise.all([slow, fast]);
+
+    // The unrelated-bucket task completes without waiting on the slow one.
+    expect(order.indexOf('fast-end')).toBeLessThan(order.indexOf('slow-end'));
   });
 });

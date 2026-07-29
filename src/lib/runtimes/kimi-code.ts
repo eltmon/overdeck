@@ -210,9 +210,73 @@ export async function waitForNewKimiSession(
   return null;
 }
 
+/**
+ * Async twin of {@link waitForNewKimiSession} (PAN-1837 review fix, P2). The
+ * conversation-spawn capture task runs on the dashboard event loop, so its
+ * 250ms poll loop must not block on readdirSync/statSync — runtime-side sync
+ * callers (kill/spawn lifecycle) keep the sync version above.
+ */
+export async function waitForNewKimiSessionAsync(
+  kimiHome: string,
+  workspace: string,
+  existingBefore: Set<string>,
+  timeoutMs: number = SPAWN_READY_TIMEOUT_MS,
+): Promise<string | null> {
+  const bucketDir = kimiSessionsRoot(kimiHome, workspace);
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    let entries: string[] = [];
+    try {
+      entries = await readdirAsync(bucketDir);
+    } catch {
+      entries = [];
+    }
+    const fresh = entries.filter((entry) => !existingBefore.has(entry));
+    if (fresh.length > 0) {
+      let newest: { name: string; mtimeMs: number } | null = null;
+      for (const name of fresh) {
+        let mtimeMs: number;
+        try {
+          mtimeMs = (await statAsync(join(bucketDir, name))).mtimeMs;
+        } catch {
+          continue;
+        }
+        if (!newest || mtimeMs > newest.mtimeMs) newest = { name, mtimeMs };
+      }
+      if (newest) return newest.name;
+    }
+    await delay(POLL_INTERVAL_MS);
+  }
+  return null;
+}
+
 /** Persist the captured session id to `<overdeckHome>/agents/<id>/kimi-session-id` (mirrors codex's thread-id file). */
 export function writeKimiSessionId(agentId: string, sessionId: string, overdeckHome: string = getOverdeckHome()): void {
   writeFileSync(join(overdeckHome, 'agents', agentId, 'kimi-session-id'), sessionId, 'utf-8');
+}
+
+/**
+ * Per-bucket async mutex (PAN-1837 review fix): two Kimi conversations
+ * launched concurrently in the same cwd both snapshot the same
+ * "existing sessions" set, then both independently see both new session
+ * directories as fresh and pick the same newest one — silently persisting
+ * the SAME kimi-session-id for two different conversations. Serializing
+ * the whole snapshot -> launch -> capture sequence per workDirKey bucket
+ * makes each launch's "existing" snapshot include every prior launch's
+ * already-captured directory, so only the true newcomer is ever fresh.
+ */
+const kimiCaptureLocks = new Map<string, Promise<unknown>>();
+
+export async function withKimiSessionCaptureLock<T>(kimiHome: string, workspace: string, fn: () => Promise<T>): Promise<T> {
+  const bucketKey = kimiSessionsRoot(kimiHome, workspace);
+  const prior = kimiCaptureLocks.get(bucketKey) ?? Promise.resolve();
+  const task = prior.catch(() => {}).then(fn);
+  kimiCaptureLocks.set(bucketKey, task);
+  try {
+    return await task;
+  } finally {
+    if (kimiCaptureLocks.get(bucketKey) === task) kimiCaptureLocks.delete(bucketKey);
+  }
 }
 
 function delay(ms: number): Promise<void> {

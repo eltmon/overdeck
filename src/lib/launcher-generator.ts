@@ -778,12 +778,14 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
 
 /**
  * Build a native Kimi Code CLI command line (D2/erratum E1 — RESOLVED 0.29.2
- * checkpoint): `kimi -m <model> --yolo [--add-dir <dir>]...`, wrapped in the
- * PTY supervisor like claude-code (KIMI_CODE_BEHAVIOR.supportsPtySupervisor
- * is true). Deliberately NO --session, NO --work-dir (neither flag exists on
- * the installed binary), and NO -p/--print (v1 work agents run interactively).
- * Kimi generates its own session id; it is captured post-launch as the
- * newest session directory under the workspace's workDirKey bucket.
+ * checkpoint): `kimi [-S <id>] -m <model> --yolo [--add-dir <dir>]...`,
+ * wrapped in the PTY supervisor like claude-code
+ * (KIMI_CODE_BEHAVIOR.supportsPtySupervisor is true). Deliberately NO
+ * --session (long form), NO --work-dir (neither flag exists on the installed
+ * binary), and NO -p/--print (v1 work agents run interactively). On a fresh
+ * launch, Kimi generates its own session id, captured post-launch as the
+ * newest session directory under the workspace's workDirKey bucket; on a
+ * true resume, that captured id is passed back via `-S` (PAN-1837).
  */
 function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[] {
   if (!config.kimiCodeModel) {
@@ -791,6 +793,11 @@ function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[
   }
 
   const tokens: string[] = ['kimi', '-m', shellQuoteModelIdSync(config.kimiCodeModel)];
+  if (config.resumeSessionId) {
+    // `-S <id>` resumes that specific session; `kimi`'s own `-c` continue flag
+    // picks "most recent for this cwd" and can't target a captured id (PAN-1837).
+    tokens.push('-S', shellQuote(config.resumeSessionId));
+  }
   if (config.kimiCodeYolo) {
     tokens.push('--yolo');
   }

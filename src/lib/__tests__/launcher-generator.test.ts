@@ -1551,20 +1551,42 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       expect(script).not.toMatch(/export ANTHROPIC_(?:API_KEY|BASE_URL|AUTH_TOKEN)=/);
     });
 
-    it('never emits --session, --work-dir, or -p/--print (D2/erratum E1)', () => {
+    it('never emits --session (long form), --work-dir, or -p/--print (D2/erratum E1)', () => {
       const script = generateLauncherScriptSync({
         ...DEFAULT_CONFIG,
         role: 'work',
         harness: 'kimi-code',
         kimiCodeModel: 'k3',
         kimiCodeYolo: true,
-        resumeSessionId: 'session_should-be-ignored',
         promptFile: '/workspace/project/.pan/init-prompt.txt',
       });
-      expect(script).not.toMatch(/--session/);
+      expect(script).not.toMatch(/--session\b/);
       expect(script).not.toMatch(/--work-dir/);
       expect(script).not.toMatch(/(^|\s)-p(\s|$)/);
       expect(script).not.toMatch(/--print/);
+    });
+
+    it('resumes a captured session id via -S (PAN-1837)', () => {
+      const script = generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'work',
+        harness: 'kimi-code',
+        kimiCodeModel: 'k3',
+        kimiCodeYolo: true,
+        resumeSessionId: 'session-abc-123',
+      });
+      expect(script).toMatch(/^exec kimi -m 'k3' -S 'session-abc-123' --yolo$/m);
+    });
+
+    it('omits -S when no resumeSessionId is set (fresh launch)', () => {
+      const script = generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'work',
+        harness: 'kimi-code',
+        kimiCodeModel: 'k3',
+        kimiCodeYolo: true,
+      });
+      expect(script).not.toMatch(/-S /);
     });
 
     it('appends --add-dir once per configured directory', () => {
