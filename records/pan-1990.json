@@ -59,15 +59,7 @@
       "timestamp": "2026-07-29T08:55:08.702Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T08:55:08Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1990\n\n# Review — PAN-1990 — cycle 4 — 2026-07-29\n\n## Verdict: CHANGES REQUESTED — the new retry path falsely confirms durability after add/commit failures, and partial polyrepo creation still deletes the registry row for real worktrees\n\n## Context\n- Branch: `feature/pan-1990`\n- PR: `#3277`\n- HEAD reviewed: `cc815c9f3bd3ae61b20e78caf6a82a0a44f2eb77`\n- Prior cycle SHA: `c19e3b1084c00539feda613993f59a7eacee125a`\n- Cycle diff: 9 files, 337 additions, 44 deletions\n- Full PR diff: 127 files\n- Coverage: all four high-risk and five medium-risk files were covered in the preceding cycles; this pass reviewed every source and test change in `c19e3b10..cc815c9f` across correctness, security, requirements, and performance. No high- or medium-risk file is uncovered. Under the cycle-4 convergence gate, both blockers are anchored in code added by `cc815c9f`.\n\n## Blocking Findings\n\n### ! [durability/correctness] Retry handles a failed push only; a failed add or commit is misreported as durable — `src/lib/memory/state-mirror.ts:65-73`, `src/lib/pan-dir/auto-commit.ts:650-669`\n`commitMirror()` throws for any `flushAutoCommits()` error after the file was removed, including `git add` failure, an index lock, commit-hook/signing failure, or `git commit` failure. In those cases there is no local deletion commit to push: the deletion is merely unstaged or staged. On retry the target is absent, so the new branch calls `pushPendingStateCommits()`; `git push` can return success with no ahead commits, and `removeMemoryStateMirror()` then reports success. `deleteWorkspace()` proceeds to delete the workspace and pin rows while the remote mirror still exists, recreating the exact stale-descriptor divergence this cycle is intended to close. The new test mocks only the committed-but-unpushed case and cannot catch this. The retry must first establish whether the deletion is committed, stage/commit it when necessary, and only then confirm that the commit reached the configured remote.\n\n### ! [correctness/requirements] A partial polyrepo creation leaves real repo worktrees on disk but still deletes the workspace row — `src/lib/workspace-manager/create.ts:217-218`, `src/lib/workspace-manager/create.ts:274-320`, `src/lib/workspace-manager/create.ts:790-796`\n`worktreeCreated` becomes true only after the entire polyrepo loop succeeds. If repo A's worktree is created and repo B fails, `result.success` is false and the function returns before setting the flag; the outer compensation then deletes the pre-created workspace row even though repo A's worktree and the workspace directory remain. The same happens when one symlink is created before a later repo/symlink fails. A retry collides with the non-metadata workspace path, and the registry remains blind until boot backfill. Set the preservation state as soon as any durable workspace content/worktree is created, or use a canonical cleanup operation that removes every partial child before deleting the row. The added regression test covers only a monorepo failure after the single worktree succeeds.\n\n## Convergence Note\n\nThese findings arise from the cycle-four fixes themselves. The first could not have been raised in cycle 1 because `pushPendingStateCommits()` and the target-absent retry branch were introduced by `cc815c9f`; the prior code silently returned instead. The second is in the newly-added `worktreeCreated` compensation guard: cycle 3 introduced blanket compensation, while cycle 4 narrowed it but omitted the partial-polyrepo state.\n\n## Non-blocking Findings\n\n### ~ [security] The combined read still has a path-replacement race between `realpath()` and `open()` — `src/lib/memory/pin-path.ts:69-94`\nOpening and reading from one file handle prevents a second lookup after `open`, but `realTarget` is still a pathname obtained by `realpath()` and reopened later. A concurrent local writer can replace that final path with an out-of-project symlink between those calls, and `open(realTarget, 'r')` follows it. This retains the narrow local time-of-check/time-of-use advisory from cycle 3. An `O_NOFOLLOW` open plus handle-based validation, with equivalent protection for replaceable parent components where supported, would make the claim complete.\n\n### ~ [performance/availability] A missing mirror now performs an unconditional remote push attempt — `src/lib/memory/state-mirror.ts:67-72`, `src/lib/pan-dir/auto-commit.ts:650-669`\nEven when the pin was never mirrored, `unpin` and workspace cleanup can incur a network push with the full configured timeout. Multiple missing workspace pin mirrors are processed through `Promise.all`, so retries can issue concurrent pushes against the same checkout outside the auto-commit serializer. This is non-blocking relative to the durability defect above, but the retry should be tied to a concrete pending deletion intent rather than every absent path.\n\n### ~ [correctness] Branch-check failure or branch mismatch is treated as a clean no-op — `src/lib/pan-dir/auto-commit.ts:661-669`, `src/lib/memory/state-mirror.ts:68-72`\n`pushPendingStateCommits()` returns `null` when `rev-parse` fails or the checkout is on the wrong branch, and the caller interprets `null` as confirmed success. The dedicated state worktree should normally satisfy the invariant, so this does not independently block the cycle, but a durability retry should fail closed on a configured repository whose branch cannot be verified.\n\n## Resolved From Cycle 3\n\n- A locally committed deletion whose first push failed is now retried instead of being skipped solely because the target file is absent.\n- Monorepo and fully-created polyrepo workspaces retain their registry row when later setup stages report errors.\n- Boot migration now stops when issue-workspace backfill fails instead of continuing through a swallowed rejection.\n- Prompt injection reads through one verified file handle, reducing the prior symlink race window and preserving static realpath containment.\n\n## Verification Performed\n\n- `git diff --check origin/main...HEAD` passed.\n- `npm run typecheck` passed, including contracts, hooks, evals, dashboard ratchet, and frontend.\n- Focused cycle-four verification passed: 5 test files, 46 tests.\n- Reviewed the complete `c19e3b10..cc815c9f` source/test delta and confirmed both blockers are in cycle-four changed paths rather than unchanged code previously accepted or left advisory.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1990/.pan/review/agent-pan-1990-review-cc815c9f/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1990 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".gitignore",
@@ -318,10 +310,10 @@
     "recordedAt": "2026-07-29T05:44:27.078Z"
   },
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T09:00:32.376Z",
+  "updated": "2026-07-29T09:00:34.589Z",
   "pipeline": {
     "issueId": "PAN-1990",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -329,13 +321,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T05:45:20.146Z",
-    "updatedAt": "2026-07-29T09:00:32.310Z",
+    "updatedAt": "2026-07-29T09:00:33.131Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "AC1: MemoryIdentity/MemoryObservation issueId -> Schema.NullOr(IssueId) in packages/contracts/src/memory.ts; new contracts memory.test.ts passes 4/4 (decodes null and a real PAN-1990 for both structs). AC2: src/lib/memory/injection.ts:110 replaces the sibling search with Promise.resolve([]) when issueId is null, so the branch is skipped rather than widened; tests/lib/memory/injection.test.ts 18/18 pass including the new null-issueId case, which seeds the same PAN-999 sibling row the positive test retrieves and asserts hitCounts.sibling===0 and no sibling docType. AC3: npm run typecheck exits 0 - contracts dts rebuild, root tsc --noEmit, hooks, evals, dashboard ratchet (61 known, none new), frontend ratchet (0). New imports verified real: getProjectSync src/lib/projects.ts:601, resolveProjectPath src/lib/projects.ts:508. Non-blocking note: the ?? workspaceId fallbacks for paths/event keys are documented as deferred to memory-paths-rekey and events-workspaceid, but updateMemoryHealth returning EMPTY_HEALTH on a null issueId drops health tracking for main/scratch turns rather than relocating it - confirm a follow-on bead owns that.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3277",
     "reviewedAtCommit": "cc815c9f3bd3ae61b20e78caf6a82a0a44f2eb77",
     "lastVerifiedCommit": "cc815c9f3bd3ae61b20e78caf6a82a0a44f2eb77",
-    "reviewSpawnedAt": "2026-07-29T08:44:44.514Z",
+    "reviewSpawnedAt": "2026-07-29T09:00:33.130Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".gitignore",
@@ -607,10 +599,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 5342,
-            "output": 1327290,
-            "cacheRead": 1396303933,
-            "cacheWrite": 10544629
+            "input": 5344,
+            "output": 1328009,
+            "cacheRead": 1397142733,
+            "cacheWrite": 10546245
           }
         }
       },
@@ -628,15 +620,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 5342,
-          "output": 1327290,
-          "cacheRead": 1396303933,
-          "cacheWrite": 10544629
+          "input": 5344,
+          "output": 1328009,
+          "cacheRead": 1397142733,
+          "cacheWrite": 10546245
         }
       },
       "costAtCloseOut": {
-        "usd": 404.686743,
-        "pricingAsOf": "2026-07-29T09:00:32.372Z"
+        "usd": 404.865737,
+        "pricingAsOf": "2026-07-29T09:00:34.555Z"
       }
     },
     "merges": [
