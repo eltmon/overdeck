@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T02:02:52.518Z",
+  "updated": "2026-07-29T02:03:04.835Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -84,8 +84,16 @@
     }
   ],
   "tasks": {
-    "sequence": 28,
-    "claims": {},
+    "sequence": 29,
+    "claims": {
+      "rebuild-workspaces-cmd": {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 1052944,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T02:03:04.835Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -292,6 +300,7 @@
     "memory-paths-rekey.memory-paths-rekey.ac1": "completed",
     "memory-paths-rekey.memory-paths-rekey.ac2": "completed",
     "memory-paths-rekey.memory-paths-rekey.ac3": "completed",
-    "memory-paths-rekey.memory-paths-rekey.ac4": "completed"
+    "memory-paths-rekey.memory-paths-rekey.ac4": "completed",
+    "rebuild-workspaces-cmd": "running"
   }
 }
