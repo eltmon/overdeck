@@ -528,5 +528,29 @@ describe('settings', () => {
       expect(available.google.length).toBeGreaterThan(0);
       expect(available.minimax.length).toBeGreaterThan(0);
     });
+
+    it('should gate QuantumLlama models on the quantumllama API key (PAN-3252)', async () => {
+      const { getAvailableModelsSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
+
+      const without = getAvailableModelsSync(getDefaultSettingsSync());
+      expect(without.quantumllama).toEqual([]);
+
+      const settings = getDefaultSettingsSync();
+      settings.api_keys.quantumllama = 'ql-test-key';
+      const available = getAvailableModelsSync(settings);
+      expect(available.quantumllama).toEqual(['ql-reason-70b', 'ql-swift-8b', 'ql-nano-1b']);
+    });
+
+    it('should fall back to QUANTUMLLAMA_API_KEY from the environment', async () => {
+      const { loadSettingsSync } = await import('../../src/lib/settings.js');
+
+      process.env.QUANTUMLLAMA_API_KEY = 'ql-env-key';
+      try {
+        const loaded = loadSettingsSync();
+        expect(loaded.api_keys.quantumllama).toBe('ql-env-key');
+      } finally {
+        delete process.env.QUANTUMLLAMA_API_KEY;
+      }
+    });
   });
 });

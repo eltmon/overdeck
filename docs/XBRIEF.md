@@ -457,6 +457,16 @@ Manual lifecycle transition overrides for xBRIEFs. All commands resolve the proj
 7. **`postMergeLifecycle`** updates `plan.status` to `completed` in `specs/` on `overdeck-state`.
 8. **Dashboard** renders the plan via the Directive Flow (DAG visualization) and xBRIEF viewer (List/DAG/Raw JSON tabs).
 
+### Dashboard viewer
+
+The dashboard exposes the same xBRIEF through three entry points:
+
+- The kanban issue-card and InspectorPanel xBRIEF buttons open `XBriefDialog`.
+- The project-tree issue row's xBRIEF resource chip opens `XBriefFullscreen`.
+- The drawer Plan panel and cockpit `PlanMapCard` expand buttons open the same `XBriefFullscreen` instance.
+
+`XBriefFullscreen` is mounted once in `App.tsx` and selected through `xbriefViewerIssueId` in the dashboard store. It reads the merged plan through `useWorkspacePlanQuery` and keeps the List, DAG, and Raw view switcher in the full-screen header. Entry points set the issue ID; they do not create new query keys, routes, or issue-view inventory sections.
+
 ### Plan Resolution (PAN-1124: single-spec-on-main)
 
 `findPlan(workspacePath)` in `src/lib/xbrief/io.ts` resolves the canonical spec on `overdeck-state` first via `findSpecByIssue(projectRoot, issueId)`. It derives the issue ID from the workspace directory name (`feature-<id>`) and the project root (two levels up), then falls back to the workspace compatibility copy documented in [Migration from vBRIEF](#migration-from-vbrief).

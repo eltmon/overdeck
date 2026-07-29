@@ -617,4 +617,36 @@ describe('model-fallback', () => {
       expect(hasModelCapabilitySync('grok-build-0.1')).toBe(true);
     });
   });
+
+  describe('QuantumLlama (PAN-3252)', () => {
+    it('resolves ql-* models to the quantumllama provider', () => {
+      expect(getModelProviderSync('ql-reason-70b')).toBe('quantumllama');
+      expect(getModelProviderSync('ql-swift-8b')).toBe('quantumllama');
+      expect(getModelProviderSync('ql-nano-1b')).toBe('quantumllama');
+    });
+
+    it('resolves unlisted ql-* ids via the prefix heuristic', () => {
+      expect(getModelProviderSync('ql-future-model')).toBe('quantumllama');
+    });
+
+    it('detectEnabledProviders enables quantumllama from its API key', () => {
+      const enabled = detectEnabledProvidersSync({ quantumllama: 'test-key' });
+      expect(enabled.has('quantumllama')).toBe(true);
+    });
+
+    it('getAvailableModels includes ql-* models only when quantumllama is enabled', () => {
+      const withQl = getAvailableModelsSync(new Set<ModelProvider>(['anthropic', 'quantumllama']));
+      expect(withQl).toEqual(expect.arrayContaining(['ql-reason-70b', 'ql-swift-8b', 'ql-nano-1b']));
+
+      const withoutQl = getAvailableModelsSync(new Set<ModelProvider>(['anthropic']));
+      expect(withoutQl).not.toContain('ql-reason-70b');
+      expect(withoutQl).not.toContain('ql-swift-8b');
+      expect(withoutQl).not.toContain('ql-nano-1b');
+    });
+
+    it('falls back to Sonnet for ql-reason-70b and Haiku for ql-nano-1b', () => {
+      expect(getFallbackModelSync('ql-reason-70b' as ModelId)).toBe('claude-sonnet-5');
+      expect(getFallbackModelSync('ql-nano-1b' as ModelId)).toBe('claude-haiku-4-5');
+    });
+  });
 });

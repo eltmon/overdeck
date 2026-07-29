@@ -13,6 +13,7 @@
  */
 
 import { existsSync } from 'fs';
+import { access, readFile, readdir } from 'node:fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
 import {
@@ -32,6 +33,24 @@ export interface PrdLocation {
   path: string;
   format: PrdFormat;
   status: PrdStatus;
+}
+
+/** Read Markdown from any location returned by this module's PRD resolvers. */
+export async function readPrdContent(loc: PrdLocation): Promise<string | null> {
+  if (loc.format === 'flat' || loc.format === 'pan-draft') {
+    return readFile(loc.path, 'utf8').catch(() => null);
+  }
+
+  const files = (await readdir(loc.path).catch(() => [] as string[]))
+    .filter((file) => file.endsWith('.md'))
+    .sort((a, b) => {
+      if (a === 'prd.md') return -1;
+      if (b === 'prd.md') return 1;
+      return a.localeCompare(b);
+    });
+  const firstMarkdown = files[0];
+  if (!firstMarkdown) return null;
+  return readFile(join(loc.path, firstMarkdown), 'utf8').catch(() => null);
 }
 
 const STATUS_DIRS: Record<Exclude<PrdStatus, 'draft'>, string> = {
@@ -82,20 +101,33 @@ export function findPrdAtStatusSync(
   return null;
 }
 
-export function findDraftPrdSync(projectPath: string, issueId: string): PrdLocation | null {
+function draftPrdCandidates(projectPath: string, issueId: string): PrdLocation[] {
   // Canonical drafts exist in both filename cases on disk (the door writes
   // UPPER.md; humans and conversations historically wrote lower.md) — accept
   // either, matching checkPrdGateSync.
-  const candidates = [
-    getIssueDraftPath(projectPath, issueId),
-    getDraftPath(projectPath, `${issueId.toLowerCase()}.md`),
-  ]
-  for (const path of candidates) {
-    if (existsSync(path)) {
-      return { path, format: 'pan-draft', status: 'draft' }
+  return [
+    { path: getIssueDraftPath(projectPath, issueId), format: 'pan-draft', status: 'draft' },
+    { path: getDraftPath(projectPath, `${issueId.toLowerCase()}.md`), format: 'pan-draft', status: 'draft' },
+  ];
+}
+
+export function findDraftPrdSync(projectPath: string, issueId: string): PrdLocation | null {
+  for (const candidate of draftPrdCandidates(projectPath, issueId)) {
+    if (existsSync(candidate.path)) return candidate;
+  }
+  return null;
+}
+
+export async function findDraftPrdAsync(projectPath: string, issueId: string): Promise<PrdLocation | null> {
+  for (const candidate of draftPrdCandidates(projectPath, issueId)) {
+    try {
+      await access(candidate.path);
+      return candidate;
+    } catch {
+      // Try the historical filename case before reporting no draft.
     }
   }
-  return null
+  return null;
 }
 
 /**
@@ -115,8 +147,8 @@ export function findPrdAnywhereSync(
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 //
-// All helpers in this module are pure path computation + existsSync stat — no
-// real I/O failure modes. Effect.sync wrappers preserve the synchronous nature.
+// Path-only helpers stay synchronous. Draft discovery uses the promise-based
+// filesystem door so resource refreshes never block the dashboard event loop.
 
 /** Effect variant of {@link canonicalPrdSubdirSync}. */
 export const canonicalPrdSubdir = (
@@ -134,12 +166,12 @@ export const findPrdAtStatus = (
 ): Effect.Effect<PrdLocation | null, never> =>
   Effect.sync(() => findPrdAtStatusSync(projectPath, issueId, status));
 
-/** Effect variant of {@link findDraftPrdSync}. */
+/** Async Effect variant of {@link findDraftPrdAsync}. */
 export const findDraftPrd = (
   projectPath: string,
   issueId: string,
 ): Effect.Effect<PrdLocation | null, never> =>
-  Effect.sync(() => findDraftPrdSync(projectPath, issueId));
+  Effect.promise(() => findDraftPrdAsync(projectPath, issueId));
 
 /** Effect variant of {@link findPrdAnywhereSync}. */
 export const findPrdAnywhere = (

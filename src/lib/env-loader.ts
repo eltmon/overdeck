@@ -91,6 +91,7 @@ export function getApiKeysFromEnv(): {
   kimi?: string;
   openrouter?: string;
   nous?: string;
+  quantumllama?: string;
 } {
   return {
     openai: process.env.OPENAI_API_KEY,
@@ -98,6 +99,7 @@ export function getApiKeysFromEnv(): {
     kimi: process.env.KIMI_CODING_API_KEY || process.env.KIMI_API_KEY,
     openrouter: process.env.OPENROUTER_API_KEY,
     nous: process.env.NOUS_API_KEY,
+    quantumllama: process.env.QUANTUMLLAMA_API_KEY,
   };
 }
 
