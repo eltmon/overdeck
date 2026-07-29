@@ -379,7 +379,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T06:57:00.208Z",
+  "updated": "2026-07-29T06:57:02.593Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "passed",
@@ -389,7 +389,7 @@
     "releaseStatus": "pending",
     "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-29T06:12:06.508Z",
-    "updatedAt": "2026-07-29T06:56:59.963Z",
+    "updatedAt": "2026-07-29T06:57:02.543Z",
     "reviewNotes": "Verification infrastructure error: Verification worker bundle missing at /home/eltmon/.overdeck/deployments/dashboard/.pan-reload-generation-a/dist/verification-worker.js; run npm run build",
     "testNotes": "Gates run from workspace feature-pan-3232 (HEAD 3322b75b00, matches reviewedAtCommit; review passed). bun install OK, packages/contracts unchanged vs origin/main so no rebuild needed. npm run typecheck PASSED (root tsc, hooks, evals, dashboard-types guard 58 known/0 new, frontend-types guard 0 known/0 new). npm run lint PASSED (eslint + all custom guards: skills, slash-commands, prompts, prompt-trailer, file-size, source-introspection, no-coderabbit-merge-gate, circular-deps 77 baselined/0 new, ratchet-audit, quarantine-audit). npm test PASSED: root vitest 1286 files/12067 tests passed (3 files/50 tests skipped, pre-existing quarantine); frontend targeted subset (issueActions.test.ts, issueActions.no-actions-lost.test.ts, issueActions.parity.test.tsx, fr7-conversation-pending-input.test.tsx) 4 files/59 tests passed. No browser UAT performed: PRD (drafts/PAN-3232.md) and GitHub issue #3232 contain no UAT/browser/Playwright/manual-test language; every xBRIEF item's verify_commands is vitest/typecheck/grep only; the two items whose acceptance criteria describe live push-based runtime behavior (live-tree-delta: pending_input_changed SessionTreeDelta; specialist-pending-input: review/test/ship node awaiting-input fields) were deliberately cancelled and deferred to follow-up work (recorded in tasks.claimHistory with reasons), a scope reduction already reviewed and passed on this exact commit. The 6 shipped items (issue-view-awaiting-fields, decisions-prompt-threading, session-panel-kind-label, remove-project-pending-input, widen-direct-selector-surfaces, docs-askuserquestion-dashboard) are fully covered by component-level unit tests mocking the exact prop shapes named in the issue's acceptance criteria.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
@@ -469,7 +469,7 @@
       },
       "costAtCloseOut": {
         "usd": 325.062936,
-        "pricingAsOf": "2026-07-29T06:57:00.142Z"
+        "pricingAsOf": "2026-07-29T06:57:02.579Z"
       }
     },
     "merges": [
