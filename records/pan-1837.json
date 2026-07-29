@@ -304,20 +304,19 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T03:11:43.261Z",
+  "updated": "2026-07-29T03:25:52.441Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T03:11:42.210Z",
+    "updatedAt": "2026-07-29T03:25:52.400Z",
     "reviewNotes": "Review blocked: normal kimi-code resume uses Claude-only readiness/transcript confirmation and drops continue prompts; artifact/context validators still omit kimi-code; reviewed merge SHA a913491195 is not pushed to PR #3255. See .pan/review/agent-pan-1837-review-a9134911/review.md.",
-    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
       "detectedAt": "2026-07-29T00:03:35.975Z",
@@ -328,6 +327,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
     "reviewedAtCommit": "a91349119598898b09353f75fe2c0a4fdeed599c",
+    "lastVerifiedCommit": "aa65ccfa54a4ed05f33764fbbf6c15de3508f913",
     "reviewSpawnedAt": "2026-07-29T03:11:42.209Z"
   },
   "closeOut": {
@@ -343,9 +343,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 7139624,
-            "output": 357230,
-            "cacheRead": 126200832,
+            "input": 8505788,
+            "output": 396606,
+            "cacheRead": 143067136,
             "cacheWrite": 0
           }
         },
@@ -366,9 +366,9 @@
           "cacheWrite": 187167
         },
         "openai/gpt-5.6-sol": {
-          "input": 7139624,
-          "output": 357230,
-          "cacheRead": 126200832,
+          "input": 8505788,
+          "output": 396606,
+          "cacheRead": 143067136,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -379,8 +379,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 339.84203,
-        "pricingAsOf": "2026-07-29T03:11:42.243Z"
+        "usd": 356.287282,
+        "pricingAsOf": "2026-07-29T03:25:52.429Z"
       }
     },
     "merges": [
@@ -389,7 +389,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-1837",
