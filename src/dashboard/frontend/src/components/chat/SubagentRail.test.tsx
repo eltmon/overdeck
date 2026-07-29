@@ -92,3 +92,47 @@ describe('SubagentRail', () => {
     expect(new URLSearchParams(window.location.search).has('subagent')).toBe(false);
   });
 });
+
+describe('SubagentRail collapse (Awareness-rail pattern)', () => {
+  beforeEach(() => {
+    window.history.replaceState({}, '', '/conv/42');
+    localStorage.removeItem('overdeck.ui.agentsRailCollapsed');
+  });
+
+  it('collapses to a slim vertical tab and expands back', async () => {
+    const user = userEvent.setup();
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
+
+    await user.click(screen.getByRole('button', { name: 'Collapse agents rail' }));
+
+    expect(screen.queryByRole('complementary', { name: 'Conversation agents' })).not.toBeInTheDocument();
+    const expandTab = screen.getByRole('button', { name: 'Show agents rail' });
+    expect(expandTab).toHaveTextContent('Agents');
+    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBe('true');
+
+    await user.click(expandTab);
+
+    expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toBeInTheDocument();
+    expect(screen.getByText('Main agent')).toBeInTheDocument();
+    expect(localStorage.getItem('overdeck.ui.agentsRailCollapsed')).toBe('false');
+  });
+
+  it('restores the persisted collapsed state on mount', () => {
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'true');
+
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
+
+    expect(screen.queryByRole('complementary', { name: 'Conversation agents' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show agents rail' })).toBeInTheDocument();
+  });
+
+  it('renders nothing while collapsed with no subagents', () => {
+    localStorage.setItem('overdeck.ui.agentsRailCollapsed', 'true');
+
+    const { container } = render(
+      <SubagentRail conversation={conversation} subagents={[]} selectedAgentId={null} />,
+    );
+
+    expect(container).toBeEmptyDOMElement();
+  });
+});
