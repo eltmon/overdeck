@@ -90,6 +90,16 @@ describe('file-at-path', () => {
       await expectPanRpcError(readFileAtPath({ path: link }), 'PATH_NOT_ALLOWED');
     });
 
+    it('rejects an in-root .md symlink whose target is a non-markdown file, with UNSUPPORTED_FILE_TYPE', async () => {
+      const { readFileAtPath } = await import('../file-at-path.js');
+      const nonMarkdownTarget = join(projectDir, 'package.json');
+      await writeFile(nonMarkdownTarget, '{}');
+      const alias = join(projectDir, 'alias.md');
+      await symlink(nonMarkdownTarget, alias);
+
+      await expectPanRpcError(readFileAtPath({ path: alias }), 'UNSUPPORTED_FILE_TYPE');
+    });
+
     it('rejects a non-markdown extension with UNSUPPORTED_FILE_TYPE', async () => {
       const { readFileAtPath } = await import('../file-at-path.js');
       const target = join(projectDir, 'src.ts');
@@ -113,6 +123,20 @@ describe('file-at-path', () => {
       const missing = join(projectDir, 'missing.md');
 
       await expectPanRpcError(readFileAtPath({ path: missing }), 'FILE_NOT_FOUND');
+    });
+
+    it('treats a Windows drive-letter path as absolute, not rejecting it at the absoluteness gate', async () => {
+      // PAN-3260 review fix: `C:\...` starts with neither `/` nor this host's
+      // `path.sep`, so the old `path.startsWith(sep)` check rejected every
+      // Windows path with PATH_NOT_ALLOWED / "Path must be absolute" even
+      // though the dashboard also ships as a Windows desktop app. This path
+      // doesn't exist on this (Linux) test host, so it still fails — but it
+      // must fail at realpath (FILE_NOT_FOUND), not at the absoluteness check.
+      const { readFileAtPath } = await import('../file-at-path.js');
+
+      const promise = readFileAtPath({ path: 'C:\\Users\\test\\notes.md' });
+      await expectPanRpcError(promise, 'FILE_NOT_FOUND');
+      await expect(promise).rejects.not.toMatchObject({ message: expect.stringContaining('must be absolute') });
     });
   });
 
@@ -167,6 +191,18 @@ describe('file-at-path', () => {
       await writeFile(outside, 'outside');
 
       await expectPanRpcError(writeFileAtPath({ path: outside, content: 'hi' }), 'PATH_NOT_ALLOWED');
+    });
+
+    it('rejects a write through an in-root .md symlink to a non-markdown file, leaving it unchanged', async () => {
+      const { writeFileAtPath } = await import('../file-at-path.js');
+      const nonMarkdownTarget = join(projectDir, 'package.json');
+      await writeFile(nonMarkdownTarget, '{}');
+      const alias = join(projectDir, 'alias.md');
+      await symlink(nonMarkdownTarget, alias);
+
+      await expectPanRpcError(writeFileAtPath({ path: alias, content: 'clobbered' }), 'UNSUPPORTED_FILE_TYPE');
+      const onDisk = await import('node:fs/promises').then((fs) => fs.readFile(nonMarkdownTarget, 'utf8'));
+      expect(onDisk).toBe('{}');
     });
   });
 });

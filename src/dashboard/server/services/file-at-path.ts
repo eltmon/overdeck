@@ -1,5 +1,5 @@
 import { readFile, realpath, stat, writeFile } from 'node:fs/promises';
-import { extname, sep } from 'node:path';
+import { extname, posix as pathPosix, sep, win32 as pathWin32 } from 'node:path';
 
 import { Effect } from 'effect';
 import {
@@ -22,6 +22,18 @@ const MARKDOWN_EXTENSIONS = new Set(['.md', '.mdx', '.markdown']);
 
 function isInsidePath(parent: string, child: string): boolean {
   return child === parent || child.startsWith(`${parent}${sep}`);
+}
+
+/**
+ * PAN-3260 review fix: recognize both POSIX (`/...`) and Windows
+ * (`C:\...`, `\\...`) absolute paths regardless of the host platform's
+ * ambient `path.isAbsolute`, since the dashboard server also ships as a
+ * Windows desktop app. A path this accepts that doesn't actually resolve
+ * on the running host still fails the realpath/containment checks below —
+ * this only widens what counts as "absolute", not what's allowed.
+ */
+function isAbsolutePath(candidate: string): boolean {
+  return pathWin32.isAbsolute(candidate) || pathPosix.isAbsolute(candidate);
 }
 
 function countLines(text: string): number {
@@ -62,7 +74,7 @@ async function validateAndResolve(path: string): Promise<{ realPath: string }> {
   if (path.length > MAX_PATH_LENGTH) {
     throw new PanRpcError({ message: `Path exceeds ${MAX_PATH_LENGTH} characters`, code: 'PATH_NOT_ALLOWED' });
   }
-  if (!path.startsWith(sep)) {
+  if (!isAbsolutePath(path)) {
     throw new PanRpcError({ message: 'Path must be absolute', code: 'PATH_NOT_ALLOWED' });
   }
   const ext = extname(path).toLowerCase();
@@ -73,6 +85,15 @@ async function validateAndResolve(path: string): Promise<{ realPath: string }> {
   const realPath = await realpath(path).catch(() => {
     throw new PanRpcError({ message: 'File not found', code: 'FILE_NOT_FOUND' });
   });
+
+  // PAN-3260 review fix: re-check the extension on the *resolved* path too.
+  // The lexical check above only sees the caller-supplied path — a symlink
+  // like `<root>/alias.md -> <root>/package.json` passes it but resolves to
+  // a non-markdown file, which would otherwise let a write through.
+  const realExt = extname(realPath).toLowerCase();
+  if (!MARKDOWN_EXTENSIONS.has(realExt)) {
+    throw new PanRpcError({ message: `Unsupported file type: ${realExt || '(none)'}`, code: 'UNSUPPORTED_FILE_TYPE' });
+  }
 
   const allowedRoots = await resolveAllowedRoots();
   if (!allowedRoots.some((root) => isInsidePath(root, realPath))) {
