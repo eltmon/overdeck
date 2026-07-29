@@ -3,18 +3,18 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-29T00:05:06.073Z",
-  "updated": "2026-07-29T01:35:58.669Z",
+  "updated": "2026-07-29T01:36:01.127Z",
   "pipeline": {
     "issueId": "PAN-3259",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
-    "mergeStatus": "merging",
+    "mergeStatus": "failed",
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T01:35:58.608Z",
-    "mergeNotes": "Stale strike signal: recorded HEAD 8cde0b73bbb7af47c07d8e9c1e10e92c523699e3 differs from origin/strike/pan-3259 at c686bdd6eee99413c0a2b1671f50b212d442bb40",
+    "updatedAt": "2026-07-29T01:35:59.996Z",
+    "mergeNotes": "GitHub PR #3263 has failing required checks on HEAD c686bdd6. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3263 for details.",
     "lastVerifiedCommit": "c686bdd6eee99413c0a2b1671f50b212d442bb40",
     "strikeReadyHead": "c686bdd6eee99413c0a2b1671f50b212d442bb40",
     "strikeReadyAt": "2026-07-29T01:17:42.180Z",
@@ -43,7 +43,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-29T01:35:58.662Z"
+        "pricingAsOf": "2026-07-29T01:36:00.025Z"
       }
     },
     "merges": [],
