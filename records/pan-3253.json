@@ -64,16 +64,16 @@
     "recordedAt": "2026-07-29T06:18:50.753Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T07:31:38.777Z",
+  "updated": "2026-07-29T07:31:40.728Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T07:31:38.739Z",
+    "updatedAt": "2026-07-29T07:31:39.287Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed boot-trim to truncate notes in all history entries",
     "verificationNotes": "Acceptance criteria check FAILED — 3/12 AC incomplete:\n\n### Extend trimReviewStatusHistoryPayloads to delegate to the bounding helper (3/3 incomplete)\n  - [ ] Given a seeded oversized row with 25 entries carrying 3,697-char notes, the trim persists a smaller payload that parses back to <= 20 entries with <= 500-char notes\n  - [ ] Running the trim a second time over already-trimmed rows returns trimmed: 0 (converges to a no-op)\n  - [ ] An oversized row of a non-review event type survives the trim byte-identically",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
@@ -156,7 +156,7 @@
       },
       "costAtCloseOut": {
         "usd": 27.202884,
-        "pricingAsOf": "2026-07-29T07:31:38.773Z"
+        "pricingAsOf": "2026-07-29T07:31:40.725Z"
       }
     },
     "merges": [
