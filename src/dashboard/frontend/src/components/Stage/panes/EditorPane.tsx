@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type KeyboardEvent } from 'react'
 import { EDITORS, PanRpcError, WS_METHODS, type EditorId } from '@overdeck/contracts'
 import { toast } from 'sonner'
 
@@ -98,16 +98,22 @@ export function EditorPane({ pane }: PaneWrapperProps) {
     [load, draft, filePath],
   )
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+  // PAN-3260 review fix: Stage supports split layouts that mount multiple
+  // EditorPane instances at once. A window-level listener would fire in
+  // every mounted instance on one Ctrl/Cmd+S, saving unrelated drafts the
+  // user never touched. A React onKeyDown on this pane's own root only
+  // fires when the event bubbles from within this instance's DOM subtree —
+  // i.e. only when focus (the textarea, the Save button, a tab) is inside
+  // this specific pane.
+  const handlePaneKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
       if ((event.metaKey || event.ctrlKey) && event.key === 's') {
         event.preventDefault()
         if (dirty && !saving) save()
       }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [dirty, saving, save])
+    },
+    [dirty, saving, save],
+  )
 
   const openExternally = useCallback(() => {
     if (!filePath) return
@@ -163,7 +169,7 @@ export function EditorPane({ pane }: PaneWrapperProps) {
   }
 
   return (
-    <div className={styles.subPane} data-testid="editor-pane">
+    <div className={styles.subPane} data-testid="editor-pane" onKeyDown={handlePaneKeyDown}>
       <div className={styles.subTabs} role="tablist" aria-label="Editor">
         <button
           type="button"

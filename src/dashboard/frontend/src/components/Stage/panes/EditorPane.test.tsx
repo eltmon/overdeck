@@ -101,15 +101,19 @@ describe('EditorPane', () => {
     expect(toastMock.success).toHaveBeenCalledWith('Saved')
   })
 
-  it('saves on Ctrl/Cmd+S', async () => {
+  it('saves on Ctrl/Cmd+S while the textarea is focused', async () => {
     wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'original', lang: 'markdown', mtimeMs: 100, totalLines: 1 })
     wsTransportMock.writeFileAtPath.mockResolvedValue({ mtimeMs: 200 })
 
     render(<EditorPane pane={pane()} ctx={ctx} />)
     await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('original'))
-    fireEvent.change(screen.getByTestId('editor-pane-textarea'), { target: { value: 'edited via shortcut' } })
+    const textarea = screen.getByTestId('editor-pane-textarea')
+    fireEvent.change(textarea, { target: { value: 'edited via shortcut' } })
 
-    fireEvent.keyDown(window, { key: 's', metaKey: true })
+    // The shortcut is scoped to this pane's own DOM subtree (PAN-3260 review
+    // fix) — fire it on the focused textarea, not window, so it bubbles
+    // through this pane's onKeyDown the same way a real keypress would.
+    fireEvent.keyDown(textarea, { key: 's', metaKey: true })
 
     await waitFor(() => {
       expect(wsTransportMock.writeFileAtPath).toHaveBeenCalledWith({
@@ -118,6 +122,49 @@ describe('EditorPane', () => {
         expectedMtimeMs: 100,
       })
     })
+  })
+
+  it('Ctrl/Cmd+S in one split pane does not save a different dirty pane mounted alongside it', async () => {
+    wsTransportMock.readFileAtPath.mockImplementation(({ path }: { path: string }) =>
+      Promise.resolve({
+        text: path === '/repo/docs/a.md' ? 'a original' : 'b original',
+        lang: 'markdown',
+        mtimeMs: 100,
+        totalLines: 1,
+      }),
+    )
+    wsTransportMock.writeFileAtPath.mockResolvedValue({ mtimeMs: 200 })
+
+    render(
+      <>
+        <EditorPane pane={pane({ paneId: 'e-a', editorFilePath: '/repo/docs/a.md' })} ctx={ctx} />
+        <EditorPane pane={pane({ paneId: 'e-b', editorFilePath: '/repo/docs/b.md' })} ctx={ctx} />
+      </>,
+    )
+
+    const textareas = await screen.findAllByTestId('editor-pane-textarea')
+    await waitFor(() => {
+      expect(textareas[0]).toHaveValue('a original')
+      expect(textareas[1]).toHaveValue('b original')
+    })
+
+    // Both panes go dirty, but only pane B's own textarea receives the
+    // shortcut — split layouts mount multiple EditorPane instances at once,
+    // and the fix must not let one save the other's untouched draft.
+    fireEvent.change(textareas[0], { target: { value: 'a edited' } })
+    fireEvent.change(textareas[1], { target: { value: 'b edited' } })
+    fireEvent.keyDown(textareas[1], { key: 's', ctrlKey: true })
+
+    await waitFor(() => {
+      expect(wsTransportMock.writeFileAtPath).toHaveBeenCalledWith({
+        path: '/repo/docs/b.md',
+        content: 'b edited',
+        expectedMtimeMs: 100,
+      })
+    })
+    expect(wsTransportMock.writeFileAtPath).not.toHaveBeenCalledWith(
+      expect.objectContaining({ path: '/repo/docs/a.md' }),
+    )
   })
 
   it('shows Reload-from-disk and Overwrite on WRITE_CONFLICT; Overwrite resaves without expectedMtimeMs', async () => {
