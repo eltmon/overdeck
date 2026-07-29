@@ -85,6 +85,15 @@ pan project remove myapp
 
 **Note:** This only removes the project from Overdeck's registry. It does NOT delete the actual project files.
 
+### Add a Secondary Target Path (PAN-1990)
+
+```bash
+pan project add-target myproject --path /path/to/secondary/checkout
+pan project add-target myproject --path /path/to/primary/checkout --primary
+```
+
+A project can have multiple target paths (e.g. a secondary worktree or mirror). `--primary` marks the given path as the primary target, demoting any previously-primary target — exactly one target is primary at a time.
+
 ## Project Requirements
 
 For a project to work well with Overdeck:

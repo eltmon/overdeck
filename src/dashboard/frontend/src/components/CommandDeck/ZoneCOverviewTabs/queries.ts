@@ -81,6 +81,7 @@ export interface ActivitySection {
   awaitingInput?: boolean;
   awaitingInputPrompt?: string;
   awaitingInputReason?: string;
+  pendingInputKinds?: string[];
 }
 
 export interface ActivityResponse {

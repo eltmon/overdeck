@@ -31,6 +31,8 @@ export interface SearchMemoryInput {
   limit?: number;
   tags?: string[];
   includeArchived?: boolean;
+  /** Restrict to one FTS doc_type (e.g. 'observation') — the index is shared across observations and daily summaries. */
+  docType?: string;
 }
 
 export interface MemorySearchHit {
@@ -118,6 +120,7 @@ export async function searchMemory(input: SearchMemoryInput): Promise<MemorySear
       WHERE memory_fts MATCH ?
         AND project_id = ?
         ${identityPredicate.sql}
+        ${input.docType ? 'AND doc_type = ?' : ''}
         AND (? = 1 OR (entry_date || 'T' || entry_time) > COALESCE((
           SELECT MAX(from_timestamp)
           FROM reset_markers
@@ -133,6 +136,7 @@ export async function searchMemory(input: SearchMemoryInput): Promise<MemorySear
       matchQuery,
       input.projectId,
       ...identityPredicate.params,
+      ...(input.docType ? [input.docType] : []),
       input.includeArchived ? 1 : 0,
       limit * OVERFETCH_RATIO,
     ],

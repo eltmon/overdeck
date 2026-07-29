@@ -57,12 +57,14 @@ Verbs that **don't** get wrapped (current exclusion list, with rationale):
 | `pan map` | No CLI verb exists; `/pan-map` is a topical skill for bootstrapping `.pan/context/codebase/` orientation files. |
 | `pan open` | Trivial — opens an editor. |
 | `pan recover`, `pan restore` | Recovery flows are documented in workflow skills (`pan-diagnose`, `pan-workflow`). |
-| `pan scope`, `pan staffing`, `pan swarm`, `pan workspace`, `pan test` | Power-user commands documented in topical/workflow skills as needed. |
+| `pan scope`, `pan staffing`, `pan swarm`, `pan test` | Power-user commands documented in topical/workflow skills as needed. |
 | `pan cost`, `pan update`, `pan serve` | Operations whose `--help` is self-contained. |
 | `pan health` | Distinct from `pan doctor`; runtime-health output is meant to be read directly. |
 | `pan admin conversations` | Internal backfill utility; `--help` covers the single subcommand. |
 
 This list is **deliberate, not aspirational.** Adding a wrapper for any of these should be justified case-by-case.
+
+**`pan workspace` was removed from this list (PAN-1990).** `pan workspace` is overloaded: its older subcommands (`create`, `migrate`, `ssh`, `sync-auth`, `start`, `stop`, `destroy`, `render-devcontainer`, …) are the PAN-428 issue/git-worktree lifecycle, still power-user commands with no wrapper skill. Its newer subcommands (`new`, `main`, `get`, `activate`, `archive`, and `list --kind/--archived`) are the PAN-1990 projects/workspaces domain (kinds, doors, memory homes) — genuinely non-obvious workflow, so `sync-sources/skills/pan-workspace/SKILL.md` wraps *only* that subset. It does not document the PAN-428 subcommands; those remain unwrapped per the rationale above.
 
 ## Linting
 

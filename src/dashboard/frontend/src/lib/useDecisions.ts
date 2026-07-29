@@ -64,6 +64,10 @@ export interface Decision {
    * outright; a plan review does not necessarily.
    */
   blocking: boolean;
+  /** The pending input prompt from the agent enrichment (for pending-input display). */
+  pendingQuestionPrompt?: PendingInputSubject['pendingQuestionPrompt'];
+  /** The pending input reason from the agent enrichment (for classification). */
+  pendingQuestionReason?: PendingInputSubject['pendingQuestionReason'];
 }
 
 /**
@@ -180,6 +184,8 @@ export function useDecisions(): Decision[] {
         pendingProposedPlan: s.pendingProposedPlan,
         since: s.since,
         blocking: isBlockingDecision(s.kinds),
+        pendingQuestionPrompt: s.pendingQuestionPrompt,
+        pendingQuestionReason: s.pendingQuestionReason,
       });
     }
 

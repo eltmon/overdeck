@@ -96,6 +96,10 @@ function toSessionNode(section: ActivitySection): SessionNode {
         durationSec: round.durationSec ?? undefined,
       })),
     } : undefined,
+    awaitingInput: section.awaitingInput,
+    awaitingInputPrompt: section.awaitingInputPrompt,
+    awaitingInputReason: section.awaitingInputReason,
+    pendingInputKinds: section.pendingInputKinds,
   };
 }
 
