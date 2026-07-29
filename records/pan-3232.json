@@ -337,7 +337,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:25:30.273Z",
+  "updated": "2026-07-29T05:25:35.864Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -347,7 +347,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:25:29.615Z",
+    "updatedAt": "2026-07-29T05:25:35.852Z",
     "reviewNotes": "Both revised FR-7 tests still fail due an incomplete SimpleHomePage bucket fixture and mismatched React Query context",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -357,7 +357,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "f3e0d00a8c42a0fc125032d75c9dba1b01ff25c2",
+    "reviewedAtCommit": "3191261e3de7ad4dbeedb4318ecec64f3fe0c192",
     "reviewSpawnedAt": "2026-07-29T05:23:42.027Z"
   },
   "closeOut": {
@@ -418,7 +418,7 @@
       },
       "costAtCloseOut": {
         "usd": 289.930709,
-        "pricingAsOf": "2026-07-29T05:25:29.635Z"
+        "pricingAsOf": "2026-07-29T05:25:35.860Z"
       }
     },
     "merges": [
