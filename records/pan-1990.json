@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T05:20:09.853Z",
+  "updated": "2026-07-29T05:20:26.934Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
     }
   ],
   "tasks": {
-    "sequence": 51,
-    "claims": {
-      "dashboard-switcher": {
-        "writerId": "agent-pan-1990",
-        "agentId": "agent-pan-1990",
-        "pid": 2100528,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T05:06:56.937Z"
-      }
-    },
+    "sequence": 52,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -345,6 +337,16 @@
         "itemId": "dashboard-workspace-view",
         "outcome": "completed",
         "releasedAt": "2026-07-29T05:06:35.445Z"
+      },
+      {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 2100528,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T05:06:56.937Z",
+        "itemId": "dashboard-switcher",
+        "outcome": "completed",
+        "releasedAt": "2026-07-29T05:20:26.934Z"
       }
     ],
     "statusReasons": {
@@ -459,6 +461,9 @@
     "dashboard-workspace-view.dashboard-workspace-view.ac2": "completed",
     "dashboard-workspace-view.dashboard-workspace-view.ac3": "completed",
     "dashboard-workspace-view.dashboard-workspace-view.ac4": "completed",
-    "dashboard-switcher": "running"
+    "dashboard-switcher": "completed",
+    "dashboard-switcher.dashboard-switcher.ac1": "completed",
+    "dashboard-switcher.dashboard-switcher.ac2": "completed",
+    "dashboard-switcher.dashboard-switcher.ac3": "completed"
   }
 }
