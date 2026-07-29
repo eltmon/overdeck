@@ -1,0 +1,1178 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-29T21:14:12Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3286: Workspace parity with Subspace: first-class shared workspaces, target-scoped recall, status history, session briefing",
+    "updated": "2026-07-29T21:19:55.878Z"
+  },
+  "plan": {
+    "id": "pan-3286",
+    "title": "Workspace parity with Subspace: first-class shared workspaces, target-scoped recall, status history, session briefing",
+    "status": "proposed",
+    "uid": "cadb6784-f0e2-4fd4-bf95-86ac0849f37e",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-29T21:14:12Z",
+    "updated": "2026-07-29T21:19:55.878Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3286",
+        "label": "PAN-3286",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3286.md",
+        "label": "Canonical PRD",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1990",
+        "label": "PAN-1990",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "workspaces",
+      "memory",
+      "cli",
+      "dashboard",
+      "subspace-parity"
+    ],
+    "metadata": {
+      "sizeJustification": "The canonical PRD (drafts/pan-3286.md on overdeck-state) deliberately structures this as one issue: items are coupled through shared files (searchMemory in src/lib/memory/cli.ts feeds both target-scoped search and cross-workspace injection; Sidebar.tsx carries both the rail filter and the phase badge) and an explicit ordering constraint (rail filter lands before phase UI). blocks edges inside one plan model these dependencies; sibling issues would race on the same files.",
+      "canonicalFilename": "2026-07-29-PAN-3286-workspace-parity-with-subspace-first-class-shared-workspaces-target-scoped-recall-status-history-session-briefing.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-1990 ported Subspace's workspace storage model (UUID-keyed registry, per-workspace memory homes, two doors) but not its premise: a workspace as a long-lived user-owned lens targeting any repo directory. Scratch workspaces can only target the project primary path, there is no relocate/dry-run, no target-scoped or history recall, no timeline/read CLI, SessionStart injects nothing, non-issue turns get no cross-workspace context, memory-synthesized phase is invisible for main/scratch rows, and boot seeding floods the sidebar with dozens of pipeline feature-* worktrees presented as user workspaces.",
+      "Proposal": "Close the gaps additively per the canonical PRD: --target-path and --dry-run on pan workspace new; relocateWorkspace writer + pan workspace relocate; pan memory search --target; workspace-addressable status/summary with --history; pan memory timeline and containment-checked pan memory read; a SessionStart briefing composed from local artifacts with per-session dedup; same-project cross-workspace injection for null-issue turns; memoryPhase in the registry list DTO with badges for non-issue rows; sidebar/Cmd-K default filter to main/scratch/favorited with a collapsed pipeline-worktrees count row; rebuild-workspaces archives terminal-issue rows. All registry access stays behind the two doors.",
+      "NonGoals": "- Per-workspace boards, threads, notes, tasks, transcripts, or diffs storage (PRD D-10)\n- Renaming or restructuring memory homes on disk (PRD D-2)\n- Any change to issue-workspace creation/teardown or pipeline-phase derivation for issue rows (PRD D-1)\n- A standalone `pan workspace plan` verb (PRD D-4 folds it into --dry-run)\n- New LLM calls at SessionStart (PRD D-7/NFR-6)\n- Removing or deleting issue-kind registry rows (presentation filter + archive only, PRD D-13)\n- Making `pan memory read` reach anything outside the resolved memory home, including ~/.claude JSONL session files (PRD D-9/NFR-4)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Lower the xBRIEF from the existing canonical PRD on overdeck-state instead of authoring a new PRD.",
+        "rationale": "drafts/pan-3286.md (259 lines, verified 2026-07-29 against main) already meets the prd-authoring standard; re-verification against feature/pan-3286 @ 5c2886b195 confirmed every code anchor. The workspace copy adds an addendum correcting only stale paths (sync-sources/skills/, db.ts wiring, injection test path, configuration/workspaces.mdx)."
+      },
+      {
+        "summary": "Keep one plan with sizeJustification instead of splitting into sibling issues.",
+        "rationale": "Items are coupled by shared files and an explicit PRD ordering constraint; blocks edges serialize them correctly, while sibling issues would race on src/lib/memory/cli.ts, src/cli/commands/memory.ts, and Sidebar.tsx."
+      },
+      {
+        "summary": "No requiresInspection:true items.",
+        "rationale": "Every item is an additive leaf surface (new flag, new subcommand, presentation filter) whose defects surface immediately at its own named tests or typecheck; no downstream item encodes assumptions about another item's internal structure, so an inspection gate would rubber-stamp mechanical diffs. Shared-file collisions are handled with blocks edges."
+      },
+      {
+        "summary": "Skill wrapper edits ride in the CLI items' files_scope rather than the docs item.",
+        "rationale": "scripts/lint-skills.sh requires the CLI and its wrapper skill to change together; sync-sources/skills/pan-memory/SKILL.md and sync-sources/skills/pan-workspace/SKILL.md therefore belong to the commits that change the verbs."
+      },
+      {
+        "summary": "SessionStart briefing transport checkpoint resolves at implementation time with the PRD's stated fallback.",
+        "rationale": "The PRD marks this as an explicit implementation checkpoint: verify the installed hook script transport for SessionStart additionalContext; if undeliverable, inject at first prompt per session via the existing UserPromptSubmit path using the same dedup marker."
+      }
+    ],
+    "items": [
+      {
+        "id": "ws-new-target-path",
+        "title": "Add --target-path to pan workspace new",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T21:14:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/workspace-scratch.ts",
+            "src/cli/commands/workspace.ts",
+            "sync-sources/skills/pan-workspace/SKILL.md",
+            "tests/unit/cli/workspace-new-target-path.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/workspace-new-target-path.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "workspace-new-target-path.test.ts completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-1 (FR-1, D-3): add a --target-path <dir> option to WorkspaceNewOptions and workspaceNewCommand in src/cli/commands/workspace-scratch.ts (option wiring in workspace.ts). When given, the resolved absolute path replaces project.config.path as the scratch workspace path; validate it is an existing directory, reject combination with --isolated, detect is_git_repository via existsSync(join(path, '.git')). When the path is under no registered project_targets row of the chosen project, print an informational note suggesting pan project add-target but do not fail (D-3). Update sync-sources/skills/pan-workspace/SKILL.md in the same commit (lint-skills rule). New test file per PRD WI-1."
+        },
+        "items": [
+          {
+            "id": "ws-new-target-path.ac1",
+            "title": "Given an existing directory, pan workspace new x --target-path <dir> creates a scratch workspace row whose path column stores the resolved directory and whose is_git_repository reflects .git presence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-new-target-path.ac2",
+            "title": "The command rejects a nonexistent or non-directory --target-path and rejects --target-path combined with --isolated, exiting non-zero with an error naming the problem",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-new-target-path.ac3",
+            "title": "When the target path is under no registered project target, the command prints an informational note suggesting pan project add-target and still creates the row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-new-target-path.ac4",
+            "title": "npx vitest run tests/unit/cli/workspace-new-target-path.test.ts exits 0 covering the happy path and both rejection cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ws-new-dry-run",
+        "title": "Add --dry-run intent resolution to pan workspace new",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-29T21:14:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/workspace-scratch.ts",
+            "src/cli/commands/workspace.ts",
+            "sync-sources/skills/pan-workspace/SKILL.md",
+            "tests/unit/cli/workspace-new-target-path.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/workspace-new-target-path.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "workspace-new-target-path.test.ts completes with exit code 0 including the dry-run cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-1 (FR-2, D-4): add a --dry-run flag to pan workspace new that prints the resolved intent as JSON ({projectId, kind, name, path, branchName, parentBranch, parentBranchGuessed, isGitRepository, wouldCreateWorktree}) and returns BEFORE the isolated git worktree add and before createWorkspace, so no DB row, no worktree, and no memory home is created. Extend the WI-1 test file with dry-run assertions that verify via the resolver (listWorkspaces) that no row was written."
+        },
+        "items": [
+          {
+            "id": "ws-new-dry-run.ac1",
+            "title": "pan workspace new x --dry-run prints intent JSON containing projectId, kind, name, path, branchName, parentBranch, parentBranchGuessed, isGitRepository, and wouldCreateWorktree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-new-dry-run.ac2",
+            "title": "After a --dry-run invocation (shared and --isolated variants), the resolver returns no new workspace row and no worktree directory exists on disk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-new-dry-run.ac3",
+            "title": "--dry-run combined with --target-path prints the resolved target directory as path and wouldCreateWorktree false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ws-relocate",
+        "title": "relocateWorkspace writer + pan workspace relocate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T21:14:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspaces/writer.ts",
+            "src/cli/commands/workspace-scratch.ts",
+            "src/cli/commands/workspace.ts",
+            "sync-sources/skills/pan-workspace/SKILL.md",
+            "tests/unit/lib/workspaces/relocate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/workspaces/relocate.test.ts",
+            "bash scripts/guard-workspace-doors.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "relocate.test.ts completes with exit code 0",
+            "guard-workspace-doors.sh exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-2 (FR-3, D-2, D-5): add relocateWorkspace(id, path) to src/lib/workspaces/writer.ts next to archiveWorkspace — validate the row exists and is not archived, refuse kind='issue', require --force for kind='main' (warn about projects.yaml divergence), then UPDATE path, is_git_repository, last_accessed_at and re-write the memory-home metadata.json through the existing identity-record writer (atomic tmp+rename). Add workspaceRelocateCommand resolving <ws> via resolveWorkspaceRef and printing old → new path; register pan workspace relocate <ws> --path <dir> [--force]. Ensure pan workspace get <ws> prints the memory-home path (D-2), adding it if absent. Update sync-sources/skills/pan-workspace/SKILL.md in the same commit. All child processes via async execFile only (NFR-2)."
+        },
+        "items": [
+          {
+            "id": "ws-relocate.ac1",
+            "title": "pan workspace relocate on a scratch workspace updates the path column, refreshes is_git_repository, rewrites memory-home metadata.json, and touches last_accessed_at",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-relocate.ac2",
+            "title": "relocate refuses kind='issue' workspaces and archived workspaces with a non-zero exit and guidance; main without --force is refused while main with --force succeeds with a divergence warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-relocate.ac3",
+            "title": "pan workspace get <ws> prints the workspace's memory-home path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-relocate.ac4",
+            "title": "scripts/guard-workspace-doors.sh exits 0 with the new writer function (all registry writes stay behind the write door)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mem-target-search",
+        "title": "pan memory search --target: target-scoped recall",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T21:14:12Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readinessReason": "First item in the memory-CLI chain; no other ready item shares src/lib/memory/cli.ts or src/cli/commands/memory.ts, and the new resolver read is additive.",
+          "files_scope": [
+            "src/lib/workspaces/resolver.ts",
+            "src/lib/memory/cli.ts",
+            "src/cli/commands/memory.ts",
+            "sync-sources/skills/pan-memory/SKILL.md",
+            "tests/unit/lib/memory/target-search.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/memory/target-search.test.ts",
+            "bash scripts/guard-workspace-doors.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "target-search.test.ts completes with exit code 0",
+            "guard-workspace-doors.sh exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3 (FR-4): add listWorkspacesForPath(path) to src/lib/workspaces/resolver.ts near resolveWorkspaceForCwd — realpath both sides, all projects, is_archived=0 by default. Extend searchMemory in src/lib/memory/cli.ts with targetPath support that fans out per matched workspace's project FTS filtered by those workspace ids and merges by rank, reusing the --global merging code path. Add --target [path] to the search command in src/cli/commands/memory.ts: bare --target defaults to cwd; mutually exclusive with --workspace/--issue/--global; zero matches prints a friendly 'no workspaces target <dir>' note and exits 0. Update sync-sources/skills/pan-memory/SKILL.md in the same commit."
+        },
+        "items": [
+          {
+            "id": "mem-target-search.ac1",
+            "title": "Given two workspaces in different projects sharing one target directory, pan memory search q --target <dir> returns merged rank-ordered hits from both workspaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-target-search.ac2",
+            "title": "listWorkspacesForPath resolves symlinked directories via realpath and excludes archived workspaces by default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-target-search.ac3",
+            "title": "--target combined with --workspace, --issue, or --global exits non-zero naming the exclusivity rule; bare --target defaults to the current working directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-target-search.ac4",
+            "title": "When no workspace targets the directory, the command prints a 'no workspaces target <dir>' note and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mem-status-history",
+        "title": "Workspace-addressed pan memory status/summary + --history",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T21:14:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/memory.ts",
+            "src/lib/memory/cli.ts",
+            "sync-sources/skills/pan-memory/SKILL.md",
+            "tests/unit/cli/memory-status-workspace.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/memory-status-workspace.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "memory-status-workspace.test.ts completes with exit code 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4 (FR-5/6/7, D-8): make the status and summary issue positionals optional and add --workspace <ref> plus --history <n> (status only). Resolution order: --workspace via resolveWorkspaceRef; issue positional via the existing getWorkspaceForIssue path; neither → resolveWorkspaceForCwd(process.cwd()); nothing resolvable → actionable error naming all three addressing modes. Add getMemoryStatusForWorkspace and getMemoryStatusHistory (delegating to readArchivedStatuses, default 3 untouched for synthesis, CLI cap 50) to src/lib/memory/cli.ts. History output prints current status first then archived newest-first with updatedAt/headline/phase; --json emits {current, history}. Update sync-sources/skills/pan-memory/SKILL.md in the same commit."
+        },
+        "items": [
+          {
+            "id": "mem-status-history.ac1",
+            "title": "pan memory status --workspace <ref> resolves by id and by name and prints the same status.json content the issue-positional path prints for an issue workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-status-history.ac2",
+            "title": "--history N prints the current status followed by up to N archived statuses newest-first, N capped at 50; --json emits {current, history}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-status-history.ac3",
+            "title": "With neither positional nor --workspace, the command falls back to the cwd's workspace, and when nothing resolves it exits non-zero naming all three addressing modes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-status-history.ac4",
+            "title": "Each pan memory status <issue> and pan memory summary <issue> positional invocation produces output identical to before the change (regression assertions in the named test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mem-timeline",
+        "title": "pan memory timeline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-29T21:14:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/memory.ts",
+            "src/lib/memory/cli.ts",
+            "src/lib/memory/rollup.ts",
+            "sync-sources/skills/pan-memory/SKILL.md",
+            "tests/unit/lib/memory/timeline-read.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/memory/timeline-read.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "timeline-read.test.ts completes with exit code 0 for the timeline cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5 (FR-8): add pan memory timeline [--workspace <ref>] [--days N] [--limit M] [--json] printing chronological observations (timestamp, actionStatus/summary, files) for the resolved workspace, defaulting to the cwd's workspace via resolveWorkspaceForCwd. Implement by extending readRecentObservations in src/lib/memory/rollup.ts or adding a date-windowed sibling readObservationsSince(projectId, workspaceId, days). Update sync-sources/skills/pan-memory/SKILL.md in the same commit."
+        },
+        "items": [
+          {
+            "id": "mem-timeline.ac1",
+            "title": "pan memory timeline prints chronological observation rows showing timestamp, actionStatus or summary, and files for the resolved workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-timeline.ac2",
+            "title": "--days windows the observations to the given day span, --limit caps the row count, and --json emits structured rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-timeline.ac3",
+            "title": "Without --workspace the command falls back to the current working directory's workspace via resolveWorkspaceForCwd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mem-read",
+        "title": "pan memory read with realpath containment",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T21:14:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/memory.ts",
+            "src/lib/memory/cli.ts",
+            "sync-sources/skills/pan-memory/SKILL.md",
+            "tests/unit/lib/memory/timeline-read.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/memory/timeline-read.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "timeline-read.test.ts completes with exit code 0 including every traversal-rejection case"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5 (FR-9, D-9, NFR-4): add pan memory read <path> [--from N] [--lines M] printing a file from the resolved workspace's memory home. Containment: realpath(join(memoryRoot, userPath)) must start with realpath(memoryRoot) + sep, mirroring the symlink-safe check in src/lib/memory/pin-path.ts; reject absolute input paths outright. Claude Code JSONL session files under ~/.claude must be unreachable by construction. Ship the traversal test matrix (../ traversal, absolute path, symlink escaping the home) in the same commit. Update sync-sources/skills/pan-memory/SKILL.md in the same commit."
+        },
+        "items": [
+          {
+            "id": "mem-read.ac1",
+            "title": "pan memory read <relative path> prints the file's content and --from/--lines return the requested line slice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-read.ac2",
+            "title": "The command rejects ../ traversal, absolute input paths, and symlinks whose realpath escapes the memory home, each with a non-zero exit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-read.ac3",
+            "title": "The containment check rejects a path constructed to point at a ~/.claude JSONL session file, proven by a named test assertion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "injection-cross-workspace",
+        "title": "Cross-workspace injection for null-issue turns",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-29T21:14:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/injection.ts",
+            "src/lib/memory/cli.ts",
+            "tests/lib/memory/injection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/memory/injection.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "injection.test.ts completes with exit code 0 including the issue-turn snapshot assertion"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7 (FR-11, D-6): in src/lib/memory/injection.ts, replace the issueId === null Promise.resolve([]) arm (around line 118) with a same-project cross-workspace search excluding the current workspace, under the existing sibling byte budget and limit 6. Extend searchMemory in src/lib/memory/cli.ts with excludeWorkspaceId/crossWorkspace options (FTS already stores workspace_id per row). Update the PAN-1990 D-6 comment in place to reference the PAN-3286 PRD. Issue-turn behavior must be diff-identical: snapshot the issue-turn injection output in tests/lib/memory/injection.test.ts before changing the null arm."
+        },
+        "items": [
+          {
+            "id": "injection-cross-workspace.ac1",
+            "title": "A null-issue (main/scratch) turn's prompt-time injection contains same-project hits from other workspaces under the sibling byte budget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "injection-cross-workspace.ac2",
+            "title": "The cross-workspace arm returns no rows from the current workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "injection-cross-workspace.ac3",
+            "title": "The issue-turn injection output survives the change byte-for-byte, proven by a snapshot taken before the null-arm edit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-start-briefing",
+        "title": "SessionStart standing briefing with per-session dedup",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T21:14:12Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readinessReason": "Touches only the hooks route and a brand-new module; no other plan item shares src/dashboard/server/routes/hooks.ts or src/lib/memory/session-briefing.ts.",
+          "files_scope": [
+            "src/dashboard/server/routes/hooks.ts",
+            "src/lib/memory/session-briefing.ts",
+            "tests/unit/dashboard/session-briefing.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/session-briefing.test.ts",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "session-briefing.test.ts completes with exit code 0",
+            "build completes so the boot path can be runtime-tested on a throwaway instance"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-3",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6 (FR-10, D-7, NFR-6): create src/lib/memory/session-briefing.ts composing a briefing from readCurrentStatus + readRecentObservations + pinned-doc titles via the existing pin reader — local files only, no LLM call, bounded by a new SESSION_START_MEMORY_BUDGETS constant beside PROMPT_TIME_MEMORY_BUDGETS. In handleMemorySessionStartBody (src/dashboard/server/routes/hooks.ts), on 'accepted' additionally compose the briefing and include it in the HTTP response for the hook script to emit as SessionStart additionalContext. Write the dedup marker rag-runs/injected-<sessionId>.json ({sessionId, writtenAt, byteSize}) first; if it exists, return the briefing-less response. Any composition error logs and degrades to current behavior. IMPLEMENTATION CHECKPOINT (PRD WI-6): verify how the installed SessionStart hook script consumes the route response and how Claude Code expects hookSpecificOutput.additionalContext before wiring; fallback is first-prompt-per-session delivery via the existing UserPromptSubmit path with the same dedup marker. Boot-path discipline: runtime-boot-test on a throwaway instance before the live server runs this; any delay-based test uses vi.useFakeTimers (NFR-3)."
+        },
+        "items": [
+          {
+            "id": "session-start-briefing.ac1",
+            "title": "A fresh session's SessionStart (or the documented first-prompt fallback) receives a rendered briefing containing status headline/goal/phase/nextSteps, a recent-observations digest, and pinned-doc titles, within SESSION_START_MEMORY_BUDGETS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-start-briefing.ac2",
+            "title": "When the dedup marker rag-runs/injected-<sessionId>.json exists, the route returns the briefing-less response, so a session id receives at most one briefing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-start-briefing.ac3",
+            "title": "A composition failure logs and returns the current briefing-less accepted response, and disabled observations still return 'disabled' unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-start-briefing.ac4",
+            "title": "Composition performs no LLM call and reads only local files, and the change survives a runtime boot of the built dashboard server on a throwaway instance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-phase-api",
+        "title": "memoryPhase in the workspace-registry list DTO",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-29T21:14:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspace-registry.ts",
+            "tests/unit/dashboard/workspace-registry-memory-phase.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/workspace-registry-memory-phase.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "workspace-registry-memory-phase.test.ts completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-8 (D-12): the GET /api/workspace-registry list handler attaches memoryPhase: string | null per row, read server-side via readCurrentStatus(projectId, workspaceId).phase ?? null, and only for kind !== 'issue' (issue rows return null without status reads). No per-row client fetches; status reads are small local JSON files. Existing DTO fields stay untouched (no-loss). The planning addendum confirmed no workspace-registry DTO lives in packages/contracts — the shape is owned by the route."
+        },
+        "items": [
+          {
+            "id": "memory-phase-api.ac1",
+            "title": "The list response contains memoryPhase with the status.json phase for main/scratch rows that have a status file and null for rows without one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-phase-api.ac2",
+            "title": "Each issue-kind row returns memoryPhase null without any status-file read",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-phase-api.ac3",
+            "title": "Every pre-existing list DTO field survives unchanged in the response (no-loss assertion in the named test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rail-filter",
+        "title": "Sidebar rail + Cmd-K default to main/scratch/favorited with pipeline-worktrees count row",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T21:14:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Sidebar.tsx",
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/workspace-rail-filter.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/workspace-rail-filter.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "workspace-rail-filter.test.tsx completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-11 (FR-13, D-13): the sidebar WORKSPACES rail defaults to rows where kind !== 'issue' || is_favorite; non-favorited issue rows collapse into an expandable 'N pipeline worktrees' count row using the same pattern as the existing archived-count row, with the expanded state persisted in localStorage beside the existing grouping toggle. The Cmd-K workspaces scope in CommandPalette.tsx applies the same default filter. GET /api/workspace-registry keeps returning all kinds — this filter is presentation-side only. Badge/row styling follows the pan-style-guide (no decorative color). Frontend tests are colocated per the planning addendum. Playwright screenshots at narrow and wide widths are verified by the implementer, never the operator."
+        },
+        "items": [
+          {
+            "id": "rail-filter.ac1",
+            "title": "With non-favorited issue rows in the registry, the rail renders only main/scratch/favorited entries plus a 'N pipeline worktrees' row whose count equals the hidden rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-filter.ac2",
+            "title": "Expanding the pipeline-worktrees row reveals all issue rows and the expanded state survives a reload via localStorage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-filter.ac3",
+            "title": "The Cmd-K workspaces scope applies the same default filter and a favorited issue workspace stays visible in both surfaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rail-filter.ac4",
+            "title": "The filtered rail renders correctly in Playwright screenshots at narrow and wide widths, inspected by the implementer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-phase-ui",
+        "title": "Memory-phase badges for non-issue rows in Sidebar and WorkspaceView",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-29T21:14:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Sidebar.tsx",
+            "src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx",
+            "src/dashboard/frontend/src/components/workspace-rail-filter.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/workspace-rail-filter.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the colocated sidebar test file completes with exit code 0 including the phase-badge assertions"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-8 (FR-12, D-12): render a memory-phase text badge for non-issue rows from the list DTO's memoryPhase, beside the existing pipeline-phase badge logic keyed by workspacePhaseByIssueId (Sidebar.tsx around line 274); issue rows keep the pipeline badge untouched (D-1). WorkspaceView.tsx shows phase + confidence in the existing memory surface header. Badge styling follows the pan-style-guide (text badge like the pipeline one, no decorative color). Lands after rail-filter per the PRD ordering note so the badge styles the already-filtered rail. Playwright screenshot verification by the implementer."
+        },
+        "items": [
+          {
+            "id": "memory-phase-ui.ac1",
+            "title": "A main/scratch row with a memoryPhase renders a phase text badge, and a row with null memoryPhase renders no badge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-phase-ui.ac2",
+            "title": "Each issue-kind row preserves the pipeline-phase badge exactly as before (regression assertion)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-phase-ui.ac3",
+            "title": "WorkspaceView renders phase and confidence in the memory surface header for a workspace with a status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rebuild-archive-terminal",
+        "title": "rebuild-workspaces archives terminal-issue rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-29T21:14:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspaces/rebuild.ts",
+            "src/cli/commands/db.ts",
+            "tests/unit/lib/workspaces/rebuild-archive-terminal.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/workspaces/rebuild-archive-terminal.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "rebuild-archive-terminal.test.ts completes with exit code 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-11 (FR-14, D-13): pan admin db rebuild-workspaces (wired in src/cli/commands/db.ts per the planning addendum) gains a pass that archives — never deletes — issue-kind workspace rows whose tracker issue is terminal (closed/merged), resolving issue state through the canonical issue resolver only, never a direct tracker or DB read. --dry-run reports what would be archived and mutates nothing. Archival goes through archiveWorkspace on the write door (NFR-1)."
+        },
+        "items": [
+          {
+            "id": "rebuild-archive-terminal.ac1",
+            "title": "rebuild-workspaces marks terminal-issue rows archived via archiveWorkspace and preserves open-issue rows untouched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rebuild-archive-terminal.ac2",
+            "title": "Issue terminality resolves through the canonical issue resolver, with no direct tracker or DB status read in the new code path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rebuild-archive-terminal.ac3",
+            "title": "--dry-run prints the would-archive list and a subsequent registry read shows zero mutated rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-loss-audit",
+        "title": "No-loss audit + surface inventory for the new verbs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-29T21:14:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-3286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/dashboard/no-loss-audit.test.ts",
+            "docs/audits/pan-1990-surface-inventory.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/no-loss-audit.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "no-loss-audit.test.ts completes with exit code 0",
+            "lint (including guard-workspace-doors and lint-skills) exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-9 (NFR-5): append the new surfaces (workspace new --target-path/--dry-run, workspace relocate, memory search --target, status --workspace/--history, summary --workspace, timeline, read, memoryPhase DTO field, rail filter, rebuild archival pass) to docs/audits/pan-1990-surface-inventory.md and extend tests/unit/dashboard/no-loss-audit.test.ts so every pre-existing pan workspace and pan memory verb/flag still parses, with explicit regression assertions for the status <issue> and summary <issue> positionals."
+        },
+        "items": [
+          {
+            "id": "no-loss-audit.ac1",
+            "title": "docs/audits/pan-1990-surface-inventory.md contains every new verb, flag, and DTO field this plan ships",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac2",
+            "title": "The audit test covers every pre-existing pan workspace and pan memory verb and flag, asserting each still parses, including the status/summary issue positionals",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac3",
+            "title": "npm run lint exits 0, covering guard-workspace-doors.sh with the new resolver/writer functions and lint-skills.sh with the updated wrappers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-updates",
+        "title": "Documentation: workspaces/memory docs, CLAUDE.md, Mintlify page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-29T21:14:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3286",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "CLAUDE.md",
+            "configuration/workspaces.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint exits 0 and each named doc contains the new flags and verbs by exact name"
+          ],
+          "readiness": "sequential",
+          "traces": []
+        },
+        "narrative": {
+          "Action": "Per PRD WI-10: docs/WORKSPACES-AND-PROJECTS.md covers target-path semantics, relocate, dry-run, the D-3/D-5 rules, and memory-phase surfacing; the repo CLAUDE.md 'Workspaces & Projects (PAN-1990)' section names the new CLI verbs and the target-search scope; configuration/workspaces.mdx (confirmed to exist in the planning addendum) shows the new workspace verbs and flags for users. Skill wrappers are NOT part of this item — they ride in the CLI items' commits per the lint-skills same-commit rule. Every doc names the exact new flags."
+        },
+        "items": [
+          {
+            "id": "docs-updates.ac1",
+            "title": "docs/WORKSPACES-AND-PROJECTS.md contains sections covering --target-path, --dry-run, relocate (with the D-5 kind rules), and memory-phase surfacing, naming each flag exactly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-updates.ac2",
+            "title": "The repo CLAUDE.md workspaces section contains workspace relocate, search --target, status --workspace/--history, timeline, and read",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-updates.ac3",
+            "title": "configuration/workspaces.mdx shows the new pan workspace verbs and flags with usage examples",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ws-new-target-path",
+        "to": "ws-new-dry-run",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-new-target-path",
+        "to": "ws-relocate",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-new-dry-run",
+        "to": "ws-relocate",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-target-search",
+        "to": "mem-status-history",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-target-search",
+        "to": "mem-timeline",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-target-search",
+        "to": "mem-read",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-target-search",
+        "to": "injection-cross-workspace",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-status-history",
+        "to": "mem-timeline",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-status-history",
+        "to": "mem-read",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-timeline",
+        "to": "mem-read",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-read",
+        "to": "injection-cross-workspace",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-phase-api",
+        "to": "memory-phase-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "rail-filter",
+        "to": "memory-phase-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-relocate",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "injection-cross-workspace",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "session-start-briefing",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-phase-ui",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "rebuild-archive-terminal",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-relocate",
+        "to": "docs-updates",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-read",
+        "to": "docs-updates",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-phase-ui",
+        "to": "docs-updates",
+        "type": "informs"
+      },
+      {
+        "from": "mem-status-history",
+        "to": "injection-cross-workspace",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-timeline",
+        "to": "injection-cross-workspace",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
