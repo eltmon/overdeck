@@ -284,15 +284,7 @@
       "timestamp": "2026-07-29T05:36:59.068Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T05:36:59Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3232\n\n# Review — PAN-3232 — Cycle 24\n\n## Verdict: CHANGES REQUESTED — the agent-backed ConversationDock regression test remains red because its new `pickDefaultDrawerAgent` mock returns the agents array instead of an agent\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3232/.pan/review/agent-pan-3232-review-b3c3ac68/context.json`\n- Branch: `feature/pan-3232`\n- PR: `#3251`\n- HEAD reviewed: `b3c3ac68c5aa216f13672f8c34df277014636caf`\n- Prior reviewed HEAD: `0450d10a8eaea980d8372554534ccd905fb42aae`\n- Cycle diff: `0450d10a..b3c3ac68`\n- Dimensions reviewed: correctness, security, requirements/acceptance criteria, and performance\n- The cycle changes one file: the root-selected FR-7 frontend regression suite.\n\n## Blocking Finding\n\n### ! [correctness/requirements] The focused FR-7 suite is still red because `pickDefaultDrawerAgent` is mocked with the wrong contract — `src/dashboard/frontend/src/__tests__/fr7-conversation-pending-input.test.tsx:46`\n**Scope:** in_pr_scope; the defective mock was added in this cycle  \n**Evidence tier:** Tier 0 — direct test execution, plus Tier 1 production-call trace\n\nThe cycle added the previously missing named export as:\n\n```ts\npickDefaultDrawerAgent: vi.fn((agent: any) => agent),\n```\n\nProduction calls `pickDefaultDrawerAgent(agents)?.id`, where `agents` is an array and the real helper returns one `SessionAgent`. The mock returns the entire array, so `.id` is `undefined`. `ConversationDock` consequently renders `no agent` and passes `agentId={null}` to the mocked `DrawerAgentSession`; the assertion for `agent-test-1` fails.\n\nThe focused suite now reports 1 failed test and 7 passed tests. The SimpleHomePage fixes are effective: `TalkItThrough` is isolated, `/PAN-1/` matches the rendered card text, and the prior unexpected-request teardown failures are gone. The remaining ConversationDock failure means the newly required AC-3 regression still does not prove that an agent-backed dock panel preserves and selects its agent.\n\n**Impact:** the root `package.json` test command explicitly selects this file, so the project test gate remains red. The branch also lacks passing executable evidence for the agent-preservation half of FR-7.\n\n**Fix:** mock the helper according to its production contract, for example `pickDefaultDrawerAgent: vi.fn((agents) => agents[0] ?? null)`, then rerun the focused suite and confirm all eight tests pass.\n\n## Non-blocking Findings\n\n### ~ [correctness, previously reviewed] Conversations disappear when their issue also has an agent — `src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx:142` and `src/dashboard/frontend/src/components/dock/ConversationDock.tsx:106`\nThe production implementation is unchanged in this cycle and remains advisory under the convergence gate.\n\n### ~ [correctness, previously reviewed] SimpleHomePage collapses multiple pending subjects by issue — `src/dashboard/frontend/src/components/simple/SimpleHomePage.tsx:210`\n`subjectByIssue` stores one subject per issue, so same-issue waits can overwrite each other. This line did not change in the active cycle.\n\n### ~ [correctness, previously reviewed] SessionPanel can discard independent Channels permission evidence — `src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx:338`\nThe kind selection does not merge the independent permission source. This implementation is outside the cycle diff.\n\n### ~ [correctness/UX, previously reviewed] NeedsYouStrip omits enrichment-only prompt text — `src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx:138`\nThe strip does not fall back to `pendingQuestionPrompt`. This line was previously reviewed and did not change.\n\n### ~ [requirements, previously reviewed] FR-1 through FR-5 still lack production-backed seam tests\nIssue-view projection, Decisions prompt precedence, SessionPanel labels, live delta mapping/reduction, and specialist projection remain without their named executable tests. Those omissions are outside the active cycle.\n\n### ~ [documentation, previously reviewed] The documented approximately one-second tree update conflicts with the ten-second enrichment interval — `docs/ASKUSERQUESTION-DASHBOARD.md:345`\nThe delta is immediate after enrichment, but enrichment polls every ten seconds. This wording did not change in the active cycle.\n\n## Security Review\nNo blocking security issue found. The cycle changes test mocks and one text matcher only. It adds no production endpoint, authorization decision, raw HTML, command construction, filesystem mutation, secret handling, or destructive operation.\n\n## Performance Review\nNo runtime performance regression found because the cycle changes tests only. Mocking `TalkItThrough` removes unrelated request fan-out from the focused suite. No production timer, polling loop, network path, or collection behavior changed.\n\n## Requirements Coverage\n- FR-1 through FR-6: production implementation is unchanged from prior reviews; previous advisories remain non-promotable.\n- FR-7: seven cases pass, including the conversation-only SimpleHomePage case fixed in this cycle. The agent-backed ConversationDock case still fails because the helper mock cannot select the fixture agent, so the acceptance blocker remains unresolved.\n- FR-8: documentation is unchanged, with the prior latency wording advisory.\n- Non-goals remain respected: no classifier, GodView/AgentCard, recovery-path, shared projection-helper, conversation prompt-threading, or polling change appears in the cycle diff.\n\n## Verification Performed\n- Reviewed the complete cycle diff `0450d10a..b3c3ac68` and traced the new helper mock through `ConversationDock` and the real `pickDefaultDrawerAgent` contract.\n- Confirmed branch, workspace root, local HEAD, and PR head resolve to the assigned SHA.\n- `git diff --check 0450d10a..HEAD` passes.\n- Focused FR-7 suite fails: 1 file failed; 1 test failed and 7 passed.\n- SimpleHomePage now renders without unexpected requests and passes its conversation-only assertion.\n- Agent-backed ConversationDock renders `no agent` because the helper mock returns the array rather than its selected member.\n- Focused ESLint invocation passes.\n- No implementation files were modified and no test role was queued.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3232/.pan/review/agent-pan-3232-review-b3c3ac68/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3232 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "package.json",
@@ -367,17 +359,17 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:37:28.190Z",
+  "updated": "2026-07-29T05:37:31.931Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:37:28.151Z",
+    "updatedAt": "2026-07-29T05:37:31.537Z",
     "reviewNotes": "Agent re-review request (8/25): Fixed review issues",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -419,19 +411,19 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 5337,
-            "output": 257931,
-            "cacheRead": 104273963,
-            "cacheWrite": 6469269
+            "input": 5347,
+            "output": 258295,
+            "cacheRead": 104653601,
+            "cacheWrite": 6470261
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 5771,
-          "output": 285804,
-          "cacheRead": 114395166,
-          "cacheWrite": 6779082
+          "input": 5781,
+          "output": 286168,
+          "cacheRead": 114774804,
+          "cacheWrite": 6780074
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -447,8 +439,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 309.584626,
-        "pricingAsOf": "2026-07-29T05:37:28.187Z"
+        "usd": 309.62566,
+        "pricingAsOf": "2026-07-29T05:37:31.553Z"
       }
     },
     "merges": [
