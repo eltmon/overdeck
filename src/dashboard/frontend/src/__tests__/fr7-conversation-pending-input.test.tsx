@@ -5,13 +5,8 @@
  * 2. Preserve agent-backed pending input entries (AC-3)
  * 3. Handle multiple conversations per docked issue (regression from cycle 13)
  *
- * AC-3 is demonstrated by production code paths:
- * - NeedsYouStrip.tsx:121-158: agentsByIssue includes agents when present in store,
- *   and separate pending subjects are added as conversation-only entries only when
- *   NO agents exist for the issue (line 142 check).
- * - When agents exist, agent-backed pending subjects route with isConversation: false
- *   (line 177: isConversation={item.source === 'conversation'}).
- * - ConversationDock.tsx:106-108: same logic preserves agent-backed entries.
+ * AC-1 tests verify conversation-only rendering when no agents exist.
+ * AC-3 test verifies agent-backed entries are preserved and routed with isConversation: false.
  */
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -39,6 +34,11 @@ vi.mock('../lib/convoDock', () => ({
   })),
 }));
 
+vi.mock('../lib/simple/derive', () => ({
+  bucketSimpleHome: vi.fn(),
+  deriveSimpleIssue: vi.fn(),
+}));
+
 // Now import after all mocks are in place
 import { NeedsYouStrip } from '../components/KanbanBoard/NeedsYouStrip';
 import { ConversationDock } from '../components/dock/ConversationDock';
@@ -46,6 +46,7 @@ import * as store from '../lib/store';
 import * as decisions from '../lib/useDecisions';
 import * as simpleActions from '../lib/simple/useSimpleActions';
 import * as convoDock from '../lib/convoDock';
+import * as derive from '../lib/simple/derive';
 
 const mockIssue = {
   identifier: 'PAN-1',
@@ -90,6 +91,20 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
       unstick: { mutate: vi.fn(), isPending: false },
       answer: { mutate: vi.fn(), isPending: false },
     } as any);
+
+    // Default: no agent-backed needs-you items, just an empty derivation
+    const emptyDerivation = {
+      issue: mockIssue,
+      primaryAgent: undefined,
+      pendingInputAgent: undefined,
+      display: { sentence: '' },
+      agentStuck: false,
+      reviewStuck: false,
+    };
+    vi.mocked(derive.bucketSimpleHome).mockReturnValue({
+      needsYou: [],
+    } as any);
+    vi.mocked(derive.deriveSimpleIssue).mockReturnValue(emptyDerivation as any);
   });
 
   describe('NeedsYouStrip: AC-1', () => {
@@ -169,6 +184,74 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
           agentId: 'conv-route-test',
           text: 'yes',
           isConversation: true,
+        })
+      );
+    });
+
+    it('AC-3: preserves agent-backed pending input with isConversation false', () => {
+      const answerMutate = vi.fn();
+      vi.mocked(simpleActions.useSimpleActions).mockReturnValue({
+        tell: { mutate: vi.fn(), isPending: false },
+        recover: { mutate: vi.fn(), isPending: false },
+        unstick: { mutate: vi.fn(), isPending: false },
+        answer: { mutate: answerMutate, isPending: false },
+      } as any);
+
+      // Mock bucketSimpleHome to return agent-backed needs-you item
+      const mockAgentDerivation = {
+        issue: mockIssue,
+        primaryAgent: mockAgent,
+        pendingInputAgent: mockAgent,
+        display: { sentence: 'Agent question' },
+        agentStuck: false,
+        reviewStuck: false,
+      };
+
+      vi.mocked(derive.bucketSimpleHome).mockReturnValue({
+        needsYou: [
+          {
+            source: 'agent' as const,
+            derivation: mockAgentDerivation,
+            kind: 'question' as const,
+            subjectId: 'agent-test-1',
+          },
+        ],
+      } as any);
+
+      vi.mocked(derive.deriveSimpleIssue).mockReturnValue(mockAgentDerivation as any);
+
+      vi.mocked(decisions.usePendingInputSubjects).mockReturnValue([
+        {
+          agentId: 'agent-test-1',
+          issueId: 'PAN-1',
+          since: new Date().toISOString(),
+          pendingAskUserQuestion: {
+            questions: [{ question: 'Agent needs input' }],
+          },
+        } as any,
+      ]);
+
+      vi.mocked(store.useDashboardStore).mockImplementation((selector) => {
+        const state = {
+          issuesRaw: [mockIssue],
+          agentsById: { 'agent-test-1': mockAgent },
+          reviewStatusByIssueId: {},
+        };
+        return selector(state as any);
+      });
+
+      render(<NeedsYouStrip onOpenIssue={vi.fn()} />);
+
+      const input = screen.getByPlaceholderText('Type your answer…');
+      fireEvent.change(input, { target: { value: 'agent response' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Answer' }));
+
+      // Agent-backed entry routes with isConversation: false
+      expect(answerMutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agentId: 'agent-test-1',
+          text: 'agent response',
+          isConversation: false,
         })
       );
     });
