@@ -486,6 +486,7 @@ export interface YamlConfig {
     openrouter?: string;
     nous?: string;
     dashscope?: string;
+    quantumllama?: string;
   };
 
   /** Tracker API keys (override environment variables) */
@@ -748,6 +749,7 @@ export interface NormalizedConfig {
     openrouter?: string;
     nous?: string;
     dashscope?: string;
+    quantumllama?: string;
   };
 
   /** Provider auth mode (subscription vs api-key) by provider */

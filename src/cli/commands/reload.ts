@@ -18,6 +18,7 @@ import {
   writeActiveDashboardBundle,
 } from '../../lib/deploy/active-dashboard-bundle.js';
 import { supervisorDeploymentFailure } from '../../lib/channels/pty-supervisor-locate.js';
+import { dashboardServerBootFailure } from '../../lib/deploy/dashboard-bundle-integrity.js';
 import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-lock.js';
 import {
   leavesDashboardRunning,
@@ -184,6 +185,11 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
         // is dead (PAN-3172). Fail before any traffic moves onto it.
         const supervisorFailure = supervisorDeploymentFailure(deployment.deployRoot);
         if (supervisorFailure) throw new Error(supervisorFailure);
+        // The same trap one layer down: the server bundle's own externals have
+        // to resolve from the generation, or the switchover hands traffic to a
+        // deployment that dies on ERR_MODULE_NOT_FOUND at boot (PAN-3264).
+        const serverBootFailure = dashboardServerBootFailure(deployment.serverPath);
+        if (serverBootFailure) throw new Error(serverBootFailure);
         await writeActiveDashboardBundle({ repoRoot, ...deployment });
         try {
           activation = await activateDashboardDeployment(repoRoot, deployment);

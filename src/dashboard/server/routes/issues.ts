@@ -20,6 +20,7 @@ import { httpHandler } from './http-handler.js';
  *   POST /api/issues/:id/cleanup-workspace
  *   POST /api/issues/:id/deep-wipe
  *   POST /api/issues/:id/close-out
+ *   GET  /api/issues/:id/prd
  *   GET  /api/issues/:id/tasks
  *   POST /api/issues/:id/tasks/:taskId/inspect
  *   GET  /api/issues/:id/costs
@@ -121,6 +122,7 @@ import { bulkCloseOut, closeOutIssue } from '../../../lib/overdeck/issue-close-o
 import { DOD_ROWS, type DodRowId } from '../../../lib/lifecycle/dod.js';
 import {
   analyzeIssue,
+  getIssuePrd,
   getIssueTasks,
   getIssueResourceDetails,
   getResourceAllocatedIssues,
@@ -654,6 +656,22 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/issues/:id/prd ──────────────────────────────────────────
+
+const getIssuePrdRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/prd',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!parseIssueIdSync(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
+
+    return yield* getIssuePrd(id);
+  })),
+);
+
 // ─── Route: GET /api/issues/:id/tasks ────────────────────────────────────────
 
 const getIssueTasksRoute = HttpRouter.add(
@@ -944,6 +962,7 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueCopySettingsRoute,
   postIssueCloseOutRoute,
   postIssuesBulkCloseOutRoute,
+  getIssuePrdRoute,
   getIssueTasksRoute,
   postIssueTaskInspectRoute,
   getIssuePlanningStateRoute,

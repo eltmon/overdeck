@@ -63,6 +63,8 @@ The targets and architecture are documented in [DASHBOARD-PERFORMANCE.md](./DASH
 
 `pan reload` builds before it touches the running dashboard. It fetches `origin/main` and builds in a temporary detached worktree, then keeps that detached checkout as the active deployment root and launches its `dist/dashboard/server.js` with its canonical runtime dependencies and workspace packages intact. The dashboard process still uses the primary repository as its working directory and health identity. The primary checkout's `node_modules/` remains untouched; its `dist/` mirror is refreshed for subsequent CLI commands and resolves external packages through a link to the canonical deployment root. Uncommitted changes and local-only commits in the primary worktree can therefore neither contaminate nor block a deploy, newly added external runtime packages remain available, and active development dependencies are preserved. An active-bundle marker makes later `pan restart` and `pan up` launches reuse the same canonical deployment root. Reload alternates between two fixed generation worktrees. A restart failure before the new dashboard is left running restores the prior marker and primary `dist/`, removes the failed generation, and leaves the previous dashboard generation available. A health timeout preserves the new marker, `dist/`, and deployment root because the lifecycle deliberately leaves that process running so a slow boot can finish or a broken boot can be inspected. Every reload also sweeps legacy unreferenced deployment roots, so restart failures and cleanup errors cannot create an unbounded disk leak. If the build fails, the old dashboard keeps running and the command exits non-zero. If the build succeeds, `pan reload` restarts only the dashboard and waits for `/api/health`. The health payload reports the raw build provenance as `buildCommit`, `buildDirty`, and `buildBranch`; a canonical reload reports `buildDirty: false` and a null branch because its build worktree is detached.
 
+A deployment generation is only used while it can still boot. Both `pan reload`, before it moves traffic onto a freshly built generation, and every `pan restart` that would reuse the active-bundle marker resolve the bare imports of that generation's `dist/dashboard/server.js` from the generation's own location — the same question Node asks at boot. Reload fails and leaves the old dashboard running; restart logs the unresolvable packages, ignores the marker, and launches the primary checkout's `dist/` copy of the same commit instead, which resolves against the primary `node_modules`. Existence alone is not enough: in [PAN-3264](https://github.com/eltmon/overdeck/issues/3264) a live generation's `node_modules/.bun` store was deleted underneath the running server, turning all 31 top-level entries into dangling symlinks while `server.js` stayed on disk, and every restart relaunched the unbootable tree for 14 minutes. The build-time guard `scripts/lint-dist-externals.mjs` covers the same contract one step earlier, failing the build when a package `dist/` imports is declared in `dependencies` but does not resolve from the build root.
+
 Restart operations are serialized by `${OVERDECK_HOME}/restart.lock`. The lock records the holder PID, timestamp, and caller. Stale locks recover when the holder PID is dead or the lock is older than five minutes.
 
 The supervisor watchdog polls the dashboard API health endpoint every 10 seconds by default. After three consecutive failures, it spawns `pan restart --dashboard`. It allows three watchdog-triggered restarts within a five-minute rolling window. If the cap is reached, it logs `WATCHDOG GIVING UP — manual intervention required` and stops attempting until a healthy poll clears the state.
@@ -165,6 +167,15 @@ less ~/.overdeck/logs/dashboard.log
 ```
 
 The dashboard log contains startup failures, runtime exceptions, and health-check failures from the bundled server process.
+
+If the dashboard log shows `ERR_MODULE_NOT_FOUND` from a path under `~/.overdeck/deployments/dashboard/`, that generation's dependency tree is broken. Restart now detects this and falls back to the primary checkout's build, printing `Ignoring the active deployment` with the packages that failed to resolve — so the dashboard should come back on its own. To put the generation itself back in service, restore its tree and reinstall, then reload.
+
+```bash
+D=~/.overdeck/deployments/dashboard/.pan-reload-generation-b
+git -C "$D" checkout -- packages/
+(cd "$D" && bun install)
+pan reload
+```
 
 ## Process and port topology
 
