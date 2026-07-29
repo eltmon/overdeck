@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T05:20:40.329Z",
+  "updated": "2026-07-29T05:29:24.295Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
     }
   ],
   "tasks": {
-    "sequence": 53,
-    "claims": {
-      "no-loss-audit": {
-        "writerId": "agent-pan-1990",
-        "agentId": "agent-pan-1990",
-        "pid": 2431120,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T05:20:40.329Z"
-      }
-    },
+    "sequence": 54,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -355,6 +347,16 @@
         "itemId": "dashboard-switcher",
         "outcome": "completed",
         "releasedAt": "2026-07-29T05:20:26.934Z"
+      },
+      {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 2431120,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T05:20:40.329Z",
+        "itemId": "no-loss-audit",
+        "outcome": "completed",
+        "releasedAt": "2026-07-29T05:29:24.294Z"
       }
     ],
     "statusReasons": {
@@ -473,6 +475,9 @@
     "dashboard-switcher.dashboard-switcher.ac1": "completed",
     "dashboard-switcher.dashboard-switcher.ac2": "completed",
     "dashboard-switcher.dashboard-switcher.ac3": "completed",
-    "no-loss-audit": "running"
+    "no-loss-audit": "completed",
+    "no-loss-audit.no-loss-audit.ac1": "completed",
+    "no-loss-audit.no-loss-audit.ac2": "completed",
+    "no-loss-audit.no-loss-audit.ac3": "completed"
   }
 }
