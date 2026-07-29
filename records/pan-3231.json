@@ -31,18 +31,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-29T01:37:28.934Z",
+  "updated": "2026-07-29T01:42:32.493Z",
   "pipeline": {
     "issueId": "PAN-3231",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T01:37:28.919Z",
-    "inspectNotes": "Inspecting item xbrief-fullscreen-shell"
+    "updatedAt": "2026-07-29T01:42:32.339Z",
+    "inspectNotes": "All 5 ACs met. AC5 gaps from the prior review are closed: identity block with 'xBRIEF · active plan' eyebrow + mono issue id + plan title (XBriefFullscreen.tsx:154-171), controlled List/DAG/Raw tablist moved into the topbar per mockup lines 332-345 (XBriefFullscreen.tsx:173-196), summary strip with N/M complete + progress track + happening-now/ready/waiting-on-edges + execution lanes per mockup lines 358-369 (XBriefFullscreen.tsx:211-247), and the esc-hinted close per mockup lines 351-354. AC1/AC2 intact: role=dialog + aria-modal=true, focus on the panel, Escape and scrim close, inner clicks stopPropagation; the toggle is preserved, relocated to the shell, and XBriefViewer's own bar is suppressed via showTabBar=false. AC3 unchanged - useWorkspacePlanQuery plus the same canonical ['workspace-plan', issueId] key for setQueryData. AC4 unchanged - DAG pane still flex-1 min-h-0 with a 400px floor, and the three pre-existing mounts keep the uncontrolled path (showTabBar defaults true, initialTab honored, selectTab only writes internal state when activeTab is undefined). Non-blocking observations: the third tab is labelled 'Raw' (matches the approved mockup; FR-1 prose says 'Raw JSON'); the mockup's 'Click any item for its acceptance criteria and file scope' hint line is not rendered; and the shared localStorage tab key now also records the shell-controlled tab, so a fullscreen tab change seeds other mounts' initial tab."
   },
   "closeOut": {
     "usage": {
@@ -57,9 +57,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6294537,
-            "output": 323103,
-            "cacheRead": 138813952,
+            "input": 6296537,
+            "output": 323241,
+            "cacheRead": 139359744,
             "cacheWrite": 0
           }
         }
@@ -72,15 +72,15 @@
           "cacheWrite": 379189
         },
         "openai/gpt-5.6-sol": {
-          "input": 6294537,
-          "output": 323103,
-          "cacheRead": 138813952,
+          "input": 6296537,
+          "output": 323241,
+          "cacheRead": 139359744,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 125.89928,
-        "pricingAsOf": "2026-07-29T01:37:28.927Z"
+        "usd": 126.186316,
+        "pricingAsOf": "2026-07-29T01:42:32.414Z"
       }
     },
     "merges": [],
