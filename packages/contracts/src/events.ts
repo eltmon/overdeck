@@ -54,7 +54,7 @@ export const AgentStartedEvent = Schema.Struct({
   type: Schema.Literal("agent.started"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ agentId: AgentId, issueId: IssueId, agent: AgentSnapshot }),
+  payload: Schema.Struct({ agentId: AgentId, issueId: IssueId, workspaceId: Schema.optional(Schema.String), agent: AgentSnapshot }),
 })
 export type AgentStartedEvent = typeof AgentStartedEvent.Type
 
@@ -63,7 +63,7 @@ export const AgentStoppedEvent = Schema.Struct({
   type: Schema.Literal("agent.stopped"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ agentId: AgentId, issueId: IssueId, sessionId: Schema.optional(Schema.String) }),
+  payload: Schema.Struct({ agentId: AgentId, issueId: IssueId, workspaceId: Schema.optional(Schema.String), sessionId: Schema.optional(Schema.String) }),
 })
 export type AgentStoppedEvent = typeof AgentStoppedEvent.Type
 
@@ -71,7 +71,7 @@ export const AgentHeartbeatDeadEvent = Schema.Struct({
   type: Schema.Literal("agent.heartbeat_dead"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ agentId: AgentId, issueId: Schema.optional(IssueId), sessionId: Schema.optional(Schema.String) }),
+  payload: Schema.Struct({ agentId: AgentId, issueId: Schema.optional(IssueId), workspaceId: Schema.optional(Schema.String), sessionId: Schema.optional(Schema.String) }),
 })
 export type AgentHeartbeatDeadEvent = typeof AgentHeartbeatDeadEvent.Type
 
@@ -80,7 +80,7 @@ export const WorkCompletedEvent = Schema.Struct({
   type: Schema.Literal("work.completed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, agentId: Schema.optional(AgentId) }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), agentId: Schema.optional(AgentId) }),
 })
 export type WorkCompletedEvent = typeof WorkCompletedEvent.Type
 
@@ -89,7 +89,7 @@ export const AgentCompletedEvent = Schema.Struct({
   type: Schema.Literal("agent.completed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, agentId: Schema.optional(AgentId), role: Schema.optional(Role) }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), agentId: Schema.optional(AgentId), role: Schema.optional(Role) }),
 })
 export type AgentCompletedEvent = typeof AgentCompletedEvent.Type
 
@@ -98,7 +98,7 @@ export const ReviewApprovedEvent = Schema.Struct({
   type: Schema.Literal("review.approved"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String) }),
 })
 export type ReviewApprovedEvent = typeof ReviewApprovedEvent.Type
 
@@ -107,7 +107,7 @@ export const TestPassedEvent = Schema.Struct({
   type: Schema.Literal("test.passed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String) }),
 })
 export type TestPassedEvent = typeof TestPassedEvent.Type
 
@@ -118,7 +118,7 @@ export const AgentStatusChangedEvent = Schema.Struct({
   timestamp: Schema.String,
   payload: Schema.Struct({
     agentId: AgentId,
-    issueId: Schema.optional(IssueId),
+    issueId: Schema.optional(IssueId), workspaceId: Schema.optional(Schema.String),
     status: AgentStatus,
     previousStatus: Schema.optional(AgentStatus),
     hasLiveTmuxSession: Schema.optional(Schema.Boolean),
@@ -180,7 +180,7 @@ export const AgentEnrichmentChangedEvent = Schema.Struct({
   timestamp: Schema.String,
   payload: Schema.Struct({
     agentId: AgentId,
-    issueId: Schema.optional(IssueId),
+    issueId: Schema.optional(IssueId), workspaceId: Schema.optional(Schema.String),
     role: Schema.optional(Role),
     // Optional because this event type predates these fields (PAN-440). The event
     // store is append-only, so older persisted events lack them — a required schema
@@ -222,7 +222,7 @@ export const AgentCreatedEvent = Schema.Struct({
   type: Schema.Literal("agent.created"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ agentId: AgentId, issueId: IssueId, agent: AgentSnapshot }),
+  payload: Schema.Struct({ agentId: AgentId, issueId: IssueId, workspaceId: Schema.optional(Schema.String), agent: AgentSnapshot }),
 })
 export type AgentCreatedEvent = typeof AgentCreatedEvent.Type
 
@@ -302,7 +302,7 @@ export const AgentPermissionResolvedEvent = Schema.Struct({
   payload: Schema.Struct({
     requestId: Schema.String,
     agentId: AgentId,
-    issueId: Schema.optional(IssueId),
+    issueId: Schema.optional(IssueId), workspaceId: Schema.optional(Schema.String),
     behavior: ClaudeChannelPermissionBehavior,
   }),
 })
@@ -424,7 +424,7 @@ export const PlanningStartedEvent = Schema.Struct({
   type: Schema.Literal("planning.started"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, sessionName: Schema.String, harness: Schema.optional(Schema.String) }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), sessionName: Schema.String, harness: Schema.optional(Schema.String) }),
 })
 export type PlanningStartedEvent = typeof PlanningStartedEvent.Type
 
@@ -433,7 +433,7 @@ export const PlanningFailedEvent = Schema.Struct({
   type: Schema.Literal("planning.failed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, error: Schema.String }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), error: Schema.String }),
 })
 export type PlanningFailedEvent = typeof PlanningFailedEvent.Type
 
@@ -443,7 +443,7 @@ export const PlanningSyncEvent = Schema.Struct({
   sequence: SequenceNumber,
   timestamp: Schema.String,
   payload: Schema.Struct({
-    issueId: IssueId,
+    issueId: IssueId, workspaceId: Schema.optional(Schema.String),
     status: Schema.String,
     progress: Schema.optional(Schema.Number),
     message: Schema.optional(Schema.String),
@@ -458,7 +458,7 @@ export const PlanItemStatusChangedEvent = Schema.Struct({
   type: Schema.Literal("plan.item_status_changed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, itemId: Schema.String, status: Schema.String }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), itemId: Schema.String, status: Schema.String }),
 })
 export type PlanItemStatusChangedEvent = typeof PlanItemStatusChangedEvent.Type
 
@@ -468,7 +468,7 @@ export const PlanSubitemStatusChangedEvent = Schema.Struct({
   sequence: SequenceNumber,
   timestamp: Schema.String,
   payload: Schema.Struct({
-    issueId: IssueId,
+    issueId: IssueId, workspaceId: Schema.optional(Schema.String),
     itemId: Schema.String,
     subItemId: Schema.String,
     status: Schema.String,
@@ -481,7 +481,7 @@ export const PlanItemsUnblockedEvent = Schema.Struct({
   type: Schema.Literal("plan.items_unblocked"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, items: Schema.Array(Schema.String) }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), items: Schema.Array(Schema.String) }),
 })
 export type PlanItemsUnblockedEvent = typeof PlanItemsUnblockedEvent.Type
 
@@ -492,7 +492,7 @@ export const PipelineStatusChangedEvent = Schema.Struct({
   type: Schema.Literal("pipeline.status_changed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, status: ReviewStatusSnapshot }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), status: ReviewStatusSnapshot }),
 })
 export type PipelineStatusChangedEvent = typeof PipelineStatusChangedEvent.Type
 
@@ -501,7 +501,7 @@ export const MergeReadyEvent = Schema.Struct({
   type: Schema.Literal("merge.ready"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String) }),
 })
 export type MergeReadyEvent = typeof MergeReadyEvent.Type
 
@@ -510,7 +510,7 @@ export const ReviewStatusChangedEvent = Schema.Struct({
   type: Schema.Literal("review.status_changed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, status: ReviewStatusSnapshot }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), status: ReviewStatusSnapshot }),
 })
 export type ReviewStatusChangedEvent = typeof ReviewStatusChangedEvent.Type
 
@@ -519,7 +519,7 @@ export const PipelineReviewStartedEvent = Schema.Struct({
   type: Schema.Literal("pipeline.review-started"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String) }),
 })
 export type PipelineReviewStartedEvent = typeof PipelineReviewStartedEvent.Type
 
@@ -528,7 +528,7 @@ export const PipelineReviewCompletedEvent = Schema.Struct({
   type: Schema.Literal("pipeline.review-completed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, passed: Schema.Boolean }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), passed: Schema.Boolean }),
 })
 export type PipelineReviewCompletedEvent = typeof PipelineReviewCompletedEvent.Type
 
@@ -537,7 +537,7 @@ export const PipelineTestStartedEvent = Schema.Struct({
   type: Schema.Literal("pipeline.test-started"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String) }),
 })
 export type PipelineTestStartedEvent = typeof PipelineTestStartedEvent.Type
 
@@ -546,7 +546,7 @@ export const PipelineTestCompletedEvent = Schema.Struct({
   type: Schema.Literal("pipeline.test-completed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, passed: Schema.Boolean }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), passed: Schema.Boolean }),
 })
 export type PipelineTestCompletedEvent = typeof PipelineTestCompletedEvent.Type
 
@@ -555,7 +555,7 @@ export const PipelineVerificationStartedEvent = Schema.Struct({
   type: Schema.Literal("pipeline.verification-started"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String) }),
 })
 export type PipelineVerificationStartedEvent = typeof PipelineVerificationStartedEvent.Type
 
@@ -565,7 +565,7 @@ export const PipelineVerificationFailedEvent = Schema.Struct({
   sequence: SequenceNumber,
   timestamp: Schema.String,
   payload: Schema.Struct({
-    issueId: IssueId,
+    issueId: IssueId, workspaceId: Schema.optional(Schema.String),
     failedCheck: Schema.optional(Schema.String),
     message: Schema.optional(Schema.String),
   }),
@@ -579,7 +579,7 @@ export const IssueTransitionedEvent = Schema.Struct({
   type: Schema.Literal("issue.transitioned"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, state: Schema.String }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), state: Schema.String }),
 })
 export type IssueTransitionedEvent = typeof IssueTransitionedEvent.Type
 
@@ -588,7 +588,7 @@ export const OperatorInterventionEvent = Schema.Struct({
   sequence: SequenceNumber,
   timestamp: Schema.String,
   payload: Schema.Struct({
-    issueId: IssueId,
+    issueId: IssueId, workspaceId: Schema.optional(Schema.String),
     kind: Schema.Literals(["tell", "pause", "restart", "manual_edit", "deep_wipe", "unpause", "untroubled"]),
     source: Schema.String,
   }),
@@ -654,7 +654,7 @@ export const SubstrateBugFiledEvent = Schema.Struct({
   sequence: SequenceNumber,
   timestamp: Schema.String,
   payload: Schema.Struct({
-    issueId: IssueId,
+    issueId: IssueId, workspaceId: Schema.optional(Schema.String),
     runId: Schema.optional(Schema.String),
     filedBy: Schema.Literals(["agent", "operator"]),
     discoveredIn: Schema.optional(IssueId),
@@ -673,7 +673,7 @@ export const ReviewReviewerStartedEvent = Schema.Struct({
   sequence: SequenceNumber,
   timestamp: Schema.String,
   payload: Schema.Struct({
-    issueId: IssueId,
+    issueId: IssueId, workspaceId: Schema.optional(Schema.String),
     role: Schema.String,
     sessionName: Schema.String,
   }),
@@ -689,7 +689,7 @@ export const ReviewReviewerCompletedEvent = Schema.Struct({
   sequence: SequenceNumber,
   timestamp: Schema.String,
   payload: Schema.Struct({
-    issueId: IssueId,
+    issueId: IssueId, workspaceId: Schema.optional(Schema.String),
     role: Schema.String,
   }),
 })
@@ -705,7 +705,7 @@ export const ReviewSpecialistTimedOutEvent = Schema.Struct({
   sequence: SequenceNumber,
   timestamp: Schema.String,
   payload: Schema.Struct({
-    issueId: IssueId,
+    issueId: IssueId, workspaceId: Schema.optional(Schema.String),
     role: Schema.String,
     sessionName: Schema.String,
     attempt: Schema.Number,
@@ -725,7 +725,7 @@ export const ReviewCoordinatorStartedEvent = Schema.Struct({
   sequence: SequenceNumber,
   timestamp: Schema.String,
   payload: Schema.Struct({
-    issueId: IssueId,
+    issueId: IssueId, workspaceId: Schema.optional(Schema.String),
     sessionName: Schema.String,
   }),
 })
@@ -737,7 +737,7 @@ export const ReviewCoordinatorDiedEvent = Schema.Struct({
   sequence: SequenceNumber,
   timestamp: Schema.String,
   payload: Schema.Struct({
-    issueId: IssueId,
+    issueId: IssueId, workspaceId: Schema.optional(Schema.String),
     sessionName: Schema.String,
     reason: Schema.String,
   }),
@@ -768,7 +768,7 @@ export const SpecialistCompletedEvent = Schema.Struct({
   type: Schema.Literal("specialist.completed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ name: Role, issueId: Schema.optional(IssueId) }),
+  payload: Schema.Struct({ name: Role, issueId: Schema.optional(IssueId), workspaceId: Schema.optional(Schema.String) }),
 })
 export type SpecialistCompletedEvent = typeof SpecialistCompletedEvent.Type
 
@@ -779,7 +779,7 @@ export const SpecialistFailedEvent = Schema.Struct({
   timestamp: Schema.String,
   payload: Schema.Struct({
     name: Role,
-    issueId: Schema.optional(IssueId),
+    issueId: Schema.optional(IssueId), workspaceId: Schema.optional(Schema.String),
     error: Schema.String,
   }),
 })
@@ -831,7 +831,7 @@ export const IssuesUpdatedEvent = Schema.Struct({
   type: Schema.Literal("issues.updated"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: Schema.optional(IssueId) }),
+  payload: Schema.Struct({ issueId: Schema.optional(IssueId), workspaceId: Schema.optional(Schema.String) }),
 })
 export type IssuesUpdatedEvent = typeof IssuesUpdatedEvent.Type
 
@@ -841,7 +841,7 @@ export const IssueStatusChangedEvent = Schema.Struct({
   sequence: SequenceNumber,
   timestamp: Schema.String,
   payload: Schema.Struct({
-    issueId: IssueId,
+    issueId: IssueId, workspaceId: Schema.optional(Schema.String),
     status: Schema.String,
     canonicalStatus: Schema.String,
     labels: Schema.optional(Schema.Array(Schema.String)),
@@ -874,7 +874,7 @@ export const ActivityEntryEvent = Schema.Struct({
     message: Schema.String,
     details: Schema.optional(Schema.String),
     output: Schema.optional(Schema.String),
-    issueId: Schema.optional(IssueId),
+    issueId: Schema.optional(IssueId), workspaceId: Schema.optional(Schema.String),
     /** Dashboard route the feed navigates to on click (e.g. /conv/<name>, /flywheel). */
     link: Schema.optional(Schema.String),
     /** PAN-1862 (FR-12): fire a desktop notification for this entry (operator-facing warnings). */
@@ -894,7 +894,7 @@ export const ActivityDetailedEvent = Schema.Struct({
     level: Schema.String,
     message: Schema.String,
     details: Schema.optional(Schema.String),
-    issueId: Schema.optional(IssueId),
+    issueId: Schema.optional(IssueId), workspaceId: Schema.optional(Schema.String),
     triggeringEvent: Schema.optional(Schema.String),
   }),
 })
@@ -909,7 +909,7 @@ export const ActivityTtsEvent = Schema.Struct({
     id: Schema.String,
     utterance: Schema.String,
     priority: Schema.optional(Schema.Number),
-    issueId: Schema.optional(IssueId),
+    issueId: Schema.optional(IssueId), workspaceId: Schema.optional(Schema.String),
     source: Schema.optional(Schema.String),
     eventType: Schema.optional(Schema.String),
   }),
@@ -925,7 +925,7 @@ export const DashboardLifecycleStartedEvent = Schema.Struct({
   timestamp: Schema.String,
   payload: Schema.Struct({
     reason: Schema.String,
-    issueId: Schema.optional(IssueId),
+    issueId: Schema.optional(IssueId), workspaceId: Schema.optional(Schema.String),
     trigger: Schema.String,
   }),
 })
@@ -938,7 +938,7 @@ export const DashboardLifecycleCompletedEvent = Schema.Struct({
   timestamp: Schema.String,
   payload: Schema.Struct({
     reason: Schema.String,
-    issueId: Schema.optional(IssueId),
+    issueId: Schema.optional(IssueId), workspaceId: Schema.optional(Schema.String),
     durationMs: Schema.Number,
   }),
 })
@@ -951,7 +951,7 @@ export const DashboardLifecycleFailedEvent = Schema.Struct({
   timestamp: Schema.String,
   payload: Schema.Struct({
     reason: Schema.String,
-    issueId: Schema.optional(IssueId),
+    issueId: Schema.optional(IssueId), workspaceId: Schema.optional(Schema.String),
     error: Schema.String,
   }),
 })
@@ -962,7 +962,7 @@ export const ShadowInferenceUpdateEvent = Schema.Struct({
   type: Schema.Literal("shadow.inference_update"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, content: Schema.String }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), content: Schema.String }),
 })
 export type ShadowInferenceUpdateEvent = typeof ShadowInferenceUpdateEvent.Type
 
@@ -973,7 +973,7 @@ export const WorkspaceCreatedEvent = Schema.Struct({
   type: Schema.Literal("workspace.created"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, workspacePath: Schema.String }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), workspacePath: Schema.String }),
 })
 export type WorkspaceCreatedEvent = typeof WorkspaceCreatedEvent.Type
 
@@ -982,7 +982,7 @@ export const WorkspaceWipeStartedEvent = Schema.Struct({
   type: Schema.Literal("workspace.wipe_started"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String) }),
 })
 export type WorkspaceWipeStartedEvent = typeof WorkspaceWipeStartedEvent.Type
 
@@ -991,7 +991,7 @@ export const WorkspaceDestroyedEvent = Schema.Struct({
   type: Schema.Literal("workspace.destroyed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String) }),
 })
 export type WorkspaceDestroyedEvent = typeof WorkspaceDestroyedEvent.Type
 
@@ -1000,7 +1000,7 @@ export const WorkspaceDeletedEvent = Schema.Struct({
   type: Schema.Literal("workspace.deleted"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String) }),
 })
 export type WorkspaceDeletedEvent = typeof WorkspaceDeletedEvent.Type
 
@@ -1009,7 +1009,7 @@ export const WorkspaceAbortedEvent = Schema.Struct({
   type: Schema.Literal("workspace.aborted"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ issueId: IssueId, sessionName: Schema.optional(Schema.String) }),
+  payload: Schema.Struct({ issueId: IssueId, workspaceId: Schema.optional(Schema.String), sessionName: Schema.optional(Schema.String) }),
 })
 export type WorkspaceAbortedEvent = typeof WorkspaceAbortedEvent.Type
 
@@ -1064,7 +1064,7 @@ export const MemoryHealthChangedEvent = Schema.Struct({
   timestamp: Schema.String,
   payload: Schema.Struct({
     projectId: Schema.String,
-    issueId: IssueId,
+    issueId: IssueId, workspaceId: Schema.optional(Schema.String),
     status: Schema.Literals(["healthy", "degraded", "failing"]),
     reason: Schema.NullOr(Schema.String),
     // Human-readable cause of the most recent failure (e.g. the provider error
@@ -1086,7 +1086,7 @@ export const CostEventRecordedEvent = Schema.Struct({
   timestamp: Schema.String,
   payload: Schema.Struct({
     agentId: AgentId,
-    issueId: IssueId,
+    issueId: IssueId, workspaceId: Schema.optional(Schema.String),
     cost: Schema.Number,
     inputTokens: Schema.Number,
     outputTokens: Schema.Number,

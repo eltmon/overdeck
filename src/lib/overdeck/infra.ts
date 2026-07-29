@@ -67,6 +67,14 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     // PAN-3092: listed explicitly so the drift audit reports the table's
     // absence if the runtime top-up ever fails on an existing database.
     { table: 'event_idempotency', column: 'key' },
+    // PAN-1990: sentinels for the four brand-new tables (SchemaTopUpExpectations
+    // has no dedicated "tables" list).
+    { table: 'projects', column: 'id' },
+    { table: 'workspaces', column: 'id' },
+    { table: 'project_targets', column: 'project_id' },
+    { table: 'pinned_docs', column: 'id' },
+    { table: 'conversations', column: 'workspace_id' },
+    { table: 'agents', column: 'workspace_id' },
   ],
   indexes: [
     'cost_session_id_idx',
@@ -78,6 +86,12 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     'uat_generation_repos_uat_order_idx',
     'uat_generation_member_repos_uat_idx',
     'uat_generations_uncleaned_terminal_idx',
+    'projects_primary_path_idx',
+    'idx_workspace_project',
+    'idx_workspace_kind',
+    'idx_workspace_last_accessed',
+    'idx_project_targets_one_primary',
+    'idx_pinned_docs_scope',
   ],
 };
 
@@ -180,6 +194,81 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `yielded_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `started_by` text');
+  ensureWorkspaceTablesSync(db);
+}
+
+/**
+ * Idempotent schema top-up for first-class projects/workspaces (PAN-1990).
+ * A fresh overdeck.db predates these tables — the init migration only runs on
+ * a brand-new database, so existing files need them added here.
+ */
+function ensureWorkspaceTablesSync(db: SqliteDatabase): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS \`projects\` (
+      \`id\` text PRIMARY KEY NOT NULL,
+      \`name\` text NOT NULL,
+      \`primary_path\` text NOT NULL,
+      \`created_at\` integer NOT NULL,
+      \`last_accessed_at\` integer NOT NULL,
+      \`is_system\` integer DEFAULT 0 NOT NULL
+    )
+  `);
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS `projects_primary_path_idx` ON `projects` (`primary_path`)');
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS \`workspaces\` (
+      \`id\` text PRIMARY KEY NOT NULL,
+      \`project_id\` text NOT NULL,
+      \`kind\` text NOT NULL,
+      \`name\` text NOT NULL,
+      \`path\` text NOT NULL,
+      \`branch_name\` text,
+      \`parent_branch\` text,
+      \`parent_branch_guessed\` integer DEFAULT 0 NOT NULL,
+      \`is_git_repository\` integer DEFAULT 1 NOT NULL,
+      \`issue_id\` text,
+      \`layout_config\` text,
+      \`is_favorite\` integer DEFAULT 0,
+      \`is_archived\` integer DEFAULT 0,
+      \`title\` text,
+      \`created_at\` integer NOT NULL,
+      \`last_accessed_at\` integer NOT NULL,
+      CHECK (\`kind\` IN ('main','issue','scratch')),
+      FOREIGN KEY (\`project_id\`) REFERENCES \`projects\`(\`id\`) ON UPDATE no action ON DELETE cascade
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS `idx_workspace_project` ON `workspaces` (`project_id`)');
+  db.exec('CREATE INDEX IF NOT EXISTS `idx_workspace_kind` ON `workspaces` (`kind`)');
+  db.exec('CREATE INDEX IF NOT EXISTS `idx_workspace_last_accessed` ON `workspaces` (`last_accessed_at`)');
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS \`project_targets\` (
+      \`project_id\` text NOT NULL,
+      \`path\` text NOT NULL,
+      \`is_primary\` integer DEFAULT 0 NOT NULL,
+      \`created_at\` integer NOT NULL,
+      \`last_used_at\` integer NOT NULL,
+      PRIMARY KEY(\`project_id\`, \`path\`),
+      FOREIGN KEY (\`project_id\`) REFERENCES \`projects\`(\`id\`) ON UPDATE no action ON DELETE cascade
+    )
+  `);
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS `idx_project_targets_one_primary` ON `project_targets` (`project_id`) WHERE `is_primary` = 1');
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS \`pinned_docs\` (
+      \`id\` text PRIMARY KEY NOT NULL,
+      \`scope\` text NOT NULL,
+      \`scope_id\` text NOT NULL,
+      \`doc_path\` text NOT NULL,
+      \`created_at\` integer NOT NULL,
+      CHECK (\`scope\` IN ('workspace','project')),
+      UNIQUE(\`scope\`, \`scope_id\`, \`doc_path\`)
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS `idx_pinned_docs_scope` ON `pinned_docs` (`scope`, `scope_id`)');
+
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `workspace_id` text');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `workspace_id` text');
 }
 
 /**

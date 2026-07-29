@@ -15,6 +15,7 @@ import {
   getIssuePrefix,
 } from '../../lib/projects.js';
 import { registerProjectFromPath, installGitHooksInDir, DuplicateProjectError } from '../../lib/project-registration.js';
+import { addProjectTarget, upsertProjectFromConfig } from '../../lib/workspaces/writer.js';
 
 interface AddOptions {
   name?: string;
@@ -345,6 +346,30 @@ export async function projectShowCommand(keyOrName: string): Promise<void> {
   console.log('');
 }
 
+interface AddTargetOptions {
+  path?: string;
+  primary?: boolean;
+}
+
+export async function projectAddTargetCommand(key: string, options: AddTargetOptions): Promise<void> {
+  if (!options.path) {
+    console.log(chalk.red('--path is required'));
+    return exitCli(1);
+  }
+
+  const config = getProjectSync(key);
+  if (!config) {
+    console.log(chalk.red(`No project registered with key '${key}'`));
+    return exitCli(1);
+  }
+
+  const targetPath = resolve(options.path);
+  upsertProjectFromConfig(key, config);
+  addProjectTarget(key, targetPath, options.primary ?? false);
+
+  console.log(chalk.green(`✓ Added target '${targetPath}' to project '${key}'${options.primary ? ' (primary)' : ''}`));
+}
+
 export function registerProjectCommands(command: Command): void {
   command
     .command('add <path>')
@@ -380,4 +405,11 @@ export function registerProjectCommands(command: Command): void {
     .command('init')
     .description('Initialize projects.yaml with example configuration')
     .action(projectInitCommand);
+
+  command
+    .command('add-target <project>')
+    .description('Add a secondary target path for a registered project')
+    .option('--path <path>', 'Target path to add')
+    .option('--primary', 'Make this the primary target (demotes any existing primary)')
+    .action(projectAddTargetCommand);
 }

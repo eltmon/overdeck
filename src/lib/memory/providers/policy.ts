@@ -79,9 +79,11 @@ function describeExtractionError(error: unknown, selection: ExtractionProviderSe
   return `${selection.provider}/${selection.model}: ${message}`;
 }
 
-export async function getTodayMemoryExtractionSpendUsd(identity: Pick<MemoryIdentity, 'issueId'>): Promise<number> {
+export async function getTodayMemoryExtractionSpendUsd(identity: Pick<MemoryIdentity, 'issueId' | 'workspaceId'>): Promise<number> {
   return queryMemoryExtractionCostUsdSync({
-    issueId: identity.issueId,
+    // Cost query is issue-keyed; a null issueId (main/scratch workspace turn,
+    // PRD D-6) falls back to workspaceId, matching recordExtractionCost.
+    issueId: identity.issueId ?? identity.workspaceId,
     startTs: startOfLocalDayIso(),
   });
 }

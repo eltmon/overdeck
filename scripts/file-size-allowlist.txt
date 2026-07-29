@@ -1,5 +1,6 @@
 # Audited growth exceptions: <lines> <path> # <ISSUE-REF>
 1004 src/lib/overdeck/merge.ts # PAN-3166
+1551 src/lib/overdeck/conversations.ts # PAN-1990
 1766 src/lib/database/schema.ts # PAN-3092
 1008 src/lib/pan-dir/record.ts # PAN-3092
 1006 src/lib/review-status.ts # PAN-3253
@@ -8,6 +9,7 @@
 3541 src/lib/cloister/deacon.ts # PAN-3228
 1315 src/lib/tmux.ts # PAN-3212
 1116 src/lib/lifecycle/workflows.ts # PAN-3215
+1052 src/lib/overdeck/memory.ts # PAN-1990
 849 src/lib/overdeck/planning-promotion.ts # PAN-3229
 1351 src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx # PAN-3231
 1452 src/lib/model-capabilities.ts # PAN-3252

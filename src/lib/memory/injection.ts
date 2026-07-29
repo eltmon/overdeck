@@ -5,9 +5,11 @@ import { parse as parseYaml } from 'yaml';
 import type { MemoryIdentity, MemoryStatus, RagDecision, RagDecisionSource } from '@overdeck/contracts';
 import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from './paths.js';
 import { expandMemoryQuery, type QueryExpansionCall, type QueryExpansionResult } from './query-expansion.js';
+import { readVerifiedPinFile } from './pin-path.js';
 import { searchMemory, type MemorySearchHit } from './search.js';
 import { isMemoryKnowledgeIndexEnabled, isMemoryPromptTimeInjectionEnabled } from './settings.js';
-import { findProjectByPathSync, loadProjectsConfigSync, resolveProjectFromIssueSync } from '../projects.js';
+import { findProjectByPathSync, getProjectSync, loadProjectsConfigSync, resolveProjectFromIssueSync, resolveProjectPath } from '../projects.js';
+import { getProjectByKey, listPinnedDocs } from '../workspaces/resolver.js';
 
 export const PROMPT_TIME_MEMORY_BUDGETS = {
   status: 2000,
@@ -31,7 +33,8 @@ export interface PromptTimeMemoryInjectionInput {
   loadPromptTimeEnabled?: () => boolean | Promise<boolean>;
   loadKnowledgeIndexEnabled?: () => boolean | Promise<boolean>;
   loadKnowledgeIndex?: (identity: MemoryIdentity) => Promise<string | null>;
-  loadStatus?: (projectId: string, issueId: string) => Promise<MemoryStatus | null>;
+  loadPinnedDocs?: (identity: MemoryIdentity) => Promise<CandidateContext[]>;
+  loadStatus?: (projectId: string, workspaceId: string) => Promise<MemoryStatus | null>;
   search?: typeof searchMemory;
   logDecision?: (entry: PromptTimeRagDecisionLogEntry) => Promise<void>;
 }
@@ -94,36 +97,45 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
 
   const search = input.search ?? searchMemory;
   const knowledgeEnabled = await (input.loadKnowledgeIndexEnabled ?? isMemoryKnowledgeIndexEnabled)();
-  const [status, knowledgeIndex, sameProjectHits, siblingHits] = await Promise.all([
-    (input.loadStatus ?? readStatus)(input.identity.projectId, input.identity.issueId).catch(() => null),
+  const { issueId } = input.identity;
+  const [status, knowledgeIndex, pinnedDocs, sameProjectHits, siblingHits] = await Promise.all([
+    (input.loadStatus ?? readStatus)(input.identity.projectId, input.identity.workspaceId).catch(() => null),
     knowledgeEnabled
       ? (input.loadKnowledgeIndex ?? readKnowledgeIndex)(input.identity).catch(() => null)
       : Promise.resolve(null),
+    knowledgeEnabled
+      ? (input.loadPinnedDocs ?? readPinnedDocCandidates)(input.identity).catch(() => [])
+      : Promise.resolve([]),
     search({
       query: expansion.query,
       projectId: input.identity.projectId,
       workspaceId: input.identity.workspaceId,
-      issueId: input.identity.issueId,
+      issueId: issueId ?? undefined,
       limit: 12,
     }).catch(() => []),
-    search({
-      query: expansion.query,
-      projectId: input.identity.projectId,
-      workspaceId: input.identity.workspaceId,
-      issueId: input.identity.issueId,
-      sibling: true,
-      siblingTokenBudget: budgets.sibling,
-      limit: 6,
-    }).catch(() => []),
+    // Sibling-issue summary injection is inherently issue-scoped — skip it
+    // entirely for a null issueId (main/scratch workspace turn, PRD D-6).
+    issueId !== null
+      ? search({
+          query: expansion.query,
+          projectId: input.identity.projectId,
+          workspaceId: input.identity.workspaceId,
+          issueId,
+          sibling: true,
+          siblingTokenBudget: budgets.sibling,
+          limit: 6,
+        }).catch(() => [])
+      : Promise.resolve([]),
   ]);
 
   const candidates = [
     ...status ? [statusCandidate(status, input.identity)] : [],
     ...knowledgeIndex ? [knowledgeIndexCandidate(knowledgeIndex, input.identity)] : [],
+    ...pinnedDocs,
     ...sameProjectHits.map(hitCandidate),
     ...siblingHits.map(siblingCandidate),
   ];
-  const hitCounts = countHits(status, knowledgeIndex, sameProjectHits, siblingHits);
+  const hitCounts = countHits(status, knowledgeIndex, pinnedDocs, sameProjectHits, siblingHits);
 
   if (candidates.length === 0) {
     return finalize(input, now, budgets, {
@@ -231,9 +243,9 @@ function statusCandidate(status: MemoryStatus, identity: MemoryIdentity): Candid
     title: `Status: ${status.name}`,
     text,
     source: {
-      id: `status:${identity.projectId}:${identity.issueId}`,
+      id: `status:${identity.projectId}:${identity.workspaceId}`,
       docType: 'status',
-      scope: 'issue',
+      scope: 'workspace',
       score: status.confidence,
       tokens: estimateTokens(text),
     },
@@ -421,14 +433,14 @@ async function writeDecision(input: PromptTimeMemoryInjectionInput, decision: Pr
     return;
   }
 
-  const filePath = resolveRagRunsFile(input.identity.projectId, input.identity.issueId, decision.timestamp);
+  const filePath = resolveRagRunsFile(input.identity.projectId, input.identity.workspaceId, decision.timestamp);
   await ensureParentDir(filePath);
   void appendFile(filePath, `${JSON.stringify(decision)}\n`, 'utf8').catch(() => {});
 }
 
-async function readStatus(projectId: string, issueId: string): Promise<MemoryStatus | null> {
+async function readStatus(projectId: string, workspaceId: string): Promise<MemoryStatus | null> {
   try {
-    return JSON.parse(await readFile(resolveStatusFile(projectId, issueId), 'utf8')) as MemoryStatus;
+    return JSON.parse(await readFile(resolveStatusFile(projectId, workspaceId), 'utf8')) as MemoryStatus;
   } catch (error) {
     if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') return null;
     throw error;
@@ -462,17 +474,70 @@ async function readKnowledgeIndex(identity: MemoryIdentity): Promise<string | nu
   return lines.join('\n');
 }
 
+/**
+ * PAN-1990: pinned docs (workspace- and project-scoped) read through the
+ * workspaces resolver, injected under the same knowledgeIndex budget as the
+ * OKF knowledge bundle. docPath is always project-relative (memory-pins),
+ * regardless of pin scope — a workspace is one worktree of the same project
+ * repo, so a project-relative path resolves identically from any of them. A
+ * missing or unreadable pin is skipped silently — pins are a convenience,
+ * never a reason to fail injection.
+ */
+async function readPinnedDocCandidates(identity: MemoryIdentity): Promise<CandidateContext[]> {
+  const projectPath = getProjectByKey(identity.projectId)?.primaryPath;
+  if (!projectPath) return [];
+
+  const pins = [
+    ...listPinnedDocs('workspace', identity.workspaceId),
+    ...listPinnedDocs('project', identity.projectId),
+  ];
+
+  const candidates: CandidateContext[] = [];
+  for (const pin of pins) {
+    // Defense in depth: pin creation (memory.ts) already verifies real-path
+    // containment, but never trust a stored value as pre-validated — a stale
+    // row from before that guard, or any other writer of the pinned_docs
+    // table, must not be able to read arbitrary local files (e.g.
+    // ~/.ssh/id_rsa) into prompt-time context. readVerifiedPinFile verifies
+    // AND reads through one open file handle (no separate check-then-open
+    // path lookup a concurrent local process could race against — review
+    // fix, cycle 3 non-blocking).
+    const text = await readVerifiedPinFile(projectPath, pin.docPath);
+    if (text === null) continue;
+    candidates.push({
+      key: 'knowledgeIndex',
+      title: `Pinned doc: ${pin.docPath}`,
+      text,
+      source: {
+        id: `pin:${pin.id}`,
+        docType: 'knowledge',
+        scope: pin.scope,
+        score: 1,
+        tokens: estimateTokens(text),
+      },
+    });
+  }
+  return candidates;
+}
+
 export async function resolveKnowledgeBundleRoot(
   identity: MemoryIdentity | { projectPath: string },
 ): Promise<string | null> {
   let projectPath: string;
   let knowledgeRepo: string | undefined;
 
-  if ('issueId' in identity) {
+  if ('issueId' in identity && identity.issueId !== null) {
     const resolved = resolveProjectFromIssueSync(identity.issueId);
     if (!resolved) return null;
     projectPath = resolved.projectPath;
     knowledgeRepo = loadProjectsConfigSync().projects[resolved.projectKey]?.knowledge_repo;
+  } else if ('issueId' in identity) {
+    // Null issueId means a main/scratch workspace turn (PRD D-6) — resolve the
+    // project directly by projectId (the project registry key) instead of via issue.
+    const project = getProjectSync(identity.projectId);
+    if (!project) return null;
+    projectPath = resolveProjectPath(project);
+    knowledgeRepo = project.knowledge_repo;
   } else {
     const project = findProjectByPathSync(identity.projectPath);
     projectPath = project?.path ?? identity.projectPath;
@@ -558,10 +623,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function countHits(status: MemoryStatus | null, knowledgeIndex: string | null, sameProjectHits: MemorySearchHit[], siblingHits: MemorySearchHit[]): PromptTimeRagDecisionLogEntry['hitCounts'] {
+function countHits(status: MemoryStatus | null, knowledgeIndex: string | null, pinnedDocs: CandidateContext[], sameProjectHits: MemorySearchHit[], siblingHits: MemorySearchHit[]): PromptTimeRagDecisionLogEntry['hitCounts'] {
   return {
     status: status ? 1 : 0,
-    knowledgeIndex: knowledgeIndex ? 1 : 0,
+    knowledgeIndex: (knowledgeIndex ? 1 : 0) + pinnedDocs.length,
     observations: sameProjectHits.filter((hit) => hit.docType !== 'summary').length,
     summaries: sameProjectHits.filter((hit) => hit.docType === 'summary').length,
     sibling: siblingHits.length,

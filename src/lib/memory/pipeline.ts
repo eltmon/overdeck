@@ -79,7 +79,7 @@ export type PipelineClaimRange = (input: {
   expectedFromOffset: number;
   toOffset: number;
   transcriptPath: string;
-  identity: Pick<MemoryIdentity, 'projectId' | 'workspaceId' | 'issueId'>;
+  identity: { projectId: string; workspaceId: string; issueId: string };
   trigger: TranscriptClaimTrigger;
   now?: Date;
 }) => Promise<ClaimTranscriptRangeResult>;
@@ -89,7 +89,7 @@ export type PipelineCommitRange = (input: {
   toOffset: number;
   consumedOffset: number;
   transcriptPath: string;
-  identity: Pick<MemoryIdentity, 'projectId' | 'workspaceId' | 'issueId'>;
+  identity: { projectId: string; workspaceId: string; issueId: string };
   trigger: TranscriptClaimTrigger;
   now?: Date;
 }) => Promise<CommitTranscriptRangeResult>;
@@ -262,7 +262,13 @@ async function safeClaim(input: ExtractFromTranscriptDeltaInput): Promise<
         expectedFromOffset: fromOffset,
         toOffset: input.toOffset,
         transcriptPath: input.transcriptPath,
-        identity: input.identity,
+        // Transcript checkpoints are still issue-keyed; a null issueId
+        // (main/scratch workspace turn, PRD D-6) falls back to workspaceId.
+        identity: {
+          projectId: input.identity.projectId,
+          workspaceId: input.identity.workspaceId,
+          issueId: input.identity.issueId ?? input.identity.workspaceId,
+        },
         trigger: input.trigger,
         now: input.now,
       }),
@@ -326,7 +332,11 @@ async function safeCommit(
       toOffset: claimed.toOffset,
       consumedOffset,
       transcriptPath: input.transcriptPath,
-      identity: input.identity,
+      identity: {
+        projectId: input.identity.projectId,
+        workspaceId: input.identity.workspaceId,
+        issueId: input.identity.issueId ?? input.identity.workspaceId,
+      },
       trigger: input.trigger,
       now: input.now,
     });

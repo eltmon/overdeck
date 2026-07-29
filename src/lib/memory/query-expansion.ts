@@ -243,7 +243,11 @@ async function logQueryExpansion(input: QueryExpansionInput, result: QueryExpans
     return;
   }
 
-  await appendJsonl(resolveRagRunsFile(input.identity.projectId, input.identity.issueId, entry.timestamp), entry);
+  // PAN-1990 FR-7: rag-runs logging is workspace-scoped, not issue-scoped —
+  // identity.workspaceId is always present (unlike issueId, which is null for
+  // a main/scratch workspace turn, PRD D-6), so every prompt gets a log file
+  // regardless of whether it's issue-attributed.
+  await appendJsonl(resolveRagRunsFile(input.identity.projectId, input.identity.workspaceId, entry.timestamp), entry);
 }
 
 function normalizeTerms(terms: readonly string[]): string[] {

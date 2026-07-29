@@ -87,6 +87,7 @@ import { startServerBootTelemetry } from './telemetry.js';
 import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
 import { flushAllPendingAutoCommits } from '../../lib/pan-dir/auto-commit.js';
 import { listProjectsSync } from '../../lib/projects.js';
+import { backfillIssueWorkspaces, migrateMemoryHomesToWorkspacesOnce, seedProjectsFromYaml } from '../../lib/workspaces/rebuild.js';
 import { ensureAutomaticStateMigration, decideDeaconBootGate } from '../../lib/state-auto-migrate.js';
 import { broadcastServerRestarting } from './ws-terminal.js';
 
@@ -521,6 +522,34 @@ console.log('[overdeck] Attachment cleanup started');
 await refreshTtsRuntimeConfig();
 void startTtsSummarizer().catch(err => console.warn('[tts-summarizer] start failed:', err));
 void startTtsPlayback().catch(err => console.warn('[tts-playback] start failed:', err));
+
+// PAN-1990: seed the projects/workspaces runtime tables from projects.yaml +
+// existing feature-* worktrees. Idempotent; never removes or modifies rows.
+seedProjectsFromYaml();
+console.log('[overdeck] Workspaces boot seeding started');
+
+// PAN-1990 WI-6 review fix: migration reads issue-workspace rows that
+// backfillIssueWorkspaces() creates, so it must not start until backfill has
+// SUCCEEDED — a `.catch().then()` chain (cycle 2's version of this) still
+// starts migration after a backfill rejection, causing an avoidable partial
+// scan against issue rows that were never created this boot. A skipped
+// migration here is still retried on the next boot: migrateMemoryHomesToWorkspacesOnce's
+// marker is only written once every scanned legacy home resolves, so no boot
+// can silently strand one.
+void (async () => {
+  try {
+    await backfillIssueWorkspaces();
+  } catch (err) {
+    console.warn('[workspaces] issue-worktree backfill failed:', (err as Error)?.message ?? err);
+    return;
+  }
+  try {
+    const result = await migrateMemoryHomesToWorkspacesOnce();
+    if (result) console.log(`[memory-migration] migrated ${result.migrated}/${result.scanned} legacy memory home(s), ${result.unresolvable.length} unresolvable`);
+  } catch (err) {
+    console.warn('[memory-migration] boot migration failed:', (err as Error)?.message ?? err);
+  }
+})();
 
 void syncTranscriptPollerRegistry().catch(err => console.warn('[memory-poller] initial registry sync failed:', err?.message ?? err));
 void reconcileStaleTranscriptCheckpoints({ log: (message) => console.log(message) })

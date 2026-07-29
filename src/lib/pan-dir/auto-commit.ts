@@ -626,9 +626,47 @@ function doCommit(
   });
 }
 
-interface PushResult {
+export interface PushResult {
   pushed: boolean;
   reason?: string;
+}
+
+/**
+ * Push whatever local commits already exist on a project's state-plane
+ * branch, without requiring a new diff to stage.
+ *
+ * Review fix (PAN-1990 cycle 3): a durable-cleanup caller (e.g.
+ * removeMemoryStateMirror) that deletes a file, commits the deletion, but
+ * fails to push leaves a REAL local commit on disk. A naive retry that only
+ * checks "does the file still exist locally" sees it's already gone and
+ * skips straight to "nothing to do" — the stuck commit never gets another
+ * push attempt. `git push` sends every local commit ahead of the remote
+ * tracking ref, not just the newest one, so retrying the push alone (with no
+ * new file change required) is enough to carry the earlier stuck commit
+ * along. Returns null when there's no repo, the branch doesn't match, or no
+ * `origin` remote is configured (mirrors maybePushStateCommit's own
+ * "no origin = not part of the write" convention for local/test repos).
+ */
+export function pushPendingStateCommits(projectRoot: string): Effect.Effect<PushResult | null, never> {
+  const project = findProjectByPathSync(projectRoot);
+  let gitRoot = projectRoot;
+  let expectedBranch = 'main';
+  if (project) {
+    const stateHome = resolveStateReadHomeSync(project);
+    if (stateHome.migrated) {
+      gitRoot = stateHome.root;
+      expectedBranch = STATE_BRANCH;
+    }
+  }
+  if (!existsSync(join(gitRoot, '.git'))) return Effect.succeed(null);
+
+  return runGit(['rev-parse', '--abbrev-ref', 'HEAD'], gitRoot).pipe(
+    Effect.matchEffect({
+      onSuccess: (r) => Effect.succeed(r.stdout.trim() as string | null),
+      onFailure: () => Effect.succeed(null as string | null),
+    }),
+    Effect.flatMap((branch) => branch === expectedBranch ? maybePushStateCommit(gitRoot, expectedBranch) : Effect.succeed(null)),
+  );
 }
 
 function maybePushStateCommit(

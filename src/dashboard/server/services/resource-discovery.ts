@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { readdir, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { compareIssueIds } from '@overdeck/contracts';
@@ -21,6 +21,7 @@ import {
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { findDraftPrd } from '../../../lib/prd-locations.js';
 import { listProjectsSync, resolveProjectFromIssueSync, type ProjectConfig, type ResolvedProject } from '../../../lib/projects.js';
+import { listWorkspaces } from '../../../lib/workspaces/resolver.js';
 import {
   PLANNED_BACKLOG_SPEC_ONLY_REASON,
   type PipelineBucket,
@@ -589,17 +590,28 @@ async function computeResourceAllocatedIssues(
     // ONE bulk tasks read per project per refresh, rather than a per-workspace
     // read each 30s TTL — the bulk shape keeps refreshes cheap as the workspace
     // count grows.
-    const [workspaceEntries, branches] = await Promise.all([
-      readdir(workspacesDir, { withFileTypes: true }).catch(() => []),
+    // PAN-1990: prefer the workspaces resolver (kind='issue' rows for this
+    // project); fall back to the directory scan only when the table hasn't
+    // been seeded yet for this project (pre-first-boot / not yet backfilled).
+    const resolverRows = listWorkspaces({ projectId: project.key, kind: 'issue' });
+    const [workspaceCandidates, branches] = await Promise.all([
+      resolverRows.length > 0
+        ? Promise.resolve(resolverRows.map((row) => ({
+            name: basename(row.path),
+            issueId: (row.issueId ?? basename(row.path).replace(/^feature-/, '')).toUpperCase(),
+          })))
+        : readdir(workspacesDir, { withFileTypes: true })
+            .then((entries) => entries
+              .filter((entry) => entry.isDirectory() && entry.name.startsWith('feature-'))
+              .map((entry) => ({ name: entry.name, issueId: entry.name.replace(/^feature-/, '').toUpperCase() })))
+            .catch(() => []),
       loadProjectBranchSnapshot(projectPath),
     ]);
 
-    await Promise.all(workspaceEntries.map(async (entry) => {
-      if (!entry.isDirectory() || !entry.name.startsWith('feature-')) return;
-      const issueId = entry.name.replace(/^feature-/, '').toUpperCase();
+    await Promise.all(workspaceCandidates.map(async ({ name, issueId }) => {
       const issue = ensureIssue(issueId, project);
       if (!issue) return;
-      const workspace = await scanWorkspace(workspacesDir, entry.name);
+      const workspace = await scanWorkspace(workspacesDir, name);
       issue.resourceSources.add('workspace');
       issue.resourceDetails.workspacePath = workspace.workspacePath;
       issue.hasPlanning = workspace.hasPlanning;

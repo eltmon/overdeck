@@ -42,6 +42,7 @@ import { issuesRouteLayer } from './routes/issues.js'
 import { pipelineMembershipRouteLayer } from './routes/pipeline-membership.js'
 import { agentsRouteLayer } from './routes/agents.js'
 import { workspacesRouteLayer } from './routes/workspaces.js'
+import { workspaceRegistryRouteLayer } from './routes/workspace-registry.js'
 import { specialistsRouteLayer } from './routes/specialists.js'
 import { costsRouteLayer } from './routes/costs.js'
 import { cloisterRouteLayer } from './routes/cloister.js'
@@ -337,6 +338,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   pipelineMembershipRouteLayer,
   agentsRouteLayer,
   workspacesRouteLayer,
+  workspaceRegistryRouteLayer,
   specialistsRouteLayer,
   costsRouteLayer,
   cloisterRouteLayer,

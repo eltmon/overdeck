@@ -39,6 +39,9 @@ templates/traefik/certs/
 workspaces/
 # Source route subdir named "workspaces" (B2 container-ops) — not an overdeck workspace dir.
 !src/dashboard/server/routes/workspaces/
+# PAN-1990 two-doors module and its tests — not an overdeck workspace dir.
+!src/lib/workspaces/
+!tests/unit/lib/workspaces/
 
 # Compiled TypeScript (build artifacts)
 src/lib/**/*.js
