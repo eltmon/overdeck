@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T00:58:05.604Z",
+  "updated": "2026-07-29T00:59:10.994Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "docs-markdown-editor": {
-        "writerId": "agent-pan-3260",
-        "agentId": "agent-pan-3260",
-        "pid": 757163,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T00:58:05.604Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3260",
@@ -155,6 +147,17 @@
         "outcome": "completed",
         "reason": "Added a module-level cached fetchAvailableEditors() (same pattern as the Quickview highlighter cache; on failure clears the cache and proceeds with an empty external list). Markdown chip right-click now builds an async menu: 'Open in internal editor' (persists setMarkdownOpenTarget('internal'), opens/focuses the pane or falls back to handleOpen() with no deck) + one 'Open in <EDITORS label>' per available editor (persists setMarkdownOpenTarget(id), launches via the new openWithExternalEditor) + the existing two copy actions. Non-markdown chips are untouched (same three-item menu built synchronously as before). 4 new tests (menu order, external-choice persists across an unmount/remount, internal-choice persists, non-markdown menu unchanged) — found and fixed a real cross-test leak in the process: showContextMenu appends its menu directly to document.body outside React's tree, so a test that opens the menu without dismissing it leaks stale DOM nodes that a later test's role queries can match; added an explicit Escape dismissal to the menu-order test. 23/23 tests pass (stable across repeated runs), full root typecheck clean.",
         "releasedAt": "2026-07-29T00:57:56.460Z"
+      },
+      {
+        "writerId": "agent-pan-3260",
+        "agentId": "agent-pan-3260",
+        "pid": 757163,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T00:58:05.604Z",
+        "itemId": "docs-markdown-editor",
+        "outcome": "completed",
+        "reason": "Created docs/MARKDOWN-EDITOR-PANE.md (131 lines) covering: the 'editor' paneType/editorFilePath field and why it's deliberately excluded from Stage's ISSUE_SCOPED self-heal set (with the guarding test named); the pan.readFileAtPath/pan.writeFileAtPath file door's allowlist (registered project roots + OVERDECK_HOME), markdown-only extension gate, 1 MiB error-not-truncate cap, and the expectedMtimeMs/WRITE_CONFLICT optimistic-concurrency protocol with the Reload-from-disk/Overwrite UI actions; StageDeckContext and why it exists (chips nested deeper than StageApi/StageContext prop-threading reaches); the overdeck:markdown-open-target preference (default 'internal') and its independence from overdeck:last-editor; and a fallback-matrix table covering deck/popout/dock/drawer surfaces plus non-markdown chips. All RPC method names and file/line references verified against the current code before writing.",
+        "releasedAt": "2026-07-29T00:59:10.994Z"
       }
     ],
     "statusReasons": {
@@ -181,6 +184,10 @@
       "chip-context-menu": {
         "reason": "Added a module-level cached fetchAvailableEditors() (same pattern as the Quickview highlighter cache; on failure clears the cache and proceeds with an empty external list). Markdown chip right-click now builds an async menu: 'Open in internal editor' (persists setMarkdownOpenTarget('internal'), opens/focuses the pane or falls back to handleOpen() with no deck) + one 'Open in <EDITORS label>' per available editor (persists setMarkdownOpenTarget(id), launches via the new openWithExternalEditor) + the existing two copy actions. Non-markdown chips are untouched (same three-item menu built synchronously as before). 4 new tests (menu order, external-choice persists across an unmount/remount, internal-choice persists, non-markdown menu unchanged) — found and fixed a real cross-test leak in the process: showContextMenu appends its menu directly to document.body outside React's tree, so a test that opens the menu without dismissing it leaks stale DOM nodes that a later test's role queries can match; added an explicit Escape dismissal to the menu-order test. 23/23 tests pass (stable across repeated runs), full root typecheck clean.",
         "updatedAt": "2026-07-29T00:57:56.460Z"
+      },
+      "docs-markdown-editor": {
+        "reason": "Created docs/MARKDOWN-EDITOR-PANE.md (131 lines) covering: the 'editor' paneType/editorFilePath field and why it's deliberately excluded from Stage's ISSUE_SCOPED self-heal set (with the guarding test named); the pan.readFileAtPath/pan.writeFileAtPath file door's allowlist (registered project roots + OVERDECK_HOME), markdown-only extension gate, 1 MiB error-not-truncate cap, and the expectedMtimeMs/WRITE_CONFLICT optimistic-concurrency protocol with the Reload-from-disk/Overwrite UI actions; StageDeckContext and why it exists (chips nested deeper than StageApi/StageContext prop-threading reaches); the overdeck:markdown-open-target preference (default 'internal') and its independence from overdeck:last-editor; and a fallback-matrix table covering deck/popout/dock/drawer surfaces plus non-markdown chips. All RPC method names and file/line references verified against the current code before writing.",
+        "updatedAt": "2026-07-29T00:59:10.994Z"
       }
     }
   },
@@ -213,6 +220,8 @@
     "chip-context-menu.chip-context-menu.ac2": "completed",
     "chip-context-menu.chip-context-menu.ac3": "completed",
     "chip-context-menu.chip-context-menu.ac4": "completed",
-    "docs-markdown-editor": "running"
+    "docs-markdown-editor": "completed",
+    "docs-markdown-editor.docs-markdown-editor.ac1": "completed",
+    "docs-markdown-editor.docs-markdown-editor.ac2": "completed"
   }
 }
