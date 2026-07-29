@@ -43,46 +43,20 @@
 
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { unresolvedBundleImports } from '../bundle-imports.js';
 import { readActiveDashboardBundleSync } from '../deploy/active-dashboard-bundle.js';
 import { getOverdeckHome, packageRoot } from '../paths.js';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
-/** `from "x"`, `import "x"`, and `import("x")` in the bundled ESM output. */
-const IMPORT_SOURCE_PATTERN = /\b(?:from|import)\s*\(?\s*(["'])([^"'\n]+)\1/g;
-/** Bare package specifiers — relative, absolute, and `node:` are always fine. */
-const PACKAGE_SPECIFIER_PATTERN = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*(?:\/[^\s]*)?$/;
-
 /**
  * Bare package specifiers the built supervisor imports but cannot resolve from
  * its own location. Empty means the artifact can start where it sits.
- *
- * Only a genuine module-not-found counts. A package that is present but whose
- * exports refuse the `require` condition still resolves under `import`, so it
- * must not be reported as missing.
  */
-export function unresolvedSupervisorImports(scriptPath: string): string[] {
-  const source = readFileSync(scriptPath, 'utf8');
-  const requireFrom = createRequire(scriptPath);
-  const missing = new Set<string>();
-
-  for (const match of source.matchAll(IMPORT_SOURCE_PATTERN)) {
-    const specifier = match[2];
-    if (!specifier || !PACKAGE_SPECIFIER_PATTERN.test(specifier)) continue;
-    try {
-      requireFrom.resolve(specifier);
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code === 'MODULE_NOT_FOUND' || code === 'ERR_MODULE_NOT_FOUND') missing.add(specifier);
-    }
-  }
-
-  return [...missing];
-}
+export const unresolvedSupervisorImports = unresolvedBundleImports;
 
 /**
  * Why a freshly built deployment cannot run the supervisor, or null if it can.
