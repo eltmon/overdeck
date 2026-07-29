@@ -204,7 +204,7 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T01:31:10.505Z",
+  "updated": "2026-07-29T01:31:16.069Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -214,7 +214,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T01:31:09.714Z",
+    "updatedAt": "2026-07-29T01:31:16.055Z",
     "reviewNotes": "ConversationDock deletes the required conversation-only entry path, and NeedsYouStrip now loses agent question text through mismatched map keys",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
@@ -225,6 +225,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
+    "reviewedAtCommit": "2841ef193b958693270f58b12b6354c78436f44b",
     "reviewSpawnedAt": "2026-07-29T01:22:45.350Z"
   },
   "closeOut": {
@@ -285,7 +286,7 @@
       },
       "costAtCloseOut": {
         "usd": 172.109389,
-        "pricingAsOf": "2026-07-29T01:31:09.738Z"
+        "pricingAsOf": "2026-07-29T01:31:16.062Z"
       }
     },
     "merges": [
