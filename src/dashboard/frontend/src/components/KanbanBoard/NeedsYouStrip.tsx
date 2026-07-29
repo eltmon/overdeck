@@ -165,17 +165,20 @@ export function NeedsYouStrip({ onOpenIssue }: { onOpenIssue: (id: string) => vo
         <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Needs you</span>
         <span className="text-xl font-medium text-warning-foreground">{items.length}</span>
       </div>
-      {items.slice(0, 6).map((item) => (
-        <NeedsYouRow
-          key={item.subjectId}
-          item={item.derivation}
-          kind={item.kind}
-          question={questions.get(item.subjectId)}
-          onOpen={onOpenIssue}
-          isConversation={item.source === 'conversation'}
-          conversationName={item.source === 'conversation' ? item.conversationName : undefined}
-        />
-      ))}
+      {items.slice(0, 6).map((item) => {
+        const key = item.subjectId || `${item.derivation.issue.identifier}-${item.kind}`;
+        return (
+          <NeedsYouRow
+            key={key}
+            item={item.derivation}
+            kind={item.kind}
+            question={questions.get(item.subjectId)}
+            onOpen={onOpenIssue}
+            isConversation={item.source === 'conversation'}
+            conversationName={item.source === 'conversation' ? item.conversationName : undefined}
+          />
+        );
+      })}
       {items.length > 6 && (
         <div className="flex flex-none items-center px-2 text-xs text-muted-foreground">+{items.length - 6} more</div>
       )}

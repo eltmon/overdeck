@@ -30,12 +30,13 @@ function DockPanel({ item, needsYou, onClose }: { item: { type: 'issue'; issueId
             <div className="truncate font-mono text-[11px]">{item.conversationName}</div>
             <div className="truncate text-[10.5px] text-muted-foreground">{item.issueId}{issue ? ` · ${issue.title}` : ''}</div>
           </div>
-          <button onClick={onClose} className="flex-none text-muted-foreground hover:text-foreground" aria-label={`Close ${item.conversationName}`}>
-            <X size={13} />
-          </button>
+          {/* Close button removed: conversation-only entries have no close action on dock */}
         </div>
         <div className="h-[420px] border-t border-border p-2">
-          <div className="text-center text-xs text-muted-foreground pt-2">Conversation pending input — answer from Needs You strip</div>
+          <div className="flex h-full flex-col items-center justify-center text-center text-xs text-muted-foreground">
+            <div>Pending conversation</div>
+            <div className="text-[10px] mt-1">Answer from Needs You strip</div>
+          </div>
         </div>
       </div>
     );
@@ -100,9 +101,11 @@ export function ConversationDock() {
     }
 
     const result: DockItem[] = [];
+    const dockedIssueIds = new Set<string>();
 
     // Add explicitly docked issues
     for (const item of items) {
+      dockedIssueIds.add(item.issueId.toLowerCase());
       result.push({
         type: 'issue',
         issueId: item.issueId,
@@ -111,8 +114,9 @@ export function ConversationDock() {
     }
 
     // Add conversation-only subjects with pending questions
+    // Only if the issue is not already docked and has no agent
     for (const s of pendingSubjects ?? []) {
-      if (s.pendingAskUserQuestion && s.issueId && !agentsByIssue.has(s.issueId.toLowerCase())) {
+      if (s.pendingAskUserQuestion && s.issueId && !agentsByIssue.has(s.issueId.toLowerCase()) && !dockedIssueIds.has(s.issueId.toLowerCase())) {
         const issue = issues.find((i) => i.identifier.toLowerCase() === s.issueId?.toLowerCase());
         if (issue) {
           result.push({
