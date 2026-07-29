@@ -138,39 +138,29 @@ describe('gitlab-merge-requests', () => {
   });
 
   describe('listGitLabMergedMergeRequestHeads', () => {
-    it('invokes the runner with argv containing \'--merged\' and \'--source-branch <head>\' per head', async () => {
-      const runner: GitLabRunner = vi.fn(async (args) => {
-        // First call (feature/min-1) returns a merged MR, second (feature/min-2) returns empty
-        if (args.includes('feature/min-1')) {
-          return JSON.stringify([{ source_branch: 'feature/min-1', state: 'merged' } as GitLabMergeRequestRow]);
-        }
-        return '';
-      });
+    it('issues one repo-wide --merged query that answers every head (PAN-3267)', async () => {
+      const runner: GitLabRunner = vi.fn(async () => JSON.stringify(
+        [{ source_branch: 'feature/min-1', state: 'merged' }] as GitLabMergeRequestRow[],
+      ));
 
       const result = await listGitLabMergedMergeRequestHeads('/test/merged-1', ['feature/min-1', 'feature/min-2'], runner);
 
       expect(result).toEqual(['feature/min-1']);
-      // Should have been called for each head
+      // One subprocess for the repository, NOT one per head — the per-head
+      // fan-out is what stalled and broke membership refresh.
+      expect(runner).toHaveBeenCalledTimes(1);
       expect(runner).toHaveBeenCalledWith(
-        ['mr', 'list', '--merged', '--source-branch', 'feature/min-1', '--output', 'json', '--per-page', '100', '--page', '1'],
-        '/test/merged-1',
-      );
-      expect(runner).toHaveBeenCalledWith(
-        ['mr', 'list', '--merged', '--source-branch', 'feature/min-2', '--output', 'json', '--per-page', '100', '--page', '1'],
+        ['mr', 'list', '--merged', '--output', 'json', '--per-page', '100', '--page', '1'],
         '/test/merged-1',
       );
     });
 
-    it('returns exactly the heads whose query produced >=1 row', async () => {
-      const runner: GitLabRunner = vi.fn(async (args) => {
-        if (args.includes('feature/min-1')) {
-          return JSON.stringify([{ source_branch: 'feature/min-1', state: 'merged' }] as GitLabMergeRequestRow[]);
-        }
-        if (args.includes('feature/min-3')) {
-          return JSON.stringify([{ source_branch: 'feature/min-3', state: 'merged' }] as GitLabMergeRequestRow[]);
-        }
-        return '';
-      });
+    it("returns exactly the heads present among the repo's merged source branches", async () => {
+      const runner: GitLabRunner = vi.fn(async () => JSON.stringify([
+        { source_branch: 'feature/min-1', state: 'merged' },
+        { source_branch: 'feature/min-3', state: 'merged' },
+        { source_branch: 'feature/someone-elses-branch', state: 'merged' },
+      ] as GitLabMergeRequestRow[]));
 
       const result = await listGitLabMergedMergeRequestHeads(
         '/test/merged-2',
@@ -208,7 +198,7 @@ describe('gitlab-merge-requests', () => {
       expect(runner).toHaveBeenCalledTimes(2);
       expect(runner).toHaveBeenNthCalledWith(
         2,
-        ['mr', 'list', '--merged', '--source-branch', 'feature/min-multipage', '--output', 'json', '--per-page', '100', '--page', '2'],
+        ['mr', 'list', '--merged', '--output', 'json', '--per-page', '100', '--page', '2'],
         '/test/merged-3',
       );
     });
@@ -223,11 +213,8 @@ describe('gitlab-merge-requests', () => {
     });
 
     it('given a rejecting runner, rejects with the error (not silently treating as unmerged)', async () => {
-      const runner: GitLabRunner = vi.fn(async (args) => {
-        if (args.includes('feature/min-1')) {
-          throw new Error('glab error');
-        }
-        return '';
+      const runner: GitLabRunner = vi.fn(async () => {
+        throw new Error('glab error');
       });
 
       await expect(
@@ -243,18 +230,16 @@ describe('gitlab-merge-requests', () => {
       ).rejects.toThrow();
     });
 
-    it('caches results by (repoPath, head) for 30s and dedupes concurrent calls', async () => {
+    it('caches by repoPath for 30s, dedupes concurrent calls, and serves other heads from the same snapshot', async () => {
       vi.useFakeTimers();
       try {
         vi.resetModules();
         const { listGitLabMergedMergeRequestHeads: listMergedWithFreshCache } =
           await import('../../../src/lib/gitlab-merge-requests.js');
-        const runner: GitLabRunner = vi.fn(async (args) => {
-          if (args.includes('feature/min-1')) {
-            return JSON.stringify([{ source_branch: 'feature/min-1' } as GitLabMergeRequestRow]);
-          }
-          return '';
-        });
+        const runner: GitLabRunner = vi.fn(async () => JSON.stringify([
+          { source_branch: 'feature/min-1' },
+          { source_branch: 'feature/min-2' },
+        ] as GitLabMergeRequestRow[]));
 
         const first = listMergedWithFreshCache('/test/merged-8', ['feature/min-1'], runner);
         const concurrent = listMergedWithFreshCache('/test/merged-8', ['feature/min-1'], runner);
@@ -266,6 +251,12 @@ describe('gitlab-merge-requests', () => {
         const cached = await listMergedWithFreshCache('/test/merged-8', ['feature/min-1'], runner);
         expect(runner).toHaveBeenCalledTimes(1);
         expect(cached).toEqual(result1);
+
+        // PAN-3267: a DIFFERENT head hits the same repo snapshot — under the old
+        // per-head cache key this was a fresh subprocess every time.
+        const otherHead = await listMergedWithFreshCache('/test/merged-8', ['feature/min-2'], runner);
+        expect(runner).toHaveBeenCalledTimes(1);
+        expect(otherHead).toEqual(['feature/min-2']);
 
         await vi.advanceTimersByTimeAsync(31_000);
         const reloaded = await listMergedWithFreshCache('/test/merged-8', ['feature/min-1'], runner);

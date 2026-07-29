@@ -338,6 +338,42 @@ describe('ambiguous keyed delivery retry (PAN-1837)', () => {
     return workspace;
   }
 
+  // Mirrors AMBIGUOUS_DELIVERY_RETRY_MS in review-verdict-feedback.ts.
+  const RETRY_SLEEP_MS = 2_000;
+  // Stays under the 5s testTimeout so a genuine hang fails here with a readable
+  // message instead of leaking a hot loop past the runner's own timeout. Fake
+  // timers own `Date`, `performance`, AND `process.hrtime`, so the only honest
+  // wall clock is a reference captured before any of them is installed.
+  const realNow = Date.now;
+  const SETTLE_BUDGET_MS = 4_000;
+
+  // PAN-3259: the product sleeps between ambiguous-delivery retries with a real
+  // `setTimeout`, so fake timers have to drive it — but one advance tick yields
+  // a single event-loop turn, and the delivery path first awaits real `fs`
+  // reads of the workspace synthesis on the libuv threadpool. Driving with a
+  // fixed iteration budget raced that I/O: under load the reads landed a turn
+  // late, the budget drained mid-retry-chain, and the trailing `await promise`
+  // then blocked forever because nothing was left to advance the clock. The
+  // promise settling is the only correct stop condition — each advance still
+  // visits the poll phase, so pending fs work lands between ticks.
+  async function settleWithFakeTimers<T>(promise: Promise<T>): Promise<T> {
+    let settled = false;
+    const tracked = promise.finally(() => {
+      settled = true;
+    });
+    const deadline = realNow() + SETTLE_BUDGET_MS;
+    while (!settled) {
+      if (realNow() > deadline) {
+        void tracked.catch(() => {});
+        throw new Error(
+          'delivery promise never settled while driving the ambiguous-delivery retry sleeps',
+        );
+      }
+      await vi.advanceTimersByTimeAsync(RETRY_SLEEP_MS);
+    }
+    return tracked;
+  }
+
   it('retries the same key and delivers without surfacing needs-you', async () => {
     vi.useFakeTimers();
     try {
@@ -355,12 +391,7 @@ describe('ambiguous keyed delivery retry (PAN-1837)', () => {
         workspacePath: workspace,
         runId: 'agent-pan-1059-review-abcdef12',
       }));
-      // Drive fake time until every retry has fired; each advance also flushes
-      // the interleaved fs/microtask turns before the sleep gets scheduled.
-      for (let i = 0; i < 50 && mockMessageAgent.mock.calls.length < 3; i++) {
-        await vi.advanceTimersByTimeAsync(2_000);
-      }
-      const result = await promise;
+      const result = await settleWithFakeTimers(promise);
 
       expect(result.agentMessageSent).toBe(true);
       expect(mockMessageAgent).toHaveBeenCalledTimes(3);
@@ -388,10 +419,7 @@ describe('ambiguous keyed delivery retry (PAN-1837)', () => {
         workspacePath: workspace,
         runId: 'agent-pan-1059-review-abcdef12',
       }));
-      for (let i = 0; i < 50 && mockMessageAgent.mock.calls.length < 4; i++) {
-        await vi.advanceTimersByTimeAsync(2_000);
-      }
-      const result = await promise;
+      const result = await settleWithFakeTimers(promise);
 
       expect(result.agentMessageSent).toBe(false);
       expect(mockMessageAgent).toHaveBeenCalledTimes(4);
