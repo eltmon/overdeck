@@ -94,17 +94,17 @@
     "recordedAt": "2026-07-29T06:18:50.753Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T07:39:08.101Z",
+  "updated": "2026-07-29T07:39:15.371Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T07:39:07.296Z",
-    "reviewNotes": "Boot trim now passes, but the new trim-only helper does not bound review.status_changed in append() or appendOnce(); stale emitters can still recreate unbounded event payloads.",
+    "updatedAt": "2026-07-29T07:39:15.346Z",
+    "reviewNotes": "Verification failed at vbrief-ac — fix and resubmit",
     "verificationNotes": "Acceptance criteria check FAILED — 3/12 AC incomplete:\n\n### Extend trimReviewStatusHistoryPayloads to delegate to the bounding helper (3/3 incomplete)\n  - [ ] Given a seeded oversized row with 25 entries carrying 3,697-char notes, the trim persists a smaller payload that parses back to <= 20 entries with <= 500-char notes\n  - [ ] Running the trim a second time over already-trimmed rows returns trimmed: 0 (converges to a no-op)\n  - [ ] An oversized row of a non-review event type survives the trim byte-identically",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewedAtCommit": "cccc58288bf35005e46072c242c4bef78cbd8791",
@@ -187,7 +187,7 @@
       },
       "costAtCloseOut": {
         "usd": 32.102909,
-        "pricingAsOf": "2026-07-29T07:39:07.310Z"
+        "pricingAsOf": "2026-07-29T07:39:15.366Z"
       }
     },
     "merges": [
