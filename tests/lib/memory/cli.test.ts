@@ -1,5 +1,4 @@
-import { appendFile, mkdtemp, readFile, rm, writeFile } from 'fs/promises';
-import { tmpdir } from 'os';
+import { appendFile, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { MemoryObservation, MemoryIdentity } from '@overdeck/contracts';
@@ -13,33 +12,47 @@ import { ensureDir, resolveObservationsFile, resolvePendingDir } from '../../../
 import { getMemoryHealthPath } from '../../../src/lib/memory/health.js';
 import { closeDatabase } from '../../../src/lib/database/index.js';
 import { closeMemoryFtsDatabases, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
+import { createWorkspace, upsertProjectFromConfig } from '../../../src/lib/workspaces/writer.js';
+import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
 
-let tempDir: string | null = null;
-let originalHome: string | undefined;
+let odb: OverdeckTestDb;
+let identity: MemoryIdentity;
+let workspace999: string;
+let workspace998: string;
+let workspace997: string;
 
-const identity: MemoryIdentity = {
-  projectId: 'overdeck',
-  workspaceId: 'feature-pan-1052',
-  issueId: 'PAN-1052',
-  runId: 'run-1',
-  sessionId: 'session-1',
-  agentRole: 'work',
-  agentHarness: 'claude-code',
-};
+function registerWorkspace(issueId: string, name: string): Promise<string> {
+  return createWorkspace({
+    projectId: 'overdeck',
+    kind: 'issue',
+    name,
+    path: join(odb.home, 'workspaces', name),
+    issueId,
+  });
+}
 
 beforeEach(async () => {
-  originalHome = process.env.OVERDECK_HOME;
-  tempDir = await mkdtemp(join(tmpdir(), 'pan-memory-cli-'));
-  process.env.OVERDECK_HOME = tempDir;
+  odb = setupOverdeckTestDb();
+  upsertProjectFromConfig('overdeck', { name: 'Overdeck', path: join(odb.home, 'overdeck') });
+  const workspaceId = await registerWorkspace('PAN-1052', 'feature-pan-1052');
+  identity = {
+    projectId: 'overdeck',
+    workspaceId,
+    issueId: 'PAN-1052',
+    runId: 'run-1',
+    sessionId: 'session-1',
+    agentRole: 'work',
+    agentHarness: 'claude-code',
+  };
+  workspace999 = await registerWorkspace('PAN-999', 'feature-pan-999');
+  workspace998 = await registerWorkspace('PAN-998', 'feature-pan-998');
+  workspace997 = await registerWorkspace('PAN-997', 'feature-pan-997');
 });
 
-afterEach(async () => {
+afterEach(() => {
   closeMemoryFtsDatabases();
   closeDatabase();
-  if (originalHome === undefined) delete process.env.OVERDECK_HOME;
-  else process.env.OVERDECK_HOME = originalHome;
-  if (tempDir) await rm(tempDir, { recursive: true, force: true });
-  tempDir = null;
+  teardownOverdeckTestDb(odb);
 });
 
 function observation(overrides: Partial<MemoryObservation> = {}): MemoryObservation {
@@ -62,8 +75,8 @@ function observation(overrides: Partial<MemoryObservation> = {}): MemoryObservat
 }
 
 async function writeObservationRecord(item: MemoryObservation): Promise<void> {
-  const path = resolveObservationsFile(item.projectId, item.issueId, item.timestamp);
-  await ensureDir(join(tempDir!, 'memory', item.projectId, item.issueId, 'observations'));
+  const path = resolveObservationsFile(item.projectId, item.workspaceId, item.timestamp);
+  await ensureDir(join(odb.home, 'memory', item.projectId, item.workspaceId, 'observations'));
   await appendFile(path, `${JSON.stringify(item)}\n`, 'utf8');
 }
 
@@ -73,6 +86,7 @@ describe('pan memory CLI service', () => {
     await writeObservationRecord(observation({
       id: 'sibling',
       issueId: 'PAN-999',
+      workspaceId: workspace999,
       summary: 'Sibling memory result',
       tags: ['memory', 'handoff'],
     }));
@@ -87,9 +101,9 @@ describe('pan memory CLI service', () => {
 
   it('applies project, workspace, issue, and session reset markers at read time', async () => {
     await writeObservationRecord(observation({ id: 'issue-archived', summary: 'issue scoped memory', timestamp: '2026-05-16T20:00:00.000Z' }));
-    await writeObservationRecord(observation({ id: 'workspace-live', summary: 'workspace scoped memory', issueId: 'PAN-999', timestamp: '2026-05-16T22:00:00.000Z' }));
-    await writeObservationRecord(observation({ id: 'session-archived', summary: 'session scoped memory', issueId: 'PAN-998', workspaceId: 'feature-pan-998', timestamp: '2026-05-16T20:00:00.000Z' }));
-    await writeObservationRecord(observation({ id: 'project-live', summary: 'project scoped memory', issueId: 'PAN-997', workspaceId: 'feature-pan-997', sessionId: 'session-997', timestamp: '2026-05-16T22:00:00.000Z' }));
+    await writeObservationRecord(observation({ id: 'workspace-live', summary: 'workspace scoped memory', issueId: 'PAN-999', workspaceId: workspace999, timestamp: '2026-05-16T22:00:00.000Z' }));
+    await writeObservationRecord(observation({ id: 'session-archived', summary: 'session scoped memory', issueId: 'PAN-998', workspaceId: workspace998, timestamp: '2026-05-16T20:00:00.000Z' }));
+    await writeObservationRecord(observation({ id: 'project-live', summary: 'project scoped memory', issueId: 'PAN-997', workspaceId: workspace997, sessionId: 'session-997', timestamp: '2026-05-16T22:00:00.000Z' }));
 
     await createResetMarker({
       projectId: 'overdeck',
@@ -103,7 +117,7 @@ describe('pan memory CLI service', () => {
     await createResetMarker({
       projectId: 'overdeck',
       scope: 'workspace',
-      scopeId: 'feature-pan-1052',
+      scopeId: identity.workspaceId,
       reason: 'workspace reset',
       fromTimestamp: '2026-05-16T21:00:00.000Z',
       createdAt: '2026-05-16T21:00:00.000Z',
@@ -154,7 +168,7 @@ describe('pan memory CLI service', () => {
     expect(marker.id).toBe('reset-1');
     expect((await searchMemory('memory', { project: 'overdeck', issue: 'PAN-1052' }))).toHaveLength(0);
     expect((await searchMemory('memory', { project: 'overdeck', issue: 'PAN-1052', includeArchived: true }))).toHaveLength(1);
-    expect(JSON.parse(await readFile(join(tempDir!, 'memory/overdeck/reset-markers.json'), 'utf8'))).toEqual([marker]);
+    expect(JSON.parse(await readFile(join(odb.home, 'memory/overdeck/reset-markers.json'), 'utf8'))).toEqual([marker]);
     expect(indexedMarkers).toEqual([{
       scope: 'issue',
       scope_id: 'PAN-1052',
@@ -249,17 +263,17 @@ describe('pan memory CLI service', () => {
   });
 
   it('reports stale active agents with a non-zero doctor exit code', async () => {
-    await ensureDir(join(tempDir!, 'agents/agent-pan-1052'));
-    await writeFile(join(tempDir!, 'agents/agent-pan-1052/state.json'), JSON.stringify({
+    await ensureDir(join(odb.home, 'agents/agent-pan-1052'));
+    await writeFile(join(odb.home, 'agents/agent-pan-1052/state.json'), JSON.stringify({
       id: 'agent-pan-1052',
       issueId: 'PAN-1052',
       status: 'running',
       role: 'work',
     }), 'utf8');
-    await ensureDir(resolvePendingDir('overdeck', 'PAN-1052'));
-    await writeFile(join(resolvePendingDir('overdeck', 'PAN-1052'), 'pending.json'), '{}\n', 'utf8');
-    await ensureDir(join(tempDir!, 'memory/overdeck/PAN-1052'));
-    await writeFile(getMemoryHealthPath({ projectId: 'overdeck', issueId: 'PAN-1052' }), JSON.stringify({
+    await ensureDir(resolvePendingDir('overdeck', identity.workspaceId));
+    await writeFile(join(resolvePendingDir('overdeck', identity.workspaceId), 'pending.json'), '{}\n', 'utf8');
+    await ensureDir(join(odb.home, 'memory/overdeck', identity.workspaceId));
+    await writeFile(getMemoryHealthPath({ projectId: 'overdeck', workspaceId: identity.workspaceId }), JSON.stringify({
       status: 'healthy',
       last_success: '2026-05-16T19:00:00.000Z',
       last_failure: null,
@@ -271,7 +285,7 @@ describe('pan memory CLI service', () => {
     const result = await runMemoryDoctor({ project: 'overdeck', now: new Date('2026-05-16T21:00:00.000Z') });
 
     expect(result.exitCode).toBe(1);
-    expect(result.issues[0]).toMatchObject({ issueId: 'PAN-1052', pendingCount: 1 });
+    expect(result.issues.find((issue) => issue.issueId === 'PAN-1052')).toMatchObject({ issueId: 'PAN-1052', pendingCount: 1 });
     expect(result.staleActiveAgents).toEqual([{ agentId: 'agent-pan-1052', issueId: 'PAN-1052', lastSuccess: '2026-05-16T19:00:00.000Z' }]);
   });
 });

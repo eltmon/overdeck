@@ -31,7 +31,7 @@ afterEach(() => {
   rmSync(memoryHome, { recursive: true, force: true });
 });
 
-function seedWorkspace(issueId: string) {
+function seedWorkspace(issueId: string): Promise<string> {
   upsertProjectFromConfig('proj-1', { name: 'overdeck', path: '/repo/overdeck' });
   return createWorkspace({
     projectId: 'proj-1',
@@ -55,11 +55,11 @@ function writeMemoryHomeFixture(): { path: string; content: string }[] {
 }
 
 describe('archiveIssueWorkspaceRow (PAN-1990)', () => {
-  it('marks an existing issue workspace row is_archived=1 without deleting it', () => {
-    const id = seedWorkspace('PAN-2000');
+  it('marks an existing issue workspace row is_archived=1 without deleting it', async () => {
+    const id = await seedWorkspace('PAN-2000');
     expect(getWorkspaceForIssue('PAN-2000')?.isArchived).toBe(false);
 
-    archiveIssueWorkspaceRow('PAN-2000');
+    await archiveIssueWorkspaceRow('PAN-2000');
 
     const row = odb.raw().prepare('SELECT is_archived FROM workspaces WHERE id = ?').get(id) as { is_archived: number };
     expect(row.is_archived).toBe(1);
@@ -67,26 +67,26 @@ describe('archiveIssueWorkspaceRow (PAN-1990)', () => {
     expect(odb.raw().prepare('SELECT COUNT(*) as c FROM workspaces WHERE id = ?').get(id)).toEqual({ c: 1 });
   });
 
-  it('is a no-op for an issue with no workspace row yet (never backfilled)', () => {
-    expect(() => archiveIssueWorkspaceRow('PAN-9999')).not.toThrow();
+  it('is a no-op for an issue with no workspace row yet (never backfilled)', async () => {
+    await expect(archiveIssueWorkspaceRow('PAN-9999')).resolves.toBeUndefined();
     expect(getWorkspaceForIssue('PAN-9999')).toBeNull();
   });
 
-  it('never touches the fixture memory-home tree — files survive byte-identical', () => {
-    seedWorkspace('PAN-2001');
+  it('never touches the fixture memory-home tree — files survive byte-identical', async () => {
+    await seedWorkspace('PAN-2001');
     const files = writeMemoryHomeFixture();
 
-    archiveIssueWorkspaceRow('PAN-2001');
+    await archiveIssueWorkspaceRow('PAN-2001');
 
     for (const file of files) {
       expect(readFileSync(file.path, 'utf-8')).toBe(file.content);
     }
   });
 
-  it('archiving is idempotent — calling it twice leaves exactly one archived row', () => {
-    const id = seedWorkspace('PAN-2002');
-    archiveIssueWorkspaceRow('PAN-2002');
-    archiveIssueWorkspaceRow('PAN-2002');
+  it('archiving is idempotent — calling it twice leaves exactly one archived row', async () => {
+    const id = await seedWorkspace('PAN-2002');
+    await archiveIssueWorkspaceRow('PAN-2002');
+    await archiveIssueWorkspaceRow('PAN-2002');
 
     const row = odb.raw().prepare('SELECT is_archived FROM workspaces WHERE id = ?').get(id) as { is_archived: number };
     expect(row.is_archived).toBe(1);

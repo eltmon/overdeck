@@ -1,5 +1,4 @@
-import { appendFile, mkdtemp, rm, writeFile } from 'fs/promises';
-import { tmpdir } from 'os';
+import { appendFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { MemoryIdentity, MemoryObservation } from '@overdeck/contracts';
@@ -8,33 +7,37 @@ import { getComplianceStatus } from '../../../src/lib/compliance/status.js';
 import { closeDatabase } from '../../../src/lib/database/index.js';
 import { closeMemoryFtsDatabases } from '../../../src/lib/memory/fts-db.js';
 import { ensureDir, resolveObservationsFile } from '../../../src/lib/memory/paths.js';
+import { createWorkspace, upsertProjectFromConfig } from '../../../src/lib/workspaces/writer.js';
+import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
 
-let tempDir: string | null = null;
-let originalHome: string | undefined;
-
-const identity: MemoryIdentity = {
-  projectId: 'overdeck',
-  workspaceId: 'feature-pan-1204',
-  issueId: 'PAN-1204',
-  runId: 'run-1',
-  sessionId: 'session-1',
-  agentRole: 'work',
-  agentHarness: 'claude-code',
-};
+let odb: OverdeckTestDb;
+let identity: MemoryIdentity;
 
 beforeEach(async () => {
-  originalHome = process.env.OVERDECK_HOME;
-  tempDir = await mkdtemp(join(tmpdir(), 'pan-compliance-status-'));
-  process.env.OVERDECK_HOME = tempDir;
+  odb = setupOverdeckTestDb();
+  upsertProjectFromConfig('overdeck', { name: 'Overdeck', path: join(odb.home, 'overdeck') });
+  const workspaceId = await createWorkspace({
+    projectId: 'overdeck',
+    kind: 'issue',
+    name: 'feature-pan-1204',
+    path: join(odb.home, 'workspaces', 'feature-pan-1204'),
+    issueId: 'PAN-1204',
+  });
+  identity = {
+    projectId: 'overdeck',
+    workspaceId,
+    issueId: 'PAN-1204',
+    runId: 'run-1',
+    sessionId: 'session-1',
+    agentRole: 'work',
+    agentHarness: 'claude-code',
+  };
 });
 
-afterEach(async () => {
+afterEach(() => {
   closeMemoryFtsDatabases();
   closeDatabase();
-  if (originalHome === undefined) delete process.env.OVERDECK_HOME;
-  else process.env.OVERDECK_HOME = originalHome;
-  if (tempDir) await rm(tempDir, { recursive: true, force: true });
-  tempDir = null;
+  teardownOverdeckTestDb(odb);
 });
 
 function observation(overrides: Partial<MemoryObservation> = {}): MemoryObservation {
@@ -58,13 +61,13 @@ function observation(overrides: Partial<MemoryObservation> = {}): MemoryObservat
 }
 
 async function writeObservationRecord(item: MemoryObservation): Promise<void> {
-  const path = resolveObservationsFile(item.projectId, item.issueId, item.timestamp);
-  await ensureDir(join(tempDir!, 'memory', item.projectId, item.issueId, 'observations'));
+  const path = resolveObservationsFile(item.projectId, item.workspaceId, item.timestamp);
+  await ensureDir(join(odb.home, 'memory', item.projectId, item.workspaceId, 'observations'));
   await appendFile(path, `${JSON.stringify(item)}\n`, 'utf8');
 }
 
 async function writeConfig(content: string): Promise<string> {
-  const path = join(tempDir!, 'config.yaml');
+  const path = join(odb.home, 'config.yaml');
   await writeFile(path, content, 'utf8');
   return path;
 }
@@ -89,7 +92,7 @@ describe('compliance status', () => {
     await writeObservationRecord(observation({ id: 'other-issue', issueId: 'PAN-999', workspaceId: 'feature-pan-999' }));
 
     const status = await getComplianceStatus({
-      workspace: 'feature-pan-1204',
+      workspace: identity.workspaceId,
       issue: 'PAN-1204',
       session: 'session-1',
       now: new Date('2026-05-25T12:00:00.000Z'),
@@ -99,7 +102,7 @@ describe('compliance status', () => {
       mode: 'advisory',
       recentMissCount: 1,
       projectId: 'overdeck',
-      workspaceId: 'feature-pan-1204',
+      workspaceId: identity.workspaceId,
       issueId: 'PAN-1204',
       sessionId: 'session-1',
     });

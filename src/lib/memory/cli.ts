@@ -16,6 +16,7 @@ import {
 import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';
 import { readCurrentStatus } from './rollup.js';
 import { getAgentStateSync } from '../agents.js';
+import { getWorkspaceForIssue, listWorkspaces } from '../workspaces/resolver.js';
 
 const DEFAULT_PROJECT_ID = 'overdeck';
 const MIN_DAILY_SUMMARY_OBSERVATIONS = 3;
@@ -83,7 +84,9 @@ export async function searchMemory(query: string, options: MemorySearchOptions =
 }
 
 export async function getMemoryStatus(projectId: string, issueId: string): Promise<MemoryStatus | undefined> {
-  return readCurrentStatus(projectId, issueId);
+  const workspaceId = getWorkspaceForIssue(issueId)?.id;
+  if (!workspaceId) return undefined;
+  return readCurrentStatus(projectId, workspaceId);
 }
 
 export async function createResetMarker(input: {
@@ -120,8 +123,10 @@ export async function generateDailySummary(input: {
 }): Promise<DailySummaryResult> {
   const projectId = input.projectId ?? DEFAULT_PROJECT_ID;
   const date = input.date ?? new Date().toISOString().slice(0, 10);
-  const path = join(resolveSummariesDir(projectId, input.issueId), `${date}.md`);
-  const observations = await readObservationsFile(resolveObservationsFile(projectId, input.issueId, date));
+  const workspaceId = getWorkspaceForIssue(input.issueId)?.id;
+  if (!workspaceId) throw new Error(`No workspace found for issue ${input.issueId}`);
+  const path = join(resolveSummariesDir(projectId, workspaceId), `${date}.md`);
+  const observations = await readObservationsFile(resolveObservationsFile(projectId, workspaceId, date));
   const existingMarkdown = await readTextFile(path);
   const previousObservationCount = existingMarkdown ? parseSummaryObservationCount(existingMarkdown) : null;
 
@@ -174,15 +179,17 @@ export async function readMemorySettingsSummary(): Promise<{
 }
 
 async function readObservationScope(projectId: string, issueId: string | undefined, sibling: boolean): Promise<MemoryObservation[]> {
-  if (issueId && !sibling) return readIssueObservations(projectId, issueId);
-  const issueIds = await listIssueIds(projectId);
-  const selectedIssueIds = issueId && sibling ? issueIds.filter((candidate) => candidate !== issueId) : issueIds;
-  const nested = await Promise.all(selectedIssueIds.map((candidate) => readIssueObservations(projectId, candidate)));
+  const workspaceId = issueId ? getWorkspaceForIssue(issueId)?.id : undefined;
+  if (issueId && !sibling) return workspaceId ? readWorkspaceObservations(projectId, workspaceId) : [];
+
+  const workspaceIds = await listWorkspaceIds(projectId);
+  const selectedWorkspaceIds = issueId && sibling ? workspaceIds.filter((candidate) => candidate !== workspaceId) : workspaceIds;
+  const nested = await Promise.all(selectedWorkspaceIds.map((candidate) => readWorkspaceObservations(projectId, candidate)));
   return nested.flat();
 }
 
-async function readIssueObservations(projectId: string, issueId: string): Promise<MemoryObservation[]> {
-  const observationsDir = dirname(resolveObservationsFile(projectId, issueId, new Date()));
+async function readWorkspaceObservations(projectId: string, workspaceId: string): Promise<MemoryObservation[]> {
+  const observationsDir = dirname(resolveObservationsFile(projectId, workspaceId, new Date()));
   const files = (await readdir(observationsDir).catch((error: unknown) => {
     if (isEnoent(error)) return [] as string[];
     throw error;
@@ -368,7 +375,7 @@ async function indexDailySummary(projectId: string, issueId: string, date: strin
   ]);
 }
 
-async function listIssueIds(projectId: string): Promise<string[]> {
+async function listWorkspaceIds(projectId: string): Promise<string[]> {
   const root = resolveMemoryRoot(projectId);
   const entries = await readdir(root, { withFileTypes: true }).catch((error: unknown) => {
     if (isEnoent(error)) return [];
@@ -399,14 +406,14 @@ function occurrences(value: string, term: string): number {
 }
 
 async function readIssueDoctorSnapshots(projectId: string): Promise<MemoryDoctorResult['issues']> {
-  const issueIds = await listIssueIds(projectId);
-  return Promise.all(issueIds.map(async (issueId) => {
-    const health = await readJsonFile<MemoryHealthSnapshot>(getMemoryHealthPath({ projectId, issueId }), emptyHealth());
-    const pendingCount = await countJsonFiles(resolvePendingDir(projectId, issueId));
-    const observations = await readIssueObservations(projectId, issueId);
+  const issueWorkspaces = listWorkspaces({ projectId, kind: 'issue' }).filter((ws): ws is typeof ws & { issueId: string } => ws.issueId !== null);
+  return Promise.all(issueWorkspaces.map(async (workspace) => {
+    const health = await readJsonFile<MemoryHealthSnapshot>(getMemoryHealthPath({ projectId, workspaceId: workspace.id }), emptyHealth());
+    const pendingCount = await countJsonFiles(resolvePendingDir(projectId, workspace.id));
+    const observations = await readWorkspaceObservations(projectId, workspace.id);
     return {
       projectId,
-      issueId,
+      issueId: workspace.issueId,
       health,
       pendingCount,
       lastObservation: observations.at(-1)?.timestamp ?? null,

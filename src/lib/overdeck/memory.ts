@@ -27,7 +27,7 @@ import {
   ResetMarkerScope,
 } from '@overdeck/contracts'
 import { runMemoryFtsStatement, runMemoryFtsTransaction } from '../memory/fts-db.js'
-import { resolveMemoryRoot, resolveIssueMemoryRoot, resolveStatusFile } from '../memory/paths.js'
+import { resolveMemoryRoot, resolveWorkspaceMemoryRoot, resolveStatusFile } from '../memory/paths.js'
 import { readMemoryHealthSnapshot, type MemoryHealthSnapshot as HealthSnapshotType } from '../memory/health.js'
 import { Db, EventBus, MemoryFiles, MemorySearch, type FtsStatement } from './infra.js'
 
@@ -232,7 +232,7 @@ export class CheckpointNotFound extends Schema.TaggedErrorClass<CheckpointNotFou
 
 export interface MemoryResolverServiceShape {
   readonly search: (input: SearchMemoryInput) => Effect.Effect<ReadonlyArray<MemorySearchHit>>
-  readonly getStatus: (projectId: string, issueId: string) => Effect.Effect<MemoryStatus | null>
+  readonly getStatus: (projectId: string, workspaceId: string) => Effect.Effect<MemoryStatus | null>
   readonly getHealth: (projectId: string) => Effect.Effect<ReadonlyArray<MemoryHealthSnapshot>>
   readonly getCheckpoint: (sessionId: string) => Effect.Effect<TranscriptCheckpoint | null>
   readonly listCheckpoints: (limit?: number) => Effect.Effect<ReadonlyArray<TranscriptCheckpoint>>
@@ -408,22 +408,22 @@ export const MemoryResolverLive = Layer.effect(
           .slice(0, limit)
       })
 
-    const getStatus = (projectId: string, issueId: string) =>
-      files.readStatus(projectId, issueId) as Effect.Effect<MemoryStatus | null>
+    const getStatus = (projectId: string, workspaceId: string) =>
+      files.readStatus(projectId, workspaceId) as Effect.Effect<MemoryStatus | null>
 
     const listResetMarkers = (projectId: string) =>
       files.readResetMarkers(projectId) as Effect.Effect<ReadonlyArray<ResetMarker>>
 
     const getHealth = (projectId: string) =>
       Effect.promise(async () => {
-        // Aggregate health across all issues in the project.
+        // Aggregate health across all workspaces in the project.
         const root = resolveMemoryRoot(projectId)
         const entries = await readdir(root, { withFileTypes: true }).catch(() => [])
         const snapshots = await Promise.all(
           entries
             .filter((e) => e.isDirectory())
             .map((e) =>
-              readMemoryHealthSnapshot({ projectId, issueId: e.name }).then(
+              readMemoryHealthSnapshot({ projectId, workspaceId: e.name }).then(
                 (s): MemoryHealthSnapshot => ({
                   status: s.status,
                   last_success: s.last_success,
@@ -504,10 +504,10 @@ export interface MemoryWriterServiceShape {
 
   readonly writeObservation: (o: MemoryObservation) => Effect.Effect<void>
 
-  readonly rollupStatus: (projectId: string, issueId: string) => Effect.Effect<MemoryStatus | null>
+  readonly rollupStatus: (projectId: string, workspaceId: string) => Effect.Effect<MemoryStatus | null>
   readonly generateSummary: (
     projectId: string,
-    issueId: string,
+    workspaceId: string,
     date?: string,
   ) => Effect.Effect<SummaryResult>
 
@@ -663,20 +663,20 @@ export const MemoryWriterLive = Layer.effect(
       })
 
     // rollupStatus — writes status.json then emits.
-    const rollupStatus = (projectId: string, issueId: string) =>
+    const rollupStatus = (projectId: string, workspaceId: string) =>
       Effect.gen(function* () {
-        const current = yield* files.readStatus(projectId, issueId) as Effect.Effect<MemoryStatus | null>
+        const current = yield* files.readStatus(projectId, workspaceId) as Effect.Effect<MemoryStatus | null>
         if (!current) return null
-        yield* files.writeStatus(projectId, issueId, current)
-        yield* bus.emit({ type: 'memory.status_updated', payload: { identity: { projectId, issueId }, status: current } })
+        yield* files.writeStatus(projectId, workspaceId, current)
+        yield* bus.emit({ type: 'memory.status_updated', payload: { identity: { projectId, workspaceId, issueId: workspaceId }, status: current } })
         return current
       })
 
     // generateSummary — a cache-derivative write (observations → markdown summary).
-    const generateSummary = (projectId: string, issueId: string, date?: string) =>
+    const generateSummary = (projectId: string, workspaceId: string, date?: string) =>
       Effect.gen(function* () {
         const d = date ?? new Date().toISOString().slice(0, 10)
-        const path = join(resolveIssueMemoryRoot(projectId, issueId), 'summaries', `${d}.md`)
+        const path = join(resolveWorkspaceMemoryRoot(projectId, workspaceId), 'summaries', `${d}.md`)
         yield* Effect.promise(() => mkdir(dirname(path), { recursive: true }))
         return SummaryResult.make({ path, date: d })
       })
@@ -883,7 +883,7 @@ export const MemoryFilesLive = Layer.succeed(
         const date = o.timestamp.slice(0, 10)
         // A null issueId (main/scratch workspace turn, PRD D-6) falls back to
         // workspaceId until memory-paths-rekey moves storage onto the pair.
-        const jsonlPath = join(resolveIssueMemoryRoot(o.projectId, o.issueId ?? o.workspaceId), 'observations', `${date}.jsonl`)
+        const jsonlPath = join(resolveWorkspaceMemoryRoot(o.projectId, o.workspaceId), 'observations', `${date}.jsonl`)
         await mkdir(dirname(jsonlPath), { recursive: true })
 
         // Idempotent: if this observation id is already in the file, return its offset.
@@ -911,7 +911,7 @@ export const MemoryFilesLive = Layer.succeed(
         const o = observation as MemoryObservation
         const date = o.timestamp.slice(0, 10)
         const mdPath = join(
-          resolveIssueMemoryRoot(o.projectId, o.issueId ?? o.workspaceId),
+          resolveWorkspaceMemoryRoot(o.projectId, o.workspaceId),
           'observations',
           `${date}.md`,
         )
@@ -920,9 +920,9 @@ export const MemoryFilesLive = Layer.succeed(
         await appendFile(mdPath, line)
       }),
 
-    readStatus: (projectId: string, issueId: string) =>
+    readStatus: (projectId: string, workspaceId: string) =>
       Effect.promise(async () => {
-        const path = resolveStatusFile(projectId, issueId)
+        const path = resolveStatusFile(projectId, workspaceId)
         const content = await readFile(path, 'utf8').catch(() => null)
         if (!content) return null
         try {
@@ -932,9 +932,9 @@ export const MemoryFilesLive = Layer.succeed(
         }
       }),
 
-    writeStatus: (projectId: string, issueId: string, status: unknown) =>
+    writeStatus: (projectId: string, workspaceId: string, status: unknown) =>
       Effect.promise(async () => {
-        const path = resolveStatusFile(projectId, issueId)
+        const path = resolveStatusFile(projectId, workspaceId)
         await mkdir(dirname(path), { recursive: true })
         await writeFile(path + '.tmp', JSON.stringify(status, null, 2))
         const { rename } = await import('node:fs/promises')

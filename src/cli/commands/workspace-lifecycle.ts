@@ -48,6 +48,6 @@ export async function workspaceArchiveCommand(ws: string): Promise<void> {
     return exitCli(1);
   }
 
-  archiveWorkspace(row.id);
+  await archiveWorkspace(row.id);
   console.log(chalk.green(`✓ Archived workspace '${row.name}' (reversible)`));
 }

@@ -112,10 +112,10 @@ describe('pan workspace list --kind/--archived (PAN-1990)', () => {
   it('returns only matching rows read through the resolver', async () => {
     const { createWorkspace, upsertProjectFromConfig } = await import('../../../src/lib/workspaces/writer.js');
     upsertProjectFromConfig('test-project', { name: 'Test Project', path: projectRoot });
-    const scratchId = createWorkspace({ projectId: 'test-project', kind: 'scratch', name: 'scratch-a', path: join(projectRoot, 'a') });
-    const issueId = createWorkspace({ projectId: 'test-project', kind: 'issue', name: 'feature-pan-1', path: join(projectRoot, 'b'), issueId: 'PAN-1' });
+    const scratchId = await createWorkspace({ projectId: 'test-project', kind: 'scratch', name: 'scratch-a', path: join(projectRoot, 'a') });
+    const issueId = await createWorkspace({ projectId: 'test-project', kind: 'issue', name: 'feature-pan-1', path: join(projectRoot, 'b'), issueId: 'PAN-1' });
     const { archiveWorkspace } = await import('../../../src/lib/workspaces/writer.js');
-    archiveWorkspace(scratchId);
+    await archiveWorkspace(scratchId);
 
     const { listCommand } = await import('../../../src/cli/commands/workspace-list.js');
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
@@ -141,7 +141,7 @@ describe('pan workspace destroy (PAN-1990)', () => {
   it('refuses to destroy a kind=main workspace', async () => {
     const { createWorkspace, upsertProjectFromConfig } = await import('../../../src/lib/workspaces/writer.js');
     upsertProjectFromConfig('test-project', { name: 'Test Project', path: projectRoot });
-    const id = createWorkspace({ projectId: 'test-project', kind: 'main', name: 'main', path: projectRoot, issueId: 'PAN-9030' });
+    const id = await createWorkspace({ projectId: 'test-project', kind: 'main', name: 'main', path: projectRoot, issueId: 'PAN-9030' });
 
     const exitError = new Error('process exited');
     const { destroyCommand } = await import('../../../src/cli/commands/workspace-list.js');
@@ -168,7 +168,7 @@ describe('pan workspace destroy (PAN-1990)', () => {
     upsertProjectFromConfig('test-project', { name: 'Test Project', path: projectRoot });
     const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-9031');
     mkdirSyncReal(workspacePath, { recursive: true });
-    const workspaceId = createWorkspace({
+    const workspaceId = await createWorkspace({
       projectId: 'test-project', kind: 'issue', name: 'feature-pan-9031', path: workspacePath, issueId: 'PAN-9031',
     });
 
@@ -200,7 +200,7 @@ describe('pan workspace destroy (PAN-1990)', () => {
     upsertProjectFromConfig('test-project', { name: 'Test Project', path: projectRoot });
     const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-9032');
     mkdirSyncReal(workspacePath, { recursive: true });
-    const workspaceId = createWorkspace({
+    const workspaceId = await createWorkspace({
       projectId: 'test-project', kind: 'issue', name: 'feature-pan-9032', path: workspacePath, issueId: 'PAN-9032',
     });
 
@@ -226,7 +226,7 @@ describe('pan workspace get/activate/archive (PAN-1990)', () => {
     const { workspaceActivateCommand, workspaceArchiveCommand, workspaceGetCommand } = await import('../../../src/cli/commands/workspace-lifecycle.js');
 
     upsertProjectFromConfig('test-project', { name: 'Test Project', path: projectRoot });
-    const id = createWorkspace({ projectId: 'test-project', kind: 'scratch', name: 'lifecycle-notes', path: join(projectRoot, 'notes') });
+    const id = await createWorkspace({ projectId: 'test-project', kind: 'scratch', name: 'lifecycle-notes', path: join(projectRoot, 'notes') });
 
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     await workspaceGetCommand(id);
@@ -248,7 +248,7 @@ describe('pan workspace get/activate/archive (PAN-1990)', () => {
     const { workspaceArchiveCommand } = await import('../../../src/cli/commands/workspace-lifecycle.js');
 
     upsertProjectFromConfig('test-project', { name: 'Test Project', path: projectRoot });
-    const id = createWorkspace({ projectId: 'test-project', kind: 'main', name: 'main', path: projectRoot });
+    const id = await createWorkspace({ projectId: 'test-project', kind: 'main', name: 'main', path: projectRoot });
 
     const exitError = new Error('process exited');
     vi.spyOn(process, 'exit').mockImplementation(() => { throw exitError; });

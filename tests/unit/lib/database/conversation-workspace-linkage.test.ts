@@ -21,9 +21,9 @@ afterEach(() => {
 });
 
 describe('conversation <-> workspace linkage (PAN-1990)', () => {
-  it('persists an explicitly-provided workspaceId', () => {
+  it('persists an explicitly-provided workspaceId', async () => {
     upsertProjectFromConfig('proj-1', { name: 'overdeck', path: '/repo/overdeck' });
-    const workspaceId = createWorkspace({
+    const workspaceId = await createWorkspace({
       projectId: 'proj-1', kind: 'scratch', name: 'scratch', path: '/repo/overdeck-scratch',
     });
 
@@ -32,9 +32,9 @@ describe('conversation <-> workspace linkage (PAN-1990)', () => {
     expect(getConversationByName('conv-explicit')?.workspaceId).toBe(workspaceId);
   });
 
-  it('resolves workspace_id from cwd via resolveWorkspaceForCwd when not given explicitly', () => {
+  it('resolves workspace_id from cwd via resolveWorkspaceForCwd when not given explicitly', async () => {
     upsertProjectFromConfig('proj-1', { name: 'overdeck', path: '/repo/overdeck' });
-    const workspaceId = createWorkspace({
+    const workspaceId = await createWorkspace({
       projectId: 'proj-1', kind: 'issue', name: 'pan-1990', path: '/repo/overdeck/workspaces/feature-pan-1990', issueId: 'PAN-1990',
     });
 
@@ -47,23 +47,23 @@ describe('conversation <-> workspace linkage (PAN-1990)', () => {
     expect(getConversationByName('conv-cwd-resolved')?.workspaceId).toBe(workspaceId);
   });
 
-  it('leaves workspace_id null when cwd matches nothing', () => {
+  it('leaves workspace_id null when cwd matches nothing', async () => {
     createConversation({ name: 'conv-no-match', tmuxSession: 'tmux-3', cwd: '/nowhere/relevant' });
     expect(getConversationByName('conv-no-match')?.workspaceId).toBeNull();
   });
 
-  it('an explicit workspaceId: null opts out of cwd resolution', () => {
+  it('an explicit workspaceId: null opts out of cwd resolution', async () => {
     upsertProjectFromConfig('proj-1', { name: 'overdeck', path: '/repo/overdeck' });
-    createWorkspace({ projectId: 'proj-1', kind: 'main', name: 'main', path: '/repo/overdeck' });
+    await createWorkspace({ projectId: 'proj-1', kind: 'main', name: 'main', path: '/repo/overdeck' });
 
     createConversation({ name: 'conv-opt-out', tmuxSession: 'tmux-4', cwd: '/repo/overdeck', workspaceId: null });
 
     expect(getConversationByName('conv-opt-out')?.workspaceId).toBeNull();
   });
 
-  it('after deleteWorkspace, the conversation row survives with workspace_id NULL', () => {
+  it('after deleteWorkspace, the conversation row survives with workspace_id NULL', async () => {
     upsertProjectFromConfig('proj-1', { name: 'overdeck', path: '/repo/overdeck' });
-    const workspaceId = createWorkspace({
+    const workspaceId = await createWorkspace({
       projectId: 'proj-1', kind: 'scratch', name: 'scratch', path: '/repo/overdeck-scratch',
     });
     createConversation({ name: 'conv-survives', tmuxSession: 'tmux-5', cwd: '/repo/overdeck-scratch', workspaceId });

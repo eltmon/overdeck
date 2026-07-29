@@ -51,9 +51,7 @@ export function setStatusRollupProcessor(processor: StatusRollupProcessor | unde
 }
 
 export async function writePendingTurn(turn: PendingTurn, options: StatusRollupTriggerOptions = {}): Promise<WritePendingTurnResult> {
-  // Null issueId (main/scratch workspace turn, PRD D-6) falls back to
-  // workspaceId as the path segment until memory-paths-rekey lands.
-  const dir = resolvePendingDir(turn.identity.projectId, turn.identity.issueId ?? turn.identity.workspaceId);
+  const dir = resolvePendingDir(turn.identity.projectId, turn.identity.workspaceId);
   await ensureDir(dir);
 
   const existing = await findExistingPendingTurn(dir, turn);
@@ -74,7 +72,7 @@ export async function maybeTriggerStatusRollup(
   options: StatusRollupTriggerOptions = {},
 ): Promise<StatusRollupTriggerResult> {
   const threshold = await loadThreshold(options);
-  const pendingTurns = await readPendingTurns(identity.projectId, identity.issueId ?? identity.workspaceId);
+  const pendingTurns = await readPendingTurns(identity.projectId, identity.workspaceId);
   const pendingCount = pendingTurns.length;
 
   if (pendingCount < threshold) return { status: 'below-threshold', pendingCount, threshold };
@@ -101,8 +99,8 @@ export async function maybeTriggerStatusRollup(
   }
 }
 
-export async function readPendingTurns(projectId: string, issueId: string): Promise<PendingTurn[]> {
-  const dir = resolvePendingDir(projectId, issueId);
+export async function readPendingTurns(projectId: string, workspaceId: string): Promise<PendingTurn[]> {
+  const dir = resolvePendingDir(projectId, workspaceId);
   const files = (await readdir(dir).catch((error: unknown) => {
     if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return [] as string[];
     throw error;
@@ -170,7 +168,7 @@ async function enqueueStatusRollupEvent(job: StatusRollupJob): Promise<void> {
   const identity = job.pendingTurns[0]?.identity;
   const result = await synthesizeStatusRollup({
     projectId: job.identity.projectId,
-    issueId: eventIssueId,
+    workspaceId: job.identity.workspaceId,
     pendingTurns: job.pendingTurns,
     identity,
   });

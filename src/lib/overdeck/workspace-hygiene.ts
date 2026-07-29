@@ -32,10 +32,10 @@ const execAsync = promisify(exec);
  * backfilled) or a write failure must never block the destructive teardown
  * this function is called alongside.
  */
-export function archiveIssueWorkspaceRow(issueId: string): void {
+export async function archiveIssueWorkspaceRow(issueId: string): Promise<void> {
   try {
     const row = getWorkspaceForIssue(issueId);
-    if (row) archiveWorkspace(row.id);
+    if (row) await archiveWorkspace(row.id);
   } catch { /* non-fatal */ }
 }
 
@@ -105,7 +105,7 @@ export async function cleanupWorkspaceForIssue(rawId: string, eventStore: EventS
     cleanupLog.push(`Removed agent state: ${agentDir}`);
   }
 
-  archiveIssueWorkspaceRow(id);
+  await archiveIssueWorkspaceRow(id);
 
   await Effect.runPromise(eventStore.append({
     type: 'workspace.deleted',
@@ -158,7 +158,7 @@ export async function deepWipeIssue(
       });
 
       if (result.success) {
-        archiveIssueWorkspaceRow(id.toUpperCase());
+        await archiveIssueWorkspaceRow(id.toUpperCase());
         await Effect.runPromise(eventStore.appendAsync(operatorInterventionEvent({
           issueId: id.toUpperCase(),
           kind: 'deep_wipe',

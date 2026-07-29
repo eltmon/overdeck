@@ -152,7 +152,7 @@ export function closeOutIssue(id: string, opts: { acceptedRows?: DodRowId[]; acc
     // PAN-1990: archive (never delete) the issue's workspace row alongside
     // close-out's own teardown. Row and memory home survive; only
     // is_archived flips.
-    archiveIssueWorkspaceRow(id.toUpperCase());
+    yield* Effect.promise(() => archiveIssueWorkspaceRow(id.toUpperCase()));
 
     let newLabels: string[] = ['closed-out'];
     try {

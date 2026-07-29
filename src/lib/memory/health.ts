@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import type { MemoryIdentity } from '@overdeck/contracts';
-import { ensureParentDir, resolveIssueMemoryRoot } from './paths.js';
+import { ensureParentDir, resolveWorkspaceMemoryRoot } from './paths.js';
 
 export type MemoryHealthStatus = 'healthy' | 'degraded' | 'failing';
 
@@ -51,11 +51,7 @@ export async function updateMemoryHealth(
   update: MemoryHealthUpdate,
   options: MemoryHealthUpdateOptions = {},
 ): Promise<MemoryHealthSnapshot> {
-  // Health tracking is issue-scoped (resolveIssueMemoryRoot); a null issueId
-  // means a main/scratch workspace turn with no per-issue health file to track.
-  if (identity.issueId === null) return { ...EMPTY_HEALTH, failed_by_reason: {} };
-
-  const path = getMemoryHealthPath({ projectId: identity.projectId, issueId: identity.issueId });
+  const path = getMemoryHealthPath({ projectId: identity.projectId, workspaceId: identity.workspaceId });
   const current = await readMemoryHealth(path);
   const now = (options.now ?? new Date()).toISOString();
   // Preserve the prior failure detail when a later detail-less failure write
@@ -89,9 +85,11 @@ export async function updateMemoryHealth(
   const statusChanged = current.status !== next.status;
   const detailChanged = !update.success && (nextDetail ?? null) !== (current.last_failure_detail ?? null);
   if (statusChanged || detailChanged) {
+    // The health_changed event/reducer is still issue-keyed (events-workspaceid
+    // covers widening it); fall back to workspaceId for a null issueId.
     const payload: MemoryHealthChangedPayload = {
       projectId: identity.projectId,
-      issueId: identity.issueId,
+      issueId: identity.issueId ?? identity.workspaceId,
       status: next.status,
       reason: update.reason ?? null,
       ...(nextDetail ? { detail: nextDetail } : {}),
@@ -102,12 +100,12 @@ export async function updateMemoryHealth(
   return next;
 }
 
-export async function readMemoryHealthSnapshot(identity: { projectId: string; issueId: string }): Promise<MemoryHealthSnapshot> {
+export async function readMemoryHealthSnapshot(identity: { projectId: string; workspaceId: string }): Promise<MemoryHealthSnapshot> {
   return readMemoryHealth(getMemoryHealthPath(identity));
 }
 
-export function getMemoryHealthPath(identity: { projectId: string; issueId: string }): string {
-  return join(resolveIssueMemoryRoot(identity.projectId, identity.issueId), 'health.json');
+export function getMemoryHealthPath(identity: { projectId: string; workspaceId: string }): string {
+  return join(resolveWorkspaceMemoryRoot(identity.projectId, identity.workspaceId), 'health.json');
 }
 
 async function readMemoryHealth(path: string): Promise<MemoryHealthSnapshot> {

@@ -59,10 +59,12 @@ describe('sacred-file invariant — memory observations (FR-6 runtime)', () => {
     const { MemoryFilesLive } = await import('../../../../src/lib/overdeck/memory.js');
     const { MemoryFiles } = await import('../../../../src/lib/overdeck/infra.js');
 
-    // Minimal shape: appendObservation only accesses id, projectId, issueId, timestamp.
+    // Minimal shape: appendObservation only accesses id, projectId, workspaceId, timestamp
+    // (PAN-1990: memory storage is keyed by workspaceId, not issueId).
     const obs = {
       id: 'g4-test-obs',
       projectId: 'proj1',
+      workspaceId: 'workspace-pan-9999',
       issueId: 'PAN-9999',
       timestamp: new Date().toISOString(),
     };

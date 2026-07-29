@@ -42,7 +42,7 @@ export async function backfillIssueWorkspaces(): Promise<void> {
       const issueId = match[1].toUpperCase();
       if (getWorkspaceForIssue(issueId)) continue;
 
-      createWorkspace({
+      await createWorkspace({
         projectId: project.id,
         kind: 'issue',
         name: entry.name,

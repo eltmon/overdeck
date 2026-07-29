@@ -211,7 +211,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     const project = getProjectByPath(projectConfig.path);
     if (project) {
       try {
-        createWorkspace({
+        await createWorkspace({
           projectId: project.id,
           kind: 'issue',
           name: featureFolder,

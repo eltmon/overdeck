@@ -45,34 +45,34 @@ describe('workspaces writer', () => {
     expect(odb.raw().prepare(`SELECT COUNT(*) as c FROM projects`).get()).toEqual({ c: 1 });
   });
 
-  it('createWorkspace rejects a second kind=main row for the same project', () => {
+  it('createWorkspace rejects a second kind=main row for the same project', async () => {
     const projectId = seedProject();
-    createWorkspace({ projectId, kind: 'main', name: 'main', path: '/repo/overdeck' });
+    await createWorkspace({ projectId, kind: 'main', name: 'main', path: '/repo/overdeck' });
 
-    expect(() =>
+    await expect(
       createWorkspace({ projectId, kind: 'main', name: 'main-2', path: '/repo/overdeck' }),
-    ).toThrow(/already has a main workspace/);
+    ).rejects.toThrow(/already has a main workspace/);
 
     expect(listWorkspaces({ projectId, kind: 'main' })).toHaveLength(1);
   });
 
-  it('createWorkspace allows multiple scratch/issue workspaces for the same project', () => {
+  it('createWorkspace allows multiple scratch/issue workspaces for the same project', async () => {
     const projectId = seedProject();
-    createWorkspace({ projectId, kind: 'scratch', name: 'scratch-1', path: '/repo/overdeck-scratch-1' });
-    createWorkspace({ projectId, kind: 'scratch', name: 'scratch-2', path: '/repo/overdeck-scratch-2' });
-    createWorkspace({ projectId, kind: 'issue', name: 'pan-1', path: '/repo/workspaces/feature-pan-1', issueId: 'pan-1' });
+    await createWorkspace({ projectId, kind: 'scratch', name: 'scratch-1', path: '/repo/overdeck-scratch-1' });
+    await createWorkspace({ projectId, kind: 'scratch', name: 'scratch-2', path: '/repo/overdeck-scratch-2' });
+    await createWorkspace({ projectId, kind: 'issue', name: 'pan-1', path: '/repo/workspaces/feature-pan-1', issueId: 'pan-1' });
 
     expect(listWorkspaces({ projectId })).toHaveLength(3);
   });
 
-  it('touchWorkspaceAccessed, updateWorkspaceLayout, setWorkspaceFavorite, archive/unarchive round-trip', () => {
+  it('touchWorkspaceAccessed, updateWorkspaceLayout, setWorkspaceFavorite, archive/unarchive round-trip', async () => {
     const projectId = seedProject();
-    const id = createWorkspace({ projectId, kind: 'scratch', name: 'scratch', path: '/repo/overdeck-scratch' });
+    const id = await createWorkspace({ projectId, kind: 'scratch', name: 'scratch', path: '/repo/overdeck-scratch' });
 
     touchWorkspaceAccessed(id);
     updateWorkspaceLayout(id, '{"tabs":[]}');
     setWorkspaceFavorite(id, true);
-    archiveWorkspace(id);
+    await archiveWorkspace(id);
 
     let row = getWorkspaceById(id)!;
     expect(row.layoutConfig).toBe('{"tabs":[]}');
@@ -84,17 +84,17 @@ describe('workspaces writer', () => {
     expect(row.isArchived).toBe(false);
   });
 
-  it('deleteWorkspace refuses kind=main', () => {
+  it('deleteWorkspace refuses kind=main', async () => {
     const projectId = seedProject();
-    const id = createWorkspace({ projectId, kind: 'main', name: 'main', path: '/repo/overdeck' });
+    const id = await createWorkspace({ projectId, kind: 'main', name: 'main', path: '/repo/overdeck' });
 
     expect(() => deleteWorkspace(id)).toThrow(/Cannot delete the main workspace/);
     expect(getWorkspaceById(id)).not.toBeNull();
   });
 
-  it('deleteWorkspace sets conversations.workspace_id to NULL and preserves the conversation row', () => {
+  it('deleteWorkspace sets conversations.workspace_id to NULL and preserves the conversation row', async () => {
     const projectId = seedProject();
-    const id = createWorkspace({ projectId, kind: 'scratch', name: 'scratch', path: '/repo/overdeck-scratch' });
+    const id = await createWorkspace({ projectId, kind: 'scratch', name: 'scratch', path: '/repo/overdeck-scratch' });
 
     odb.raw().prepare(`
       INSERT INTO conversations (id, name, tmux_session, status, cwd, created_at, workspace_id)
@@ -111,9 +111,9 @@ describe('workspaces writer', () => {
     expect(conversation).toEqual({ name: 'conv-1', workspace_id: null });
   });
 
-  it('deleteWorkspace removes workspace-scoped pins but leaves project-scoped pins for the same id untouched', () => {
+  it('deleteWorkspace removes workspace-scoped pins but leaves project-scoped pins for the same id untouched', async () => {
     const projectId = seedProject();
-    const id = createWorkspace({ projectId, kind: 'scratch', name: 'scratch', path: '/repo/overdeck-scratch' });
+    const id = await createWorkspace({ projectId, kind: 'scratch', name: 'scratch', path: '/repo/overdeck-scratch' });
 
     pinDoc('workspace', id, 'docs/NOTES.md');
     pinDoc('project', projectId, 'docs/README.md');
@@ -146,9 +146,9 @@ describe('workspaces writer', () => {
 });
 
 describe('workspaces writer + resolver: main workspace lookup', () => {
-  it('getMainWorkspace finds the singleton row created via createWorkspace', () => {
+  it('getMainWorkspace finds the singleton row created via createWorkspace', async () => {
     const projectId = seedProject();
-    const id = createWorkspace({ projectId, kind: 'main', name: 'main', path: '/repo/overdeck' });
+    const id = await createWorkspace({ projectId, kind: 'main', name: 'main', path: '/repo/overdeck' });
     expect(getMainWorkspace(projectId)?.id).toBe(id);
   });
 });

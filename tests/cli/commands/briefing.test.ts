@@ -4,6 +4,8 @@ import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { briefingCommandAction, createBriefingCommand } from '../../../src/cli/commands/briefing.js';
 import { ensureParentDir, resolveStatusFile } from '../../../src/lib/memory/paths.js';
+import { closeOverdeckDatabaseSync } from '../../../src/lib/overdeck/infra.js';
+import { createWorkspace, upsertProjectFromConfig } from '../../../src/lib/workspaces/writer.js';
 
 let tempDir: string | null = null;
 let originalHome: string | undefined;
@@ -15,6 +17,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  closeOverdeckDatabaseSync();
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = originalHome;
   if (tempDir) await rm(tempDir, { recursive: true, force: true });
@@ -49,7 +52,15 @@ describe('pan briefing command', () => {
     await writeFile(join(workspace, '.pan', 'spec.vbrief.json'), JSON.stringify({
       plan: { title: 'Home tab + live session-context briefing' },
     }), 'utf8');
-    const statusPath = resolveStatusFile('overdeck', 'PAN-1204');
+    upsertProjectFromConfig('overdeck', { name: 'Overdeck', path: tempDir! });
+    const workspaceId = await createWorkspace({
+      projectId: 'overdeck',
+      kind: 'issue',
+      name: 'feature-pan-1204',
+      path: workspace,
+      issueId: 'PAN-1204',
+    });
+    const statusPath = resolveStatusFile('overdeck', workspaceId);
     await ensureParentDir(statusPath);
     await writeFile(statusPath, JSON.stringify({
       phase: 'building',

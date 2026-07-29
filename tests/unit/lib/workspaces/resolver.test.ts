@@ -30,9 +30,9 @@ function seedProject(id = 'proj-1', path = '/repo/overdeck') {
 }
 
 describe('workspaces resolver', () => {
-  it('getWorkspaceById and getWorkspaceByName find a created row', () => {
+  it('getWorkspaceById and getWorkspaceByName find a created row', async () => {
     const projectId = seedProject();
-    const id = createWorkspace({ projectId, kind: 'scratch', name: 'notes', path: '/repo/overdeck-notes' });
+    const id = await createWorkspace({ projectId, kind: 'scratch', name: 'notes', path: '/repo/overdeck-notes' });
 
     expect(getWorkspaceById(id)?.name).toBe('notes');
     expect(getWorkspaceByName(projectId, 'notes')?.id).toBe(id);
@@ -40,9 +40,9 @@ describe('workspaces resolver', () => {
     expect(getWorkspaceByName(projectId, 'missing')).toBeNull();
   });
 
-  it('getWorkspaceForIssue returns the non-archived kind=issue row and ignores archived ones', () => {
+  it('getWorkspaceForIssue returns the non-archived kind=issue row and ignores archived ones', async () => {
     const projectId = seedProject();
-    const activeId = createWorkspace({
+    const activeId = await createWorkspace({
       projectId,
       kind: 'issue',
       name: 'pan-1990',
@@ -57,19 +57,19 @@ describe('workspaces resolver', () => {
     expect(getWorkspaceForIssue('pan-1990')).toBeNull();
   });
 
-  it('getMainWorkspace returns null when no main workspace exists yet', () => {
+  it('getMainWorkspace returns null when no main workspace exists yet', async () => {
     const projectId = seedProject();
     expect(getMainWorkspace(projectId)).toBeNull();
-    const id = createWorkspace({ projectId, kind: 'main', name: 'main', path: '/repo/overdeck' });
+    const id = await createWorkspace({ projectId, kind: 'main', name: 'main', path: '/repo/overdeck' });
     expect(getMainWorkspace(projectId)?.id).toBe(id);
   });
 
-  it('listWorkspaces filters by projectId, kind, and archived state', () => {
+  it('listWorkspaces filters by projectId, kind, and archived state', async () => {
     const projectA = seedProject('proj-a', '/repo/a');
     const projectB = seedProject('proj-b', '/repo/b');
-    createWorkspace({ projectId: projectA, kind: 'main', name: 'main', path: '/repo/a' });
-    const scratchA = createWorkspace({ projectId: projectA, kind: 'scratch', name: 'scratch', path: '/repo/a-scratch' });
-    createWorkspace({ projectId: projectB, kind: 'main', name: 'main', path: '/repo/b' });
+    await createWorkspace({ projectId: projectA, kind: 'main', name: 'main', path: '/repo/a' });
+    const scratchA = await createWorkspace({ projectId: projectA, kind: 'scratch', name: 'scratch', path: '/repo/a-scratch' });
+    await createWorkspace({ projectId: projectB, kind: 'main', name: 'main', path: '/repo/b' });
 
     odb.raw().prepare(`UPDATE workspaces SET is_archived = 1 WHERE id = ?`).run(scratchA);
 
@@ -79,7 +79,7 @@ describe('workspaces resolver', () => {
     expect(listWorkspaces()).toHaveLength(2); // both mains; archived scratch excluded
   });
 
-  it('getProjectByKey, getProjectByPath, and listProjects resolve seeded projects', () => {
+  it('getProjectByKey, getProjectByPath, and listProjects resolve seeded projects', async () => {
     seedProject('proj-a', '/repo/a');
     seedProject('proj-b', '/repo/b');
 
@@ -90,10 +90,10 @@ describe('workspaces resolver', () => {
     expect(listProjects().map((p) => p.id)).toEqual(['proj-a', 'proj-b']);
   });
 
-  it('resolveWorkspaceForCwd matches the longest workspace path prefix, not a shorter sibling', () => {
+  it('resolveWorkspaceForCwd matches the longest workspace path prefix, not a shorter sibling', async () => {
     const projectId = seedProject();
-    const outer = createWorkspace({ projectId, kind: 'scratch', name: 'outer', path: '/repo/overdeck' });
-    const inner = createWorkspace({
+    const outer = await createWorkspace({ projectId, kind: 'scratch', name: 'outer', path: '/repo/overdeck' });
+    const inner = await createWorkspace({
       projectId,
       kind: 'issue',
       name: 'pan-1',
@@ -105,21 +105,21 @@ describe('workspaces resolver', () => {
     expect(resolveWorkspaceForCwd('/repo/overdeck/some-other-dir')?.id).toBe(outer);
   });
 
-  it('resolveWorkspaceForCwd does not prefix-match a sibling directory with a shared string prefix', () => {
+  it('resolveWorkspaceForCwd does not prefix-match a sibling directory with a shared string prefix', async () => {
     const projectId = seedProject();
-    createWorkspace({ projectId, kind: 'scratch', name: 'overdeck', path: '/repo/overdeck' });
+    await createWorkspace({ projectId, kind: 'scratch', name: 'overdeck', path: '/repo/overdeck' });
 
     expect(resolveWorkspaceForCwd('/repo/overdeck-other-project')).toBeNull();
   });
 
-  it('resolveWorkspaceForCwd falls back to a project primary path and returns its main workspace', () => {
+  it('resolveWorkspaceForCwd falls back to a project primary path and returns its main workspace', async () => {
     const projectId = seedProject('proj-1', '/repo/overdeck');
-    const mainId = createWorkspace({ projectId, kind: 'main', name: 'main', path: '/repo/overdeck' });
+    const mainId = await createWorkspace({ projectId, kind: 'main', name: 'main', path: '/repo/overdeck' });
 
     expect(resolveWorkspaceForCwd('/repo/overdeck/some/nested/dir')?.id).toBe(mainId);
   });
 
-  it('resolveWorkspaceForCwd returns null when nothing matches', () => {
+  it('resolveWorkspaceForCwd returns null when nothing matches', async () => {
     seedProject();
     expect(resolveWorkspaceForCwd('/completely/unrelated/path')).toBeNull();
   });

@@ -51,7 +51,7 @@ const STATUS_RESPONSE_JSON_SCHEMA = {
 
 export interface SynthesizeStatusRollupInput {
   projectId: string;
-  issueId: string;
+  workspaceId: string;
   pendingTurns: PendingTurn[];
   identity?: MemoryIdentity;
   observations?: MemoryObservation[];
@@ -98,8 +98,8 @@ export async function synthesizeStatusRollup(input: SynthesizeStatusRollupInput)
   const identity = input.identity ?? input.pendingTurns[0]?.identity;
   if (!identity) return { status: 'dropped', reason: 'missing-identity' };
 
-  const observations = input.observations ?? await readRecentObservations(input.projectId, input.issueId, 20);
-  const archivedStatuses = input.archivedStatuses ?? await readArchivedStatuses(input.projectId, input.issueId, 3);
+  const observations = input.observations ?? await readRecentObservations(input.projectId, input.workspaceId, 20);
+  const archivedStatuses = input.archivedStatuses ?? await readArchivedStatuses(input.projectId, input.workspaceId, 3);
   const prompt = buildStatusRollupPrompt({
     pendingTurns: input.pendingTurns,
     observations,
@@ -127,16 +127,13 @@ export async function synthesizeStatusRollup(input: SynthesizeStatusRollupInput)
 
 export async function commitStatusRollup(input: CommitStatusRollupInput): Promise<CommitStatusRollupResult> {
   const { projectId, workspaceId } = input.identity;
-  // Status rollup storage/events are still issue-only (events-workspaceid covers
-  // widening them); fall back to workspaceId for a null issueId in the meantime.
-  const issueId = input.identity.issueId ?? workspaceId;
-  const statusPath = resolveStatusFile(projectId, issueId);
-  const previousStatus = await readCurrentStatus(projectId, issueId);
+  const statusPath = resolveStatusFile(projectId, workspaceId);
+  const previousStatus = await readCurrentStatus(projectId, workspaceId);
   let archivedPath: string | undefined;
 
   if (previousStatus) {
-    archivedPath = await archiveStatus(projectId, issueId, previousStatus, input.now ?? new Date());
-    await pruneArchivedStatuses(projectId, issueId, 3);
+    archivedPath = await archiveStatus(projectId, workspaceId, previousStatus, input.now ?? new Date());
+    await pruneArchivedStatuses(projectId, workspaceId, 3);
   }
 
   if (input.failAfterArchive) throw new Error('Injected rollup archive failure');
@@ -145,19 +142,22 @@ export async function commitStatusRollup(input: CommitStatusRollupInput): Promis
 
   if (input.failAfterStatusWrite) throw new Error('Injected rollup status write failure');
 
+  // The status_updated event/reducer is still issue-keyed (events-workspaceid
+  // covers widening it); fall back to workspaceId for a null issueId.
+  const eventIssueId = input.identity.issueId ?? workspaceId;
   await (input.emitStatusUpdated ?? emitStatusUpdatedEvent)({
-    identity: { projectId, workspaceId, issueId },
+    identity: { projectId, workspaceId, issueId: eventIssueId },
     status: input.status,
     previousStatus,
   });
 
-  const clearedPending = await clearPendingTurns(projectId, issueId, input.pendingTurns);
+  const clearedPending = await clearPendingTurns(projectId, workspaceId, input.pendingTurns);
   return { previousStatus, archivedPath, statusPath, clearedPending };
 }
 
-export async function readCurrentStatus(projectId: string, issueId: string): Promise<MemoryStatus | undefined> {
+export async function readCurrentStatus(projectId: string, workspaceId: string): Promise<MemoryStatus | undefined> {
   try {
-    return JSON.parse(await readFile(resolveStatusFile(projectId, issueId), 'utf8')) as MemoryStatus;
+    return JSON.parse(await readFile(resolveStatusFile(projectId, workspaceId), 'utf8')) as MemoryStatus;
   } catch (error) {
     if (isEnoent(error)) return undefined;
     throw error;
@@ -181,8 +181,8 @@ export function buildStatusRollupPrompt(input: {
   ].join('\n\n');
 }
 
-export async function readRecentObservations(projectId: string, issueId: string, limit = 20): Promise<MemoryObservation[]> {
-  const observationsDir = dirname(resolveObservationsFile(projectId, issueId, new Date()));
+export async function readRecentObservations(projectId: string, workspaceId: string, limit = 20): Promise<MemoryObservation[]> {
+  const observationsDir = dirname(resolveObservationsFile(projectId, workspaceId, new Date()));
   const files = (await readdir(observationsDir).catch((error: unknown) => {
     if (isEnoent(error)) return [] as string[];
     throw error;
@@ -207,8 +207,8 @@ export async function readRecentObservations(projectId: string, issueId: string,
     .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 }
 
-export async function readArchivedStatuses(projectId: string, issueId: string, limit = 3): Promise<MemoryStatus[]> {
-  const archiveDir = resolveArchiveDir(projectId, issueId);
+export async function readArchivedStatuses(projectId: string, workspaceId: string, limit = 3): Promise<MemoryStatus[]> {
+  const archiveDir = resolveArchiveDir(projectId, workspaceId);
   const files = (await readdir(archiveDir).catch((error: unknown) => {
     if (isEnoent(error)) return [] as string[];
     throw error;
@@ -224,16 +224,16 @@ export async function readArchivedStatuses(projectId: string, issueId: string, l
   return statuses;
 }
 
-async function archiveStatus(projectId: string, issueId: string, status: MemoryStatus, now: Date): Promise<string> {
-  const archiveDir = resolveArchiveDir(projectId, issueId);
+async function archiveStatus(projectId: string, workspaceId: string, status: MemoryStatus, now: Date): Promise<string> {
+  const archiveDir = resolveArchiveDir(projectId, workspaceId);
   await ensureDir(archiveDir);
   const path = `${archiveDir}/${now.toISOString().replace(/[:.]/g, '-')}_${slugify(status.name)}_${randomUUID()}.json`;
   await writeJsonAtomically(path, status);
   return path;
 }
 
-async function pruneArchivedStatuses(projectId: string, issueId: string, keep: number): Promise<void> {
-  const archiveDir = resolveArchiveDir(projectId, issueId);
+async function pruneArchivedStatuses(projectId: string, workspaceId: string, keep: number): Promise<void> {
+  const archiveDir = resolveArchiveDir(projectId, workspaceId);
   const files = (await readdir(archiveDir).catch((error: unknown) => {
     if (isEnoent(error)) return [] as string[];
     throw error;
@@ -244,8 +244,8 @@ async function pruneArchivedStatuses(projectId: string, issueId: string, keep: n
   await Promise.all(files.slice(0, Math.max(0, files.length - keep)).map((file) => unlink(`${archiveDir}/${file}`)));
 }
 
-async function clearPendingTurns(projectId: string, issueId: string, pendingTurns: PendingTurn[]): Promise<string[]> {
-  const pendingDir = resolvePendingDir(projectId, issueId);
+async function clearPendingTurns(projectId: string, workspaceId: string, pendingTurns: PendingTurn[]): Promise<string[]> {
+  const pendingDir = resolvePendingDir(projectId, workspaceId);
   const cleared: string[] = [];
   for (const turn of pendingTurns) {
     const path = `${pendingDir}/${pendingTurnFileName(turn)}`;

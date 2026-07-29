@@ -1,7 +1,9 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { join, resolve } from 'path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   ensureDir,
@@ -16,6 +18,7 @@ import {
   resolveRagRunsFile,
   resolveStatusFile,
   resolveSummariesDir,
+  resolveWorkspaceMemoryRoot,
 } from '../../../src/lib/memory/paths.js';
 
 let tempDir: string | null = null;
@@ -34,25 +37,25 @@ afterEach(async () => {
   tempDir = null;
 });
 
-describe('memory path resolvers', () => {
-  it('resolves project and issue memory roots under OVERDECK_HOME', () => {
+describe('memory path resolvers (PAN-1990: keyed by workspaceId)', () => {
+  it('resolves project and workspace memory roots under OVERDECK_HOME', () => {
     expect(resolveMemoryRoot('overdeck')).toBe(join(tempDir!, 'memory/overdeck'));
-    expect(resolveIssueMemoryRoot('overdeck', 'PAN-1052')).toBe(join(tempDir!, 'memory/overdeck/PAN-1052'));
+    expect(resolveWorkspaceMemoryRoot('overdeck', 'workspace-pan-1052')).toBe(join(tempDir!, 'memory/overdeck/workspace-pan-1052'));
   });
 
-  it('resolves issue-scoped memory artifacts', () => {
-    expect(resolveObservationsFile('overdeck', 'PAN-1052', '2026-05-16T20:00:00.000Z'))
-      .toBe(join(tempDir!, 'memory/overdeck/PAN-1052/observations/2026-05-16.jsonl'));
-    expect(resolvePendingDir('overdeck', 'PAN-1052'))
-      .toBe(join(tempDir!, 'memory/overdeck/PAN-1052/pending'));
-    expect(resolveStatusFile('overdeck', 'PAN-1052'))
-      .toBe(join(tempDir!, 'memory/overdeck/PAN-1052/status.json'));
-    expect(resolveArchiveDir('overdeck', 'PAN-1052'))
-      .toBe(join(tempDir!, 'memory/overdeck/PAN-1052/archive'));
-    expect(resolveSummariesDir('overdeck', 'PAN-1052'))
-      .toBe(join(tempDir!, 'memory/overdeck/PAN-1052/summaries'));
-    expect(resolveRagRunsFile('overdeck', 'PAN-1052', new Date('2026-05-16T20:00:00.000Z')))
-      .toBe(join(tempDir!, 'memory/overdeck/PAN-1052/rag-runs/2026-05-16.jsonl'));
+  it('resolves workspace-scoped memory artifacts', () => {
+    expect(resolveObservationsFile('overdeck', 'workspace-pan-1052', '2026-05-16T20:00:00.000Z'))
+      .toBe(join(tempDir!, 'memory/overdeck/workspace-pan-1052/observations/2026-05-16.jsonl'));
+    expect(resolvePendingDir('overdeck', 'workspace-pan-1052'))
+      .toBe(join(tempDir!, 'memory/overdeck/workspace-pan-1052/pending'));
+    expect(resolveStatusFile('overdeck', 'workspace-pan-1052'))
+      .toBe(join(tempDir!, 'memory/overdeck/workspace-pan-1052/status.json'));
+    expect(resolveArchiveDir('overdeck', 'workspace-pan-1052'))
+      .toBe(join(tempDir!, 'memory/overdeck/workspace-pan-1052/archive'));
+    expect(resolveSummariesDir('overdeck', 'workspace-pan-1052'))
+      .toBe(join(tempDir!, 'memory/overdeck/workspace-pan-1052/summaries'));
+    expect(resolveRagRunsFile('overdeck', 'workspace-pan-1052', new Date('2026-05-16T20:00:00.000Z')))
+      .toBe(join(tempDir!, 'memory/overdeck/workspace-pan-1052/rag-runs/2026-05-16.jsonl'));
   });
 
   it('resolves workspace checkpoint and project FTS database paths', () => {
@@ -61,16 +64,35 @@ describe('memory path resolvers', () => {
   });
 
   it('keeps path functions pure and exposes separate idempotent directory helpers', async () => {
-    const file = resolveRagRunsFile('overdeck', 'PAN-1052', '2026-05-16');
+    const file = resolveRagRunsFile('overdeck', 'workspace-pan-1052', '2026-05-16');
     expect(existsSync(join(tempDir!, 'memory'))).toBe(false);
 
     await ensureParentDir(file);
     await ensureParentDir(file);
-    expect(existsSync(join(tempDir!, 'memory/overdeck/PAN-1052/rag-runs'))).toBe(true);
+    expect(existsSync(join(tempDir!, 'memory/overdeck/workspace-pan-1052/rag-runs'))).toBe(true);
 
-    const dir = resolvePendingDir('overdeck', 'PAN-1052');
+    const dir = resolvePendingDir('overdeck', 'workspace-pan-1052');
     await ensureDir(dir);
     await ensureDir(dir);
     expect(existsSync(dir)).toBe(true);
+  });
+
+  it('keeps deprecated resolveIssueMemoryRoot working for migration use', () => {
+    expect(resolveIssueMemoryRoot('overdeck', 'PAN-1052')).toBe(join(tempDir!, 'memory/overdeck/PAN-1052'));
+  });
+
+  it('rejects unsafe segments for resolveWorkspaceMemoryRoot', () => {
+    expect(() => resolveWorkspaceMemoryRoot('overdeck', '..')).toThrow('Invalid memory workspaceId');
+  });
+
+  it('has no non-migration caller of the deprecated resolveIssueMemoryRoot outside paths.ts (PAN-1990 ac4)', () => {
+    const repoRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
+    const output = execFileSync(
+      'git',
+      ['grep', '-l', 'resolveIssueMemoryRoot', '--', 'src/'],
+      { cwd: repoRoot, encoding: 'utf-8' },
+    );
+    const files = output.trim().split('\n').filter(Boolean);
+    expect(files).toEqual(['src/lib/memory/paths.ts']);
   });
 });

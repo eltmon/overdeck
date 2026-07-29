@@ -77,7 +77,7 @@ export async function workspaceNewCommand(name: string, options: WorkspaceNewOpt
       );
     }
 
-    const id = createWorkspace({
+    const id = await createWorkspace({
       projectId: project.key,
       kind: 'scratch',
       name,
@@ -114,7 +114,7 @@ export async function workspaceMainCommand(options: WorkspaceMainOptions): Promi
     }
 
     const isGitRepository = existsSync(join(project.config.path, '.git'));
-    const id = createWorkspace({
+    const id = await createWorkspace({
       projectId: project.key,
       kind: 'main',
       name: 'main',

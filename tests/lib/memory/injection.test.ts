@@ -60,7 +60,7 @@ afterEach(async () => {
 });
 
 async function writeStatus(value: MemoryStatus = status) {
-  const path = resolveStatusFile(identity.projectId, identity.issueId);
+  const path = resolveStatusFile(identity.projectId, identity.workspaceId);
   await ensureParentDir(path);
   await writeFile(path, `${JSON.stringify(value)}\n`, 'utf8');
 }
@@ -121,7 +121,7 @@ async function injectWithLog(
 }
 
 async function readRagEntries() {
-  const raw = await readFile(resolveRagRunsFile(identity.projectId, identity.issueId, '2026-05-16'), 'utf8');
+  const raw = await readFile(resolveRagRunsFile(identity.projectId, identity.workspaceId, '2026-05-16'), 'utf8');
   return raw.trim().split('\n').map((line) => JSON.parse(line));
 }
 

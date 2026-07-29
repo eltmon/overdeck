@@ -31,7 +31,7 @@ export interface PromptTimeMemoryInjectionInput {
   loadPromptTimeEnabled?: () => boolean | Promise<boolean>;
   loadKnowledgeIndexEnabled?: () => boolean | Promise<boolean>;
   loadKnowledgeIndex?: (identity: MemoryIdentity) => Promise<string | null>;
-  loadStatus?: (projectId: string, issueId: string) => Promise<MemoryStatus | null>;
+  loadStatus?: (projectId: string, workspaceId: string) => Promise<MemoryStatus | null>;
   search?: typeof searchMemory;
   logDecision?: (entry: PromptTimeRagDecisionLogEntry) => Promise<void>;
 }
@@ -96,9 +96,7 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
   const knowledgeEnabled = await (input.loadKnowledgeIndexEnabled ?? isMemoryKnowledgeIndexEnabled)();
   const { issueId } = input.identity;
   const [status, knowledgeIndex, sameProjectHits, siblingHits] = await Promise.all([
-    issueId !== null
-      ? (input.loadStatus ?? readStatus)(input.identity.projectId, issueId).catch(() => null)
-      : Promise.resolve(null),
+    (input.loadStatus ?? readStatus)(input.identity.projectId, input.identity.workspaceId).catch(() => null),
     knowledgeEnabled
       ? (input.loadKnowledgeIndex ?? readKnowledgeIndex)(input.identity).catch(() => null)
       : Promise.resolve(null),
@@ -238,9 +236,9 @@ function statusCandidate(status: MemoryStatus, identity: MemoryIdentity): Candid
     title: `Status: ${status.name}`,
     text,
     source: {
-      id: `status:${identity.projectId}:${identity.issueId}`,
+      id: `status:${identity.projectId}:${identity.workspaceId}`,
       docType: 'status',
-      scope: 'issue',
+      scope: 'workspace',
       score: status.confidence,
       tokens: estimateTokens(text),
     },
@@ -428,18 +426,14 @@ async function writeDecision(input: PromptTimeMemoryInjectionInput, decision: Pr
     return;
   }
 
-  // rag-runs logging is issue-scoped; a null issueId (main/scratch workspace
-  // turn) has no per-issue log file to write to.
-  if (input.identity.issueId === null) return;
-
-  const filePath = resolveRagRunsFile(input.identity.projectId, input.identity.issueId, decision.timestamp);
+  const filePath = resolveRagRunsFile(input.identity.projectId, input.identity.workspaceId, decision.timestamp);
   await ensureParentDir(filePath);
   void appendFile(filePath, `${JSON.stringify(decision)}\n`, 'utf8').catch(() => {});
 }
 
-async function readStatus(projectId: string, issueId: string): Promise<MemoryStatus | null> {
+async function readStatus(projectId: string, workspaceId: string): Promise<MemoryStatus | null> {
   try {
-    return JSON.parse(await readFile(resolveStatusFile(projectId, issueId), 'utf8')) as MemoryStatus;
+    return JSON.parse(await readFile(resolveStatusFile(projectId, workspaceId), 'utf8')) as MemoryStatus;
   } catch (error) {
     if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') return null;
     throw error;

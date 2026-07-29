@@ -80,7 +80,7 @@ describe('backfillIssueWorkspaces', () => {
     const workspacesDir = join(projectRoot, 'workspaces');
     mkdirSync(join(workspacesDir, 'feature-pan-1990'), { recursive: true });
 
-    createWorkspace({
+    await createWorkspace({
       projectId: 'overdeck',
       kind: 'issue',
       name: 'feature-pan-1990',

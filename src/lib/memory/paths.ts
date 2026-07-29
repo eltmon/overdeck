@@ -28,33 +28,42 @@ export function resolveMemoryRoot(projectId: string): string {
   return assertUnderMemoryBase(path);
 }
 
+export function resolveWorkspaceMemoryRoot(projectId: string, workspaceId: string): string {
+  const path = join(resolveMemoryRoot(projectId), assertMemorySafeSegment(workspaceId, 'workspaceId'));
+  return assertUnderMemoryBase(path);
+}
+
+/**
+ * @deprecated Memory storage is keyed by workspaceId (see resolveWorkspaceMemoryRoot).
+ * Retained only for the memory-paths-rekey migration path (reading pre-rekey layouts).
+ */
 export function resolveIssueMemoryRoot(projectId: string, issueId: string): string {
   const path = join(resolveMemoryRoot(projectId), assertMemorySafeSegment(issueId, 'issueId'));
   return assertUnderMemoryBase(path);
 }
 
-export function resolveObservationsFile(projectId: string, issueId: string, date: string | Date | number): string {
-  return join(resolveIssueMemoryRoot(projectId, issueId), 'observations', `${dateKey(date)}.jsonl`);
+export function resolveObservationsFile(projectId: string, workspaceId: string, date: string | Date | number): string {
+  return join(resolveWorkspaceMemoryRoot(projectId, workspaceId), 'observations', `${dateKey(date)}.jsonl`);
 }
 
-export function resolvePendingDir(projectId: string, issueId: string): string {
-  return join(resolveIssueMemoryRoot(projectId, issueId), 'pending');
+export function resolvePendingDir(projectId: string, workspaceId: string): string {
+  return join(resolveWorkspaceMemoryRoot(projectId, workspaceId), 'pending');
 }
 
-export function resolveStatusFile(projectId: string, issueId: string): string {
-  return join(resolveIssueMemoryRoot(projectId, issueId), 'status.json');
+export function resolveStatusFile(projectId: string, workspaceId: string): string {
+  return join(resolveWorkspaceMemoryRoot(projectId, workspaceId), 'status.json');
 }
 
-export function resolveArchiveDir(projectId: string, issueId: string): string {
-  return join(resolveIssueMemoryRoot(projectId, issueId), 'archive');
+export function resolveArchiveDir(projectId: string, workspaceId: string): string {
+  return join(resolveWorkspaceMemoryRoot(projectId, workspaceId), 'archive');
 }
 
-export function resolveSummariesDir(projectId: string, issueId: string): string {
-  return join(resolveIssueMemoryRoot(projectId, issueId), 'summaries');
+export function resolveSummariesDir(projectId: string, workspaceId: string): string {
+  return join(resolveWorkspaceMemoryRoot(projectId, workspaceId), 'summaries');
 }
 
-export function resolveRagRunsFile(projectId: string, issueId: string, date: string | Date | number): string {
-  return join(resolveIssueMemoryRoot(projectId, issueId), 'rag-runs', `${dateKey(date)}.jsonl`);
+export function resolveRagRunsFile(projectId: string, workspaceId: string, date: string | Date | number): string {
+  return join(resolveWorkspaceMemoryRoot(projectId, workspaceId), 'rag-runs', `${dateKey(date)}.jsonl`);
 }
 
 export function resolveCheckpointFile(workspacePath: string): string {

@@ -5,12 +5,14 @@
  * project_targets/pinned_docs tables. See docs/PIPELINE-MEMBERSHIP.md's
  * two-doors tenet — every write to these tables goes through this writer.
  *
- * Identity-record mirroring into a workspace's memory-home metadata.json
- * (on create/rename/archive) is wired by the memory-paths-rekey item; this
- * module intentionally does not call into src/lib/memory/ yet.
+ * Identity-record mirroring into a workspace's memory-home metadata.json is a
+ * best-effort recovery hint, not canonical state (the workspaces table row
+ * remains the source of truth) — createWorkspace/archiveWorkspace are async
+ * only to await that mirror write; the SQLite row write itself stays sync.
  */
 import { randomUUID } from 'node:crypto';
 import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
+import { writeWorkspaceIdentity } from '../memory/identity-record.js';
 import type { ProjectConfig } from '../projects.js';
 import type { PinScope, WorkspaceKind } from './types.js';
 import { getMainWorkspace, getProjectByKey, getWorkspaceById } from './resolver.js';
@@ -64,7 +66,7 @@ export interface CreateWorkspaceOptions {
 }
 
 /** Create a workspace row. Generates a fresh UUID and enforces main-singleton per project. */
-export function createWorkspace(opts: CreateWorkspaceOptions): string {
+export async function createWorkspace(opts: CreateWorkspaceOptions): Promise<string> {
   const db = getOverdeckDatabaseSync();
   if (opts.kind === 'main' && getMainWorkspace(opts.projectId)) {
     throw new Error(`Project ${opts.projectId} already has a main workspace`);
@@ -92,6 +94,17 @@ export function createWorkspace(opts: CreateWorkspaceOptions): string {
     now,
     now,
   );
+  await writeWorkspaceIdentity({
+    id,
+    projectId: opts.projectId,
+    kind: opts.kind,
+    name: opts.name,
+    path: opts.path,
+    branchName: opts.branchName ?? null,
+    parentBranch: opts.parentBranch ?? null,
+    issueId: opts.issueId ?? null,
+    createdAt: now,
+  }).catch(() => {});
   return id;
 }
 
@@ -107,8 +120,22 @@ export function setWorkspaceFavorite(id: string, isFavorite: boolean): void {
   getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET is_favorite = ? WHERE id = ?`).run(isFavorite ? 1 : 0, id);
 }
 
-export function archiveWorkspace(id: string): void {
+export async function archiveWorkspace(id: string): Promise<void> {
   getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET is_archived = 1 WHERE id = ?`).run(id);
+  const workspace = getWorkspaceById(id);
+  if (workspace) {
+    await writeWorkspaceIdentity({
+      id: workspace.id,
+      projectId: workspace.projectId,
+      kind: workspace.kind,
+      name: workspace.name,
+      path: workspace.path,
+      branchName: workspace.branchName,
+      parentBranch: workspace.parentBranch,
+      issueId: workspace.issueId,
+      createdAt: workspace.createdAt,
+    }).catch(() => {});
+  }
 }
 
 export function unarchiveWorkspace(id: string): void {
