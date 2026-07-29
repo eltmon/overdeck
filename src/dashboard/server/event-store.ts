@@ -21,8 +21,47 @@ import { getOverdeckHome } from '../../lib/paths.js';
 import { setActivityEventStoreProvider } from '../../lib/activity-logger.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { getOverdeckDatabaseSync } from '../../lib/overdeck/infra.js';
+import { getWorkspaceForIssue } from '../../lib/workspaces/resolver.js';
 import { REVIEW_STATUS_HISTORY_LIMIT, REVIEW_STATUS_NOTE_LIMIT } from '../../lib/review-status-limits.js';
 import type { DomainEvent } from '@overdeck/contracts';
+
+/** Default workspace-id resolver: the real workspaces resolver against the global overdeck.db. */
+function defaultResolveWorkspaceId(issueId: string): string | undefined {
+  return getWorkspaceForIssue(issueId)?.id;
+}
+
+/**
+ * PAN-1990 D-10/WI-11: stamp `workspaceId` onto any issue-bearing event
+ * payload that omits it, so a producer that only knows `issueId` still
+ * reaches workspace-scoped consumers without every call site resolving the
+ * lookup itself. Never overwrites a payload that already carries a
+ * `workspaceId` — some producers (e.g. operatorInterventionEvent) resolve it
+ * themselves at construction time and that value wins.
+ *
+ * Review fix (non-blocking, test isolation/perf): the resolver is injected
+ * (defaulting to the real one) so a store built with a mock DbAdapter for
+ * unit tests can opt out of touching the global overdeck.db, and resolution
+ * is wrapped in try/catch so a resolver failure — e.g. a test DB that isn't
+ * in a state this lookup expects — degrades to "no stamp" rather than
+ * breaking the append itself.
+ */
+function withWorkspaceId(
+  event: Omit<DomainEvent, 'sequence'>,
+  resolveWorkspaceId: (issueId: string) => string | undefined,
+): Omit<DomainEvent, 'sequence'> {
+  const payload = (event as Record<string, unknown>)['payload'];
+  if (!payload || typeof payload !== 'object') return event;
+  const record = payload as Record<string, unknown>;
+  if (record['workspaceId'] !== undefined || typeof record['issueId'] !== 'string') return event;
+  let workspaceId: string | undefined;
+  try {
+    workspaceId = resolveWorkspaceId(record['issueId'] as string);
+  } catch {
+    return event;
+  }
+  if (!workspaceId) return event;
+  return { ...event, payload: { ...record, workspaceId } } as Omit<DomainEvent, 'sequence'>;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -384,22 +423,23 @@ export function createEventStore(db: DbAdapter): EventStore {
   }
 
   function append(event: Omit<DomainEvent, 'sequence'>): number {
-    const timestamp = eventTimestampMillis(event);
-    let payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
+    const eventWithWorkspace = withWorkspaceId(event, defaultResolveWorkspaceId);
+    const timestamp = eventTimestampMillis(eventWithWorkspace);
+    let payload = JSON.stringify((eventWithWorkspace as Record<string, unknown>)['payload'] ?? {});
 
     // Enforce bounds on review.status_changed payloads at the append door
-    if (event.type === 'review.status_changed') {
+    if (eventWithWorkspace.type === 'review.status_changed') {
       payload = boundReviewStatusPayload(payload);
     }
 
-    insertStmt.run([event.type, timestamp, payload]);
+    insertStmt.run([eventWithWorkspace.type, timestamp, payload]);
 
     const row = lastRowIdStmt.get();
     const sequence = row?.sequence ?? 0;
 
     const stored: StoredEvent = {
       sequence,
-      type: event.type,
+      type: eventWithWorkspace.type,
       timestamp: new Date(timestamp).toISOString(),
       // PAN-2225: distribute the persisted JSON round-trip, not the raw object.
       // A raw payload can carry undefined-valued keys (dropped by stringify),
@@ -413,16 +453,17 @@ export function createEventStore(db: DbAdapter): EventStore {
 
   function appendAsync(event: Omit<DomainEvent, 'sequence'>): Promise<number> {
     return new Promise((resolve) => {
-      const timestamp = eventTimestampMillis(event);
-      let payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
+      const eventWithWorkspace = withWorkspaceId(event, defaultResolveWorkspaceId);
+      const timestamp = eventTimestampMillis(eventWithWorkspace);
+      let payload = JSON.stringify((eventWithWorkspace as Record<string, unknown>)['payload'] ?? {});
 
       // Enforce bounds on review.status_changed payloads at the append door
-      if (event.type === 'review.status_changed') {
+      if (eventWithWorkspace.type === 'review.status_changed') {
         payload = boundReviewStatusPayload(payload);
       }
 
       writeQueue.push({
-        type: event.type,
+        type: eventWithWorkspace.type,
         timestamp,
         payload,
         // PAN-2225: subscribers get the persisted JSON round-trip (see append).
@@ -501,12 +542,13 @@ export function createEventStore(db: DbAdapter): EventStore {
     idempotencyKey: string,
   ): { outcome: 'appended' | 'duplicate'; sequence: number } {
     const stmts = getIdempotencyStmts();
-    const timestamp = eventTimestampMillis(event);
-    let payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
+    const eventWithWorkspace = withWorkspaceId(event, defaultResolveWorkspaceId);
+    const timestamp = eventTimestampMillis(eventWithWorkspace);
+    let payload = JSON.stringify((eventWithWorkspace as Record<string, unknown>)['payload'] ?? {});
 
     // Enforce bounds on review.status_changed payloads at the append door,
     // before the dedup check so the bounded form is used for idempotency.
-    if (event.type === 'review.status_changed') {
+    if (eventWithWorkspace.type === 'review.status_changed') {
       payload = boundReviewStatusPayload(payload);
     }
 
@@ -523,7 +565,7 @@ export function createEventStore(db: DbAdapter): EventStore {
         duplicate = true;
         sequence = claimed.sequence;
       } else {
-        insertStmt.run([event.type, timestamp, payload]);
+        insertStmt.run([eventWithWorkspace.type, timestamp, payload]);
         sequence = lastRowIdStmt.get()?.sequence ?? 0;
         stmts.setSeq.run([sequence, idempotencyKey]);
       }
@@ -541,7 +583,7 @@ export function createEventStore(db: DbAdapter): EventStore {
     if (!duplicate) {
       emitter.emit('event', {
         sequence,
-        type: event.type,
+        type: eventWithWorkspace.type,
         timestamp: new Date(timestamp).toISOString(),
         payload: JSON.parse(payload),
       } satisfies StoredEvent);
