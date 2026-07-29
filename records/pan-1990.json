@@ -49,15 +49,7 @@
       "timestamp": "2026-07-29T08:16:25.343Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T08:16:25Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1990\n\n# Review — PAN-1990 — cycle 3 — 2026-07-29\n\n## Verdict: CHANGES REQUESTED — the cycle-three cleanup ordering can still strand durable pin mirrors, and failed setup can delete the registry row for an existing worktree\n\n## Context\n- Branch: `feature/pan-1990`\n- PR: `#3277`\n- HEAD reviewed: `c19e3b1084c00539feda613993f59a7eacee125a`\n- Prior cycle SHA: `326c48a75815bda5dee42508b62ccf3959b93759`\n- Cycle diff: 24 files, 614 additions, 57 deletions\n- Full PR diff: 125 files\n- Coverage: the four high-risk and five medium-risk files were already reviewed in the preceding two cycles; this pass rechecked the complete cycle-three fix delta and its tests across correctness, security, requirements, and performance. No high- or medium-risk file is uncovered. Under the cycle-3 convergence gate, blocking findings below are anchored in code added or reordered by `c19e3b10`.\n\n## Blocking Findings\n\n### ! [durability/correctness] A failed mirror push still becomes unretryable because the retry sees the locally deleted file and skips the push — `src/lib/workspaces/writer.ts:177-185`, `src/lib/memory/state-mirror.ts:57-64`\nThe cycle-three fix moves `unmirrorPin()` before the SQLite transaction and keeps the rows when it throws, but `removeMemoryStateMirror()` deletes the mirror file and commits locally before discovering that `git push` failed. On retry, `existsSync(target)` is false, so `unmirrorPin()` returns without flushing the local-ahead deletion; `deleteWorkspace()` then removes the workspace and pin rows. The remote `overdeck-state` branch can still retain the stale pin descriptor with no canonical row left to drive another retry. This is the exact transport-failure class the fix claims to close, and state pushes have already shown real non-fast-forward/lock failures during this review. Preserve a durable cleanup intent until the deletion is confirmed on the remote write door, or make the retry flush an existing local-ahead deletion even when the mirror file is already absent.\n\n### ! [correctness/requirements] Compensation deletes the workspace row after failures that occur after a real worktree already exists — `src/lib/workspace-manager/create.ts:240-775`, `src/lib/workspace-manager/create.ts:777-783`\nThe new wrapper calls `deleteWorkspace(createdWorkspaceRowId)` for every `outcome.success === false`, although many errors are accumulated after `git worktree add` succeeded: port assignment, devcontainer rendering, tunnel/Hume setup, and Docker startup can all add `result.errors`, causing line 773 to return `success=false`. The compensation then removes the row while leaving the worktree and branch on disk. The running process loses the FR-6 workspace registry row until a later boot backfill, and retrying creation encounters the existing non-metadata worktree path. Limit compensation to failures proven to occur before any worktree was created, or retain/archive the row and route partial-worktree cleanup through the canonical workspace lifecycle.\n\n## Convergence Note\n\nBoth blockers are introduced by the `c19e3b10` cycle diff. The first could not have been raised in cycle 1 because cycle 3 introduced the unmirror-first ordering specifically to fix cycle 2's DB-first durability defect. The second could not have been raised in cycle 1 because cycle 3 introduced the blanket post-outcome compensation wrapper; before this commit, failure left the pre-created row rather than deleting a row for an already-created worktree.\n\n## Non-blocking Findings\n\n### ~ [security] Realpath containment closes the reported symlink escape, but verification and reading remain separate filesystem operations — `src/lib/memory/pin-path.ts:39-55`, `src/lib/memory/injection.ts:498-505`\nA concurrent local process could retarget a symlink after `verifyPinPathContainment()` returns and before `readFile()` opens the lexical path. This requires local filesystem write access during the narrow race and is not a remotely exploitable path by itself, so it does not block this cycle. Opening and reading one verified file descriptor would remove the time-of-check/time-of-use gap entirely.\n\n### ~ [performance] Production event appends still perform a synchronous global workspace lookup for every issue-bearing event — `src/dashboard/server/event-store.ts:27-30`, `src/dashboard/server/event-store.ts:251-252`\nResolver injection fixes unit-store isolation, but the production default retains the synchronous global database query on each append/appendAsync/emitOnly/appendOnce call. This was advisory in cycle 2 and the production behavior is not newly promotable in cycle 3. Producer-side stamping or a cached/injected runtime resolver would remove the extra hot-path lookup.\n\n### ~ [correctness] A failed backfill is swallowed before migration starts — `src/dashboard/server/main.ts:538-544`\nThe marker guard now prevents unresolved homes from being permanently marked complete, so the prior data-loss blocker is fixed. Still, `.catch(...).then(...)` starts migration after backfill rejects, contrary to the comment that migration must wait for successful backfill. This causes avoidable partial scans and warnings but remains retryable because no marker is written while unresolved homes remain.\n\n## Resolved From Cycle 2\n\n- Boot now sequences migration after backfill completion, and the marker is withheld while any legacy home remains unresolved.\n- Snapshot/per-record collisions are no longer concatenated into invalid JSON; only `.jsonl` logs are appended.\n- Pin creation and injection now use realpath containment and reject out-of-project symlink targets, missing paths, and directories.\n- `deleteWorkspace()` reads pins through `listPinnedDocs()` instead of issuing a direct `SELECT` in the writer.\n- `pan memory search --workspace` resolves active workspaces by UUID or unique name and reports cross-project name ambiguity.\n- Memory CLI FTS searches now restrict results to observation documents, so summaries no longer consume and disappear from the bounded result set.\n- Event-store workspace resolution is injectable for isolated stores.\n- Scratch workspace names are validated before becoming branch/path components.\n\n## Verification Performed\n\n- `git diff --check origin/main...HEAD` passed.\n- Focused cycle-three verification passed: 10 test files, 89 tests.\n- Reviewed the full `326c48a7..c19e3b10` source/test delta and confirmed both blockers are in changed cycle-three paths rather than previously-reviewed unchanged code.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1990/.pan/review/agent-pan-1990-review-c19e3b10/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1990 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".gitignore",
@@ -308,10 +300,10 @@
     "recordedAt": "2026-07-29T05:44:27.078Z"
   },
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T08:31:34.945Z",
+  "updated": "2026-07-29T08:44:44.593Z",
   "pipeline": {
     "issueId": "PAN-1990",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -319,12 +311,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T05:45:20.146Z",
-    "updatedAt": "2026-07-29T08:31:34.907Z",
+    "updatedAt": "2026-07-29T08:44:44.516Z",
     "inspectNotes": "AC1: MemoryIdentity/MemoryObservation issueId -> Schema.NullOr(IssueId) in packages/contracts/src/memory.ts; new contracts memory.test.ts passes 4/4 (decodes null and a real PAN-1990 for both structs). AC2: src/lib/memory/injection.ts:110 replaces the sibling search with Promise.resolve([]) when issueId is null, so the branch is skipped rather than widened; tests/lib/memory/injection.test.ts 18/18 pass including the new null-issueId case, which seeds the same PAN-999 sibling row the positive test retrieves and asserts hitCounts.sibling===0 and no sibling docType. AC3: npm run typecheck exits 0 - contracts dts rebuild, root tsc --noEmit, hooks, evals, dashboard ratchet (61 known, none new), frontend ratchet (0). New imports verified real: getProjectSync src/lib/projects.ts:601, resolveProjectPath src/lib/projects.ts:508. Non-blocking note: the ?? workspaceId fallbacks for paths/event keys are documented as deferred to memory-paths-rekey and events-workspaceid, but updateMemoryHealth returning EMPTY_HEALTH on a null issueId drops health tracking for main/scratch turns rather than relocating it - confirm a follow-on bead owns that.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3277",
     "reviewedAtCommit": "c19e3b1084c00539feda613993f59a7eacee125a",
     "lastVerifiedCommit": "c19e3b1084c00539feda613993f59a7eacee125a",
-    "reviewSpawnedAt": "2026-07-29T08:16:06.090Z",
+    "reviewSpawnedAt": "2026-07-29T08:44:44.514Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".gitignore",
@@ -596,10 +588,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 5272,
-            "output": 1303578,
-            "cacheRead": 1368759733,
-            "cacheWrite": 9736683
+            "input": 5304,
+            "output": 1308985,
+            "cacheRead": 1380694722,
+            "cacheWrite": 10511460
           }
         }
       },
@@ -617,15 +609,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 5272,
-          "output": 1303578,
-          "cacheRead": 1368759733,
-          "cacheWrite": 9736683
+          "input": 5304,
+          "output": 1308985,
+          "cacheRead": 1380694722,
+          "cacheWrite": 10511460
         }
       },
       "costAtCloseOut": {
-        "usd": 384.265094,
-        "pricingAsOf": "2026-07-29T08:31:34.941Z"
+        "usd": 388.643166,
+        "pricingAsOf": "2026-07-29T08:44:44.561Z"
       }
     },
     "merges": [
