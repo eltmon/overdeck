@@ -63,6 +63,10 @@ export interface CreateWorkspaceOptions {
   isGitRepository?: boolean;
   issueId?: string | null;
   title?: string | null;
+  /** Preserve a specific id (rebuild only — otherwise a fresh UUID is generated). */
+  id?: string;
+  /** Preserve the original creation time (rebuild only — otherwise now is used). */
+  createdAt?: number;
 }
 
 /** Create a workspace row. Generates a fresh UUID and enforces main-singleton per project. */
@@ -71,8 +75,8 @@ export async function createWorkspace(opts: CreateWorkspaceOptions): Promise<str
   if (opts.kind === 'main' && getMainWorkspace(opts.projectId)) {
     throw new Error(`Project ${opts.projectId} already has a main workspace`);
   }
-  const id = randomUUID();
-  const now = Date.now();
+  const id = opts.id ?? randomUUID();
+  const now = opts.createdAt ?? Date.now();
   db.prepare(`
     INSERT INTO workspaces (
       id, project_id, kind, name, path, branch_name, parent_branch, parent_branch_guessed,

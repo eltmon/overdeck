@@ -13,8 +13,8 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: hoistedMockListProjects,
 }));
 
-import { backfillIssueWorkspaces, seedProjectsFromYaml } from '../../../../src/lib/workspaces/rebuild.js';
-import { getProjectByKey, listWorkspaces } from '../../../../src/lib/workspaces/resolver.js';
+import { backfillIssueWorkspaces, rebuildMainAndScratchWorkspaces, seedProjectsFromYaml } from '../../../../src/lib/workspaces/rebuild.js';
+import { getProjectByKey, getWorkspaceById, listWorkspaces } from '../../../../src/lib/workspaces/resolver.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../../../src/lib/workspaces/writer.js';
 
 let odb: OverdeckTestDb;
@@ -101,5 +101,89 @@ describe('backfillIssueWorkspaces', () => {
 
     await expect(backfillIssueWorkspaces()).resolves.not.toThrow();
     expect(listWorkspaces({ projectId: 'overdeck' })).toHaveLength(0);
+  });
+});
+
+describe('rebuildMainAndScratchWorkspaces (PAN-1990)', () => {
+  beforeEach(() => {
+    hoistedMockListProjects.mockReturnValue([
+      { key: 'overdeck', config: { name: 'overdeck', path: projectRoot } },
+    ]);
+    upsertProjectFromConfig('overdeck', { name: 'overdeck', path: projectRoot });
+  });
+
+  it('recreates a main workspace row deleted from the DB from its fixture metadata.json (ac1)', async () => {
+    const id = await createWorkspace({
+      projectId: 'overdeck',
+      kind: 'main',
+      name: 'main',
+      path: projectRoot,
+      isGitRepository: true,
+    });
+    odb.raw().prepare('DELETE FROM workspaces WHERE id = ?').run(id);
+    expect(getWorkspaceById(id)).toBeNull();
+
+    const result = await rebuildMainAndScratchWorkspaces();
+
+    expect(result.created).toBe(1);
+    expect(result.createdIds).toEqual([id]);
+    const row = getWorkspaceById(id);
+    expect(row).toMatchObject({ id, projectId: 'overdeck', kind: 'main', name: 'main', path: projectRoot });
+  });
+
+  it('--dry-run reports planned changes and persists zero rows (ac2)', async () => {
+    const id = await createWorkspace({
+      projectId: 'overdeck', kind: 'scratch', name: 'notes', path: join(projectRoot, 'notes'),
+    });
+    odb.raw().prepare('DELETE FROM workspaces WHERE id = ?').run(id);
+
+    const result = await rebuildMainAndScratchWorkspaces({ dryRun: true });
+
+    expect(result.created).toBe(1);
+    expect(result.createdIds).toEqual([id]);
+    expect(getWorkspaceById(id)).toBeNull();
+    expect(odb.raw().prepare('SELECT COUNT(*) as c FROM workspaces').get()).toEqual({ c: 0 });
+  });
+
+  it('the next (non-dry-run) run recreates a scratch row deleted from the DB (ac3)', async () => {
+    const id = await createWorkspace({
+      projectId: 'overdeck', kind: 'scratch', name: 'scratch-a', path: join(projectRoot, 'scratch-a'),
+    });
+    odb.raw().prepare('DELETE FROM workspaces WHERE id = ?').run(id);
+
+    const dryRunResult = await rebuildMainAndScratchWorkspaces({ dryRun: true });
+    expect(dryRunResult.created).toBe(1);
+    expect(getWorkspaceById(id)).toBeNull(); // dry run persisted nothing
+
+    const realResult = await rebuildMainAndScratchWorkspaces();
+    expect(realResult.created).toBe(1);
+    expect(getWorkspaceById(id)).toMatchObject({ id, kind: 'scratch', name: 'scratch-a' });
+  });
+
+  it('is idempotent — a second run skips rows that already exist', async () => {
+    const id = await createWorkspace({
+      projectId: 'overdeck', kind: 'main', name: 'main', path: projectRoot,
+    });
+    odb.raw().prepare('DELETE FROM workspaces WHERE id = ?').run(id);
+
+    const first = await rebuildMainAndScratchWorkspaces();
+    expect(first.created).toBe(1);
+
+    const second = await rebuildMainAndScratchWorkspaces();
+    expect(second.created).toBe(0);
+    expect(second.skipped).toBeGreaterThanOrEqual(1);
+    expect(odb.raw().prepare('SELECT COUNT(*) as c FROM workspaces').get()).toEqual({ c: 1 });
+  });
+
+  it('does not touch issue-kind identity records (backfillIssueWorkspaces owns those)', async () => {
+    const id = await createWorkspace({
+      projectId: 'overdeck', kind: 'issue', name: 'feature-pan-1', path: join(projectRoot, 'workspaces', 'feature-pan-1'), issueId: 'PAN-1',
+    });
+    odb.raw().prepare('DELETE FROM workspaces WHERE id = ?').run(id);
+
+    const result = await rebuildMainAndScratchWorkspaces();
+
+    expect(result.created).toBe(0);
+    expect(getWorkspaceById(id)).toBeNull();
   });
 });
