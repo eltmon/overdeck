@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { setReviewStatusSync } from '../../../../src/lib/review-status.js';
 import {
   getReviewStatusFromDbSync,
-  setReviewStatusSync,
   upsertReviewStatusSync,
 } from '../../../../src/lib/overdeck/review-status-sync.js';
 import {
