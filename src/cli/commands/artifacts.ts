@@ -281,7 +281,7 @@ export function registerArtifactCommands(program: Command): void {
     .option('--issue <id>', 'Issue ID for artifact provenance')
     .option('--workspace <id>', 'Workspace ID for artifact provenance')
     .option('--agent-role <role>', 'Agent role: plan, work, review, test, ship, flywheel, or user')
-    .option('--agent-harness <harness>', 'Agent harness: claude-code, pi, codex, acp, or user')
+    .option('--agent-harness <harness>', 'Agent harness: claude-code, pi, ohmypi, codex, acp, kimi-code, or user')
     .option('--run-id <id>', 'Run ID for artifact provenance')
     .option('--session-id <id>', 'Session ID for artifact provenance')
     .option('--title <title>', 'Artifact title')

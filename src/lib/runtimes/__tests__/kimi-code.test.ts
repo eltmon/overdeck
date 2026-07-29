@@ -415,7 +415,7 @@ describe('KimiCodeRuntimeSync', () => {
  * advance window has already closed. Small repeated advances give the real
  * I/O a chance to resolve and schedule its next timer between each step.
  */
-async function drainFakeTimersUntilSettled(promise: Promise<unknown>, maxSteps = 50, stepMs = 10): Promise<void> {
+async function drainFakeTimersUntilSettled(promise: Promise<unknown>, maxSteps = 300, stepMs = 10): Promise<void> {
   let isSettled = false;
   promise.then(() => { isSettled = true; }, () => { isSettled = true; });
   for (let i = 0; i < maxSteps && !isSettled; i++) {
@@ -499,5 +499,52 @@ describe('withKimiSessionCaptureLock (PAN-1837 review fix — concurrent same-cw
 
     // The unrelated-bucket task completes without waiting on the slow one.
     expect(order.indexOf('fast-end')).toBeLessThan(order.indexOf('slow-end'));
+  });
+
+  it('pins distinct ids when a work/restart-shaped launch and a conversation-shaped launch race in the same cwd (PAN-1837 review fix)', async () => {
+    // PAN-1837 review cycle 6: the lock was previously wired into
+    // spawnConversationSession() only; spawnAgent(), restartAgent(), and
+    // recoverAgent() snapshotted/polled outside it, so a work agent and a
+    // conversation launched concurrently against the same cwd could each
+    // capture the OTHER's session directory. All four owners now route
+    // through this same withKimiSessionCaptureLock — this proves two
+    // DIFFERENT identity shapes (a work-agent id, a conversation tmux-session
+    // id) racing on one cwd each still pin their own, distinct session.
+    const kimiHome = makeHome();
+    const overdeckHome = makeHome();
+    const workDir = '/tmp/cross-owner-workspace';
+    const bucketDir = kimiSessionsRoot(kimiHome, workDir);
+    // writeKimiSessionId doesn't create parent dirs — real callers always run
+    // after the agent/conversation dir already exists (getAgentDir mkdir's it
+    // at spawn time); mirror that here.
+    mkdirSync(join(overdeckHome, 'agents', 'agent-work-1'), { recursive: true });
+    mkdirSync(join(overdeckHome, 'agents', 'conv-abc'), { recursive: true });
+
+    const launch = (identityId: string, sessionId: string) =>
+      withKimiSessionCaptureLock(kimiHome, workDir, async () => {
+        let existingBefore: Set<string>;
+        try {
+          existingBefore = new Set(await readdirAsync(bucketDir));
+        } catch {
+          existingBefore = new Set();
+        }
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        writeWireFixture(kimiHome, workDir, sessionId);
+        const captured = await waitForNewKimiSessionAsync(kimiHome, workDir, existingBefore, 2_000);
+        if (captured) writeKimiSessionId(identityId, captured, overdeckHome);
+        return captured;
+      });
+
+    const workLaunch = launch('agent-work-1', 'session_work');
+    const conversationLaunch = launch('conv-abc', 'session_conversation');
+    const both = Promise.all([workLaunch, conversationLaunch]);
+    await drainFakeTimersUntilSettled(both);
+    const [workCaptured, conversationCaptured] = await both;
+
+    expect(workCaptured).not.toBeNull();
+    expect(conversationCaptured).not.toBeNull();
+    expect(workCaptured).not.toBe(conversationCaptured);
+    expect(readFileSync(join(overdeckHome, 'agents', 'agent-work-1', 'kimi-session-id'), 'utf-8').trim()).toBe(workCaptured);
+    expect(readFileSync(join(overdeckHome, 'agents', 'conv-abc', 'kimi-session-id'), 'utf-8').trim()).toBe(conversationCaptured);
   });
 });

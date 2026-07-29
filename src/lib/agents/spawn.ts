@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs';
-import { mkdir, writeFile, writeFile as writeFileAsync } from 'fs/promises';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { mkdir, readdir as readdirAsync, writeFile, writeFile as writeFileAsync } from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
@@ -826,34 +826,66 @@ async function spawnAgentWithoutConsentClaim(
   // PAN-1837: Kimi generates its own session id and cannot be told one via a
   // launch flag (D2/erratum E1) — it must be captured post-launch as whatever
   // new directory appears under the workspace's session bucket. Snapshot the
-  // bucket's current contents BEFORE the tmux session exists so the
-  // post-launch poll (below, after prompt delivery) can diff against it
-  // instead of guessing from mtime alone, which would misfire on a workspace
-  // that already has prior kimi sessions (retries/resumes).
-  let kimiExistingSessionsBefore: Set<string> | undefined;
-  if (resolvedHarness === 'kimi-code') {
-    try {
-      const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
-      kimiExistingSessionsBefore = new Set(readdirSync(kimiSessionsRoot(join(homedir(), '.kimi-code'), options.workspace)));
-    } catch {
-      kimiExistingSessionsBefore = new Set();
+  // bucket's current contents BEFORE the tmux session exists so the capture
+  // below can diff against it instead of guessing from mtime alone, which
+  // would misfire on a workspace that already has prior kimi sessions
+  // (retries/resumes).
+  //
+  // PAN-1837 review fix: snapshot, launch, and capture/persist all run inside
+  // withKimiSessionCaptureLock — a review cycle 6 finding is that awaiting
+  // the capture (as restartAgent's own fix already did) is not sufficient on
+  // its own: it only guarantees *some* new same-cwd directory was observed,
+  // not that it's THIS launch's directory. Only the per-workDirKey mutex,
+  // held across the whole snapshot -> createSession -> capture span, stops a
+  // concurrent same-cwd Kimi launch (another work agent, a restart, a
+  // recovery, or a conversation) from claiming this session or vice versa.
+  const launchAndCaptureKimiSession = async (): Promise<void> => {
+    let kimiExistingSessionsBefore: Set<string> | undefined;
+    if (resolvedHarness === 'kimi-code') {
+      try {
+        const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
+        kimiExistingSessionsBefore = new Set(await readdirAsync(kimiSessionsRoot(join(homedir(), '.kimi-code'), options.workspace)));
+      } catch {
+        kimiExistingSessionsBefore = new Set();
+      }
     }
-  }
 
-  await Effect.runPromise(createSession(agentId, options.workspace, claudeCmd, {
-    env: {
-      ...BLANKED_PROVIDER_ENV, // Blank stale provider vars inherited by tmux server
-      TERM: 'xterm-256color',
-      OVERDECK_AGENT_ID: agentId,
-      OVERDECK_ISSUE_ID: options.issueId,
-      OVERDECK_SESSION_TYPE: role,
-      OVERDECK_AGENT_STARTED_BY: startedBy,
-      CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
-      GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
-      ...flywheelEnv,
-      ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
+    await Effect.runPromise(createSession(agentId, options.workspace, claudeCmd, {
+      env: {
+        ...BLANKED_PROVIDER_ENV, // Blank stale provider vars inherited by tmux server
+        TERM: 'xterm-256color',
+        OVERDECK_AGENT_ID: agentId,
+        OVERDECK_ISSUE_ID: options.issueId,
+        OVERDECK_SESSION_TYPE: role,
+        OVERDECK_AGENT_STARTED_BY: startedBy,
+        CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
+        GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
+        ...flywheelEnv,
+        ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
+      }
+    }));
+
+    if (kimiExistingSessionsBefore) {
+      const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+      const sessionId = await waitForNewKimiSessionAsync(
+        join(homedir(), '.kimi-code'),
+        options.workspace,
+        kimiExistingSessionsBefore,
+      );
+      if (sessionId) {
+        writeKimiSessionId(agentId, sessionId);
+      } else {
+        console.warn(`[${agentId}] kimi-code session capture timed out — transcript lookup falls back to newest-session by mtime`);
+      }
     }
-  }));
+  };
+
+  if (resolvedHarness === 'kimi-code') {
+    const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
+    await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), options.workspace, launchAndCaptureKimiSession);
+  } else {
+    await launchAndCaptureKimiSession();
+  }
   await acceptConsent?.();
   await saveAgentRuntimeState(agentId, {
     claudeSessionId: state.sessionId,
@@ -946,25 +978,6 @@ async function spawnAgentWithoutConsentClaim(
           if (threadId) writeThreadId(agentId, threadId);
         }
       } catch { /* non-fatal — the latest-rollout fallback still resolves the transcript */ }
-    })();
-  }
-
-  // PAN-1837: same shape as the codex block above — poll for the new session
-  // directory Kimi writes under the workspace's bucket and persist its id so
-  // transcript/cost lookups (resolveKimiWirePath) hit the fast path instead of
-  // the newest-mtime fallback. Non-blocking: Kimi only creates the session dir
-  // once its TUI boots, which can race the kickoff prompt delivery above.
-  if (resolvedHarness === 'kimi-code' && kimiExistingSessionsBefore) {
-    void (async () => {
-      try {
-        const { waitForNewKimiSession, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
-        const sessionId = await waitForNewKimiSession(
-          join(homedir(), '.kimi-code'),
-          options.workspace,
-          kimiExistingSessionsBefore,
-        );
-        if (sessionId) writeKimiSessionId(agentId, sessionId);
-      } catch { /* non-fatal — the newest-session fallback still resolves the transcript */ }
     })();
   }
 

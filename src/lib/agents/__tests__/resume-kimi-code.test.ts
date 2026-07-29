@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   resolveHarness: vi.fn(async () => 'kimi-code'),
   deliverInitialPromptWithRetry: vi.fn(async () => ({ ok: true, path: 'supervisor' })),
   deliverResumeMessageWithTranscriptConfirmation: vi.fn(async () => ({ delivered: true, attempts: 1 })),
+  killSession: vi.fn(() => Effect.succeed(undefined)),
 }));
 
 vi.mock('../spawn-prep.js', async (importOriginal) => {
@@ -63,7 +64,7 @@ vi.mock('../../tmux.js', async (importOriginal) => {
     ...actual,
     createSession: vi.fn(() => Effect.succeed(undefined)),
     sessionExists: vi.fn(() => Effect.succeed(false)),
-    killSession: vi.fn(() => Effect.succeed(undefined)),
+    killSession: mocks.killSession,
     isPaneDead: vi.fn(() => Effect.succeed(false)),
     listPaneValues: vi.fn(() => Effect.succeed([])),
   };
@@ -84,6 +85,7 @@ beforeEach(() => {
   mocks.resolveHarness.mockResolvedValue('kimi-code');
   mocks.deliverInitialPromptWithRetry.mockResolvedValue({ ok: true, path: 'supervisor' });
   mocks.deliverResumeMessageWithTranscriptConfirmation.mockResolvedValue({ delivered: true, attempts: 1 });
+  mocks.killSession.mockReturnValue(Effect.succeed(undefined));
 
   tempHome = mkdtempSync(join(tmpdir(), 'pan-resume-kimi-test-'));
   prevOverdeckHome = process.env.OVERDECK_HOME;
@@ -135,5 +137,38 @@ describe('resumeAgent — native Kimi Code session resume (PAN-1837 review fix)'
       'resumeAgent:kimi-code-continue',
     );
     expect(mocks.deliverResumeMessageWithTranscriptConfirmation).not.toHaveBeenCalled();
+  });
+
+  it('fails the resume and kills the session when the continue prompt never lands (PAN-1837 review fix, cycle 6)', async () => {
+    // Kimi has no fallback signal (no SessionStart hook, no JSONL) to confirm
+    // the message landed some other way, so a failed delivery here means the
+    // continue/rework prompt is genuinely lost — this must not be reported as
+    // a successfully resumed agent, unlike the pre-fix behavior that logged
+    // the failure but still returned { success: true, messageDelivered: false }.
+    mocks.deliverInitialPromptWithRetry.mockResolvedValue({ ok: false, failure: 'readiness timeout' });
+
+    const agentId = 'agent-kimi-resume-delivery-failed';
+    const pinnedSessionId = 'pinned-kimi-session-delivery-failed';
+
+    mkdirSync(getAgentDir(agentId), { recursive: true });
+    writeFileSync(join(getAgentDir(agentId), 'kimi-session-id'), `${pinnedSessionId}\n`);
+
+    saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-1837',
+      workspace,
+      harness: 'kimi-code',
+      role: 'work',
+      model: 'kimi-code/k3',
+      status: 'stopped',
+      startedAt: new Date().toISOString(),
+      kickoffDelivered: true,
+    });
+
+    const result = await resumeAgent(agentId);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Kimi Code continue prompt did not land');
+    expect(mocks.killSession).toHaveBeenCalledWith(agentId);
   });
 });

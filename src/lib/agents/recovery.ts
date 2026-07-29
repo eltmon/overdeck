@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { readdir as readdirAsync } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -208,41 +208,68 @@ export async function restartAgent(
 
     // PAN-1837: restartAgent always kills and fresh-launches (no resumeSessionId
     // above), so a kimi-code relaunch always starts a brand-new Kimi session —
-    // snapshot the bucket before the tmux session exists so the post-launch poll
-    // below can capture that new session id for the next resume/recovery
-    // (mirrors spawnAgent's fresh-launch capture in spawn.ts).
+    // snapshot the bucket before the tmux session exists so the capture below
+    // can diff against it (mirrors spawnAgent's fresh-launch capture in
+    // spawn.ts).
     //
     // PAN-1837 review fix: clear the stale kimi-session-id pointer BEFORE the
-    // fresh launch. If the post-launch capture below times out or fails, this
-    // leaves NO pointer (findKimiWirePath's safe newest-session-by-mtime
-    // fallback) rather than a WRONG pointer still pinned to the pre-restart
-    // transcript, which would otherwise surface indefinitely. Uses the async
-    // poller/readdir throughout — restart runs in the dashboard process, and
-    // even a fire-and-forget task blocks the shared event loop for every
-    // synchronous fs call it makes while it runs.
-    let kimiExistingSessionsBefore: Set<string> | undefined;
-    if (effectiveHarness === 'kimi-code') {
-      try { unlinkSync(join(getAgentDir(normalizedId), 'kimi-session-id')); } catch { /* absent or already cleared */ }
-      try {
-        const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
-        kimiExistingSessionsBefore = new Set(await readdirAsync(kimiSessionsRoot(join(homedir(), '.kimi-code'), agentState.workspace)));
-      } catch {
-        kimiExistingSessionsBefore = new Set();
+    // fresh launch, so a failed/timed-out capture leaves NO pointer
+    // (findKimiWirePath's safe newest-session-by-mtime fallback) rather than a
+    // WRONG pointer still pinned to the pre-restart transcript. Review cycle 6:
+    // snapshot, createSession, and capture/persist all run inside
+    // withKimiSessionCaptureLock — merely awaiting the capture (the cycle-5
+    // fix) is not enough on its own, since it only proves *some* new same-cwd
+    // directory appeared, not that it's THIS relaunch's. Only the per-
+    // workDirKey mutex, held across the whole span, stops a concurrent
+    // same-cwd Kimi launch (another work agent, a conversation, or a recovery)
+    // from claiming this session or vice versa.
+    const launchAndCaptureKimiSession = async (): Promise<void> => {
+      let kimiExistingSessionsBefore: Set<string> | undefined;
+      if (effectiveHarness === 'kimi-code') {
+        try { unlinkSync(join(getAgentDir(normalizedId), 'kimi-session-id')); } catch { /* absent or already cleared */ }
+        try {
+          const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
+          kimiExistingSessionsBefore = new Set(await readdirAsync(kimiSessionsRoot(join(homedir(), '.kimi-code'), agentState.workspace)));
+        } catch {
+          kimiExistingSessionsBefore = new Set();
+        }
       }
-    }
 
-    await Effect.runPromise(createSession(normalizedId, agentState.workspace, claudeCmd, {
-      env: {
-        ...BLANKED_PROVIDER_ENV,
-        TERM: 'xterm-256color',
-        OVERDECK_AGENT_ID: normalizedId,
-        OVERDECK_ISSUE_ID: agentState.issueId || '',
-        OVERDECK_SESSION_TYPE: agentState.role,
-        CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
-        GIT_SEQUENCE_EDITOR: 'false',
-        ...providerEnv,
-      },
-    }));
+      await Effect.runPromise(createSession(normalizedId, agentState.workspace, claudeCmd, {
+        env: {
+          ...BLANKED_PROVIDER_ENV,
+          TERM: 'xterm-256color',
+          OVERDECK_AGENT_ID: normalizedId,
+          OVERDECK_ISSUE_ID: agentState.issueId || '',
+          OVERDECK_SESSION_TYPE: agentState.role,
+          CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
+          GIT_SEQUENCE_EDITOR: 'false',
+          ...providerEnv,
+        },
+      }));
+
+      if (kimiExistingSessionsBefore) {
+        const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+        const sessionId = await waitForNewKimiSessionAsync(
+          join(homedir(), '.kimi-code'),
+          agentState.workspace,
+          kimiExistingSessionsBefore,
+        );
+        if (!sessionId) {
+          throw new Error(
+            `kimi-code session capture timed out after fresh relaunch for ${normalizedId} — no new session directory appeared under the workspace bucket`,
+          );
+        }
+        writeKimiSessionId(normalizedId, sessionId);
+      }
+    };
+
+    if (effectiveHarness === 'kimi-code') {
+      const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
+      await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), agentState.workspace, launchAndCaptureKimiSession);
+    } else {
+      await launchAndCaptureKimiSession();
+    }
 
     // PAN-2974 (root cause B): the fallback continue-prompt is phase-aware —
     // a handed-off agent (completed marker) gets a passive restore, not a
@@ -280,31 +307,6 @@ export async function restartAgent(
       } else {
         await Effect.runPromise(sendKeys(normalizedId, prompt));
       }
-    }
-
-    // PAN-1837 review fix: keep the restart pending until the replacement
-    // Kimi session identity is actually captured, instead of reporting
-    // success while capture races on in the background. By this point Kimi
-    // has already become ready and received its continue prompt, so its
-    // session directory normally exists already and this resolves almost
-    // immediately; a genuine miss after the full poll window most likely
-    // means Kimi never started a real session, which is worth failing
-    // loudly for rather than silently leaving the pointer cleared and
-    // letting the newest-session-by-mtime fallback attribute a DIFFERENT
-    // same-cwd Kimi session's transcript/cost to this agent.
-    if (kimiExistingSessionsBefore) {
-      const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
-      const sessionId = await waitForNewKimiSessionAsync(
-        join(homedir(), '.kimi-code'),
-        agentState.workspace,
-        kimiExistingSessionsBefore,
-      );
-      if (!sessionId) {
-        throw new Error(
-          `kimi-code session capture timed out after fresh relaunch for ${normalizedId} — no new session directory appeared under the workspace bucket`,
-        );
-      }
-      writeKimiSessionId(normalizedId, sessionId);
     }
 
     markAgentRunning(agentState);
@@ -543,19 +545,6 @@ export async function recoverAgent(
     // that buildKimiCodeCommand() requires; the generic default branch below
     // never sets those and would throw "kimi-code launcher requires kimiCodeModel".
     const resumeSessionId = resolveRecoveryResumeSessionId(normalizedId, recoveryHarness);
-    // When there is no captured session id to resume, this recovery is a fresh
-    // Kimi launch — snapshot the workspace's session bucket BEFORE the tmux
-    // session exists so the post-launch poll below (mirrors spawn.ts) can
-    // diff against it and capture the new session id for the NEXT recovery.
-    let kimiExistingSessionsBefore: Set<string> | undefined;
-    if (!resumeSessionId) {
-      try {
-        const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
-        kimiExistingSessionsBefore = new Set(readdirSync(kimiSessionsRoot(join(homedir(), '.kimi-code'), state.workspace)));
-      } catch {
-        kimiExistingSessionsBefore = new Set();
-      }
-    }
     const { launcherContent, providerEnv: kimiProviderEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
       model: state.model,
@@ -569,16 +558,60 @@ export async function recoverAgent(
     });
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
-    await Effect.runPromise(createSession(normalizedId, state.workspace, `bash ${launcherScript}`, {
-      env: {
-        ...BLANKED_PROVIDER_ENV,
-        OVERDECK_AGENT_ID: normalizedId,
-        OVERDECK_ISSUE_ID: state.issueId || '',
-        OVERDECK_SESSION_TYPE: recoveryRole,
-        CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
-        ...kimiProviderEnv,
-      },
-    }));
+
+    // PAN-1837 review fix: snapshot, createSession, and capture/persist all run
+    // inside withKimiSessionCaptureLock (review cycle 6) — a fire-and-forget or
+    // merely-awaited capture outside the per-workDirKey mutex only proves *some*
+    // new same-cwd directory appeared, not that it's THIS recovery's, so a
+    // concurrent same-cwd Kimi launch (a work agent, a restart, or a
+    // conversation) could otherwise claim this session or vice versa. When
+    // there is no captured session id to resume, this recovery is a fresh
+    // Kimi launch — snapshot the workspace's session bucket BEFORE the tmux
+    // session exists so the capture below can diff against it and persist the
+    // new session id for the NEXT recovery.
+    const launchAndCaptureKimiSession = async (): Promise<void> => {
+      let kimiExistingSessionsBefore: Set<string> | undefined;
+      if (!resumeSessionId) {
+        try {
+          const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
+          kimiExistingSessionsBefore = new Set(await readdirAsync(kimiSessionsRoot(join(homedir(), '.kimi-code'), state.workspace)));
+        } catch {
+          kimiExistingSessionsBefore = new Set();
+        }
+      }
+
+      await Effect.runPromise(createSession(normalizedId, state.workspace, `bash ${launcherScript}`, {
+        env: {
+          ...BLANKED_PROVIDER_ENV,
+          OVERDECK_AGENT_ID: normalizedId,
+          OVERDECK_ISSUE_ID: state.issueId || '',
+          OVERDECK_SESSION_TYPE: recoveryRole,
+          CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
+          ...kimiProviderEnv,
+        },
+      }));
+
+      if (kimiExistingSessionsBefore) {
+        const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+        const sessionId = await waitForNewKimiSessionAsync(
+          join(homedir(), '.kimi-code'),
+          state.workspace,
+          kimiExistingSessionsBefore,
+        );
+        if (sessionId) {
+          writeKimiSessionId(normalizedId, sessionId);
+        } else {
+          logAgentLifecycleSync(
+            normalizedId,
+            `recoverAgent: kimi-code session capture timed out after fresh relaunch for ${normalizedId} — transcript lookup falls back to newest-session by mtime`,
+          );
+        }
+      }
+    };
+
+    const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
+    await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), state.workspace, launchAndCaptureKimiSession);
+
     const delivery = await deliverInitialPromptWithRetry(
       normalizedId,
       recoveryPrompt,
@@ -589,19 +622,6 @@ export async function recoverAgent(
       throw new Error(
         `Kimi Code recovery prompt delivery failed for ${normalizedId}: ${delivery.failure ?? 'unknown failure'}`,
       );
-    }
-    if (kimiExistingSessionsBefore) {
-      void (async () => {
-        try {
-          const { waitForNewKimiSession, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
-          const sessionId = await waitForNewKimiSession(
-            join(homedir(), '.kimi-code'),
-            state.workspace,
-            kimiExistingSessionsBefore!,
-          );
-          if (sessionId) writeKimiSessionId(normalizedId, sessionId);
-        } catch { /* non-fatal — the newest-session fallback still resolves the transcript */ }
-      })();
     }
     markAgentRunning(state);
     saveAgentStateSync(state);

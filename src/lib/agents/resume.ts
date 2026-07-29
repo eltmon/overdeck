@@ -509,11 +509,23 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       // same shape as the acp/codex branches above; this covers both a true
       // -S resume and a fresh relaunch since the launcher config already
       // resolved which one applies.
+      //
+      // PAN-1837 review fix (cycle 6): mirror ACP's strict contract — a failed
+      // delivery must not be reported as a successfully resumed agent. Kimi
+      // has no fallback signal (no hook, no JSONL) to confirm the message
+      // landed any other way, so a failure here means the operator's
+      // continue/rework prompt is genuinely lost; killing the session and
+      // failing the resume surfaces that instead of leaving Kimi sitting idle
+      // at its prompt while the caller believes the resume succeeded.
       const delivery = await deliverInitialPromptWithRetry(normalizedId, effectiveMessage, 'resumeAgent:kimi-code-continue');
       messageDelivered = delivery.ok;
       if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
       if (!delivery.ok) {
-        console.error(`[resumeAgent] Kimi Code continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
+        await Effect.runPromise(killSession(normalizedId));
+        return {
+          success: false,
+          error: `Kimi Code continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`,
+        };
       }
     } else if (!shouldResumeSavedSession) {
       // Fresh session fallback — deliver like a kickoff. Transcript
