@@ -4,17 +4,17 @@
     "created": "2026-07-29T00:11:11.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3260: Markdown file chips should open the internal markdown editor in a tab by default, with internal/external choice on right-click",
-    "updated": "2026-07-29T00:14:26.043Z"
+    "updated": "2026-07-29T00:18:36.361Z"
   },
   "plan": {
     "id": "pan-3260",
     "title": "Markdown file chips should open the internal markdown editor in a tab by default, with internal/external choice on right-click",
-    "status": "proposed",
+    "status": "approved",
     "uid": "1cff4b16-100a-44c7-8f5c-e6943607a09d",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-29T00:11:11.000Z",
-    "updated": "2026-07-29T00:14:26.043Z",
+    "updated": "2026-07-29T00:18:36.361Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3260",
@@ -573,5 +573,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
