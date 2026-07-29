@@ -44,17 +44,17 @@
     "recordedAt": "2026-07-29T06:18:50.753Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T06:59:01.490Z",
+  "updated": "2026-07-29T06:59:07.139Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T06:59:01.396Z",
-    "reviewNotes": "Agent re-review request (1/25): Re-requesting review after verification error resolution",
+    "updatedAt": "2026-07-29T06:59:07.112Z",
+    "reviewNotes": "Verification failed at vbrief-ac — fix and resubmit",
     "verificationNotes": "Acceptance criteria check FAILED — 9/12 AC incomplete:\n\n### Bound review.status_changed payloads inside event-store append() and appendOnce() (4/4 incomplete)\n  - [ ] Appending a review.status_changed event whose history has 259 entries with 3,697-char notes persists a row that parses back to exactly 20 entries, each with notes <= 500 chars\n  - [ ] Appending a non-review event type with a large payload persists the payload byte-identically\n  - [ ] Appending a review.status_changed event with an unparseable payload persists it unchanged instead of throwing\n  - [ ] appendOnce called twice with the same over-cap event persists exactly one row, with the bounded payload (dedup sees the bounded form)\n\n### Extend trimReviewStatusHistoryPayloads to delegate to the bounding helper (3/3 incomplete)\n  - [ ] Given a seeded oversized row with 25 entries carrying 3,697-char notes, the trim persists a smaller payload that parses back to <= 20 entries with <= 500-char notes\n  - [ ] Running the trim a second time over already-trimmed rows returns trimmed: 0 (converges to a no-op)\n  - [ ] An oversized row of a non-review event type survives the trim byte-identically\n\n### Document the bounded review-status history invariant in AGENT-STATE-PLANES.md (2/2 incomplete)\n  - [ ] The new subsection contains both limit constants with their values (20 and 500) and covers all four enforcement points (write, hydration, append door, boot trim + VACUUM)\n  - [ ] The subsection states that the status_history table intentionally preserves the full uncapped record",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewSpawnedAt": "2026-07-29T06:55:35.989Z",
@@ -136,7 +136,7 @@
       },
       "costAtCloseOut": {
         "usd": 14.981295,
-        "pricingAsOf": "2026-07-29T06:59:01.436Z"
+        "pricingAsOf": "2026-07-29T06:59:07.134Z"
       }
     },
     "merges": [
