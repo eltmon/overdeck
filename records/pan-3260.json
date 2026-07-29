@@ -98,7 +98,7 @@
     "recordedAt": "2026-07-29T01:09:34.738Z"
   },
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T16:39:36.883Z",
+  "updated": "2026-07-29T16:51:11.016Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "blocked",
@@ -109,7 +109,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T01:11:05.562Z",
-    "updatedAt": "2026-07-29T16:39:36.814Z",
+    "updatedAt": "2026-07-29T16:51:10.982Z",
     "reviewNotes": "Workspace branch drifted to a main-tip SHA (ffc4ec7f) with zero PAN-3260 changes; real work is PR #3268 head 21db0cd — restore local feature/pan-3260 to origin and re-run review. Code itself reviewed clean.",
     "conflictsSince": {
       "sha": "3e6036dbd60fcbcd83d9577006279e03103cc0e7",
