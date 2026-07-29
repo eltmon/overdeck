@@ -307,7 +307,7 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T02:48:48.713Z",
+  "updated": "2026-07-29T02:48:54.268Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "blocked",
@@ -318,7 +318,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T02:48:47.913Z",
+    "updatedAt": "2026-07-29T02:48:54.244Z",
     "reviewNotes": "Review blocked: normal kimi-code resume uses Claude-only readiness/transcript confirmation and drops continue prompts; artifact/context validators still omit kimi-code; reviewed merge SHA a913491195 is not pushed to PR #3255. See .pan/review/agent-pan-1837-review-a9134911/review.md.",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
@@ -330,26 +330,8 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
-    "reviewedAtCommit": "c6d2ddc5596539e9ef4dbaebf6a435697a86df90",
-    "reviewSpawnedAt": "2026-07-29T02:26:08.078Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "a91349119598898b09353f75fe2c0a4fdeed599c"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "a91349119598898b09353f75fe2c0a4fdeed599c"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "a91349119598898b09353f75fe2c0a4fdeed599c"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "a91349119598898b09353f75fe2c0a4fdeed599c"
-      }
-    }
+    "reviewedAtCommit": "a91349119598898b09353f75fe2c0a4fdeed599c",
+    "reviewSpawnedAt": "2026-07-29T02:26:08.078Z"
   },
   "closeOut": {
     "usage": {
@@ -401,7 +383,7 @@
       },
       "costAtCloseOut": {
         "usd": 323.970436,
-        "pricingAsOf": "2026-07-29T02:48:47.939Z"
+        "pricingAsOf": "2026-07-29T02:48:54.261Z"
       }
     },
     "merges": [
