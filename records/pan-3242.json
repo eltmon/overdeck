@@ -74,7 +74,7 @@
     "recordedAt": "2026-07-28T20:52:11.749Z"
   },
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-29T01:16:36.905Z",
+  "updated": "2026-07-29T01:17:34.003Z",
   "pipeline": {
     "issueId": "PAN-3242",
     "reviewStatus": "blocked",
@@ -84,16 +84,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:52:32.420Z",
-    "updatedAt": "2026-07-29T01:16:36.885Z",
-    "reviewNotes": "⊗ The rework violates the explicit `OrderBookPage.tsx` must-not constraint — `src/dashboard/frontend/src/pages/OrderBookPage.tsx:241` — applied by deacon sweep from on-disk review.md",
-    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 3e981e2 (3 paths): src/lib/gitlab-merge-requests.ts, tests/unit/lib/gitlab-merge-requests.test.ts, tests/unit/lib/pipeline-membership-gather.test.ts",
-        "detectedAt": "2026-07-29T01:16:19.128Z"
-      }
-    ],
+    "updatedAt": "2026-07-29T01:17:33.670Z",
     "conflictsSince": {
       "sha": "3e981e26c497dc13d6dad0f66cd114112ce68983",
       "detectedAt": "2026-07-29T01:16:19.128Z",
@@ -105,25 +96,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3249",
     "reviewedAtCommit": "7ab7097fdf630f7b166478bb5b02ac770cdbf4dc",
-    "reviewSpawnedAt": "2026-07-28T21:24:14.612Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "docs/FLYWHEEL-STATE.md"
-      ],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "configuration/order-books.mdx",
-        "src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx",
-        "src/dashboard/frontend/src/components/orders/__tests__/RunSettingsPanel.test.tsx"
-      ],
-      "actualChangedFiles": [
-        "configuration/order-books.mdx",
-        "docs/FLYWHEEL-STATE.md",
-        "src/dashboard/frontend/src/components/orders/RunSettingsPanel.tsx",
-        "src/dashboard/frontend/src/components/orders/__tests__/RunSettingsPanel.test.tsx"
-      ],
-      "recordedAt": "2026-07-28T20:52:11.749Z"
-    }
+    "reviewSpawnedAt": "2026-07-28T21:24:14.612Z"
   },
   "closeOut": {
     "usage": {
@@ -146,10 +119,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 482,
-            "output": 139823,
-            "cacheRead": 66544253,
-            "cacheWrite": 1092701
+            "input": 494,
+            "output": 141700,
+            "cacheRead": 69251882,
+            "cacheWrite": 1098836
           }
         }
       },
@@ -167,15 +140,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 482,
-          "output": 139823,
-          "cacheRead": 66544253,
-          "cacheWrite": 1092701
+          "input": 494,
+          "output": 141700,
+          "cacheRead": 69251882,
+          "cacheWrite": 1098836
         }
       },
       "costAtCloseOut": {
-        "usd": 52.138869,
-        "pricingAsOf": "2026-07-29T01:16:36.894Z"
+        "usd": 52.714526,
+        "pricingAsOf": "2026-07-29T01:17:33.796Z"
       }
     },
     "merges": [
