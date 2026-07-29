@@ -154,7 +154,7 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T00:15:12.424Z",
+  "updated": "2026-07-29T00:15:18.374Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -164,7 +164,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T00:15:11.488Z",
+    "updatedAt": "2026-07-29T00:15:18.339Z",
     "reviewNotes": "This cycle changes only the allowlist; FR-7 still uses an unregistered conversation route and prior blockers remain",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
@@ -174,7 +174,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "f2a3bffa861b4553e52947b3be0df57ec50aa888",
+    "reviewedAtCommit": "e44c92fa4615961df1add72e466b132ad9ea4f1e",
     "reviewSpawnedAt": "2026-07-29T00:11:57.105Z"
   },
   "closeOut": {
@@ -235,7 +235,7 @@
       },
       "costAtCloseOut": {
         "usd": 80.078401,
-        "pricingAsOf": "2026-07-29T00:15:11.599Z"
+        "pricingAsOf": "2026-07-29T00:15:18.362Z"
       }
     },
     "merges": [
