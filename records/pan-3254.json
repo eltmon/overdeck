@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:18:00.558Z",
-  "updated": "2026-07-29T03:26:40.384Z",
+  "updated": "2026-07-29T03:30:08.720Z",
   "pipeline": {
     "issueId": "PAN-3254",
     "reviewStatus": "pending",
@@ -63,18 +63,33 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "docs-anchor-drift-semantics": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3254",
         "agentId": "agent-pan-3254",
         "pid": 3700179,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T03:26:40.384Z"
+        "claimedAt": "2026-07-29T03:26:40.384Z",
+        "itemId": "docs-anchor-drift-semantics",
+        "outcome": "completed",
+        "reason": "Replaced outdated wrapper SHA paragraph with shape-mismatch handling; added repeat-reset bound documentation with escalation semantics; included test file references and MIN-901 incident context",
+        "releasedAt": "2026-07-29T03:30:08.720Z"
+      }
+    ],
+    "statusReasons": {
+      "docs-anchor-drift-semantics": {
+        "reason": "Replaced outdated wrapper SHA paragraph with shape-mismatch handling; added repeat-reset bound documentation with escalation semantics; included test file references and MIN-901 incident context",
+        "updatedAt": "2026-07-29T03:30:08.720Z"
       }
     }
   },
   "statusOverrides": {
-    "docs-anchor-drift-semantics": "running"
+    "docs-anchor-drift-semantics": "completed",
+    "docs-anchor-drift-semantics.docs-anchor-drift-semantics.ac1": "completed",
+    "docs-anchor-drift-semantics.docs-anchor-drift-semantics.ac2": "completed",
+    "docs-anchor-drift-semantics.docs-anchor-drift-semantics.ac3": "completed",
+    "docs-anchor-drift-semantics.docs-anchor-drift-semantics.ac4": "completed"
   }
 }
