@@ -26,6 +26,7 @@ export function createMemoryCommand(): Command {
     .option('--issue <id>', 'Issue ID')
     .option('--tag <tag>', 'Filter by tag')
     .option('--sibling', 'Search same-project sibling issues instead of the selected issue')
+    .option('--global', 'Search across all registered projects instead of just one')
     .option('--include-archived', 'Include observations hidden by reset markers')
     .option('--limit <n>', 'Maximum results', parseInt)
     .option('--json', 'Output JSON')

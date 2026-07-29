@@ -16,7 +16,7 @@ import {
 import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';
 import { readCurrentStatus } from './rollup.js';
 import { getAgentStateSync } from '../agents.js';
-import { getWorkspaceForIssue, listWorkspaces } from '../workspaces/resolver.js';
+import { getWorkspaceForIssue, listProjects, listWorkspaces } from '../workspaces/resolver.js';
 
 const DEFAULT_PROJECT_ID = 'overdeck';
 const MIN_DAILY_SUMMARY_OBSERVATIONS = 3;
@@ -28,6 +28,7 @@ export interface MemorySearchOptions {
   issue?: string;
   tag?: string;
   sibling?: boolean;
+  global?: boolean;
   limit?: number;
   includeArchived?: boolean;
 }
@@ -67,17 +68,22 @@ export interface MemoryDoctorResult {
 }
 
 export async function searchMemory(query: string, options: MemorySearchOptions = {}): Promise<MemorySearchResult[]> {
-  const projectId = options.project ?? DEFAULT_PROJECT_ID;
-  const observations = await readObservationScope(projectId, options.issue, options.sibling ?? false);
-  const resetMarkers = options.includeArchived ? [] : await readResetMarkers(projectId);
+  const projectIds = options.global ? listProjects().map((project) => project.id) : [options.project ?? DEFAULT_PROJECT_ID];
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-  const results = observations
-    .filter((observation) => !options.workspace || observation.workspaceId === options.workspace)
-    .filter((observation) => !options.issue || options.sibling || observation.issueId === options.issue)
-    .filter((observation) => options.includeArchived || isAfterLatestResetMarker(observation, resetMarkers))
-    .filter((observation) => !options.tag || observation.tags.includes(options.tag))
-    .map((observation) => ({ observation, score: scoreObservation(observation, terms) }))
-    .filter((result) => terms.length === 0 || result.score > 0)
+
+  const perProject = await Promise.all(projectIds.map(async (projectId) => {
+    const observations = await readObservationScope(projectId, options.issue, options.sibling ?? false);
+    const resetMarkers = options.includeArchived ? [] : await readResetMarkers(projectId);
+    return observations
+      .filter((observation) => !options.workspace || observation.workspaceId === options.workspace)
+      .filter((observation) => !options.issue || options.sibling || observation.issueId === options.issue)
+      .filter((observation) => options.includeArchived || isAfterLatestResetMarker(observation, resetMarkers))
+      .filter((observation) => !options.tag || observation.tags.includes(options.tag))
+      .map((observation) => ({ observation, score: scoreObservation(observation, terms) }))
+      .filter((result) => terms.length === 0 || result.score > 0);
+  }));
+
+  const results = perProject.flat()
     .sort((a, b) => b.score - a.score || b.observation.timestamp.localeCompare(a.observation.timestamp));
 
   return results.slice(0, options.limit ?? 20);
