@@ -225,3 +225,77 @@ describe('trimReviewStatusHistoryPayloads (PAN-3253)', () => {
     expect(rows[1]!.payload).toBe(other);
   });
 });
+
+describe('append() bounding of review.status_changed (PAN-3253 append-door-bound)', () => {
+  it('bounds oversized review.status_changed at append door (FR-1)', () => {
+    const store = createEventStore(db as unknown as DbAdapter);
+
+    const longNote = 'x'.repeat(1000);
+    const largeHistory = Array.from({ length: 30 }, (_, i) => ({
+      type: 'review',
+      status: i % 2 === 0 ? 'pending' : 'passed',
+      timestamp: new Date(1_753_000_000_000 + i * 1000).toISOString(),
+      notes: longNote,
+    }));
+
+    const seq = store.append({
+      type: 'review.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: {
+        status: {
+          history: largeHistory,
+          issueId: 'PAN-3260',
+          reviewStatus: 'passed',
+        },
+      },
+    } as any);
+
+    const rows = db.prepare('SELECT payload FROM events WHERE sequence = ?').all([seq]) as Array<{ payload: string }>;
+    expect(rows).toHaveLength(1);
+
+    const parsed = JSON.parse(rows[0]!.payload) as {
+      status?: { history?: Array<{ notes?: string }> };
+    };
+    expect(parsed.status?.history).toHaveLength(20);
+    for (const entry of parsed.status?.history || []) {
+      if (entry.notes) {
+        expect(entry.notes.length).toBeLessThanOrEqual(500);
+      }
+    }
+  });
+
+  it('preserves large non-review payloads byte-identically at append door', () => {
+    const store = createEventStore(db as unknown as DbAdapter);
+
+    const largePayload = { big: 'x'.repeat(100_000), nested: { data: 'y'.repeat(50_000) } };
+
+    const seq = store.append({
+      type: 'agent.activity_changed',
+      timestamp: new Date().toISOString(),
+      payload: largePayload,
+    } as any);
+
+    const rows = db.prepare('SELECT payload FROM events WHERE sequence = ?').all([seq]) as Array<{ payload: string }>;
+    expect(rows).toHaveLength(1);
+
+    const parsed = JSON.parse(rows[0]!.payload);
+    expect(JSON.stringify(parsed)).toBe(JSON.stringify(largePayload));
+  });
+
+  it('handles unparseable review.status_changed payloads gracefully at append door', () => {
+    const store = createEventStore(db as unknown as DbAdapter);
+
+    const event = {
+      type: 'review.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: { some: 'data', status: { issueId: 'PAN-1' } },
+    } as any;
+
+    expect(() => {
+      store.append(event);
+    }).not.toThrow();
+
+    const rows = db.prepare('SELECT payload FROM events WHERE type = ?').all(['review.status_changed']) as Array<{ payload: string }>;
+    expect(rows.length).toBeGreaterThan(0);
+  });
+});

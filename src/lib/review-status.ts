@@ -27,6 +27,7 @@ import {
 } from './review-status-reconcile.js';
 import { isReviewRequestStale, needsReviewDispatch } from './review-dispatch-decision.js';
 import { REVIEW_STATUS_HISTORY_LIMIT } from './review-status-reconcile.js';
+import { REVIEW_STATUS_NOTE_LIMIT } from './review-status-limits.js';
 import { resolveJournalReconciledReviewStatusSync } from './review-status-read.js';
 import { capturePipelineStageForIssue } from './telemetry/pipeline.js';
 import type { ReviewStatusUpdate } from './workspace-anchor-drift.js';
@@ -38,6 +39,11 @@ export type { ReviewStatusUpdate } from './workspace-anchor-drift.js';
 export interface MergeGateEligibility {
   eligible: boolean;
   reason?: string;
+}
+
+function truncateHistoryNote(notes: string | undefined): string | undefined {
+  if (!notes || notes.length <= REVIEW_STATUS_NOTE_LIMIT) return notes;
+  return notes.slice(0, REVIEW_STATUS_NOTE_LIMIT - 1) + '…';
 }
 
 /**
@@ -253,19 +259,19 @@ export function setReviewStatusSync(
   const history = [...(status.history || [])];
   const now = new Date().toISOString();
   if (update.reviewStatus && update.reviewStatus !== status.reviewStatus) {
-    history.push({ type: 'review', status: update.reviewStatus, timestamp: now, notes: update.reviewNotes });
+    history.push({ type: 'review', status: update.reviewStatus, timestamp: now, notes: truncateHistoryNote(update.reviewNotes) });
   }
   if (update.testStatus && update.testStatus !== status.testStatus) {
-    history.push({ type: 'test', status: update.testStatus, timestamp: now, notes: update.testNotes });
+    history.push({ type: 'test', status: update.testStatus, timestamp: now, notes: truncateHistoryNote(update.testNotes) });
   }
   if (update.uatStatus && update.uatStatus !== status.uatStatus) {
-    history.push({ type: 'uat', status: update.uatStatus, timestamp: now, notes: update.uatNotes });
+    history.push({ type: 'uat', status: update.uatStatus, timestamp: now, notes: truncateHistoryNote(update.uatNotes) });
   }
   if (update.mergeStatus && update.mergeStatus !== status.mergeStatus) {
     history.push({ type: 'merge', status: update.mergeStatus, timestamp: now });
   }
   if (update.releaseStatus && update.releaseStatus !== status.releaseStatus) {
-    history.push({ type: 'release', status: update.releaseStatus, timestamp: now, notes: update.releaseNotes });
+    history.push({ type: 'release', status: update.releaseStatus, timestamp: now, notes: truncateHistoryNote(update.releaseNotes) });
   }
   while (history.length > REVIEW_STATUS_HISTORY_LIMIT) history.shift();
 
