@@ -347,7 +347,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:28:37.823Z",
+  "updated": "2026-07-29T05:28:43.412Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -357,7 +357,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:28:37.077Z",
+    "updatedAt": "2026-07-29T05:28:43.402Z",
     "reviewNotes": "FR-7 tests still fail because SimpleHomePage lacks a query provider and the DrawerAgentSession mock targets the wrong module",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -367,7 +367,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "3191261e3de7ad4dbeedb4318ecec64f3fe0c192",
+    "reviewedAtCommit": "0ec63b2992872060a1437b3be1b9e574ca9d372d",
     "reviewSpawnedAt": "2026-07-29T05:26:41.847Z"
   },
   "closeOut": {
@@ -428,7 +428,7 @@
       },
       "costAtCloseOut": {
         "usd": 295.507481,
-        "pricingAsOf": "2026-07-29T05:28:37.097Z"
+        "pricingAsOf": "2026-07-29T05:28:43.408Z"
       }
     },
     "merges": [
