@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T02:28:57.955Z",
+  "updated": "2026-07-29T02:56:29.205Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
     }
   ],
   "tasks": {
-    "sequence": 33,
-    "claims": {
-      "memory-capture-nonissue": {
-        "writerId": "agent-pan-1990",
-        "agentId": "agent-pan-1990",
-        "pid": 1964411,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T02:28:57.955Z"
-      }
-    },
+    "sequence": 34,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -255,6 +247,16 @@
         "itemId": "memory-home-migration",
         "outcome": "completed",
         "releasedAt": "2026-07-29T02:28:49.240Z"
+      },
+      {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 1964411,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T02:28:57.955Z",
+        "itemId": "memory-capture-nonissue",
+        "outcome": "completed",
+        "releasedAt": "2026-07-29T02:56:29.205Z"
       }
     ],
     "statusReasons": {
@@ -330,6 +332,10 @@
     "memory-home-migration.memory-home-migration.ac2": "completed",
     "memory-home-migration.memory-home-migration.ac3": "completed",
     "memory-home-migration.memory-home-migration.ac4": "completed",
-    "memory-capture-nonissue": "running"
+    "memory-capture-nonissue": "completed",
+    "memory-capture-nonissue.memory-capture-nonissue.ac1": "completed",
+    "memory-capture-nonissue.memory-capture-nonissue.ac2": "completed",
+    "memory-capture-nonissue.memory-capture-nonissue.ac3": "completed",
+    "memory-capture-nonissue.memory-capture-nonissue.ac4": "completed"
   }
 }
