@@ -88,6 +88,8 @@ export interface Conversation {
   /** True when the live session is parked on a boot-blocking TUI screen (Claude
    *  first-run onboarding, trust dialog) that only the terminal can answer. */
   needsTerminal?: boolean;
+  /** PAN-1990: the projects/workspaces registry row this conversation belongs to. Null for pre-migration rows. */
+  workspaceId?: string | null;
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────

@@ -23,4 +23,5 @@ export type Tab =
   | 'god-view'
   | 'deacon'
   | 'sessions'
-  | 'awaiting-merge';
+  | 'awaiting-merge'
+  | 'workspace';

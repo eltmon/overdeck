@@ -1,0 +1,215 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
+
+const { mockExecAsync } = vi.hoisted(() => ({
+  mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+}));
+
+vi.mock('child_process', async () => {
+  const actual = await vi.importActual<typeof import('child_process')>('child_process');
+  return { ...actual, exec: vi.fn() };
+});
+
+vi.mock('util', async () => {
+  const actual = await vi.importActual<typeof import('util')>('util');
+  return { ...actual, promisify: () => mockExecAsync };
+});
+
+import { createWorkspacePromise } from '../../../../src/lib/workspace-manager/create.js';
+import { getWorkspaceForIssue, getProjectByPath } from '../../../../src/lib/workspaces/resolver.js';
+import { upsertProjectFromConfig } from '../../../../src/lib/workspaces/writer.js';
+import { registerProjectSync, unregisterProjectSync } from '../../../../src/lib/projects.js';
+
+let odb: OverdeckTestDb;
+let tempDir: string;
+
+beforeEach(() => {
+  odb = setupOverdeckTestDb();
+  tempDir = mkdtempSync(join(tmpdir(), 'pan-1990-create-row-'));
+  mockExecAsync.mockReset();
+  mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+});
+
+afterEach(() => {
+  teardownOverdeckTestDb(odb);
+  rmSync(tempDir, { recursive: true, force: true });
+});
+
+describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
+  it('creates a kind=issue row via the writer before the worktree directory exists', async () => {
+    upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
+
+    let rowExistedDuringWorktreeAdd: boolean | null = null;
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (typeof command === 'string' && command.includes('git worktree add')) {
+        rowExistedDuringWorktreeAdd = getWorkspaceForIssue('PAN-2050') !== null;
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await createWorkspacePromise({
+      projectConfig: { name: 'Test', path: tempDir },
+      featureName: 'pan-2050',
+    });
+
+    expect(result.success).toBe(true);
+    expect(rowExistedDuringWorktreeAdd).toBe(true);
+
+    const row = getWorkspaceForIssue('PAN-2050');
+    expect(row?.kind).toBe('issue');
+    expect(row?.branchName).toBe('feature/pan-2050');
+    expect(row?.path).toBe(join(tempDir, 'workspaces', 'feature-pan-2050'));
+  });
+
+  it('reuses an existing row for the same issue and creates no duplicates', async () => {
+    upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
+
+    await createWorkspacePromise({
+      projectConfig: { name: 'Test', path: tempDir },
+      featureName: 'pan-3000',
+    });
+    const firstRowId = getWorkspaceForIssue('PAN-3000')?.id;
+    expect(firstRowId).toBeDefined();
+
+    // Simulate the workspace already existing on disk and being re-created
+    // (e.g. a retried `pan start`) by clearing the mocked side effects only —
+    // the row itself should be reused, not duplicated.
+    await createWorkspacePromise({
+      projectConfig: { name: 'Test', path: tempDir },
+      featureName: 'pan-3000',
+    }).catch(() => undefined); // second call may fail at the "already exists" guard; that's fine
+
+    const rows = odb.raw().prepare(
+      `SELECT COUNT(*) as c FROM workspaces WHERE issue_id = 'PAN-3000'`,
+    ).get() as { c: number };
+    expect(rows.c).toBe(1);
+  });
+
+  it('seeds the project row from projects.yaml when boot-seeding has not run yet, then creates the workspace row (FR-6/AC-4)', async () => {
+    // Registered in projects.yaml (registerProjectSync) but deliberately NOT
+    // upserted into the DB — simulates a project the dashboard hasn't
+    // boot-seeded against yet.
+    registerProjectSync('pan-4000-project', { name: 'Unseeded', path: tempDir });
+    try {
+      expect(getProjectByPath(tempDir)).toBeNull();
+
+      let rowExistedDuringWorktreeAdd: boolean | null = null;
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (typeof command === 'string' && command.includes('git worktree add')) {
+          rowExistedDuringWorktreeAdd = getWorkspaceForIssue('PAN-4000') !== null;
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const result = await createWorkspacePromise({
+        projectConfig: { name: 'Unseeded', path: tempDir },
+        featureName: 'pan-4000',
+      });
+
+      expect(result.success).toBe(true);
+      expect(rowExistedDuringWorktreeAdd).toBe(true);
+      expect(getWorkspaceForIssue('PAN-4000')?.kind).toBe('issue');
+    } finally {
+      unregisterProjectSync('pan-4000-project');
+    }
+  });
+
+  it('fails workspace creation (never reaching worktree creation) when the project has no projects.yaml entry at all (FR-6/AC-4)', async () => {
+    // Deliberately skip both upsertProjectFromConfig and registerProjectSync.
+    const result = await createWorkspacePromise({
+      projectConfig: { name: 'Unregistered', path: tempDir },
+      featureName: 'pan-4001',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.errors.join(' ')).toContain('No projects.yaml entry found');
+    expect(getWorkspaceForIssue('PAN-4001')).toBeNull();
+    expect(mockExecAsync).not.toHaveBeenCalled();
+  });
+
+  it('deletes the pre-created workspace row when git worktree add fails (non-blocking review fix)', async () => {
+    upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (typeof command === 'string' && command.includes('git worktree add')) {
+        throw new Error('fatal: could not create worktree');
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await createWorkspacePromise({
+      projectConfig: { name: 'Test', path: tempDir },
+      featureName: 'pan-5000',
+    });
+
+    expect(result.success).toBe(false);
+    // The row created before the worktree attempt must not survive a failure —
+    // otherwise the registry advertises a workspace whose path was never created.
+    expect(getWorkspaceForIssue('PAN-5000')).toBeNull();
+  });
+
+  it('keeps the workspace row when a failure occurs AFTER the worktree already exists on disk (cycle-3 review fix)', async () => {
+    upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (typeof command === 'string' && command.includes('git worktree add')) {
+        // Real git isn't run in this mocked harness, so the worktree
+        // directory itself must exist for later steps to run inside it.
+        const { mkdirSync } = await import('node:fs');
+        mkdirSync(join(tempDir, 'workspaces', 'feature-pan-6000'), { recursive: true });
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await createWorkspacePromise({
+      // An inverted port range (start > end) makes assignPort's search loop
+      // never execute, throwing immediately — a real post-worktree failure
+      // path (ports/devcontainer/tunnel/Docker) that pushes to result.errors
+      // without an early return, exactly the class of bug this fix closes.
+      projectConfig: { name: 'Test', path: tempDir, workspace: { workspaces_dir: 'workspaces', ports: { app: { range: [3000, 2999] } } } as any },
+      featureName: 'pan-6000',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.errors.join(' ')).toContain('Failed to assign app port');
+    // The worktree itself was created — deleting the row here would strand
+    // the registry blind to a real on-disk worktree until a later boot
+    // backfill, and a retry would collide with the existing path.
+    expect(getWorkspaceForIssue('PAN-6000')).not.toBeNull();
+  });
+
+  it('keeps the workspace row for a partial polyrepo failure (repo A created, repo B fails) (cycle-4 review fix)', async () => {
+    upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (typeof command === 'string' && command.includes('git worktree add') && command.includes('repo-b')) {
+        throw new Error('fatal: repo-b worktree failed');
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await createWorkspacePromise({
+      projectConfig: {
+        name: 'Test',
+        path: tempDir,
+        workspace: {
+          workspaces_dir: 'workspaces',
+          type: 'polyrepo',
+          repos: [
+            { name: 'repo-a', path: 'repo-a', link_type: 'worktree' },
+            { name: 'repo-b', path: 'repo-b', link_type: 'worktree' },
+          ],
+        },
+      } as any,
+      featureName: 'pan-7000',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.errors.join(' ')).toContain('repo-b');
+    // repo-a's worktree (and the polyrepo container directory) are real,
+    // on-disk content — deleting the row here would strand the registry
+    // blind to them until a later boot backfill, and a retry would collide
+    // with the existing non-metadata path.
+    expect(getWorkspaceForIssue('PAN-7000')).not.toBeNull();
+  });
+});

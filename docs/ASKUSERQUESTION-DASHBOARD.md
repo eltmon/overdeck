@@ -317,6 +317,97 @@ Reaping removes the question from the Decisions list, but it does not erase
 history. The original question and its options remain in the agent's JSONL
 transcript, and the agent's terminal status records why the question expired.
 
+## Prompt text — threading from enrichment to Decisions card (PAN-3232)
+
+The enrichment poller captures three pieces of pending-input metadata:
+- `hasPendingQuestion`: boolean, whether the agent is blocked
+- `pendingQuestionPrompt`: the literal first line(s) of the pending question
+- `pendingQuestionReason`: the rationale text for the block (e.g. "tool permission denied")
+
+The **prompt text** is carried through the full render-to-display chain so the
+Decisions card shows the actual question, not a generic label:
+
+```text
+agent.enrichment_changed event
+    │ payload.pendingQuestionPrompt, pendingQuestionReason
+    ▼
+agentsById[agentId] snapshot  (written by event reducer)
+    ▼
+selectPendingInputSubjects → PendingInputSubject (store.ts)
+    └─ copies pendingQuestionPrompt and pendingQuestionReason
+    ▼
+useDecisions hook → Decision interface (useDecisions.ts)
+    └─ preserves both fields for agent-sourced subjects
+    ▼
+DecisionsPanel → DecisionRow component
+    └─ uses getPendingQuestionTitle (revived from pipeline-state.ts)
+       to format: "Permission prompt: <first line>" or
+       "Question: <first line>" depending on kind
+    └─ falls back to describePendingInput(kinds) when prompt is absent
+```
+
+Conversations carry their own prompt text via the `pendingAskUserQuestion`
+structure returned from the `/api/conversations/pending-input` REST endpoint,
+so the threading is agent-only and leaves conversation rows unchanged.
+
+## Sidebar badge and session-tree delta (PAN-3232)
+
+When enrichment detects a state change (`pendingInputCount` shifts from 0 to
+nonzero), the poller emits `agent.enrichment_changed`. The **session tree
+sidebar** must refresh its pending-input badge within ~1s (not ~70s via the
+next full JSONL scan). `mapEventToDelta` in `ws-rpc.ts` converts this event to
+a `pending_input_changed` SessionTreeDelta:
+
+```ts
+// event payload carries issueId now (PAN-3232)
+kind: 'pending_input_changed'
+issueId: <issue>
+sessionId: <agentId>
+awaitingInput: <boolean>
+awaitingInputPrompt: <string | undefined>
+awaitingInputReason: <string | undefined>
+pendingInputKinds: <['askUserQuestion'] | ['rateLimit'] | etc>
+```
+
+The `awaitingInputPrompt` and `awaitingInputReason` fields here **match the
+Decisions card fields** above — the enrichment event is the single source.
+The client-side `applySessionTreeDelta` **merges** (does not refetch) these
+fields in place on the matched session, so the tree stays responsive while
+the sidebar badge updates live. The merge is idempotent: absent fields in a
+delta still clear their counterparts on the tree (so a resolved question
+clears the prompt text immediately).
+
+The `issueId` is optional on the event payload (required to issue-resolve
+context). If absent, the delta is dropped (no session to match).
+
+## Specialist nodes — review, test, ship, and reviewer (PAN-3232)
+
+Specialist agents (review-converter, test-runner, ship-coordinator) and
+reviewer sub-agents are registered in the enrichment poller the same way
+work agents are. They carry `hasPendingQuestion` and `pendingInputKinds`
+when blocked on a permission prompt or rate limit.
+
+The session tree, activity route, and reviewer-tree surfaces now include the
+four awaiting-input fields on specialist nodes:
+
+- `awaitingInput: <boolean>` — whether the specialist is blocked
+- `awaitingInputPrompt: <string | undefined>` — the prompt text (or undefined)
+- `awaitingInputReason: <string | undefined>` — the rationale (or undefined)
+- `pendingInputKinds: ReadonlyArray<string>` — the kind(s): `['permissionRequest']`, `['rateLimit']`, etc.
+
+These fields are populated via projection-only reads against
+`agentSnapshotsById` — no tmux-pane fallback is used. This is safe because
+specialists are always enumerated from the poller's live registry, unlike
+work agents which may be parked.
+
+The dead `projectPendingInput` function in `read-model.ts` has been removed
+(PAN-3232). That function was a bootstrap-time guard meant to detect pending
+input when the enrichment poller had not yet run. But
+`agentSnapshotFromOverdeck` (which populates the store at bootstrap) never
+initializes pending-input fields, so the bootstrap scenario was structurally
+impossible — waiting for the first enrichment poll is the only correct
+initialization path.
+
 ## Gotchas for future debugging
 
 - Dashboard runs under `pan dev`: the **frontend is Vite HMR** (source changes

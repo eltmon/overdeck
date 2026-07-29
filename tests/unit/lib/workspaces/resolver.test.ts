@@ -1,0 +1,167 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
+
+import {
+  getMainWorkspace,
+  getProjectByKey,
+  getProjectByPath,
+  getWorkspaceByName,
+  getWorkspaceById,
+  getWorkspaceForIssue,
+  listProjects,
+  listWorkspaces,
+  resolveWorkspaceForCwd,
+  resolveWorkspaceRef,
+} from '../../../../src/lib/workspaces/resolver.js';
+import { createWorkspace, upsertProjectFromConfig } from '../../../../src/lib/workspaces/writer.js';
+
+let odb: OverdeckTestDb;
+
+beforeEach(() => {
+  odb = setupOverdeckTestDb();
+});
+
+afterEach(() => {
+  teardownOverdeckTestDb(odb);
+});
+
+function seedProject(id = 'proj-1', path = '/repo/overdeck') {
+  upsertProjectFromConfig(id, { name: 'overdeck', path });
+  return id;
+}
+
+describe('workspaces resolver', () => {
+  it('getWorkspaceById and getWorkspaceByName find a created row', async () => {
+    const projectId = seedProject();
+    const id = await createWorkspace({ projectId, kind: 'scratch', name: 'notes', path: '/repo/overdeck-notes' });
+
+    expect(getWorkspaceById(id)?.name).toBe('notes');
+    expect(getWorkspaceByName(projectId, 'notes')?.id).toBe(id);
+    expect(getWorkspaceById('missing')).toBeNull();
+    expect(getWorkspaceByName(projectId, 'missing')).toBeNull();
+  });
+
+  describe('resolveWorkspaceRef (D-3: --workspace <id|name>, review fix cycle 2)', () => {
+    it('resolves by id', async () => {
+      const projectId = seedProject();
+      const id = await createWorkspace({ projectId, kind: 'scratch', name: 'notes', path: '/repo/overdeck-notes' });
+
+      const resolution = resolveWorkspaceRef(id);
+      expect(resolution.ambiguous).toBe(false);
+      expect(resolution.workspace?.id).toBe(id);
+    });
+
+    it('resolves by name when unique across all projects', async () => {
+      const projectId = seedProject();
+      const id = await createWorkspace({ projectId, kind: 'scratch', name: 'unique-name', path: '/repo/overdeck-unique' });
+
+      const resolution = resolveWorkspaceRef('unique-name');
+      expect(resolution.ambiguous).toBe(false);
+      expect(resolution.workspace?.id).toBe(id);
+    });
+
+    it('reports ambiguity instead of guessing when the name matches workspaces in more than one project', async () => {
+      const projectA = seedProject('proj-a', '/repo/a');
+      const projectB = seedProject('proj-b', '/repo/b');
+      await createWorkspace({ projectId: projectA, kind: 'scratch', name: 'shared-name', path: '/repo/a-shared' });
+      await createWorkspace({ projectId: projectB, kind: 'scratch', name: 'shared-name', path: '/repo/b-shared' });
+
+      const resolution = resolveWorkspaceRef('shared-name');
+      expect(resolution.ambiguous).toBe(true);
+      expect(resolution.workspace).toBeNull();
+      if (resolution.ambiguous) {
+        expect(resolution.matches.map((w) => w.projectId).sort()).toEqual(['proj-a', 'proj-b']);
+      }
+    });
+
+    it('reports not-found (not ambiguous) for a ref matching neither an id nor a name', () => {
+      const resolution = resolveWorkspaceRef('does-not-exist');
+      expect(resolution.ambiguous).toBe(false);
+      expect(resolution.workspace).toBeNull();
+    });
+  });
+
+  it('getWorkspaceForIssue returns the non-archived kind=issue row and ignores archived ones', async () => {
+    const projectId = seedProject();
+    const activeId = await createWorkspace({
+      projectId,
+      kind: 'issue',
+      name: 'pan-1990',
+      path: '/repo/workspaces/feature-pan-1990',
+      issueId: 'pan-1990',
+    });
+
+    expect(getWorkspaceForIssue('pan-1990')?.id).toBe(activeId);
+    expect(getWorkspaceForIssue('pan-9999')).toBeNull();
+
+    odb.raw().prepare(`UPDATE workspaces SET is_archived = 1 WHERE id = ?`).run(activeId);
+    expect(getWorkspaceForIssue('pan-1990')).toBeNull();
+  });
+
+  it('getMainWorkspace returns null when no main workspace exists yet', async () => {
+    const projectId = seedProject();
+    expect(getMainWorkspace(projectId)).toBeNull();
+    const id = await createWorkspace({ projectId, kind: 'main', name: 'main', path: '/repo/overdeck' });
+    expect(getMainWorkspace(projectId)?.id).toBe(id);
+  });
+
+  it('listWorkspaces filters by projectId, kind, and archived state', async () => {
+    const projectA = seedProject('proj-a', '/repo/a');
+    const projectB = seedProject('proj-b', '/repo/b');
+    await createWorkspace({ projectId: projectA, kind: 'main', name: 'main', path: '/repo/a' });
+    const scratchA = await createWorkspace({ projectId: projectA, kind: 'scratch', name: 'scratch', path: '/repo/a-scratch' });
+    await createWorkspace({ projectId: projectB, kind: 'main', name: 'main', path: '/repo/b' });
+
+    odb.raw().prepare(`UPDATE workspaces SET is_archived = 1 WHERE id = ?`).run(scratchA);
+
+    expect(listWorkspaces({ projectId: projectA })).toHaveLength(1); // archived scratch excluded by default
+    expect(listWorkspaces({ projectId: projectA, includeArchived: true })).toHaveLength(2);
+    expect(listWorkspaces({ kind: 'main' })).toHaveLength(2);
+    expect(listWorkspaces()).toHaveLength(2); // both mains; archived scratch excluded
+  });
+
+  it('getProjectByKey, getProjectByPath, and listProjects resolve seeded projects', async () => {
+    seedProject('proj-a', '/repo/a');
+    seedProject('proj-b', '/repo/b');
+
+    expect(getProjectByKey('proj-a')?.primaryPath).toBe('/repo/a');
+    expect(getProjectByKey('missing')).toBeNull();
+    expect(getProjectByPath('/repo/b')?.id).toBe('proj-b');
+    expect(getProjectByPath('/repo/missing')).toBeNull();
+    expect(listProjects().map((p) => p.id)).toEqual(['proj-a', 'proj-b']);
+  });
+
+  it('resolveWorkspaceForCwd matches the longest workspace path prefix, not a shorter sibling', async () => {
+    const projectId = seedProject();
+    const outer = await createWorkspace({ projectId, kind: 'scratch', name: 'outer', path: '/repo/overdeck' });
+    const inner = await createWorkspace({
+      projectId,
+      kind: 'issue',
+      name: 'pan-1',
+      path: '/repo/overdeck/workspaces/feature-pan-1',
+      issueId: 'pan-1',
+    });
+
+    expect(resolveWorkspaceForCwd('/repo/overdeck/workspaces/feature-pan-1/src')?.id).toBe(inner);
+    expect(resolveWorkspaceForCwd('/repo/overdeck/some-other-dir')?.id).toBe(outer);
+  });
+
+  it('resolveWorkspaceForCwd does not prefix-match a sibling directory with a shared string prefix', async () => {
+    const projectId = seedProject();
+    await createWorkspace({ projectId, kind: 'scratch', name: 'overdeck', path: '/repo/overdeck' });
+
+    expect(resolveWorkspaceForCwd('/repo/overdeck-other-project')).toBeNull();
+  });
+
+  it('resolveWorkspaceForCwd falls back to a project primary path and returns its main workspace', async () => {
+    const projectId = seedProject('proj-1', '/repo/overdeck');
+    const mainId = await createWorkspace({ projectId, kind: 'main', name: 'main', path: '/repo/overdeck' });
+
+    expect(resolveWorkspaceForCwd('/repo/overdeck/some/nested/dir')?.id).toBe(mainId);
+  });
+
+  it('resolveWorkspaceForCwd returns null when nothing matches', async () => {
+    seedProject();
+    expect(resolveWorkspaceForCwd('/completely/unrelated/path')).toBeNull();
+  });
+});

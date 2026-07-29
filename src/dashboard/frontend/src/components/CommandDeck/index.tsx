@@ -109,6 +109,21 @@ function applySessionTreeDelta(tree: ProjectSessionTree, delta: SessionTreeDelta
       newFeatures[featureIdx] = { ...feature, sessions: newSessions };
       return { ...tree, features: newFeatures };
     }
+    case 'pending_input_changed': {
+      const sessionIdx = feature.sessions.findIndex(s => s.sessionId === delta.sessionId);
+      if (sessionIdx === -1) return tree;
+      const newSessions = [...feature.sessions];
+      newSessions[sessionIdx] = {
+        ...feature.sessions[sessionIdx]!,
+        awaitingInput: delta.awaitingInput ?? false,
+        awaitingInputPrompt: delta.awaitingInputPrompt,
+        awaitingInputReason: delta.awaitingInputReason,
+        pendingInputKinds: delta.pendingInputKinds,
+      };
+      const newFeatures = [...tree.features];
+      newFeatures[featureIdx] = { ...feature, sessions: newSessions };
+      return { ...tree, features: newFeatures };
+    }
     default:
       return tree;
   }

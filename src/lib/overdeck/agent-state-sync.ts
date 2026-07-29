@@ -1,6 +1,7 @@
 import type { AgentState, Role } from '../agents.js';
 import { registerFeedbackAgentStateReader } from '../agents/agent-state-source.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { getWorkspaceForIssue } from '../workspaces/resolver.js';
 import { getOverdeckDatabaseSync } from './infra.js';
 
 type OverdeckAgentRow = {
@@ -9,6 +10,7 @@ type OverdeckAgentRow = {
   role: string;
   status: string;
   workspace: string;
+  workspace_id: string | null;
   session_id: string | null;
   harness: string | null;
   model: string | null;
@@ -65,6 +67,7 @@ export const AGENT_COLUMNS_FOR_DB = [
   'role',
   'status',
   'workspace',
+  'workspace_id',
   'session_id',
   'harness',
   'model',
@@ -142,6 +145,7 @@ function overdeckRowToAgentState(row: OverdeckAgentRow): AgentState {
     id: row.id,
     issueId: row.issue_id,
     workspace: row.workspace,
+    workspaceId: row.workspace_id ?? undefined,
     role: row.role as Role,
     model: row.model ?? '',
     status: row.status as AgentState['status'],
@@ -200,6 +204,10 @@ export function stateToOverdeckParamsForDb(state: AgentState, updatedAt: number)
     state.role,
     state.status,
     state.workspace,
+    // PAN-1990 AC-1/FR-4: resolve from issueId when the caller didn't already
+    // set workspaceId, so every write path gets the linkage without each
+    // call site (spawn, resume, restart, ...) doing its own lookup.
+    state.workspaceId ?? getWorkspaceForIssue(state.issueId)?.id ?? null,
     state.sessionId ?? null,
     state.harness ?? '',
     state.model ?? '',

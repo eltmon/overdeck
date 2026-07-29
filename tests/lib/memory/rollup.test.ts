@@ -130,25 +130,25 @@ describe('memory status rollup synthesis', () => {
   });
 
   it('loads the last 20 observations and last 3 archived statuses from memory storage', async () => {
-    const observationsPath = resolveObservationsFile(identity.projectId, identity.issueId, '2026-05-16T00:00:00.000Z');
-    await ensureDir(join(tempDir!, 'memory/overdeck/PAN-1052/observations'));
+    const observationsPath = resolveObservationsFile(identity.projectId, identity.workspaceId, '2026-05-16T00:00:00.000Z');
+    await ensureDir(join(tempDir!, 'memory/overdeck/feature-pan-1052/observations'));
     await writeFile(
       observationsPath,
       `${Array.from({ length: 25 }, (_, index) => JSON.stringify(observation(index + 1))).join('\n')}\n`,
       'utf8',
     );
 
-    const archiveDir = resolveArchiveDir(identity.projectId, identity.issueId);
+    const archiveDir = resolveArchiveDir(identity.projectId, identity.workspaceId);
     await ensureDir(archiveDir);
     await writeFile(join(archiveDir, '2026-05-14_one.json'), JSON.stringify({ ...baseStatus, name: 'Old' }), 'utf8');
     await writeFile(join(archiveDir, '2026-05-15_two.json'), JSON.stringify({ ...baseStatus, name: 'Two' }), 'utf8');
     await writeFile(join(archiveDir, '2026-05-16_three.json'), JSON.stringify({ ...baseStatus, name: 'Three' }), 'utf8');
     await writeFile(join(archiveDir, '2026-05-17_four.json'), JSON.stringify({ ...baseStatus, name: 'Four' }), 'utf8');
 
-    expect((await readRecentObservations(identity.projectId, identity.issueId)).map((item) => item.id)).toEqual(
+    expect((await readRecentObservations(identity.projectId, identity.workspaceId)).map((item) => item.id)).toEqual(
       Array.from({ length: 20 }, (_, index) => `obs-${index + 6}`),
     );
-    expect((await readArchivedStatuses(identity.projectId, identity.issueId)).map((status) => status.name)).toEqual([
+    expect((await readArchivedStatuses(identity.projectId, identity.workspaceId)).map((status) => status.name)).toEqual([
       'Two',
       'Three',
       'Four',
@@ -156,7 +156,7 @@ describe('memory status rollup synthesis', () => {
   });
 
   it('scans newest observation files first and stops after the requested limit', async () => {
-    const observationsDir = join(tempDir!, 'memory/overdeck/PAN-1052/observations');
+    const observationsDir = join(tempDir!, 'memory/overdeck/feature-pan-1052/observations');
     await ensureDir(observationsDir);
     await writeFile(
       join(observationsDir, '2026-05-15.jsonl'),
@@ -169,7 +169,7 @@ describe('memory status rollup synthesis', () => {
       'utf8',
     );
 
-    expect((await readRecentObservations(identity.projectId, identity.issueId, 3)).map((item) => item.id)).toEqual([
+    expect((await readRecentObservations(identity.projectId, identity.workspaceId, 3)).map((item) => item.id)).toEqual([
       'new-1',
       'new-2',
       'new-3',
@@ -199,7 +199,7 @@ describe('memory status rollup synthesis', () => {
 
     const result = await synthesizeStatusRollup({
       projectId: identity.projectId,
-      issueId: identity.issueId,
+      workspaceId: identity.workspaceId,
       pendingTurns: [pendingTurn(1)],
       observations: [observation(1)],
       archivedStatuses: [{ ...baseStatus, workingSet: ['stale-file.ts'] }],
@@ -225,7 +225,7 @@ describe('memory status rollup synthesis', () => {
 
     const result = await synthesizeStatusRollup({
       projectId: identity.projectId,
-      issueId: identity.issueId,
+      workspaceId: identity.workspaceId,
       pendingTurns: [pendingTurn(1)],
       observations: [],
       archivedStatuses: [],
@@ -242,7 +242,7 @@ describe('memory status rollup synthesis', () => {
 
     await expect(synthesizeStatusRollup({
       projectId: identity.projectId,
-      issueId: identity.issueId,
+      workspaceId: identity.workspaceId,
       pendingTurns: [pendingTurn(1)],
       observations: [],
       archivedStatuses: [],
@@ -253,8 +253,8 @@ describe('memory status rollup synthesis', () => {
   it('archives previous status, writes the new status, emits after commit, then clears included pending turns', async () => {
     const previousStatus = { ...baseStatus, name: 'Previous Status' };
     const nextStatus = { ...baseStatus, name: 'Next Status', phase: 'shipping' as const };
-    await ensureDir(join(tempDir!, 'memory/overdeck/PAN-1052'));
-    await writeFile(resolveStatusFile(identity.projectId, identity.issueId), `${JSON.stringify(previousStatus)}\n`, 'utf8');
+    await ensureDir(join(tempDir!, 'memory/overdeck/feature-pan-1052'));
+    await writeFile(resolveStatusFile(identity.projectId, identity.workspaceId), `${JSON.stringify(previousStatus)}\n`, 'utf8');
     const turns = [pendingTurn(1), pendingTurn(2)];
     for (const turn of turns) await writePendingTurn(turn, { loadThreshold: () => 10 });
 
@@ -265,24 +265,24 @@ describe('memory status rollup synthesis', () => {
       pendingTurns: turns,
       now: new Date('2026-05-16T22:00:00.000Z'),
       emitStatusUpdated: async (event) => {
-        expect(JSON.parse(await readFile(resolveStatusFile(identity.projectId, identity.issueId), 'utf8'))).toEqual(nextStatus);
+        expect(JSON.parse(await readFile(resolveStatusFile(identity.projectId, identity.workspaceId), 'utf8'))).toEqual(nextStatus);
         emitted.push(event);
       },
     });
 
     expect(result.previousStatus).toEqual(previousStatus);
-    expect(JSON.parse(await readFile(resolveStatusFile(identity.projectId, identity.issueId), 'utf8'))).toEqual(nextStatus);
+    expect(JSON.parse(await readFile(resolveStatusFile(identity.projectId, identity.workspaceId), 'utf8'))).toEqual(nextStatus);
     expect(JSON.parse(await readFile(result.archivedPath!, 'utf8'))).toEqual(previousStatus);
     expect(emitted).toEqual([{ identity: { projectId: identity.projectId, workspaceId: identity.workspaceId, issueId: identity.issueId }, status: nextStatus, previousStatus }]);
-    await expect(readdir(resolvePendingDir(identity.projectId, identity.issueId))).resolves.toEqual([]);
+    await expect(readdir(resolvePendingDir(identity.projectId, identity.workspaceId))).resolves.toEqual([]);
     expect(result.clearedPending.map((path) => path.split('/').at(-1))).toEqual(turns.map(pendingTurnFileName));
   });
 
   it('leaves pending turns intact when rollup commit fails before the clear step', async () => {
     const previousStatus = { ...baseStatus, name: 'Previous Status' };
     const nextStatus = { ...baseStatus, name: 'Next Status' };
-    await ensureDir(join(tempDir!, 'memory/overdeck/PAN-1052'));
-    await writeFile(resolveStatusFile(identity.projectId, identity.issueId), `${JSON.stringify(previousStatus)}\n`, 'utf8');
+    await ensureDir(join(tempDir!, 'memory/overdeck/feature-pan-1052'));
+    await writeFile(resolveStatusFile(identity.projectId, identity.workspaceId), `${JSON.stringify(previousStatus)}\n`, 'utf8');
     const turn = pendingTurn(1);
     await writePendingTurn(turn, { loadThreshold: () => 10 });
 
@@ -293,18 +293,18 @@ describe('memory status rollup synthesis', () => {
       failAfterStatusWrite: true,
     })).rejects.toThrow('Injected rollup status write failure');
 
-    await expect(readdir(resolvePendingDir(identity.projectId, identity.issueId))).resolves.toEqual([pendingTurnFileName(turn)]);
-    expect(await readCurrentStatus(identity.projectId, identity.issueId)).toEqual(nextStatus);
+    await expect(readdir(resolvePendingDir(identity.projectId, identity.workspaceId))).resolves.toEqual([pendingTurnFileName(turn)]);
+    expect(await readCurrentStatus(identity.projectId, identity.workspaceId)).toEqual(nextStatus);
   });
 
   it('keeps only the latest three archived statuses', async () => {
-    const archiveDir = resolveArchiveDir(identity.projectId, identity.issueId);
+    const archiveDir = resolveArchiveDir(identity.projectId, identity.workspaceId);
     await ensureDir(archiveDir);
     await writeFile(join(archiveDir, '2026-05-13_old.json'), JSON.stringify({ ...baseStatus, name: 'Old' }), 'utf8');
     await writeFile(join(archiveDir, '2026-05-14_one.json'), JSON.stringify({ ...baseStatus, name: 'One' }), 'utf8');
     await writeFile(join(archiveDir, '2026-05-15_two.json'), JSON.stringify({ ...baseStatus, name: 'Two' }), 'utf8');
-    await ensureDir(join(tempDir!, 'memory/overdeck/PAN-1052'));
-    await writeFile(resolveStatusFile(identity.projectId, identity.issueId), JSON.stringify({ ...baseStatus, name: 'Three' }), 'utf8');
+    await ensureDir(join(tempDir!, 'memory/overdeck/feature-pan-1052'));
+    await writeFile(resolveStatusFile(identity.projectId, identity.workspaceId), JSON.stringify({ ...baseStatus, name: 'Three' }), 'utf8');
 
     await commitStatusRollup({
       identity,

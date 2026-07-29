@@ -2,6 +2,7 @@ import { readFile, stat } from 'fs/promises';
 import { basename, dirname, join, resolve } from 'path';
 import type { DashboardSnapshot, FeatureRegistryEntry } from '@overdeck/contracts';
 import { resolveStatusFile } from './memory/paths.js';
+import { resolveWorkspaceForCwd } from './workspaces/resolver.js';
 
 export interface AssembleLiveBriefingInput {
   cwd?: string;
@@ -33,8 +34,12 @@ export async function assembleLiveBriefingMarkdown(input: AssembleLiveBriefingIn
   const now = input.now ?? new Date();
   const snapshot = input.snapshot;
   const registryEntries = input.registryEntries ?? [];
-  const workspace = snapshot ? null : await detectWorkspaceContext(resolve(input.cwd ?? process.cwd()));
-  const status = workspace ? await readWorkspaceStatus(projectId, workspace.issueId) : null;
+  const cwd = resolve(input.cwd ?? process.cwd());
+  const workspace = snapshot ? null : await detectWorkspaceContext(cwd);
+  // Memory status is keyed by the workspaces-table row id, not the
+  // feature-<issue> directory name this module's own WorkspaceContext uses.
+  const workspaceRowId = workspace ? resolveWorkspaceForCwd(cwd)?.id : null;
+  const status = workspace && workspaceRowId ? await readWorkspaceStatus(projectId, workspaceRowId) : null;
 
   return [
     '# Working Inside Overdeck',
@@ -113,9 +118,9 @@ async function readWorkspacePlanTitle(workspacePath: string): Promise<string | n
   }
 }
 
-async function readWorkspaceStatus(projectId: string, issueId: string): Promise<BriefingStatus | null> {
+async function readWorkspaceStatus(projectId: string, workspaceId: string): Promise<BriefingStatus | null> {
   try {
-    const parsed = JSON.parse(await readFile(resolveStatusFile(projectId, issueId), 'utf8')) as BriefingStatus;
+    const parsed = JSON.parse(await readFile(resolveStatusFile(projectId, workspaceId), 'utf8')) as BriefingStatus;
     return parsed && typeof parsed === 'object' ? parsed : null;
   } catch (error) {
     if (isNotFound(error)) return null;

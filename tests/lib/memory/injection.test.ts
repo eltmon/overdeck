@@ -60,7 +60,7 @@ afterEach(async () => {
 });
 
 async function writeStatus(value: MemoryStatus = status) {
-  const path = resolveStatusFile(identity.projectId, identity.issueId);
+  const path = resolveStatusFile(identity.projectId, identity.workspaceId);
   await ensureParentDir(path);
   await writeFile(path, `${JSON.stringify(value)}\n`, 'utf8');
 }
@@ -121,7 +121,7 @@ async function injectWithLog(
 }
 
 async function readRagEntries() {
-  const raw = await readFile(resolveRagRunsFile(identity.projectId, identity.issueId, '2026-05-16'), 'utf8');
+  const raw = await readFile(resolveRagRunsFile(identity.projectId, identity.workspaceId, '2026-05-16'), 'utf8');
   return raw.trim().split('\n').map((line) => JSON.parse(line));
 }
 
@@ -327,6 +327,38 @@ describe('prompt-time memory injection', () => {
     });
     expect(decision.allocationBytes.observations).toBeGreaterThan(0);
     expect(decision.sources.map((source: { docType: string }) => source.docType)).toContain('sibling');
+  });
+
+  it('skips sibling-issue summary injection when issueId is null (main/scratch workspace turn, PAN-1990)', async () => {
+    await insertRow({
+      content: 'prompt injection memory retrieval summary sibling hit',
+      workspace_id: 'feature-pan-999',
+      issue_id: 'PAN-999',
+      doc_type: 'observation',
+    });
+
+    const nullIssueIdentity = { ...identity, issueId: null };
+    const expansion = vi.fn(async () => ({
+      status: 'extracted' as const,
+      provider: 'stub',
+      result: {
+        data: { terms: ['prompt injection', 'memory retrieval', 'summary'] },
+        usage: { input: 1, output: 1 },
+        cost: { usd: 0 },
+        model: 'stub-model',
+        provider: 'stub',
+      },
+    }));
+    const { decision } = await injectWithLog({
+      prompt: 'prompt injection memory retrieval summary',
+      identity: nullIssueIdentity,
+      now: new Date('2026-05-16T22:30:00.000Z'),
+      id: 'inject-null-issue',
+      expansion,
+    });
+
+    expect(decision.hitCounts.sibling).toBe(0);
+    expect(decision.sources.map((source: { docType: string }) => source.docType)).not.toContain('sibling');
   });
 
   it('escapes retrieved memory text so stored content cannot close prompt delimiters', async () => {

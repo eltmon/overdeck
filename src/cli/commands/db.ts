@@ -20,6 +20,12 @@ import {
   getSnapshotCleanerProvisioner,
   type DatabaseProvisionerLogger,
 } from '../../lib/db-provisioners/index.js';
+import {
+  backfillIssueWorkspaces,
+  migrateMemoryHomesToWorkspaces,
+  rebuildMainAndScratchWorkspaces,
+  seedProjectsFromYaml,
+} from '../../lib/workspaces/rebuild.js';
 import type { DatabaseConfig, ProjectConfig as FullProjectConfig } from '../../lib/workspace-config.js';
 import { readIssueRecordForWorkspaceSync } from '../../lib/pan-dir/record.js';
 
@@ -112,6 +118,12 @@ export function registerDbCommands(program: Command): void {
     .option('--dry-run', 'Show what would be backfilled without writing')
     .option('--verbose', 'Log each processed agent')
     .action(rebuildAgentsCommand);
+
+  db.command('rebuild-workspaces')
+    .description('Rebuild the projects/workspaces tables from projects.yaml, worktree scan, and memory-home identity records (PAN-1990)')
+    .option('--dry-run', 'Show what would be created without writing')
+    .option('--verbose', 'Log each processed workspace')
+    .action(rebuildWorkspacesCommand);
 
   db.command('gc-agents')
     .description('Remove stopped work-agent rows for terminal issues')
@@ -486,6 +498,40 @@ async function rebuildAgentsCommand(options: {
     spinner.succeed(
       `Rebuilt agents table: ${result.processed} rows, ${result.markedStopped} marked stopped, ${result.skipped} skipped`
     );
+  } catch (error: any) {
+    spinner.fail(`Rebuild failed: ${error.message}`);
+    process.exitCode = 1;
+  }
+}
+
+async function rebuildWorkspacesCommand(options: {
+  dryRun?: boolean;
+  verbose?: boolean;
+}): Promise<void> {
+  const spinner = ora('Rebuilding projects/workspaces tables...').start();
+
+  try {
+    // seedProjectsFromYaml/backfillIssueWorkspaces/migrateMemoryHomesToWorkspaces
+    // have no dry-run mode of their own (they're idempotent upserts/renames),
+    // so a true --dry-run — zero rows persisted — only previews the
+    // memory-home identity-record scan for main/scratch.
+    if (!options.dryRun) {
+      seedProjectsFromYaml();
+      await backfillIssueWorkspaces();
+      const migration = await migrateMemoryHomesToWorkspaces();
+      if (options.verbose || migration.unresolvable.length > 0) {
+        console.log(`[rebuild-workspaces] migrated ${migration.migrated} legacy memory homes, ${migration.unresolvable.length} unresolvable`);
+      }
+    }
+
+    const result = await rebuildMainAndScratchWorkspaces({ dryRun: options.dryRun, verbose: options.verbose });
+
+    if (options.dryRun) {
+      spinner.info(`Dry run: scanned ${result.scanned}, would create ${result.created}, skip ${result.skipped}`);
+      return;
+    }
+
+    spinner.succeed(`Rebuilt workspaces: scanned ${result.scanned}, created ${result.created}, skipped ${result.skipped}`);
   } catch (error: any) {
     spinner.fail(`Rebuild failed: ${error.message}`);
     process.exitCode = 1;
