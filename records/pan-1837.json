@@ -277,7 +277,7 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T00:28:01.508Z",
+  "updated": "2026-07-29T00:28:07.181Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "blocked",
@@ -288,7 +288,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T00:28:00.755Z",
+    "updatedAt": "2026-07-29T00:28:07.165Z",
     "reviewNotes": "Reviewed fixes are not pushed to PR #3255; native Kimi conversations also lack deterministic wire-session resolution, incompatible dashboard selections are silently coerced, artifact provenance omits kimi-code, and committed HEAD fails the file-size gate.",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
@@ -299,6 +299,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
+    "reviewedAtCommit": "900554f76eef6a96b91387ea58b696b9b9a5a776",
     "reviewSpawnedAt": "2026-07-29T00:14:00.977Z"
   },
   "closeOut": {
@@ -322,10 +323,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 2750,
-            "output": 567565,
-            "cacheRead": 703456733,
-            "cacheWrite": 3080802
+            "input": 2754,
+            "output": 568062,
+            "cacheRead": 704931182,
+            "cacheWrite": 3083222
           }
         }
       },
@@ -343,15 +344,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2750,
-          "output": 567565,
-          "cacheRead": 703456733,
-          "cacheWrite": 3080802
+          "input": 2754,
+          "output": 568062,
+          "cacheRead": 704931182,
+          "cacheWrite": 3083222
         }
       },
       "costAtCloseOut": {
-        "usd": 224.565366,
-        "pricingAsOf": "2026-07-29T00:28:00.812Z"
+        "usd": 224.871284,
+        "pricingAsOf": "2026-07-29T00:28:07.175Z"
       }
     },
     "merges": [
