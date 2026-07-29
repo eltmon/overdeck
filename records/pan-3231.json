@@ -109,20 +109,20 @@
     "recordedAt": "2026-07-29T02:53:51.344Z"
   },
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-29T02:54:41.605Z",
+  "updated": "2026-07-29T03:01:00.115Z",
   "pipeline": {
     "issueId": "PAN-3231",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T02:54:40.568Z",
+    "updatedAt": "2026-07-29T03:01:00.079Z",
+    "reviewNotes": "Tasks viewer omits xBRIEF sub-items, and the PRD modal does not move focus into the dialog.",
     "inspectNotes": "All 5 ACs met. AC5 gaps from the prior review are closed: identity block with 'xBRIEF · active plan' eyebrow + mono issue id + plan title (XBriefFullscreen.tsx:154-171), controlled List/DAG/Raw tablist moved into the topbar per mockup lines 332-345 (XBriefFullscreen.tsx:173-196), summary strip with N/M complete + progress track + happening-now/ready/waiting-on-edges + execution lanes per mockup lines 358-369 (XBriefFullscreen.tsx:211-247), and the esc-hinted close per mockup lines 351-354. AC1/AC2 intact: role=dialog + aria-modal=true, focus on the panel, Escape and scrim close, inner clicks stopPropagation; the toggle is preserved, relocated to the shell, and XBriefViewer's own bar is suppressed via showTabBar=false. AC3 unchanged - useWorkspacePlanQuery plus the same canonical ['workspace-plan', issueId] key for setQueryData. AC4 unchanged - DAG pane still flex-1 min-h-0 with a 400px floor, and the three pre-existing mounts keep the uncontrolled path (showTabBar defaults true, initialTab honored, selectTab only writes internal state when activeTab is undefined). Non-blocking observations: the third tab is labelled 'Raw' (matches the approved mockup; FR-1 prose says 'Raw JSON'); the mockup's 'Click any item for its acceptance criteria and file scope' hint line is not rendered; and the shared localStorage tab key now also records the shell-controlled tab, so a fullscreen tab change seeds other mounts' initial tab.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3273",
-    "reviewRequestedAt": "2026-07-29T02:53:54.072Z",
     "reviewSpawnedAt": "2026-07-29T02:54:40.566Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -214,6 +214,14 @@
             "cacheWrite": 379189
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 1364625,
+            "output": 85598,
+            "cacheRead": 16902144,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 7556780,
@@ -231,15 +239,15 @@
           "cacheWrite": 379189
         },
         "openai/gpt-5.6-sol": {
-          "input": 7556780,
-          "output": 471184,
-          "cacheRead": 219921920,
+          "input": 8921405,
+          "output": 556782,
+          "cacheRead": 236824064,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 177.206909,
-        "pricingAsOf": "2026-07-29T02:54:40.596Z"
+        "usd": 195.049046,
+        "pricingAsOf": "2026-07-29T03:01:00.098Z"
       }
     },
     "merges": [
