@@ -14,6 +14,7 @@ import {
   resolveSummariesDir,
 } from './paths.js';
 import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';
+import { mirrorDailySummary } from './state-mirror.js';
 import { readCurrentStatus } from './rollup.js';
 import { getAgentStateSync } from '../agents.js';
 import { getWorkspaceForIssue, listProjects, listWorkspaces } from '../workspaces/resolver.js';
@@ -129,8 +130,9 @@ export async function generateDailySummary(input: {
 }): Promise<DailySummaryResult> {
   const projectId = input.projectId ?? DEFAULT_PROJECT_ID;
   const date = input.date ?? new Date().toISOString().slice(0, 10);
-  const workspaceId = getWorkspaceForIssue(input.issueId)?.id;
-  if (!workspaceId) throw new Error(`No workspace found for issue ${input.issueId}`);
+  const workspace = getWorkspaceForIssue(input.issueId);
+  if (!workspace) throw new Error(`No workspace found for issue ${input.issueId}`);
+  const workspaceId = workspace.id;
   const path = join(resolveSummariesDir(projectId, workspaceId), `${date}.md`);
   const observations = await readObservationsFile(resolveObservationsFile(projectId, workspaceId, date));
   const existingMarkdown = await readTextFile(path);
@@ -148,6 +150,7 @@ export async function generateDailySummary(input: {
   await ensureParentDir(path);
   await writeFile(path, markdown, 'utf8');
   await indexDailySummary(projectId, input.issueId, date, observations, markdown);
+  await mirrorDailySummary(projectId, workspace.name, date, markdown);
   return { status: 'generated', path, markdown, observationCount: observations.length, previousObservationCount };
 }
 

@@ -13,6 +13,7 @@
 import { randomUUID } from 'node:crypto';
 import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
 import { writeWorkspaceIdentity } from '../memory/identity-record.js';
+import { mirrorPin, unmirrorPin } from '../memory/state-mirror.js';
 import type { ProjectConfig } from '../projects.js';
 import type { PinScope, WorkspaceKind } from './types.js';
 import { getMainWorkspace, getProjectByKey, getWorkspaceById } from './resolver.js';
@@ -170,16 +171,27 @@ export function deleteWorkspace(id: string): void {
 
 // ─── Pinned docs ───────────────────────────────────────────────────────────
 
-export function pinDoc(scope: PinScope, scopeId: string, docPath: string): void {
+/** The classic projects.yaml key that owns a pin scope, for memory-state mirroring. */
+function pinProjectId(scope: PinScope, scopeId: string): string | null {
+  if (scope === 'project') return scopeId;
+  return getWorkspaceById(scopeId)?.projectId ?? null;
+}
+
+export async function pinDoc(scope: PinScope, scopeId: string, docPath: string): Promise<void> {
+  const createdAt = Date.now();
   getOverdeckDatabaseSync().prepare(`
     INSERT INTO pinned_docs (id, scope, scope_id, doc_path, created_at)
     VALUES (?, ?, ?, ?, ?)
     ON CONFLICT (scope, scope_id, doc_path) DO NOTHING
-  `).run(randomUUID(), scope, scopeId, docPath, Date.now());
+  `).run(randomUUID(), scope, scopeId, docPath, createdAt);
+  const projectId = pinProjectId(scope, scopeId);
+  if (projectId) await mirrorPin(projectId, scope, scopeId, docPath, createdAt);
 }
 
-export function unpinDoc(scope: PinScope, scopeId: string, docPath: string): void {
+export async function unpinDoc(scope: PinScope, scopeId: string, docPath: string): Promise<void> {
   getOverdeckDatabaseSync()
     .prepare(`DELETE FROM pinned_docs WHERE scope = ? AND scope_id = ? AND doc_path = ?`)
     .run(scope, scopeId, docPath);
+  const projectId = pinProjectId(scope, scopeId);
+  if (projectId) await unmirrorPin(projectId, scope, scopeId, docPath);
 }

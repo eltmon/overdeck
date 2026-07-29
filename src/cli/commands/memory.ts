@@ -180,7 +180,7 @@ export async function memoryPinCommand(docPath: string, options: MemoryPinOption
   const { scope, scopeId, project } = resolved;
   const projectRelativePath = isAbsolute(docPath) ? relative(project.primaryPath, docPath) : docPath;
 
-  pinDoc(scope, scopeId, projectRelativePath);
+  await pinDoc(scope, scopeId, projectRelativePath);
   if (options.json) console.log(JSON.stringify({ scope, scopeId, docPath: projectRelativePath }, null, 2));
   else console.log(chalk.green(`Pinned ${projectRelativePath} for ${scope} ${scopeId}`));
 }
@@ -191,7 +191,7 @@ export async function memoryUnpinCommand(docPath: string, options: MemoryPinOpti
   const { scope, scopeId, project } = resolved;
   const projectRelativePath = isAbsolute(docPath) ? relative(project.primaryPath, docPath) : docPath;
 
-  unpinDoc(scope, scopeId, projectRelativePath);
+  await unpinDoc(scope, scopeId, projectRelativePath);
   if (options.json) console.log(JSON.stringify({ scope, scopeId, docPath: projectRelativePath }, null, 2));
   else console.log(chalk.green(`Unpinned ${projectRelativePath} for ${scope} ${scopeId}`));
 }

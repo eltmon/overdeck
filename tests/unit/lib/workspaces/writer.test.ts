@@ -115,8 +115,8 @@ describe('workspaces writer', () => {
     const projectId = seedProject();
     const id = await createWorkspace({ projectId, kind: 'scratch', name: 'scratch', path: '/repo/overdeck-scratch' });
 
-    pinDoc('workspace', id, 'docs/NOTES.md');
-    pinDoc('project', projectId, 'docs/README.md');
+    await pinDoc('workspace', id, 'docs/NOTES.md');
+    await pinDoc('project', projectId, 'docs/README.md');
 
     deleteWorkspace(id);
 
@@ -134,13 +134,13 @@ describe('workspaces writer', () => {
     expect(targets.find((t) => t.isPrimary)?.path).toBe('/repo/overdeck-secondary');
   });
 
-  it('pinDoc is idempotent and unpinDoc removes the pin', () => {
+  it('pinDoc is idempotent and unpinDoc removes the pin', async () => {
     const projectId = seedProject();
-    pinDoc('project', projectId, 'docs/README.md');
-    pinDoc('project', projectId, 'docs/README.md');
+    await pinDoc('project', projectId, 'docs/README.md');
+    await pinDoc('project', projectId, 'docs/README.md');
     expect(listPinnedDocs('project', projectId)).toHaveLength(1);
 
-    unpinDoc('project', projectId, 'docs/README.md');
+    await unpinDoc('project', projectId, 'docs/README.md');
     expect(listPinnedDocs('project', projectId)).toHaveLength(0);
   });
 });

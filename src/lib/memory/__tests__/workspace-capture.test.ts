@@ -151,7 +151,7 @@ describe('prompt-time injection for a null-issueId workspace turn (ac2, ac3)', (
     const docPath = 'docs/ARCHITECTURE.md';
     mkdirSync(join(projectRoot, 'docs'), { recursive: true });
     writeFileSync(join(projectRoot, docPath), 'Pinned architecture notes for the project.', 'utf-8');
-    pinDoc('project', 'overdeck', docPath);
+    await pinDoc('project', 'overdeck', docPath);
 
     const result = await injectPromptTimeMemory({
       prompt: 'architecture question',
