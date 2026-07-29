@@ -220,7 +220,7 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T15:39:43.382Z",
+  "updated": "2026-07-29T15:40:07.162Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -230,9 +230,16 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T15:39:02.204Z",
-    "updatedAt": "2026-07-29T15:39:41.116Z",
+    "updatedAt": "2026-07-29T15:40:07.127Z",
     "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since ffc4ec7 (1 path): src/dashboard/server/event-store.ts",
+        "detectedAt": "2026-07-29T15:25:25.726Z"
+      }
+    ],
     "conflictsSince": {
       "sha": "ffc4ec7f593609a737880ff7027b3c4277205230",
       "detectedAt": "2026-07-29T15:25:25.726Z",
@@ -299,10 +306,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3569,
-            "output": 167423,
-            "cacheRead": 80906823,
-            "cacheWrite": 4132057
+            "input": 3584,
+            "output": 169231,
+            "cacheRead": 81380212,
+            "cacheWrite": 4135642
           }
         }
       },
@@ -320,15 +327,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3569,
-          "output": 167423,
-          "cacheRead": 80906823,
-          "cacheWrite": 4132057
+          "input": 3584,
+          "output": 169231,
+          "cacheRead": 81380212,
+          "cacheWrite": 4135642
         }
       },
       "costAtCloseOut": {
-        "usd": 122.486111,
-        "pricingAsOf": "2026-07-29T15:39:43.379Z"
+        "usd": 122.546986,
+        "pricingAsOf": "2026-07-29T15:40:07.154Z"
       }
     },
     "merges": [
