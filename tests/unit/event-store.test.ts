@@ -159,6 +159,32 @@ describe('trimReviewStatusHistoryPayloads (PAN-3253)', () => {
     expect(parsed.issueId).toBe('MIN-901');
   });
 
+  it('trim converges to a no-op on second run (boot-trim-notes.ac2)', async () => {
+    const { trimReviewStatusHistoryPayloads } = await import('../../src/dashboard/server/event-store.js');
+    const originalLength = insertReviewEvent(25, 'MIN-905');
+
+    // First trim
+    const result1 = trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
+    expect(result1.trimmed).toBe(1);
+    expect(result1.savedChars).toBeGreaterThan(0);
+
+    // Second trim on already-trimmed row should be a no-op
+    const result2 = trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
+    expect(result2.trimmed).toBe(0);
+    expect(result2.savedChars).toBe(0);
+
+    // Payload should remain identical after second run
+    const row = db.prepare("SELECT payload FROM events WHERE type = 'review.status_changed'").get() as { payload: string };
+    const parsed = JSON.parse(row.payload);
+    expect(parsed.status.history).toHaveLength(20);
+    // All notes should still be <= 500 chars
+    for (const entry of parsed.status.history) {
+      if (entry.notes) {
+        expect(entry.notes.length).toBeLessThanOrEqual(500);
+      }
+    }
+  });
+
   it('payload size is bounded regardless of how many transitions occurred', async () => {
     const { trimReviewStatusHistoryPayloads } = await import('../../src/dashboard/server/event-store.js');
     insertReviewEvent(500, 'MIN-901');
