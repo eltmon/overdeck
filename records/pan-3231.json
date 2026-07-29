@@ -122,18 +122,18 @@
     "recordedAt": "2026-07-29T02:53:51.344Z"
   },
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-29T03:08:36.356Z",
+  "updated": "2026-07-29T03:08:42.002Z",
   "pipeline": {
     "issueId": "PAN-3231",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T03:08:36.245Z",
-    "reviewNotes": "Tasks viewer omits xBRIEF sub-items, and the PRD modal does not move focus into the dialog.",
+    "updatedAt": "2026-07-29T03:08:41.952Z",
+    "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (188927ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3231\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3231/src/dashboard/frontend\n\n ❯ src/App.test.tsx (40 tests | 1 failed) 2609ms\n     × redirects direct experimental routes to Home when experimental features are off 1018ms\n\n Test Files  1 failed | 92 passed (93)\n      Tests  1 failed | 1143 passed (1144)\n     Errors  4 errors\n   Start at  23:07:27\n   Duration  16.35s (transform 56.50s, setup 27.65s, import 164.38s, tests 52.02s, environment 59.25s)\n\n[global-setup] packages/contracts/dist/index.mjs missing — building contracts...\n\n> @overdeck/core@0.47.1 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.47.1 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3231/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m Cleaning 4 files\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m360.76 kB\u001b[22m \u001b[2m│ gzip: 58.65 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 360.76 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m4203ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m330.75 kB\u001b[22m \u001b[2m│ gzip: 56.48 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m545.34 kB\u001b[22m \u001b[2m│ gzip: 87.87 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 46.34 kB\u001b[22m \u001b[2m│ gzip:  5.67 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m767.30 kB\u001b[22m \u001b[2m│ gzip: 76.34 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 \n…(1955 chars elided)…\nFound workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-xmgZGW/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-xmgZGW/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-xmgZGW/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-xmgZGW/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent\n...(truncated)",
     "inspectNotes": "All 5 ACs met. AC5 gaps from the prior review are closed: identity block with 'xBRIEF · active plan' eyebrow + mono issue id + plan title (XBriefFullscreen.tsx:154-171), controlled List/DAG/Raw tablist moved into the topbar per mockup lines 332-345 (XBriefFullscreen.tsx:173-196), summary strip with N/M complete + progress track + happening-now/ready/waiting-on-edges + execution lanes per mockup lines 358-369 (XBriefFullscreen.tsx:211-247), and the esc-hinted close per mockup lines 351-354. AC1/AC2 intact: role=dialog + aria-modal=true, focus on the panel, Escape and scrim close, inner clicks stopPropagation; the toggle is preserved, relocated to the shell, and XBriefViewer's own bar is suppressed via showTabBar=false. AC3 unchanged - useWorkspacePlanQuery plus the same canonical ['workspace-plan', issueId] key for setQueryData. AC4 unchanged - DAG pane still flex-1 min-h-0 with a 400px floor, and the three pre-existing mounts keep the uncontrolled path (showTabBar defaults true, initialTab honored, selectTab only writes internal state when activeTab is undefined). Non-blocking observations: the third tab is labelled 'Raw' (matches the approved mockup; FR-1 prose says 'Raw JSON'); the mockup's 'Click any item for its acceptance criteria and file scope' hint line is not rendered; and the shared localStorage tab key now also records the shell-controlled tab, so a fullscreen tab change seeds other mounts' initial tab.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3273",
@@ -262,7 +262,7 @@
       },
       "costAtCloseOut": {
         "usd": 208.888474,
-        "pricingAsOf": "2026-07-29T03:08:36.295Z"
+        "pricingAsOf": "2026-07-29T03:08:41.996Z"
       }
     },
     "merges": [
