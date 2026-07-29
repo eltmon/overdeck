@@ -120,19 +120,20 @@
     "recordedAt": "2026-07-28T20:15:30.548Z"
   },
   "created": "2026-07-28T17:07:17.610Z",
-  "updated": "2026-07-28T23:48:54.257Z",
+  "updated": "2026-07-29T00:01:16.428Z",
   "pipeline": {
     "issueId": "PAN-3229",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-28T20:16:31.872Z",
-    "updatedAt": "2026-07-28T23:48:54.197Z",
+    "updatedAt": "2026-07-29T00:01:16.354Z",
     "reviewNotes": "Approved: prior transcript regression restored; pending-promotion feature remains requirements-complete with focused tests green",
+    "testNotes": "Reconciled from green GitHub Actions CI on f9aca64e: Non-blocking flake lane (https://github.com/eltmon/overdeck/actions/runs/30408866917/job/90440371417)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "04bcaeb9f6b9d766a637e3e18eafcc828b0fbdbf",
@@ -159,9 +160,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5213057,
-            "output": 181575,
-            "cacheRead": 42272768,
+            "input": 5215543,
+            "output": 181771,
+            "cacheRead": 42695680,
             "cacheWrite": 0
           }
         },
@@ -182,15 +183,15 @@
           "cacheWrite": 170493
         },
         "openai/gpt-5.6-sol": {
-          "input": 12475185,
-          "output": 512811,
-          "cacheRead": 204444672,
+          "input": 12477671,
+          "output": 513007,
+          "cacheRead": 204867584,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 187.84327,
-        "pricingAsOf": "2026-07-28T23:48:54.239Z"
+        "usd": 188.073036,
+        "pricingAsOf": "2026-07-29T00:01:16.404Z"
       }
     },
     "merges": [
