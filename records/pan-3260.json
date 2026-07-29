@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T01:09:25.015Z",
+  "updated": "2026-07-29T01:09:34.740Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "pending",
@@ -223,5 +223,49 @@
     "docs-markdown-editor": "completed",
     "docs-markdown-editor.docs-markdown-editor.ac1": "completed",
     "docs-markdown-editor.docs-markdown-editor.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".husky/_/pre-rebase",
+      "scripts/file-size-allowlist.txt",
+      "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/MARKDOWN-EDITOR-PANE.md",
+      "packages/contracts/src/rpc.ts",
+      "src/dashboard/frontend/src/components/Stage/StageDeckContext.tsx",
+      "src/dashboard/frontend/src/components/Stage/index.tsx",
+      "src/dashboard/frontend/src/components/Stage/panes/EditorPane.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx",
+      "src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx",
+      "src/dashboard/frontend/src/editorPreferences.ts",
+      "src/dashboard/frontend/src/lib/panesStore.ts",
+      "src/dashboard/server/services/__tests__/file-at-path.test.ts",
+      "src/dashboard/server/services/file-at-path.ts",
+      "src/dashboard/server/ws-rpc.ts"
+    ],
+    "actualChangedFiles": [
+      ".husky/_/pre-rebase",
+      "docs/MARKDOWN-EDITOR-PANE.md",
+      "packages/contracts/src/rpc.ts",
+      "scripts/file-size-allowlist.txt",
+      "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
+      "src/dashboard/frontend/src/components/Stage/StageDeckContext.tsx",
+      "src/dashboard/frontend/src/components/Stage/index.tsx",
+      "src/dashboard/frontend/src/components/Stage/panes/EditorPane.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx",
+      "src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx",
+      "src/dashboard/frontend/src/editorPreferences.ts",
+      "src/dashboard/frontend/src/lib/panesStore.ts",
+      "src/dashboard/server/services/__tests__/file-at-path.test.ts",
+      "src/dashboard/server/services/file-at-path.ts",
+      "src/dashboard/server/ws-rpc.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "recordedAt": "2026-07-29T01:09:34.738Z"
   }
 }
