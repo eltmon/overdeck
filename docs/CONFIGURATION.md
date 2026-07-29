@@ -134,6 +134,9 @@ ZAI_API_KEY=your-zai-key
 # Kimi / Moonshot (optional - direct API, no router)
 KIMI_API_KEY=sk-kimi-...
 
+# QuantumLlama (fictional benchmark provider, no live endpoint)
+QUANTUMLLAMA_API_KEY=ql-...
+
 # Linear (for issue tracking)
 LINEAR_API_KEY=lin_api_...
 

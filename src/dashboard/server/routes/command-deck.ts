@@ -45,7 +45,7 @@ import type { AgentSnapshot, SessionNodePresence } from '@overdeck/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { findPrdAnywhereSync, type PrdLocation } from '../../../lib/prd-locations.js';
+import { findPrdAnywhereSync, readPrdContent } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssueSync, listProjectsSync } from '../../../lib/projects.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
@@ -761,25 +761,6 @@ async function fetchPlanningData(
     pipelineMirror?: unknown;
   } = { hasPrd: false, hasState: false, transcripts: [], discussions: [], notes: [] };
 
-  // Helper: read PRD content from a location, handling both flat and subdir formats.
-  const readPrdContent = async (loc: PrdLocation | null): Promise<string | undefined> => {
-    if (!loc) return undefined;
-    if (loc.format === 'flat' || loc.format === 'pan-draft') {
-      return (await readOptional(loc.path)) ?? undefined;
-    }
-
-    const files = (await readdir(loc.path).catch(() => [] as string[]))
-      .filter((file) => file.endsWith('.md'))
-      .sort((a, b) => {
-        if (a === 'prd.md') return -1;
-        if (b === 'prd.md') return 1;
-        return a.localeCompare(b);
-      });
-    const firstMarkdown = files[0];
-    if (!firstMarkdown) return undefined;
-    return (await readOptional(join(loc.path, firstMarkdown))) ?? undefined;
-  };
-
   const hasPlanningDir = await pathExists(planningDir);
   const hasPanContinue = await pathExists(panContinuePath);
 
@@ -802,7 +783,8 @@ async function fetchPlanningData(
   } catch { /* no xBRIEF plan */ }
 
   if (!hasPlanningDir && !hasPanContinue) {
-    const prd = await readPrdContent(findPrdAnywhereSync(projectPath, issueId));
+    const prdLocation = findPrdAnywhereSync(projectPath, issueId);
+    const prd = prdLocation ? await readPrdContent(prdLocation) : null;
     if (prd) {
       result.prd = prd;
       result.hasPrd = true;
@@ -840,7 +822,8 @@ async function fetchPlanningData(
     // findPrdAnywhereSync covers legacy docs/prds roots and canonical
     // drafts/<issue>.md on overdeck-state, which the status-only loop missed,
     // so promoted PRDs were invisible here.
-    const content = await readPrdContent(findPrdAnywhereSync(projectPath, issueId));
+    const prdLocation = findPrdAnywhereSync(projectPath, issueId);
+    const content = prdLocation ? await readPrdContent(prdLocation) : null;
     if (content) {
       result.prd = content;
       result.hasPrd = true;

@@ -44,4 +44,21 @@ describe('model capabilities', () => {
     expect(policy.maxContextTokens).toBe(MODEL_CAPABILITIES['gpt-5.6-sol'].contextWindow);
     expect(policy.autoCompactWindow).toBe(MODEL_CAPABILITIES['gpt-5.6-sol'].contextWindow);
   });
+
+  it('exposes QuantumLlama capabilities with spec display names and windows (PAN-3252)', () => {
+    const nano = MODEL_CAPABILITIES['ql-nano-1b'];
+    expect(nano.displayName).toBe('QL Nano 1B');
+    expect(nano.contextWindow).toBe(32000);
+    expect(nano.maxOutputTokens).toBe(4096);
+
+    const reason = MODEL_CAPABILITIES['ql-reason-70b'];
+    expect(reason.displayName).toBe('QL Reason 70B');
+    expect(reason.contextWindow).toBe(200000);
+    expect(reason.maxOutputTokens).toBe(16384);
+
+    const swift = MODEL_CAPABILITIES['ql-swift-8b'];
+    expect(swift.displayName).toBe('QL Swift 8B');
+    expect(swift.contextWindow).toBe(128000);
+    expect(swift.maxOutputTokens).toBe(8192);
+  });
 });

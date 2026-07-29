@@ -262,6 +262,7 @@ describe('agents auth routing', () => {
         'unset OPENROUTER_API_KEY',
         'unset NOUS_API_KEY',
         'unset DASHSCOPE_API_KEY',
+        'unset QUANTUMLLAMA_API_KEY',
         '',
       ].join('\n')
     );

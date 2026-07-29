@@ -203,32 +203,50 @@ const AC_STATUS_ICONS: Record<string, { color: string; symbol: string }> = {
   cancelled:   { color: '#6b7280', symbol: '○' },
 };
 
+function legacyTaskTitle(planId: string, item: XBriefItem): string {
+  return `${planId}: ${item.title}`.toLowerCase();
+}
+
+function findPlanItemForTask(task: TaskTask, doc: XBriefDocument): XBriefItem | undefined {
+  return doc.plan.items.find(item => item.id === task.id)
+    ?? doc.plan.items.find(item =>
+      legacyTaskTitle(doc.plan.id, item) === (task.title || task.name || '').toLowerCase()
+    );
+}
+
+function findTaskForPlanItem(item: XBriefItem, doc: XBriefDocument, tasks: TaskTask[]): TaskTask | undefined {
+  return tasks.find(task => task.id === item.id)
+    ?? tasks.find(task =>
+      (task.title || task.name || '').toLowerCase() === legacyTaskTitle(doc.plan.id, item)
+    );
+}
+
 function TaskItem({ task, planDoc }: { task: TaskTask; planDoc: XBriefDocument | null }) {
   const [expanded, setExpanded] = useState(false);
-
-  // Match task to plan item using the same pattern as PlanItemDetail
-  const planItem: XBriefItem | undefined = planDoc
-    ? planDoc.plan.items.find(item =>
-        `${planDoc.plan.id}: ${item.title}`.toLowerCase() === (task.title || task.name || '').toLowerCase()
-      )
-    : undefined;
+  const statusBucket = taskStatusBucket(task.status);
+  const planItem = planDoc ? findPlanItemForTask(task, planDoc) : undefined;
   const acs = (planItem?.subItems ?? []).filter(s => s.metadata?.kind === 'acceptance_criterion');
   const completedAcs = acs.filter(s => s.status === 'completed').length;
   const hasACs = acs.length > 0;
 
   return (
     <div
+      data-status-bucket={statusBucket}
       className={`rounded border text-xs ${
-        taskStatusBucket(task.status) !== 'done'
-          ? 'border-border bg-card/50'
-          : 'border-border bg-card/50 opacity-60'
+        statusBucket === 'working'
+          ? 'border-primary/40 bg-primary/5'
+          : statusBucket === 'done'
+            ? 'border-border bg-card/50 opacity-60'
+            : 'border-border bg-card/50'
       }`}
     >
       <div className="flex items-start gap-2 p-2">
-        {taskStatusBucket(task.status) !== 'done' ? (
-          <Circle className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
-        ) : (
+        {statusBucket === 'working' ? (
+          <Loader2 className="w-3.5 h-3.5 text-primary animate-spin mt-0.5 shrink-0" />
+        ) : statusBucket === 'done' ? (
           <CheckCircle2 className="w-3.5 h-3.5 text-success mt-0.5 shrink-0" />
+        ) : (
+          <Circle className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
         )}
         <div className="flex-1 min-w-0">
           <div className="text-foreground break-words leading-tight">
@@ -285,7 +303,13 @@ function TaskItem({ task, planDoc }: { task: TaskTask; planDoc: XBriefDocument |
             return (
               <div key={ac.id} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
                 <span style={{ color: icon.color, fontSize: 7, marginTop: 2, flexShrink: 0 }}>{icon.symbol}</span>
-                <span className="leading-tight break-words">{ac.title}</span>
+                <span className="min-w-0 flex-1 leading-tight break-words">{ac.title}</span>
+                <span
+                  className="shrink-0 font-mono text-[9px] text-muted-foreground"
+                  data-subitem-status={ac.status}
+                >
+                  {ac.status.replaceAll('_', ' ')}
+                </span>
               </div>
             );
           })}
@@ -304,9 +328,7 @@ interface PlanItemDetailProps {
 }
 
 function PlanItemDetail({ item, doc, tasks }: PlanItemDetailProps) {
-  // Tasks are created with title "{plan.id}: {item.title}" — match using plan.id, not issueId
-  const titlePattern = `${doc.plan.id}: ${item.title}`.toLowerCase();
-  const matchedTask = tasks.find(b => (b.title || b.name || '').toLowerCase() === titlePattern);
+  const matchedTask = findTaskForPlanItem(item, doc, tasks);
 
   // All incoming edges (this item is the target)
   const incomingEdges = doc.plan.edges.filter(e => e.to === item.id);

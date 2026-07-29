@@ -197,6 +197,7 @@ export function IssueTreeLane({
       prs: [],
       hasXbrief: actions.state.hasPlan,
       hasTasks: actions.state.hasTasks,
+      hasPrd: false,
       dockerContainerCount: 0,
       conversations: [],
     },

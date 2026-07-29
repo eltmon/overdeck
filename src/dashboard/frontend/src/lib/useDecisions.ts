@@ -21,6 +21,7 @@ import {
   selectIssues,
   selectPendingInputSubjects,
   type PendingInputSubject,
+  type PendingInputSource,
 } from './store';
 import { fetchWithTimeout } from './apiFetch';
 import { formatIssueRef } from './issueLabel';
@@ -38,7 +39,8 @@ export interface ConversationPendingInputRow {
   pendingPaneChoice?: PendingPaneChoice;
 }
 
-export type DecisionSource = 'agent' | 'conversation';
+/** One definition, shared with `PendingInputSubject` so the two never drift. */
+export type DecisionSource = PendingInputSource;
 
 export interface Decision {
   /** The subject id `requestReopen` routes on: an agent id or a conversation name. */
@@ -134,6 +136,7 @@ export function usePendingInputSubjects(): PendingInputSubject[] {
       if (kinds.length === 0) continue;
       out.push({
         agentId: c.name,
+        source: 'conversation',
         issueId: c.issueId ?? undefined,
         kinds,
         pendingAskUserQuestion: c.pendingAskUserQuestion,
