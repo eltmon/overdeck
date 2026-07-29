@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:18:00.558Z",
-  "updated": "2026-07-29T03:25:51.435Z",
+  "updated": "2026-07-29T03:26:40.384Z",
   "pipeline": {
     "issueId": "PAN-3254",
     "reviewStatus": "pending",
@@ -61,5 +61,20 @@
       "open": true,
       "needsYouEmittedAt": "2026-07-29T00:28:27.692Z"
     }
-  ]
+  ],
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "docs-anchor-drift-semantics": {
+        "writerId": "agent-pan-3254",
+        "agentId": "agent-pan-3254",
+        "pid": 3700179,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T03:26:40.384Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "docs-anchor-drift-semantics": "running"
+  }
 }
