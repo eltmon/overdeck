@@ -374,7 +374,7 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T17:02:06.213Z",
+  "updated": "2026-07-29T17:03:14.268Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "passed",
@@ -383,14 +383,14 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T16:59:58.900Z",
+    "updatedAt": "2026-07-29T17:00:19.987Z",
     "reviewNotes": "Main merge preserved all previously approved Kimi behavior; conflict resolution and focused verification are clean.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "mergeNotes": "Workspace does not exist",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
-    "reviewedAtCommit": "421a3ae7413c69ca9a9562c93fc657d1062d81ce",
+    "reviewedAtCommit": "5c2886b195ec26c33974d9b37d8b3ac6ef5511b0",
     "lastVerifiedCommit": "421a3ae7413c69ca9a9562c93fc657d1062d81ce",
     "reviewSpawnedAt": "2026-07-29T15:45:56.870Z"
   },
