@@ -40,13 +40,19 @@ vi.mock('../lib/simple/derive', () => ({
   deriveSimpleIssue: vi.fn(),
 }));
 
-// Mock DrawerAgentSession to avoid nested React Query context issues
+// Mock DrawerAgentSession and related exports
 vi.mock('../components/drawer/DrawerAgentSession', () => ({
   DrawerAgentSession: ({ agentId }: any) => (
     <div data-testid="drawer-agent-session">
       <div>{agentId}</div>
     </div>
   ),
+  pickDefaultDrawerAgent: vi.fn((agent: any) => agent),
+}));
+
+// Mock TalkItThrough to avoid unrelated requests
+vi.mock('../components/simple/TalkItThrough', () => ({
+  TalkItThrough: () => <div data-testid="talk-it-through" />,
 }));
 
 // Now import after all mocks are in place
@@ -381,7 +387,8 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
 
       // Verify conversation question appears as actionable card in SimpleHomePage
       expect(screen.getByText('SimpleHomePage conversation question')).toBeInTheDocument();
-      expect(screen.getByText('PAN-1')).toBeInTheDocument();
+      // Issue ID is part of a larger text node (e.g., "Question · PAN-1")
+      expect(screen.getByText(/PAN-1/)).toBeInTheDocument();
     });
   });
 
