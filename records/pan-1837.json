@@ -297,7 +297,7 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T02:00:47.917Z",
+  "updated": "2026-07-29T02:00:53.706Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "blocked",
@@ -308,7 +308,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T02:00:47.126Z",
+    "updatedAt": "2026-07-29T02:00:53.691Z",
     "reviewNotes": "Kimi conversation resume still fresh-launches instead of using the captured -S session, denied planning pairs mutate state before validation, and the reviewed merge commit is not pushed to PR #3255.",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
@@ -320,7 +320,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
-    "reviewedAtCommit": "7f5c4b6d87b811f9621fbeb0fa46d433624b2641",
+    "reviewedAtCommit": "c6d2ddc5596539e9ef4dbaebf6a435697a86df90",
     "reviewSpawnedAt": "2026-07-29T01:56:52.989Z"
   },
   "closeOut": {
@@ -373,7 +373,7 @@
       },
       "costAtCloseOut": {
         "usd": 299.880916,
-        "pricingAsOf": "2026-07-29T02:00:47.184Z"
+        "pricingAsOf": "2026-07-29T02:00:53.701Z"
       }
     },
     "merges": [
