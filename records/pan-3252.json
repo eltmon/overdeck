@@ -82,7 +82,7 @@
     "recordedAt": "2026-07-28T23:54:25.516Z"
   },
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-28T23:55:36.694Z",
+  "updated": "2026-07-29T00:04:07.080Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "reviewing",
@@ -92,9 +92,23 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-28T23:55:36.665Z",
+    "updatedAt": "2026-07-29T00:04:07.060Z",
     "reviewNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-28T23:41:22.136Z by deploy-patrol). It re-runs automatically after the deploy.",
     "inspectNotes": "All 3 ACs met: getProviderForModelSync resolves ql-reason-70b/ql-swift-8b/ql-nano-1b to PROVIDERS.quantumllama (providers.ts:392-395, reached — no earlier branch matches ql-* ids); getProviderEnvSync emits ANTHROPIC_BASE_URL=https://api.quantumllama.ai/v1 via provider.baseUrl and QUANTUMLLAMA_API_KEY (providers.ts:469-470); defaultHarness 'claude-code' declared and EXPECTED_DEFAULT_HARNESSES updated. NFR-1 respected: registry/env only, no HTTP, request, or streaming code and no agent-spawn changes. Verified locally: tests/unit/lib/providers.test.ts + tests/lib/providers.test.ts, 23 passed.",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since c109ed6 (1 path): scripts/file-size-allowlist.txt",
+        "detectedAt": "2026-07-29T00:03:35.975Z"
+      }
+    ],
+    "conflictsSince": {
+      "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
+      "detectedAt": "2026-07-29T00:03:35.975Z",
+      "paths": [
+        "scripts/file-size-allowlist.txt"
+      ]
+    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3258",
     "reviewRequestedAt": "2026-07-28T23:54:28.202Z",
     "reviewSpawnedAt": "2026-07-28T23:55:36.663Z",
@@ -181,6 +195,14 @@
             "cacheWrite": 172477
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 539657,
+            "output": 40557,
+            "cacheRead": 15292928,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 577246,
@@ -198,15 +220,15 @@
           "cacheWrite": 172477
         },
         "openai/gpt-5.6-sol": {
-          "input": 577246,
-          "output": 49115,
-          "cacheRead": 15796224,
+          "input": 1116903,
+          "output": 89672,
+          "cacheRead": 31089152,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 19.169416,
-        "pricingAsOf": "2026-07-28T23:55:36.675Z"
+        "usd": 30.730875,
+        "pricingAsOf": "2026-07-29T00:04:07.069Z"
       }
     },
     "merges": [
