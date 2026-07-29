@@ -8,7 +8,7 @@
  * AC-1 tests verify conversation-only rendering when no agents exist.
  * AC-3 test verifies agent-backed entries are preserved and routed with isConversation: false.
  */
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -445,9 +445,10 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
 
       // Verify agent panel is rendered for the docked issue
       expect(screen.getByText(/PAN-1.*Test Issue/)).toBeInTheDocument();
-      // DrawerAgentSession mock renders agent identity; verify it appears
-      expect(screen.getByTestId('drawer-agent-session')).toBeInTheDocument();
-      expect(screen.getByText('agent-test-1')).toBeInTheDocument();
+      // DrawerAgentSession mock renders agent identity; scope query to avoid ambiguous match
+      const drawerSession = screen.getByTestId('drawer-agent-session');
+      expect(drawerSession).toBeInTheDocument();
+      expect(within(drawerSession).getByText('agent-test-1')).toBeInTheDocument();
     });
   });
 });
