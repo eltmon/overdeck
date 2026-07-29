@@ -304,7 +304,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:13:10.197Z",
+  "updated": "2026-07-29T05:13:12.867Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "reviewing",
@@ -314,7 +314,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:13:03.781Z",
+    "updatedAt": "2026-07-29T05:13:11.015Z",
     "reviewNotes": "Agent re-review request (2/25): FR-7 test coverage complete. Branch has 3 auto-commits for file-size-allowlist sync. Ready for review.",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -385,7 +385,7 @@
       },
       "costAtCloseOut": {
         "usd": 275.168845,
-        "pricingAsOf": "2026-07-29T05:13:10.142Z"
+        "pricingAsOf": "2026-07-29T05:13:11.072Z"
       }
     },
     "merges": [
