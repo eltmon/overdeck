@@ -334,18 +334,19 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T03:42:41.087Z",
+  "updated": "2026-07-29T03:50:58.453Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T03:42:41.052Z",
+    "updatedAt": "2026-07-29T03:50:58.399Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
       "detectedAt": "2026-07-29T00:03:35.975Z",
@@ -380,10 +381,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 4076,
-            "output": 930447,
-            "cacheRead": 1051064349,
-            "cacheWrite": 5423457
+            "input": 4110,
+            "output": 934493,
+            "cacheRead": 1063448418,
+            "cacheWrite": 5438643
           }
         }
       },
@@ -401,15 +402,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 4076,
-          "output": 930447,
-          "cacheRead": 1051064349,
-          "cacheWrite": 5423457
+          "input": 4110,
+          "output": 934493,
+          "cacheRead": 1063448418,
+          "cacheWrite": 5438643
         }
       },
       "costAtCloseOut": {
-        "usd": 370.848449,
-        "pricingAsOf": "2026-07-29T03:42:41.084Z"
+        "usd": 373.403757,
+        "pricingAsOf": "2026-07-29T03:50:58.449Z"
       }
     },
     "merges": [
