@@ -161,7 +161,7 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T00:55:50.995Z",
+  "updated": "2026-07-29T00:55:55.287Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "reviewing",
@@ -250,7 +250,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3232",
