@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T01:15:03.965Z",
+  "updated": "2026-07-29T01:16:24.635Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -26,8 +26,22 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T00:44:38.571Z",
-    "inspectNotes": "AC1: MemoryIdentity/MemoryObservation issueId -> Schema.NullOr(IssueId) in packages/contracts/src/memory.ts; new contracts memory.test.ts passes 4/4 (decodes null and a real PAN-1990 for both structs). AC2: src/lib/memory/injection.ts:110 replaces the sibling search with Promise.resolve([]) when issueId is null, so the branch is skipped rather than widened; tests/lib/memory/injection.test.ts 18/18 pass including the new null-issueId case, which seeds the same PAN-999 sibling row the positive test retrieves and asserts hitCounts.sibling===0 and no sibling docType. AC3: npm run typecheck exits 0 - contracts dts rebuild, root tsc --noEmit, hooks, evals, dashboard ratchet (61 known, none new), frontend ratchet (0). New imports verified real: getProjectSync src/lib/projects.ts:601, resolveProjectPath src/lib/projects.ts:508. Non-blocking note: the ?? workspaceId fallbacks for paths/event keys are documented as deferred to memory-paths-rekey and events-workspaceid, but updateMemoryHealth returning EMPTY_HEALTH on a null issueId drops health tracking for main/scratch turns rather than relocating it - confirm a follow-on bead owns that."
+    "updatedAt": "2026-07-29T01:16:24.585Z",
+    "inspectNotes": "AC1: MemoryIdentity/MemoryObservation issueId -> Schema.NullOr(IssueId) in packages/contracts/src/memory.ts; new contracts memory.test.ts passes 4/4 (decodes null and a real PAN-1990 for both structs). AC2: src/lib/memory/injection.ts:110 replaces the sibling search with Promise.resolve([]) when issueId is null, so the branch is skipped rather than widened; tests/lib/memory/injection.test.ts 18/18 pass including the new null-issueId case, which seeds the same PAN-999 sibling row the positive test retrieves and asserts hitCounts.sibling===0 and no sibling docType. AC3: npm run typecheck exits 0 - contracts dts rebuild, root tsc --noEmit, hooks, evals, dashboard ratchet (61 known, none new), frontend ratchet (0). New imports verified real: getProjectSync src/lib/projects.ts:601, resolveProjectPath src/lib/projects.ts:508. Non-blocking note: the ?? workspaceId fallbacks for paths/event keys are documented as deferred to memory-paths-rekey and events-workspaceid, but updateMemoryHealth returning EMPTY_HEALTH on a null issueId drops health tracking for main/scratch turns rather than relocating it - confirm a follow-on bead owns that.",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since 3e981e2 (1 path): scripts/file-size-allowlist.txt",
+        "detectedAt": "2026-07-29T01:16:19.128Z"
+      }
+    ],
+    "conflictsSince": {
+      "sha": "3e981e26c497dc13d6dad0f66cd114112ce68983",
+      "detectedAt": "2026-07-29T01:16:19.128Z",
+      "paths": [
+        "scripts/file-size-allowlist.txt"
+      ]
+    }
   },
   "closeOut": {
     "usage": {
@@ -42,10 +56,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 1932,
-            "output": 462311,
-            "cacheRead": 460189678,
-            "cacheWrite": 2896312
+            "input": 2146,
+            "output": 522489,
+            "cacheRead": 507472096,
+            "cacheWrite": 3032681
           }
         }
       },
@@ -57,22 +71,22 @@
           "cacheWrite": 194048
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1932,
-          "output": 462311,
-          "cacheRead": 460189678,
-          "cacheWrite": 2896312
+          "input": 2146,
+          "output": 522489,
+          "cacheRead": 507472096,
+          "cacheWrite": 3032681
         }
       },
       "costAtCloseOut": {
-        "usd": 112.362359,
-        "pricingAsOf": "2026-07-29T00:44:38.644Z"
+        "usd": 122.761973,
+        "pricingAsOf": "2026-07-29T01:16:24.611Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-1990",
