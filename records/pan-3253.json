@@ -220,18 +220,18 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T15:38:37.830Z",
+  "updated": "2026-07-29T15:38:40.145Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T15:38:36.560Z",
+    "updatedAt": "2026-07-29T15:38:37.048Z",
     "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/event-store.ts",
+    "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -334,7 +334,7 @@
       },
       "costAtCloseOut": {
         "usd": 122.003361,
-        "pricingAsOf": "2026-07-29T15:38:36.602Z"
+        "pricingAsOf": "2026-07-29T15:38:40.142Z"
       }
     },
     "merges": [
