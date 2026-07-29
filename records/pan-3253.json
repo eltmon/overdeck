@@ -44,7 +44,7 @@
     "recordedAt": "2026-07-29T06:18:50.753Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T06:59:35.654Z",
+  "updated": "2026-07-29T06:59:41.008Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -157,16 +157,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "append-door-bound": {
-        "writerId": "agent-pan-3253",
-        "agentId": "agent-pan-3253",
-        "pid": 430067,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T06:59:35.654Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3253",
@@ -189,6 +181,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3253 dead)",
         "releasedAt": "2026-07-29T06:19:53.822Z"
+      },
+      {
+        "writerId": "agent-pan-3253",
+        "agentId": "agent-pan-3253",
+        "pid": 430067,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T06:59:35.654Z",
+        "itemId": "append-door-bound",
+        "outcome": "completed",
+        "reason": "Bounded payloads at append door with comprehensive tests",
+        "releasedAt": "2026-07-29T06:59:41.008Z"
       }
     ],
     "statusReasons": {
@@ -197,8 +200,8 @@
         "updatedAt": "2026-07-29T06:07:07.511Z"
       },
       "append-door-bound": {
-        "reason": "stale claim released (agent-pan-3253 dead)",
-        "updatedAt": "2026-07-29T06:19:53.822Z"
+        "reason": "Bounded payloads at append door with comprehensive tests",
+        "updatedAt": "2026-07-29T06:59:41.008Z"
       }
     }
   },
@@ -207,6 +210,10 @@
     "notes-cap.notes-cap.ac1": "completed",
     "notes-cap.notes-cap.ac2": "completed",
     "notes-cap.notes-cap.ac3": "completed",
-    "append-door-bound": "running"
+    "append-door-bound": "completed",
+    "append-door-bound.append-door-bound.ac1": "completed",
+    "append-door-bound.append-door-bound.ac2": "completed",
+    "append-door-bound.append-door-bound.ac3": "completed",
+    "append-door-bound.append-door-bound.ac4": "completed"
   }
 }
