@@ -119,15 +119,7 @@
       "timestamp": "2026-07-29T01:31:10.505Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T01:31:10Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3232\n\n# Review — PAN-3232 — Cycle 10\n\n## Verdict: CHANGES REQUESTED — ConversationDock no longer materializes conversation-only pending input, and the NeedsYouStrip fix hides agent question text\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3232/.pan/review/agent-pan-3232-review-2841ef19/context.json`\n- Branch: `feature/pan-3232`\n- PR: `#3251`\n- HEAD reviewed: `2841ef193b958693270f58b12b6354c78436f44b`\n- Prior reviewed HEAD: `c50512fefb0aa57fcaa4e58d12afed4cabfa9168`\n- Cycle diff: `c50512fe..2841ef19`\n- Dimensions reviewed: correctness, security, requirements/acceptance criteria, and performance\n- All blockers below are anchored in code added, changed, or deleted since the prior verdict.\n\n## Blocking Findings\n\n### ! [correctness/requirements] ConversationDock's repair deletes the only conversation-only entry path — `src/dashboard/frontend/src/components/dock/ConversationDock.tsx:67`\n**Scope:** in_pr_scope; changed in the current cycle  \n**Evidence tier:** Tier 1 — direct empty-store render trace  \n**Requirement:** FR-7 AC-1 requires each of NeedsYouStrip, SimpleHomePage, and ConversationDock to render a needs-you entry sourced from a conversation pending-input row while the agent store is empty.\n\nThe current-cycle repair removes `conversationOnlyItems` entirely and sorts only `useConvoDock().items`. With an empty agent store and one pending conversation:\n\n- `usePendingInputSubjects()` contributes the conversation to `needsYouIds`.\n- `useConvoDock().items` remains empty because pending-input rows do not add dock items.\n- The collapsed handle shows no count.\n- The expanded dock shows a “1 needs you” header beside “Nothing docked,” with no entry for the conversation and no way to open or answer it.\n\nThis avoids the previous empty agent-panel bug by removing the required surface rather than rendering the conversation correctly.\n\n**Impact:** ConversationDock still fails FR-7's explicit empty-agent-store acceptance case. The operator is told that something needs them but cannot identify or act on it from the dock.\n\n**Fix:** Model dock entries as a typed union of issue/agent panels and conversation panels. Materialize a conversation entry keyed by conversation name, and render/open the actual conversation rather than an agent drawer. Do not satisfy the type/lint issue by deleting the conversation entry.\n\n### ! [correctness/data integrity] NeedsYouStrip now keys all question text by subject ID but looks up agent questions by issue ID — `src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx:137`\n**Scope:** in_pr_scope; introduced in the current cycle  \n**Evidence tier:** Tier 1 — deterministic map-key mismatch  \n\nThe repair correctly changes conversation rows to retain their own identity, but `questionBySubject` stores every question under `s.agentId`. Rendering then uses:\n\n- conversation rows: `questions.get(item.subjectId)` — correct;\n- agent rows: `questions.get(item.derivation.issue.identifier.toLowerCase())` — a different key space.\n\nFor an agent subject such as `agent-pan-3232` on `PAN-3232`, the map contains `agent-pan-3232`, while the lookup asks for `pan-3232`. It therefore returns `undefined`, and `NeedsYouRow` falls back to `item.display.sentence` instead of the actual AskUserQuestion text.\n\n**Impact:** The current fix regresses the existing agent-sourced path while repairing conversation identity. Operators again see generic status copy instead of the question they must answer, conflicting with the feature's prompt-rendering goal and FR-7 AC-3's agent coverage preservation requirement.\n\n**Fix:** Carry a stable `subjectId` on agent items too, normally `derivation.pendingInputAgent.id`, and use that ID for the question lookup. Keep issue identity separate from pending-subject identity.\n\n### ! [requirements/test coverage] The current cycle deletes the only FR-7 test file without replacing it with production-backed coverage — `src/dashboard/frontend/src/__tests__/pending-input-conversation-routing.test.ts:1` (deleted)\n**Scope:** in_pr_scope; deleted in the current cycle  \n**Evidence tier:** Tier 1 — test inventory and import trace  \n\nDeleting the prior self-simulating test is correct, but the commit adds no replacement. No test imports or renders `NeedsYouStrip`, `SimpleHomePage`, or `ConversationDock`, and no test invokes the real `useSimpleActions.answer` mutation. The two production defects above therefore pass all current checks.\n\nThe xBRIEF names component verification for FR-7 and explicitly requires conversation-only rendering with an empty agent store plus preservation of agent-sourced entries. Those cases have no executable coverage after this deletion.\n\n**Impact:** FR-7 remains unproven and already regressed in two distinct ways. Removing false coverage without adding real coverage does not satisfy the acceptance criteria.\n\n**Fix:** Add React Testing Library coverage that supplies a conversation pending-input row with an empty agent store to all three surfaces, invokes the real answer path where applicable, asserts the conversation message endpoint/payload, covers two conversations on one issue, and preserves an agent-backed question's prompt and answer target. Ensure the tests run in the normal frontend test command.\n\n## Resolved Prior Findings\n\n- NeedsYouStrip now preserves distinct conversation identities instead of rejoining them by issue ID.\n- The explicit `any` casts in ConversationDock are gone; local lint and CI lint pass.\n- The self-simulating routing test was removed; replacement coverage is still required above.\n- The conversation message endpoint and payload remain correct.\n- The misplaced `.overdeck` artifacts remain removed.\n\n## Non-blocking Findings\n\n### ~ [correctness, previously reviewed] SimpleHomePage collapses multiple pending subjects by issue and may route an agent card to a conversation — `src/dashboard/frontend/src/components/simple/SimpleHomePage.tsx:210`\n`subjectByIssue` stores only one subject per issue. Because conversation subjects are appended after agent subjects, a same-issue conversation can overwrite the pending agent subject; the existing agent-derived question card then submits to the conversation. Multiple conversations on one issue also collapse to one row. This path predates the current cycle, so the convergence gate keeps it advisory rather than promoting it to a blocker.\n\n### ~ [correctness, previously reviewed] SessionPanel can discard independent Channels permission evidence — `src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx:338`\n`session.pendingInputKinds ?? ...` keeps enrichment kinds without merging an independent Channels `permissionRequest`, and an empty array is treated as authoritative. This remains advisory under the convergence gate.\n\n### ~ [correctness, previously reviewed] NeedsYouStrip still omits enrichment-only prompt text — `src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx:138`\nThe map reads only the structured AskUserQuestion payload and does not fall back to `pendingQuestionPrompt`. This remains advisory under the convergence gate; the fresh agent-key regression above is independently blocking.\n\n### ~ [requirements, previously reviewed] FR-1 through FR-5 still lack the xBRIEF's named executable seam tests\nThere is no production-backed coverage for issue-view projection, Decisions prompt precedence, SessionPanel labels, `mapEventToDelta`, `applySessionTreeDelta`, specialist activity projection, or reviewer pending-input fields. This was already reviewed before the current cycle, so it remains advisory here rather than being promoted.\n\n### ~ [documentation, previously reviewed] The pending-input delta documentation promises ~1s updates while the enrichment poller runs every 10 seconds — `docs/ASKUSERQUESTION-DASHBOARD.md:345`\nThe delta is push-based after enrichment, but `agent-enrichment-service.ts` schedules enrichment every 10 seconds. The operator-visible latency claim should say “within one enrichment poll” or state the actual upper bound.\n\n## Security Review\nNo blocking security issue found. Conversation and agent identifiers are URL-encoded, operator text is sent through existing origin-checked routes, and prompt content is rendered as React text rather than raw HTML. No authentication, authorization, filesystem, command-execution, secret-handling, or destructive endpoint boundary changed.\n\n## Performance Review\nNo blocking performance regression found. The new pending-input delta updates the cached session tree in place without adding invalidation or a new polling loop. The surface joins operate over bounded dashboard lists. The enrichment poller can re-emit pending state and cause a tree allocation on each poll, but that is bounded and does not justify blocking this cycle.\n\n## Requirements Coverage\n- FR-1: implementation present; named executable coverage absent.\n- FR-2: implementation present; named executable coverage absent.\n- FR-3: implementation present; independent permission evidence remains advisory and named coverage is absent.\n- FR-4 / NFR-1 / NFR-2: push-based producer-to-consumer implementation present; named mapper/reducer coverage is absent.\n- FR-5: specialist projection and `ReviewerNode` fields are present; named route/builder coverage is absent.\n- FR-6 / NFR-3: implemented.\n- FR-7: SimpleHomePage handles the single conversation-only case; NeedsYouStrip preserves conversation identity but regresses agent prompt text; ConversationDock fails the required empty-store case; real component coverage is absent.\n- FR-8: documentation present, with the latency wording advisory above.\n- Non-goals remain respected: no classifier, GodView/AgentCard, recovery-path, shared awaiting-input helper, conversation prompt-threading, or new polling-loop change.\n\n## Verification Performed\n- Reviewed the complete PR diff from merge base `701cbb21` through assigned HEAD `2841ef19`.\n- Applied the convergence gate against prior reviewed HEAD `c50512fe`.\n- `git diff --check` passes for the PR and current cycle.\n- `npm run typecheck` passes: root/hooks/evals clean, dashboard baseline 58 with no new errors, frontend 0 errors.\n- `npm run lint -- --quiet` passes locally; PR lint is green.\n- Relevant server unit tests pass: 2 files, 58 tests.\n- Relevant frontend store/pipeline tests pass: 2 files, 52 tests.\n- PR build, clean-install smoke, guard, and lint checks are green; the full CI test job was still pending when reviewed.\n- No implementation files were modified and no test role was queued.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3232/.pan/review/agent-pan-3232-review-2841ef19/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3232 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -204,17 +196,17 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T01:43:47.169Z",
+  "updated": "2026-07-29T01:45:55.124Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T01:43:45.462Z",
+    "updatedAt": "2026-07-29T01:45:55.058Z",
     "reviewNotes": "Agent re-review request (6/25): Fixed cycle 10 blocking findings: conversation identity, agent prompt regression, production-backed test coverage",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
@@ -226,7 +218,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
     "reviewedAtCommit": "2841ef193b958693270f58b12b6354c78436f44b",
-    "reviewSpawnedAt": "2026-07-29T01:22:45.350Z"
+    "reviewSpawnedAt": "2026-07-29T01:45:55.056Z"
   },
   "closeOut": {
     "usage": {
@@ -257,19 +249,19 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3194,
-            "output": 117280,
-            "cacheRead": 57503377,
-            "cacheWrite": 2977929
+            "input": 3200,
+            "output": 117428,
+            "cacheRead": 57624540,
+            "cacheWrite": 2979069
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3628,
-          "output": 145153,
-          "cacheRead": 67624580,
-          "cacheWrite": 3287742
+          "input": 3634,
+          "output": 145301,
+          "cacheRead": 67745743,
+          "cacheWrite": 3288882
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -285,8 +277,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 172.619803,
-        "pricingAsOf": "2026-07-29T01:43:47.152Z"
+        "usd": 172.63409,
+        "pricingAsOf": "2026-07-29T01:45:55.096Z"
       }
     },
     "merges": [
