@@ -382,7 +382,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T06:12:00.398Z",
+  "updated": "2026-07-29T06:12:03.396Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -391,14 +391,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T06:12:00.369Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-07-29T06:10:29.653Z"
-      }
-    ],
+    "updatedAt": "2026-07-29T06:12:00.784Z",
+    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
       "detectedAt": "2026-07-29T05:03:44.105Z",
@@ -481,7 +475,7 @@
       },
       "costAtCloseOut": {
         "usd": 321.442761,
-        "pricingAsOf": "2026-07-29T06:12:00.395Z"
+        "pricingAsOf": "2026-07-29T06:12:03.393Z"
       }
     },
     "merges": [
