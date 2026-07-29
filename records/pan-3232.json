@@ -382,18 +382,18 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:58:20.762Z",
+  "updated": "2026-07-29T05:58:23.233Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "failed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:58:19.487Z",
-    "reviewNotes": "Scoped DrawerAgentSession assertion is correct and all eight FR-7 regression tests pass",
+    "updatedAt": "2026-07-29T05:58:19.613Z",
+    "testNotes": "Gates run from workspace feature-pan-3232 (HEAD d814ebec88): npm run typecheck PASSED (root, hooks, evals, dashboard, frontend). npm run lint PASSED (eslint + all custom guards, exit 0). npm test FAILED: root vitest suite passed cleanly (1285 files / 12044 tests, 3 skipped), but the frontend targeted subset failed 1 of 59 tests. FAILING TEST: src/__tests__/fr7-conversation-pending-input.test.tsx > FR-7: Conversation-only pending input surfaces > ConversationDock: AC-3 > 'AC-3: preserves agent-backed dock panel when agent exists for docked issue' (line 450). TestingLibraryElementError: screen.getByText('agent-test-1') matches two elements - the panel header's agent-id label (div.truncate.font-mono) and the mocked DrawerAgentSession component body, which also renders the literal text 'agent-test-1'. This is a query-ambiguity bug in the test itself (needs getAllByText or a scoped query), introduced by this branch's own fix(fr7) commits at HEAD (d814ebec88, b3c3ac68c5, 0450d10a8e). No browser UAT was performed: the PRD (drafts/PAN-3232.md) and GitHub issue #3232 do not request live/browser verification, verify_commands across all xBRIEF items specify only vitest/typecheck/grep, and the two items requiring live runtime behavior (live-tree-delta, specialist-pending-input) were explicitly cancelled/deferred per PR comments as out of this branch's shipped scope - the shipped rendering fixes are fully covered by component-level unit tests mocking the exact prop shapes in the issue's acceptance criteria. Blocking this failure: work agent must fix the ambiguous query in fr7-conversation-pending-input.test.tsx:450 (e.g. scope to within(screen.getByTestId('drawer-agent-session')) or use getAllByText) and re-run npm test.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -478,7 +478,7 @@
       },
       "costAtCloseOut": {
         "usd": 320.004441,
-        "pricingAsOf": "2026-07-29T05:58:19.600Z"
+        "pricingAsOf": "2026-07-29T05:58:23.228Z"
       }
     },
     "merges": [
@@ -487,7 +487,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3232",
