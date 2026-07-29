@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T00:27:36.638Z",
+  "updated": "2026-07-29T00:30:00.661Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T00:26:56.940Z",
-    "inspectNotes": "Inspecting item contracts-file-rpcs"
+    "updatedAt": "2026-07-29T00:30:00.461Z",
+    "inspectNotes": "AC1-3 verified: WS_METHODS.readFileAtPath/writeFileAtPath exported and both Rpcs registered in PanRpcGroup (36 requests, both present in dist .d.ts as literal-typed Rpc members); ReadFileAtPathResult rejects decode when mtimeMs or totalLines is missing and accepts the full struct; WriteFileAtPathInput decodes with and without expectedMtimeMs; contracts build + workspace root npm run typecheck exit 0 with no new dashboard/frontend ratchet errors."
   },
   "closeOut": {
     "usage": {
@@ -37,10 +37,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 68,
-            "output": 6814,
-            "cacheRead": 5866600,
-            "cacheWrite": 162977
+            "input": 112,
+            "output": 20427,
+            "cacheRead": 10570422,
+            "cacheWrite": 204584
           }
         }
       },
@@ -52,15 +52,15 @@
           "cacheWrite": 184960
         },
         "anthropic/claude-sonnet-5": {
-          "input": 68,
-          "output": 6814,
-          "cacheRead": 5866600,
-          "cacheWrite": 162977
+          "input": 112,
+          "output": 20427,
+          "cacheRead": 10570422,
+          "cacheWrite": 204584
         }
       },
       "costAtCloseOut": {
-        "usd": 11.179136,
-        "pricingAsOf": "2026-07-29T00:26:56.950Z"
+        "usd": 12.360138,
+        "pricingAsOf": "2026-07-29T00:30:00.562Z"
       }
     },
     "merges": [],
