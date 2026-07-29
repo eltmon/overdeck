@@ -14,15 +14,7 @@
       "timestamp": "2026-07-29T03:37:35.921Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T03:37:35Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3254\n\n# Review — PAN-3254\n\n## Verdict: CHANGES REQUESTED — the architecture doc names a nonexistent implementation module and tells operators to use a recovery command that does not exist or clear this bound\n\n## Context\n\n- Branch: `feature/pan-3254`\n- HEAD reviewed: `da1261f22317b63e8f210b3882ae836ba32aac50`\n- PR diff: `docs/REVIEW-AGENT-ARCHITECTURE.md` only\n- Dimensions reviewed: correctness/logic, security, requirements/acceptance criteria, performance\n\n## Blocking Findings\n\n### ! [requirements/correctness] Restore the real `checkPostReviewCommits()` module path — `docs/REVIEW-AGENT-ARCHITECTURE.md:191`\n\nThe updated numbered inventory says `checkPostReviewCommits()` lives in `cloister/deacon-post-blocked-review-commits.ts`, but that implementation file does not exist. The function remains in `src/lib/cloister/deacon-post-review-commits.ts`; only its locking test is named `tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts`.\n\nThis issue's sole deliverable is accurate architecture documentation. A maintainer following the changed path cannot find the implementation, so the change fails the requirement to correct the anchor-drift documentation. Change the implementation reference back to `cloister/deacon-post-review-commits.ts` while retaining the separately named test reference.\n\n### ! [requirements/correctness] Remove the invalid `pan unstick` recovery instruction — `docs/REVIEW-AGENT-ARCHITECTURE.md:204`\n\nThe new text says an operator can run `pan unstick` “to clear the gate and resume the issue for rework,” but `pan unstick` is not a registered CLI command (`pan unstick PAN-3254 --help` prints the top-level command list with no `unstick` command). The dashboard's HTTP unstick flow is also unrelated: `processUnstickRequest()` rejects issues without `reviewStatus.stuck`, while `recordDeadEndNeedsYou()` only records an open recovery trip and the repeat-reset path never sets `stuck`.\n\nEven if the HTTP unstick flow were invoked, it does not clear the module-local `lastResetAnchors` or `resetLoopEscalated` state. The implementation's own escalation message says re-dispatch remains suppressed until the workspace head changes; the maps are otherwise cleared only on merge or process restart. The documented operator action therefore cannot produce the promised recovery and would leave them at an unknown command or a 400 response. Document the real recovery condition instead of `pan unstick`.\n\n## Non-blocking Findings\n\n### ~ [quality] Remove trailing whitespace — `docs/REVIEW-AGENT-ARCHITECTURE.md:199`\n\n`git diff --check origin/main...HEAD` reports trailing whitespace on the blank line before the repeat-reset paragraph. This does not affect behavior or acceptance criteria, but it should be cleaned up with the blocking documentation corrections.\n\n## Clean Dimensions\n\n- **Security:** Documentation-only change introduces no security boundary or unsafe instruction beyond the incorrect non-destructive recovery command above.\n- **Performance:** Documentation-only change has no runtime cost or performance regression.\n- **Other acceptance checks:** The stale phrase `reported as drift once` is absent; the new text correctly states shape mismatch returns `unreadable`, preserves the verdict, cites the 426-cycle incident, names both locking tests, and says a genuinely new anchor still resets review.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3254/.pan/review/agent-pan-3254-review-da1261f2/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3254 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -35,20 +27,19 @@
     "recordedAt": "2026-07-29T03:31:46.073Z"
   },
   "created": "2026-07-29T00:18:00.558Z",
-  "updated": "2026-07-29T03:37:41.554Z",
+  "updated": "2026-07-29T03:39:48.021Z",
   "pipeline": {
     "issueId": "PAN-3254",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T03:37:41.541Z",
+    "updatedAt": "2026-07-29T03:39:47.626Z",
     "reviewNotes": "Docs name a nonexistent implementation module and an invalid pan unstick recovery path",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3275",
-    "reviewedAtCommit": "da1261f22317b63e8f210b3882ae836ba32aac50",
     "reviewSpawnedAt": "2026-07-29T03:34:40.708Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -75,18 +66,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 822265,
-            "output": 27118,
-            "cacheRead": 3693056,
+            "input": 827351,
+            "output": 29118,
+            "cacheRead": 4151808,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 562,
-            "output": 15706,
-            "cacheRead": 11331846,
-            "cacheWrite": 172088
+            "input": 621,
+            "output": 18357,
+            "cacheRead": 12558068,
+            "cacheWrite": 284449
           }
         }
       },
@@ -98,21 +89,21 @@
           "cacheWrite": 129386
         },
         "openai/gpt-5.6-sol": {
-          "input": 822265,
-          "output": 27118,
-          "cacheRead": 3693056,
+          "input": 827351,
+          "output": 29118,
+          "cacheRead": 4151808,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 562,
-          "output": 15706,
-          "cacheRead": 11331846,
-          "cacheWrite": 172088
+          "input": 621,
+          "output": 18357,
+          "cacheRead": 12558068,
+          "cacheWrite": 284449
         }
       },
       "costAtCloseOut": {
-        "usd": 13.158167,
-        "pricingAsOf": "2026-07-29T03:37:41.550Z"
+        "usd": 13.74936,
+        "pricingAsOf": "2026-07-29T03:39:47.687Z"
       }
     },
     "merges": [
