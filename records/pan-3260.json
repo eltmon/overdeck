@@ -14,15 +14,7 @@
       "timestamp": "2026-07-29T01:24:15.746Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T01:24:15Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3260\n\n# Review — PAN-3260\n\n## Verdict: CHANGES REQUESTED\n\nFive blocking findings remain in the PR diff. The focused frontend/server tests and the full workspace typecheck pass, but the tests do not cover the failing path, symlink, split-pane, Windows, or generated-hook cases below.\n\n## Context\n\n- Branch: `feature/pan-3260`\n- HEAD reviewed: `d53875d75409a9dfd7cad0f9294517c28bd2180d`\n- Review cycle: 1\n- Dimensions covered: correctness/logic, security, requirements/acceptance criteria, performance\n- Commands run:\n  - `npx vitest run src/dashboard/server/services/__tests__/file-at-path.test.ts` — 12/12 passed\n  - `cd src/dashboard/frontend && npx vitest run src/components/Stage/panes/EditorPane.test.tsx src/components/chat/__tests__/MarkdownFileLink.test.tsx` — 32/32 passed\n  - `npm run typecheck` from the workspace root — passed, including contracts, hooks, evals, dashboard, and frontend\n\n## Blocking Findings\n\n### ! [correctness/requirements] Line-addressed markdown chips open an invalid internal file path — `src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx:245`\n\n**Evidence: Tier 1 (static).** The existing markdown-link parser deliberately separates `filePath` (the real path) from `targetPath` (the external-editor target, which can retain `:line[:column]`). The new internal path calls `openOrFocusEditorPane(targetPath, ...)` at lines 245 and 323. For a valid chip such as `/repo/README.md:12`, the editor pane therefore calls `readFileAtPath` with `/repo/README.md:12`; `extname()` returns `.md:12`, so the file door rejects it as `UNSUPPORTED_FILE_TYPE` instead of opening the markdown file.\n\nThis breaks FR-6/FR-7 and the issue-level requirement that markdown file chips open internally. Use `filePath` for the internal pane identity/read-write path while preserving `targetPath` for external-editor launches, hrefs, and copied full paths. Add left-click and context-menu tests for a markdown chip with line/column metadata.\n\n### ⊗ [security/requirements] A `.md` symlink can bypass the markdown-only write boundary — `src/dashboard/server/services/file-at-path.ts:68`\n\n**Evidence: Tier 1 (static).** The service validates the extension on the caller-supplied path before resolving the symlink. A path such as `<project>/alias.md -> <project>/package.json` passes the `.md` check, resolves to an allowlisted real path, passes the regular-file check, and can then be overwritten by `writeFileAtPath`. The existing symlink test covers escape outside the root, but not a symlink to a non-markdown file inside the root.\n\nThis violates the explicit NonGoal “No internal editing for non-markdown files” and defeats the security boundary described by FR-2/FR-3. Validate the extension of the resolved target as well as, or instead of, the lexical request path, and add a read/write regression test for an in-root `.md` symlink targeting a non-markdown file.\n\n### ! [correctness] Ctrl/Cmd+S saves every dirty editor visible in a split — `src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx:101`\n\n**Evidence: Tier 1 (static).** Every mounted `EditorPane` installs its own `window` `keydown` listener. Stage supports split layouts that mount multiple panes simultaneously, so pressing Ctrl/Cmd+S while editing one pane invokes `save()` in every dirty editor pane in the split. That can persist unrelated drafts the user did not intend to save, including stale work they expected to review or discard.\n\nScope the shortcut to the focused editor/pane rather than the global window for every instance, and cover two simultaneously mounted dirty editor panes in a test that proves only the focused one saves.\n\n### ! [correctness/requirements] Windows absolute paths are rejected as relative — `src/dashboard/server/services/file-at-path.ts:65`\n\n**Evidence: Tier 1 (static).** The xBRIEF explicitly requires `node:path.isAbsolute`, but the implementation uses `path.startsWith(sep)`. On Windows, an ordinary absolute path such as `C:\\repo\\README.md` starts with a drive letter rather than `\\`, so both file-door RPCs reject every drive-letter path with `PATH_NOT_ALLOWED`. The codebase ships Windows assets and already contains `win32` editor-launch support, so FR-2/FR-3 cannot be treated as POSIX-only.\n\nUse `isAbsolute(path)` and add platform-aware validation coverage for drive-letter paths without weakening the containment checks.\n\n### ! [correctness/repository] The PR tracks a generated Husky wrapper that immediately dirties the worktree — `.husky/_/pre-rebase:1`\n\n**Evidence: Tier 2 (command).** `.husky/_/.gitignore` ignores every generated wrapper, but commit `e21d305866` force-added `.husky/_/pre-rebase`. In this review workspace, Husky has already regenerated that path to its normal two-line wrapper, so `git status` reports it modified against the committed 12-line guard. If merged, dependency setup/Husky prepare will mutate a tracked file in every checkout, breaking clean-tree gates and making the committed guard unstable.\n\nRemove the generated `.husky/_/pre-rebase` file from this PR. Any durable pre-rebase behavior belongs in the existing hook installation source, not in Husky’s ignored generated directory.\n\n## Requirements Coverage\n\n- FR-1: implemented and typechecks.\n- FR-2 / FR-3: blocked by the symlink extension bypass and Windows absolute-path rejection.\n- FR-4: editor load/edit/preview/conflict flows are present, but the global shortcut is unsafe in supported split layouts.\n- FR-5: StageDeckContext wraps the full Stage and deduplicates editor panes by path.\n- FR-6 / FR-7: default and context-menu routing are present, but positioned markdown paths (`.md:line[:column]`) fail internally.\n- FR-8: the new markdown target key is separate from `overdeck:last-editor` and persists.\n- NFR-1 / NFR-2 / NFR-4 / NFR-5: satisfied in the reviewed diff.\n- NFR-3: existing non-markdown and Quickview flows remain intact.\n\n## Performance\n\nNo blocking performance regression found. File-door work is user-triggered and bounded by the read cap; editor discovery is cached module-wide; the Stage provider adds no meaningful hot-path cost.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3260/.pan/review/agent-pan-3260-review-d53875d7/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3260 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".husky/_/pre-rebase",
@@ -68,10 +60,10 @@
     "recordedAt": "2026-07-29T01:09:34.738Z"
   },
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T01:35:40.316Z",
+  "updated": "2026-07-29T01:35:44.496Z",
   "pipeline": {
     "issueId": "PAN-3260",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -79,12 +71,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T01:11:05.562Z",
-    "updatedAt": "2026-07-29T01:35:38.939Z",
+    "updatedAt": "2026-07-29T01:35:44.442Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "AC1-3 verified: WS_METHODS.readFileAtPath/writeFileAtPath exported and both Rpcs registered in PanRpcGroup (36 requests, both present in dist .d.ts as literal-typed Rpc members); ReadFileAtPathResult rejects decode when mtimeMs or totalLines is missing and accepts the full struct; WriteFileAtPathInput decodes with and without expectedMtimeMs; contracts build + workspace root npm run typecheck exit 0 with no new dashboard/frontend ratchet errors.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3268",
     "reviewedAtCommit": "d53875d75409a9dfd7cad0f9294517c28bd2180d",
-    "reviewSpawnedAt": "2026-07-29T01:12:25.878Z",
+    "reviewSpawnedAt": "2026-07-29T01:35:44.440Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".husky/_/pre-rebase",
@@ -180,7 +172,7 @@
       },
       "costAtCloseOut": {
         "usd": 53.546,
-        "pricingAsOf": "2026-07-29T01:35:40.313Z"
+        "pricingAsOf": "2026-07-29T01:35:44.465Z"
       }
     },
     "merges": [
