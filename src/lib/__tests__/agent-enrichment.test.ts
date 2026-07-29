@@ -51,6 +51,29 @@ describe('appendPaneDetectionKind', () => {
     appendPaneDetectionKind(null, kinds)
     expect(kinds).toEqual([])
   })
+
+  // PAN-3233 — question-family detections previously yielded no kind, making
+  // the agent invisible to Decisions and unreapable.
+  it.each(['user_question', 'confirmation', 'disambiguation', 'planning_done'] as const)(
+    'adds paneQuestion for a %s detection',
+    (reason) => {
+      const kinds: PendingInputKind[] = []
+      appendPaneDetectionKind({ reason, prompt: 'Which one?' }, kinds)
+      expect(kinds).toEqual(['paneQuestion'])
+    },
+  )
+
+  it('does not duplicate an existing paneQuestion kind', () => {
+    const kinds: PendingInputKind[] = ['paneQuestion']
+    appendPaneDetectionKind({ reason: 'user_question', prompt: 'Which one?' }, kinds)
+    expect(kinds).toEqual(['paneQuestion'])
+  })
+
+  it('does not add paneQuestion when a JSONL askUserQuestion kind is already present', () => {
+    const kinds: PendingInputKind[] = ['askUserQuestion']
+    appendPaneDetectionKind({ reason: 'user_question', prompt: 'Which one?' }, kinds)
+    expect(kinds).toEqual(['askUserQuestion'])
+  })
 })
 
 describe('isBlockedOnPendingInput', () => {
