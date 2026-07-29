@@ -357,7 +357,7 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T04:31:26.015Z",
+  "updated": "2026-07-29T04:31:31.495Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "blocked",
@@ -368,7 +368,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T04:31:25.151Z",
+    "updatedAt": "2026-07-29T04:31:31.485Z",
     "reviewNotes": "Fresh dashboard Kimi conversations swallow native session-capture failures and remain healthy without an owned session ID.",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
@@ -379,7 +379,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
-    "reviewedAtCommit": "96f15e4b7bc5cbcc7d8167c5deb2966b4779434c",
+    "reviewedAtCommit": "aff1bd008a4920ceb373869e5ee301fc64332bb7",
     "lastVerifiedCommit": "aff1bd008a4920ceb373869e5ee301fc64332bb7",
     "reviewSpawnedAt": "2026-07-29T04:25:45.330Z"
   },
@@ -433,7 +433,7 @@
       },
       "costAtCloseOut": {
         "usd": 429.400192,
-        "pricingAsOf": "2026-07-29T04:31:25.168Z"
+        "pricingAsOf": "2026-07-29T04:31:31.493Z"
       }
     },
     "merges": [
