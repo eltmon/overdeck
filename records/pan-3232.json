@@ -287,7 +287,7 @@
     "recordedAt": "2026-07-29T02:58:56.941Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T03:08:10.954Z",
+  "updated": "2026-07-29T03:08:42.750Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -380,7 +380,9 @@
         "src/dashboard/server/ws-rpc.ts"
       ],
       "recordedAt": "2026-07-29T02:58:56.941Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-29T03:08:42.315Z",
+    "panDoneRecoveredAt": "2026-07-29T03:08:42.315Z"
   },
   "closeOut": {
     "usage": {
