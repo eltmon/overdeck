@@ -1,0 +1,577 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-29T00:11:11.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3260: Markdown file chips should open the internal markdown editor in a tab by default, with internal/external choice on right-click",
+    "updated": "2026-07-29T00:14:26.043Z"
+  },
+  "plan": {
+    "id": "pan-3260",
+    "title": "Markdown file chips should open the internal markdown editor in a tab by default, with internal/external choice on right-click",
+    "status": "proposed",
+    "uid": "1cff4b16-100a-44c7-8f5c-e6943607a09d",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-29T00:11:11.000Z",
+    "updated": "2026-07-29T00:14:26.043Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3260",
+        "label": "PAN-3260",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "stage",
+      "markdown",
+      "editor",
+      "rpc"
+    ],
+    "narratives": {
+      "Problem": "Left-clicking a file chip in chat always launches an external editor (shellOpenInEditor), and right-click offers only that one open action. There is no internal markdown editor, and the only file-content RPC (readWorkspaceFile) requires an issueId — so the reported case, the Flywheel brief chip (a repo-root file inside the flywheel-orchestrator conversation with no workspace), cannot be served by any issue-scoped door.",
+      "Proposal": "Add an absolute-path markdown file door (pan.readFileAtPath / pan.writeFileAtPath) validated against registered project roots + OVERDECK_HOME; a new Stage paneType 'editor' (EditorPane: textarea Edit tab, ChatMarkdown Preview tab, Save with mtime conflict detection); a StageDeckContext so chips can open/focus panes in their deck; markdown chips default left-click to the internal editor (persisted 'overdeck:markdown-open-target' preference, default 'internal'), and right-click lists the internal editor plus every available external editor, persisting the choice. Non-deck surfaces and non-markdown chips keep today's external behavior unchanged.",
+      "NonGoals": "- No internal editing for non-markdown files; EDITORS in contracts stays external-process-only\n- No internal-editor entry in surfaces without a Stage deck (popout conversation windows, ConversationDock, issue-drawer/session transcripts) — they keep the external fallback\n- No rich markdown editing (CodeMirror/Monaco/WYSIWYG), no autosave, no multi-file tabs within one pane\n- No changes to Quickview, readWorkspaceFile, or the overdeck:last-editor preference semantics\n- No file creation or deletion through the file door — existing files only"
+    },
+    "autoDecisions": [
+      {
+        "summary": "New dedicated paneType 'editor' with editorFilePath, not an extension of DocsPane.",
+        "rationale": "DocsPane is bound to planning queries (PRD/STATE/INFERENCE); a path-scoped editor is a different concern, and a new pane type is additive with no risk to existing tabs."
+      },
+      {
+        "summary": "Chips reach the deck via a new StageDeckContext; surfaces without a Stage fall back to the existing external flow.",
+        "rationale": "The reported case (flywheel conversation) renders inside the Stage as an agent pane, so context covers it. Prop-threading through the markdown component tree would touch many files; cross-surface navigation machinery for popouts/dock is out of scope and the fallback loses nothing that exists today."
+      },
+      {
+        "summary": "File door allowlist = registered project roots (listProjectsSync) + OVERDECK_HOME; markdown extensions only; 1 MiB cap that errors instead of truncating.",
+        "rationale": "Covers repo-root files, workspaces (under project roots), and state-worktree drafts — the real chip targets — while keeping the write door far narrower than the existing open-any-path shellOpenInEditor precedent. Erroring on oversize prevents ever saving a truncated buffer."
+      },
+      {
+        "summary": "Optimistic concurrency via expectedMtimeMs with a Reload/Overwrite conflict UI.",
+        "rationale": "Agents routinely edit the same markdown files (drafts, briefs); silent last-write-wins would destroy agent work. mtime comparison is the smallest mechanism that prevents it."
+      },
+      {
+        "summary": "Plain textarea editor with Edit|Preview sub-tabs; no new npm dependency.",
+        "rationale": "Markdown needs no syntax-highlighted editing surface to satisfy the issue; Preview reuses ChatMarkdown per the issue's explicit single-renderer requirement. Simplicity-first rule."
+      },
+      {
+        "summary": "New localStorage key overdeck:markdown-open-target ('internal' | EditorId, default 'internal'), separate from overdeck:last-editor.",
+        "rationale": "The issue mandates internal-by-default for markdown while non-markdown keeps the external default; separate keys keep the two behaviors independent and the change additive."
+      },
+      {
+        "summary": "Focus-if-open semantics for the editor pane keyed on editorFilePath.",
+        "rationale": "Mirrors existing openIssue/openCommits dedupe patterns; repeated clicks must not stack duplicate tabs."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-file-rpcs",
+        "title": "Contracts: add readFileAtPath/writeFileAtPath RPC pair",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T00:11:11.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3260",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "server-file-door",
+            "editor-pane",
+            "chip-internal-default"
+          ],
+          "files_scope": [
+            "packages/contracts/src/rpc.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd packages/contracts && npm run build",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "contracts build completes without errors",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/rpc.ts add WS_METHODS entries readFileAtPath: \"pan.readFileAtPath\" and writeFileAtPath: \"pan.writeFileAtPath\"; define ReadFileAtPathInput {path}, ReadFileAtPathResult {text, lang, mtimeMs, totalLines}, WriteFileAtPathInput {path, content, expectedMtimeMs?}, WriteFileAtPathResult {mtimeMs} as Schema.Structs with exported types; create Rpc.make entries with error: PanRpcError following the ReadWorkspaceFileRpc pattern (rpc.ts:318-338); register both in PanRpcGroup (rpc.ts:627). Rebuild contracts so both dashboard halves compile against them."
+        },
+        "items": [
+          {
+            "id": "contracts-file-rpcs.ac1",
+            "title": "Given the contracts build, WS_METHODS exports readFileAtPath and writeFileAtPath keys and PanRpcGroup registers both Rpcs (typecheck accepts client[WS_METHODS.readFileAtPath] calls)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-file-rpcs.ac2",
+            "title": "ReadFileAtPathResult schema requires text, lang, mtimeMs, totalLines and WriteFileAtPathInput accepts an omitted expectedMtimeMs (schema decode accepts both variants)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-file-rpcs.ac3",
+            "title": "cd packages/contracts && npm run build exits 0 and npm run typecheck at the workspace root completes without new errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-file-door",
+        "title": "Server: file-at-path read/write service with allowlist validation, wired into ws-rpc",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T00:11:11.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3260",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/file-at-path.ts",
+            "src/dashboard/server/services/__tests__/file-at-path.test.ts",
+            "src/dashboard/server/ws-rpc.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/file-at-path.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "file-at-path.test.ts passes with all tests green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/file-at-path.ts modeled on read-workspace-file.ts (PanRpcError codes, Effect.tryPromise wrappers, realpath+isInsidePath containment per read-workspace-file.ts:48-50,120-133). Shared validation: absolute path ≤4096 chars; extension in {.md,.mdx,.markdown} else UNSUPPORTED_FILE_TYPE; realpath(target) contained in realpath of a registered project path (listProjectsSync() from src/lib/projects.ts:307, each config.path) or realpath(OVERDECK_HOME) (src/lib/paths.ts:6) else PATH_NOT_ALLOWED; regular file else FILE_NOT_FOUND. readFileAtPath: stat.size > 1 MiB → FILE_TOO_LARGE (never truncate); return {text, lang: languageForPath(path), mtimeMs, totalLines}. writeFileAtPath: expectedMtimeMs mismatch → WRITE_CONFLICT with nothing written; else writeFile UTF-8, re-stat, return {mtimeMs}. Use node:fs/promises only — no execSync. Wire both handlers in ws-rpc.ts next to readWorkspaceFile (ws-rpc.ts:1040-1053). Vitest tests with temp dirs covering containment accept/reject, symlink escape rejection, extension gate, too-large, conflict, and read/write round-trip."
+        },
+        "items": [
+          {
+            "id": "server-file-door.ac1",
+            "title": "Given a .md file under a registered project root or OVERDECK_HOME, readFileAtPath returns its full text, lang 'markdown', mtimeMs, and totalLines; given /etc/hosts-style outside paths or a symlink resolving outside the roots, it rejects with PATH_NOT_ALLOWED",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-file-door.ac2",
+            "title": "readFileAtPath rejects a .ts path with UNSUPPORTED_FILE_TYPE and a >1 MiB markdown file with FILE_TOO_LARGE, returning no truncated text in either case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-file-door.ac3",
+            "title": "writeFileAtPath with a stale expectedMtimeMs rejects with WRITE_CONFLICT and preserves the on-disk content unchanged; with a matching expectedMtimeMs it persists the new content and returns the new mtimeMs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-file-door.ac4",
+            "title": "Both handlers are reachable through PanRpcGroup wiring in ws-rpc.ts and file-at-path.test.ts exits green under npx vitest run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "editor-pane",
+        "title": "Frontend: 'editor' pane type and EditorPane with edit, preview, and save",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T00:11:11.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3260",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/panesStore.ts",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx",
+            "src/dashboard/frontend/src/components/Stage/panes/EditorPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Stage/panes/EditorPane.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "EditorPane.test.tsx passes with all tests green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-2",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add 'editor' to PaneType and editorFilePath?: string to WorkspacePane in panesStore.ts (:18-27, :29-56); add editor: 'Editor' to PANE_LABELS and an EditorPane case to renderPane in Stage/index.tsx (:75-85, :100-121). CRITICAL: do NOT add 'editor' to the ISSUE_SCOPED self-heal set (Stage/index.tsx:156) — it closes panes lacking issueId and would delete editor tabs on load. Create EditorPane.tsx: on mount and on Reload, request WS_METHODS.readFileAtPath with pane.editorFilePath; hold {text, mtimeMs}; Edit|Preview sub-tabs styled like DocsPane's subTabs (DocsPane.tsx:43-56, stage.module.css); Edit is a monospace textarea; Preview renders <MarkdownTab body={draft}/>; Save button (disabled when clean) plus Ctrl/Cmd+S calls writeFileAtPath with expectedMtimeMs, updates mtimeMs, clears dirty, toasts success; dirty indicator when draft differs from loaded text; WRITE_CONFLICT shows an inline banner with 'Reload from disk' (discard draft, re-read) and 'Overwrite' (re-save without expectedMtimeMs); FILE_TOO_LARGE and other read errors render an error state, too-large additionally offering 'Open externally' via the existing resolvePreferredEditor + shellOpenInEditor flow; a pane missing editorFilePath renders an explicit error state rather than crashing. Tests mock getTransport (pattern MarkdownFileLink.test.tsx:17-19)."
+        },
+        "items": [
+          {
+            "id": "editor-pane.ac1",
+            "title": "Given a pane with editorFilePath, EditorPane renders the file text in the Edit textarea and the Preview sub-tab renders the draft as markdown through MarkdownTab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-pane.ac2",
+            "title": "Editing then saving sends writeFileAtPath with the draft content and the last-read expectedMtimeMs, and Ctrl/Cmd+S triggers the same save; the dirty indicator clears after a successful save",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-pane.ac3",
+            "title": "A WRITE_CONFLICT response renders Reload-from-disk and Overwrite actions; Overwrite re-sends the save without expectedMtimeMs and Reload replaces the draft with freshly read content",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-pane.ac4",
+            "title": "A FILE_TOO_LARGE read error renders an error state offering Open externally, and a pane missing editorFilePath renders an error state without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-pane.ac5",
+            "title": "The Stage self-heal effect preserves 'editor' panes on deck load (the ISSUE_SCOPED set does not contain 'editor'), verified by test or by the pane surviving a store rehydrate in EditorPane.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stage-deck-context",
+        "title": "Frontend: StageDeckContext so nested chips can open panes in their deck",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T00:11:11.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3260",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/StageDeckContext.tsx",
+            "src/dashboard/frontend/src/components/Stage/index.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/Stage/StageDeckContext.tsx exporting a React context with value { deckKey: string; openOrFocusEditorPane: (filePath: string, label: string) => void } | null and a useStageDeck() hook. In Stage (Stage/index.tsx), implement openOrFocusEditorPane mirroring openIssue (:206-214): find a pane with paneType 'editor' and matching editorFilePath → setActivePane, else addPane(deckKey, { paneType: 'editor', label, editorFilePath: filePath }). Wrap everything Stage renders (pane layout plus renderHome/renderIssue output) in the provider so AgentPane → ConversationPanel → ChatMarkdown → MarkdownFileLink can consume it."
+        },
+        "items": [
+          {
+            "id": "stage-deck-context.ac1",
+            "title": "useStageDeck() inside any Stage-rendered pane returns the deck's key and a working openOrFocusEditorPane, and returns null when rendered outside a Stage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stage-deck-context.ac2",
+            "title": "openOrFocusEditorPane called twice with the same filePath creates one editor pane and focuses it on the second call (no duplicate tab)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "chip-internal-default",
+        "title": "Frontend: markdown chips left-click opens the internal editor by default",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T00:11:11.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3260",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/editorPreferences.ts",
+            "src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/MarkdownFileLink.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MarkdownFileLink.test.tsx passes with all pre-existing and new tests green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend editorPreferences.ts with MarkdownOpenTarget = 'internal' | EditorId, getMarkdownOpenTarget() (reads localStorage key 'overdeck:markdown-open-target', defaults 'internal'), and setMarkdownOpenTarget(). In MarkdownFileLink.tsx add isMarkdownPath via the existing extensionOfPath (:77-81) for {md,mdx,markdown}. Change the left-click handler (:288-292): markdown chip with target 'internal' and useStageDeck() non-null → deck.openOrFocusEditorPane(targetPath, basename); markdown chip with an external EditorId target → launch that editor via the existing shellOpenInEditor flow; markdown chip with 'internal' but null deck context → existing handleOpen() external fallback; non-markdown chips → handleOpen() unchanged. Extend tests: internal default opens the pane (mocked StageDeckContext provider) and never calls shellOpenInEditor; a named test covers the reported case — a repo-root markdown targetPath with no issueId prop and no /workspaces/feature-*/ segment still opens the pane; a persisted external target launches externally; null context falls back to shellOpenInEditor; all pre-existing tests still pass."
+        },
+        "items": [
+          {
+            "id": "chip-internal-default.ac1",
+            "title": "Given a markdown chip inside a StageDeckContext and no stored preference, left click opens/focuses an editor pane for targetPath and shellOpenInEditor is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chip-internal-default.ac2",
+            "title": "A named test covering a repo-root markdown chip with no issueId and no workspace path segment (the flywheel-brief case) passes: the editor pane opens with the absolute targetPath",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chip-internal-default.ac3",
+            "title": "With a persisted external EditorId as the markdown open target, left click launches that external editor and opens no pane; with null deck context and 'internal' target, left click falls back to the existing external flow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chip-internal-default.ac4",
+            "title": "Non-markdown chips (e.g. .ts) keep launching the preferred external editor on left click, and every pre-existing MarkdownFileLink test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "chip-context-menu",
+        "title": "Frontend: markdown chip right-click lists internal plus available external editors and persists the choice",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T00:11:11.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3260",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/chat/__tests__/MarkdownFileLink.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MarkdownFileLink.test.tsx passes with all tests green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In MarkdownFileLink.tsx, for markdown chips replace the single 'Open in editor' context-menu item: capture event.clientX/clientY, await a module-level cached pan.getAvailableEditors fetch (pattern: sharedQuickviewHighlighterPromise at :75,121-135; on fetch failure proceed with an empty external list), then showContextMenu with items in order: 'Open in internal editor' (persists setMarkdownOpenTarget('internal') then opens/focuses the pane, or external fallback when deck context is null), one 'Open in <label>' per available editor using EDITORS labels (persists setMarkdownOpenTarget(id) then launches via shellOpenInEditor), then the existing 'Copy relative path' and 'Copy full path' items unchanged. Non-markdown chips keep the current three-item menu verbatim (contextMenuFallback.ts needs no changes). Tests: menu order internal → externals → copy items; choosing an external persists the target so a subsequent left click launches it; choosing internal persists 'internal'; non-markdown menu unchanged."
+        },
+        "items": [
+          {
+            "id": "chip-context-menu.ac1",
+            "title": "Right-clicking a markdown chip renders a menu listing 'Open in internal editor', one entry per available external editor, and both copy actions, in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chip-context-menu.ac2",
+            "title": "Choosing an external editor from the menu launches it via shellOpenInEditor and persists the choice so a subsequent left click launches the same editor after a simulated reload (fresh localStorage read)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chip-context-menu.ac3",
+            "title": "Choosing 'Open in internal editor' opens/focuses the editor pane and persists 'internal' as the markdown open target",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chip-context-menu.ac4",
+            "title": "Right-clicking a non-markdown chip renders exactly today's three items (Open in editor, Copy relative path, Copy full path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-markdown-editor",
+        "title": "Docs: document the editor pane, file door, and chip preference model",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-29T00:11:11.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3260",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MARKDOWN-EDITOR-PANE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f docs/MARKDOWN-EDITOR-PANE.md && wc -l docs/MARKDOWN-EDITOR-PANE.md"
+          ],
+          "expected_outputs": [
+            "docs/MARKDOWN-EDITOR-PANE.md exists and is non-trivial (>40 lines)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Create docs/MARKDOWN-EDITOR-PANE.md documenting: the 'editor' paneType and its editorFilePath field (and why it is NOT in Stage's ISSUE_SCOPED self-heal set); the pan.readFileAtPath / pan.writeFileAtPath door — allowlist (registered project roots + OVERDECK_HOME), markdown-only extensions, 1 MiB error-not-truncate cap, and the expectedMtimeMs/WRITE_CONFLICT protocol; the StageDeckContext mechanism chips use to open panes; the overdeck:markdown-open-target preference ('internal' | EditorId, default 'internal') and its relationship to overdeck:last-editor; and the fallback matrix (deck surfaces open internally, popout/dock/drawer surfaces keep the external flow, non-markdown chips unchanged)."
+        },
+        "items": [
+          {
+            "id": "docs-markdown-editor.ac1",
+            "title": "docs/MARKDOWN-EDITOR-PANE.md contains the editor pane type, the file door validation rules (allowlist, markdown-only, 1 MiB error cap), and covers the WRITE_CONFLICT mtime protocol with the exact RPC method names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-markdown-editor.ac2",
+            "title": "The doc shows the fallback matrix — which surfaces open internally versus externally and that non-markdown chips are unchanged — and contains the overdeck:markdown-open-target localStorage key with its default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-file-rpcs",
+        "to": "server-file-door",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-file-rpcs",
+        "to": "editor-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "server-file-door",
+        "to": "editor-pane",
+        "type": "informs"
+      },
+      {
+        "from": "stage-deck-context",
+        "to": "editor-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "editor-pane",
+        "to": "chip-internal-default",
+        "type": "blocks"
+      },
+      {
+        "from": "stage-deck-context",
+        "to": "chip-internal-default",
+        "type": "blocks"
+      },
+      {
+        "from": "chip-internal-default",
+        "to": "chip-context-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "chip-context-menu",
+        "to": "docs-markdown-editor",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-29-PAN-3260-markdown-file-chips-should-open-the-internal-markdown-editor-in-a-tab-by-default-with-internal-external-choice-on-right-click.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
