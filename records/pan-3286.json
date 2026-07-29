@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-29T23:49:08.845Z",
+  "updated": "2026-07-29T23:49:12.666Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -45,20 +45,5 @@
       "open": true,
       "needsYouEmittedAt": "2026-07-29T23:33:39.077Z"
     }
-  ],
-  "tasks": {
-    "sequence": 1,
-    "claims": {
-      "ws-new-target-path": {
-        "writerId": "agent-pan-3286",
-        "agentId": "agent-pan-3286",
-        "pid": 39804,
-        "host": "Edwards-MacBook-Air.local",
-        "claimedAt": "2026-07-29T23:49:08.845Z"
-      }
-    }
-  },
-  "statusOverrides": {
-    "ws-new-target-path": "running"
-  }
+  ]
 }
