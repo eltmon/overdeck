@@ -156,17 +156,17 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T00:52:11.934Z",
+  "updated": "2026-07-29T00:55:49.198Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T00:52:11.278Z",
+    "updatedAt": "2026-07-29T00:55:48.801Z",
     "reviewNotes": "The new regression suite tests only hand-written literals while NeedsYouStrip and ConversationDock still fail FR-7",
     "blockerReasons": [
       {
@@ -183,7 +183,6 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "bba5dfc5e38d555b08626ec4b25ca9691a7bba11",
     "reviewSpawnedAt": "2026-07-29T00:48:46.454Z"
   },
   "closeOut": {
@@ -207,27 +206,27 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6837121,
-            "output": 297980,
-            "cacheRead": 63969792,
+            "input": 6845613,
+            "output": 298172,
+            "cacheRead": 64443904,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2681,
-            "output": 73945,
-            "cacheRead": 46182869,
-            "cacheWrite": 2262478
+            "input": 2808,
+            "output": 82332,
+            "cacheRead": 48919099,
+            "cacheWrite": 2376138
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3115,
-          "output": 101818,
-          "cacheRead": 56304072,
-          "cacheWrite": 2572291
+          "input": 3242,
+          "output": 110205,
+          "cacheRead": 59040302,
+          "cacheWrite": 2685951
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -236,15 +235,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 6837121,
-          "output": 297980,
-          "cacheRead": 63969792,
+          "input": 6845613,
+          "output": 298172,
+          "cacheRead": 64443904,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 94.676378,
-        "pricingAsOf": "2026-07-29T00:52:11.286Z"
+        "usd": 95.419412,
+        "pricingAsOf": "2026-07-29T00:55:48.853Z"
       }
     },
     "merges": [
