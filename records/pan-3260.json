@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T00:47:48.233Z",
+  "updated": "2026-07-29T00:51:55.389Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "chip-internal-default": {
-        "writerId": "agent-pan-3260",
-        "agentId": "agent-pan-3260",
-        "pid": 3815765,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T00:47:48.233Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3260",
@@ -133,6 +125,17 @@
         "outcome": "completed",
         "reason": "Added EditorPane.tsx (paneType='editor') and wired it into Stage/index.tsx's renderPane switch. Reads via readFileAtPath on mount, holds {text, mtimeMs}, Edit textarea + Preview (MarkdownTab) sub-tabs styled like DocsPane. Save disabled when clean, bound to click and Ctrl/Cmd+S, sends writeFileAtPath with the last-read expectedMtimeMs. WRITE_CONFLICT shows a banner with Reload-from-disk (re-reads, discards draft) and Overwrite (resends without expectedMtimeMs). FILE_TOO_LARGE read errors show an 'Open externally' action via the existing preferred-editor + shellOpenInEditor flow; a pane with no editorFilePath renders an explicit error state instead of crashing. 9 new EditorPane.test.tsx cases (load/preview, save+mtimeMs, Ctrl/Cmd+S, conflict banner's both actions, FILE_TOO_LARGE vs other-error states, missing-path guard, and ac5's self-heal-survival test mounting the full Stage). Full Stage suite (155 tests) and root typecheck pass clean.",
         "releasedAt": "2026-07-29T00:47:36.484Z"
+      },
+      {
+        "writerId": "agent-pan-3260",
+        "agentId": "agent-pan-3260",
+        "pid": 3815765,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T00:47:48.233Z",
+        "itemId": "chip-internal-default",
+        "outcome": "completed",
+        "reason": "Added MarkdownOpenTarget/getMarkdownOpenTarget/setMarkdownOpenTarget to editorPreferences.ts (localStorage key overdeck:markdown-open-target, default 'internal', separate from overdeck:last-editor). MarkdownFileLink.tsx: added isMarkdownPath (md/mdx/markdown via existing extensionOfPath), useStageDeck() consumption, and a new handleMarkdownClick left-click path — 'internal' target + deck present opens/focuses the editor pane via openOrFocusEditorPane; 'internal' + no deck falls back to the existing handleOpen() external flow; a persisted external EditorId target launches that editor directly via openWithExternalEditor. Non-markdown chips are untouched (still always handleOpen()). Right-click menu is untouched here — that's chip-context-menu's job. 5 new tests (internal-default opens pane + no shellOpenInEditor call, the flywheel-brief repo-root/no-issueId case, persisted external target launches externally, null-deck fallback, non-markdown chips stay external even inside a deck) plus all 14 pre-existing tests pass (19 total). Root typecheck clean.",
+        "releasedAt": "2026-07-29T00:51:55.389Z"
       }
     ],
     "statusReasons": {
@@ -151,6 +154,10 @@
       "editor-pane": {
         "reason": "Added EditorPane.tsx (paneType='editor') and wired it into Stage/index.tsx's renderPane switch. Reads via readFileAtPath on mount, holds {text, mtimeMs}, Edit textarea + Preview (MarkdownTab) sub-tabs styled like DocsPane. Save disabled when clean, bound to click and Ctrl/Cmd+S, sends writeFileAtPath with the last-read expectedMtimeMs. WRITE_CONFLICT shows a banner with Reload-from-disk (re-reads, discards draft) and Overwrite (resends without expectedMtimeMs). FILE_TOO_LARGE read errors show an 'Open externally' action via the existing preferred-editor + shellOpenInEditor flow; a pane with no editorFilePath renders an explicit error state instead of crashing. 9 new EditorPane.test.tsx cases (load/preview, save+mtimeMs, Ctrl/Cmd+S, conflict banner's both actions, FILE_TOO_LARGE vs other-error states, missing-path guard, and ac5's self-heal-survival test mounting the full Stage). Full Stage suite (155 tests) and root typecheck pass clean.",
         "updatedAt": "2026-07-29T00:47:36.484Z"
+      },
+      "chip-internal-default": {
+        "reason": "Added MarkdownOpenTarget/getMarkdownOpenTarget/setMarkdownOpenTarget to editorPreferences.ts (localStorage key overdeck:markdown-open-target, default 'internal', separate from overdeck:last-editor). MarkdownFileLink.tsx: added isMarkdownPath (md/mdx/markdown via existing extensionOfPath), useStageDeck() consumption, and a new handleMarkdownClick left-click path — 'internal' target + deck present opens/focuses the editor pane via openOrFocusEditorPane; 'internal' + no deck falls back to the existing handleOpen() external flow; a persisted external EditorId target launches that editor directly via openWithExternalEditor. Non-markdown chips are untouched (still always handleOpen()). Right-click menu is untouched here — that's chip-context-menu's job. 5 new tests (internal-default opens pane + no shellOpenInEditor call, the flywheel-brief repo-root/no-issueId case, persisted external target launches externally, null-deck fallback, non-markdown chips stay external even inside a deck) plus all 14 pre-existing tests pass (19 total). Root typecheck clean.",
+        "updatedAt": "2026-07-29T00:51:55.389Z"
       }
     }
   },
@@ -173,6 +180,10 @@
     "editor-pane.editor-pane.ac3": "completed",
     "editor-pane.editor-pane.ac4": "completed",
     "editor-pane.editor-pane.ac5": "completed",
-    "chip-internal-default": "running"
+    "chip-internal-default": "completed",
+    "chip-internal-default.chip-internal-default.ac1": "completed",
+    "chip-internal-default.chip-internal-default.ac2": "completed",
+    "chip-internal-default.chip-internal-default.ac3": "completed",
+    "chip-internal-default.chip-internal-default.ac4": "completed"
   }
 }
