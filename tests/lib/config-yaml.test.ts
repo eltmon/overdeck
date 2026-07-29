@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { existsSync, writeFileSync, unlinkSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import {
@@ -62,6 +62,24 @@ models:
       expect(config.preset).toBe('premium');
       expect(config.enabledProviders.has('openai')).toBe(true);
       expect(config.enabledProviders.has('google')).toBe(false);
+    });
+
+    it('should enable quantumllama from QUANTUMLLAMA_API_KEY env (PAN-3252)', async () => {
+      const prevHome = process.env.HOME;
+      process.env.HOME = testDir;
+      process.env.QUANTUMLLAMA_API_KEY = 'ql-env-key';
+      try {
+        vi.resetModules();
+        const { loadConfigSync: loadIsolatedConfigSync } = await import('../../src/lib/config-yaml.js');
+        const { config } = loadIsolatedConfigSync();
+        expect(config.apiKeys.quantumllama).toBe('ql-env-key');
+        expect(config.enabledProviders.has('quantumllama')).toBe(true);
+      } finally {
+        delete process.env.QUANTUMLLAMA_API_KEY;
+        if (prevHome === undefined) delete process.env.HOME;
+        else process.env.HOME = prevHome;
+        vi.resetModules();
+      }
     });
 
     it.skip('should merge project config with higher precedence', () => {

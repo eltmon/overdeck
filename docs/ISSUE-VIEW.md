@@ -37,6 +37,12 @@ To add or move an issue-view section without losing an existing surface:
 
 The no-loss tests are a surface lock. The root test fixes the historical inventory, requires unique names and valid owning files, and fails when an old surface disappears. The frontend render test requires every inventory entry to have a declared density and rejects hidden section markers. A refactor is complete only when each old action, status, route, view, and affordance still has a real home.
 
+### Full-screen artifact overlays
+
+The xBRIEF expand controls stay inside the existing `DrawerPlanPanel / XBriefViewer` and `PlanMapCard` sections. They set `xbriefViewerIssueId`, which opens the globally mounted `XBriefFullscreen` overlay above the current issue surface. The overlay is an interaction layer, not another density section, so it does not belong in `ISSUE_VIEW_INVENTORY` or `DENSITY_SECTIONS`.
+
+The tasks and PRD resource chips follow the same global-mount pattern with their own store fields. Keep the originating chip or expand control inside its protected section, and keep overlay hosts beside `IssueDrawer` in `App.tsx`.
+
 ## Issue action registry contract
 
 Every issue-action surface renders from the single executable registry in `src/dashboard/frontend/src/lib/issueActions.ts`. Surfaces declare only their presentation: `grouped-panel` for the cockpit popover, `grouped-context` for right-click menus, `primary-strip` for phase-primary buttons with grouped overflow, `overflow-only` where only the grouped menu is shown, and pinned slots for declared registry actions or React controls such as the drawer merge button. Action identity, availability, grouping, ordering, descriptions, confirmation, and invocation remain registry-owned.

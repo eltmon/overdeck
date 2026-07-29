@@ -5,6 +5,7 @@ import { PLANNED_BACKLOG_SPEC_ONLY_REASON } from '../../../../../src/lib/pipelin
 
 const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
+  findDraftPrd: vi.fn(),
   findSpecByIssue: vi.fn(),
   getPipelineMembershipForProjects: vi.fn(),
   membershipSnapshotResults: [] as Array<{ project: { name: string; path: string }; memberships: unknown[] }>,
@@ -98,6 +99,10 @@ vi.mock('../../../../../src/lib/pan-dir/specs.js', () => ({
   findSpecByIssue: mocks.findSpecByIssue,
 }));
 
+vi.mock('../../../../../src/lib/prd-locations.js', () => ({
+  findDraftPrd: mocks.findDraftPrd,
+}));
+
 vi.mock('../../../../../src/dashboard/server/services/issue-service-singleton.js', () => ({
   getSharedIssueService: vi.fn(async () => mocks.issueService),
 }));
@@ -146,6 +151,7 @@ beforeEach(() => {
   mocks.openPullRequests = [];
   mocks.readdir.mockResolvedValue([]);
   mocks.stat.mockRejectedValue(new Error('no such file'));
+  mocks.findDraftPrd.mockReturnValue(Effect.succeed(null));
   mocks.findSpecByIssue.mockReturnValue(Effect.fail('no spec'));
   mocks.getPipelineMembershipForProjects.mockResolvedValue([]);
   mocks.membershipSnapshotResults = [];
@@ -761,6 +767,40 @@ describe('resource-discovery conversation signal', () => {
     const discovered = await discoverResourceAllocatedIssues();
 
     expect(discovered).toEqual([]);
+  });
+});
+
+describe('resource-discovery PRD signal', () => {
+  beforeEach(() => {
+    resetResourceAllocatedIssuesCacheForTests();
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9004', title: 'PRD issue', state: 'open', rawTrackerState: 'OPEN' },
+    ]);
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([membership('PAN-9004', 'planned')]);
+  });
+
+  it('adds the canonical PRD source and detail flag when a draft exists', async () => {
+    mocks.findDraftPrd.mockReturnValue(Effect.succeed({
+      path: '/state/drafts/PAN-9004.md',
+      format: 'pan-draft',
+      status: 'draft',
+    }));
+
+    const discovered = await discoverResourceAllocatedIssues();
+    const issue = discovered.find((entry) => entry.issueId === 'PAN-9004');
+
+    expect(issue?.resourceSources).toEqual(expect.arrayContaining(['tracker', 'prd']));
+    expect(issue?.resourceDetails.hasPrd).toBe(true);
+    expect(issue?.hasPrd).toBe(true);
+  });
+
+  it('omits the PRD source and reports false when no draft exists', async () => {
+    const discovered = await discoverResourceAllocatedIssues();
+    const issue = discovered.find((entry) => entry.issueId === 'PAN-9004');
+
+    expect(issue?.resourceSources).toContain('tracker');
+    expect(issue?.resourceSources).not.toContain('prd');
+    expect(issue?.resourceDetails.hasPrd).toBe(false);
   });
 });
 

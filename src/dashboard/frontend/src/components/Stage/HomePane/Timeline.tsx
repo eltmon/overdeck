@@ -78,7 +78,16 @@ function providerForConversation(conversation: TimelineConversation): string {
   return harness === 'ohmypi' || harness === 'pi' ? 'openrouter' : 'openai';
 }
 
-function friendlyModelName(model: string): string {
+const QL_MODEL_NAMES: Record<string, string> = {
+  'ql-reason-70b': 'QL Reason 70B',
+  'ql-swift-8b': 'QL Swift 8B',
+  'ql-nano-1b': 'QL Nano 1B',
+};
+
+export function friendlyModelName(model: string): string {
+  // Exact-match guard for the QuantumLlama benchmark provider (PAN-3252) — the
+  // generic heuristic would render 'Ql Reason 70b'.
+  if (QL_MODEL_NAMES[model]) return QL_MODEL_NAMES[model];
   return model
     .replace(/-20\d{6}$/, '')
     .replace(/-/g, ' ')

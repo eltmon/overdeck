@@ -197,6 +197,7 @@ KIMI_API_KEY="sk-kimi-..."
 OPENAI_API_KEY="sk-..."
 GOOGLE_AI_KEY="AIza..."
 ZAI_API_KEY="..."
+QUANTUMLLAMA_API_KEY="ql-..."  # fictional benchmark provider, no live endpoint
 ```
 
 These keys are used by both the Claude Code harness (routed through Anthropic-compatible endpoints) and the Pi harness (bridged as native provider env vars automatically).
