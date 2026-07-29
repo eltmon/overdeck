@@ -134,15 +134,7 @@
       "timestamp": "2026-07-29T04:31:26.014Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T04:31:25Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1837\n\n# Code Review — PAN-1837\n\n## Verdict: CHANGES REQUESTED\n\nReviewed `feature/pan-1837` at HEAD `aff1bd008a4920ceb373869e5ee301fc64332bb7` across correctness, security, requirements, and performance. The seventh-cycle rework replaces the process-local mutex with an atomic per-bucket filesystem lock, proves cross-process exclusion with real child processes, and makes fresh work/strike spawn, restart, and recovery fail closed when native session capture fails. Dashboard conversation launch still does not follow that contract, however: it ignores a null capture result and swallows capture exceptions, leaving a running native Kimi conversation without an owned session ID.\n\n## Blocking finding\n\n### P1 — Fresh dashboard Kimi conversations still fail open when session capture fails\n\n**Location:** `src/lib/overdeck/conversation-runtime.ts:822-848`\n\n`spawnConversationSession()` correctly holds the cross-process per-bucket lock while launching and awaiting `waitForNewKimiSessionAsync()`, but lines 827–832 treat identity capture as optional: a `null` result is ignored and every thrown error is swallowed. The function then releases the lock, configures the tmux session as a normal persistent conversation, and returns success while no `kimi-session-id` pointer exists for that Overdeck conversation identity.\n\nThis recreates the ownership failure the seventh-cycle change now closes in work spawn and recovery. Transcript and cost resolution cannot prove which native Kimi session belongs to the conversation and falls back to the newest session in the shared cwd bucket. A later work agent, recovery launch, or second conversation can therefore be rendered under the wrong conversation identity, exposing that session's prompts, main-wire transcript, usage, and cost in another conversation.\n\nThis violates FR-5/FR-7, the main-wire-only ownership requirement, and the acceptance criterion that every supported fresh launch identify its own native session. Require a non-null capture result, propagate capture errors, tear down the newly launched conversation session, and persist the resulting `spawnError` instead of presenting the conversation as healthy. Add a conversation-level regression test proving both timeout and thrown capture failures leave no running healthy conversation and no newest-session fallback.\n\n## Non-blocking finding\n\n### P2 — An ownerless or corrupt filesystem lock cannot be reclaimed\n\n**Locations:** `src/lib/runtimes/kimi-code.ts:305-343`, `src/lib/pan-dir/fs-lock.ts:42-49`\n\nThe lock's stale-owner recovery depends exclusively on a readable positive PID in `owner.json`. `readKimiCaptureLockOwner()` returns `{}` for a missing, partially written, or corrupt owner file, and `isPidDead(undefined)` deliberately returns false. If a process dies after atomic `mkdir` succeeds but before `owner.json` is durably written, every future launch for that bucket waits 90 seconds and fails, repeatedly, because the orphaned directory is never considered stale. PID reuse can produce the same long-lived false ownership.\n\nUse an ownership record with an atomic write/rename and a bounded age fallback derived from trustworthy lock metadata, then test missing/corrupt-owner recovery. Any reclamation must preserve the current per-bucket mutual-exclusion guarantee and avoid deleting a lock held by a live process.\n\n## Security review\n\nNo command injection, credential exposure, authentication bypass, destructive JSONL behavior, duplicate Kimi prerequisite, `execSync`, synchronous tmux delivery, or ACP regression survived review. Model and session arguments remain shell-quoted, the binary resolves through the canonical resolver, lock paths are hash-derived beneath Overdeck's lock root, and lock directories use mode `0700`. The P1 defect is security-relevant because identity misattribution can display one same-cwd session's prompts, transcript, token usage, and cost under another conversation.\n\n## Requirements and no-loss review\n\nThe canonical harness union, runtime behavior matrix, resolver, policy gate, launchers, provider environment, authentication, parser/runtime, context layers, prerequisite surface, dashboard pickers, artifact provenance, planning, specialist roles, work/strike/recovery paths, conversation paths, resume behavior, and documentation were covered across this and the preceding review cycles. The cross-process lock and fail-closed agent launch changes satisfy the previous cycle's blockers, but dashboard conversation identity ownership remains incomplete, so the feature does not yet meet its end-to-end native session continuity and exclusive main-wire association requirements.\n\n## Performance review\n\nThe capture lock uses asynchronous filesystem operations and polling, and its hash key preserves parallel launches for different Kimi cwd buckets. The explicit real-process test is isolated in an excluded `@slow` file, so it does not add a one-second wall-clock delay to the default suite. No event-loop-blocking or algorithmic performance blocker survived review. The P2 orphan case is a reliability and latency issue because it imposes the full 90-second wait on every launch for the affected bucket.\n\n## Verification and coverage\n\nReviewed the highest-risk launch/capture delta first, then the recovery tests, runtime lock tests, validators, and surrounding conversation/transcript ownership paths. The real cross-process slow test passed (1 file, 1 test), and the focused Kimi regression set passed (5 files, 40 tests). `npm run typecheck`, `npm run lint:file-size`, and `git diff --check origin/main...HEAD` passed. The first local `npm run lint` process exited 137 during the CLI build; investigation showed 33 GiB available memory and zero memory PSI, and an uncompressed rerun passed with exit 0. GitHub build, lint, smoke, state-plane, prompt-trailer, flake-lane, CodeRabbit, and `overdeck/test` status checks were green at the reviewed SHA; the main GitHub test job was still in progress at the last observation. The local branch and PR head both equal the reviewed SHA, PR #3255 is mergeable, and the worktree is clean. No test role was queued.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1837/.pan/review/agent-pan-1837-review-aff1bd00/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1837 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -357,10 +349,10 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T04:37:18.167Z",
+  "updated": "2026-07-29T04:45:32.742Z",
   "pipeline": {
     "issueId": "PAN-1837",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -368,7 +360,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T04:37:17.970Z",
+    "updatedAt": "2026-07-29T04:45:32.430Z",
     "conflictsSince": {
       "sha": "3e6036dbd60fcbcd83d9577006279e03103cc0e7",
       "detectedAt": "2026-07-29T04:37:09.427Z",
@@ -378,7 +370,6 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
-    "reviewedAtCommit": "aff1bd008a4920ceb373869e5ee301fc64332bb7",
     "lastVerifiedCommit": "aff1bd008a4920ceb373869e5ee301fc64332bb7",
     "reviewSpawnedAt": "2026-07-29T04:25:45.330Z"
   },
@@ -403,10 +394,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 4368,
-            "output": 1008977,
-            "cacheRead": 1168356123,
-            "cacheWrite": 6399535
+            "input": 4444,
+            "output": 1031928,
+            "cacheRead": 1203058960,
+            "cacheWrite": 6440461
           }
         }
       },
@@ -424,15 +415,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 4368,
-          "output": 1008977,
-          "cacheRead": 1168356123,
-          "cacheWrite": 6399535
+          "input": 4444,
+          "output": 1031928,
+          "cacheRead": 1203058960,
+          "cacheWrite": 6440461
         }
       },
       "costAtCloseOut": {
-        "usd": 439.344355,
-        "pricingAsOf": "2026-07-29T04:37:18.145Z"
+        "usd": 446.616901,
+        "pricingAsOf": "2026-07-29T04:45:32.454Z"
       }
     },
     "merges": [
