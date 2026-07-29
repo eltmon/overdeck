@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T00:33:02.085Z",
+  "updated": "2026-07-29T00:38:05.167Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "server-file-door": {
-        "writerId": "agent-pan-3260",
-        "agentId": "agent-pan-3260",
-        "pid": 2635428,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T00:33:02.085Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3260",
@@ -111,6 +103,17 @@
         "outcome": "completed",
         "reason": "Created StageDeckContext.tsx (useStageDeck hook + StageDeckProvider) and implemented openOrFocusEditorPane in Stage/index.tsx mirroring openIssue's find-or-create dedupe pattern, wrapping Stage's full render output in the provider. Also added the 'editor' PaneType + editorFilePath field to panesStore.ts and the required PANE_LABELS/PANE_ICONS entries (PaneBar.tsx) since openOrFocusEditorPane needs the pane type to type-check; the editor-pane task will build the actual EditorPane component/renderPane case. Existing Stage.test.tsx and PaneBar.test.tsx (17 tests) pass; full root typecheck clean.",
         "releasedAt": "2026-07-29T00:32:50.658Z"
+      },
+      {
+        "writerId": "agent-pan-3260",
+        "agentId": "agent-pan-3260",
+        "pid": 2635428,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T00:33:02.085Z",
+        "itemId": "server-file-door",
+        "outcome": "completed",
+        "reason": "Added src/dashboard/server/services/file-at-path.ts (readFileAtPath/writeFileAtPath) modeled on read-workspace-file.ts's PanRpcError/Effect.tryPromise pattern: absolute-path + markdown-extension + realpath-containment validation against listProjectsSync() roots + OVERDECK_HOME, 1 MiB error-not-truncate cap, and expectedMtimeMs optimistic concurrency (WRITE_CONFLICT on mismatch, nothing written). Wired both into ws-rpc.ts next to readWorkspaceFile. Added file-at-path.test.ts (12 cases: containment accept/reject, symlink escape, extension gate, oversize, conflict, read/write round-trip, write never creates a new file) — all pass. Root typecheck clean. Had to add a file-size-allowlist.txt entry for ws-rpc.ts (grew 9 lines past its origin/main count from the two new handler registrations) in a separate commit, since the pre-push file-size guard blocks unaudited growth.",
+        "releasedAt": "2026-07-29T00:38:05.167Z"
       }
     ],
     "statusReasons": {
@@ -121,6 +124,10 @@
       "stage-deck-context": {
         "reason": "Created StageDeckContext.tsx (useStageDeck hook + StageDeckProvider) and implemented openOrFocusEditorPane in Stage/index.tsx mirroring openIssue's find-or-create dedupe pattern, wrapping Stage's full render output in the provider. Also added the 'editor' PaneType + editorFilePath field to panesStore.ts and the required PANE_LABELS/PANE_ICONS entries (PaneBar.tsx) since openOrFocusEditorPane needs the pane type to type-check; the editor-pane task will build the actual EditorPane component/renderPane case. Existing Stage.test.tsx and PaneBar.test.tsx (17 tests) pass; full root typecheck clean.",
         "updatedAt": "2026-07-29T00:32:50.658Z"
+      },
+      "server-file-door": {
+        "reason": "Added src/dashboard/server/services/file-at-path.ts (readFileAtPath/writeFileAtPath) modeled on read-workspace-file.ts's PanRpcError/Effect.tryPromise pattern: absolute-path + markdown-extension + realpath-containment validation against listProjectsSync() roots + OVERDECK_HOME, 1 MiB error-not-truncate cap, and expectedMtimeMs optimistic concurrency (WRITE_CONFLICT on mismatch, nothing written). Wired both into ws-rpc.ts next to readWorkspaceFile. Added file-at-path.test.ts (12 cases: containment accept/reject, symlink escape, extension gate, oversize, conflict, read/write round-trip, write never creates a new file) — all pass. Root typecheck clean. Had to add a file-size-allowlist.txt entry for ws-rpc.ts (grew 9 lines past its origin/main count from the two new handler registrations) in a separate commit, since the pre-push file-size guard blocks unaudited growth.",
+        "updatedAt": "2026-07-29T00:38:05.167Z"
       }
     }
   },
@@ -132,6 +139,10 @@
     "stage-deck-context": "completed",
     "stage-deck-context.stage-deck-context.ac1": "completed",
     "stage-deck-context.stage-deck-context.ac2": "completed",
-    "server-file-door": "running"
+    "server-file-door": "completed",
+    "server-file-door.server-file-door.ac1": "completed",
+    "server-file-door.server-file-door.ac2": "completed",
+    "server-file-door.server-file-door.ac3": "completed",
+    "server-file-door.server-file-door.ac4": "completed"
   }
 }
