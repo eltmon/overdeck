@@ -171,6 +171,13 @@ describe('XBriefViewer: tab switching', () => {
     expect(screen.getByText(/test-1/)).toBeTruthy(); // JSON contains plan.id
   });
 
+  it('accepts a controlled tab while hiding its internal tab bar', () => {
+    render(<XBriefViewer doc={makeDoc()} activeTab="raw" showTabBar={false} />);
+
+    expect(screen.queryByRole('tab')).toBeNull();
+    expect(screen.getByText(/test-1/)).toBeTruthy();
+  });
+
   it('switches to DAG tab', () => {
     render(<XBriefViewer doc={makeDoc()} initialTab="list" />);
     const dagTab = screen.getByRole('tab', { name: /dag/i });

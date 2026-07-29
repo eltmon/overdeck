@@ -12,14 +12,18 @@ vi.mock('../CommandDeck/ZoneCOverviewTabs/queries', () => ({
 }));
 
 vi.mock('./XBriefViewer', () => ({
-  XBriefViewer: ({ doc, onInspectionPolicyChange }: {
+  XBriefViewer: ({ doc, activeTab, showTabBar, onInspectionPolicyChange }: {
     doc: XBriefDocument | null;
+    activeTab?: string;
+    showTabBar?: boolean;
     onInspectionPolicyChange?: (policy: XBriefInspectionPolicy) => void;
   }) => (
-    <div data-testid="xbrief-viewer" data-plan-id={doc?.plan.id ?? ''}>
-      <button role="tab" type="button">List</button>
-      <button role="tab" type="button">DAG</button>
-      <button role="tab" type="button">Raw JSON</button>
+    <div
+      data-testid="xbrief-viewer"
+      data-plan-id={doc?.plan.id ?? ''}
+      data-active-tab={activeTab}
+      data-show-tab-bar={String(showTabBar)}
+    >
       <button type="button" onClick={() => onInspectionPolicyChange?.('never')}>
         Disable inspection
       </button>
@@ -36,8 +40,13 @@ const doc: XBriefDocument = {
     id: 'pan-3231',
     title: 'Artifact viewers',
     status: 'running',
-    items: [],
-    edges: [],
+    items: [
+      { id: 'done', title: 'Done', status: 'completed' },
+      { id: 'running', title: 'Running', status: 'running' },
+      { id: 'ready', title: 'Ready', status: 'pending' },
+      { id: 'waiting', title: 'Waiting', status: 'pending' },
+    ],
+    edges: [{ from: 'running', to: 'waiting', type: 'blocks' }],
   },
 };
 
@@ -78,13 +87,26 @@ describe('XBriefFullscreen', () => {
 
     renderViewer();
 
-    const dialog = screen.getByRole('dialog', { name: 'Full-screen xBRIEF' });
+    const dialog = screen.getByRole('dialog', { name: 'PAN-3231 Artifact viewers' });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(dialog).toHaveFocus();
+    expect(screen.getByText('xBRIEF · active plan')).toBeInTheDocument();
+    expect(screen.getByText('PAN-3231')).toBeInTheDocument();
+    expect(screen.getByText('Artifact viewers')).toBeInTheDocument();
     expect(screen.getByTestId('xbrief-viewer')).toHaveAttribute('data-plan-id', 'pan-3231');
+    expect(screen.getByTestId('xbrief-viewer')).toHaveAttribute('data-show-tab-bar', 'false');
     expect(screen.getByRole('tab', { name: 'List' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'DAG' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Raw JSON' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Raw' })).toBeInTheDocument();
+    expect(screen.getByText('1 / 4')).toBeInTheDocument();
+    expect(screen.getByText(/happening now/)).toHaveTextContent('1 happening now');
+    expect(screen.getByText(/ready/)).toHaveTextContent('1 ready');
+    expect(screen.getByText(/waiting on edges/)).toHaveTextContent('1 waiting on edges');
+    expect(screen.getByText(/execution lanes/)).toHaveTextContent('2 execution lanes');
+    expect(screen.getByText('esc')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'DAG' }));
+    expect(screen.getByTestId('xbrief-viewer')).toHaveAttribute('data-active-tab', 'dag');
     expect(useWorkspacePlanQuery).toHaveBeenCalledWith('PAN-3231', { enabled: true });
   });
 
@@ -92,7 +114,7 @@ describe('XBriefFullscreen', () => {
     useDashboardStore.getState().openXbriefViewer('PAN-3231');
     const firstRender = renderViewer();
 
-    fireEvent.click(screen.getByRole('dialog', { name: 'Full-screen xBRIEF' }));
+    fireEvent.click(screen.getByRole('dialog', { name: 'PAN-3231 Artifact viewers' }));
     expect(useDashboardStore.getState().xbriefViewerIssueId).toBe('PAN-3231');
 
     fireEvent.keyDown(window, { key: 'Escape' });
