@@ -287,7 +287,7 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T00:57:12.989Z",
+  "updated": "2026-07-29T00:57:18.553Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "blocked",
@@ -298,7 +298,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T00:57:12.221Z",
+    "updatedAt": "2026-07-29T00:57:18.534Z",
     "reviewNotes": "The new Kimi conversation capture races concurrent same-cwd launches, fresh restart validates only after wiping state, and planning/conversation/recovery no-loss paths still drop kimi-code.",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
@@ -309,6 +309,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
+    "reviewedAtCommit": "7f5c4b6d87b811f9621fbeb0fa46d433624b2641",
     "reviewSpawnedAt": "2026-07-29T00:50:58.299Z"
   },
   "closeOut": {
@@ -361,7 +362,7 @@
       },
       "costAtCloseOut": {
         "usd": 260.968215,
-        "pricingAsOf": "2026-07-29T00:57:12.257Z"
+        "pricingAsOf": "2026-07-29T00:57:18.545Z"
       }
     },
     "merges": [
