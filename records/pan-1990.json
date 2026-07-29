@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T03:40:16.402Z",
+  "updated": "2026-07-29T03:54:07.320Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
     }
   ],
   "tasks": {
-    "sequence": 41,
-    "claims": {
-      "memory-backfill": {
-        "writerId": "agent-pan-1990",
-        "agentId": "agent-pan-1990",
-        "pid": 4161269,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T03:40:16.401Z"
-      }
-    },
+    "sequence": 42,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -295,6 +287,16 @@
         "itemId": "memory-state-mirror",
         "outcome": "completed",
         "releasedAt": "2026-07-29T03:40:06.566Z"
+      },
+      {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 4161269,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T03:40:16.401Z",
+        "itemId": "memory-backfill",
+        "outcome": "completed",
+        "releasedAt": "2026-07-29T03:54:07.319Z"
       }
     ],
     "statusReasons": {
@@ -386,6 +388,10 @@
     "memory-state-mirror.memory-state-mirror.ac1": "completed",
     "memory-state-mirror.memory-state-mirror.ac2": "completed",
     "memory-state-mirror.memory-state-mirror.ac3": "completed",
-    "memory-backfill": "running"
+    "memory-backfill": "completed",
+    "memory-backfill.memory-backfill.ac1": "completed",
+    "memory-backfill.memory-backfill.ac2": "completed",
+    "memory-backfill.memory-backfill.ac3": "completed",
+    "memory-backfill.memory-backfill.ac4": "completed"
   }
 }
