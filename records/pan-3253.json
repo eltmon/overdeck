@@ -109,7 +109,7 @@
     "recordedAt": "2026-07-29T07:45:29.088Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T08:29:39.138Z",
+  "updated": "2026-07-29T08:29:44.746Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "blocked",
@@ -119,9 +119,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T07:47:05.835Z",
-    "updatedAt": "2026-07-29T08:29:38.370Z",
+    "updatedAt": "2026-07-29T08:29:44.734Z",
     "reviewNotes": "Reviewed HEAD b0bbd24b is not on PR #3279; canonical getHistorySync still loads the full forensic table before slicing, and the raw-table/canonical-hydration plus appendAsync/appendOnce regressions are not committed at this HEAD.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
+    "reviewedAtCommit": "26fa1a17a368b0cadf6507e4d903cb990073e923",
     "lastVerifiedCommit": "58b23fbb019a2efab08d55a90124d0b4615a0b9f",
     "reviewSpawnedAt": "2026-07-29T08:20:42.865Z",
     "scopeDrift": {
@@ -199,7 +200,7 @@
       },
       "costAtCloseOut": {
         "usd": 69.632413,
-        "pricingAsOf": "2026-07-29T08:29:38.391Z"
+        "pricingAsOf": "2026-07-29T08:29:44.740Z"
       }
     },
     "merges": [
