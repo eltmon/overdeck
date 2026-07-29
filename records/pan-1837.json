@@ -304,10 +304,10 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T03:25:52.441Z",
+  "updated": "2026-07-29T03:25:55.949Z",
   "pipeline": {
     "issueId": "PAN-1837",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -315,8 +315,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T03:25:52.400Z",
-    "reviewNotes": "Review blocked: normal kimi-code resume uses Claude-only readiness/transcript confirmation and drops continue prompts; artifact/context validators still omit kimi-code; reviewed merge SHA a913491195 is not pushed to PR #3255. See .pan/review/agent-pan-1837-review-a9134911/review.md.",
+    "updatedAt": "2026-07-29T03:25:55.904Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
       "detectedAt": "2026-07-29T00:03:35.975Z",
@@ -380,7 +380,7 @@
       },
       "costAtCloseOut": {
         "usd": 356.287282,
-        "pricingAsOf": "2026-07-29T03:25:52.429Z"
+        "pricingAsOf": "2026-07-29T03:25:55.930Z"
       }
     },
     "merges": [
