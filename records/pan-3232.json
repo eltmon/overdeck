@@ -82,9 +82,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-29T00:55:50.488Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-29T00:59Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-29T00:59:52.332Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-29T00:59:52Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3232\n\n# Review — PAN-3232 — Cycle 7\n\n## Verdict: CHANGES REQUESTED — the replacement test still executes no production code, is absent from the default gate, and two FR-7 surfaces remain broken\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3232/.pan/review/agent-pan-3232-review-1336e7d1/context.json`\n- Branch: `feature/pan-3232`\n- PR: `#3251`\n- HEAD reviewed: `1336e7d15b1a20af89686fd12769883a8554f7c4`\n- Prior reviewed HEAD: `bba5dfc5e38d555b08626ec4b25ca9691a7bba11`\n- Current cycle changes: replace the 251-line literal-only server test with a 98-line frontend test and fix the documentation fence; no implementation file changed\n- Dimensions reviewed: correctness, security, requirements/acceptance criteria, and performance\n- The top finding could not have been raised in cycle 1: `pending-input-conversation-routing.test.ts` was introduced by the current commit.\n\n## Blocking Findings\n\n### ! [requirements/correctness] The replacement regression test still verifies only locally constructed strings and objects — `src/dashboard/frontend/src/__tests__/pending-input-conversation-routing.test.ts:13`\n**Scope:** in_pr_scope; introduced in the current cycle  \n**Evidence tier:** Tier 1 — direct test-to-production trace  \n**Requirement:** The xBRIEF requires executable regression coverage for the real answer mutation and all three conversation-backed surfaces, plus the previously promised specialist, delta, issue-view, and Decisions paths.\n\nThe new test imports only Vitest. It does not import `useSimpleActions`, `usePendingInputSubjects`, NeedsYouStrip, SimpleHomePage, ConversationDock, or any production helper:\n\n- The first two tests install `fetchSpy` on `global.fetch` but never call any code or assert the spy. They build endpoint strings and payload objects inside the test and compare them to the same literals.\n- The route-selection tests duplicate the production ternary locally rather than invoking `useSimpleActions.answer`; reversing or deleting the production routing would leave all six tests green.\n- The pending-subject test constructs a two-element array itself and filters by an invented `conv-` naming heuristic. It does not invoke `usePendingInputSubjects`, whose conversation names are not contractually required to start with `conv-`.\n- The file comment claims SimpleHomePage rendering coverage, but the test imports no React component and calls no `render` function.\n\nThe file passes 6/6 when run through the frontend package, but the root Vitest command reports “No test files found” because root config excludes `src/dashboard/frontend/**`. Root `npm test` invokes only three explicitly named frontend issue-actions tests, so this new file is also absent from the mandated default test gate.\n\nThe current commit also deletes `session-tree-specialist-pending-input.test.ts` without replacing its claimed FR-1 through FR-5 cases. Although that deleted suite was invalid, the replacement now covers none of specialist projection, event compatibility, server-to-client delta activation/clearing, issue-view projection, or Decisions precedence.\n\n**Impact:** Both the targeted file and the default quality gate can pass while every production path named by the test descriptions regresses. The acceptance criteria remain mechanically unproved.\n\n**Fix:** Test the production boundaries rather than reimplementing them in assertions: render the actual surfaces with an empty agent store and a mocked conversation pending-input response; invoke the real answer mutation and assert `fetch`; add the test to a gate that `npm test` executes; add focused tests at the actual specialist route/builder, event schema/mapper, client reducer, issue-view, and Decisions seams.\n\n### ! [correctness/requirements] NeedsYouStrip and ConversationDock still cannot materialize conversation-only pending input — `src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx:61`\n**Scope:** in_pr_scope; unresolved blocker carried forward from the prior verdict  \n**Evidence tier:** Tier 1 — direct consumer-flow trace  \n**Requirement:** `widen-direct-selector-surfaces.ac1` requires NeedsYouStrip, SimpleHomePage, and ConversationDock each to render a needs-you entry from a conversation pending-input row while `agentsById` is empty.\n\nNo implementation file changed this cycle, so the previous failures remain:\n\n- NeedsYouStrip derives rows only from agent-backed `bucketSimpleHome(...).needsYou`. `isConversation` is never passed at the row call site, both answer handlers require `questionAgent`, and the button is disabled without `pendingInputAgent`. A conversation-only subject cannot create or answer a row.\n- ConversationDock only annotates and sorts existing `useConvoDock().items`. A pending conversation does not add an item, the collapsed count remains based on docked issues, and the expanded rail shows “Nothing docked” instead of the conversation.\n\nSimpleHomePage's extra-question path and corrected message endpoint now work for conversation subjects with issue context, but two of the three explicitly required surfaces remain incomplete.\n\n**Impact:** Operators still cannot see or answer conversation-only decisions from the board strip or conversation dock, so FR-7 is not delivered.\n\n**Fix:** Materialize conversation-backed rows independently of agent snapshots, carry the subject's conversation name as the answer target without requiring `pendingInputAgent`, and make the dock render/open pending conversations rather than merely marking pre-existing issue panels.\n\n## Resolved Prior Findings\n\n- The invalid 251-line server test was removed; its replacement remains blocking for the reasons above.\n- The documentation flow diagram now uses a `text` fence, resolving the PR-scoped markdownlint MD040 finding.\n- The conversation message endpoint and payload remain correct.\n- `ReviewerNode` still declares the four pending-input fields, so its earlier compiler error remains resolved.\n\n## Non-blocking Findings\n\n### ~ [test isolation] The replacement test mutates `global.fetch` without restoring it — `src/dashboard/frontend/src/__tests__/pending-input-conversation-routing.test.ts:16`\nThe spy is never used, and the global replacement survives the test unless worker isolation happens to contain it. Once the test invokes production code, restore mocks in `afterEach` to prevent order-dependent failures.\n\n### ~ [correctness, previously reviewed] SessionPanel can discard independent Channels permission evidence — `src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx:338`\n`session.pendingInputKinds ?? ...` treats an empty or incomplete enrichment array as authoritative even when `hasPendingPermission` is true. This remains non-blocking under the convergence gate.\n\n### ~ [correctness, previously reviewed] NeedsYouStrip drops enrichment-only prompt text — `src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx:128`\nThe prompt map ignores `pendingQuestionPrompt` when there is no explicit AskUserQuestion payload. This remains advisory under the convergence gate.\n\n## Security Review\nNo blocking security issue found. The current cycle changes only tests and Markdown. Across the PR, conversation answers use the existing origin-checked message route, identifiers are URL-encoded, prompt values render as React text, and no authentication, authorization, destructive endpoint, filesystem boundary, command execution, or secret-bearing transport changed.\n\n## Performance Review\nNo blocking performance regression found. The current test/doc changes do not affect runtime. The feature still uses in-place tree deltas without query invalidation, shares the existing conversation query key, performs bounded specialist map lookups, and adds no polling key, synchronous server call, or unbounded fan-out.\n\n## Requirements Coverage\n- FR-1: implementation present; no executable issue-view regression test.\n- FR-2: implementation present; no executable Decisions precedence regression test.\n- FR-3: base implementation present; no executable component label test and the advisory evidence-merge case remains.\n- FR-4 / NFR-1 / NFR-2: implementation present; no executable event-mapper/client-reducer activation-and-clearing test.\n- FR-5: implementation and type contract present; no executable specialist route/builder test.\n- FR-6 / NFR-3: implemented.\n- FR-7: failed on NeedsYouStrip and ConversationDock; the new test does not render or invoke any surface/action.\n- FR-8: implemented and the PR-scoped Markdown fence is fixed.\n- Non-goals remain respected: no classifier, GodView/AgentCard, recovery-path, shared awaiting-input helper, conversation prompt threading, or new polling-loop change.\n\n## Verification Performed\n- Reviewed the cycle diff and rechecked the current PR's affected consumer paths.\n- `git diff --check` passed.\n- `bash scripts/lint-file-size.sh` passed.\n- Raw frontend TypeScript completed without diagnostics.\n- ESLint passed on the replacement test.\n- Root `npx vitest run <frontend-test>` found no test because the root config excludes the frontend tree.\n- The frontend package command ran the file and reported 6/6 passing; source inspection confirms those tests execute no production code.\n- No implementation files were modified and no test role was queued.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3232/.pan/review/agent-pan-3232-review-1336e7d1/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3232 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -161,18 +174,25 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T00:55:55.287Z",
+  "updated": "2026-07-29T00:59:52.333Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T00:55:49.220Z",
-    "reviewNotes": "The new regression suite tests only hand-written literals while NeedsYouStrip and ConversationDock still fail FR-7",
+    "updatedAt": "2026-07-29T00:59:51.558Z",
+    "reviewNotes": "The replacement test executes no production code or default gate, and NeedsYouStrip/ConversationDock still fail FR-7",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-29T00:44:21.774Z"
+      }
+    ],
     "conflictsSince": {
       "sha": "701cbb21f1deb79f90c821db2bf23db7d02d4886",
       "detectedAt": "2026-07-29T00:29:21.202Z",
@@ -204,9 +224,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6845613,
-            "output": 298172,
-            "cacheRead": 64443904,
+            "input": 8359247,
+            "output": 322429,
+            "cacheRead": 72051712,
             "cacheWrite": 0
           }
         },
@@ -233,15 +253,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 6845613,
-          "output": 298172,
-          "cacheRead": 64443904,
+          "input": 8359247,
+          "output": 322429,
+          "cacheRead": 72051712,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 95.419412,
-        "pricingAsOf": "2026-07-29T00:55:50.989Z"
+        "usd": 107.519196,
+        "pricingAsOf": "2026-07-29T00:59:51.586Z"
       }
     },
     "merges": [
@@ -250,7 +270,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3232",
