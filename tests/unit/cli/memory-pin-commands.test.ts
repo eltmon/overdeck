@@ -50,6 +50,30 @@ describe('pan memory pin/unpin (PAN-1990)', () => {
     expect(listPinnedDocs('project', 'overdeck')).toHaveLength(0);
   });
 
+  it('refuses to pin an absolute path outside the project root (security)', async () => {
+    const exitError = new Error('process exited');
+    vi.spyOn(process, 'exit').mockImplementation(() => { throw exitError; });
+
+    try {
+      await expect(memoryPinCommand('/etc/passwd', { project: 'overdeck' })).rejects.toThrow(exitError);
+    } finally {
+      vi.restoreAllMocks();
+    }
+    expect(listPinnedDocs('project', 'overdeck')).toHaveLength(0);
+  });
+
+  it('refuses to pin a relative path that traverses outside the project root (security)', async () => {
+    const exitError = new Error('process exited');
+    vi.spyOn(process, 'exit').mockImplementation(() => { throw exitError; });
+
+    try {
+      await expect(memoryPinCommand('../../../../etc/passwd', { project: 'overdeck' })).rejects.toThrow(exitError);
+    } finally {
+      vi.restoreAllMocks();
+    }
+    expect(listPinnedDocs('project', 'overdeck')).toHaveLength(0);
+  });
+
   it('exits 1 for an unregistered project key', async () => {
     const exitError = new Error('process exited');
     vi.spyOn(process, 'exit').mockImplementation(() => { throw exitError; });
@@ -68,7 +92,7 @@ describe('pan memory pin/unpin (PAN-1990)', () => {
     await memoryPinCommand('docs/WORKSPACE.md', { workspace: workspaceId });
     await memoryPinCommand('docs/PROJECT.md', { project: 'overdeck' });
 
-    deleteWorkspace(workspaceId);
+    await deleteWorkspace(workspaceId);
 
     expect(listPinnedDocs('workspace', workspaceId)).toHaveLength(0);
     expect(listPinnedDocs('project', 'overdeck').map((p) => p.docPath)).toEqual(['docs/PROJECT.md']);

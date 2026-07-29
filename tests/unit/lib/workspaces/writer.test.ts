@@ -88,7 +88,7 @@ describe('workspaces writer', () => {
     const projectId = seedProject();
     const id = await createWorkspace({ projectId, kind: 'main', name: 'main', path: '/repo/overdeck' });
 
-    expect(() => deleteWorkspace(id)).toThrow(/Cannot delete the main workspace/);
+    await expect(deleteWorkspace(id)).rejects.toThrow(/Cannot delete the main workspace/);
     expect(getWorkspaceById(id)).not.toBeNull();
   });
 
@@ -101,7 +101,7 @@ describe('workspaces writer', () => {
       VALUES ('conv-id-1', 'conv-1', 'tmux-1', 'active', '/repo/overdeck-scratch', ?, ?)
     `).run(Date.now(), id);
 
-    deleteWorkspace(id);
+    await deleteWorkspace(id);
 
     expect(getWorkspaceById(id)).toBeNull();
     const conversation = odb.raw().prepare(`SELECT name, workspace_id FROM conversations WHERE name = ?`).get('conv-1') as {
@@ -118,7 +118,7 @@ describe('workspaces writer', () => {
     await pinDoc('workspace', id, 'docs/NOTES.md');
     await pinDoc('project', projectId, 'docs/README.md');
 
-    deleteWorkspace(id);
+    await deleteWorkspace(id);
 
     expect(listPinnedDocs('workspace', id)).toHaveLength(0);
     expect(listPinnedDocs('project', projectId)).toHaveLength(1);

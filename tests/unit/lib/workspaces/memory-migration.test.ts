@@ -123,6 +123,32 @@ describe('migrateMemoryHomesToWorkspaces (PAN-1990)', () => {
     warnSpy.mockRestore();
   });
 
+  it('merges into an already-populated destination home instead of failing ENOTEMPTY (correctness/data preservation)', async () => {
+    const workspaceId = await createWorkspace({
+      projectId: 'overdeck', kind: 'issue', name: 'feature-pan-2104', path: '/repo/overdeck/workspaces/feature-pan-2104', issueId: 'PAN-2104',
+    });
+    const legacyDir = await writeLegacyIssueHome('PAN-2104', 'obs-legacy');
+
+    // A session already wrote to the workspace-uuid path before migration ran —
+    // both a same-named observations/ subdirectory AND a same-named file
+    // within it, which a flat `rename` onto the destination would reject with
+    // ENOTEMPTY.
+    const newDir = join(resolveMemoryRoot('overdeck'), workspaceId);
+    await mkdir(join(newDir, 'observations'), { recursive: true });
+    await writeFile(join(newDir, 'observations', '2026-07-28.jsonl'), '{"turn":2}\n', 'utf-8');
+    await writeFile(join(newDir, 'observations', '2026-07-29.jsonl'), '{"turn":3}\n', 'utf-8');
+
+    const result = await migrateMemoryHomesToWorkspaces();
+
+    expect(result.migrated).toBe(1);
+    expect(existsSync(legacyDir)).toBe(false);
+    // Same-named file: both sides' content survive (legacy appended after the
+    // pre-existing content), never overwritten or dropped.
+    expect(readFileSync(join(newDir, 'observations', '2026-07-28.jsonl'), 'utf-8')).toBe('{"turn":2}\n{"turn":1}\n');
+    // File that only existed at the destination is untouched.
+    expect(readFileSync(join(newDir, 'observations', '2026-07-29.jsonl'), 'utf-8')).toBe('{"turn":3}\n');
+  });
+
   it('skips a directory that already carries a metadata.json identity record', async () => {
     await createWorkspace({
       projectId: 'overdeck', kind: 'issue', name: 'feature-pan-2103', path: '/repo/overdeck/workspaces/feature-pan-2103', issueId: 'PAN-2103',

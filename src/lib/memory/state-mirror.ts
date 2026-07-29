@@ -12,6 +12,7 @@
  * mirror to; callers no-op rather than fail, since mirroring is a durability
  * convenience, not the source of truth (the memory-home file is).
  */
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -80,8 +81,17 @@ interface PinMirrorDescriptor {
   createdAt: number;
 }
 
+/**
+ * Non-blocking review fix: replacing `/` with `__` made `a/b.md` and
+ * `a__b.md` map to the same filename, so pinning one could silently overwrite
+ * or delete the other's mirror descriptor. Hashing docPath instead of
+ * transliterating it makes the filename collision-resistant regardless of
+ * what characters the path contains; docPath itself is still stored inside
+ * the JSON descriptor content for readability.
+ */
 function pinMirrorPath(scope: PinScope, scopeId: string, docPath: string): string {
-  return join('pins', `${scope}__${scopeId}__${docPath.replace(/\//g, '__')}.json`);
+  const docPathHash = createHash('sha256').update(docPath).digest('hex').slice(0, 16);
+  return join('pins', `${scope}__${scopeId}__${docPathHash}.json`);
 }
 
 export async function mirrorPin(projectId: string, scope: PinScope, scopeId: string, docPath: string, createdAt: number): Promise<void> {

@@ -13,7 +13,8 @@ cd "$(dirname "$0")/.."
 TABLES='workspaces|projects|project_targets|pinned_docs'
 
 ALLOWED=(
-  ':!src/lib/workspaces/*.ts'
+  ':!src/lib/workspaces/resolver.ts'
+  ':!src/lib/workspaces/writer.ts'
   ':!src/lib/overdeck/infra.ts'
   ':!scripts/guard-workspace-doors.sh'
   ':!**/__tests__/**'
@@ -40,6 +41,7 @@ candidates=$(
       -e "INTO ($TABLES)(?![.\\-\\w])" \
       -e "UPDATE ($TABLES)(?![.\\-\\w])" \
       -e "DELETE FROM ($TABLES)(?![.\\-\\w])" \
+      -e "JOIN ($TABLES)(?![.\\-\\w])" \
       -- 'src/**' 'scripts/**' "${ALLOWED[@]}"; } || true
 )
 violations=$(printf '%s\n' "$candidates" | comment_filter)

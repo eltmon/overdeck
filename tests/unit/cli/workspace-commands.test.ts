@@ -71,8 +71,12 @@ describe('pan workspace new (PAN-1990)', () => {
     expect(row?.isGitRepository).toBe(true);
     expect(row?.parentBranch).toBe('main');
     expect(row?.parentBranchGuessed).toBe(false);
+    // PAN-1990 review fix: argument-vector spawn (execFile), not an
+    // interpolated shell string — see workspace-scratch-isolated.test.ts for
+    // the security/branch-collision behavior this call shape fixes.
     expect(mockExecAsync).toHaveBeenCalledWith(
-      expect.stringContaining('git worktree add'),
+      'git',
+      ['worktree', 'add', '-b', 'scratch/isolated-notes', expectedPath, 'main'],
       expect.objectContaining({ cwd: projectRoot }),
     );
   });

@@ -1,4 +1,3 @@
-import { isAbsolute, relative } from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import {
@@ -10,6 +9,7 @@ import {
   searchMemory,
 } from '../../lib/memory/cli.js';
 import { backfillMemoryFromTranscripts } from '../../lib/memory/backfill.js';
+import { resolveContainedPinPath } from '../../lib/memory/pin-path.js';
 import { getProjectByKey, getWorkspaceById, listPinnedDocs } from '../../lib/workspaces/resolver.js';
 import { pinDoc, unpinDoc } from '../../lib/workspaces/writer.js';
 import type { PinScope, ProjectRow } from '../../lib/workspaces/types.js';
@@ -204,7 +204,11 @@ export async function memoryPinCommand(docPath: string, options: MemoryPinOption
   const resolved = resolvePinTarget(options);
   if (!resolved) return exitCli(1);
   const { scope, scopeId, project } = resolved;
-  const projectRelativePath = isAbsolute(docPath) ? relative(project.primaryPath, docPath) : docPath;
+  const projectRelativePath = resolveContainedPinPath(project.primaryPath, docPath);
+  if (projectRelativePath === null) {
+    console.error(chalk.red(`Refusing to pin '${docPath}': it resolves outside the project root '${project.primaryPath}'.`));
+    return exitCli(1);
+  }
 
   await pinDoc(scope, scopeId, projectRelativePath);
   if (options.json) console.log(JSON.stringify({ scope, scopeId, docPath: projectRelativePath }, null, 2));
@@ -215,7 +219,11 @@ export async function memoryUnpinCommand(docPath: string, options: MemoryPinOpti
   const resolved = resolvePinTarget(options);
   if (!resolved) return exitCli(1);
   const { scope, scopeId, project } = resolved;
-  const projectRelativePath = isAbsolute(docPath) ? relative(project.primaryPath, docPath) : docPath;
+  const projectRelativePath = resolveContainedPinPath(project.primaryPath, docPath);
+  if (projectRelativePath === null) {
+    console.error(chalk.red(`Refusing to unpin '${docPath}': it resolves outside the project root '${project.primaryPath}'.`));
+    return exitCli(1);
+  }
 
   await unpinDoc(scope, scopeId, projectRelativePath);
   if (options.json) console.log(JSON.stringify({ scope, scopeId, docPath: projectRelativePath }, null, 2));

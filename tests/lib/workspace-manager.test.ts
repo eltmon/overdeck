@@ -244,23 +244,33 @@ describe('createWorkspace', () => {
       return { stdout: '', stderr: '' };
     });
 
-    const { createWorkspace } = await import('../../src/lib/workspace-manager.js');
-    const result = await Effect.runPromise(createWorkspace({
-      projectConfig: {
-        name: 'Test',
-        path: tempDir,
-        package_manager: 'npm',
-      },
-      featureName: 'pan-2050',
-    }));
+    // PAN-1990 FR-6/AC-4: create.ts now guarantees the workspace row exists
+    // before the worktree — it must resolve this project's projects.yaml
+    // entry to seed the row rather than skipping silently when unseeded.
+    const { registerProjectSync, unregisterProjectSync } = await import('../../src/lib/projects.js');
+    registerProjectSync('workspace-manager-test-project', { name: 'Test', path: tempDir });
 
-    expect(result.success).toBe(true);
-    expect(result.steps).toContain('Staged pre-worktree .pan metadata');
-    expect(mockExecAsync).toHaveBeenCalledWith(
-      expect.stringContaining(`git worktree add -b "feature/pan-2050" "${workspacePath}"`),
-      expect.objectContaining({ cwd: tempDir }),
-    );
-    expect(readFileSync(recordPath, 'utf8')).toBe('{"issueId":"PAN-2050"}\n');
+    try {
+      const { createWorkspace } = await import('../../src/lib/workspace-manager.js');
+      const result = await Effect.runPromise(createWorkspace({
+        projectConfig: {
+          name: 'Test',
+          path: tempDir,
+          package_manager: 'npm',
+        },
+        featureName: 'pan-2050',
+      }));
+
+      expect(result.success).toBe(true);
+      expect(result.steps).toContain('Staged pre-worktree .pan metadata');
+      expect(mockExecAsync).toHaveBeenCalledWith(
+        expect.stringContaining(`git worktree add -b "feature/pan-2050" "${workspacePath}"`),
+        expect.objectContaining({ cwd: tempDir }),
+      );
+      expect(readFileSync(recordPath, 'utf8')).toBe('{"issueId":"PAN-2050"}\n');
+    } finally {
+      unregisterProjectSync('workspace-manager-test-project');
+    }
   });
 });
 

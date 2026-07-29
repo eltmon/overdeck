@@ -68,15 +68,13 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     // absence if the runtime top-up ever fails on an existing database.
     { table: 'event_idempotency', column: 'key' },
     // PAN-1990: sentinels for the four brand-new tables (SchemaTopUpExpectations
-    // has no dedicated "tables" list). agents.workspace_id is intentionally NOT
-    // added yet — nothing reads/writes it, and AGENT_COLUMNS_FOR_DB has its own
-    // DDL-parity test that would force codec wiring ahead of the item that
-    // actually needs agent-to-workspace linkage.
+    // has no dedicated "tables" list).
     { table: 'projects', column: 'id' },
     { table: 'workspaces', column: 'id' },
     { table: 'project_targets', column: 'project_id' },
     { table: 'pinned_docs', column: 'id' },
     { table: 'conversations', column: 'workspace_id' },
+    { table: 'agents', column: 'workspace_id' },
   ],
   indexes: [
     'cost_session_id_idx',
@@ -269,11 +267,8 @@ function ensureWorkspaceTablesSync(db: SqliteDatabase): void {
   `);
   db.exec('CREATE INDEX IF NOT EXISTS `idx_pinned_docs_scope` ON `pinned_docs` (`scope`, `scope_id`)');
 
-  // agents.workspace_id is deliberately NOT added here yet — nothing in this
-  // item reads or writes it, and adding it would require extending
-  // AGENT_COLUMNS_FOR_DB's read/write codec (its own DDL-parity test) ahead of
-  // the item that actually wires agent-to-workspace linkage.
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `workspace_id` text');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `workspace_id` text');
 }
 
 /**

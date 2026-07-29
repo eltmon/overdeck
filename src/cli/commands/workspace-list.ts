@@ -215,11 +215,11 @@ interface DestroyOptions {
  * not after). --purge-memory additionally removes the memory home —
  * irreversible, opt-in only.
  */
-function finalizeWorkspaceRowDestroy(issueIdUpper: string, purgeMemory: boolean | undefined): void {
+async function finalizeWorkspaceRowDestroy(issueIdUpper: string, purgeMemory: boolean | undefined): Promise<void> {
   const row = getWorkspaceForIssue(issueIdUpper);
   if (!row) return;
   const memoryRoot = purgeMemory ? join(resolveMemoryRoot(row.projectId), row.id) : null;
-  deleteWorkspace(row.id);
+  await deleteWorkspace(row.id);
   if (memoryRoot && existsSync(memoryRoot)) {
     rmSync(memoryRoot, { recursive: true, force: true });
   }
@@ -248,7 +248,7 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
     const metadata = loadWorkspaceMetadataSync(normalizedId);
     if (metadata && metadata.location === 'remote') {
       await destroyRemoteWorkspace(issueId, normalizedId, metadata, spinner, options);
-      finalizeWorkspaceRowDestroy(issueIdUpper, options.purgeMemory);
+      await finalizeWorkspaceRowDestroy(issueIdUpper, options.purgeMemory);
       return;
     }
 
@@ -271,7 +271,7 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
         for (const step of result.steps) {
           console.log(`  ${chalk.green('✓')} ${step}`);
         }
-        finalizeWorkspaceRowDestroy(issueIdUpper, options.purgeMemory);
+        await finalizeWorkspaceRowDestroy(issueIdUpper, options.purgeMemory);
       } else {
         spinner.fail('Workspace destruction failed');
         for (const error of result.errors) {
@@ -299,7 +299,7 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
         }
 
         spinner.succeed('Workspace destroyed via custom command!');
-        finalizeWorkspaceRowDestroy(issueIdUpper, options.purgeMemory);
+        await finalizeWorkspaceRowDestroy(issueIdUpper, options.purgeMemory);
         return;
       } catch (error: any) {
         spinner.fail(`Custom remove command failed: ${error.message}`);
@@ -341,7 +341,7 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
     );
 
     spinner.succeed(`Workspace destroyed: ${folderName}`);
-    finalizeWorkspaceRowDestroy(issueIdUpper, options.purgeMemory);
+    await finalizeWorkspaceRowDestroy(issueIdUpper, options.purgeMemory);
   } catch (error: any) {
     spinner.fail(error.message);
     if (!options.force) {

@@ -6,7 +6,7 @@
  * tests assert the file lands at the resolved domain path, not that a real
  * commit/push occurred.
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -61,15 +61,25 @@ describe('mirrorDailySummary (ac1)', () => {
   });
 });
 
+const PINS_DIR_PARTS = ['.pan', 'memory', 'pins'] as const;
+
+/** Find the single mirrored pin file whose name starts with the given scope/scopeId prefix. */
+function findPinFile(prefix: string): string | null {
+  const pinsDir = join(projectRoot, ...PINS_DIR_PARTS);
+  if (!existsSync(pinsDir)) return null;
+  const match = readdirSync(pinsDir).find((name) => name.startsWith(prefix));
+  return match ? join(pinsDir, match) : null;
+}
+
 describe('mirrorPin / unmirrorPin (ac2)', () => {
   it('pin creates a descriptor in memory/pins/ and unpin deletes it', async () => {
     const { mirrorPin, unmirrorPin } = await import('../../../../src/lib/memory/state-mirror.js');
     const createdAt = 1785000000000;
     await mirrorPin(PROJECT_KEY, 'project', PROJECT_KEY, 'docs/A.md', createdAt);
 
-    const expected = join(projectRoot, '.pan', 'memory', 'pins', `project__${PROJECT_KEY}__docs__A.md.json`);
-    expect(existsSync(expected)).toBe(true);
-    expect(JSON.parse(readFileSync(expected, 'utf8'))).toEqual({
+    const pinFile = findPinFile(`project__${PROJECT_KEY}__`);
+    expect(pinFile).not.toBeNull();
+    expect(JSON.parse(readFileSync(pinFile!, 'utf8'))).toEqual({
       scope: 'project',
       scopeId: PROJECT_KEY,
       docPath: 'docs/A.md',
@@ -77,7 +87,44 @@ describe('mirrorPin / unmirrorPin (ac2)', () => {
     });
 
     await unmirrorPin(PROJECT_KEY, 'project', PROJECT_KEY, 'docs/A.md');
-    expect(existsSync(expected)).toBe(false);
+    expect(findPinFile(`project__${PROJECT_KEY}__`)).toBeNull();
+  });
+
+  it('two doc paths that would collide under a naive "/" -> "__" filename encoding get distinct mirror files (non-blocking fix)', async () => {
+    const { mirrorPin } = await import('../../../../src/lib/memory/state-mirror.js');
+    // "a/b.md" and "a__b.md" both transliterate to "a__b.md" under the old
+    // `.replace(/\//g, '__')` scheme — pinning one would overwrite the other.
+    await mirrorPin(PROJECT_KEY, 'project', PROJECT_KEY, 'a/b.md', 1);
+    await mirrorPin(PROJECT_KEY, 'project', PROJECT_KEY, 'a__b.md', 2);
+
+    const pinsDir = join(projectRoot, ...PINS_DIR_PARTS);
+    const files = readdirSync(pinsDir).filter((name) => name.startsWith(`project__${PROJECT_KEY}__`));
+    expect(files).toHaveLength(2);
+
+    const descriptors = files.map((name) => JSON.parse(readFileSync(join(pinsDir, name), 'utf8')));
+    expect(descriptors.find((d) => d.docPath === 'a/b.md')?.createdAt).toBe(1);
+    expect(descriptors.find((d) => d.docPath === 'a__b.md')?.createdAt).toBe(2);
+  });
+});
+
+describe('deleteWorkspace unmirrors workspace-scoped pins (FR-10/FR-11, review fix)', () => {
+  it('removes the committed pin descriptor for a deleted workspace, not just the SQLite row', async () => {
+    const { createWorkspace, deleteWorkspace, pinDoc, upsertProjectFromConfig } = await import('../../../../src/lib/workspaces/writer.js');
+    const { listPinnedDocs } = await import('../../../../src/lib/workspaces/resolver.js');
+    upsertProjectFromConfig(PROJECT_KEY, { name: 'State Mirror Test', path: projectRoot });
+
+    const workspaceId = await createWorkspace({
+      projectId: PROJECT_KEY, kind: 'scratch', name: 'scratch-a', path: join(projectRoot, 'scratch-a'),
+    });
+    await pinDoc('workspace', workspaceId, 'docs/WORKSPACE-PIN.md');
+
+    const prefix = `workspace__${workspaceId}__`;
+    expect(findPinFile(prefix)).not.toBeNull();
+
+    await deleteWorkspace(workspaceId);
+
+    expect(listPinnedDocs('workspace', workspaceId)).toHaveLength(0);
+    expect(findPinFile(prefix)).toBeNull();
   });
 });
 

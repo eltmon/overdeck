@@ -34,7 +34,8 @@ import {
 } from './worktree-ops.js';
 import type { WorkspaceCreateOptions, WorkspaceCreateResult } from './types.js';
 import { getProjectByPath, getWorkspaceForIssue } from '../workspaces/resolver.js';
-import { createWorkspace } from '../workspaces/writer.js';
+import { createWorkspace, upsertProjectFromConfig } from '../workspaces/writer.js';
+import { listProjectsSync } from '../projects.js';
 import {
   createWorkspacePlaceholdersSync as createPlaceholders,
   sanitizeComposeFileSync,
@@ -201,28 +202,34 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     return result;
   }
 
-  // PAN-1990: create the kind='issue' workspace row before any git worktree
-  // operation. Idempotent (getWorkspaceForIssue check) and non-fatal — if the
-  // project row hasn't been seeded yet (dashboard boot hasn't run against this
-  // project), skip silently; the next boot-seeding backfill picks up the
-  // worktree directory retroactively via its own idempotent scan.
+  // PAN-1990 FR-6/AC-4: create the kind='issue' workspace row before any git
+  // worktree operation — never skipped and never swallowed. Idempotent
+  // (getWorkspaceForIssue check). If the project row hasn't been boot-seeded
+  // yet, seed it here from the same projects.yaml entry the worktree is about
+  // to be created under (the same idempotent upsert boot-seeding uses), so the
+  // row always exists ahead of the worktree rather than waiting on a later
+  // backfill to retroactively guess it from the directory.
   const issueId = featureName.toUpperCase();
   if (!getWorkspaceForIssue(issueId)) {
-    const project = getProjectByPath(projectConfig.path);
-    if (project) {
-      try {
-        await createWorkspace({
-          projectId: project.id,
-          kind: 'issue',
-          name: featureFolder,
-          path: workspacePath,
-          branchName: `feature/${featureName}`,
-          issueId,
-        });
-      } catch (err) {
-        console.warn(`[workspaces] failed to create workspace row for ${issueId}:`, err);
+    let project = getProjectByPath(projectConfig.path);
+    if (!project) {
+      const projectKey = listProjectsSync().find((p) => p.config.path === projectConfig.path)?.key;
+      if (!projectKey) {
+        result.success = false;
+        result.errors.push(`No projects.yaml entry found for path ${projectConfig.path}; cannot create workspace row for ${issueId}.`);
+        return result;
       }
+      upsertProjectFromConfig(projectKey, projectConfig);
+      project = getProjectByPath(projectConfig.path);
     }
+    await createWorkspace({
+      projectId: project!.id,
+      kind: 'issue',
+      name: featureFolder,
+      path: workspacePath,
+      branchName: `feature/${featureName}`,
+      issueId,
+    });
   }
 
   // A failed auto-plan/start can leave only orchestration metadata at the

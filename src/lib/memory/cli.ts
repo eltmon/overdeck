@@ -17,7 +17,8 @@ import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';
 import { mirrorDailySummary } from './state-mirror.js';
 import { readCurrentStatus } from './rollup.js';
 import { getAgentStateSync } from '../agents.js';
-import { getWorkspaceForIssue, listProjects, listWorkspaces } from '../workspaces/resolver.js';
+import { getWorkspaceById, getWorkspaceForIssue, listProjects, listWorkspaces } from '../workspaces/resolver.js';
+import { searchMemory as searchMemoryFts, type MemorySearchHit } from './search.js';
 
 const DEFAULT_PROJECT_ID = 'overdeck';
 const MIN_DAILY_SUMMARY_OBSERVATIONS = 3;
@@ -68,26 +69,70 @@ export interface MemoryDoctorResult {
   staleActiveAgents: Array<{ agentId: string; issueId: string; lastSuccess: string | null }>;
 }
 
+/**
+ * PAN-1990 FR-9: search runs against the existing memory_fts index (every
+ * observation write indexes into it — see observations.ts's indexObservation)
+ * instead of reading every daily JSONL file for every workspace into memory
+ * and sorting the full corpus. Runtime and memory scale with the FTS-bounded
+ * result set (limit), not with total history. Reset-marker filtering also
+ * moves into the FTS query itself (search.ts already does this in SQL).
+ *
+ * `--workspace <id>` resolves its OWNING project (D-3) before searching, so a
+ * workspace registered under a project other than `overdeck` is actually
+ * searched instead of silently querying the default project and finding
+ * nothing.
+ */
 export async function searchMemory(query: string, options: MemorySearchOptions = {}): Promise<MemorySearchResult[]> {
-  const projectIds = options.global ? listProjects().map((project) => project.id) : [options.project ?? DEFAULT_PROJECT_ID];
-  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const workspaceProjectId = options.workspace ? getWorkspaceById(options.workspace)?.projectId : undefined;
+  const projectIds = options.global
+    ? listProjects().map((project) => project.id)
+    : [workspaceProjectId ?? options.project ?? DEFAULT_PROJECT_ID];
+  const limit = options.limit ?? 20;
+  // sibling mode needs a workspaceId to exclude even when the caller only
+  // passed --issue (the CLI's usual sibling invocation) — resolve it the same
+  // way the pre-FTS implementation did.
+  const workspaceIdForIssue = options.issue ? getWorkspaceForIssue(options.issue)?.id : undefined;
 
   const perProject = await Promise.all(projectIds.map(async (projectId) => {
-    const observations = await readObservationScope(projectId, options.issue, options.sibling ?? false);
-    const resetMarkers = options.includeArchived ? [] : await readResetMarkers(projectId);
-    return observations
-      .filter((observation) => !options.workspace || observation.workspaceId === options.workspace)
-      .filter((observation) => !options.issue || options.sibling || observation.issueId === options.issue)
-      .filter((observation) => options.includeArchived || isAfterLatestResetMarker(observation, resetMarkers))
-      .filter((observation) => !options.tag || observation.tags.includes(options.tag))
-      .map((observation) => ({ observation, score: scoreObservation(observation, terms) }))
-      .filter((result) => terms.length === 0 || result.score > 0);
+    const hits = await searchMemoryFts({
+      query,
+      projectId,
+      workspaceId: options.workspace ?? workspaceIdForIssue,
+      issueId: options.issue,
+      sibling: options.sibling,
+      includeArchived: options.includeArchived,
+      tags: options.tag ? [options.tag] : undefined,
+      limit,
+    });
+
+    const fileCache = new Map<string, MemoryObservation[]>();
+    const pairs = await Promise.all(hits.map(async (hit) => ({
+      hit,
+      observation: await resolveObservationFromHit(projectId, hit, fileCache),
+    })));
+    return pairs
+      .filter((pair): pair is { hit: MemorySearchHit; observation: MemoryObservation } => pair.observation !== null)
+      .map((pair) => ({ observation: pair.observation, score: pair.hit.rankScore }));
   }));
 
-  const results = perProject.flat()
-    .sort((a, b) => b.score - a.score || b.observation.timestamp.localeCompare(a.observation.timestamp));
+  return perProject.flat()
+    .sort((a, b) => b.score - a.score || b.observation.timestamp.localeCompare(a.observation.timestamp))
+    .slice(0, limit);
+}
 
-  return results.slice(0, options.limit ?? 20);
+/** Resolve an FTS hit back to its full MemoryObservation by reading only the one day-file it points at. */
+async function resolveObservationFromHit(
+  projectId: string,
+  hit: MemorySearchHit,
+  fileCache: Map<string, MemoryObservation[]>,
+): Promise<MemoryObservation | null> {
+  const filePath = resolveObservationsFile(projectId, hit.workspaceId, hit.entryDate);
+  let observations = fileCache.get(filePath);
+  if (!observations) {
+    observations = await readObservationsFile(filePath);
+    fileCache.set(filePath, observations);
+  }
+  return observations.find((observation) => observation.id === hit.source) ?? null;
 }
 
 export async function getMemoryStatus(projectId: string, issueId: string): Promise<MemoryStatus | undefined> {
@@ -187,16 +232,6 @@ export async function readMemorySettingsSummary(): Promise<{
   };
 }
 
-async function readObservationScope(projectId: string, issueId: string | undefined, sibling: boolean): Promise<MemoryObservation[]> {
-  const workspaceId = issueId ? getWorkspaceForIssue(issueId)?.id : undefined;
-  if (issueId && !sibling) return workspaceId ? readWorkspaceObservations(projectId, workspaceId) : [];
-
-  const workspaceIds = await listWorkspaceIds(projectId);
-  const selectedWorkspaceIds = issueId && sibling ? workspaceIds.filter((candidate) => candidate !== workspaceId) : workspaceIds;
-  const nested = await Promise.all(selectedWorkspaceIds.map((candidate) => readWorkspaceObservations(projectId, candidate)));
-  return nested.flat();
-}
-
 async function readWorkspaceObservations(projectId: string, workspaceId: string): Promise<MemoryObservation[]> {
   const observationsDir = dirname(resolveObservationsFile(projectId, workspaceId, new Date()));
   const files = (await readdir(observationsDir).catch((error: unknown) => {
@@ -205,69 +240,6 @@ async function readWorkspaceObservations(projectId: string, workspaceId: string)
   })).filter((file) => file.endsWith('.jsonl')).sort();
   const nested = await Promise.all(files.map((file) => readObservationsFile(join(observationsDir, file))));
   return nested.flat();
-}
-
-async function readResetMarkers(projectId: string): Promise<ResetMarker[]> {
-  const jsonMarkers = await readJsonFile<ResetMarker[]>(join(resolveMemoryRoot(projectId), 'reset-markers.json'), []);
-  const dbMarkers = await withMemoryFtsDatabase(projectId, (db) => db.prepare(`
-    SELECT id, scope, scope_id, from_timestamp, reason, created_at
-    FROM reset_markers
-  `).all<{
-    id: number;
-    scope: ResetMarker['scope'];
-    scope_id: string;
-    from_timestamp: string;
-    reason: string | null;
-    created_at: string;
-  }>()).catch((error: unknown) => {
-    if (isNoSuchTable(error)) return [];
-    throw error;
-  });
-  return dedupeResetMarkers([
-    ...jsonMarkers,
-    ...dbMarkers.map((marker) => ({
-      id: `db-${marker.id}`,
-      scope: marker.scope,
-      scopeId: marker.scope_id,
-      fromTimestamp: marker.from_timestamp,
-      reason: marker.reason ?? '',
-      createdAt: marker.created_at,
-    })),
-  ]);
-}
-
-function dedupeResetMarkers(markers: ResetMarker[]): ResetMarker[] {
-  const seen = new Set<string>();
-  const deduped: ResetMarker[] = [];
-  for (const marker of markers) {
-    const key = [marker.scope, marker.scopeId, marker.fromTimestamp, marker.reason, marker.createdAt].join('|');
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(marker);
-  }
-  return deduped;
-}
-
-function isAfterLatestResetMarker(observation: MemoryObservation, markers: ResetMarker[]): boolean {
-  const latest = markers
-    .filter((marker) => appliesToObservation(marker, observation))
-    .map((marker) => marker.fromTimestamp)
-    .sort()
-    .at(-1);
-  return !latest || observation.timestamp > latest;
-}
-
-function appliesToObservation(marker: ResetMarker, observation: MemoryObservation): boolean {
-  switch (marker.scope) {
-    case 'project':
-      return marker.scopeId === observation.projectId;
-    case 'workspace':
-      return marker.scopeId === observation.workspaceId;
-    case 'issue':
-      return marker.scopeId === observation.issueId;
-    case 'session':
-      return marker.scopeId === observation.sessionId;
-  }
 }
 
 async function readObservationsFile(path: string): Promise<MemoryObservation[]> {
@@ -384,36 +356,6 @@ async function indexDailySummary(projectId: string, issueId: string, date: strin
   ]);
 }
 
-async function listWorkspaceIds(projectId: string): Promise<string[]> {
-  const root = resolveMemoryRoot(projectId);
-  const entries = await readdir(root, { withFileTypes: true }).catch((error: unknown) => {
-    if (isEnoent(error)) return [];
-    throw error;
-  });
-  return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
-}
-
-function scoreObservation(observation: MemoryObservation, terms: string[]): number {
-  const haystack = [
-    observation.actionStatus ?? '',
-    observation.summary,
-    observation.narrative,
-    observation.files.join(' '),
-    observation.tags.join(' '),
-  ].join(' ').toLowerCase();
-  return terms.reduce((score, term) => score + occurrences(haystack, term), 0);
-}
-
-function occurrences(value: string, term: string): number {
-  let count = 0;
-  let index = value.indexOf(term);
-  while (index !== -1) {
-    count += 1;
-    index = value.indexOf(term, index + term.length);
-  }
-  return count;
-}
-
 async function readIssueDoctorSnapshots(projectId: string): Promise<MemoryDoctorResult['issues']> {
   const issueWorkspaces = listWorkspaces({ projectId, kind: 'issue' }).filter((ws): ws is typeof ws & { issueId: string } => ws.issueId !== null);
   return Promise.all(issueWorkspaces.map(async (workspace) => {
@@ -509,8 +451,4 @@ function emptyHealth(): MemoryHealthSnapshot {
 
 function isEnoent(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
-}
-
-function isNoSuchTable(error: unknown): boolean {
-  return error instanceof Error && error.message.includes('no such table: reset_markers');
 }

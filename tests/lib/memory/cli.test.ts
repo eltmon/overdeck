@@ -1,4 +1,4 @@
-import { appendFile, readFile, writeFile } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { MemoryObservation, MemoryIdentity } from '@overdeck/contracts';
@@ -8,7 +8,8 @@ import {
   runMemoryDoctor,
   searchMemory,
 } from '../../../src/lib/memory/cli.js';
-import { ensureDir, resolveObservationsFile, resolvePendingDir } from '../../../src/lib/memory/paths.js';
+import { writeObservation } from '../../../src/lib/memory/observations.js';
+import { ensureDir, resolvePendingDir } from '../../../src/lib/memory/paths.js';
 import { getMemoryHealthPath } from '../../../src/lib/memory/health.js';
 import { closeDatabase } from '../../../src/lib/database/index.js';
 import { closeMemoryFtsDatabases, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
@@ -74,10 +75,13 @@ function observation(overrides: Partial<MemoryObservation> = {}): MemoryObservat
   };
 }
 
+// PAN-1990 FR-9 review fix: searchMemory now queries the memory_fts index
+// (see cli.ts), which only a real observation write populates — a raw JSONL
+// append (the pre-fix version of this helper) is invisible to it.
+// writeObservation is the same production write path every real observation
+// goes through.
 async function writeObservationRecord(item: MemoryObservation): Promise<void> {
-  const path = resolveObservationsFile(item.projectId, item.workspaceId, item.timestamp);
-  await ensureDir(join(odb.home, 'memory', item.projectId, item.workspaceId, 'observations'));
-  await appendFile(path, `${JSON.stringify(item)}\n`, 'utf8');
+  await writeObservation(item);
 }
 
 describe('pan memory CLI service', () => {

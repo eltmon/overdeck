@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { promisify } from 'util';
@@ -10,6 +10,7 @@ import { getMainWorkspace, resolveWorkspaceForCwd } from '../../lib/workspaces/r
 import { createWorkspace, touchWorkspaceAccessed, upsertProjectFromConfig } from '../../lib/workspaces/writer.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 interface ResolvedProjectRef {
   key: string;
@@ -63,6 +64,7 @@ export async function workspaceNewCommand(name: string, options: WorkspaceNewOpt
     const parentBranchGuessed = !options.parentBranch && parentBranch !== null;
 
     let path = project.config.path;
+    let scratchBranch: string | undefined;
     if (options.isolated) {
       const workspaceConfig = project.config.workspace || getDefaultWorkspaceConfigSync();
       const workspacesDir = join(project.config.path, workspaceConfig.workspaces_dir || 'workspaces');
@@ -70,11 +72,17 @@ export async function workspaceNewCommand(name: string, options: WorkspaceNewOpt
       if (existsSync(path)) {
         throw new Error(`Path already exists: ${path}`);
       }
-      const branchArgs = parentBranch ? [parentBranch] : [];
-      await execAsync(
-        `git worktree add "${path}" ${branchArgs.join(' ')}`.trim(),
-        { cwd: project.config.path },
-      );
+      // A new worktree cannot check out `parentBranch` directly — it's
+      // normally the project's currently-checked-out branch, and git refuses
+      // to have the same branch checked out in two worktrees at once. Create
+      // a distinct scratch branch off of it instead. Argument-vector spawn
+      // (execFile, not a shell string) so `name`/`path`/`--parent-branch`
+      // can't inject shell metacharacters.
+      scratchBranch = `scratch/${name}`;
+      const worktreeArgs = parentBranch
+        ? ['worktree', 'add', '-b', scratchBranch, path, parentBranch]
+        : ['worktree', 'add', '-b', scratchBranch, path];
+      await execFileAsync('git', worktreeArgs, { cwd: project.config.path });
     }
 
     const id = await createWorkspace({
@@ -82,6 +90,7 @@ export async function workspaceNewCommand(name: string, options: WorkspaceNewOpt
       kind: 'scratch',
       name,
       path,
+      branchName: scratchBranch,
       parentBranch: parentBranch ?? undefined,
       parentBranchGuessed,
       isGitRepository: options.isolated ? true : existsSync(join(project.config.path, '.git')),

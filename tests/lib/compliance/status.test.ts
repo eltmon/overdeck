@@ -1,4 +1,4 @@
-import { appendFile, writeFile } from 'fs/promises';
+import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { MemoryIdentity, MemoryObservation } from '@overdeck/contracts';
@@ -6,7 +6,7 @@ import type { MemoryIdentity, MemoryObservation } from '@overdeck/contracts';
 import { getComplianceStatus } from '../../../src/lib/compliance/status.js';
 import { closeDatabase } from '../../../src/lib/database/index.js';
 import { closeMemoryFtsDatabases } from '../../../src/lib/memory/fts-db.js';
-import { ensureDir, resolveObservationsFile } from '../../../src/lib/memory/paths.js';
+import { writeObservation } from '../../../src/lib/memory/observations.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../../src/lib/workspaces/writer.js';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
 
@@ -60,10 +60,11 @@ function observation(overrides: Partial<MemoryObservation> = {}): MemoryObservat
   };
 }
 
+// PAN-1990 FR-9 review fix: searchMemory now queries the memory_fts index
+// (see cli.ts), which only a real observation write populates — a raw JSONL
+// append (the pre-fix version of this helper) is invisible to it.
 async function writeObservationRecord(item: MemoryObservation): Promise<void> {
-  const path = resolveObservationsFile(item.projectId, item.workspaceId, item.timestamp);
-  await ensureDir(join(odb.home, 'memory', item.projectId, item.workspaceId, 'observations'));
-  await appendFile(path, `${JSON.stringify(item)}\n`, 'utf8');
+  await writeObservation(item);
 }
 
 async function writeConfig(content: string): Promise<string> {

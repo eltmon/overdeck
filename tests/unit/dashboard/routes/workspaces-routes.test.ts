@@ -177,6 +177,33 @@ describe('POST activate/archive/favorite (ac2)', () => {
     expect(routeMocks.setWorkspaceFavorite).toHaveBeenCalledWith('ws-1', true);
   });
 
+  it('rejects malformed JSON on archive with 400 instead of defaulting to archived=true (non-blocking fix)', async () => {
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace());
+
+    const { status } = await requestWorkspaceRegistryRoute('/api/workspace-registry/ws-1/archive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{not valid json',
+    });
+
+    expect(status).toBe(400);
+    expect(routeMocks.archiveWorkspace).not.toHaveBeenCalled();
+    expect(routeMocks.unarchiveWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed JSON on favorite with 400 instead of defaulting to favorite=true (non-blocking fix)', async () => {
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace());
+
+    const { status } = await requestWorkspaceRegistryRoute('/api/workspace-registry/ws-1/favorite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{not valid json',
+    });
+
+    expect(status).toBe(400);
+    expect(routeMocks.setWorkspaceFavorite).not.toHaveBeenCalled();
+  });
+
   it('rejects a mutation the dashboard-auth guard blocks', async () => {
     routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace());
     const { HttpServerResponse } = await import('effect/unstable/http');
@@ -209,6 +236,19 @@ describe('PUT layout (ac3)', () => {
 
     const getResult = await requestWorkspaceRegistryRoute('/api/workspace-registry/ws-1');
     expect((getResult.body as { layoutConfig: string }).layoutConfig).toBe(JSON.stringify({ panels: ['tree', 'terminal'] }));
+  });
+
+  it('rejects malformed JSON with 400 instead of treating it as a missing layout field (non-blocking fix)', async () => {
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace());
+
+    const { status } = await requestWorkspaceRegistryRoute('/api/workspace-registry/ws-1/layout', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{not valid json',
+    });
+
+    expect(status).toBe(400);
+    expect(routeMocks.updateWorkspaceLayout).not.toHaveBeenCalled();
   });
 });
 

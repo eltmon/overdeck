@@ -30,11 +30,15 @@ describe('workspace tables top-up (PAN-1990)', () => {
     `).all() as Array<{ name: string }>;
     expect(tables.map((row) => row.name)).toEqual(['pinned_docs', 'project_targets', 'projects', 'workspaces']);
 
-    // agents.workspace_id is deliberately deferred — nothing reads/writes it yet,
-    // and adding it would require extending AGENT_COLUMNS_FOR_DB's codec ahead
-    // of the item that actually wires agent-to-workspace linkage.
     const conversationColumns = db.prepare('PRAGMA table_info(conversations)').all() as Array<{ name: string }>;
     expect(conversationColumns.map((c) => c.name)).toContain('workspace_id');
+
+    // PAN-1990 AC-1/FR-4: agents.workspace_id must exist on both a fresh
+    // database (drizzle/overdeck/0000_overdeck_init.sql) and an upgraded one
+    // (this runtime top-up) — see agent-discovery-columns.test.ts for the
+    // codec/DDL parity check.
+    const agentColumns = db.prepare('PRAGMA table_info(agents)').all() as Array<{ name: string }>;
+    expect(agentColumns.map((c) => c.name)).toContain('workspace_id');
   });
 
   it('rejects a workspace kind outside main/issue/scratch via the CHECK constraint', () => {

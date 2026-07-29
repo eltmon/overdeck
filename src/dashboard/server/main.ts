@@ -87,7 +87,7 @@ import { startServerBootTelemetry } from './telemetry.js';
 import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
 import { flushAllPendingAutoCommits } from '../../lib/pan-dir/auto-commit.js';
 import { listProjectsSync } from '../../lib/projects.js';
-import { backfillIssueWorkspaces, seedProjectsFromYaml } from '../../lib/workspaces/rebuild.js';
+import { backfillIssueWorkspaces, migrateMemoryHomesToWorkspacesOnce, seedProjectsFromYaml } from '../../lib/workspaces/rebuild.js';
 import { ensureAutomaticStateMigration, decideDeaconBootGate } from '../../lib/state-auto-migrate.js';
 import { broadcastServerRestarting } from './ws-terminal.js';
 
@@ -528,6 +528,16 @@ void startTtsPlayback().catch(err => console.warn('[tts-playback] start failed:'
 seedProjectsFromYaml();
 void backfillIssueWorkspaces().catch(err => console.warn('[workspaces] issue-worktree backfill failed:', err?.message ?? err));
 console.log('[overdeck] Workspaces boot seeding started');
+
+// PAN-1990 WI-6: one-time, marker-gated migration of legacy issue-keyed memory
+// homes onto their workspace UUID. No-ops after the first successful boot
+// (migrateMemoryHomesToWorkspacesOnce's own marker file), so this never
+// re-scans every project's memory home on a normal restart.
+void migrateMemoryHomesToWorkspacesOnce()
+  .then((result) => {
+    if (result) console.log(`[memory-migration] migrated ${result.migrated}/${result.scanned} legacy memory home(s), ${result.unresolvable.length} unresolvable`);
+  })
+  .catch(err => console.warn('[memory-migration] boot migration failed:', err?.message ?? err));
 
 void syncTranscriptPollerRegistry().catch(err => console.warn('[memory-poller] initial registry sync failed:', err?.message ?? err));
 void reconcileStaleTranscriptCheckpoints({ log: (message) => console.log(message) })

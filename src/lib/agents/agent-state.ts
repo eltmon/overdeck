@@ -22,6 +22,13 @@ export interface AgentState {
   id: string;
   issueId: string;
   workspace: string;
+  /**
+   * The projects/workspaces registry row this agent belongs to (PAN-1990
+   * AC-1/FR-4). Resolved from `issueId` at persistence time
+   * (agent-state-sync.ts) when not set explicitly — undefined only when no
+   * workspace row exists for the issue yet.
+   */
+  workspaceId?: string;
   /** Coding-agent harness this agent runs under (PAN-636). */
   harness?: RuntimeName;
   /** Unified role primitive (PAN-1048). */

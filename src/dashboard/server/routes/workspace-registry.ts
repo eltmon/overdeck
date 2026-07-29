@@ -54,13 +54,22 @@ function toListRow(workspace: WorkspaceRow): WorkspaceListRow {
   return { ...workspace, pipeline: pipelineBadgeForWorkspace(workspace) };
 }
 
+/**
+ * Returns `{}` for a genuinely empty body (the legitimate "no explicit flag,
+ * apply the default" case for archive/favorite), and `undefined` for a
+ * non-empty body that fails to parse. These two cases were previously
+ * conflated — a malformed body silently became `{}`, and archive/favorite's
+ * `!== false` default then read as "apply the mutation" instead of rejecting
+ * the request.
+ */
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const text = yield* request.text;
+  if (!text) return {} as unknown;
   try {
-    return text ? JSON.parse(text) as unknown : {};
+    return JSON.parse(text) as unknown;
   } catch {
-    return {};
+    return undefined;
   }
 });
 
@@ -144,7 +153,8 @@ const postWorkspaceRegistryArchiveRoute = HttpRouter.add(
     const id = (yield* HttpRouter.params)['id'] ?? '';
     const workspace = getWorkspaceById(id);
     if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
-    const body = (yield* readJsonBody) as { archived?: unknown };
+    const body = (yield* readJsonBody) as { archived?: unknown } | undefined;
+    if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
     if (body.archived === false) unarchiveWorkspace(id);
     else yield* Effect.promise(() => archiveWorkspace(id));
     return jsonResponse(toListRow(getWorkspaceById(id) ?? workspace));
@@ -161,7 +171,8 @@ const postWorkspaceRegistryFavoriteRoute = HttpRouter.add(
     const id = (yield* HttpRouter.params)['id'] ?? '';
     const workspace = getWorkspaceById(id);
     if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
-    const body = (yield* readJsonBody) as { favorite?: unknown };
+    const body = (yield* readJsonBody) as { favorite?: unknown } | undefined;
+    if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
     setWorkspaceFavorite(id, body.favorite !== false);
     return jsonResponse(toListRow(getWorkspaceById(id) ?? workspace));
   })),
@@ -179,7 +190,8 @@ const putWorkspaceRegistryLayoutRoute = HttpRouter.add(
     const id = (yield* HttpRouter.params)['id'] ?? '';
     const workspace = getWorkspaceById(id);
     if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
-    const body = (yield* readJsonBody) as { layout?: unknown };
+    const body = (yield* readJsonBody) as { layout?: unknown } | undefined;
+    if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
     if (body.layout === undefined) return jsonResponse({ error: 'layout is required' }, { status: 400 });
     updateWorkspaceLayout(id, JSON.stringify(body.layout));
     return jsonResponse(toListRow(getWorkspaceById(id) ?? workspace));

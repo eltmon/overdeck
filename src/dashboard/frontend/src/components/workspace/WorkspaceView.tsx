@@ -12,8 +12,11 @@
  * conversations panel below.
  *
  * Conversation filtering: conversations are scoped to this workspace by
- * matching `conversation.cwd` against the workspace path, the same
- * cwd-prefix pattern CommandDeck/index.tsx already uses for project scoping
+ * `conversation.workspaceId` (FR-15/AC-11) when set. A conversation that
+ * predates the PAN-1990 linkage (workspaceId null) falls back to the
+ * cwd-prefix match CommandDeck/index.tsx already uses for project scoping —
+ * this is the only case cwd containment should decide membership, since a
+ * main workspace's path is a prefix of every issue workspace path beneath it
  * (ConversationList's `includeIds` prop already supports this — no changes
  * needed to ConversationList or ConversationPanel).
  */
@@ -122,10 +125,13 @@ export function WorkspaceView({ workspaceId, onBack }: WorkspaceViewProps) {
     if (showAllConversations || !workspace) return undefined;
     const ids = new Set<number>();
     for (const conv of conversations) {
-      if (isUnderWorkspacePath(conv.cwd, workspace.path)) ids.add(conv.id);
+      const matches = conv.workspaceId != null
+        ? conv.workspaceId === workspaceId
+        : isUnderWorkspacePath(conv.cwd, workspace.path);
+      if (matches) ids.add(conv.id);
     }
     return ids;
-  }, [showAllConversations, workspace, conversations]);
+  }, [showAllConversations, workspace, workspaceId, conversations]);
 
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const selectedConversationObj = conversations.find((c) => c.name === selectedConversation) ?? null;

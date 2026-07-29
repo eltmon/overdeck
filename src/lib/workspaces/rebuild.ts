@@ -16,13 +16,12 @@
  * workspace UUID and re-points memory_fts.workspace_id by issueId.
  * migrateMemoryHomesToWorkspacesOnce() is the boot-safe wrapper, gated by a
  * marker file so a dashboard restart never re-scans every project's memory
- * home. Wiring that wrapper into the dashboard boot path is a follow-up —
- * boot-path changes need their own runtime-boot-test (see
- * no-live-boot-hotpatch); for now it's reachable via `pan admin db
- * rebuild-workspaces`, which also runs the unconditional (non-marker-gated)
- * migrateMemoryHomesToWorkspaces() directly.
+ * home. Wired into the dashboard boot path in main.ts, right after the
+ * projects/workspaces boot seeding it depends on. Also reachable directly via
+ * `pan admin db rebuild-workspaces`, which runs the unconditional
+ * (non-marker-gated) migrateMemoryHomesToWorkspaces().
  */
-import { mkdir, readdir, readFile, rename, rmdir, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readdir, readFile, rename, rmdir, stat, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readWorkspaceIdentity, resolveWorkspaceIdentityPath, writeWorkspaceIdentity } from '../memory/identity-record.js';
 import { runMemoryFtsStatement } from '../memory/fts-db.js';
@@ -142,20 +141,48 @@ export async function rebuildMainAndScratchWorkspaces(
 
 const ISSUE_HOME_DIR_PATTERN = /^[a-z]+-\d+$/i;
 
+async function pathExists(path: string): Promise<boolean> {
+  return stat(path).then(() => true, () => false);
+}
+
 /**
  * Move every entry from `oldPath` into `newPath` (creating `newPath` if
  * needed) except `metadata.json`, which the caller rewrites separately via
  * writeWorkspaceIdentity. Removes `oldPath` once drained. Used instead of a
  * bare directory rename because `newPath` (the workspace's memory home) may
  * already exist — createWorkspace() writes its own metadata.json there at
- * row-creation time, before any migration ever runs.
+ * row-creation time, before any migration ever runs, and a session can also
+ * have already written observations/pending/summaries/rag-runs under the
+ * workspace-uuid path before migration gets a chance to run.
+ *
+ * A same-named subdirectory at the destination is merged recursively rather
+ * than renamed over — a flat `rename` onto an existing non-empty directory
+ * fails with ENOTEMPTY. A same-named file at the destination has its legacy
+ * content appended rather than silently dropped or overwritten (memory
+ * observation/summary files are append-only JSONL/markdown logs, so this
+ * preserves both sides).
  */
 async function mergeDirectoryEntries(oldPath: string, newPath: string): Promise<void> {
   await mkdir(newPath, { recursive: true });
   const entries = await readdir(oldPath, { withFileTypes: true });
   for (const entry of entries) {
     if (entry.name === 'metadata.json') continue;
-    await rename(join(oldPath, entry.name), join(newPath, entry.name));
+    const oldEntryPath = join(oldPath, entry.name);
+    const newEntryPath = join(newPath, entry.name);
+
+    if (entry.isDirectory()) {
+      await mergeDirectoryEntries(oldEntryPath, newEntryPath);
+      continue;
+    }
+
+    if (await pathExists(newEntryPath)) {
+      const legacyContent = await readFile(oldEntryPath, 'utf8');
+      await appendFile(newEntryPath, legacyContent, 'utf8');
+      await unlink(oldEntryPath);
+      continue;
+    }
+
+    await rename(oldEntryPath, newEntryPath);
   }
   await rmdir(oldPath).catch(() => {});
 }

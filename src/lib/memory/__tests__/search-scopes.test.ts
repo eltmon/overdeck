@@ -4,13 +4,12 @@
  * these tests lock the --workspace scoping (ac1), add --global multi-project
  * merge-by-score (ac2), and confirm the default stays project-scoped (ac3).
  */
-import { appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { MemoryObservation, MemoryIdentity } from '@overdeck/contracts';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../../tests/helpers/overdeck-test-db.js';
 import { searchMemory } from '../cli.js';
-import { ensureDir, resolveObservationsFile } from '../paths.js';
+import { writeObservation } from '../observations.js';
 import { closeMemoryFtsDatabases } from '../fts-db.js';
 import { closeDatabase } from '../../database/index.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../workspaces/writer.js';
@@ -57,10 +56,12 @@ function observation(identity: MemoryIdentity, overrides: Partial<MemoryObservat
   };
 }
 
+// PAN-1990 FR-9 review fix: searchMemory now queries the memory_fts index
+// (see cli.ts), which only a real observation write populates — a raw JSONL
+// append (the pre-fix helper here) is invisible to it. writeObservation is
+// the same production write path every real observation goes through.
 async function writeObservationRecord(item: MemoryObservation): Promise<void> {
-  const path = resolveObservationsFile(item.projectId, item.workspaceId, item.timestamp);
-  await ensureDir(join(odb.home, 'memory', item.projectId, item.workspaceId, 'observations'));
-  await appendFile(path, `${JSON.stringify(item)}\n`, 'utf8');
+  await writeObservation(item);
 }
 
 describe('pan memory search --workspace (ac1)', () => {

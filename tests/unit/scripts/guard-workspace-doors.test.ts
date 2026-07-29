@@ -59,6 +59,38 @@ describe('guard-workspace-doors.sh', () => {
     expect(output).toContain('FROM workspaces');
   });
 
+  it('exits 1 for direct SQL in a workspaces/ sibling file that is not resolver.ts or writer.ts', () => {
+    const root = makeTempRepo();
+    installScript(root);
+
+    mkdirSync(join(root, 'src', 'lib', 'workspaces'), { recursive: true });
+    writeFileSync(
+      join(root, 'src', 'lib', 'workspaces', 'rebuild.ts'),
+      `import { getOverdeckDatabaseSync } from '../overdeck/infra.js';\nexport function badRebuildRead(id: string) {\n  return getOverdeckDatabaseSync().prepare(\`SELECT * FROM workspaces WHERE id = ?\`).get(id);\n}\n`,
+    );
+    commitAll(root);
+
+    const { ok, output } = runGuard(root);
+    expect(ok).toBe(false);
+    expect(output).toContain('rebuild.ts');
+  });
+
+  it('exits 1 for a direct JOIN against a doors table outside the two doors', () => {
+    const root = makeTempRepo();
+    installScript(root);
+
+    mkdirSync(join(root, 'src', 'lib', 'somewhere'), { recursive: true });
+    writeFileSync(
+      join(root, 'src', 'lib', 'somewhere', 'bad-join.ts'),
+      `import { getDatabase } from '../database/index.js';\nexport function badJoin() {\n  return getDatabase().prepare(\`SELECT * FROM conversations c JOIN workspaces w ON w.id = c.workspace_id\`).all();\n}\n`,
+    );
+    commitAll(root);
+
+    const { ok, output } = runGuard(root);
+    expect(ok).toBe(false);
+    expect(output).toContain('bad-join.ts');
+  });
+
   it('exits 0 on a clean tree with schema.ts and the door modules allowlisted', () => {
     const root = makeTempRepo();
     installScript(root);

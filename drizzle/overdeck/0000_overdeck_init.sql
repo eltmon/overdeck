@@ -4,6 +4,7 @@ CREATE TABLE `agents` (
 	`role` text NOT NULL,
 	`status` text NOT NULL,
 	`workspace` text NOT NULL,
+	`workspace_id` text,
 	`session_id` text,
 	`harness` text NOT NULL,
 	`model` text NOT NULL,

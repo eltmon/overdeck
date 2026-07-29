@@ -127,6 +127,46 @@ describe('WorkspaceView (ac2)', () => {
   });
 });
 
+describe('WorkspaceView conversation filtering (FR-15/AC-11)', () => {
+  it('filters by conversation.workspaceId when set, even when cwd would suggest otherwise', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const workspaceId = 'ws-1';
+    const workspace = {
+      id: workspaceId, projectId: 'overdeck', kind: 'issue', name: 'feature-pan-9001',
+      path: '/repo/workspaces/feature-pan-9001', issueId: 'PAN-9001', layoutConfig: null, title: null, pipeline: null,
+    };
+    const conversations = [
+      // cwd is under the workspace path, but workspaceId points elsewhere — must be excluded.
+      { id: 10, name: 'cwd-under-but-other-workspace', tmuxSession: 't10', status: 'active', cwd: '/repo/workspaces/feature-pan-9001/sub', issueId: null, createdAt: '', endedAt: null, lastAttachedAt: null, sessionAlive: true, workspaceId: 'ws-other' },
+      // cwd is NOT under the workspace path, but workspaceId matches — must be included.
+      { id: 11, name: 'cwd-elsewhere-but-this-workspace', tmuxSession: 't11', status: 'active', cwd: '/repo/unrelated', issueId: null, createdAt: '', endedAt: null, lastAttachedAt: null, sessionAlive: true, workspaceId },
+      // No workspaceId at all (pre-migration row) — falls back to cwd containment, matches.
+      { id: 12, name: 'legacy-cwd-match', tmuxSession: 't12', status: 'active', cwd: '/repo/workspaces/feature-pan-9001', issueId: null, createdAt: '', endedAt: null, lastAttachedAt: null, sessionAlive: true },
+    ];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `/api/workspace-registry/${workspaceId}`) return Response.json(workspace);
+      if (url === `/api/workspace-registry/${workspaceId}/memory`) return Response.json(null);
+      if (url === '/api/conversations') return Response.json(conversations);
+      if (url.startsWith('/api/workspaces/') && url.endsWith('/plan')) return Response.json(null);
+      return Response.json({});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <QueryClientProvider client={client}>
+        <WorkspaceView workspaceId={workspaceId} />
+      </QueryClientProvider>,
+    );
+
+    const list = await screen.findByTestId('conversation-list');
+    await waitFor(() => {
+      const ids = (list.getAttribute('data-include-ids') ?? '').split(',').map(Number).sort();
+      expect(ids).toEqual([11, 12]);
+    });
+  });
+});
+
 describe('WorkspaceView (ac4)', () => {
   it('the conversations filter has an all-conversations escape hatch', async () => {
     renderWorkspaceView();

@@ -150,23 +150,32 @@ export function unarchiveWorkspace(id: string): void {
 /**
  * Delete a non-main workspace row. Conversations attributed to it are
  * preserved with workspace_id set to NULL — never deleted. Workspace-scoped
- * pins are removed; project-scoped pins are untouched. Never touches JSONL
- * transcripts or the memory home (memory purge is a separate explicit flag
- * on the CLI destroy verb).
+ * pins are removed, including their committed overdeck-state mirror
+ * descriptors (FR-10/FR-11 — the mirror is the durable representation, so a
+ * pin row deleted here without unmirroring it would let a future recovery
+ * from state resurrect a pin the workspace deletion was supposed to remove).
+ * Project-scoped pins are untouched. Never touches JSONL transcripts or the
+ * memory home (memory purge is a separate explicit flag on the CLI destroy
+ * verb).
  */
-export function deleteWorkspace(id: string): void {
+export async function deleteWorkspace(id: string): Promise<void> {
   const db = getOverdeckDatabaseSync();
   const workspace = getWorkspaceById(id);
   if (!workspace) return;
   if (workspace.kind === 'main') {
     throw new Error(`Cannot delete the main workspace for project ${workspace.projectId}`);
   }
+  const workspacePins = db.prepare(`SELECT doc_path FROM pinned_docs WHERE scope = 'workspace' AND scope_id = ?`)
+    .all(id) as Array<{ doc_path: string }>;
+
   const run = db.transaction(() => {
     db.prepare(`UPDATE conversations SET workspace_id = NULL WHERE workspace_id = ?`).run(id);
     db.prepare(`DELETE FROM pinned_docs WHERE scope = 'workspace' AND scope_id = ?`).run(id);
     db.prepare(`DELETE FROM workspaces WHERE id = ?`).run(id);
   });
   run();
+
+  await Promise.all(workspacePins.map((pin) => unmirrorPin(workspace.projectId, 'workspace', id, pin.doc_path)));
 }
 
 // ─── Pinned docs ───────────────────────────────────────────────────────────

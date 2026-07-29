@@ -69,7 +69,7 @@ describe('conversation <-> workspace linkage (PAN-1990)', () => {
     createConversation({ name: 'conv-survives', tmuxSession: 'tmux-5', cwd: '/repo/overdeck-scratch', workspaceId });
     expect(getConversationByName('conv-survives')?.workspaceId).toBe(workspaceId);
 
-    deleteWorkspace(workspaceId);
+    await deleteWorkspace(workspaceId);
 
     const conv = getConversationByName('conv-survives');
     expect(conv).not.toBeNull();
