@@ -44,7 +44,7 @@
     "recordedAt": "2026-07-29T06:18:50.753Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T06:59:52.070Z",
+  "updated": "2026-07-29T06:59:54.729Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "blocked",
@@ -157,7 +157,7 @@
     }
   ],
   "tasks": {
-    "sequence": 8,
+    "sequence": 9,
     "claims": {
       "boot-trim-notes": {
         "writerId": "agent-pan-3253",
@@ -165,13 +165,6 @@
         "pid": 431544,
         "host": "eltmon-z790",
         "claimedAt": "2026-07-29T06:59:47.470Z"
-      },
-      "docs-bounds": {
-        "writerId": "agent-pan-3253",
-        "agentId": "agent-pan-3253",
-        "pid": 432132,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T06:59:52.070Z"
       }
     },
     "claimHistory": [
@@ -207,6 +200,17 @@
         "outcome": "completed",
         "reason": "Bounded payloads at append door with comprehensive tests",
         "releasedAt": "2026-07-29T06:59:41.008Z"
+      },
+      {
+        "writerId": "agent-pan-3253",
+        "agentId": "agent-pan-3253",
+        "pid": 432132,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T06:59:52.070Z",
+        "itemId": "docs-bounds",
+        "outcome": "completed",
+        "reason": "Implementation complete",
+        "releasedAt": "2026-07-29T06:59:54.728Z"
       }
     ],
     "statusReasons": {
@@ -217,6 +221,10 @@
       "append-door-bound": {
         "reason": "Bounded payloads at append door with comprehensive tests",
         "updatedAt": "2026-07-29T06:59:41.008Z"
+      },
+      "docs-bounds": {
+        "reason": "Implementation complete",
+        "updatedAt": "2026-07-29T06:59:54.728Z"
       }
     }
   },
@@ -231,6 +239,8 @@
     "append-door-bound.append-door-bound.ac3": "completed",
     "append-door-bound.append-door-bound.ac4": "completed",
     "boot-trim-notes": "running",
-    "docs-bounds": "running"
+    "docs-bounds": "completed",
+    "docs-bounds.docs-bounds.ac1": "completed",
+    "docs-bounds.docs-bounds.ac2": "completed"
   }
 }
