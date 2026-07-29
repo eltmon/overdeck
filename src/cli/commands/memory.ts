@@ -9,6 +9,7 @@ import {
   runMemoryDoctor,
   searchMemory,
 } from '../../lib/memory/cli.js';
+import { backfillMemoryFromTranscripts } from '../../lib/memory/backfill.js';
 import { getProjectByKey, getWorkspaceById, listPinnedDocs } from '../../lib/workspaces/resolver.js';
 import { pinDoc, unpinDoc } from '../../lib/workspaces/writer.js';
 import type { PinScope, ProjectRow } from '../../lib/workspaces/types.js';
@@ -126,6 +127,31 @@ export function createMemoryCommand(): Command {
         }
       }
       process.exitCode = result.exitCode;
+    });
+
+  memory
+    .command('backfill')
+    .description('Backfill memory observations from historical Claude Code JSONL transcripts')
+    .option('--workspace <id>', 'Only backfill sessions resolved to this workspace id')
+    .option('--project <id>', 'Only backfill sessions resolved to this project id')
+    .option('--dry-run', 'Report matched sessions without extracting or writing anything')
+    .option('--json', 'Output JSON')
+    .action(async (options) => {
+      const result = await backfillMemoryFromTranscripts({
+        workspaceId: options.workspace,
+        projectId: options.project,
+        dryRun: options.dryRun,
+      });
+      if (options.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      for (const warning of result.warnings) console.log(chalk.yellow(`warning: ${warning}`));
+      for (const session of result.sessions) {
+        console.log(`${session.transcriptPath}: ${session.status}${session.workspaceId ? ` (workspace ${session.workspaceId})` : ''}`);
+      }
+      const processed = result.sessions.filter((s) => s.status === 'processed' || s.status === 'dry-run-matched').length;
+      console.log(chalk.bold(`${processed}/${result.sessions.length} session(s) matched a workspace.`));
     });
 
   memory
