@@ -147,17 +147,14 @@
       "reason": "feedback",
       "note": "[2026-07-29T02:12Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-29T02:12:38.872Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T02:12:38Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3232\n\n# Review — PAN-3232 — Cycle 13\n\n## Verdict: CHANGES REQUESTED — the restored SimpleHome and agent-preservation cases still do not execute those production paths, and multiple pending conversations are dropped when their issue is already docked\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3232/.pan/review/agent-pan-3232-review-93eb66b0/context.json`\n- Branch: `feature/pan-3232`\n- PR: `#3251`\n- HEAD reviewed: `93eb66b0ac68213ef197f67df543f99c01aecfeb`\n- Prior reviewed HEAD: `10c51d3f55119efe24f769a3b7b007022a3c59c1`\n- Cycle diff: `10c51d3f..93eb66b0`\n- Dimensions reviewed: correctness, security, requirements/acceptance criteria, and performance\n- The repair commit `8e5d963f4e` is pushed to PR #3251. The assigned local HEAD adds a merge from current `origin/main`; that merge commit itself is not yet on the feature remote.\n- All blockers below are anchored in code added or changed since the prior verdict.\n\n## Blocking Findings\n\n### ! [requirements/test integrity] The “restored” SimpleHomePage and agent-preservation coverage still executes no such production behavior — `src/dashboard/frontend/src/__tests__/fr7-conversation-pending-input.test.tsx:37`\n**Scope:** in_pr_scope; introduced in the current cycle  \n**Evidence tier:** Tier 1 — direct test-to-production trace  \n\nThe current cycle brings the focused suite back to seven green tests, but two required cases remain simulated or absent:\n\n- The SimpleHomePage case never imports or renders `SimpleHomePage`. It defines an unused `SimpleHomePageMock`, then renders a literal `<div>` whose source text is already “SimpleHome question?” and asserts that literal exists. The `vi.mock(... importActual ...)` above it has no consumer and does not exercise production.\n- The claimed agent/conversation distinction case supplies only a conversation subject with an empty agent store. `mockAgent` is unused, so no test verifies any of the three surfaces still renders an agent-sourced entry, as required by FR-7 AC-3.\n\nThe suite therefore passes if SimpleHomePage completely drops conversation rows or if agent-backed behavior regresses. This repeats the earlier self-simulating-test defect under a production-looking filename.\n\nThe file also remains outside root `npm test`, which runs only three explicitly named frontend issue-action tests after the root suite.\n\n**Impact:** FR-7 AC-1 is still unproved for SimpleHomePage, FR-7 AC-3 is unproved for every surface, and the required project quality gate cannot catch regressions in this file.\n\n**Fix:** Render the real SimpleHomePage with its required QueryClient/UI providers or mock only unrelated children, create a valid pending `AgentSnapshot` and assert agent-backed entries/actions for each surface, and include this file in root `npm test` or the default frontend suite root invokes. Do not assert hand-written replacement markup.\n\n### ! [correctness/data integrity] A docked issue with two pending conversations silently drops the second conversation — `src/dashboard/frontend/src/components/dock/ConversationDock.tsx:125`\n**Scope:** in_pr_scope; introduced in the current cycle  \n**Evidence tier:** Tier 1 — deterministic multi-row trace  \n\nThe promotion logic correctly replaces an already-docked empty issue panel with the first conversation. For the second pending conversation on the same issue, `dockedIssueIds.has(issueKey)` is still true, but `result.findIndex(...)` can no longer find an `{ type: 'issue' }` row because the first iteration replaced it. The index is `-1`, and the code neither replaces nor appends the second conversation.\n\nThe new “multiple conversations” test does not cover this path because the mocked dock always has `items: []`. With an empty dock both rows append, so the test passes while the persisted-dock path loses one pending conversation.\n\n**Impact:** ConversationDock silently omits actionable operator input whenever multiple conversations for an already-docked issue are waiting. The omitted conversation has no name, question, or action in that surface.\n\n**Fix:** Build the conversation rows independently and replace the docked issue entry once without suppressing subsequent conversation identities, or group the issue entry with all matching conversation rows. Add a test whose dock contains `PAN-1` and whose pending subjects contain two distinct conversations for `PAN-1`.\n\n## Resolved Prior Findings\n\n- A single pending conversation now promotes an already-docked empty issue panel to the typed conversation entry.\n- The focused FR-7 suite runs green: 1 file, 7 tests.\n- The repair restores a nominal SimpleHome section and a nominal distinction section, but both require real production coverage as described above.\n- The branch repair commit is pushed to PR #3251.\n- Typecheck and focused lint remain green.\n\n## Non-blocking Findings\n\n### ~ [correctness/UX] The conversation entry remains a 420px placeholder without the question, transcript, navigation, or answer action — `src/dashboard/frontend/src/components/dock/ConversationDock.tsx:23`\nIt identifies the conversation and issue and satisfies the narrow materialization requirement, but still directs the operator elsewhere rather than functioning as the live-feed/composer panel described by the component contract. FR-7 explicitly requires an entry rather than the complete conversation renderer, so this remains advisory.\n\n### ~ [correctness, previously reviewed] SimpleHomePage collapses multiple pending subjects by issue and may route an agent card to a conversation — `src/dashboard/frontend/src/components/simple/SimpleHomePage.tsx:210`\n`subjectByIssue` stores one subject per issue, so same-issue subjects can overwrite each other. This predates the current cycle and remains advisory under the convergence gate.\n\n### ~ [correctness, previously reviewed] SessionPanel can discard independent Channels permission evidence — `src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx:338`\n`session.pendingInputKinds ?? ...` does not merge the independent Channels permission source and treats an empty array as authoritative. This remains advisory under the convergence gate.\n\n### ~ [correctness, previously reviewed] NeedsYouStrip still omits enrichment-only prompt text — `src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx:138`\nThe question map reads only structured AskUserQuestion text and does not fall back to `pendingQuestionPrompt`. This remains advisory under the convergence gate.\n\n### ~ [requirements, previously reviewed] FR-1 through FR-5 still lack the xBRIEF's named executable seam tests\nIssue-view projection, Decisions precedence, SessionPanel labels, delta mapping/reduction, and specialist projection still lack their named production-backed tests. Those implementation lines were not changed this cycle, so the convergence gate keeps this advisory.\n\n### ~ [documentation, previously reviewed] The delta documentation promises ~1s updates while enrichment runs every 10 seconds — `docs/ASKUSERQUESTION-DASHBOARD.md:345`\nThe delta is push-based after enrichment, but the poller interval is 10 seconds. The wording should promise one enrichment cycle or state the actual upper bound.\n\n## Security Review\nNo blocking security issue found. Conversation and agent identifiers render as React text, URL identifiers remain encoded, and answers use existing origin-checked endpoints. No authentication, authorization, filesystem, command-execution, secret-handling, raw-HTML, or destructive endpoint boundary changed.\n\n## Performance Review\nNo blocking performance regression found. Dock construction and sorting operate over bounded dashboard lists and are memoized. The replacement loop performs repeated linear searches, but dock and pending-subject populations are small. No new polling loop, synchronous server operation, cache invalidation, or unbounded fan-out was introduced.\n\n## Requirements Coverage\n- FR-1: implementation present; named executable coverage absent.\n- FR-2: implementation present; named executable coverage absent.\n- FR-3: implementation present; independent permission evidence remains advisory and named coverage is absent.\n- FR-4 / NFR-1 / NFR-2: push-based implementation present; named mapper/reducer coverage is absent.\n- FR-5: specialist projection and `ReviewerNode` fields are present; named route/builder coverage is absent.\n- FR-6 / NFR-3: implemented.\n- FR-7: NeedsYouStrip identity/key behavior is covered; the SimpleHome test is hand-written markup, agent preservation is not tested, and the docked multi-conversation path loses rows; the focused file is still outside root `npm test`.\n- FR-8: documentation present, with the latency wording advisory above.\n- Non-goals remain respected: no classifier, GodView/AgentCard, recovery-path, shared awaiting-input helper, conversation prompt-threading, or new polling-loop change.\n\n## Verification Performed\n- Reviewed the complete assigned HEAD and cycle diff `10c51d3f..93eb66b0`.\n- Confirmed the workspace is clean and `git diff --check` passes.\n- Focused FR-7 test passes: 1 file, 7 tests.\n- `npm run typecheck` passes: dashboard baseline 58 with no new errors; frontend 0 errors.\n- Focused ESLint on the changed test and ConversationDock passes.\n- The repair commit is on the PR remote; the local branch is two commits ahead due to the latest main merge.\n- No implementation files were modified and no test role was queued.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3232/.pan/review/agent-pan-3232-review-93eb66b0/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3232 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-29T02:16:07.708Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -234,17 +231,17 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T02:16:05.980Z",
+  "updated": "2026-07-29T02:16:08.062Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T02:16:05.944Z",
+    "updatedAt": "2026-07-29T02:16:06.580Z",
     "reviewNotes": "The restored SimpleHome and agent tests still bypass production, and a docked issue with multiple pending conversations silently drops all but the first",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
@@ -255,7 +252,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewSpawnedAt": "2026-07-29T02:09:07.990Z"
+    "reviewSpawnedAt": "2026-07-29T02:16:06.580Z"
   },
   "closeOut": {
     "usage": {
@@ -315,7 +312,7 @@
       },
       "costAtCloseOut": {
         "usd": 224.186656,
-        "pricingAsOf": "2026-07-29T02:16:05.977Z"
+        "pricingAsOf": "2026-07-29T02:16:08.059Z"
       }
     },
     "merges": [
