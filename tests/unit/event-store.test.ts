@@ -161,7 +161,18 @@ describe('trimReviewStatusHistoryPayloads (PAN-3253)', () => {
 
   it('trim converges to a no-op on second run (boot-trim-notes.ac2)', async () => {
     const { trimReviewStatusHistoryPayloads } = await import('../../src/dashboard/server/event-store.js');
-    const originalLength = insertReviewEvent(25, 'MIN-905');
+    // Create a large payload with long notes to exceed 16KB threshold
+    const longNote = 'x'.repeat(1000);
+    const largeHistory = Array.from({ length: 30 }, (_, i) => ({
+      type: 'review',
+      status: i % 2 === 0 ? 'pending' : 'passed',
+      timestamp: new Date(1_753_000_000_000 + i * 1000).toISOString(),
+      notes: longNote,
+    }));
+    const payload = JSON.stringify({ issueId: 'MIN-905', status: { issueId: 'MIN-905', reviewStatus: 'passed', history: largeHistory } });
+    db.prepare('INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)').run(
+      'review.status_changed', Date.now(), payload,
+    );
 
     // First trim
     const result1 = trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
