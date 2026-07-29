@@ -171,18 +171,25 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T01:03:06.082Z",
+  "updated": "2026-07-29T01:06:29.248Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T01:02:59.796Z",
-    "reviewNotes": "The replacement test executes no production code or default gate, and NeedsYouStrip/ConversationDock still fail FR-7",
+    "updatedAt": "2026-07-29T01:06:29.185Z",
+    "reviewNotes": "This cycle only documents that the feature is 60% complete; FR-7 and executable acceptance coverage remain unimplemented",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-29T00:44:21.774Z"
+      }
+    ],
     "conflictsSince": {
       "sha": "701cbb21f1deb79f90c821db2bf23db7d02d4886",
       "detectedAt": "2026-07-29T00:29:21.202Z",
@@ -214,9 +221,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 8366313,
-            "output": 322627,
-            "cacheRead": 72591360,
+            "input": 10089295,
+            "output": 349765,
+            "cacheRead": 79590400,
             "cacheWrite": 0
           }
         },
@@ -243,15 +250,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 8366313,
-          "output": 322627,
-          "cacheRead": 72591360,
+          "input": 10089295,
+          "output": 349765,
+          "cacheRead": 79590400,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 108.078118,
-        "pricingAsOf": "2026-07-29T01:03:01.789Z"
+        "usd": 121.006688,
+        "pricingAsOf": "2026-07-29T01:06:29.222Z"
       }
     },
     "merges": [
@@ -260,7 +267,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3232",
