@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T00:52:04.374Z",
+  "updated": "2026-07-29T00:57:56.460Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "pending",
@@ -79,16 +79,8 @@
     }
   ],
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "chip-context-menu": {
-        "writerId": "agent-pan-3260",
-        "agentId": "agent-pan-3260",
-        "pid": 68413,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T00:52:04.374Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3260",
@@ -144,6 +136,17 @@
         "outcome": "completed",
         "reason": "Added MarkdownOpenTarget/getMarkdownOpenTarget/setMarkdownOpenTarget to editorPreferences.ts (localStorage key overdeck:markdown-open-target, default 'internal', separate from overdeck:last-editor). MarkdownFileLink.tsx: added isMarkdownPath (md/mdx/markdown via existing extensionOfPath), useStageDeck() consumption, and a new handleMarkdownClick left-click path — 'internal' target + deck present opens/focuses the editor pane via openOrFocusEditorPane; 'internal' + no deck falls back to the existing handleOpen() external flow; a persisted external EditorId target launches that editor directly via openWithExternalEditor. Non-markdown chips are untouched (still always handleOpen()). Right-click menu is untouched here — that's chip-context-menu's job. 5 new tests (internal-default opens pane + no shellOpenInEditor call, the flywheel-brief repo-root/no-issueId case, persisted external target launches externally, null-deck fallback, non-markdown chips stay external even inside a deck) plus all 14 pre-existing tests pass (19 total). Root typecheck clean.",
         "releasedAt": "2026-07-29T00:51:55.389Z"
+      },
+      {
+        "writerId": "agent-pan-3260",
+        "agentId": "agent-pan-3260",
+        "pid": 68413,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T00:52:04.374Z",
+        "itemId": "chip-context-menu",
+        "outcome": "completed",
+        "reason": "Added a module-level cached fetchAvailableEditors() (same pattern as the Quickview highlighter cache; on failure clears the cache and proceeds with an empty external list). Markdown chip right-click now builds an async menu: 'Open in internal editor' (persists setMarkdownOpenTarget('internal'), opens/focuses the pane or falls back to handleOpen() with no deck) + one 'Open in <EDITORS label>' per available editor (persists setMarkdownOpenTarget(id), launches via the new openWithExternalEditor) + the existing two copy actions. Non-markdown chips are untouched (same three-item menu built synchronously as before). 4 new tests (menu order, external-choice persists across an unmount/remount, internal-choice persists, non-markdown menu unchanged) — found and fixed a real cross-test leak in the process: showContextMenu appends its menu directly to document.body outside React's tree, so a test that opens the menu without dismissing it leaks stale DOM nodes that a later test's role queries can match; added an explicit Escape dismissal to the menu-order test. 23/23 tests pass (stable across repeated runs), full root typecheck clean.",
+        "releasedAt": "2026-07-29T00:57:56.460Z"
       }
     ],
     "statusReasons": {
@@ -166,6 +169,10 @@
       "chip-internal-default": {
         "reason": "Added MarkdownOpenTarget/getMarkdownOpenTarget/setMarkdownOpenTarget to editorPreferences.ts (localStorage key overdeck:markdown-open-target, default 'internal', separate from overdeck:last-editor). MarkdownFileLink.tsx: added isMarkdownPath (md/mdx/markdown via existing extensionOfPath), useStageDeck() consumption, and a new handleMarkdownClick left-click path — 'internal' target + deck present opens/focuses the editor pane via openOrFocusEditorPane; 'internal' + no deck falls back to the existing handleOpen() external flow; a persisted external EditorId target launches that editor directly via openWithExternalEditor. Non-markdown chips are untouched (still always handleOpen()). Right-click menu is untouched here — that's chip-context-menu's job. 5 new tests (internal-default opens pane + no shellOpenInEditor call, the flywheel-brief repo-root/no-issueId case, persisted external target launches externally, null-deck fallback, non-markdown chips stay external even inside a deck) plus all 14 pre-existing tests pass (19 total). Root typecheck clean.",
         "updatedAt": "2026-07-29T00:51:55.389Z"
+      },
+      "chip-context-menu": {
+        "reason": "Added a module-level cached fetchAvailableEditors() (same pattern as the Quickview highlighter cache; on failure clears the cache and proceeds with an empty external list). Markdown chip right-click now builds an async menu: 'Open in internal editor' (persists setMarkdownOpenTarget('internal'), opens/focuses the pane or falls back to handleOpen() with no deck) + one 'Open in <EDITORS label>' per available editor (persists setMarkdownOpenTarget(id), launches via the new openWithExternalEditor) + the existing two copy actions. Non-markdown chips are untouched (same three-item menu built synchronously as before). 4 new tests (menu order, external-choice persists across an unmount/remount, internal-choice persists, non-markdown menu unchanged) — found and fixed a real cross-test leak in the process: showContextMenu appends its menu directly to document.body outside React's tree, so a test that opens the menu without dismissing it leaks stale DOM nodes that a later test's role queries can match; added an explicit Escape dismissal to the menu-order test. 23/23 tests pass (stable across repeated runs), full root typecheck clean.",
+        "updatedAt": "2026-07-29T00:57:56.460Z"
       }
     }
   },
@@ -193,6 +200,10 @@
     "chip-internal-default.chip-internal-default.ac2": "completed",
     "chip-internal-default.chip-internal-default.ac3": "completed",
     "chip-internal-default.chip-internal-default.ac4": "completed",
-    "chip-context-menu": "running"
+    "chip-context-menu": "completed",
+    "chip-context-menu.chip-context-menu.ac1": "completed",
+    "chip-context-menu.chip-context-menu.ac2": "completed",
+    "chip-context-menu.chip-context-menu.ac3": "completed",
+    "chip-context-menu.chip-context-menu.ac4": "completed"
   }
 }
