@@ -2,7 +2,7 @@
   "issueId": "PAN-3260",
   "schemaVersion": 2,
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T00:03:07.787Z",
+  "updated": "2026-07-29T00:03:08.889Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3260: Markdown file chips should open the internal markdown editor in a tab by default, with internal/external choice on right-click",
       "timestamp": "2026-07-29T00:03:07.786Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
