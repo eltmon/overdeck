@@ -337,18 +337,18 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T03:56:54.208Z",
+  "updated": "2026-07-29T04:06:22.510Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T03:56:54.197Z",
+    "updatedAt": "2026-07-29T04:06:22.476Z",
     "reviewNotes": "The Kimi capture mutex is process-local, but pan start/strike, dashboard conversations, and Deacon recovery launch in separate processes, so same-cwd sessions can still capture each other's transcript identity. See review.md.",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
@@ -360,7 +360,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
     "reviewedAtCommit": "96f15e4b7bc5cbcc7d8167c5deb2966b4779434c",
-    "lastVerifiedCommit": "aa65ccfa54a4ed05f33764fbbf6c15de3508f913",
+    "lastVerifiedCommit": "96f15e4b7bc5cbcc7d8167c5deb2966b4779434c",
     "reviewSpawnedAt": "2026-07-29T03:51:42.658Z"
   },
   "closeOut": {
@@ -376,18 +376,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 10444332,
-            "output": 426494,
-            "cacheRead": 154650624,
+            "input": 10448766,
+            "output": 426732,
+            "cacheRead": 155206656,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 4110,
-            "output": 934493,
-            "cacheRead": 1063448418,
-            "cacheWrite": 5438643
+            "input": 4178,
+            "output": 962163,
+            "cacheRead": 1089421728,
+            "cacheWrite": 5492821
           }
         }
       },
@@ -399,21 +399,21 @@
           "cacheWrite": 187167
         },
         "openai/gpt-5.6-sol": {
-          "input": 10444332,
-          "output": 426494,
-          "cacheRead": 154650624,
+          "input": 10448766,
+          "output": 426732,
+          "cacheRead": 155206656,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 4110,
-          "output": 934493,
-          "cacheRead": 1063448418,
-          "cacheWrite": 5438643
+          "input": 4178,
+          "output": 962163,
+          "cacheRead": 1089421728,
+          "cacheWrite": 5492821
         }
       },
       "costAtCloseOut": {
-        "usd": 385.654347,
-        "pricingAsOf": "2026-07-29T03:56:54.205Z"
+        "usd": 391.568616,
+        "pricingAsOf": "2026-07-29T04:06:22.500Z"
       }
     },
     "merges": [
