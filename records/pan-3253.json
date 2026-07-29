@@ -113,17 +113,14 @@
       "reason": "feedback",
       "note": "[2026-07-29T09:37Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-29T09:37:44.631Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T09:37:44Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3253\n\n# Code Review — PAN-3253 — 2026-07-29\n\n## Verdict: CHANGES REQUESTED — two new acceptance tests still bypass the branches they claim to prove\n\n## Context\n- Branch: `feature/pan-3253`\n- HEAD reviewed: `14703dbb3871a0e90db6fb10d370b144c231ac3a`\n- PR: `#3279`\n- PR remote HEAD: `14703dbb3871a0e90db6fb10d370b144c231ac3a`\n- Cycle: 10\n- Prior blocker progress: appendOnce coverage is now correctly placed in the dashboard event-store fixture, documentation is corrected, and focused tests pass.\n- Convergence note: these blockers concern tests added in this cycle to resolve the previous verdict. The malformed case is new and does not reach its target branch; the composition case still bypasses the exact split already identified in cycle 9.\n\n## Blocking Findings\n\n### ! [requirements / test correctness] The malformed-JSON test is below the 16 KiB query threshold, so the parse-failure branch is never executed — `tests/unit/event-store.test.ts:379`\n\nThe new fixture uses roughly 1,000 characters of malformed JSON, but `trimReviewStatusHistoryPayloads()` selects only `review.status_changed` rows whose payload length exceeds `OVERSIZED_REVIEW_PAYLOAD_CHARS` (`16 * 1024`). The row is therefore never passed to `boundReviewStatusPayload()`, and the test succeeds without exercising JSON parsing or the catch-and-preserve behavior required by `append-door-bound.ac3`.\n\nMake the malformed payload exceed 16 KiB, assert `trimmed === 0`, and assert the stored bytes remain exactly equal. That directly covers the reachable malformed historical-row path while preserving D5's threshold.\n\n### ! [requirements / test correctness] The notes-cap test still calls the low-level writer directly instead of testing `setReviewStatusSync()` composition — `tests/unit/lib/overdeck/review-status-sync.test.ts:243`\n\nThe test says it verifies the `dbStatus`/`updated` split in `setReviewStatusSync()`, but it calls `upsertReviewStatusSync()` with a hand-built raw history entry. That proves only that the low-level writer stores what it receives and hydration truncates it. It cannot catch the original regression where `setReviewStatusSync()` might pass bounded history to `dbUpsert`, nor does it verify `notes-cap.ac2` that `status.testNotes` stays at 10,000 characters while the appended history note is capped.\n\nExercise a real transition through `setReviewStatusSync()` using the Overdeck DB test helper, then assert all three outputs from the same operation:\n\n1. returned/journal-facing history note is `<= 500` and ends with `…`;\n2. returned `status.testNotes` is the complete 10,000-character value;\n3. raw `status_history.notes` is the complete 10,000-character value.\n\n## Correctness / Logic\n\nNo blocking production-code defect was found in this cycle. The append doors, canonical SQL-bounded hydration, raw-versus-bounded status split, boot trim, and shared limits are internally consistent.\n\n## Security\n\nNo exploitable security issue was found. Malformed JSON is handled without execution, and the changes do not affect authentication, authorization, filesystem access, command execution, or secrets.\n\n## Requirements / Acceptance Criteria\n\n- FR-1: production logic and appendOnce coverage are present; AC3's malformed-input branch is still not genuinely exercised.\n- FR-2: production logic appears correct; AC2/AC3 still bypass the `setReviewStatusSync()` composition path.\n- FR-3: implemented and covered by idempotent boot-trim tests.\n- FR-4: documentation is now accurate about bounded event history and the canonical hydration owner.\n- D4 and all listed NonGoals are preserved.\n\n## Performance\n\nCanonical hydration is bounded in SQL, and append-time bounding is linear in incoming payload size. No blocking performance regression was found. The 16 KiB boot-trim threshold and seven-day retention remain unchanged as required.\n\n## Verification\n\n- PR HEAD matches reviewed HEAD `14703dbb`.\n- Focused Vitest run: **65 passed** across event store, appendOnce, canonical hydration, legacy hydration, and review-status suites.\n- ESLint on changed TypeScript/test files: **passed**.\n- GitHub build, guard, lint, prompt-trailer, smoke, and flake-lane checks are green; the main test check was still running during review.\n\nThe focused tests pass because the two fixtures above bypass the target branches, so green execution does not satisfy those acceptance criteria.\n\n## Non-blocking Findings\n\n### ~ [formatting] `git diff --check origin/main...HEAD` reports an extra blank line at EOF in `tests/unit/lib/overdeck/review-status-sync.test.ts:299`.\n\n### ~ [test determinism] Some unit event-store assertions still select all matching rows and rely on array position. Selecting by returned sequence would make them deterministic, though the current isolated fixture keeps them stable.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253/.pan/review/agent-pan-3253-review-14703dbb/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3253 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-29T09:40:37.035Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-allowlist.txt",
@@ -158,21 +155,21 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T09:40:35.256Z",
+  "updated": "2026-07-29T09:40:37.228Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T09:16:42.721Z",
-    "updatedAt": "2026-07-29T09:40:35.225Z",
+    "updatedAt": "2026-07-29T09:40:35.812Z",
     "reviewNotes": "Production code looks correct, but the new malformed-JSON test is below the 16 KiB trim threshold and never reaches parsing, while the notes-cap test still bypasses setReviewStatusSync and cannot prove the raw/bounded composition split.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "lastVerifiedCommit": "14703dbb3871a0e90db6fb10d370b144c231ac3a",
-    "reviewSpawnedAt": "2026-07-29T09:34:55.307Z",
+    "reviewSpawnedAt": "2026-07-29T09:40:35.811Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt",
@@ -257,7 +254,7 @@
       },
       "costAtCloseOut": {
         "usd": 95.235898,
-        "pricingAsOf": "2026-07-29T09:40:35.252Z"
+        "pricingAsOf": "2026-07-29T09:40:37.224Z"
       }
     },
     "merges": [
