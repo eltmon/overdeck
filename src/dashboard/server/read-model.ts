@@ -242,42 +242,6 @@ export function toAgentStatus(v: unknown): AgentStatus {
   return VALID_AGENT_STATUSES.has(v as AgentStatus) ? v as AgentStatus : "unknown";
 }
 
-/** Pending-input fields carried by an agent snapshot (PAN-1591). */
-type PendingInputFields = Pick<
-  AgentSnapshot,
-  | 'hasPendingQuestion'
-  | 'pendingQuestionCount'
-  | 'pendingQuestionPrompt'
-  | 'pendingQuestionReason'
-  | 'pendingInputCount'
-  | 'pendingInputKinds'
-  | 'pendingAskUserQuestion'
->;
-
-/**
- * PAN-1591 — a non-running agent cannot be awaiting interactive input. The
- * enrichment poller only emits for live agents, so a `hasPendingQuestion: true`
- * computed while the agent was last alive lingers in the cache forever; the
- * `agent.status_changed` reducer already strips it on a RUNTIME stop, but the
- * bootstrap projection of an agent that was ALREADY stopped at server start
- * never did — surfacing phantom "Waiting on your input" rows that report "no
- * longer waiting" on click. This applies the same rule at projection time:
- * clear every pending-input field unless the agent is running/starting.
- */
-export function projectPendingInput(status: AgentStatus, src: PendingInputFields): PendingInputFields {
-  if (status !== 'running' && status !== 'starting') {
-    return {
-      hasPendingQuestion: undefined,
-      pendingQuestionCount: undefined,
-      pendingQuestionPrompt: undefined,
-      pendingQuestionReason: undefined,
-      pendingInputCount: undefined,
-      pendingInputKinds: undefined,
-      pendingAskUserQuestion: undefined,
-    };
-  }
-  return src;
-}
 export function toRole(v: unknown): Role | undefined {
   return v && VALID_ROLES.has(v as Role) ? v as Role : undefined;
 }

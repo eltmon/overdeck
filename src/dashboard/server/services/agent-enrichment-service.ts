@@ -120,12 +120,14 @@ export function hasReapablePendingInput(enrichment: AgentEnrichment): boolean {
 export function buildPendingReapEvent(
   agentId: string,
   previous: AgentEnrichment,
+  issueId?: string,
 ): Omit<AgentEnrichmentChangedEvent, 'sequence'> {
   return {
     type: 'agent.enrichment_changed',
     timestamp: new Date().toISOString(),
     payload: {
       agentId,
+      issueId,
       role: previous.role,
       hasPendingQuestion: false,
       pendingQuestionCount: 0,
@@ -302,6 +304,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
         timestamp: new Date().toISOString(),
         payload: {
           agentId,
+          issueId,
           role: toRole(agent.role) ?? 'work',
           hasPendingQuestion: enrichment.hasPendingQuestion,
           pendingQuestionCount: enrichment.pendingQuestionCount,
@@ -330,14 +333,15 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
   for (const [id, previousEnrichment] of state.lastEnrichment) {
     if (!activeIds.has(id)) {
       if (hasReapablePendingInput(previousEnrichment)) {
+        const agentRecord = runningAgents.find(agent => agent.id === id)
+        const reapIssueId = agentRecord?.issueId
         try {
-          await eventStore.appendAsync(buildPendingReapEvent(id, previousEnrichment) as never)
+          await eventStore.appendAsync(buildPendingReapEvent(id, previousEnrichment, reapIssueId) as never)
         } catch {
           // Non-fatal — event store may not be initialized yet at startup
         }
 
-        const agentRecord = runningAgents.find(agent => agent.id === id)
-        const issueId = agentRecord?.issueId
+        const issueId = reapIssueId
         emitActivityEntrySync({
           source: toRole(agentRecord?.role) ?? 'work',
           level: 'info',
