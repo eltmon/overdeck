@@ -164,13 +164,19 @@ export async function openEventDb(): Promise<DbAdapter> {
 // ─── One-shot payload trim (PAN-3253) ─────────────────────────────────────────
 
 const REVIEW_HISTORY_TRIM_LIMIT = 20;
+const REVIEW_STATUS_NOTE_LIMIT = 500;
 const OVERSIZED_REVIEW_PAYLOAD_CHARS = 16 * 1024;
+
+function truncateHistoryNote(notes: string | undefined): string | undefined {
+  if (!notes || notes.length <= REVIEW_STATUS_NOTE_LIMIT) return notes;
+  return notes.slice(0, REVIEW_STATUS_NOTE_LIMIT - 1) + '…';
+}
 
 /**
  * PAN-3253: older review.status_changed rows embed the full unbounded
  * `status.history` array — on one machine that single event type was 80% of a
  * 1.3 GB overdeck.db. Rewrite each oversized payload keeping only the bounded
- * history tail. New emissions are already bounded at hydration
+ * history tail with truncated notes. New emissions are already bounded at hydration
  * (REVIEW_STATUS_HISTORY_LIMIT), so this converges to a no-op.
  */
 export function trimReviewStatusHistoryPayloads(
@@ -185,10 +191,32 @@ export function trimReviewStatusHistoryPayloads(
   let savedChars = 0;
   for (const row of rows) {
     try {
-      const parsed = JSON.parse(row.payload) as { status?: { history?: unknown } };
+      const parsed = JSON.parse(row.payload) as { status?: { history?: Array<{ notes?: string }> } };
       const history = parsed.status?.history;
-      if (!Array.isArray(history) || history.length <= REVIEW_HISTORY_TRIM_LIMIT) continue;
-      parsed.status!.history = history.slice(-REVIEW_HISTORY_TRIM_LIMIT);
+      if (!Array.isArray(history)) continue;
+
+      // Slice to tail and truncate notes in all entries
+      const needsHistorySlice = history.length > REVIEW_HISTORY_TRIM_LIMIT;
+      const boundedHistory = needsHistorySlice
+        ? history.slice(-REVIEW_HISTORY_TRIM_LIMIT)
+        : history;
+
+      let needsNoteTruncation = false;
+      for (const entry of boundedHistory) {
+        if (entry.notes && entry.notes.length > REVIEW_STATUS_NOTE_LIMIT) {
+          needsNoteTruncation = true;
+          break;
+        }
+      }
+
+      if (!needsHistorySlice && !needsNoteTruncation) continue;
+
+      // Truncate notes in all entries
+      for (const entry of boundedHistory) {
+        entry.notes = truncateHistoryNote(entry.notes);
+      }
+
+      parsed.status!.history = boundedHistory;
       const next = JSON.stringify(parsed);
       update.run([next, row.sequence]);
       trimmed += 1;
