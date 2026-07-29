@@ -42,6 +42,7 @@ import { AgentPane } from './panes/AgentPane'
 import { FilesPane } from './panes/FilesPane'
 import { BrowserPane } from './panes/BrowserPane'
 import type { StageContext, PaneWrapperProps, StageApi } from './types'
+import { StageDeckProvider, type StageDeckContextValue } from './StageDeckContext'
 import styles from './stage.module.css'
 
 export type { StageContext, PaneWrapperProps, StageApi } from './types'
@@ -80,6 +81,7 @@ const PANE_LABELS: Record<PaneType, string> = {
   plan: 'Plan',
   docs: 'Docs',
   browser: 'Web',
+  editor: 'Editor',
 }
 
 /** Safe fallback for pane types whose wrapper has not been built yet. */
@@ -210,10 +212,27 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     },
     [deckKey, setActivePane, addPane],
   )
+  // PAN-3260: opened by markdown file chips via StageDeckContext, so nested
+  // chat content (AgentPane → ConversationPanel → ChatMarkdown → MarkdownFileLink)
+  // can reach the deck without prop-threading StageApi/StageContext.
+  const openOrFocusEditorPane = useCallback(
+    (filePath: string, label: string) => {
+      const current = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
+      const existing = current.find((p) => p.paneType === 'editor' && p.editorFilePath === filePath)
+      if (existing) setActivePane(deckKey, existing.paneId)
+      else addPane(deckKey, { paneType: 'editor', label, editorFilePath: filePath })
+    },
+    [deckKey, setActivePane, addPane],
+  )
 
   const api: StageApi = useMemo(
     () => ({ deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal }),
     [deckKey, openPane, openTypedPane, openIssue, openOrFocusAgentPane, toggleTerminal],
+  )
+
+  const deckContextValue: StageDeckContextValue = useMemo(
+    () => ({ deckKey, openOrFocusEditorPane }),
+    [deckKey, openOrFocusEditorPane],
   )
 
   const ctx: StageContext = useMemo(
@@ -536,88 +555,90 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   const tabMenuConv = tabMenu ? conversations.find((c) => c.name === tabMenu.conversationName) ?? null : null
 
   return (
-    <div className={styles.stage}>
-      <PaneBar
-        panes={displayPanes}
-        activePaneId={activePane?.paneId ?? activePaneId}
-        onSelect={handleSelectPane}
-        onClose={handleClosePane}
-        onAdd={handleAddPane}
-        newActions={newActions}
-        onPaneContextMenu={handlePaneContextMenu}
-        onTabDragStart={setDraggingPaneId}
-        onTabDragEnd={() => setDraggingPaneId(null)}
-        onTabDetach={handleTabDetach}
-      />
-      <div className={styles.paneArea}>
-        {effectiveLayout && (
-          <PaneLayoutView
-            node={effectiveLayout}
-            path={[]}
-            panesById={panesById}
-            renderPaneContent={renderPaneContent}
-            focusedPaneId={focusedPaneId}
-            showHeaders={splitActive}
-            draggingPaneId={draggingPaneId}
-            onFocus={(id) => setActivePane(deckKey, id)}
-            onCloseLeaf={closeLeaf}
-            onRatioChange={onRatioChange}
-            onDropTab={onDropTab}
+    <StageDeckProvider value={deckContextValue}>
+      <div className={styles.stage}>
+        <PaneBar
+          panes={displayPanes}
+          activePaneId={activePane?.paneId ?? activePaneId}
+          onSelect={handleSelectPane}
+          onClose={handleClosePane}
+          onAdd={handleAddPane}
+          newActions={newActions}
+          onPaneContextMenu={handlePaneContextMenu}
+          onTabDragStart={setDraggingPaneId}
+          onTabDragEnd={() => setDraggingPaneId(null)}
+          onTabDetach={handleTabDetach}
+        />
+        <div className={styles.paneArea}>
+          {effectiveLayout && (
+            <PaneLayoutView
+              node={effectiveLayout}
+              path={[]}
+              panesById={panesById}
+              renderPaneContent={renderPaneContent}
+              focusedPaneId={focusedPaneId}
+              showHeaders={splitActive}
+              draggingPaneId={draggingPaneId}
+              onFocus={(id) => setActivePane(deckKey, id)}
+              onCloseLeaf={closeLeaf}
+              onRatioChange={onRatioChange}
+              onDropTab={onDropTab}
+            />
+          )}
+        </div>
+        {terminalOpen && <TerminalDrawer threadId={deckKey} cwd={terminalCwd} />}
+
+        {tabMenu && tabMenuConv && (
+          <ConversationActionMenu
+            conversation={tabMenuConv}
+            mutations={convMutations}
+            position={{ top: tabMenu.top, left: tabMenu.left }}
+            onClose={() => setTabMenu(null)}
+            onCloseTab={() => closePane(deckKey, tabMenu.paneId)}
+            onOpenInSplit={() => openInSplit(tabMenu.paneId, 'row')}
+            onSplitDown={() => openInSplit(tabMenu.paneId, 'col')}
+            onCloseOthers={() => {
+              const panes = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
+              for (const p of panes) {
+                if (p.paneId !== tabMenu.paneId && !p.isPermanent && p.paneType !== 'home') closePane(deckKey, p.paneId)
+              }
+            }}
+            onCloseRight={() => {
+              const panes = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
+              const idx = panes.findIndex((p) => p.paneId === tabMenu.paneId)
+              if (idx < 0) return
+              for (const p of panes.slice(idx + 1)) {
+                if (!p.isPermanent && p.paneType !== 'home') closePane(deckKey, p.paneId)
+              }
+            }}
+            onCloseAll={closeAllPanes}
+          />
+        )}
+
+        {paneMenu && (
+          <PaneTabMenu
+            position={{ top: paneMenu.top, left: paneMenu.left }}
+            onClose={() => setPaneMenu(null)}
+            onOpenInSplit={() => openInSplit(paneMenu.paneId, 'row')}
+            onSplitDown={() => openInSplit(paneMenu.paneId, 'col')}
+            onCloseTab={paneMenu.permanent ? undefined : () => closePane(deckKey, paneMenu.paneId)}
+            onCloseAll={closeAllPanes}
+          />
+        )}
+
+        {convMutations.forkTarget && (
+          <ForkModal
+            conversation={convMutations.forkTarget}
+            initialMode={convMutations.forkTargetMode}
+            initialFocus={convMutations.forkTargetFocus}
+            isPending={convMutations.isForkPending}
+            onClose={convMutations.closeForkModal}
+            onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness) => {
+              convMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness)
+            }}
           />
         )}
       </div>
-      {terminalOpen && <TerminalDrawer threadId={deckKey} cwd={terminalCwd} />}
-
-      {tabMenu && tabMenuConv && (
-        <ConversationActionMenu
-          conversation={tabMenuConv}
-          mutations={convMutations}
-          position={{ top: tabMenu.top, left: tabMenu.left }}
-          onClose={() => setTabMenu(null)}
-          onCloseTab={() => closePane(deckKey, tabMenu.paneId)}
-          onOpenInSplit={() => openInSplit(tabMenu.paneId, 'row')}
-          onSplitDown={() => openInSplit(tabMenu.paneId, 'col')}
-          onCloseOthers={() => {
-            const panes = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
-            for (const p of panes) {
-              if (p.paneId !== tabMenu.paneId && !p.isPermanent && p.paneType !== 'home') closePane(deckKey, p.paneId)
-            }
-          }}
-          onCloseRight={() => {
-            const panes = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
-            const idx = panes.findIndex((p) => p.paneId === tabMenu.paneId)
-            if (idx < 0) return
-            for (const p of panes.slice(idx + 1)) {
-              if (!p.isPermanent && p.paneType !== 'home') closePane(deckKey, p.paneId)
-            }
-          }}
-          onCloseAll={closeAllPanes}
-        />
-      )}
-
-      {paneMenu && (
-        <PaneTabMenu
-          position={{ top: paneMenu.top, left: paneMenu.left }}
-          onClose={() => setPaneMenu(null)}
-          onOpenInSplit={() => openInSplit(paneMenu.paneId, 'row')}
-          onSplitDown={() => openInSplit(paneMenu.paneId, 'col')}
-          onCloseTab={paneMenu.permanent ? undefined : () => closePane(deckKey, paneMenu.paneId)}
-          onCloseAll={closeAllPanes}
-        />
-      )}
-
-      {convMutations.forkTarget && (
-        <ForkModal
-          conversation={convMutations.forkTarget}
-          initialMode={convMutations.forkTargetMode}
-          initialFocus={convMutations.forkTargetFocus}
-          isPending={convMutations.isForkPending}
-          onClose={convMutations.closeForkModal}
-          onConfirm={(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness) => {
-            convMutations.submitFork(conv, launchModel, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness, focus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness)
-          }}
-        />
-      )}
-    </div>
+    </StageDeckProvider>
   )
 }
