@@ -82,7 +82,7 @@
     "recordedAt": "2026-07-28T20:52:11.749Z"
   },
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-29T05:48:56.932Z",
+  "updated": "2026-07-29T05:49:02.500Z",
   "pipeline": {
     "issueId": "PAN-3242",
     "reviewStatus": "blocked",
@@ -92,7 +92,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:52:32.420Z",
-    "updatedAt": "2026-07-29T05:48:56.123Z",
+    "updatedAt": "2026-07-29T05:49:02.486Z",
     "reviewNotes": "The keyed cross-book fix still changes OrderBookPage.tsx despite the unrevised must-not constraint",
     "conflictsSince": {
       "sha": "3e981e26c497dc13d6dad0f66cd114112ce68983",
@@ -104,6 +104,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3249",
+    "reviewedAtCommit": "a9bc5c2daf170c16e32e2cfa54344fa958b97162",
     "reviewSpawnedAt": "2026-07-29T05:44:02.352Z"
   },
   "closeOut": {
@@ -156,7 +157,7 @@
       },
       "costAtCloseOut": {
         "usd": 61.977582,
-        "pricingAsOf": "2026-07-29T05:48:56.159Z"
+        "pricingAsOf": "2026-07-29T05:49:02.496Z"
       }
     },
     "merges": [
