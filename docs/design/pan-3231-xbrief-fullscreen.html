@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PAN-3231 · Full-screen xBRIEF viewer mockup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..500;1,9..40,400..500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: light;
+      --radius: 10px;
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-xl: 14px;
+      --radius-2xl: 18px;
+      --radius-4xl: 26px;
+      --background: #f6f7f9;
+      --foreground: #1f2937;
+      --card: #ffffff;
+      --card-2: color-mix(in srgb, var(--background) 96%, white);
+      --popover: #ffffff;
+      --muted: color-mix(in srgb, black 4%, transparent);
+      --muted-foreground: #6b7280;
+      --border: color-mix(in srgb, black 8%, transparent);
+      --input: color-mix(in srgb, black 10%, transparent);
+      --accent: color-mix(in srgb, black 4%, transparent);
+      --primary: oklch(0.488 0.217 264);
+      --primary-foreground: #ffffff;
+      --ring: oklch(0.488 0.217 264);
+      --destructive: #ef4444;
+      --destructive-foreground: #b91c1c;
+      --info: #3b82f6;
+      --info-foreground: #1d4ed8;
+      --success: #10b981;
+      --success-foreground: #047857;
+      --warning: #f59e0b;
+      --warning-foreground: #b45309;
+      --signal-review: #a855f7;
+      --signal-review-foreground: #7e22ce;
+    }
+
+    .dark {
+      color-scheme: dark;
+      --background: #080b10;
+      --foreground: #e5e7eb;
+      --card: #0c1018;
+      --card-2: color-mix(in srgb, var(--card) 96%, white);
+      --popover: #0c1018;
+      --muted: color-mix(in srgb, white 4%, transparent);
+      --muted-foreground: #9ca3af;
+      --border: color-mix(in srgb, white 6%, transparent);
+      --input: color-mix(in srgb, white 8%, transparent);
+      --accent: color-mix(in srgb, white 8%, transparent);
+      --primary: oklch(0.588 0.217 264);
+      --primary-foreground: #ffffff;
+      --ring: oklch(0.588 0.217 264);
+      --destructive: #f87171;
+      --destructive-foreground: #fca5a5;
+      --info: #3b82f6;
+      --info-foreground: #60a5fa;
+      --success: #10b981;
+      --success-foreground: #34d399;
+      --warning: #f59e0b;
+      --warning-foreground: #fbbf24;
+      --signal-review: #a855f7;
+      --signal-review-foreground: #c084fc;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body {
+      background: var(--background);
+      color: var(--foreground);
+      font-family: "DM Sans", system-ui, sans-serif;
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+    }
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .035;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      z-index: 20;
+    }
+    button { font: inherit; font-weight: 500; }
+    button:focus-visible, [role="button"]:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--ring) 24%, transparent);
+      outline-offset: 2px;
+    }
+    .mono { font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    .icon { width: 17px; height: 17px; stroke: currentColor; stroke-width: 1.8; fill: none; flex: 0 0 auto; }
+
+    .app {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+    }
+
+    .topbar {
+      min-height: 70px;
+      display: grid;
+      grid-template-columns: minmax(360px, 1fr) auto minmax(360px, 1fr);
+      align-items: center;
+      gap: 24px;
+      padding: 12px 20px;
+      background: color-mix(in srgb, var(--popover) 97%, transparent);
+      border-bottom: 1px solid var(--border);
+    }
+    .identity { min-width: 0; display: flex; align-items: center; gap: 12px; }
+    .document-mark {
+      width: 38px; height: 38px; border-radius: var(--radius-xl);
+      display: grid; place-items: center; color: var(--signal-review-foreground);
+      background: color-mix(in srgb, var(--signal-review) 8%, transparent);
+      border: 1px solid color-mix(in srgb, var(--signal-review) 32%, transparent);
+    }
+    .document-mark .icon { width: 19px; height: 19px; }
+    .identity-copy { min-width: 0; }
+    .eyebrow { color: var(--muted-foreground); font-size: 10px; line-height: 1; letter-spacing: .11em; text-transform: uppercase; font-weight: 500; margin-bottom: 6px; }
+    h1 { font-size: 16px; line-height: 1.25; font-weight: 500; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .issue-id { font-size: 11px; color: var(--muted-foreground); margin-right: 8px; }
+
+    .tabs {
+      display: inline-flex; align-items: center; gap: 3px; padding: 3px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--muted);
+    }
+    .tab {
+      height: 34px; min-width: 88px; padding: 0 12px;
+      border: 0; border-radius: var(--radius-md); background: transparent;
+      color: var(--muted-foreground); display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      cursor: pointer; transition: color 150ms ease-in-out, background 150ms ease-in-out;
+    }
+    .tab:hover { color: var(--foreground); }
+    .tab[aria-selected="true"] {
+      color: var(--foreground); background: var(--card);
+      box-shadow: 0 1px 2px color-mix(in srgb, black 5%, transparent);
+    }
+    .tab .icon { width: 15px; height: 15px; }
+
+    .top-actions { justify-self: end; display: flex; align-items: center; gap: 8px; }
+    .chrome-button {
+      width: 36px; height: 36px; padding: 0; border-radius: var(--radius);
+      border: 1px solid var(--border); background: transparent; color: var(--muted-foreground);
+      display: grid; place-items: center; cursor: pointer;
+    }
+    .chrome-button:hover { color: var(--foreground); background: var(--accent); }
+    .close-button { width: auto; padding: 0 11px; gap: 7px; display: inline-flex; }
+    .key { font-size: 9px; border: 1px solid var(--border); border-bottom-color: var(--input); border-radius: 4px; padding: 1px 4px; color: var(--muted-foreground); }
+
+    .summary-strip {
+      min-height: 52px;
+      display: flex; align-items: center; gap: 18px;
+      padding: 8px 20px; border-bottom: 1px solid var(--border);
+      background: var(--card);
+    }
+    .progress-copy { min-width: 154px; display: flex; align-items: baseline; gap: 8px; }
+    .progress-copy strong { font-size: 17px; font-weight: 500; }
+    .progress-copy span { color: var(--muted-foreground); font-size: 11px; }
+    .progress-track { flex: 1; max-width: 280px; height: 3px; border-radius: 2px; overflow: hidden; background: var(--muted); }
+    .progress-fill { width: 43%; height: 100%; background: var(--success); }
+    .summary-divider { width: 1px; height: 22px; background: var(--border); }
+    .metric { display: flex; align-items: center; gap: 7px; white-space: nowrap; font-size: 11px; color: var(--muted-foreground); }
+    .metric strong { color: var(--foreground); font-weight: 500; font-size: 12px; }
+    .metric-swatch { width: 7px; height: 7px; border-radius: 2px; background: var(--muted-foreground); opacity: .7; }
+    .metric-swatch.active { background: var(--info); opacity: 1; }
+    .summary-note { margin-left: auto; font-size: 11px; color: var(--muted-foreground); }
+
+    .workspace { min-height: 0; position: relative; overflow: hidden; }
+    .view { position: absolute; inset: 0; display: none; min-height: 0; }
+    .view.active { display: flex; }
+
+    /* List view */
+    .list-view { overflow: auto; padding: 22px 24px 56px; }
+    .list-canvas { width: min(1440px, 100%); margin: 0 auto; }
+    .lane { margin-bottom: 26px; }
+    .lane-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; margin: 0 2px 10px; }
+    .lane-index {
+      min-width: 66px; height: 24px; padding: 0 7px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border); display: inline-flex; align-items: center; justify-content: center;
+      color: var(--muted-foreground); font-size: 10px; letter-spacing: .08em;
+    }
+    .lane-title { min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+    .lane-title h2 { font-size: 13px; font-weight: 500; margin: 0; }
+    .lane-title span { font-size: 11px; color: var(--muted-foreground); }
+    .lane-readiness { font-size: 10px; color: var(--muted-foreground); }
+    .lane-rule { position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--border); z-index: -1; }
+    .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .task-card {
+      --status-color: var(--muted-foreground);
+      min-height: 118px; display: grid; grid-template-columns: 3px minmax(0, 1fr) auto;
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl);
+      overflow: hidden; cursor: pointer; color: inherit; text-align: left; padding: 0;
+      transition: background 150ms ease-in-out, border-color 150ms ease-in-out, transform 150ms ease-in-out;
+      box-shadow: 0 1px 2px color-mix(in srgb, black 3%, transparent);
+    }
+    .task-card:hover { background: color-mix(in srgb, var(--card) 97%, var(--foreground)); transform: translateY(-1px); }
+    .task-card.selected { border-color: color-mix(in srgb, var(--foreground) 20%, var(--border)); }
+    .task-card.done { --status-color: var(--success); }
+    .task-card.running { --status-color: var(--info); }
+    .task-card.blocked { --status-color: var(--destructive); }
+    .task-card.waiting { --status-color: var(--muted-foreground); }
+    .status-rail { background: var(--status-color); }
+    .task-main { padding: 14px 16px 13px; min-width: 0; }
+    .task-top { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .task-id { font-size: 10px; color: var(--muted-foreground); white-space: nowrap; }
+    .task-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .task-status { margin-left: auto; font-size: 10px; color: var(--muted-foreground); white-space: nowrap; }
+    .task-description { margin-top: 8px; color: var(--muted-foreground); font-size: 11px; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ac-row { display: flex; align-items: center; gap: 13px; margin-top: 12px; color: var(--muted-foreground); font-size: 10px; }
+    .ac-stat { display: inline-flex; align-items: center; gap: 5px; }
+    .check-box { width: 13px; height: 13px; border: 1px solid var(--border); border-radius: 4px; display: inline-grid; place-items: center; font-size: 9px; color: var(--foreground); }
+    .check-box.checked { background: var(--muted); }
+    .task-meta { width: 122px; padding: 14px 13px; border-left: 1px solid var(--border); background: var(--card-2); display: flex; flex-direction: column; gap: 8px; }
+    .task-meta > span, .meta-label, .meta-value { display: block; }
+    .meta-label { color: var(--muted-foreground); font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
+    .meta-value { font-size: 10px; color: var(--foreground); margin-top: 2px; }
+    .readiness-chip { align-self: flex-start; height: 21px; padding: 0 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); display: inline-flex; align-items: center; color: var(--muted-foreground); font-size: 9px; }
+
+    /* DAG view */
+    .dag-view { overflow: auto; padding: 22px 24px 56px; }
+    .dag-stage { min-width: 1180px; min-height: 650px; width: 100%; position: relative; margin: 0 auto; border-radius: var(--radius-2xl); border: 1px solid var(--border); background-color: var(--card); background-image: radial-gradient(circle, color-mix(in srgb, var(--muted-foreground) 18%, transparent) 1px, transparent 1px); background-size: 22px 22px; overflow: hidden; }
+    .dag-lane {
+      position: absolute; top: 18px; bottom: 18px; width: 246px; border-radius: var(--radius-xl);
+      background: color-mix(in srgb, var(--background) 54%, transparent); border: 1px dashed var(--border);
+    }
+    .dag-lane.one { left: 24px; }
+    .dag-lane.two { left: 321px; }
+    .dag-lane.three { left: 618px; }
+    .dag-lane.four { left: 915px; }
+    .dag-lane-label { position: absolute; left: 12px; top: 10px; color: var(--muted-foreground); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+    .dag-lane-label span { display: block; text-transform: none; letter-spacing: 0; font-size: 10px; margin-top: 4px; }
+    .edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    .edge { fill: none; stroke: var(--muted-foreground); stroke-width: 1.4; opacity: .55; marker-end: url(#arrow); }
+    .node {
+      --status-color: var(--muted-foreground);
+      position: absolute; width: 208px; min-height: 88px; padding: 12px 13px 11px;
+      border-radius: var(--radius-xl); border: 1px solid var(--status-color); background: var(--card);
+      color: inherit; text-align: left; cursor: pointer;
+      box-shadow: 0 2px 8px color-mix(in srgb, black 5%, transparent);
+    }
+    .node:hover { background: color-mix(in srgb, var(--card) 96%, var(--foreground)); }
+    .node.done { --status-color: var(--success); }
+    .node.running { --status-color: var(--info); }
+    .node.blocked { --status-color: var(--destructive); }
+    .node.waiting { border-style: dashed; }
+    .node-id { font-size: 9px; color: var(--muted-foreground); margin-bottom: 7px; }
+    .node-title { font-size: 12px; font-weight: 500; line-height: 1.3; }
+    .node-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; color: var(--muted-foreground); font-size: 9px; }
+    .node.n1 { left: 43px; top: 94px; }
+    .node.n2 { left: 340px; top: 82px; }
+    .node.n3 { left: 340px; top: 226px; }
+    .node.n4 { left: 637px; top: 82px; }
+    .node.n5 { left: 637px; top: 226px; }
+    .node.n6 { left: 637px; top: 370px; }
+    .node.n7 { left: 934px; top: 178px; }
+    .dag-legend { position: absolute; right: 24px; bottom: 22px; display: flex; gap: 16px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: color-mix(in srgb, var(--card) 94%, transparent); color: var(--muted-foreground); font-size: 9px; }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+    .legend-box { width: 11px; height: 11px; border-radius: 3px; border: 1px solid var(--muted-foreground); }
+    .legend-box.done { border-color: var(--success); }
+    .legend-box.running { border-color: var(--info); }
+    .legend-box.blocked { border-color: var(--destructive); }
+    .legend-box.waiting { border-style: dashed; }
+
+    /* Raw view */
+    .raw-view { overflow: auto; padding: 22px 24px 56px; }
+    .raw-shell { width: min(1180px, 100%); margin: 0 auto; border: 1px solid var(--border); border-radius: var(--radius-2xl); overflow: hidden; background: var(--card); }
+    .raw-head { height: 42px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); color: var(--muted-foreground); font-size: 10px; }
+    pre { margin: 0; padding: 18px; overflow: auto; color: var(--foreground); font-size: 11px; line-height: 1.65; font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace; tab-size: 2; }
+    .json-key { color: var(--info-foreground); }
+    .json-string { color: var(--success-foreground); }
+    .json-status { color: var(--warning-foreground); }
+
+    /* Task inspector */
+    .inspector {
+      position: absolute; right: 16px; top: 16px; bottom: 16px; width: min(390px, calc(100vw - 32px));
+      border: 1px solid var(--border); border-radius: var(--radius-2xl); background: color-mix(in srgb, var(--popover) 98%, transparent);
+      box-shadow: 0 18px 48px color-mix(in srgb, black 18%, transparent);
+      transform: translateX(calc(100% + 32px)); opacity: 0; pointer-events: none;
+      transition: transform 200ms ease-in-out, opacity 200ms ease-in-out; z-index: 10;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .inspector.open { transform: translateX(0); opacity: 1; pointer-events: auto; }
+    .inspector-head { padding: 16px; display: flex; align-items: flex-start; gap: 10px; border-bottom: 1px solid var(--border); }
+    .inspector-title { flex: 1; min-width: 0; }
+    .inspector-title .mono { color: var(--muted-foreground); font-size: 10px; }
+    .inspector-title h3 { font-size: 14px; font-weight: 500; margin: 6px 0 0; line-height: 1.35; }
+    .inspector-body { overflow: auto; padding: 16px; }
+    .inspector-section { margin-bottom: 22px; }
+    .inspector-section h4 { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); font-weight: 500; margin: 0 0 10px; }
+    .inspector-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .inspector-stat { padding: 10px; border-radius: var(--radius); background: var(--muted); }
+    .inspector-stat span { display: block; font-size: 9px; color: var(--muted-foreground); margin-bottom: 4px; }
+    .inspector-stat strong { font-size: 11px; font-weight: 500; }
+    .criterion { display: grid; grid-template-columns: 16px 1fr; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 11px; line-height: 1.45; }
+    .criterion:last-child { border-bottom: 0; }
+    .criterion .check-box { margin-top: 1px; }
+    .file-scope { display: block; padding: 8px 9px; margin-bottom: 5px; border-radius: var(--radius-md); background: var(--muted); font-size: 9px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 16px); padding: 9px 12px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--popover); color: var(--foreground); font-size: 11px; opacity: 0; pointer-events: none; transition: transform 200ms ease-in-out, opacity 200ms ease-in-out; z-index: 30; box-shadow: 0 8px 24px color-mix(in srgb, black 12%, transparent); }
+    .toast.show { transform: translate(-50%, 0); opacity: 1; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--foreground) 14%, transparent); border-radius: 3px; }
+
+    @media (max-width: 980px) {
+      .topbar { grid-template-columns: 1fr auto; }
+      .tabs { grid-row: 2; grid-column: 1 / -1; justify-self: center; }
+      .summary-note { display: none; }
+      .cards { grid-template-columns: 1fr; }
+      .task-meta { width: 108px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="identity">
+        <div class="document-mark" aria-hidden="true">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M6 2h9l3 3v17H6z"/><path d="M14 2v4h4M9 11h6M9 15h6"/></svg>
+        </div>
+        <div class="identity-copy">
+          <div class="eyebrow">xBRIEF · active plan</div>
+          <h1><span class="issue-id mono">PAN-3231</span>Issue-row artifact click-throughs</h1>
+        </div>
+      </div>
+
+      <nav class="tabs" aria-label="xBRIEF view">
+        <button class="tab" data-view="list" aria-selected="true">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>
+          List
+        </button>
+        <button class="tab" data-view="dag" aria-selected="false">
+          <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M9 6h4a4 4 0 0 1 4 4v5"/></svg>
+          DAG
+        </button>
+        <button class="tab" data-view="raw" aria-selected="false">
+          <svg class="icon" viewBox="0 0 24 24"><path d="m8 9-3 3 3 3M16 9l3 3-3 3M14 5l-4 14"/></svg>
+          Raw
+        </button>
+      </nav>
+
+      <div class="top-actions">
+        <button class="chrome-button" id="theme-toggle" aria-label="Toggle light and dark theme">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>
+        </button>
+        <button class="chrome-button close-button" id="close-mock" aria-label="Close full-screen viewer">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          <span class="key mono">esc</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="summary-strip" aria-label="Plan progress summary">
+      <div class="progress-copy"><strong>3 / 7</strong><span>items complete</span></div>
+      <div class="progress-track" aria-label="43 percent complete"><div class="progress-fill"></div></div>
+      <div class="summary-divider"></div>
+      <div class="metric"><span class="metric-swatch active"></span><strong>1</strong> happening now</div>
+      <div class="metric"><span class="metric-swatch"></span><strong>3</strong> ready</div>
+      <div class="metric"><span class="metric-swatch"></span><strong>3</strong> waiting on edges</div>
+      <div class="summary-divider"></div>
+      <div class="metric"><strong>4</strong> execution lanes</div>
+      <div class="summary-note">Click any item for its acceptance criteria and file scope</div>
+    </section>
+
+    <section class="workspace">
+      <section class="view list-view active" id="view-list" aria-label="List view">
+        <div class="list-canvas">
+          <section class="lane">
+            <div class="lane-head">
+              <div class="lane-index mono">LANE 01</div>
+              <div class="lane-title"><h2>Design gate</h2><span>one operator decision unlocks the implementation path</span></div>
+              <div class="lane-readiness">1 item · happening now</div>
+            </div>
+            <div class="cards">
+              <button class="task-card running selected" data-task="mockups">
+                <span class="status-rail"></span>
+                <span class="task-main">
+                  <span class="task-top"><span class="task-id mono">mockups</span><span class="task-title">Full-screen viewer mockup</span><span class="task-status">happening now</span></span>
+                  <span class="task-description">Set the interaction and information hierarchy before the shared shell is built.</span>
+                  <span class="ac-row"><span class="ac-stat"><span class="check-box checked">✓</span>2 / 4 checks</span><span class="ac-stat">operator gate</span><span class="ac-stat">design</span></span>
+                </span>
+                <span class="task-meta"><span><span class="meta-label">Readiness</span><span class="meta-value">claimed</span></span><span><span class="meta-label">Inspection</span><span class="meta-value">none</span></span><span class="readiness-chip">unlocks lane 02</span></span>
+              </button>
+            </div>
+          </section>
+
+          <section class="lane">
+            <div class="lane-head">
+              <div class="lane-index mono">LANE 02</div>
+              <div class="lane-title"><h2>Shared viewer foundation</h2><span>the modal shell is the single expansion door</span></div>
+              <div class="lane-readiness">1 item · waiting on design gate</div>
+            </div>
+            <div class="cards">
+              <button class="task-card waiting" data-task="xbrief-fullscreen-shell">
+                <span class="status-rail"></span>
+                <span class="task-main">
+                  <span class="task-top"><span class="task-id mono">xbrief-fullscreen-shell</span><span class="task-title">Store-driven full-screen shell</span><span class="task-status">waiting its turn</span></span>
+                  <span class="task-description">Reuse the current List, DAG, and Raw views inside one accessible full-screen surface.</span>
+                  <span class="ac-row"><span class="ac-stat"><span class="check-box"></span>0 / 4 checks</span><span class="ac-stat">foundation</span><span class="ac-stat">frontend</span></span>
+                </span>
+                <span class="task-meta"><span><span class="meta-label">Readiness</span><span class="meta-value">sequential</span></span><span><span class="meta-label">Inspection</span><span class="meta-value">fast</span></span><span class="readiness-chip">blocked by mockups</span></span>
+              </button>
+            </div>
+          </section>
+
+          <section class="lane">
+            <div class="lane-head">
+              <div class="lane-index mono">LANE 03</div>
+              <div class="lane-title"><h2>Artifact click-throughs</h2><span>independent vertical slices can move in parallel</span></div>
+              <div class="lane-readiness">4 items · 3 ready · 1 waiting</div>
+            </div>
+            <div class="cards">
+              <button class="task-card waiting" data-task="row-xbrief">
+                <span class="status-rail"></span>
+                <span class="task-main">
+                  <span class="task-top"><span class="task-id mono">row-xbrief</span><span class="task-title">xBRIEF chip click-through</span><span class="task-status">waiting its turn</span></span>
+                  <span class="task-description">Open the shared full-screen viewer from the project-tree artifact strip.</span>
+                  <span class="ac-row"><span class="ac-stat"><span class="check-box"></span>0 / 3 checks</span><span class="ac-stat">issue row</span></span>
+                </span>
+                <span class="task-meta"><span><span class="meta-label">Readiness</span><span class="meta-value">sequential</span></span><span><span class="meta-label">Scope</span><span class="meta-value">2 files</span></span><span class="readiness-chip">needs shell</span></span>
+              </button>
+
+              <button class="task-card waiting" data-task="embedded-expand">
+                <span class="status-rail"></span>
+                <span class="task-main">
+                  <span class="task-top"><span class="task-id mono">embedded-expand</span><span class="task-title">Embedded plan expands</span><span class="task-status">waiting its turn</span></span>
+                  <span class="task-description">Give the issue-view plan the same expansion affordance without duplicating viewer state.</span>
+                  <span class="ac-row"><span class="ac-stat"><span class="check-box"></span>0 / 3 checks</span><span class="ac-stat">issue view</span></span>
+                </span>
+                <span class="task-meta"><span><span class="meta-label">Readiness</span><span class="meta-value">sequential</span></span><span><span class="meta-label">Scope</span><span class="meta-value">3 files</span></span><span class="readiness-chip">needs shell</span></span>
+              </button>
+
+              <button class="task-card waiting" data-task="tasks-viewer">
+                <span class="status-rail"></span>
+                <span class="task-main">
+                  <span class="task-top"><span class="task-id mono">tasks-viewer</span><span class="task-title">Checklist tasks viewer</span><span class="task-status">ready</span></span>
+                  <span class="task-description">Recover the compact beads-panel UX and feed it from merged xBRIEF item statuses.</span>
+                  <span class="ac-row"><span class="ac-stat"><span class="check-box"></span>0 / 4 checks</span><span class="ac-stat">independent slice</span></span>
+                </span>
+                <span class="task-meta"><span><span class="meta-label">Readiness</span><span class="meta-value">ready</span></span><span><span class="meta-label">Scope</span><span class="meta-value">4 files</span></span><span class="readiness-chip">can dispatch now</span></span>
+              </button>
+
+              <button class="task-card waiting" data-task="prd-resource-signal">
+                <span class="status-rail"></span>
+                <span class="task-main">
+                  <span class="task-top"><span class="task-id mono">prd-resource-signal</span><span class="task-title">PRD resource and viewer</span><span class="task-status">ready</span></span>
+                  <span class="task-description">Expose the state-door markdown draft and render it with the shared Streamdown viewer.</span>
+                  <span class="ac-row"><span class="ac-stat"><span class="check-box"></span>0 / 4 checks</span><span class="ac-stat">independent slice</span></span>
+                </span>
+                <span class="task-meta"><span><span class="meta-label">Readiness</span><span class="meta-value">ready</span></span><span><span class="meta-label">Scope</span><span class="meta-value">5 files</span></span><span class="readiness-chip">can dispatch now</span></span>
+              </button>
+            </div>
+          </section>
+
+          <section class="lane">
+            <div class="lane-head">
+              <div class="lane-index mono">LANE 04</div>
+              <div class="lane-title"><h2>Conformance and docs</h2><span>prove the old issue-view surface loses nothing</span></div>
+              <div class="lane-readiness">1 item · waiting on artifact slices</div>
+            </div>
+            <div class="cards">
+              <button class="task-card waiting" data-task="no-loss-docs">
+                <span class="status-rail"></span>
+                <span class="task-main">
+                  <span class="task-top"><span class="task-id mono">no-loss-docs</span><span class="task-title">No-loss inventory and interaction docs</span><span class="task-status">waiting its turn</span></span>
+                  <span class="task-description">Lock the artifact affordances into the issue-view inventory and regression coverage.</span>
+                  <span class="ac-row"><span class="ac-stat"><span class="check-box"></span>0 / 3 checks</span><span class="ac-stat">test + docs</span></span>
+                </span>
+                <span class="task-meta"><span><span class="meta-label">Readiness</span><span class="meta-value">sequential</span></span><span><span class="meta-label">Scope</span><span class="meta-value">3 files</span></span><span class="readiness-chip">final lane</span></span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view dag-view" id="view-dag" aria-label="DAG view">
+        <div class="dag-stage">
+          <div class="dag-lane one"><div class="dag-lane-label mono">LANE 01<span>Design gate</span></div></div>
+          <div class="dag-lane two"><div class="dag-lane-label mono">LANE 02<span>Shared foundation</span></div></div>
+          <div class="dag-lane three"><div class="dag-lane-label mono">LANE 03<span>Artifact slices</span></div></div>
+          <div class="dag-lane four"><div class="dag-lane-label mono">LANE 04<span>Conformance</span></div></div>
+
+          <svg class="edges" viewBox="0 0 1180 650" preserveAspectRatio="none" aria-hidden="true">
+            <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10z" fill="var(--muted-foreground)" /></marker></defs>
+            <path class="edge" d="M251 138 C295 138 295 126 340 126" />
+            <path class="edge" d="M548 126 C594 126 594 126 637 126" />
+            <path class="edge" d="M548 126 C594 126 594 270 637 270" />
+            <path class="edge" d="M548 126 C594 126 594 414 637 414" />
+            <path class="edge" d="M845 126 C893 126 886 222 934 222" />
+            <path class="edge" d="M845 270 C893 270 886 222 934 222" />
+            <path class="edge" d="M845 414 C900 414 879 222 934 222" />
+          </svg>
+
+          <button class="node running n1" data-task="mockups"><div class="node-id mono">mockups</div><div class="node-title">Full-screen viewer mockup</div><div class="node-foot"><span>2 / 4 checks</span><span>happening now</span></div></button>
+          <button class="node waiting n2" data-task="xbrief-fullscreen-shell"><div class="node-id mono">xbrief-fullscreen-shell</div><div class="node-title">Store-driven full-screen shell</div><div class="node-foot"><span>0 / 4 checks</span><span>blocked by edge</span></div></button>
+          <button class="node waiting n3" data-task="tasks-viewer"><div class="node-id mono">tasks-viewer</div><div class="node-title">Checklist tasks viewer</div><div class="node-foot"><span>0 / 4 checks</span><span>ready</span></div></button>
+          <button class="node waiting n4" data-task="row-xbrief"><div class="node-id mono">row-xbrief</div><div class="node-title">xBRIEF chip click-through</div><div class="node-foot"><span>0 / 3 checks</span><span>waiting</span></div></button>
+          <button class="node waiting n5" data-task="embedded-expand"><div class="node-id mono">embedded-expand</div><div class="node-title">Embedded plan expands</div><div class="node-foot"><span>0 / 3 checks</span><span>waiting</span></div></button>
+          <button class="node waiting n6" data-task="prd-resource-signal"><div class="node-id mono">prd-resource-signal</div><div class="node-title">PRD resource and viewer</div><div class="node-foot"><span>0 / 4 checks</span><span>ready</span></div></button>
+          <button class="node waiting n7" data-task="no-loss-docs"><div class="node-id mono">no-loss-docs</div><div class="node-title">No-loss inventory and docs</div><div class="node-foot"><span>0 / 3 checks</span><span>waiting on 3</span></div></button>
+
+          <div class="dag-legend" aria-label="DAG status legend">
+            <span class="legend-item"><span class="legend-box done"></span>complete</span>
+            <span class="legend-item"><span class="legend-box running"></span>happening now</span>
+            <span class="legend-item"><span class="legend-box waiting"></span>waiting / ready</span>
+            <span class="legend-item"><span class="legend-box blocked"></span>needs attention</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="view raw-view" id="view-raw" aria-label="Raw JSON view">
+        <div class="raw-shell">
+          <div class="raw-head"><span class="mono">pan-3231.xbrief.json</span><span>read-only · merged canonical spec + status overrides</span></div>
+<pre>{
+  <span class="json-key">"xBRIEFInfo"</span>: {
+    <span class="json-key">"version"</span>: <span class="json-string">"0.8"</span>,
+    <span class="json-key">"description"</span>: <span class="json-string">"Plan for PAN-3231: issue-row artifact click-throughs"</span>
+  },
+  <span class="json-key">"plan"</span>: {
+    <span class="json-key">"id"</span>: <span class="json-string">"pan-3231"</span>,
+    <span class="json-key">"status"</span>: <span class="json-status">"running"</span>,
+    <span class="json-key">"items"</span>: [
+      {
+        <span class="json-key">"id"</span>: <span class="json-string">"mockups"</span>,
+        <span class="json-key">"title"</span>: <span class="json-string">"Interactive full-screen xBRIEF viewer mockups"</span>,
+        <span class="json-key">"status"</span>: <span class="json-status">"running"</span>,
+        <span class="json-key">"metadata"</span>: {
+          <span class="json-key">"kind"</span>: <span class="json-string">"design"</span>,
+          <span class="json-key">"readiness"</span>: <span class="json-string">"ready"</span>,
+          <span class="json-key">"requiresInspection"</span>: false,
+          <span class="json-key">"files_scope"</span>: [<span class="json-string">"docs/design/pan-3231-xbrief-fullscreen.html"</span>]
+        }
+      },
+      {
+        <span class="json-key">"id"</span>: <span class="json-string">"xbrief-fullscreen-shell"</span>,
+        <span class="json-key">"status"</span>: <span class="json-string">"pending"</span>,
+        <span class="json-key">"metadata"</span>: {
+          <span class="json-key">"readiness"</span>: <span class="json-string">"sequential"</span>,
+          <span class="json-key">"requiresInspection"</span>: true,
+          <span class="json-key">"foundationFor"</span>: [<span class="json-string">"row-xbrief"</span>, <span class="json-string">"embedded-expand"</span>]
+        }
+      }
+    ],
+    <span class="json-key">"edges"</span>: [
+      { <span class="json-key">"from"</span>: <span class="json-string">"mockups"</span>, <span class="json-key">"to"</span>: <span class="json-string">"xbrief-fullscreen-shell"</span>, <span class="json-key">"type"</span>: <span class="json-string">"blocks"</span> }
+    ]
+  }
+}</pre>
+        </div>
+      </section>
+
+      <aside class="inspector open" id="inspector" aria-label="Selected item details">
+        <div class="inspector-head">
+          <div class="inspector-title"><span class="mono" id="inspect-id">mockups</span><h3 id="inspect-title">Full-screen viewer mockup</h3></div>
+          <button class="chrome-button" id="close-inspector" aria-label="Close item details"><svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div class="inspector-body">
+          <section class="inspector-section">
+            <h4>Dispatch</h4>
+            <div class="inspector-grid">
+              <div class="inspector-stat"><span>Lane</span><strong id="inspect-lane">01 · design gate</strong></div>
+              <div class="inspector-stat"><span>Readiness</span><strong id="inspect-readiness">claimed</strong></div>
+              <div class="inspector-stat"><span>Difficulty</span><strong id="inspect-difficulty">medium</strong></div>
+              <div class="inspector-stat"><span>Inspection</span><strong id="inspect-inspection">none</strong></div>
+            </div>
+          </section>
+          <section class="inspector-section">
+            <h4>Acceptance criteria</h4>
+            <div id="criteria">
+              <div class="criterion"><span class="check-box checked">✓</span><span>Renders full-screen List and DAG views with a working toggle.</span></div>
+              <div class="criterion"><span class="check-box checked">✓</span><span>Shows status, acceptance checks, and lane readiness at full width.</span></div>
+              <div class="criterion"><span class="check-box"></span><span>Receives explicit operator approval before the dependent shell is claimed.</span></div>
+              <div class="criterion"><span class="check-box"></span><span>Persists the approval decision in the issue continue record.</span></div>
+            </div>
+          </section>
+          <section class="inspector-section">
+            <h4>Expected file scope</h4>
+            <code class="file-scope mono" id="file-scope">docs/design/pan-3231-xbrief-fullscreen.html</code>
+          </section>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status">Mockup close action — the real viewer returns to the issue surface.</div>
+
+  <script>
+    const tabs = [...document.querySelectorAll('.tab')];
+    const views = [...document.querySelectorAll('.view')];
+    const inspector = document.getElementById('inspector');
+    const taskData = {
+      'mockups': ['Full-screen viewer mockup', '01 · design gate', 'claimed', 'medium', 'none', 'docs/design/pan-3231-xbrief-fullscreen.html'],
+      'xbrief-fullscreen-shell': ['Store-driven full-screen shell', '02 · foundation', 'blocked by mockups', 'complex', 'fast', 'src/dashboard/frontend/src/components/xbrief/XBriefFullscreen.tsx'],
+      'row-xbrief': ['xBRIEF chip click-through', '03 · artifact slices', 'waiting on shell', 'medium', 'none', 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx'],
+      'embedded-expand': ['Embedded plan expands', '03 · artifact slices', 'waiting on shell', 'medium', 'none', 'src/dashboard/frontend/src/components/issue-view/IssuePlanSection.tsx'],
+      'tasks-viewer': ['Checklist tasks viewer', '03 · artifact slices', 'ready', 'complex', 'fast', 'src/dashboard/frontend/src/components/issue-view/TasksPanel.tsx'],
+      'prd-resource-signal': ['PRD resource and viewer', '03 · artifact slices', 'ready', 'complex', 'none', 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx'],
+      'no-loss-docs': ['No-loss inventory and docs', '04 · conformance', 'waiting on 3 items', 'medium', 'none', 'docs/ISSUE-VIEW.md']
+    };
+
+    function switchView(name) {
+      tabs.forEach((tab) => tab.setAttribute('aria-selected', String(tab.dataset.view === name)));
+      views.forEach((view) => view.classList.toggle('active', view.id === `view-${name}`));
+      if (name === 'raw') inspector.classList.remove('open');
+    }
+
+    tabs.forEach((tab) => tab.addEventListener('click', () => switchView(tab.dataset.view)));
+
+    document.querySelectorAll('[data-task]').forEach((button) => {
+      button.addEventListener('click', () => {
+        document.querySelectorAll('.task-card').forEach((card) => card.classList.remove('selected'));
+        if (button.classList.contains('task-card')) button.classList.add('selected');
+        const data = taskData[button.dataset.task];
+        if (!data) return;
+        document.getElementById('inspect-id').textContent = button.dataset.task;
+        document.getElementById('inspect-title').textContent = data[0];
+        document.getElementById('inspect-lane').textContent = data[1];
+        document.getElementById('inspect-readiness').textContent = data[2];
+        document.getElementById('inspect-difficulty').textContent = data[3];
+        document.getElementById('inspect-inspection').textContent = data[4];
+        document.getElementById('file-scope').textContent = data[5];
+        inspector.classList.add('open');
+      });
+    });
+
+    document.getElementById('close-inspector').addEventListener('click', () => inspector.classList.remove('open'));
+    document.getElementById('theme-toggle').addEventListener('click', () => document.documentElement.classList.toggle('dark'));
+
+    const toast = document.getElementById('toast');
+    function showCloseToast() {
+      toast.classList.add('show');
+      window.setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+    document.getElementById('close-mock').addEventListener('click', showCloseToast);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        if (inspector.classList.contains('open')) inspector.classList.remove('open');
+        else showCloseToast();
+      }
+      if (event.key === '1') switchView('list');
+      if (event.key === '2') switchView('dag');
+      if (event.key === '3') switchView('raw');
+    });
+  </script>
+</body>
+</html>

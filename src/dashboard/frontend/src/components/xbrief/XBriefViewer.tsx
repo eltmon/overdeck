@@ -19,18 +19,35 @@ const TABS: { id: XBriefViewTab; label: string; Icon: React.ElementType }[] = [
 
 interface XBriefViewerProps {
   doc: XBriefDocument | null;
-  /** Optional override for active tab */
+  /** Optional override for the initial uncontrolled tab. */
   initialTab?: XBriefViewTab;
+  /** Controlled tab state for shells that own the view switcher. */
+  activeTab?: XBriefViewTab;
+  onTabChange?: (tab: XBriefViewTab) => void;
+  showTabBar?: boolean;
   onInspectionPolicyChange?: (policy: XBriefInspectionPolicy) => void;
   isUpdatingInspectionPolicy?: boolean;
 }
 
-export function XBriefViewer({ doc, initialTab, onInspectionPolicyChange, isUpdatingInspectionPolicy = false }: XBriefViewerProps) {
-  const [tab, setTab] = useState<XBriefViewTab>(() => {
+export function XBriefViewer({
+  doc,
+  initialTab,
+  activeTab,
+  onTabChange,
+  showTabBar = true,
+  onInspectionPolicyChange,
+  isUpdatingInspectionPolicy = false,
+}: XBriefViewerProps) {
+  const [internalTab, setInternalTab] = useState<XBriefViewTab>(() => {
     if (initialTab) return initialTab;
     const stored = localStorage.getItem(STORAGE_KEY);
     return (stored as XBriefViewTab | null) ?? 'list';
   });
+  const tab = activeTab ?? internalTab;
+  const selectTab = (nextTab: XBriefViewTab) => {
+    if (activeTab === undefined) setInternalTab(nextTab);
+    onTabChange?.(nextTab);
+  };
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, tab);
@@ -47,27 +64,29 @@ export function XBriefViewer({ doc, initialTab, onInspectionPolicyChange, isUpda
   return (
     <div className="flex flex-col h-full bg-card text-foreground overflow-hidden">
       {/* Tab bar */}
-      <div className="flex border-b border-border shrink-0">
-        {TABS.map(({ id, label, Icon }) => (
-          <button
-            key={id}
-            role="tab"
-            aria-selected={tab === id}
-            onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors ${
-              tab === id
-                ? 'text-foreground border-b-2 border-primary'
-                : 'text-muted-foreground hover:text-muted-foreground'
-            }`}
-          >
-            <Icon className="w-4 h-4" />
-            {label}
-          </button>
-        ))}
-      </div>
+      {showTabBar && (
+        <div className="flex shrink-0 border-b border-border" role="tablist" aria-label="xBRIEF view">
+          {TABS.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => selectTab(id)}
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors ${
+                tab === id
+                  ? 'border-b-2 border-primary text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Content — DAG tab needs overflow-hidden so ReactFlow gets a real height */}
-      <div className={`flex-1 ${tab === 'dag' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+      <div className={`flex-1 min-h-0 ${tab === 'dag' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
         {tab === 'list' && (
           <>
             <XBriefHeader
@@ -85,7 +104,7 @@ export function XBriefViewer({ doc, initialTab, onInspectionPolicyChange, isUpda
         )}
 
         {tab === 'dag' && (
-          <div style={{ height: 'calc(100vh - 280px)', minHeight: 400 }}>
+          <div className="flex-1 min-h-0" style={{ minHeight: 400 }} data-testid="xbrief-dag-pane">
             <DAGPlaceholder issueId={doc.plan.id} />
           </div>
         )}

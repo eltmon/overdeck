@@ -674,9 +674,10 @@ If you see an agent referencing `.planning/`, `docs/prds/planned/*.xbrief.json`,
 ### Dashboard Viewer
 
 XBriefViewer components at `src/dashboard/frontend/src/components/xbrief/`:
-- Accessible via **xBRIEF button** on kanban issue cards and InspectorPanel
-- List / DAG / Raw JSON tabs
-- Fetches from `GET /api/workspaces/:issueId/plan` (resolves from `specs/` on `overdeck-state` via `findSpecByIssue`, with workspace fallback for migration compat)
+- Kanban issue-card and InspectorPanel xBRIEF buttons open `XBriefDialog`.
+- The project-tree xBRIEF chip and the drawer/cockpit expand controls open the globally mounted `XBriefFullscreen` List / DAG / Raw viewer.
+- The issue-row tasks chip opens the xBRIEF-backed `TasksPanel`; the PRD chip opens the canonical draft through `PrdViewer` and `ChatMarkdown`.
+- Plan viewers fetch from `GET /api/workspaces/:issueId/plan` (resolves from `specs/` on `overdeck-state` via `findSpecByIssue`, with workspace fallback for migration compat).
 
 ## Issue Creation from PRDs
 

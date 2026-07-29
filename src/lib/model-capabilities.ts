@@ -111,7 +111,7 @@ export interface ModelCapability {
   /** Model identifier */
   model: ModelId;
   /** Provider for this model */
-  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai';
+  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'quantumllama';
   /** Display name */
   displayName: string;
   /** Cost per 1M tokens (average of input/output) in USD */
@@ -120,6 +120,8 @@ export interface ModelCapability {
   skills: Record<SkillDimension, number>;
   /** Context window size in tokens */
   contextWindow: number;
+  /** Maximum output tokens per response (undefined = not specified by the provider) */
+  maxOutputTokens?: number;
   /** Minimum subscription plan required to access this model via OAuth (undefined = API key only or no tier restriction) */
   minTier?: SubscriptionPlan;
   /**
@@ -1234,6 +1236,79 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       'context-length': 97, // 256K context window
     },
     notes: 'xAI\'s agentic coding model (May 2026). 256K context, $1/M in / $2/M out / $0.20/M cached. Reasoning always active. API id `grok-build-0.1` at https://api.x.ai/v1 (Anthropic-compatible). Sources: openrouter.ai/x-ai/grok-build-0.1/api, x.ai/news/grok-build-cli.',
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // QUANTUMLLAMA MODELS (synthetic benchmark provider, PAN-3252)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  'ql-reason-70b': {
+    model: 'ql-reason-70b',
+    provider: 'quantumllama',
+    displayName: 'QL Reason 70B',
+    costPer1MTokens: 16, // $8/M in, $24/M out
+    contextWindow: 200000,
+    maxOutputTokens: 16384,
+    skills: {
+      'code-generation': 80,
+      'code-review': 78,
+      debugging: 78,
+      planning: 80,
+      documentation: 72,
+      testing: 74,
+      security: 72,
+      performance: 74,
+      synthesis: 78,
+      speed: 62,
+      'context-length': 88, // 200K context window
+    },
+    notes: 'Fictional benchmark provider — no live endpoint exists. Scores are placeholders in the 60–80 band. Source of truth: benchmarks/specs/quantumllama.md.',
+  },
+
+  'ql-swift-8b': {
+    model: 'ql-swift-8b',
+    provider: 'quantumllama',
+    displayName: 'QL Swift 8B',
+    costPer1MTokens: 4, // $2/M in, $6/M out
+    contextWindow: 128000,
+    maxOutputTokens: 8192,
+    skills: {
+      'code-generation': 72,
+      'code-review': 70,
+      debugging: 70,
+      planning: 68,
+      documentation: 70,
+      testing: 70,
+      security: 66,
+      performance: 68,
+      synthesis: 70,
+      speed: 78,
+      'context-length': 76, // 128K context window
+    },
+    notes: 'Fictional benchmark provider — no live endpoint exists. Scores are placeholders in the 60–80 band. Source of truth: benchmarks/specs/quantumllama.md.',
+  },
+
+  'ql-nano-1b': {
+    model: 'ql-nano-1b',
+    provider: 'quantumllama',
+    displayName: 'QL Nano 1B',
+    costPer1MTokens: 0.8, // $0.40/M in, $1.20/M out
+    contextWindow: 32000,
+    maxOutputTokens: 4096,
+    skills: {
+      'code-generation': 62,
+      'code-review': 60,
+      debugging: 60,
+      planning: 60,
+      documentation: 66,
+      testing: 64,
+      security: 60,
+      performance: 62,
+      synthesis: 62,
+      speed: 80,
+      'context-length': 60, // 32K context window
+    },
+    notes: 'Fictional benchmark provider — no live endpoint exists. Scores are placeholders in the 60–80 band. Source of truth: benchmarks/specs/quantumllama.md.',
   },
 };
 

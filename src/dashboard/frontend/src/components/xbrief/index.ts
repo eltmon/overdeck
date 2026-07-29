@@ -1,6 +1,7 @@
 export { XBriefViewer } from './XBriefViewer';
 export type { XBriefViewTab } from './XBriefViewer';
 export { XBriefDialog } from './XBriefDialog';
+export { XBriefFullscreen } from './XBriefFullscreen';
 export { XBriefHeader } from './XBriefHeader';
 export { XBriefNarratives } from './XBriefNarratives';
 export { XBriefReferences } from './XBriefReferences';

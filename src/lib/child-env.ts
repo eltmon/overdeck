@@ -39,6 +39,7 @@ const PROVIDER_ENV_KEYS = new Set([
   'OPENROUTER_API_KEY',
   'NOUS_API_KEY',
   'DASHSCOPE_API_KEY',
+  'QUANTUMLLAMA_API_KEY',
 ]);
 
 /** All keys that should be stripped by default. */
