@@ -76,6 +76,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
@@ -95,6 +96,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
@@ -119,6 +121,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
@@ -245,6 +248,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
+      export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
@@ -432,6 +436,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
+      export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       set -o pipefail
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
@@ -665,6 +670,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
@@ -697,6 +703,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       set -o pipefail
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
@@ -726,6 +733,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
@@ -760,6 +768,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
@@ -791,6 +800,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
@@ -811,6 +821,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
@@ -831,6 +842,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
@@ -869,6 +881,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
@@ -1150,6 +1163,7 @@ describe('generateLauncherWrapper', () => {
       expect(script).toBe(
         [
           '#!/bin/bash',
+          'export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"',
           'unset TMUX TMUX_PANE STY',
           'command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"',
           'export SKIP_DOCS_INDEX=1',
