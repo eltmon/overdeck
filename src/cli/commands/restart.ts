@@ -33,7 +33,8 @@ import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } fro
 import { writeRestartStatus } from '../../lib/restart-status.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates, type BootGateOptions } from '../../lib/boot-gates.js';
 import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
-import { readActiveDashboardBundleSync } from '../../lib/deploy/active-dashboard-bundle.js';
+import { readActiveDashboardBundleSync, type ActiveDashboardBundle } from '../../lib/deploy/active-dashboard-bundle.js';
+import { dashboardServerBootFailure } from '../../lib/deploy/dashboard-bundle-integrity.js';
 
 import {
   DASHBOARD_LOG_FILE,
@@ -156,8 +157,40 @@ function uniqueBundleCandidates(): DashboardBundleCandidate[] {
   });
 }
 
-export function resolveBundledServerPath(): string {
+/** Last active-bundle rejection reported, so repeated probes warn only once. */
+let warnedActiveBundleFailure: string | null = null;
+
+/**
+ * The active `pan reload` deployment, but only when it can still boot.
+ *
+ * PAN-3264: the marker's existence check passed while the generation's
+ * node_modules had gone dangling underneath the running server, so restart
+ * relaunched a tree that died on ERR_MODULE_NOT_FOUND — indefinitely, with no
+ * supported way out. Rejecting an unbootable deployment falls back to this
+ * checkout's own build, which `activateDashboardDeployment()` keeps as a copy of
+ * the same commit and which resolves against the primary checkout's complete
+ * node_modules, so a restart recovers on its own.
+ */
+function usableActiveDashboardBundle(): ActiveDashboardBundle | null {
   const activeBundle = readActiveDashboardBundleSync();
+  if (!activeBundle) return null;
+
+  const failure = dashboardServerBootFailure(activeBundle.serverPath);
+  if (!failure) {
+    warnedActiveBundleFailure = null;
+    return activeBundle;
+  }
+  if (warnedActiveBundleFailure !== failure) {
+    warnedActiveBundleFailure = failure;
+    console.warn(chalk.yellow(
+      `[dashboard] Ignoring the active deployment — ${failure}. Falling back to this checkout's build.`,
+    ));
+  }
+  return null;
+}
+
+export function resolveBundledServerPath(): string {
+  const activeBundle = usableActiveDashboardBundle();
   if (activeBundle) return activeBundle.serverPath;
 
   const candidates = uniqueBundleCandidates();
@@ -167,7 +200,7 @@ export function resolveBundledServerPath(): string {
 }
 
 export function resolvePrimaryDashboardIdentity(): { repoRoot: string; mode: 'primary' } {
-  const activeBundle = readActiveDashboardBundleSync();
+  const activeBundle = usableActiveDashboardBundle();
   return {
     repoRoot: activeBundle?.repoRoot ?? resolve(resolveBundledServerPath(), '..', '..', '..'),
     mode: 'primary',
