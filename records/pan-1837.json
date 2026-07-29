@@ -374,7 +374,7 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T15:46:22.126Z",
+  "updated": "2026-07-29T15:51:28.368Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "passed",
@@ -383,10 +383,11 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T15:46:04.911Z",
-    "reviewNotes": "Agent re-review request (5/25): Fixed review issues",
+    "updatedAt": "2026-07-29T15:51:28.340Z",
+    "reviewNotes": "Main merge preserved all previously approved Kimi behavior; conflict resolution and focused verification are clean.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
     "reviewedAtCommit": "421a3ae7413c69ca9a9562c93fc657d1062d81ce",
     "lastVerifiedCommit": "421a3ae7413c69ca9a9562c93fc657d1062d81ce",
@@ -405,9 +406,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 15884825,
-            "output": 609126,
-            "cacheRead": 191254016,
+            "input": 16196812,
+            "output": 643528,
+            "cacheRead": 196520960,
             "cacheWrite": 0
           }
         },
@@ -428,9 +429,9 @@
           "cacheWrite": 187167
         },
         "openai/gpt-5.6-sol": {
-          "input": 15884825,
-          "output": 609126,
-          "cacheRead": 191254016,
+          "input": 16196812,
+          "output": 643528,
+          "cacheRead": 196520960,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -441,8 +442,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 471.061175,
-        "pricingAsOf": "2026-07-29T15:46:22.123Z"
+        "usd": 476.286642,
+        "pricingAsOf": "2026-07-29T15:51:28.360Z"
       }
     },
     "merges": [
