@@ -214,19 +214,19 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T01:54:09.593Z",
+  "updated": "2026-07-29T01:56:45.232Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T01:54:09.571Z",
+    "updatedAt": "2026-07-29T01:56:45.111Z",
     "reviewNotes": "The new FR-7 component suite fails 4 of 7 tests, and ConversationDock still renders an inert placeholder instead of a usable pending conversation",
-    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
+    "verificationNotes": "Verification FAILED at test (410535ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3232\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3232/src/dashboard/frontend\u001b[39m\n\n \u001b[32m✓\u001b[39m src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx \u001b[2m(\u001b[22m\u001b[2m19 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 440\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/__tests__/BootReconciliationModal.test.tsx \u001b[2m(\u001b[22m\u001b[2m11 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 354\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/pages/__tests__/FlywheelPage.test.tsx \u001b[2m(\u001b[22m\u001b[2m17 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 507\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/conversations/__tests__/ConversationsPage.test.tsx \u001b[2m(\u001b[22m\u001b[2m16 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 772\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m forces keyword feed search when managed-archived is selected from semantic mode \u001b[33m 395\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/CommandPalette.test.tsx \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 580\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/CommandDeck/__tests__/ProjectOverview.test.tsx \u001b[2m(\u001b[22m\u001b[2m25 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 542\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/simple/simple-pages.test.tsx \u001b[2m(\u001b[22m\u001b[2m14 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 587\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/CommandDeck/__tests__/ConversationList.test.tsx \u001b[2m(\u001b[22m\u001b[2m19 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 639\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/Sidebar.test.tsx \u001b[2m(\u001b[22m\u001b[2m14 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 816\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/CommandDeck/ZoneCOverviewTabs/__tests__/PrDiffTab.test.tsx \u001b[2m(\u001b[22m\u001b[2m10 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 984\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m renders a 5k-line diff within a full-suite jsdom budget (smoke test) \u001b[33m 766\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/IssueActionMenu/IssueActionContextMenu.test.tsx \u001b[2m(\u001b[22m\u001b[2m9 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 2048\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m render\n…(404374 chars elided)…\n[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/workspaces/__tests__/merge-ops-dirty-gate.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/agents-listing-health-status.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/dashboard/server/routes/conversations-no-loss.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/dashboard/server/services/agent-state-service.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/verification-runner-xbrief.test.ts \u001b[2m(\u001b[22m\u001b[2m5 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 7\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agents-barrel-exports.test.ts \u001b[2m(\u001b[22m\u001b[\n...(truncated)",
     "conflictsSince": {
       "sha": "701cbb21f1deb79f90c821db2bf23db7d02d4886",
       "detectedAt": "2026-07-29T00:29:21.202Z",
@@ -259,27 +259,27 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 19091975,
-            "output": 620401,
-            "cacheRead": 112845824,
+            "input": 19132400,
+            "output": 679452,
+            "cacheRead": 116513280,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3200,
-            "output": 117428,
-            "cacheRead": 57624540,
-            "cacheWrite": 2979069
+            "input": 3263,
+            "output": 124559,
+            "cacheRead": 58938348,
+            "cacheWrite": 3090116
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3634,
-          "output": 145301,
-          "cacheRead": 67745743,
-          "cacheWrite": 3288882
+          "input": 3697,
+          "output": 152432,
+          "cacheRead": 69059551,
+          "cacheWrite": 3399929
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -288,15 +288,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 19091975,
-          "output": 620401,
-          "cacheRead": 112845824,
+          "input": 19132400,
+          "output": 679452,
+          "cacheRead": 116513280,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 192.319133,
-        "pricingAsOf": "2026-07-29T01:54:09.580Z"
+        "usd": 196.432423,
+        "pricingAsOf": "2026-07-29T01:56:45.190Z"
       }
     },
     "merges": [
