@@ -344,10 +344,10 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T04:25:51.217Z",
+  "updated": "2026-07-29T04:31:25.183Z",
   "pipeline": {
     "issueId": "PAN-1837",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -355,8 +355,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T04:25:50.880Z",
-    "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
+    "updatedAt": "2026-07-29T04:31:25.151Z",
+    "reviewNotes": "Fresh dashboard Kimi conversations swallow native session-capture failures and remain healthy without an owned session ID.",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
       "detectedAt": "2026-07-29T00:03:35.975Z",
@@ -383,9 +383,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 13060579,
-            "output": 442997,
-            "cacheRead": 162699264,
+            "input": 14749055,
+            "output": 454924,
+            "cacheRead": 168773632,
             "cacheWrite": 0
           }
         },
@@ -406,9 +406,9 @@
           "cacheWrite": 187167
         },
         "openai/gpt-5.6-sol": {
-          "input": 13060579,
-          "output": 442997,
-          "cacheRead": 162699264,
+          "input": 14749055,
+          "output": 454924,
+          "cacheRead": 168773632,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -419,8 +419,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 417.562818,
-        "pricingAsOf": "2026-07-29T04:25:51.041Z"
+        "usd": 429.400192,
+        "pricingAsOf": "2026-07-29T04:31:25.168Z"
       }
     },
     "merges": [
