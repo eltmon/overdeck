@@ -44,7 +44,7 @@
     "recordedAt": "2026-07-29T06:18:50.753Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T06:59:49.465Z",
+  "updated": "2026-07-29T06:59:52.070Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "blocked",
@@ -157,7 +157,7 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
+    "sequence": 8,
     "claims": {
       "boot-trim-notes": {
         "writerId": "agent-pan-3253",
@@ -165,6 +165,13 @@
         "pid": 431544,
         "host": "eltmon-z790",
         "claimedAt": "2026-07-29T06:59:47.470Z"
+      },
+      "docs-bounds": {
+        "writerId": "agent-pan-3253",
+        "agentId": "agent-pan-3253",
+        "pid": 432132,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T06:59:52.070Z"
       }
     },
     "claimHistory": [
@@ -223,6 +230,7 @@
     "append-door-bound.append-door-bound.ac2": "completed",
     "append-door-bound.append-door-bound.ac3": "completed",
     "append-door-bound.append-door-bound.ac4": "completed",
-    "boot-trim-notes": "running"
+    "boot-trim-notes": "running",
+    "docs-bounds": "running"
   }
 }
