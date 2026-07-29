@@ -376,6 +376,31 @@ describe('append() bounding of review.status_changed (PAN-3253 append-door-bound
     }
   });
 
+  it('handles malformed stored JSON gracefully during boot trim (PAN-3253 append-door-bound.ac3)', () => {
+    // Malformed JSON is reachable through boot-trim, not through typed append()
+    // This test inserts malformed review.status_changed directly into the database
+    // and verifies trimReviewStatusHistoryPayloads() preserves it byte-identically
+
+    const malformedPayload = '{"status": {"history": [{"notes": "' + 'x'.repeat(1000) + '}'; // Malformed JSON
+
+    db.prepare('INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)')
+      .run('review.status_changed', Date.now(), malformedPayload);
+
+    // Store the original bytes for comparison
+    const original = db.prepare('SELECT payload FROM events WHERE type = ?')
+      .get('review.status_changed') as { payload: string };
+    const originalBytes = original.payload;
+
+    // trimReviewStatusHistoryPayloads should handle this gracefully
+    const result = trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
+    expect(result.trimmed).toBeGreaterThanOrEqual(0); // Should not throw
+
+    // The malformed row should survive byte-identically
+    const afterTrim = db.prepare('SELECT payload FROM events WHERE type = ?')
+      .get('review.status_changed') as { payload: string };
+    expect(afterTrim.payload).toBe(originalBytes); // Byte-identical preservation
+  });
+
 
   it('appendAsync bounding produces bounded payload in persisted data', async () => {
     const store = createEventStore(db as unknown as DbAdapter);

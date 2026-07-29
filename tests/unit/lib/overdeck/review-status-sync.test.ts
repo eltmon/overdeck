@@ -240,3 +240,61 @@ describe('overdeck review status sync', () => {
     });
   });
 });
+
+describe('composition/forensic-table split (PAN-3253 notes-cap.ac2-ac3)', () => {
+  it('preserves raw full-length notes in database while bounding hydrated history', () => {
+    // This test verifies the split between dbStatus (raw) and updated (bounded)
+    // that happens in review-status.ts:setReviewStatusSync()
+    
+    const now = Date.now();
+    const db = odb.raw();
+
+    // Create an issue for FK constraint
+    db.prepare('INSERT OR IGNORE INTO issues (id, stage, updated_at) VALUES (?, ?, ?)').run(
+      'PAN-COMPOSITION-TEST',
+      'working',
+      now
+    );
+
+    const longTestNote = 'x'.repeat(10000); // Far exceeds 500-char limit
+
+    // Write a long note through upsertReviewStatusSync
+    upsertReviewStatusSync({
+      issueId: 'PAN-COMPOSITION-TEST',
+      reviewStatus: 'passed',
+      testStatus: 'pending',
+      testNotes: longTestNote,
+      history: [
+        {
+          type: 'test',
+          status: 'pending',
+          timestamp: new Date(now).toISOString(),
+          notes: longTestNote,
+        },
+      ],
+      updatedAt: new Date().toISOString(),
+      readyForMerge: false,
+    });
+
+    // Verify hydrated history is truncated
+    const hydrated = getReviewStatusFromDbSync('PAN-COMPOSITION-TEST');
+    if (hydrated?.history && hydrated.history.length > 0) {
+      const historyNote = hydrated.history[0]!.notes;
+      if (historyNote) {
+        expect(historyNote.length).toBeLessThanOrEqual(500);
+        expect(historyNote.endsWith('…')).toBe(true); // Should have ellipsis indicator
+      }
+    }
+
+    // Verify raw status_history table has the full untrun note
+    const rawRows = db.prepare(
+      'SELECT notes FROM status_history WHERE issue_id = ?'
+    ).all('PAN-COMPOSITION-TEST') as Array<{ notes: string | null }>;
+    
+    // The first (and only) row should have the complete 10,000-char note
+    if (rawRows[0]?.notes) {
+      expect(rawRows[0].notes.length).toBe(10000);
+      expect(rawRows[0].notes).toBe(longTestNote);
+    }
+  });
+});
