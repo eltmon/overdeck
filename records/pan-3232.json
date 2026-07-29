@@ -274,16 +274,16 @@
     "recordedAt": "2026-07-29T02:58:56.941Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T02:59:06.231Z",
+  "updated": "2026-07-29T02:59:08.872Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T02:59:04.795Z",
+    "updatedAt": "2026-07-29T02:59:06.432Z",
     "reviewNotes": "Verification failed at incomplete-plan-items — fix and resubmit",
     "conflictsSince": {
       "sha": "701cbb21f1deb79f90c821db2bf23db7d02d4886",
@@ -399,19 +399,19 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3928,
-            "output": 188943,
-            "cacheRead": 74462430,
-            "cacheWrite": 4335986
+            "input": 3939,
+            "output": 189301,
+            "cacheRead": 74669217,
+            "cacheWrite": 4487624
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 4362,
-          "output": 216816,
-          "cacheRead": 84583633,
-          "cacheWrite": 4645799
+          "input": 4373,
+          "output": 217174,
+          "cacheRead": 84790420,
+          "cacheWrite": 4797437
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -427,8 +427,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 250.40361,
-        "pricingAsOf": "2026-07-29T02:59:04.823Z"
+        "usd": 250.615637,
+        "pricingAsOf": "2026-07-29T02:59:08.869Z"
       }
     },
     "merges": [
@@ -437,7 +437,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3232",
