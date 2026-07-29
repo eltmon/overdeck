@@ -299,7 +299,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:03:48.960Z",
+  "updated": "2026-07-29T05:05:12.135Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -309,16 +309,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:03:48.939Z",
-    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch; conflict resolver dispatch throttled",
-    "verificationNotes": "Checklist completion check FAILED — 8 incomplete item(s) remain:\n\n  Incomplete plan items (8):\n    - live-tree-delta.live-tree-delta.ac1 The AgentEnrichmentChangedEvent schema accepts payloads both with and without issueId, and decoding a legacy payload without the field returns a valid event (pending)\n    - live-tree-delta.live-tree-delta.ac2 mapEventToDelta returns a pending_input_changed delta carrying awaitingInput, prompt, reason, and kinds for an enrichment event with issueId, and returns null when the payload lacks issueId (pending)\n    - live-tree-delta.live-tree-delta.ac3 applySessionTreeDelta merges the four pending-input fields onto the matched session and clears them when the delta omits them, returning the same tree object when no session matches (pending)\n    - live-tree-delta.live-tree-delta.ac4 The enrichment poller emits issueId on agent.enrichment_changed events for agents with a known issue (pending)\n    - specialist-pending-input.specialist-pending-input.ac1 Session-tree review orchestrator, test, and ship nodes carry the four awaiting-input fields when the agent snapshot reports hasPendingQuestion true (pending)\n    - specialist-pending-input.specialist-pending-input.ac2 buildReviewerNodes returns reviewer nodes that carry the four awaiting-input fields taken from the provided agentSnapshotsById map (pending)\n    - specialist-pending-input.specialist-pending-input.ac3 The activity route emits specialist sections carrying the same four fields for a pending specialist snapshot (pending)\n    - specialist-pending-input.specialist-pending-input.ac4 A specialist node whose agent has no snapshot or no pending question renders with awaitingInput false and produces no prompt, reason, or kinds fields (pending)",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since ed7d676 (1 path): scripts/file-size-allowlist.txt",
-        "detectedAt": "2026-07-29T05:03:44.105Z"
-      }
-    ],
+    "updatedAt": "2026-07-29T05:05:12.077Z",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
       "detectedAt": "2026-07-29T05:03:44.105Z",
@@ -328,81 +319,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
     "reviewedAtCommit": "f62d4793235ea6644a96ca02a4706437d687b54d",
-    "reviewRequestedAt": "2026-07-29T03:32:32.610Z",
-    "reviewSpawnedAt": "2026-07-29T04:13:44.816Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "package.json",
-        "scripts/dashboard-types-baseline.txt",
-        "scripts/file-size-allowlist.txt",
-        "src/dashboard/frontend/src/__tests__/fr7-conversation-pending-input.test.tsx",
-        "src/dashboard/frontend/src/lib/simple/useSimpleActions.ts"
-      ],
-      "declaredScopeUntouched": [
-        "packages/contracts/src/events.ts",
-        "packages/contracts/src/rpc.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.test.tsx",
-        "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
-        "src/dashboard/frontend/src/components/issue-view/useIssueView.test.tsx",
-        "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
-        "src/dashboard/server/__tests__/session-tree-specialist-pending-input.test.ts",
-        "src/dashboard/server/__tests__/ws-rpc.test.ts"
-      ],
-      "declaredScope": [
-        "docs/ASKUSERQUESTION-DASHBOARD.md",
-        "packages/contracts/src/events.ts",
-        "packages/contracts/src/rpc.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-        "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
-        "src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx",
-        "src/dashboard/frontend/src/components/dock/ConversationDock.tsx",
-        "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
-        "src/dashboard/frontend/src/components/issue-view/useIssueView.test.tsx",
-        "src/dashboard/frontend/src/components/issue-view/useIssueView.ts",
-        "src/dashboard/frontend/src/components/simple/SimpleHomePage.tsx",
-        "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
-        "src/dashboard/frontend/src/lib/store.ts",
-        "src/dashboard/frontend/src/lib/useDecisions.ts",
-        "src/dashboard/server/__tests__/read-model-pending-input.test.ts",
-        "src/dashboard/server/__tests__/session-tree-specialist-pending-input.test.ts",
-        "src/dashboard/server/__tests__/ws-rpc.test.ts",
-        "src/dashboard/server/read-model.ts",
-        "src/dashboard/server/routes/command-deck.ts",
-        "src/dashboard/server/routes/projects.ts",
-        "src/dashboard/server/routes/reviewer-tree.ts",
-        "src/dashboard/server/services/agent-enrichment-service.ts",
-        "src/dashboard/server/ws-rpc.ts"
-      ],
-      "actualChangedFiles": [
-        "docs/ASKUSERQUESTION-DASHBOARD.md",
-        "package.json",
-        "scripts/dashboard-types-baseline.txt",
-        "scripts/file-size-allowlist.txt",
-        "src/dashboard/frontend/src/__tests__/fr7-conversation-pending-input.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-        "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
-        "src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx",
-        "src/dashboard/frontend/src/components/dock/ConversationDock.tsx",
-        "src/dashboard/frontend/src/components/issue-view/useIssueView.ts",
-        "src/dashboard/frontend/src/components/simple/SimpleHomePage.tsx",
-        "src/dashboard/frontend/src/lib/simple/useSimpleActions.ts",
-        "src/dashboard/frontend/src/lib/store.ts",
-        "src/dashboard/frontend/src/lib/useDecisions.ts",
-        "src/dashboard/server/__tests__/read-model-pending-input.test.ts",
-        "src/dashboard/server/read-model.ts",
-        "src/dashboard/server/routes/command-deck.ts",
-        "src/dashboard/server/routes/projects.ts",
-        "src/dashboard/server/routes/reviewer-tree.ts",
-        "src/dashboard/server/services/agent-enrichment-service.ts",
-        "src/dashboard/server/ws-rpc.ts"
-      ],
-      "recordedAt": "2026-07-29T03:30:44.354Z"
-    }
+    "reviewSpawnedAt": "2026-07-29T04:13:44.816Z"
   },
   "closeOut": {
     "usage": {
@@ -433,19 +350,19 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 4663,
-            "output": 230704,
-            "cacheRead": 90663618,
-            "cacheWrite": 5669760
+            "input": 4721,
+            "output": 232822,
+            "cacheRead": 91563453,
+            "cacheWrite": 5795345
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 5097,
-          "output": 258577,
-          "cacheRead": 100784821,
-          "cacheWrite": 5979573
+          "input": 5155,
+          "output": 260695,
+          "cacheRead": 101684656,
+          "cacheWrite": 6105158
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -461,8 +378,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 261.579019,
-        "pricingAsOf": "2026-07-29T05:03:48.952Z"
+        "usd": 261.836631,
+        "pricingAsOf": "2026-07-29T05:05:12.129Z"
       }
     },
     "merges": [
