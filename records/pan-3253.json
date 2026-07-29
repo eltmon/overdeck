@@ -89,7 +89,7 @@
     "recordedAt": "2026-07-29T07:45:29.088Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T07:56:43.461Z",
+  "updated": "2026-07-29T07:56:49.067Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "blocked",
@@ -99,10 +99,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T07:47:05.835Z",
-    "updatedAt": "2026-07-29T07:56:42.778Z",
+    "updatedAt": "2026-07-29T07:56:49.024Z",
     "reviewNotes": "The circular-import fix hardcodes duplicate 20/500 limits instead of the required leaf module, FR-2 composition/hydration remains incomplete, and the new append/appendAsync/appendOnce bounding paths have no regression tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
-    "reviewedAtCommit": "cccc58288bf35005e46072c242c4bef78cbd8791",
+    "reviewedAtCommit": "cde48b2488a78f423607d229f8a86c0c7d286085",
     "lastVerifiedCommit": "cde48b2488a78f423607d229f8a86c0c7d286085",
     "reviewSpawnedAt": "2026-07-29T07:49:57.932Z",
     "scopeDrift": {
@@ -180,7 +180,7 @@
       },
       "costAtCloseOut": {
         "usd": 36.058572,
-        "pricingAsOf": "2026-07-29T07:56:42.795Z"
+        "pricingAsOf": "2026-07-29T07:56:49.061Z"
       }
     },
     "merges": [
