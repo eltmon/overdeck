@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T01:18:55.599Z",
+  "updated": "2026-07-29T02:02:52.518Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
     }
   ],
   "tasks": {
-    "sequence": 27,
-    "claims": {
-      "memory-paths-rekey": {
-        "writerId": "agent-pan-1990",
-        "agentId": "agent-pan-1990",
-        "pid": 2822082,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T00:35:20.994Z"
-      }
-    },
+    "sequence": 28,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -225,6 +217,16 @@
         "itemId": "memory-contracts-nullable",
         "outcome": "completed",
         "releasedAt": "2026-07-29T00:35:06.997Z"
+      },
+      {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 2822082,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T00:35:20.994Z",
+        "itemId": "memory-paths-rekey",
+        "outcome": "completed",
+        "releasedAt": "2026-07-29T02:02:52.518Z"
       }
     ],
     "statusReasons": {
@@ -286,6 +288,10 @@
     "memory-contracts-nullable.memory-contracts-nullable.ac1": "completed",
     "memory-contracts-nullable.memory-contracts-nullable.ac2": "completed",
     "memory-contracts-nullable.memory-contracts-nullable.ac3": "completed",
-    "memory-paths-rekey": "running"
+    "memory-paths-rekey": "completed",
+    "memory-paths-rekey.memory-paths-rekey.ac1": "completed",
+    "memory-paths-rekey.memory-paths-rekey.ac2": "completed",
+    "memory-paths-rekey.memory-paths-rekey.ac3": "completed",
+    "memory-paths-rekey.memory-paths-rekey.ac4": "completed"
   }
 }
