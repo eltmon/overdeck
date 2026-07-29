@@ -407,7 +407,35 @@ describe('KimiCodeRuntimeSync', () => {
   });
 });
 
+/**
+ * Repeatedly advance the fake clock in small steps until `promise` settles.
+ * A single large `advanceTimersByTimeAsync` cannot drive this: real fs I/O
+ * (readdirAsync) sits between fake `setTimeout` calls, so a new timer
+ * scheduled only after real I/O resolves would never fire once the one big
+ * advance window has already closed. Small repeated advances give the real
+ * I/O a chance to resolve and schedule its next timer between each step.
+ */
+async function drainFakeTimersUntilSettled(promise: Promise<unknown>, maxSteps = 50, stepMs = 10): Promise<void> {
+  let isSettled = false;
+  promise.then(() => { isSettled = true; }, () => { isSettled = true; });
+  for (let i = 0; i < maxSteps && !isSettled; i++) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+  }
+}
+
 describe('withKimiSessionCaptureLock (PAN-1837 review fix — concurrent same-cwd conversations)', () => {
+  // PAN-1837 review fix (P2): repository policy requires fake timers for any
+  // delay-based test — real setTimeout delays here (however small) keep the
+  // test's timer/microtask state alive longer than necessary and are the
+  // documented source of flake/OOM under parallel workers.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('serializes two concurrent launches sharing one cwd so each captures its own distinct session id', async () => {
     const kimiHome = makeHome();
     const workDir = '/tmp/concurrent-conversations-workspace';
@@ -437,7 +465,13 @@ describe('withKimiSessionCaptureLock (PAN-1837 review fix — concurrent same-cw
         return waitForNewKimiSessionAsync(kimiHome, workDir, existingBefore, 2_000);
       });
 
-    const [captured1, captured2] = await Promise.all([launch('session_alpha'), launch('session_beta')]);
+    const result1 = launch('session_alpha');
+    const result2 = launch('session_beta');
+    const both = Promise.all([result1, result2]);
+
+    await drainFakeTimersUntilSettled(both);
+
+    const [captured1, captured2] = await both;
 
     expect(captured1).not.toBeNull();
     expect(captured2).not.toBeNull();
@@ -459,7 +493,9 @@ describe('withKimiSessionCaptureLock (PAN-1837 review fix — concurrent same-cw
       order.push('fast-end');
     });
 
-    await Promise.all([slow, fast]);
+    const both = Promise.all([slow, fast]);
+    await drainFakeTimersUntilSettled(both);
+    await both;
 
     // The unrelated-bucket task completes without waiting on the slow one.
     expect(order.indexOf('fast-end')).toBeLessThan(order.indexOf('slow-end'));

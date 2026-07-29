@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, writeFileSync, readdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'fs';
+import { readdir as readdirAsync } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
@@ -210,11 +211,21 @@ export async function restartAgent(
     // snapshot the bucket before the tmux session exists so the post-launch poll
     // below can capture that new session id for the next resume/recovery
     // (mirrors spawnAgent's fresh-launch capture in spawn.ts).
+    //
+    // PAN-1837 review fix: clear the stale kimi-session-id pointer BEFORE the
+    // fresh launch. If the post-launch capture below times out or fails, this
+    // leaves NO pointer (findKimiWirePath's safe newest-session-by-mtime
+    // fallback) rather than a WRONG pointer still pinned to the pre-restart
+    // transcript, which would otherwise surface indefinitely. Uses the async
+    // poller/readdir throughout — restart runs in the dashboard process, and
+    // even a fire-and-forget task blocks the shared event loop for every
+    // synchronous fs call it makes while it runs.
     let kimiExistingSessionsBefore: Set<string> | undefined;
     if (effectiveHarness === 'kimi-code') {
+      try { unlinkSync(join(getAgentDir(normalizedId), 'kimi-session-id')); } catch { /* absent or already cleared */ }
       try {
         const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
-        kimiExistingSessionsBefore = new Set(readdirSync(kimiSessionsRoot(join(homedir(), '.kimi-code'), agentState.workspace)));
+        kimiExistingSessionsBefore = new Set(await readdirAsync(kimiSessionsRoot(join(homedir(), '.kimi-code'), agentState.workspace)));
       } catch {
         kimiExistingSessionsBefore = new Set();
       }
@@ -236,14 +247,26 @@ export async function restartAgent(
     if (kimiExistingSessionsBefore) {
       void (async () => {
         try {
-          const { waitForNewKimiSession, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
-          const sessionId = await waitForNewKimiSession(
+          const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+          const sessionId = await waitForNewKimiSessionAsync(
             join(homedir(), '.kimi-code'),
             agentState.workspace,
             kimiExistingSessionsBefore!,
           );
-          if (sessionId) writeKimiSessionId(normalizedId, sessionId);
-        } catch { /* non-fatal — the newest-session fallback still resolves the transcript */ }
+          if (sessionId) {
+            writeKimiSessionId(normalizedId, sessionId);
+          } else {
+            logAgentLifecycleSync(
+              normalizedId,
+              'restartAgent: kimi-code session capture timed out after fresh relaunch — kimi-session-id pointer stays cleared; transcript lookup falls back to newest-session by mtime',
+            );
+          }
+        } catch (err) {
+          logAgentLifecycleSync(
+            normalizedId,
+            `restartAgent: kimi-code session capture failed after fresh relaunch: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
       })();
     }
 

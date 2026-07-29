@@ -175,6 +175,24 @@ export function startPlanningForIssue(options: {
     void startDocker;
     const requestedHarness = harness === 'ohmypi' || harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code' ? harness : 'claude-code';
 
+    // PAN-1837 review fix: validate the explicit harness/model pair BEFORE any
+    // mutation below (the workModel issue-record write, the preliminary
+    // planning agent state, the in_planning lifecycle transition, or event
+    // emission). A denied pair must fail here — a prior version validated only
+    // inside the SSE stream after all of that had already happened, so a
+    // rejected request still left the issue stuck in Planning with a starting
+    // agent record but no planning process.
+    const trimmedModelOverride = typeof modelOverride === 'string' && modelOverride.trim() ? modelOverride.trim() : undefined;
+    const planningAuthMode = trimmedModelOverride
+      ? yield* Effect.promise(() => getProviderAuthMode(trimmedModelOverride))
+      : undefined;
+    let effectiveHarness: RuntimeName;
+    try {
+      effectiveHarness = resolvePlanningEffectiveHarness(requestedHarness, trimmedModelOverride, planningAuthMode);
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
+    }
+
     // Role-scoped model selection (PAN-2997 flow): `workModel` targets the WORK
     // agent only. It persists to the issue record — the staffing resolver
     // ('issue-override' tier) picks it up for the post-planning auto-spawn and
@@ -409,12 +427,8 @@ export function startPlanningForIssue(options: {
         });
 
         try {
-          const trimmedModelOverride = typeof modelOverride === 'string' && modelOverride.trim() ? modelOverride.trim() : undefined;
-          const effectiveHarness = resolvePlanningEffectiveHarness(
-            requestedHarness,
-            trimmedModelOverride,
-            trimmedModelOverride ? await getProviderAuthMode(trimmedModelOverride) : undefined,
-          );
+          // effectiveHarness was already resolved and validated before any
+          // state mutation, at the top of startPlanningForIssue.
           const result = await spawnPlanningSession({
             issue: issue as PlanningIssue,
             workspacePath,

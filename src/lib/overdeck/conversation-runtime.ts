@@ -576,7 +576,7 @@ export async function spawnConversationSession(
     resumeSessionId?: string;
   } | undefined;
   let acpFields: (ReturnType<typeof getAcpLauncherFields> & { resumeSessionId?: string }) | undefined;
-  let kimiCodeFields: { harness: 'kimi-code'; kimiCodeModel: string; kimiCodeYolo: true } | undefined;
+  let kimiCodeFields: { harness: 'kimi-code'; kimiCodeModel: string; kimiCodeYolo: true; resumeSessionId?: string } | undefined;
   let codexTransport: 'app-server' | 'tui' | undefined;
   if (behavior.launchCommandKind === 'acp-host') {
     if (!model) throw new Error('ACP conversation requires a model');
@@ -655,11 +655,31 @@ export async function spawnConversationSession(
         resumeSessionId,
       };
     } else if (behavior.launchCommandKind === 'kimi-code-tui') {
-      // PAN-1837 review fix: conversations reached this launcher path without
-      // a Kimi field spread, so buildKimiCodeCommand() threw 'kimi-code
-      // launcher requires kimiCodeModel' before a session could be created.
-      // No resume support (D2: Kimi's session id is not presettable at spawn).
-      kimiCodeFields = { harness: 'kimi-code', kimiCodeModel: model, kimiCodeYolo: true };
+      // PAN-1837 review fix: read the persisted kimi-session-id when resuming
+      // so a stopped Kimi conversation actually resumes its native session
+      // (-S <id>) instead of always launching fresh and silently overwriting
+      // the pinned transcript pointer with a brand-new session directory.
+      // Verify the pinned wire.jsonl still exists on disk before trusting the
+      // id — if it was cleaned up, fall through to the fresh-launch path
+      // (kimiExistingSessionsBefore capture below) instead of resuming a
+      // session Kimi can no longer find.
+      let kimiResumeSessionId: string | undefined;
+      if (resume) {
+        const kimiSessionIdPath = join(getOverdeckHome(), 'agents', tmuxSession, 'kimi-session-id');
+        const pinnedId = await readFile(kimiSessionIdPath, 'utf-8').then((value) => value.trim() || undefined).catch(() => undefined);
+        if (pinnedId) {
+          const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
+          const candidateWire = join(kimiSessionsRoot(join(homedir(), '.kimi-code'), cwd), pinnedId, 'agents', 'main', 'wire.jsonl');
+          const wireExists = await stat(candidateWire).then(() => true, () => false);
+          if (wireExists) kimiResumeSessionId = pinnedId;
+        }
+      }
+      kimiCodeFields = {
+        harness: 'kimi-code',
+        kimiCodeModel: model,
+        kimiCodeYolo: true,
+        ...(kimiResumeSessionId ? { resumeSessionId: kimiResumeSessionId } : {}),
+      };
     }
   }
   let launcherModel = model;
@@ -706,9 +726,12 @@ export async function spawnConversationSession(
     // their wire.jsonl without a conversation-owned captured session id —
     // snapshot the bucket now (before the tmux session exists, and — for
     // kimi-code — inside the per-bucket lock) so the capture below can diff
-    // against it instead of guessing from mtime.
+    // against it instead of guessing from mtime. Skipped when kimiCodeFields
+    // already carries a verified resumeSessionId (PAN-1837 review fix): a
+    // true resume must not snapshot/capture a replacement id and overwrite
+    // the pinned transcript pointer.
     let kimiExistingSessionsBefore: Set<string> | undefined;
-    if (kimiCodeFields) {
+    if (kimiCodeFields && !kimiCodeFields.resumeSessionId) {
       try {
         const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
         kimiExistingSessionsBefore = new Set(await readdir(kimiSessionsRoot(join(homedir(), '.kimi-code'), cwd)));
