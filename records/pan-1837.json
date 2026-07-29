@@ -337,10 +337,10 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T04:06:22.510Z",
+  "updated": "2026-07-29T04:06:25.231Z",
   "pipeline": {
     "issueId": "PAN-1837",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -348,8 +348,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T04:06:22.476Z",
-    "reviewNotes": "The Kimi capture mutex is process-local, but pan start/strike, dashboard conversations, and Deacon recovery launch in separate processes, so same-cwd sessions can still capture each other's transcript identity. See review.md.",
+    "updatedAt": "2026-07-29T04:06:25.195Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
       "detectedAt": "2026-07-29T00:03:35.975Z",
@@ -413,7 +413,7 @@
       },
       "costAtCloseOut": {
         "usd": 391.568616,
-        "pricingAsOf": "2026-07-29T04:06:22.500Z"
+        "pricingAsOf": "2026-07-29T04:06:25.228Z"
       }
     },
     "merges": [
