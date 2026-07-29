@@ -17,7 +17,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T06:03:41.956Z",
+  "updated": "2026-07-29T06:07:07.511Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -69,18 +69,32 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "notes-cap": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3253",
         "agentId": "agent-pan-3253",
         "pid": 3211544,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T06:03:41.956Z"
+        "claimedAt": "2026-07-29T06:03:41.956Z",
+        "itemId": "notes-cap",
+        "outcome": "completed",
+        "reason": "Added REVIEW_STATUS_NOTE_LIMIT constant and truncateHistoryNote() helper; applied truncation at 5 push sites in review-status.ts and 3 hydration mappings in review-status-db.ts; added comprehensive test coverage",
+        "releasedAt": "2026-07-29T06:07:07.511Z"
+      }
+    ],
+    "statusReasons": {
+      "notes-cap": {
+        "reason": "Added REVIEW_STATUS_NOTE_LIMIT constant and truncateHistoryNote() helper; applied truncation at 5 push sites in review-status.ts and 3 hydration mappings in review-status-db.ts; added comprehensive test coverage",
+        "updatedAt": "2026-07-29T06:07:07.511Z"
       }
     }
   },
   "statusOverrides": {
-    "notes-cap": "running"
+    "notes-cap": "completed",
+    "notes-cap.notes-cap.ac1": "completed",
+    "notes-cap.notes-cap.ac2": "completed",
+    "notes-cap.notes-cap.ac3": "completed"
   }
 }
