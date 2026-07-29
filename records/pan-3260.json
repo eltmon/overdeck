@@ -55,7 +55,7 @@
     "recordedAt": "2026-07-29T01:09:34.738Z"
   },
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T01:11:53.727Z",
+  "updated": "2026-07-29T01:11:58.312Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "pending",
@@ -66,7 +66,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T01:11:05.562Z",
-    "updatedAt": "2026-07-29T01:11:53.630Z",
+    "updatedAt": "2026-07-29T01:11:58.283Z",
     "inspectNotes": "AC1-3 verified: WS_METHODS.readFileAtPath/writeFileAtPath exported and both Rpcs registered in PanRpcGroup (36 requests, both present in dist .d.ts as literal-typed Rpc members); ReadFileAtPathResult rejects decode when mtimeMs or totalLines is missing and accepts the full struct; WriteFileAtPathInput decodes with and without expectedMtimeMs; contracts build + workspace root npm run typecheck exit 0 with no new dashboard/frontend ratchet errors.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3268",
     "reviewRequestedAt": "2026-07-29T01:11:05.562Z",
@@ -151,7 +151,7 @@
       },
       "costAtCloseOut": {
         "usd": 27.08996,
-        "pricingAsOf": "2026-07-29T01:11:53.701Z"
+        "pricingAsOf": "2026-07-29T01:11:58.309Z"
       }
     },
     "merges": [
