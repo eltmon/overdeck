@@ -1,13 +1,19 @@
 import { Schema } from "effect"
 import { IssueId, Role } from "./types"
 
+// Memory turns can come from a conversation, not just a spawned agent
+// (PAN-1990 D-6: a main/scratch workspace turn has no agent Role). Scoped to
+// memory identity only — AgentSnapshot/AgentState.role stay agent-only.
+export const MemoryAgentRole = Schema.Union([Role, Schema.Literal("conversation")])
+export type MemoryAgentRole = typeof MemoryAgentRole.Type
+
 export const MemoryIdentity = Schema.Struct({
   projectId: Schema.String,
   workspaceId: Schema.String,
   issueId: Schema.NullOr(IssueId),
   runId: Schema.String,
   sessionId: Schema.String,
-  agentRole: Role,
+  agentRole: MemoryAgentRole,
   agentHarness: Schema.String,
 })
 export type MemoryIdentity = typeof MemoryIdentity.Type
@@ -27,7 +33,7 @@ export const MemoryObservation = Schema.Struct({
   issueId: Schema.NullOr(IssueId),
   runId: Schema.String,
   sessionId: Schema.String,
-  agentRole: Role,
+  agentRole: MemoryAgentRole,
   agentHarness: Schema.String,
   gitBranch: Schema.String,
   sourceTranscriptOffset: Schema.Number,

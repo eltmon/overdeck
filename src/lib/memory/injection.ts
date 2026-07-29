@@ -8,6 +8,7 @@ import { expandMemoryQuery, type QueryExpansionCall, type QueryExpansionResult }
 import { searchMemory, type MemorySearchHit } from './search.js';
 import { isMemoryKnowledgeIndexEnabled, isMemoryPromptTimeInjectionEnabled } from './settings.js';
 import { findProjectByPathSync, getProjectSync, loadProjectsConfigSync, resolveProjectFromIssueSync, resolveProjectPath } from '../projects.js';
+import { getProjectByKey, getWorkspaceById, listPinnedDocs } from '../workspaces/resolver.js';
 
 export const PROMPT_TIME_MEMORY_BUDGETS = {
   status: 2000,
@@ -31,6 +32,7 @@ export interface PromptTimeMemoryInjectionInput {
   loadPromptTimeEnabled?: () => boolean | Promise<boolean>;
   loadKnowledgeIndexEnabled?: () => boolean | Promise<boolean>;
   loadKnowledgeIndex?: (identity: MemoryIdentity) => Promise<string | null>;
+  loadPinnedDocs?: (identity: MemoryIdentity) => Promise<CandidateContext[]>;
   loadStatus?: (projectId: string, workspaceId: string) => Promise<MemoryStatus | null>;
   search?: typeof searchMemory;
   logDecision?: (entry: PromptTimeRagDecisionLogEntry) => Promise<void>;
@@ -95,11 +97,14 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
   const search = input.search ?? searchMemory;
   const knowledgeEnabled = await (input.loadKnowledgeIndexEnabled ?? isMemoryKnowledgeIndexEnabled)();
   const { issueId } = input.identity;
-  const [status, knowledgeIndex, sameProjectHits, siblingHits] = await Promise.all([
+  const [status, knowledgeIndex, pinnedDocs, sameProjectHits, siblingHits] = await Promise.all([
     (input.loadStatus ?? readStatus)(input.identity.projectId, input.identity.workspaceId).catch(() => null),
     knowledgeEnabled
       ? (input.loadKnowledgeIndex ?? readKnowledgeIndex)(input.identity).catch(() => null)
       : Promise.resolve(null),
+    knowledgeEnabled
+      ? (input.loadPinnedDocs ?? readPinnedDocCandidates)(input.identity).catch(() => [])
+      : Promise.resolve([]),
     search({
       query: expansion.query,
       projectId: input.identity.projectId,
@@ -125,10 +130,11 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
   const candidates = [
     ...status ? [statusCandidate(status, input.identity)] : [],
     ...knowledgeIndex ? [knowledgeIndexCandidate(knowledgeIndex, input.identity)] : [],
+    ...pinnedDocs,
     ...sameProjectHits.map(hitCandidate),
     ...siblingHits.map(siblingCandidate),
   ];
-  const hitCounts = countHits(status, knowledgeIndex, sameProjectHits, siblingHits);
+  const hitCounts = countHits(status, knowledgeIndex, pinnedDocs, sameProjectHits, siblingHits);
 
   if (candidates.length === 0) {
     return finalize(input, now, budgets, {
@@ -467,6 +473,45 @@ async function readKnowledgeIndex(identity: MemoryIdentity): Promise<string | nu
   return lines.join('\n');
 }
 
+/**
+ * PAN-1990: pinned docs (workspace- and project-scoped) read through the
+ * workspaces resolver, injected under the same knowledgeIndex budget as the
+ * OKF knowledge bundle. A missing or unreadable pin is skipped silently —
+ * pins are a convenience, never a reason to fail injection.
+ */
+async function readPinnedDocCandidates(identity: MemoryIdentity): Promise<CandidateContext[]> {
+  const workspace = getWorkspaceById(identity.workspaceId);
+  const pins = [
+    ...listPinnedDocs('workspace', identity.workspaceId),
+    ...listPinnedDocs('project', identity.projectId),
+  ];
+
+  const candidates: CandidateContext[] = [];
+  for (const pin of pins) {
+    const basePath = pin.scope === 'workspace' ? workspace?.path : getProjectByKey(pin.scopeId)?.primaryPath;
+    if (!basePath) continue;
+
+    try {
+      const text = await readFile(resolve(basePath, pin.docPath), 'utf8');
+      candidates.push({
+        key: 'knowledgeIndex',
+        title: `Pinned doc: ${pin.docPath}`,
+        text,
+        source: {
+          id: `pin:${pin.id}`,
+          docType: 'knowledge',
+          scope: pin.scope,
+          score: 1,
+          tokens: estimateTokens(text),
+        },
+      });
+    } catch {
+      // missing/unreadable pinned doc — skip, don't fail injection
+    }
+  }
+  return candidates;
+}
+
 export async function resolveKnowledgeBundleRoot(
   identity: MemoryIdentity | { projectPath: string },
 ): Promise<string | null> {
@@ -570,10 +615,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function countHits(status: MemoryStatus | null, knowledgeIndex: string | null, sameProjectHits: MemorySearchHit[], siblingHits: MemorySearchHit[]): PromptTimeRagDecisionLogEntry['hitCounts'] {
+function countHits(status: MemoryStatus | null, knowledgeIndex: string | null, pinnedDocs: CandidateContext[], sameProjectHits: MemorySearchHit[], siblingHits: MemorySearchHit[]): PromptTimeRagDecisionLogEntry['hitCounts'] {
   return {
     status: status ? 1 : 0,
-    knowledgeIndex: knowledgeIndex ? 1 : 0,
+    knowledgeIndex: (knowledgeIndex ? 1 : 0) + pinnedDocs.length,
     observations: sameProjectHits.filter((hit) => hit.docType !== 'summary').length,
     summaries: sameProjectHits.filter((hit) => hit.docType === 'summary').length,
     sibling: siblingHits.length,
