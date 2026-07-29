@@ -327,7 +327,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:22:44.241Z",
+  "updated": "2026-07-29T05:22:49.836Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -337,7 +337,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:22:43.415Z",
+    "updatedAt": "2026-07-29T05:22:49.822Z",
     "reviewNotes": "Both new FR-7 regression tests fail before proving SimpleHomePage and ConversationDock acceptance paths",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -347,7 +347,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "95f4c6c751405f1ce84e806a249daf5c848a0829",
+    "reviewedAtCommit": "f3e0d00a8c42a0fc125032d75c9dba1b01ff25c2",
     "reviewSpawnedAt": "2026-07-29T05:20:45.731Z"
   },
   "closeOut": {
@@ -408,7 +408,7 @@
       },
       "costAtCloseOut": {
         "usd": 284.743915,
-        "pricingAsOf": "2026-07-29T05:22:43.436Z"
+        "pricingAsOf": "2026-07-29T05:22:49.830Z"
       }
     },
     "merges": [
