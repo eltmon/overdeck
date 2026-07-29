@@ -364,20 +364,21 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T05:07:46.624Z",
+  "updated": "2026-07-29T05:07:49.673Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T05:07:46.507Z",
-    "reviewNotes": "Stale-lock regression coverage is complete; no blocking correctness, security, requirements, or performance findings remain.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-29T05:07:46.518Z",
+    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "conflictsSince": {
       "sha": "3e6036dbd60fcbcd83d9577006279e03103cc0e7",
       "detectedAt": "2026-07-29T04:37:09.427Z",
@@ -441,7 +442,7 @@
       },
       "costAtCloseOut": {
         "usd": 469.186206,
-        "pricingAsOf": "2026-07-29T05:07:46.609Z"
+        "pricingAsOf": "2026-07-29T05:07:49.670Z"
       }
     },
     "merges": [
