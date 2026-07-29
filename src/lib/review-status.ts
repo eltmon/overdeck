@@ -255,25 +255,28 @@ export function setReviewStatusSync(
     merged.reviewRequestedAt = undefined;
   }
 
-  // Track status transitions in history (bounded tail — PAN-3253)
-  const history = [...(status.history || [])];
+  // Track status transitions in history — store raw notes in database (PAN-3253)
+  // Truncation happens at hydration time and in event payloads, not at composition.
   const now = new Date().toISOString();
+  const rawHistory = [...(status.history || [])];
   if (update.reviewStatus && update.reviewStatus !== status.reviewStatus) {
-    history.push({ type: 'review', status: update.reviewStatus, timestamp: now, notes: truncateHistoryNote(update.reviewNotes) });
+    rawHistory.push({ type: 'review', status: update.reviewStatus, timestamp: now, ...(update.reviewNotes ? { notes: update.reviewNotes } : {}) });
   }
   if (update.testStatus && update.testStatus !== status.testStatus) {
-    history.push({ type: 'test', status: update.testStatus, timestamp: now, notes: truncateHistoryNote(update.testNotes) });
+    rawHistory.push({ type: 'test', status: update.testStatus, timestamp: now, ...(update.testNotes ? { notes: update.testNotes } : {}) });
   }
   if (update.uatStatus && update.uatStatus !== status.uatStatus) {
-    history.push({ type: 'uat', status: update.uatStatus, timestamp: now, notes: truncateHistoryNote(update.uatNotes) });
+    rawHistory.push({ type: 'uat', status: update.uatStatus, timestamp: now, ...(update.uatNotes ? { notes: update.uatNotes } : {}) });
   }
   if (update.mergeStatus && update.mergeStatus !== status.mergeStatus) {
-    history.push({ type: 'merge', status: update.mergeStatus, timestamp: now });
+    rawHistory.push({ type: 'merge', status: update.mergeStatus, timestamp: now });
   }
   if (update.releaseStatus && update.releaseStatus !== status.releaseStatus) {
-    history.push({ type: 'release', status: update.releaseStatus, timestamp: now, notes: truncateHistoryNote(update.releaseNotes) });
+    rawHistory.push({ type: 'release', status: update.releaseStatus, timestamp: now, ...(update.releaseNotes ? { notes: update.releaseNotes } : {}) });
   }
-  while (history.length > REVIEW_STATUS_HISTORY_LIMIT) history.shift();
+  // The history array in merged/updated will be bounded at hydration time during the
+  // upsertReviewStatusSync call, so this raw history may grow temporarily.
+  // The read-back via getReviewStatusFromDbSync will apply the bounds.
 
   // PAN-1650: readyForMerge is EVENT-DRIVEN — derived from the gate state on every
   // write, so it flips the instant review+test+verification pass instead of waiting
@@ -295,12 +298,29 @@ export function setReviewStatusSync(
         ? update.readyForMerge
         : reviewGatesPassedSync(merged));
 
+  // Create two versions of the history (PAN-3253):
+  // 1. Raw history (unbounded, untrun notes) for database write
+  // 2. Bounded history (last 20, truncated notes) for the returned event payload
+  const boundedHistory = rawHistory.slice(-REVIEW_STATUS_HISTORY_LIMIT).map((entry) => ({
+    ...entry,
+    notes: entry.notes ? truncateHistoryNote(entry.notes) : undefined,
+  }));
+
+  // Write raw history to the database (for archival), but return bounded history in the status
+  const dbStatus = normalizeReviewStatusSync({
+    ...merged,
+    issueId,
+    updatedAt: now,
+    readyForMerge,
+    history: rawHistory,  // Write raw (unbounded, untrun) history to the database
+  });
+
   const updated: ReviewStatus = normalizeReviewStatusSync({
     ...merged,
     issueId,
     updatedAt: now,
     readyForMerge,
-    history,
+    history: boundedHistory,  // Return bounded (truncated) history in the event payload
   });
 
   // Report commit statuses to GitHub when readyForMerge transitions to true (PAN-536)
@@ -350,8 +370,9 @@ export function setReviewStatusSync(
   // read (getReviewStatusSync's journal→DB reconcile). Tolerating this is what removes the
   // sandbox-escalation "smoke and mirrors" — the agent never has to break out of its jail to
   // record a verdict.
+  // Write the raw (full) history to the database for archival (PAN-3253)
   try {
-    dbUpsert(updated);
+    dbUpsert(dbStatus);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(`[review-status] DB cache write skipped for ${issueId} (${msg}); journal holds the verdict, host will reconcile on read.`);

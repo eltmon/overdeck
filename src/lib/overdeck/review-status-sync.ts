@@ -11,6 +11,7 @@
 import { Effect } from 'effect';
 import type { BlockerReason, ReviewStatus, StatusHistoryEntry } from '../review-status.js';
 import { normalizeReviewStatusSync } from '../review-status-normalize.js';
+import { REVIEW_STATUS_HISTORY_LIMIT, REVIEW_STATUS_NOTE_LIMIT } from '../review-status-limits.js';
 import { getOverdeckDatabaseSync } from './infra.js';
 
 // ── Timestamp helpers — overdeck stores timestamps as integer epoch-MILLISECONDS;
@@ -24,6 +25,13 @@ function isoToMs(value: string | number | null | undefined): number | null {
 }
 function msToIso(value: number | null | undefined): string | undefined {
   return value == null ? undefined : new Date(value).toISOString();
+}
+
+// ── Note truncation — cap individual note fields to prevent payload bloat (PAN-3253)
+function truncateHistoryNote(note: string | null | undefined): string | undefined {
+  if (!note) return undefined;
+  if (note.length <= REVIEW_STATUS_NOTE_LIMIT) return note;
+  return note.slice(0, REVIEW_STATUS_NOTE_LIMIT - 1) + '…';
 }
 
 // ── Internal row type ────────────────────────────────────────────────────────
@@ -164,11 +172,13 @@ function getHistorySync(issueId: string): StatusHistoryEntry[] {
     timestamp: number;
     notes: string | null;
   }>;
-  return rows.map((r) => ({
+  // Return the last REVIEW_STATUS_HISTORY_LIMIT entries with truncated notes (PAN-3253)
+  const tail = rows.slice(-REVIEW_STATUS_HISTORY_LIMIT);
+  return tail.map((r) => ({
     type: r.type as StatusHistoryEntry['type'],
     status: r.status,
     timestamp: new Date(r.timestamp).toISOString(),
-    ...(r.notes ? { notes: r.notes } : {}),
+    ...(r.notes ? { notes: truncateHistoryNote(r.notes) } : {}),
   }));
 }
 
