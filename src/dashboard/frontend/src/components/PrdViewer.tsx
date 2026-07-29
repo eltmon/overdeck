@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FileText, X } from 'lucide-react';
 import { ChatMarkdown } from './chat/ChatMarkdown';
@@ -17,6 +17,12 @@ interface PrdViewerProps {
 }
 
 export function PrdViewer({ issueId, onClose }: PrdViewerProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, [issueId]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -40,10 +46,12 @@ export function PrdViewer({ issueId, onClose }: PrdViewerProps) {
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div
-        className="relative bg-card rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] overflow-hidden flex flex-col"
+        ref={dialogRef}
+        className="relative bg-card rounded-xl shadow-2xl w-full max-w-5xl h-[90vh] overflow-hidden flex flex-col focus:outline-none"
         role="dialog"
         aria-modal="true"
         aria-labelledby="prd-viewer-title"
+        tabIndex={-1}
       >
         <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-border shrink-0">
           <div className="flex items-center gap-3 min-w-0">

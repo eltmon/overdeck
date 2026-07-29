@@ -67,7 +67,20 @@ const plan = {
         priority: 'high',
         metadata: { difficulty: 'medium' },
         narrative: { Action: 'Keep working' },
-        subItems: [],
+        subItems: [
+          {
+            id: 'criterion-completed',
+            title: 'Completed merged criterion',
+            status: 'completed',
+            metadata: { kind: 'acceptance_criterion' },
+          },
+          {
+            id: 'criterion-pending',
+            title: 'Pending merged criterion',
+            status: 'pending',
+            metadata: { kind: 'acceptance_criterion' },
+          },
+        ],
       },
     ],
     edges: [],
@@ -116,6 +129,22 @@ describe('TasksDialog', () => {
     expect(screen.getByText('Pending task').closest('[data-status-bucket]')).toHaveAttribute('data-status-bucket', 'upcoming');
     expect(screen.getByText('Running task').closest('[data-status-bucket]')).toHaveAttribute('data-status-bucket', 'working');
     expect(screen.getByText('Completed task').closest('[data-status-bucket]')).toHaveAttribute('data-status-bucket', 'done');
+  });
+
+  it('matches xBRIEF items by stable ID and expands merged sub-item statuses', async () => {
+    installFetch();
+    render(<TasksDialog issueId="PAN-3231" isOpen onClose={vi.fn()} />, { wrapper });
+
+    const runningItem = (await screen.findByText('Running task')).closest('[data-status-bucket]');
+    expect(runningItem).not.toBeNull();
+    expect(within(runningItem!).getByText('1/2 AC')).toBeInTheDocument();
+
+    fireEvent.click(within(runningItem!).getByTitle('Expand acceptance criteria'));
+
+    expect(within(runningItem!).getByText('Completed merged criterion')).toBeInTheDocument();
+    expect(within(runningItem!).getByText('Pending merged criterion')).toBeInTheDocument();
+    expect(within(runningItem!).getByText('completed')).toHaveAttribute('data-subitem-status', 'completed');
+    expect(within(runningItem!).getByText('pending')).toHaveAttribute('data-subitem-status', 'pending');
   });
 
   it('preserves the list/graph toggle and graph item drill-in', async () => {

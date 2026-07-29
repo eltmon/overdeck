@@ -35,7 +35,9 @@ describe('PrdViewer', () => {
 
     render(<PrdViewer issueId="PAN-3231" onClose={vi.fn()} />, { wrapper });
 
-    expect(screen.getByRole('dialog', { name: 'PRD: PAN-3231' })).toHaveAttribute('aria-modal', 'true');
+    const dialog = screen.getByRole('dialog', { name: 'PRD: PAN-3231' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveFocus();
     const markdown = await screen.findByTestId('chat-markdown');
     expect(markdown).toHaveTextContent('# Artifact viewers');
     expect(markdown).toHaveAttribute('data-issue-id', 'PAN-3231');
