@@ -161,6 +161,43 @@ export async function openEventDb(): Promise<DbAdapter> {
   return db as unknown as DbAdapter;
 }
 
+// ─── One-shot payload trim (PAN-3253) ─────────────────────────────────────────
+
+const REVIEW_HISTORY_TRIM_LIMIT = 20;
+const OVERSIZED_REVIEW_PAYLOAD_CHARS = 16 * 1024;
+
+/**
+ * PAN-3253: older review.status_changed rows embed the full unbounded
+ * `status.history` array — on one machine that single event type was 80% of a
+ * 1.3 GB overdeck.db. Rewrite each oversized payload keeping only the bounded
+ * history tail. New emissions are already bounded at hydration
+ * (REVIEW_STATUS_HISTORY_LIMIT), so this converges to a no-op.
+ */
+export function trimReviewStatusHistoryPayloads(
+  db: DbAdapter,
+): { trimmed: number; savedChars: number } {
+  const rows = db.prepare<{ sequence: number; payload: string }>(
+    `SELECT sequence, payload FROM events WHERE type = 'review.status_changed' AND length(payload) > ?`,
+  ).all([OVERSIZED_REVIEW_PAYLOAD_CHARS]);
+  const update = db.prepare<void>('UPDATE events SET payload = ? WHERE sequence = ?');
+
+  let trimmed = 0;
+  let savedChars = 0;
+  for (const row of rows) {
+    try {
+      const parsed = JSON.parse(row.payload) as { status?: { history?: unknown } };
+      const history = parsed.status?.history;
+      if (!Array.isArray(history) || history.length <= REVIEW_HISTORY_TRIM_LIMIT) continue;
+      parsed.status!.history = history.slice(-REVIEW_HISTORY_TRIM_LIMIT);
+      const next = JSON.stringify(parsed);
+      update.run([next, row.sequence]);
+      trimmed += 1;
+      savedChars += row.payload.length - next.length;
+    } catch { /* leave unparseable rows untouched */ }
+  }
+  return { trimmed, savedChars };
+}
+
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
 /**
@@ -528,6 +565,26 @@ export async function initEventStore(): Promise<EventStore> {
         // is the backstop for returning freed pages to the OS.
         console.error('[event-store] incremental_vacuum failed (non-fatal):', err);
       }
+    }
+
+    // One-shot migration (PAN-3253): shrink historical review.status_changed
+    // payloads that embed the unbounded history array. VACUUM only when the
+    // trim freed real space — it rewrites the whole file, and SQLite never
+    // returns freed pages to the filesystem on its own.
+    try {
+      const trim = trimReviewStatusHistoryPayloads(db);
+      if (trim.trimmed > 0) {
+        const savedMb = Math.round(trim.savedChars / (1024 * 1024));
+        console.log(`[event-store] Trimmed history in ${trim.trimmed} review.status_changed payloads (~${savedMb} MB reclaimed)`);
+        if (trim.savedChars > 64 * 1024 * 1024) {
+          db.exec('VACUUM');
+          console.log('[event-store] VACUUM completed after review-history trim');
+        } else {
+          db.exec('PRAGMA incremental_vacuum');
+        }
+      }
+    } catch (err) {
+      console.error('[event-store] review-history payload trim failed (non-fatal):', err);
     }
 
     _store = store;

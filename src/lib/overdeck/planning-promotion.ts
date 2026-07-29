@@ -17,7 +17,8 @@ import { getAgentStateSync, saveAgentStateSync } from '../agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
 import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
-import { checkPrdGateSync, promoteWorkspacePrdDraft, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue } from '../pan-dir/index.js';
+import { checkPrdGateSync, promoteWorkspacePrdDraft, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue, WORKSPACE_RUNTIME_DIRNAME } from '../pan-dir/index.js';
+import { PENDING_PROMOTION_FILENAME } from '../pan-dir/types.js';
 import { resolveAutoSpawnOnFinalize } from '../planning/spawn-planning-session.js';
 import { extractTeamPrefix, findProjectByPathSync, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
 import { markWorkspaceStuck } from '../review-status.js';
@@ -34,6 +35,17 @@ const execFileAsync = promisify(execFile);
 
 function getIssueDataService() {
   return getSharedIssueService();
+}
+
+export async function removePendingPromotionMarker(
+  workspacePath: string,
+  log: (message: string) => void = console.log,
+): Promise<boolean> {
+  const markerPath = join(workspacePath, WORKSPACE_RUNTIME_DIRNAME, PENDING_PROMOTION_FILENAME);
+  if (!existsSync(markerPath)) return false;
+  await rm(markerPath, { force: true });
+  log(`[complete-planning] Removed pending-promotion marker at ${markerPath}`);
+  return true;
 }
 
 function isGitHubIssue(issueId: string): {
@@ -814,6 +826,7 @@ export async function completePlanningForIssue(options: {
       workAgentSpawned: autoSpawnResult?.workAgentSpawned ?? false,
       workAgentSkipReason: autoSpawnResult?.workAgentSkipReason,
     });
+    await removePendingPromotionMarker(workspacePath);
 
     return jsonResponse({
       success: true,

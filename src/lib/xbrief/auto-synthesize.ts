@@ -1,11 +1,9 @@
-import { mkdir, writeFile } from 'fs/promises';
-import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { Effect } from 'effect';
 
+import type { FsError } from '../errors.js';
+import { writeSpecForIssue } from '../pan-dir/specs.js';
 import { generateXBriefFilename } from './lifecycle.js';
-import { serializeXBriefDocument } from './io.js';
-import { FsError } from '../errors.js';
 import type { XBriefDocument, XBriefSubItem } from './types.js';
 
 export interface AutoSynthesizeIssueInput {
@@ -129,46 +127,36 @@ export function synthesizeMinimalXBrief(issue: AutoSynthesizeIssueInput): XBrief
       edges: [],
     },
   };
-}async function writeAutoStartXBriefPromise(
-  projectRoot: string,
-  workspacePath: string,
-  issue: AutoSynthesizeIssueInput,
-): Promise<AutoSynthesizeResult> {
-  const document = synthesizeMinimalXBrief(issue);
-  const canonicalFilename = document.plan.metadata?.canonicalFilename as string;
-
-  const projectSpecsDir = join(projectRoot, '.pan', 'specs');
-  const projectSpecPath = join(projectSpecsDir, canonicalFilename);
-  const projectDocument: XBriefDocument = {
-    ...document,
-    plan: { ...document.plan, status: 'proposed' },
-  };
-
-  await mkdir(projectSpecsDir, { recursive: true });
-  await writeFile(projectSpecPath, serializeXBriefDocument(projectDocument), 'utf-8');
-
-  return {
-    document,
-    workspaceSpecPath: projectSpecPath,
-    projectSpecPath,
-    canonicalFilename,
-  };
 }
 
-// ─── Effect variant (PAN-1249) ────────────────────────────────────────────────
-
 /**
- * Effect variant of writeAutoStartXBrief. Wraps mkdir + writeFile in a typed
- * FsError channel so callers in Effect-native code can compose with this
- * synthesis step without losing failure typing.
+ * Synthesize and durably persist a proposed spec through the canonical write
+ * door. The returned workspace path is the canonical spec path because
+ * workspace-local spec copies are migration compatibility only.
  */
 export const writeAutoStartXBrief = (
   projectRoot: string,
-  workspacePath: string,
+  _workspacePath: string,
   issue: AutoSynthesizeIssueInput,
 ): Effect.Effect<AutoSynthesizeResult, FsError> =>
-  Effect.tryPromise({
-    try: () => writeAutoStartXBriefPromise(projectRoot, workspacePath, issue),
-    catch: (cause) =>
-      new FsError({ path: projectRoot, operation: 'writeAutoStartXBrief', cause }),
+  Effect.gen(function* () {
+    const document = synthesizeMinimalXBrief(issue);
+    const canonicalFilename = document.plan.metadata?.canonicalFilename as string;
+    const projectDocument: XBriefDocument = {
+      ...document,
+      plan: { ...document.plan, status: 'proposed' },
+    };
+    const written = yield* writeSpecForIssue(
+      projectRoot,
+      projectDocument,
+      'proposed',
+      canonicalFilename,
+    );
+
+    return {
+      document,
+      workspaceSpecPath: written.path,
+      projectSpecPath: written.path,
+      canonicalFilename,
+    };
   });

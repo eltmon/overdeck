@@ -46,12 +46,11 @@ function context(staleness: BuildStaleness = stale()) {
     config: { auto_deploy: true, debounce_minutes: 5, queue_deadline_minutes: 30 },
     computeStaleness: vi.fn(async () => staleness),
     getCiState: vi.fn(async () => ({ status: 'green' as const })),
-    getWindowAssessment: vi.fn(async () => ({ reason: null, verifyingIssues: [] as string[] })),
+    getWindowAssessment: vi.fn(async () => ({ reason: null as string | null })),
     readQueue: vi.fn(async () => null as PendingDeploy | null),
     clearQueue: vi.fn(async () => undefined),
     recordIntent: vi.fn(async () => queuedDeploy()),
     markQueueEscalated: vi.fn(async () => undefined),
-    recordNeedsYou: vi.fn(async () => undefined as string | undefined),
     spawnReload: vi.fn(async () => undefined),
     emitEntry: vi.fn(),
     emitTts: vi.fn(),
@@ -166,8 +165,7 @@ describe('runDeployPatrol', () => {
     const ctx = context();
     ctx.readQueue.mockResolvedValue(queuedDeploy());
     ctx.getWindowAssessment.mockResolvedValue({
-      reason: 'Deployment deferred because verification is in flight for PAN-10.',
-      verifyingIssues: ['PAN-10'],
+      reason: 'Deployment deferred because a merge specialist session is active.',
     });
 
     await runDeployPatrol(ctx);
@@ -181,8 +179,7 @@ describe('runDeployPatrol', () => {
     let queue = queuedDeploy({ requestedAt: '2026-07-15T11:29:00.000Z' });
     ctx.readQueue.mockImplementation(async () => queue);
     ctx.getWindowAssessment.mockResolvedValue({
-      reason: 'Deployment deferred because verification is in flight for PAN-10.',
-      verifyingIssues: ['PAN-10'],
+      reason: 'Deployment deferred because a merge specialist session is active.',
     });
     ctx.markQueueEscalated.mockImplementation(async () => {
       queue = { ...queue, escalated: true };
@@ -197,22 +194,11 @@ describe('runDeployPatrol', () => {
         message: expect.stringContaining('waited 31 minutes'),
       }),
     ]]);
-    expect(ctx.emitEntry).toHaveBeenCalledWith(expect.objectContaining({
-      level: 'error',
-      message: expect.stringContaining('Stored verification blockers: PAN-10'),
-    }));
     expect(ctx.emitTts).toHaveBeenCalledTimes(1);
     expect(ctx.emitTts).toHaveBeenCalledWith(expect.objectContaining({
       priority: 1,
       eventType: 'deploy_queue_stuck',
     }));
-    expect(ctx.recordNeedsYou).toHaveBeenCalledOnce();
-    expect(ctx.recordNeedsYou).toHaveBeenCalledWith(
-      'PAN-10',
-      'deploy-queue',
-      '2026-07-15T11:29:00.000Z',
-      expect.stringContaining('current block'),
-    );
     expect(ctx.markQueueEscalated).toHaveBeenCalledOnce();
     expect(queue.escalated).toBe(true);
   });
@@ -221,15 +207,13 @@ describe('runDeployPatrol', () => {
     const ctx = context();
     ctx.readQueue.mockResolvedValue(queuedDeploy({ requestedAt: '2026-07-15T11:31:00.000Z' }));
     ctx.getWindowAssessment.mockResolvedValue({
-      reason: 'Deployment deferred because verification is in flight for PAN-10.',
-      verifyingIssues: ['PAN-10'],
+      reason: 'Deployment deferred because a merge specialist session is active.',
     });
 
     await runDeployPatrol(ctx);
 
     expect(ctx.emitEntry.mock.calls.some(([entry]) => entry.level === 'error')).toBe(false);
     expect(ctx.emitTts).not.toHaveBeenCalled();
-    expect(ctx.recordNeedsYou).not.toHaveBeenCalled();
     expect(ctx.markQueueEscalated).not.toHaveBeenCalled();
   });
 
@@ -243,7 +227,6 @@ describe('runDeployPatrol', () => {
     expect(ctx.emitEntry.mock.calls.some(([entry]) => entry.level === 'error')).toBe(false);
     expect(ctx.emitTts).toHaveBeenCalledTimes(1);
     expect(ctx.emitTts).not.toHaveBeenCalledWith(expect.objectContaining({ priority: 1 }));
-    expect(ctx.recordNeedsYou).not.toHaveBeenCalled();
     expect(ctx.markQueueEscalated).not.toHaveBeenCalled();
   });
 
@@ -273,46 +256,11 @@ describe('runDeployPatrol', () => {
     await runDeployPatrol(ctx);
 
     expect(ctx.spawnReload).not.toHaveBeenCalled();
-    expect(ctx.markQueueEscalated).not.toHaveBeenCalled();
-    expect(ctx.recordNeedsYou).not.toHaveBeenCalled();
+    expect(ctx.markQueueEscalated).toHaveBeenCalledOnce();
     expect(ctx.emitEntry).toHaveBeenCalledWith(expect.objectContaining({
       level: 'error',
       message: expect.stringContaining('current block: Automatic deployment blocked because CI failed.'),
     }));
-  });
-
-  it('waits for a current verifier before latching needs-you after a historical CI blocker', async () => {
-    const ctx = context();
-    ctx.readQueue.mockResolvedValue(queuedDeploy({
-      requestedAt: '2026-07-15T11:00:00.000Z',
-      blockedBy: ['PAN-OLD'],
-    }));
-    ctx.getCiState.mockResolvedValue({
-      status: 'red',
-      reason: 'Automatic deployment blocked because CI failed.',
-    });
-
-    await runDeployPatrol(ctx);
-    expect(ctx.recordNeedsYou).not.toHaveBeenCalled();
-    expect(ctx.markQueueEscalated).not.toHaveBeenCalled();
-
-    ctx.getCiState.mockResolvedValue({ status: 'green' });
-    ctx.getWindowAssessment.mockResolvedValue({
-      reason: 'Deployment deferred because verification is in flight for PAN-CURRENT.',
-      verifyingIssues: ['PAN-CURRENT'],
-    });
-    await runDeployPatrol(ctx);
-
-    expect(ctx.recordNeedsYou).toHaveBeenCalledOnce();
-    expect(ctx.recordNeedsYou).toHaveBeenCalledWith(
-      'PAN-CURRENT',
-      'deploy-queue',
-      '2026-07-15T11:00:00.000Z',
-      expect.stringContaining('Stored verification blockers: PAN-OLD'),
-    );
-    expect(ctx.markQueueEscalated).toHaveBeenCalledOnce();
-    expect(ctx.emitEntry.mock.calls.filter(([entry]) => entry.level === 'error')).toHaveLength(2);
-    expect(ctx.emitTts.mock.calls.filter(([entry]) => entry.eventType === 'deploy_queue_stuck')).toHaveLength(2);
   });
 
   it('keeps a queued deploy pending during the merge debounce', async () => {
@@ -337,8 +285,7 @@ describe('runDeployPatrol', () => {
     await runDeployPatrol(ctx);
 
     expect(ctx.getCiState).not.toHaveBeenCalled();
-    expect(ctx.markQueueEscalated).not.toHaveBeenCalled();
-    expect(ctx.recordNeedsYou).not.toHaveBeenCalled();
+    expect(ctx.markQueueEscalated).toHaveBeenCalledOnce();
     expect(ctx.emitEntry).toHaveBeenCalledWith(expect.objectContaining({
       level: 'error',
       message: expect.stringContaining('merge debounce has not elapsed'),
@@ -378,19 +325,19 @@ describe('runDeployPatrol', () => {
 
   it('emits a throttled deferral and queues intent when the deploy window is blocked', async () => {
     const ctx = context();
-    const reason = 'Deployment deferred because verification is in flight for PAN-1.';
-    ctx.getWindowAssessment.mockResolvedValue({ reason, verifyingIssues: ['PAN-1'] });
+    const reason = 'Deployment deferred because a merge specialist session is active.';
+    ctx.getWindowAssessment.mockResolvedValue({ reason });
 
     await runDeployPatrol(ctx);
     await runDeployPatrol(ctx);
 
     expect(ctx.spawnReload).not.toHaveBeenCalled();
-    expect(ctx.emitEntry.mock.calls.filter(([entry]) => entry.message.includes('verification'))).toHaveLength(1);
+    expect(ctx.emitEntry.mock.calls.filter(([entry]) => entry.message.includes('merge specialist'))).toHaveLength(1);
     expect(ctx.getWindowAssessment).toHaveBeenCalledTimes(2);
     expect(ctx.recordIntent).toHaveBeenCalledWith({
       requestedBy: 'deploy-patrol',
       reason,
-      blockedBy: ['PAN-1'],
+      blockedBy: [],
     });
   });
 

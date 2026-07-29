@@ -172,6 +172,23 @@ export class AmbiguousKeyedDeliveryError extends Error {
 }
 
 /**
+ * Pure, exported for tests (PAN-1837): classify a keyed supervisor POST
+ * failure. Connect-phase errors (refused / socket path gone / permission)
+ * fire before any bytes reach the supervisor, so the injection definitively
+ * did NOT happen — a stale socket file left by a crashed supervisor refuses
+ * every connection forever, and treating that as ambiguous strands keyed
+ * deliveries permanently. A received non-2xx means the supervisor answered
+ * and recorded no key. Everything else (timeout, reset mid-response) is
+ * genuinely ambiguous.
+ */
+export function keyedSupervisorFailureKind(err: unknown): 'connect-failed' | 'status' | 'ambiguous' {
+  const code = (err as NodeJS.ErrnoException | undefined)?.code;
+  if (code === 'ECONNREFUSED' || code === 'ENOENT' || code === 'EACCES') return 'connect-failed';
+  if (err instanceof SocketPostStatusError) return 'status';
+  return 'ambiguous';
+}
+
+/**
  * POST a JSON body to a Unix-domain socket using node:net + a hand-rolled
  * minimal HTTP/1.1 request. Resolves on a 200-class response, rejects on any
  * error including socket-not-found, connection refused, an optional client
@@ -528,19 +545,17 @@ async function deliverKeyedAgentMessage(
       return { ok: true, path: 'supervisor', deduplicated };
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
-      if (!(err instanceof SocketPostStatusError)) {
-        // AMBIGUOUS (cycle 8): no response came back, so the supervisor may
-        // have completed the injection. The tmux tier keeps an INDEPENDENT
-        // key store, so crossing to it with the same key could submit a
-        // second visible wake. Stay with the same delivery owner: the
-        // caller's recovery retries the same key at the supervisor, whose
-        // in-flight reservation/delivered set deduplicates the retry.
+      const kind = keyedSupervisorFailureKind(err);
+      if (kind === 'ambiguous') {
+        // AMBIGUOUS (cycle 8): the request was sent but no response came back,
+        // so the supervisor may have completed the injection. The tmux tier
+        // keeps an INDEPENDENT key store, so crossing to it with the same key
+        // could submit a second visible wake. Stay with the same delivery
+        // owner: the caller's recovery retries the same key at the supervisor,
+        // whose in-flight reservation/delivered set deduplicates the retry.
         throw new AmbiguousKeyedDeliveryError(normalizedId, caller, reason);
       }
-      // A received non-2xx (e.g. 502 echo-confirm failure after purge) is a
-      // DEFINITIVE failure: the supervisor answered, recorded no key, and
-      // erased its partial write — safe to fall through to keyed tmux.
-      supervisorFailure = `socket-post-failed: ${reason}`;
+      supervisorFailure = `${kind === 'connect-failed' ? 'socket-connect-failed' : 'socket-post-failed'}: ${reason}`;
     }
   }
 
@@ -555,9 +570,10 @@ async function deliverKeyedAgentMessage(
 
 /**
  * Keyed tmux delivery: paste under the two-phase marker protocol, then
- * complete the submit. A replay that finds the pending marker completes the
- * prior attempt's submission WITHOUT re-pasting; a terminal marker suppresses
- * the replay entirely.
+ * complete the submit. Pending claims carry a strictly-read payload state:
+ * unverified requires active-composer proof, while enter-attempted preserves
+ * no-repaste rollback recovery. Unset legacy/unknown states fail closed. A
+ * terminal marker suppresses the replay entirely.
  */
 async function deliverKeyedViaTmux(
   normalizedId: string,

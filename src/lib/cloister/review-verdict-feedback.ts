@@ -27,6 +27,12 @@ import { findVerdictReport } from './review-verdict-report.js';
 
 const execFileAsync = promisify(execFile);
 
+// PAN-1837: bounded same-key retries for ambiguous keyed deliveries. The
+// common ambiguity source is a delivery racing an agent resume, which
+// resolves within seconds once the supervisor finishes binding its socket.
+const AMBIGUOUS_DELIVERY_RETRIES = 3;
+const AMBIGUOUS_DELIVERY_RETRY_MS = 2_000;
+
 type ReviewVerdict = 'blocked' | 'failed';
 
 export interface DeliverReviewVerdictFeedbackOptions {
@@ -193,25 +199,48 @@ async function deliverReviewVerdictFeedbackPromise(
             // PAN-2668: a blocked/failed review verdict owes rework — re-drive a
             // stopped-by-user agent with a completed handoff instead of queueing.
             let deliveryOutcome;
-            try {
-              deliveryOutcome = await messageAgent(target.agentId, message, 'internal', {
-                owesRework: true,
-                ...(dedupKey ? { dedupKey } : {}),
-              });
-            } catch (err) {
-              const reason = err instanceof Error ? err.message : String(err);
-              if (!reason.includes('cannot enforce a dedup key')) throw err;
-              // ACP and explicit Channels targets cannot enforce keyed delivery.
-              // Delivery still wins over deduplication for those transports.
-              console.warn(
-                `[review-verdict-feedback] ${target.agentId} cannot enforce keyed delivery; retrying unkeyed`,
-              );
-              deliveryOutcome = await messageAgent(
-                target.agentId,
-                message,
-                'internal',
-                { owesRework: true },
-              );
+            let ambiguousRetries = 0;
+            for (;;) {
+              try {
+                deliveryOutcome = await messageAgent(target.agentId, message, 'internal', {
+                  owesRework: true,
+                  ...(dedupKey ? { dedupKey } : {}),
+                });
+                break;
+              } catch (err) {
+                const reason = err instanceof Error ? err.message : String(err);
+                // An ambiguous keyed outcome means the supervisor may or may not
+                // have completed the injection; its contract (delivery.ts,
+                // AmbiguousKeyedDeliveryError) is to retry the SAME key at the
+                // SAME tier — the supervisor's dedup store absorbs a duplicate.
+                // Without this retry a delivery that raced an agent resume
+                // stranded rework behind feedback_delivery_needs_you (PAN-1837).
+                if (
+                  err instanceof Error
+                  && err.name === 'AmbiguousKeyedDeliveryError'
+                  && ambiguousRetries < AMBIGUOUS_DELIVERY_RETRIES
+                ) {
+                  ambiguousRetries += 1;
+                  console.warn(
+                    `[review-verdict-feedback] ambiguous keyed delivery to ${target.agentId} — retrying the same key (${ambiguousRetries}/${AMBIGUOUS_DELIVERY_RETRIES}): ${reason}`,
+                  );
+                  await new Promise((resolve) => setTimeout(resolve, AMBIGUOUS_DELIVERY_RETRY_MS));
+                  continue;
+                }
+                if (!reason.includes('cannot enforce a dedup key')) throw err;
+                // ACP and explicit Channels targets cannot enforce keyed delivery.
+                // Delivery still wins over deduplication for those transports.
+                console.warn(
+                  `[review-verdict-feedback] ${target.agentId} cannot enforce keyed delivery; retrying unkeyed`,
+                );
+                deliveryOutcome = await messageAgent(
+                  target.agentId,
+                  message,
+                  'internal',
+                  { owesRework: true },
+                );
+                break;
+              }
             }
             agentMessageSent = true;
             let repeatedDeliveryLoop = false;

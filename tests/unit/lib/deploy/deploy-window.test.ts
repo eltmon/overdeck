@@ -4,8 +4,6 @@ import { getDeployBlockReason } from '../../../../src/lib/deploy/deploy-window.j
 
 function clearDependencies() {
   return {
-    loadReviewStatuses: vi.fn(() => ({})),
-    getFlywheelActiveRunId: vi.fn(() => null as string | null),
     isMergeAgentRunning: vi.fn(async () => false),
     pendingPostMergeExists: vi.fn(async () => false),
     readRestartLockHolder: vi.fn(async () => null),
@@ -14,33 +12,6 @@ function clearDependencies() {
 }
 
 describe('getDeployBlockReason', () => {
-  it('names every issue with verification in flight before checking later gates', async () => {
-    const deps = clearDependencies();
-    deps.loadReviewStatuses.mockReturnValue({
-      'PAN-20': { issueId: 'PAN-20', verificationStatus: 'running' },
-      'PAN-10': { issueId: 'PAN-10', verificationStatus: 'running' },
-      'PAN-30': { issueId: 'PAN-30', verificationStatus: 'passed' },
-    });
-
-    await expect(getDeployBlockReason(deps)).resolves.toBe(
-      'Deployment deferred because verification is in flight for PAN-10, PAN-20.',
-    );
-    expect(deps.isMergeAgentRunning).not.toHaveBeenCalled();
-  });
-
-  it('releases a running verification after the issue has merged', async () => {
-    const deps = clearDependencies();
-    deps.loadReviewStatuses.mockReturnValue({
-      'PAN-2901': {
-        issueId: 'PAN-2901',
-        mergeStatus: 'merged',
-        verificationStatus: 'running',
-      },
-    });
-
-    await expect(getDeployBlockReason(deps)).resolves.toBeNull();
-  });
-
   it('blocks while a merge specialist session is active', async () => {
     const deps = clearDependencies();
     deps.isMergeAgentRunning.mockResolvedValue(true);
@@ -48,16 +19,6 @@ describe('getDeployBlockReason', () => {
     await expect(getDeployBlockReason(deps)).resolves.toBe(
       'Deployment deferred because a merge specialist session is active.',
     );
-  });
-
-  it('defers deployment to an active flywheel run', async () => {
-    const deps = clearDependencies();
-    deps.getFlywheelActiveRunId.mockReturnValue('RUN-42');
-
-    await expect(getDeployBlockReason(deps)).resolves.toBe(
-      'Deployment deferred because flywheel run RUN-42 owns deployment.',
-    );
-    expect(deps.isMergeAgentRunning).not.toHaveBeenCalled();
   });
 
   it('blocks while the post-merge lifecycle is pending', async () => {

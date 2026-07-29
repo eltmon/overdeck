@@ -114,6 +114,15 @@ describe('isBlockingDecision', () => {
     expect(isBlockingDecision(['permissionRequest'])).toBe(true);
   });
 
+  /**
+   * PAN-3233 review fix — a paneQuestion is a terminal prompt with no
+   * structured payload; without this the agent sorted into the non-blocking
+   * "Waiting" group despite being frozen exactly like an askUserQuestion.
+   */
+  it('treats a paneQuestion as blocking — the agent is frozen on a terminal prompt', () => {
+    expect(isBlockingDecision(['paneQuestion'])).toBe(true);
+  });
+
   it('is blocking when any kind blocks', () => {
     expect(isBlockingDecision(['exitPlanMode', 'askUserQuestion'])).toBe(true);
   });

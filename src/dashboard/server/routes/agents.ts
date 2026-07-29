@@ -27,6 +27,8 @@ import {
 } from './agents/messaging.js';
 import {
   getAgentPendingQuestionsRoute,
+  getAgentPaneChoiceRoute,
+  postAgentPaneChoiceRoute,
   postAgentAnswerQuestionRoute,
   postAgentPlanActionRoute,
   postInternalAgentPermissionRequestRoute,
@@ -103,6 +105,8 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentHealthHistoryRoute,
   postAgentPokeRoute,
   getAgentPendingQuestionsRoute,
+  getAgentPaneChoiceRoute,
+  postAgentPaneChoiceRoute,
   postAgentAnswerQuestionRoute,
   postAgentPlanActionRoute,
   postAgentHeartbeatRoute,
