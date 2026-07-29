@@ -1,0 +1,142 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-29T00:22:29Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3254: Review/test pipeline re-drove one issue 426 times in 19.5 hours, every cycle reporting 'no code changed'",
+    "updated": "2026-07-29T00:24:19.285Z"
+  },
+  "plan": {
+    "id": "pan-3254",
+    "title": "Review/test pipeline re-drove one issue 426 times in 19.5 hours, every cycle reporting 'no code changed'",
+    "status": "proposed",
+    "uid": "94f9a7f2-63f4-48a3-928c-d49f746e2288",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-29T00:22:29Z",
+    "updated": "2026-07-29T00:24:19.285Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3254",
+        "label": "PAN-3254",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/commit/fb99ed40fabcbd281b63c654d714574ab254e0b8",
+        "label": "fb99ed40fa — the landed fix",
+        "type": "commit"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3253",
+        "label": "PAN-3253 — downstream storage blowup",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "cloister",
+      "review-pipeline",
+      "anchor-drift"
+    ],
+    "narratives": {
+      "Problem": "The post-review Deacon patrol reset MIN-901's review/test to pending 426 times in 19.5 hours because a polyrepo composite reviewedAtCommit anchor compared against a bare wrapper-HEAD snapshot was reported as drift before any content check, and the wrapper HEAD never moves. The fix (shape mismatch -> unreadable; polyrepo snapshot resolution by repoKey OR repoPath; refuse degraded wrapper-HEAD snapshots; repeat-reset bound with a one-time review-reset-loop needs-you escalation) already landed on main in fb99ed40fa with locking tests, and is an ancestor of this branch. The residual defect: docs/REVIEW-AGENT-ARCHITECTURE.md still documents the removed behavior — it claims a shape mismatch is 'intentionally reported as drift once' and says nothing about the repeat-reset bound or its operator-visible needs-you escalation.",
+      "Proposal": "Correct docs/REVIEW-AGENT-ARCHITECTURE.md to match the shipped code: replace the stale 'drift once' paragraph with the unreadable-on-shape-mismatch semantics, document the repeat-reset bound (one reset per distinct anchor, then suppress + one review-reset-loop needs-you, process-local state, new anchor still resets), cite the MIN-901 426-cycle incident as the motivating failure, and name the locking test files. Documentation-only branch diff.",
+      "NonGoals": "- No changes to src/lib/cloister/deacon-post-review-commits.ts, src/lib/workspace-anchor-drift.ts, src/lib/project-repos.ts, or src/lib/git-utils.ts — the fix already landed in fb99ed40fa and must not be re-implemented or extended\n- No persistence of the repeat-reset bound's in-memory state across dashboard restarts (accepted backstop; worst post-restart cost is one extra reset)\n- No changes to the PAN-3151 review convergence gate (it targets non-converging blocking findings, a different failure mode)\n- No event-payload capping or storage remediation (that is PAN-3253)\n- No live/deploy verification that MIN-891/902/858 stopped churning — deploy and verify-on-main are owned by close-out per the Definition of Done, not this branch"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scoped this issue's remaining work to documentation only, without asking the operator.",
+        "rationale": "The issue comment states the fix landed on main in fb99ed40fa (operator-directed, gates green); git confirms it is an ancestor of feature/pan-3254, and its tests map 1:1 onto all three issue acceptance criteria (shape-mismatch->unreadable; reset-once-then-suppress-then-escalate replaying the MIN-901 signature; new-anchor-still-resets). The only artifact the fix left stale is docs/REVIEW-AGENT-ARCHITECTURE.md, which now contradicts shipped behavior."
+      },
+      {
+        "summary": "Chose docs/REVIEW-AGENT-ARCHITECTURE.md as the sole documentation target.",
+        "rationale": "It is the only file containing a now-false claim ('intentionally reported as drift once'). CLAUDE.md's pipeline sections do not describe anchor-drift semantics, so duplicating there would create drift risk without adding a surface operators actually consult for this behavior."
+      },
+      {
+        "summary": "Documented (rather than persisted) the process-local repeat-reset bound state.",
+        "rationale": "The primary loop driver is eliminated at the drift-evaluator layer, making the bound a backstop; persisting its Maps would add a storage surface for a one-extra-reset-after-restart edge the issue does not require closing."
+      }
+    ],
+    "items": [
+      {
+        "id": "docs-anchor-drift-semantics",
+        "title": "Correct anchor-drift and repeat-reset-bound documentation in REVIEW-AGENT-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T00:22:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3254",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/REVIEW-AGENT-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'review-reset-loop' docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "grep -c 'reported as drift once' docs/REVIEW-AGENT-ARCHITECTURE.md; test $? -eq 1",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grep for 'review-reset-loop' prints a count of at least 1",
+            "grep for 'reported as drift once' finds zero matches (exits 1)",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/REVIEW-AGENT-ARCHITECTURE.md, locate by phrase search (not line number) the paragraph beginning 'A legacy wrapper SHA compared with a current composite anchor is intentionally reported as drift once.' Replace it with the shipped PAN-3254 semantics: a composite/bare anchor SHAPE disagreement is a producer disagreement, not code change — evaluateWorkspaceAnchorDrift() returns unreadable, callers skip, and the existing verdict is preserved; a genuine post-review push differs by content in a well-formed anchor. Recount the motivating failure as MIN-901's 426 identical review cycles in 19.5 h (the wrapper HEAD never moves), keeping the still-true sentence about logs rendering every token as repoKey@<8-char sha>. Then extend the numbered checkPostReviewCommits() site description with the repeat-reset bound: the patrol records the current anchor at each reset; a second drifted verdict against the same anchor is suppressed and escalates one review-reset-loop needs-you via recordDeadEndNeedsYou instead of looping; a genuinely new anchor still resets; bound state is process-local in-memory, cleared when the issue merges and on dashboard restart. Name the locking tests: tests/unit/lib/workspace-anchor-drift.test.ts (shape mismatch -> unreadable) and tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts (reset-once-then-suppress-then-escalate; new-anchor-still-resets). Touch no other file.",
+          "Why": "The doc describes the exact mechanism ('drift once, then stabilize') that failed to stabilize and was removed by fb99ed40fa; anyone debugging a future reset loop from this doc would be steered to the superseded model, and the operator-visible review-reset-loop needs-you escalation is currently undocumented."
+        },
+        "items": [
+          {
+            "id": "docs-anchor-drift-semantics.ac1",
+            "title": "Given the updated doc, grep for 'reported as drift once' in docs/REVIEW-AGENT-ARCHITECTURE.md returns zero matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-anchor-drift-semantics.ac2",
+            "title": "The shape-mismatch paragraph states the evaluator returns unreadable and preserves the existing verdict, citing PAN-3254 and the MIN-901 426-cycle incident",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-anchor-drift-semantics.ac3",
+            "title": "The checkPostReviewCommits() site description states a repeated drifted verdict against the same anchor is suppressed and emits one review-reset-loop needs-you, while a new anchor still resets review",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-anchor-drift-semantics.ac4",
+            "title": "The doc contains both locking test file paths, and git diff origin/main --stat shows docs/REVIEW-AGENT-ARCHITECTURE.md as the only non-planning-artifact change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-07-29-PAN-3254-review-test-pipeline-re-drove-one-issue-426-times-in-19-5-hours-every-cycle-reporting-no-code-changed.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
