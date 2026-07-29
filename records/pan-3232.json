@@ -317,17 +317,17 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:20:40.963Z",
+  "updated": "2026-07-29T05:20:44.723Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:20:40.926Z",
+    "updatedAt": "2026-07-29T05:20:41.689Z",
     "reviewNotes": "Agent re-review request (3/25): Added missing FR-7 acceptance tests: conversation-only SimpleHomePage and agent-backed ConversationDock",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -369,19 +369,19 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 5108,
-            "output": 244692,
-            "cacheRead": 98390278,
-            "cacheWrite": 5995468
+            "input": 5114,
+            "output": 244853,
+            "cacheRead": 98520667,
+            "cacheWrite": 6010677
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 5542,
-          "output": 272565,
-          "cacheRead": 108511481,
-          "cacheWrite": 6305281
+          "input": 5548,
+          "output": 272726,
+          "cacheRead": 108641870,
+          "cacheWrite": 6320490
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -397,8 +397,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 279.728667,
-        "pricingAsOf": "2026-07-29T05:20:40.959Z"
+        "usd": 279.761528,
+        "pricingAsOf": "2026-07-29T05:20:44.719Z"
       }
     },
     "merges": [
