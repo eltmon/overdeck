@@ -222,16 +222,16 @@
     "recordedAt": "2026-07-29T15:41:58.832Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T15:41:58.833Z",
+  "updated": "2026-07-29T15:41:59.764Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T15:41:41.743Z",
+    "updatedAt": "2026-07-29T15:41:59.761Z",
     "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "conflictsSince": {
@@ -243,13 +243,14 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "lastVerifiedCommit": "7d4c9e95bfe58d87dd42e7b33ced7901a8bf6503",
-    "reviewRequestedAt": "2026-07-29T15:39:02.204Z",
+    "reviewRequestedAt": "2026-07-29T15:41:59.761Z",
     "reviewSpawnedAt": "2026-07-29T10:10:29.425Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt",
         "src/lib/overdeck/review-status-sync.ts",
         "src/lib/review-status-limits.ts",
+        "tests/dashboard/event-store.test.ts",
         "tests/unit/lib/overdeck/review-status-sync.test.ts"
       ],
       "declaredScopeUntouched": [
@@ -273,10 +274,11 @@
         "src/lib/review-status-limits.ts",
         "src/lib/review-status-reconcile.ts",
         "src/lib/review-status.ts",
+        "tests/dashboard/event-store.test.ts",
         "tests/unit/event-store.test.ts",
         "tests/unit/lib/overdeck/review-status-sync.test.ts"
       ],
-      "recordedAt": "2026-07-29T09:08:42.655Z"
+      "recordedAt": "2026-07-29T15:41:58.832Z"
     }
   },
   "closeOut": {
