@@ -26,17 +26,20 @@ function NeedsYouRow({
   question,
   onOpen,
   isConversation,
+  conversationName,
 }: {
   item: SimpleIssueDerivation;
   kind: NeedsYouKind;
   question?: string;
   onOpen: (id: string) => void;
   isConversation?: boolean;
+  conversationName?: string;
 }) {
   const actions = useSimpleActions();
   const [answer, setAnswer] = useState('');
   const agent = item.primaryAgent;
-  const questionAgent = item.pendingInputAgent;
+  const questionAgent = isConversation ? undefined : item.pendingInputAgent;
+  const answerTarget = conversationName || questionAgent?.id;
   const busy = actions.tell.isPending || actions.recover.isPending || actions.unstick.isPending || actions.answer.isPending;
   const meta = KIND_META[kind];
 
@@ -58,13 +61,13 @@ function NeedsYouRow({
             <input
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && answer.trim() && questionAgent) actions.answer.mutate({ agentId: questionAgent.id, text: answer.trim(), isConversation }); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && answer.trim() && answerTarget) actions.answer.mutate({ agentId: answerTarget, text: answer.trim(), isConversation }); }}
               placeholder="Type your answer…"
               className="h-7 flex-1 rounded-md border border-input bg-muted px-2 text-[11.5px] text-foreground outline-none focus:border-ring"
             />
             <button
-              disabled={!answer.trim() || !questionAgent || busy}
-              onClick={() => questionAgent && actions.answer.mutate({ agentId: questionAgent.id, text: answer.trim(), isConversation })}
+              disabled={!answer.trim() || !answerTarget || busy}
+              onClick={() => answerTarget && actions.answer.mutate({ agentId: answerTarget, text: answer.trim(), isConversation })}
               className="h-7 flex-none rounded-md bg-primary px-2.5 text-[11px] font-medium text-primary-foreground disabled:opacity-40"
             >
               Answer
@@ -109,7 +112,7 @@ export function NeedsYouStrip({ onOpenIssue }: { onOpenIssue: (id: string) => vo
   const reviewByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
   const pendingSubjects = usePendingInputSubjects();
 
-  const { items, questions } = useMemo(() => {
+  const { items, questions, conversationItems } = useMemo(() => {
     const issues = (issuesRaw as Issue[]) ?? [];
     const allAgents = Object.values(agentsById ?? {}) as AgentSnapshot[];
     const agentsByIssue = new Map<string, AgentSnapshot[]>();
@@ -125,32 +128,54 @@ export function NeedsYouStrip({ onOpenIssue }: { onOpenIssue: (id: string) => vo
     );
     const needs = bucketSimpleHome(derivations).needsYou;
     const questionByIssue = new Map<string, string>();
+    const convItems: Array<{ derivation: SimpleIssueDerivation; kind: NeedsYouKind; conversationName: string }> = [];
+
     for (const s of pendingSubjects ?? []) {
       const q = s.pendingAskUserQuestion?.questions?.[0]?.question;
       if (s.issueId && q) questionByIssue.set(s.issueId.toLowerCase(), q);
+
+      // Detect conversation-only subjects with pending questions
+      if (s.pendingAskUserQuestion && s.issueId && !agentsByIssue.has(s.issueId.toLowerCase())) {
+        const issue = issues.find((i) => i.identifier.toLowerCase() === s.issueId?.toLowerCase());
+        if (issue) {
+          const syntheticDerivation = deriveSimpleIssue(issue, [], reviewByIssueId?.[issue.identifier]);
+          convItems.push({
+            derivation: syntheticDerivation,
+            kind: 'question',
+            conversationName: s.agentId,
+          });
+        }
+      }
     }
-    return { items: needs, questions: questionByIssue };
+
+    return { items: needs, questions: questionByIssue, conversationItems: convItems };
   }, [issuesRaw, agentsById, reviewByIssueId, pendingSubjects]);
 
-  if (items.length === 0) return null;
+  const allItems = [...items, ...conversationItems.map((c) => ({ derivation: c.derivation, kind: c.kind }))];
+  if (allItems.length === 0) return null;
 
   return (
     <div className="mb-3 flex items-stretch gap-2.5 overflow-x-auto border-b border-border bg-warning/5 px-4 py-3" data-component="needs-you-strip">
       <div className="flex flex-none flex-col justify-center pr-1">
         <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Needs you</span>
-        <span className="text-xl font-medium text-warning-foreground">{items.length}</span>
+        <span className="text-xl font-medium text-warning-foreground">{allItems.length}</span>
       </div>
-      {items.slice(0, 6).map(({ derivation, kind }) => (
-        <NeedsYouRow
-          key={derivation.issue.identifier}
-          item={derivation}
-          kind={kind}
-          question={questions.get(derivation.issue.identifier.toLowerCase())}
-          onOpen={onOpenIssue}
-        />
-      ))}
-      {items.length > 6 && (
-        <div className="flex flex-none items-center px-2 text-xs text-muted-foreground">+{items.length - 6} more</div>
+      {allItems.slice(0, 6).map(({ derivation, kind }, idx) => {
+        const convItem = conversationItems.find((c) => c.derivation.issue.identifier === derivation.issue.identifier);
+        return (
+          <NeedsYouRow
+            key={`${derivation.issue.identifier}-${idx}`}
+            item={derivation}
+            kind={kind}
+            question={questions.get(derivation.issue.identifier.toLowerCase())}
+            onOpen={onOpenIssue}
+            isConversation={!!convItem}
+            conversationName={convItem?.conversationName}
+          />
+        );
+      })}
+      {allItems.length > 6 && (
+        <div className="flex flex-none items-center px-2 text-xs text-muted-foreground">+{allItems.length - 6} more</div>
       )}
     </div>
   );
