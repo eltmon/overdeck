@@ -48,9 +48,22 @@
       "reason": "resume",
       "agentModel": "claude-haiku-4-5",
       "timestamp": "2026-07-29T07:39:08.100Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-29T07:56Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-29T07:56:43.460Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-29T07:56:43Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3253\n\n# Code Review — PAN-3253 — 2026-07-29\n\n## Verdict: CHANGES REQUESTED — the circular-import fix duplicates the canonical limits, and the new append-door behavior lacks its required regression coverage\n\n## Context\n- Actual branch: `feature/pan-3253` (the manifest labels it `feature/3253`)\n- HEAD reviewed: `cde48b2488a78f423607d229f8a86c0c7d286085`\n- PR: `#3279`\n- Cycle: 5\n- Prior blocker: resolved; one helper now bounds `append()`, `appendAsync()`, `appendOnce()`, and boot trim.\n- Convergence gate: both blockers below concern code added since the previous reviewed HEAD `cccc58288bf35005e46072c242c4bef78cbd8791`.\n\n## Blocking Findings\n\n### ! [correctness / requirements] The cycle resolves the circular import by recreating the duplicated constants that D4 explicitly forbids — `src/dashboard/server/event-store.ts:166`\n\n`REVIEW_STATUS_HISTORY_LIMIT` and `REVIEW_STATUS_NOTE_LIMIT` are defined locally in `event-store.ts`. The approved implementation checkpoint says that if importing from `review-status-reconcile.ts` creates a Node ESM cycle, both constants must move into an import-free leaf module such as `src/lib/review-status-limits.ts`, with `review-status-reconcile.ts` re-exporting them. Hardcoding `20` and `500` locally is the fallback the plan explicitly rejects because composition, hydration, append-time bounding, and boot trim can silently diverge.\n\nThat divergence is already present: `src/lib/review-status.ts` and `src/lib/database/review-status-db.ts` do not import or apply `REVIEW_STATUS_NOTE_LIMIT`, so FR-2's composition and hydration note cap remains absent while the event-store copy independently enforces 500. Move both constants to the prescribed leaf module, import them at every enforcement point, apply note truncation at the FR-2 composition/hydration sites, and preserve the existing history-limit export surface.\n\n### ! [requirements / test coverage] None of the new persistence-door branches are exercised — `src/dashboard/server/event-store.ts:386`\n\nThe cycle adds behavior to `append()`, `appendAsync()`, and `appendOnce()`, but the PR's only new test exercises `trimReviewStatusHistoryPayloads()`. The plan requires append-door regression coverage proving that an oversized `review.status_changed` payload persists exactly 20 entries with notes `<= 500`, while a large non-review payload and an unparseable review payload remain byte-identical. The existing 39 focused tests all pass, but none would fail if the three new calls to `boundReviewStatusPayload()` were removed.\n\nAdd focused tests for the synchronous and idempotent persistence doors, plus the new async branch because this cycle changed it. The tests must inspect the persisted payload and subscriber-visible round trip, and must cover non-review and unparseable inputs so the helper's fail-open behavior is locked.\n\n## Security\n\nNo exploitable security issue was found. The helper parses only internally serialized event payloads, catches malformed JSON without executing it, and does not alter authentication, authorization, filesystem access, command execution, or secrets.\n\n## Requirements / Acceptance Criteria\n\n- FR-1: the implementation now appears to bound all three persistence paths, but required proof is missing.\n- FR-2: **not satisfied** — composition and hydration do not apply the 500-character note limit.\n- FR-3: satisfied by the shared helper and the passing boot-trim idempotency test.\n- FR-4: the PR still does not update `docs/AGENT-STATE-PLANES.md`; this is a whole-feature gap that must be completed before the issue is done.\n- D4: **not satisfied** — the prescribed leaf-module fallback was replaced with duplicated local literals.\n- No listed NonGoal is violated.\n\n## Performance\n\nThe helper adds a JSON parse and, when bounding is required, a re-serialization on review-status appends. That cost is linear in the incoming payload and is appropriate at the persistence boundary that prevents quadratic database growth. No additional performance blocker was found.\n\n## Verification\n\n- `npx vitest run tests/unit/event-store.test.ts tests/dashboard/event-store.test.ts --reporter=verbose`: **39 passed**.\n- `npx eslint src/dashboard/server/event-store.ts tests/unit/event-store.test.ts`: **passed**.\n- `git diff --check origin/main...HEAD`: **passed**.\n\n## Non-blocking Findings\n\nNone newly introduced beyond the blocking completeness gaps above.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253/.pan/review/agent-pan-3253-review-cde48b24/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3253 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [
@@ -76,7 +89,7 @@
     "recordedAt": "2026-07-29T07:45:29.088Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T07:56:42.823Z",
+  "updated": "2026-07-29T07:56:43.461Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "blocked",
