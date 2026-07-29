@@ -88,10 +88,10 @@
       "src/dashboard/server/event-store.ts",
       "tests/unit/event-store.test.ts"
     ],
-    "recordedAt": "2026-07-29T07:39:51.971Z"
+    "recordedAt": "2026-07-29T07:45:29.088Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T07:45:25.876Z",
+  "updated": "2026-07-29T07:45:29.090Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "failed",
