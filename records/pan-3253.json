@@ -190,7 +190,7 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T15:37:40.452Z",
+  "updated": "2026-07-29T15:37:57.934Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -250,7 +250,9 @@
         "tests/unit/lib/overdeck/review-status-sync.test.ts"
       ],
       "recordedAt": "2026-07-29T09:08:42.655Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-29T15:37:57.518Z",
+    "panDoneRecoveredAt": "2026-07-29T15:37:57.518Z"
   },
   "closeOut": {
     "usage": {
