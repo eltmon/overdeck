@@ -357,7 +357,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:31:03.748Z",
+  "updated": "2026-07-29T05:31:09.325Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -367,7 +367,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:31:03.082Z",
+    "updatedAt": "2026-07-29T05:31:09.315Z",
     "reviewNotes": "FR-7 tests still fail: SimpleHomePage leaks unrelated requests and the DrawerAgentSession mock omits pickDefaultDrawerAgent",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -377,7 +377,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "0ec63b2992872060a1437b3be1b9e574ca9d372d",
+    "reviewedAtCommit": "0450d10a8eaea980d8372554534ccd905fb42aae",
     "reviewSpawnedAt": "2026-07-29T05:29:20.177Z"
   },
   "closeOut": {
@@ -438,7 +438,7 @@
       },
       "costAtCloseOut": {
         "usd": 301.682716,
-        "pricingAsOf": "2026-07-29T05:31:03.104Z"
+        "pricingAsOf": "2026-07-29T05:31:09.322Z"
       }
     },
     "merges": [
