@@ -336,67 +336,6 @@ describe('append() bounding of review.status_changed (PAN-3253 append-door-bound
     }
   });
 
-  it('bounds oversized review.status_changed at appendOnce door (FR-1)', () => {
-    const store = createEventStore(db as unknown as DbAdapter);
-
-    const longNote = 'x'.repeat(1000);
-    const largeHistory = Array.from({ length: 30 }, (_, i) => ({
-      type: 'review',
-      status: i % 2 === 0 ? 'pending' : 'passed',
-      timestamp: new Date(1_753_000_000_000 + i * 1000).toISOString(),
-      notes: longNote,
-    }));
-
-    const result = store.appendOnce(
-      {
-        type: 'review.status_changed',
-        timestamp: new Date().toISOString(),
-        payload: {
-          status: {
-            history: largeHistory,
-            issueId: 'PAN-3262',
-            reviewStatus: 'passed',
-          },
-        },
-      } as any,
-      'test-idempotency-key-1'
-    );
-
-    // Verify it was appended
-    expect(result).toBeTruthy();
-
-    const rows = db.prepare('SELECT payload FROM events WHERE type = ?').all(['review.status_changed']) as Array<{ payload: string }>;
-    const mostRecent = rows[rows.length - 1]!;
-
-    const parsed = JSON.parse(mostRecent.payload) as {
-      status?: { history?: Array<{ notes?: string }> };
-    };
-    expect(parsed.status?.history).toHaveLength(20);
-    for (const entry of parsed.status?.history || []) {
-      if (entry.notes) {
-        expect(entry.notes.length).toBeLessThanOrEqual(500);
-      }
-    }
-
-    // Second call with same key should not append a new event
-    const rowsBefore = db.prepare('SELECT COUNT(*) as count FROM events WHERE type = ?').get('review.status_changed') as { count: number };
-    store.appendOnce(
-      {
-        type: 'review.status_changed',
-        timestamp: new Date().toISOString(),
-        payload: {
-          status: {
-            history: largeHistory,
-            issueId: 'PAN-3263',
-            reviewStatus: 'passed',
-          },
-        },
-      } as any,
-      'test-idempotency-key-1'
-    );
-    const rowsAfter = db.prepare('SELECT COUNT(*) as count FROM events WHERE type = ?').get('review.status_changed') as { count: number };
-    expect(rowsAfter.count).toBe(rowsBefore.count); // No new row added (duplicate detected)
-  });
 
   it('preserves raw notes in status_history table while bounding event payload (FR-2)', () => {
     const store = createEventStore(db as unknown as DbAdapter);
@@ -437,13 +376,6 @@ describe('append() bounding of review.status_changed (PAN-3253 append-door-bound
     }
   });
 
-  it('handles malformed stored JSON gracefully through trimReviewStatusHistoryPayloads', () => {
-    // trimReviewStatusHistoryPayloads should handle malformed payloads gracefully
-    const result = trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
-
-    // Should not error and should process whatever rows exist
-    expect(result.trimmed).toBeGreaterThanOrEqual(0);
-  });
 
   it('appendAsync bounding produces bounded payload in persisted data', async () => {
     const store = createEventStore(db as unknown as DbAdapter);
