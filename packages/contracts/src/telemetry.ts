@@ -115,6 +115,7 @@ export const TELEMETRY_PROPERTY_DOMAINS = {
     "deacon",
     "sessions",
     "awaiting-merge",
+    "workspace",
   ],
   decision_subject: ["agent", "conversation"],
   duration_bucket: ["under_100ms", "100ms-999ms", "1s-9s", "10s+"],
