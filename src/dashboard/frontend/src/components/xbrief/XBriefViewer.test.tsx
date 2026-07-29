@@ -179,6 +179,16 @@ describe('XBriefViewer: tab switching', () => {
     expect(dagTab.getAttribute('aria-selected')).toBe('true');
   });
 
+  it('fills the available viewer height while preserving the DAG minimum height', () => {
+    render(<XBriefViewer doc={makeDoc()} initialTab="dag" />);
+
+    const pane = screen.getByTestId('xbrief-dag-pane');
+    expect(pane.className).toContain('flex-1');
+    expect(pane.className).toContain('min-h-0');
+    expect(pane.style.minHeight).toBe('400px');
+    expect(pane.style.height).toBe('');
+  });
+
   it('List tab is aria-selected when active', () => {
     render(<XBriefViewer doc={makeDoc()} initialTab="list" />);
     const listTab = screen.getByRole('tab', { name: /list/i });

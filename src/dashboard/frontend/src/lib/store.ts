@@ -39,6 +39,7 @@ export interface DashboardState extends ReadModelState {
   drawer: DrawerState
   tasksViewerIssueId: string | null
   prdViewerIssueId: string | null
+  xbriefViewerIssueId: string | null
   /** Whether the initial snapshot has been loaded */
   bootstrapComplete: boolean
   /** ISO timestamp of the last received snapshot (used for freshness indicator) */
@@ -65,6 +66,8 @@ export interface DashboardStore extends DashboardState {
   closeTasksViewer(): void
   openPrdViewer(issueId: string): void
   closePrdViewer(): void
+  openXbriefViewer(issueId: string): void
+  closeXbriefViewer(): void
   setDrawerTab(tab: string): void
   syncDrawerFromUrl(): void
 }
@@ -76,6 +79,7 @@ const initialState: DashboardState = {
   drawer: { issueId: null, tab: 'overview' },
   tasksViewerIssueId: null,
   prdViewerIssueId: null,
+  xbriefViewerIssueId: null,
   bootstrapComplete: false,
   snapshotTimestamp: null,
 }
@@ -88,6 +92,7 @@ function syncSnapshot(state: DashboardState, snapshot: DashboardSnapshot): Dashb
     drawer: state.drawer,
     tasksViewerIssueId: state.tasksViewerIssueId,
     prdViewerIssueId: state.prdViewerIssueId,
+    xbriefViewerIssueId: state.xbriefViewerIssueId,
     bootstrapComplete: true,
     snapshotTimestamp: snapshot.timestamp,
   }
@@ -99,6 +104,7 @@ function applyEvent(state: DashboardState, event: DomainEvent): DashboardState {
     drawer: state.drawer,
     tasksViewerIssueId: state.tasksViewerIssueId,
     prdViewerIssueId: state.prdViewerIssueId,
+    xbriefViewerIssueId: state.xbriefViewerIssueId,
     bootstrapComplete: state.bootstrapComplete,
     snapshotTimestamp: state.snapshotTimestamp,
   }
@@ -110,6 +116,7 @@ function applyEvents(state: DashboardState, events: DomainEvent[]): DashboardSta
     drawer: state.drawer,
     tasksViewerIssueId: state.tasksViewerIssueId,
     prdViewerIssueId: state.prdViewerIssueId,
+    xbriefViewerIssueId: state.xbriefViewerIssueId,
     bootstrapComplete: state.bootstrapComplete,
     snapshotTimestamp: state.snapshotTimestamp,
   }
@@ -207,6 +214,8 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   closeTasksViewer: () => set({ tasksViewerIssueId: null }),
   openPrdViewer: (issueId) => set({ prdViewerIssueId: issueId }),
   closePrdViewer: () => set({ prdViewerIssueId: null }),
+  openXbriefViewer: (issueId) => set({ xbriefViewerIssueId: issueId }),
+  closeXbriefViewer: () => set({ xbriefViewerIssueId: null }),
 
   setDrawerTab: (tab) =>
     set((state) => {

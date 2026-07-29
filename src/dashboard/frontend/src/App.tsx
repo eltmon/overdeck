@@ -21,6 +21,7 @@ import { Sidebar } from './components/Sidebar';
 import { UpdateDialog } from './components/UpdateDialog';
 import { TasksDialog } from './components/TasksDialog';
 import { PrdViewer } from './components/PrdViewer';
+import { XBriefFullscreen } from './components/xbrief';
 
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { CostWarningStyles } from './components/shared/costWarning';
@@ -884,6 +885,7 @@ export default function App() {
       </div>
 
       <IssueDrawer />
+      <XBriefFullscreen />
       <TasksViewerHost />
       <PrdViewerHost />
       {/* PAN-2908 C-CONVO: persistent conversation dock (level 2 · talk). */}

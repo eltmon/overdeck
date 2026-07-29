@@ -67,7 +67,7 @@ export function XBriefViewer({ doc, initialTab, onInspectionPolicyChange, isUpda
       </div>
 
       {/* Content — DAG tab needs overflow-hidden so ReactFlow gets a real height */}
-      <div className={`flex-1 ${tab === 'dag' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+      <div className={`flex-1 min-h-0 ${tab === 'dag' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
         {tab === 'list' && (
           <>
             <XBriefHeader
@@ -85,7 +85,7 @@ export function XBriefViewer({ doc, initialTab, onInspectionPolicyChange, isUpda
         )}
 
         {tab === 'dag' && (
-          <div style={{ height: 'calc(100vh - 280px)', minHeight: 400 }}>
+          <div className="flex-1 min-h-0" style={{ minHeight: 400 }} data-testid="xbrief-dag-pane">
             <DAGPlaceholder issueId={doc.plan.id} />
           </div>
         )}
