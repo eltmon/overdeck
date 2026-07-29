@@ -82,7 +82,7 @@
     "recordedAt": "2026-07-28T23:54:25.516Z"
   },
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-29T00:04:11.843Z",
+  "updated": "2026-07-29T00:05:06.015Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "passed",
@@ -92,17 +92,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T00:04:11.791Z",
-    "reviewNotes": "Approved: no blocking correctness, security, requirements, or performance findings; focused tests, typecheck, and lint passed.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "inspectNotes": "All 3 ACs met: getProviderForModelSync resolves ql-reason-70b/ql-swift-8b/ql-nano-1b to PROVIDERS.quantumllama (providers.ts:392-395, reached — no earlier branch matches ql-* ids); getProviderEnvSync emits ANTHROPIC_BASE_URL=https://api.quantumllama.ai/v1 via provider.baseUrl and QUANTUMLLAMA_API_KEY (providers.ts:469-470); defaultHarness 'claude-code' declared and EXPECTED_DEFAULT_HARNESSES updated. NFR-1 respected: registry/env only, no HTTP, request, or streaming code and no agent-spawn changes. Verified locally: tests/unit/lib/providers.test.ts + tests/lib/providers.test.ts, 23 passed.",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since c109ed6 (1 path): scripts/file-size-allowlist.txt",
-        "detectedAt": "2026-07-29T00:03:35.975Z"
-      }
-    ],
+    "updatedAt": "2026-07-29T00:05:05.991Z",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
       "detectedAt": "2026-07-29T00:03:35.975Z",
@@ -112,78 +102,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3258",
     "reviewedAtCommit": "4599d16d113c0c9979f88918c8666e36139dfed3",
-    "reviewSpawnedAt": "2026-07-28T23:55:36.663Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "scripts/file-size-allowlist.txt",
-        "src/dashboard/frontend/src/components/Settings/__tests__/quantumllama-catalog.test.ts",
-        "src/lib/config-yaml/schema.ts",
-        "tests/lib/agents-auth-routing.test.ts",
-        "tests/lib/config-yaml.test.ts",
-        "tests/lib/cost-parsers/jsonl-parser.test.ts"
-      ],
-      "declaredScopeUntouched": [
-        "src/lib/cost-parsers/__tests__/jsonl-parser-model.test.ts"
-      ],
-      "declaredScope": [
-        "configuration/harnesses.mdx",
-        "docs/CONFIGURATION.md",
-        "docs/TESTING-PROVIDERS.md",
-        "docs/USAGE.md",
-        "src/dashboard/frontend/src/components/CostBreakdownModal.tsx",
-        "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
-        "src/dashboard/frontend/src/components/Stage/HomePane/Timeline.tsx",
-        "src/lib/__tests__/model-capabilities.test.ts",
-        "src/lib/agents/provider-env.ts",
-        "src/lib/child-env.ts",
-        "src/lib/config-yaml/load.ts",
-        "src/lib/cost-parsers/__tests__/jsonl-parser-model.test.ts",
-        "src/lib/cost-parsers/jsonl-parser.ts",
-        "src/lib/cost.ts",
-        "src/lib/env-loader.ts",
-        "src/lib/model-capabilities.ts",
-        "src/lib/model-fallback.ts",
-        "src/lib/providers.ts",
-        "src/lib/settings.ts",
-        "tests/lib/cost.test.ts",
-        "tests/lib/model-fallback.test.ts",
-        "tests/lib/providers.test.ts",
-        "tests/lib/settings.test.ts",
-        "tests/unit/lib/providers.test.ts"
-      ],
-      "actualChangedFiles": [
-        "configuration/harnesses.mdx",
-        "docs/CONFIGURATION.md",
-        "docs/TESTING-PROVIDERS.md",
-        "docs/USAGE.md",
-        "scripts/file-size-allowlist.txt",
-        "src/dashboard/frontend/src/components/CostBreakdownModal.tsx",
-        "src/dashboard/frontend/src/components/Settings/__tests__/quantumllama-catalog.test.ts",
-        "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
-        "src/dashboard/frontend/src/components/Stage/HomePane/Timeline.tsx",
-        "src/lib/__tests__/model-capabilities.test.ts",
-        "src/lib/agents/provider-env.ts",
-        "src/lib/child-env.ts",
-        "src/lib/config-yaml/load.ts",
-        "src/lib/config-yaml/schema.ts",
-        "src/lib/cost-parsers/jsonl-parser.ts",
-        "src/lib/cost.ts",
-        "src/lib/env-loader.ts",
-        "src/lib/model-capabilities.ts",
-        "src/lib/model-fallback.ts",
-        "src/lib/providers.ts",
-        "src/lib/settings.ts",
-        "tests/lib/agents-auth-routing.test.ts",
-        "tests/lib/config-yaml.test.ts",
-        "tests/lib/cost-parsers/jsonl-parser.test.ts",
-        "tests/lib/cost.test.ts",
-        "tests/lib/model-fallback.test.ts",
-        "tests/lib/providers.test.ts",
-        "tests/lib/settings.test.ts",
-        "tests/unit/lib/providers.test.ts"
-      ],
-      "recordedAt": "2026-07-28T23:54:25.516Z"
-    }
+    "reviewSpawnedAt": "2026-07-28T23:55:36.663Z"
   },
   "closeOut": {
     "usage": {
@@ -198,17 +117,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 539657,
-            "output": 40557,
-            "cacheRead": 15292928,
+            "input": 547022,
+            "output": 43421,
+            "cacheRead": 16150528,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 577246,
-            "output": 49115,
-            "cacheRead": 15796224,
+            "input": 732733,
+            "output": 52804,
+            "cacheRead": 18404864,
             "cacheWrite": 0
           }
         }
@@ -221,15 +140,15 @@
           "cacheWrite": 172477
         },
         "openai/gpt-5.6-sol": {
-          "input": 1116903,
-          "output": 89672,
-          "cacheRead": 31089152,
+          "input": 1279755,
+          "output": 96225,
+          "cacheRead": 34555392,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 30.730875,
-        "pricingAsOf": "2026-07-29T00:04:11.831Z"
+        "usd": 33.474845,
+        "pricingAsOf": "2026-07-29T00:05:06.012Z"
       }
     },
     "merges": [
