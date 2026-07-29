@@ -298,4 +298,146 @@ describe('append() bounding of review.status_changed (PAN-3253 append-door-bound
     const rows = db.prepare('SELECT payload FROM events WHERE type = ?').all(['review.status_changed']) as Array<{ payload: string }>;
     expect(rows.length).toBeGreaterThan(0);
   });
+
+  it('bounds oversized review.status_changed at appendAsync door (FR-1)', async () => {
+    const store = createEventStore(db as unknown as DbAdapter);
+
+    const longNote = 'x'.repeat(1000);
+    const largeHistory = Array.from({ length: 30 }, (_, i) => ({
+      type: 'review',
+      status: i % 2 === 0 ? 'pending' : 'passed',
+      timestamp: new Date(1_753_000_000_000 + i * 1000).toISOString(),
+      notes: longNote,
+    }));
+
+    await store.appendAsync({
+      type: 'review.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: {
+        status: {
+          history: largeHistory,
+          issueId: 'PAN-3261',
+          reviewStatus: 'passed',
+        },
+      },
+    } as any);
+
+    const rows = db.prepare('SELECT payload FROM events WHERE type = ?').all(['review.status_changed']) as Array<{ payload: string }>;
+    const mostRecent = rows[rows.length - 1]!;
+
+    const parsed = JSON.parse(mostRecent.payload) as {
+      status?: { history?: Array<{ notes?: string }> };
+    };
+    expect(parsed.status?.history).toHaveLength(20);
+    for (const entry of parsed.status?.history || []) {
+      if (entry.notes) {
+        expect(entry.notes.length).toBeLessThanOrEqual(500);
+      }
+    }
+  });
+
+  it('bounds oversized review.status_changed at appendOnce door (FR-1)', () => {
+    const store = createEventStore(db as unknown as DbAdapter);
+
+    const longNote = 'x'.repeat(1000);
+    const largeHistory = Array.from({ length: 30 }, (_, i) => ({
+      type: 'review',
+      status: i % 2 === 0 ? 'pending' : 'passed',
+      timestamp: new Date(1_753_000_000_000 + i * 1000).toISOString(),
+      notes: longNote,
+    }));
+
+    const result = store.appendOnce(
+      {
+        type: 'review.status_changed',
+        timestamp: new Date().toISOString(),
+        payload: {
+          status: {
+            history: largeHistory,
+            issueId: 'PAN-3262',
+            reviewStatus: 'passed',
+          },
+        },
+      } as any,
+      'test-idempotency-key-1'
+    );
+
+    expect(result.appended).toBe(true);
+
+    const rows = db.prepare('SELECT payload FROM events WHERE type = ?').all(['review.status_changed']) as Array<{ payload: string }>;
+    const mostRecent = rows[rows.length - 1]!;
+
+    const parsed = JSON.parse(mostRecent.payload) as {
+      status?: { history?: Array<{ notes?: string }> };
+    };
+    expect(parsed.status?.history).toHaveLength(20);
+    for (const entry of parsed.status?.history || []) {
+      if (entry.notes) {
+        expect(entry.notes.length).toBeLessThanOrEqual(500);
+      }
+    }
+
+    // Second call with same key should return duplicate
+    const result2 = store.appendOnce(
+      {
+        type: 'review.status_changed',
+        timestamp: new Date().toISOString(),
+        payload: {
+          status: {
+            history: largeHistory,
+            issueId: 'PAN-3263',
+            reviewStatus: 'passed',
+          },
+        },
+      } as any,
+      'test-idempotency-key-1'
+    );
+    expect(result2.duplicate).toBe(true);
+  });
+
+  it('preserves raw notes in status_history table while bounding event payload (FR-2)', () => {
+    const store = createEventStore(db as unknown as DbAdapter);
+
+    // Create a status update with notes that exceed the truncation limit
+    const longNote = 'x'.repeat(600); // Exceeds 500-char limit
+    const history = [
+      {
+        type: 'review',
+        status: 'passed',
+        timestamp: new Date().toISOString(),
+        notes: longNote,
+      },
+    ];
+
+    // Write a status update
+    db.prepare(`
+      INSERT INTO status_history (issue_id, type, status, timestamp, notes)
+      VALUES (?, ?, ?, ?, ?)
+    `).run('PAN-3264', history[0]!.type, history[0]!.status, Date.now(), history[0]!.notes);
+
+    // Append an event with this history
+    store.append({
+      type: 'review.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: {
+        status: {
+          history,
+          issueId: 'PAN-3264',
+          reviewStatus: 'passed',
+        },
+      },
+    } as any);
+
+    // Verify event payload has truncated notes
+    const eventRows = db.prepare('SELECT payload FROM events WHERE type = ?').all(['review.status_changed']) as Array<{ payload: string }>;
+    const mostRecent = eventRows[eventRows.length - 1]!;
+    const eventParsed = JSON.parse(mostRecent.payload) as {
+      status?: { history?: Array<{ notes?: string }> };
+    };
+    expect(eventParsed.status?.history?.[0]?.notes?.length).toBeLessThanOrEqual(500);
+
+    // Verify status_history table has the full raw notes
+    const dbRows = db.prepare('SELECT notes FROM status_history WHERE issue_id = ?').all(['PAN-3264']) as Array<{ notes: string | null }>;
+    expect(dbRows[0]?.notes?.length).toBe(600);
+  });
 });
