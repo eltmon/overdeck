@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { Effect } from 'effect';
 
-import { findDraftPrdSync, findPrdAnywhereSync } from '../prd-locations.js';
+import { findDraftPrd, findDraftPrdSync, findPrdAnywhereSync } from '../prd-locations.js';
 import { getDraftsDir } from '../pan-dir/index.js';
 
 let projectRoot: string;
@@ -41,6 +42,25 @@ describe('findDraftPrdSync', () => {
 
   it('returns null when no draft exists', () => {
     expect(findDraftPrdSync(projectRoot, 'PAN-2858')).toBeNull();
+  });
+});
+
+describe('findDraftPrd', () => {
+  it('finds a draft through the async filesystem effect', async () => {
+    const draftsDir = getDraftsDir(projectRoot);
+    mkdirSync(draftsDir, { recursive: true });
+    const lower = join(draftsDir, 'pan-2858.md');
+    writeFileSync(lower, 'prd\n', 'utf-8');
+
+    await expect(Effect.runPromise(findDraftPrd(projectRoot, 'PAN-2858'))).resolves.toEqual({
+      path: lower,
+      format: 'pan-draft',
+      status: 'draft',
+    });
+  });
+
+  it('returns null asynchronously when no draft exists', async () => {
+    await expect(Effect.runPromise(findDraftPrd(projectRoot, 'PAN-2858'))).resolves.toBeNull();
   });
 });
 

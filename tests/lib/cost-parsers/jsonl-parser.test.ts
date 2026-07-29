@@ -11,7 +11,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
-import { getActiveSessionModelSync, parseClaudeSessionSync } from '../../../src/lib/cost-parsers/jsonl-parser.js';
+import { getActiveSessionModelSync, normalizeModelName, parseClaudeSessionSync } from '../../../src/lib/cost-parsers/jsonl-parser.js';
 
 const CLAUDE_FIXTURE_DIR = join(__dirname, '../../../src/lib/cost-parsers/__tests__/fixtures/claude');
 
@@ -586,5 +586,17 @@ describe('parseClaudeSession', () => {
     expect(breakdown.inputTokens).toBe(3);
     expect(breakdown.outputTokens).toBe(1);
     expect(breakdown.cost).toBeCloseTo(expectedCost, 5);
+  });
+});
+
+describe('normalizeModelName (QuantumLlama, PAN-3252)', () => {
+  it('maps each ql-* model id to the custom provider unchanged', () => {
+    for (const model of ['ql-reason-70b', 'ql-swift-8b', 'ql-nano-1b']) {
+      expect(normalizeModelName(model)).toEqual({ provider: 'custom', model });
+    }
+  });
+
+  it('still defaults unknown models to anthropic/claude-sonnet-4', () => {
+    expect(normalizeModelName('some-unknown-model')).toEqual({ provider: 'anthropic', model: 'claude-sonnet-4' });
   });
 });

@@ -495,4 +495,40 @@ describe('cost module', () => {
       expect(result.model).toBe('claude-sonnet-4');
     });
   });
+
+  describe('QuantumLlama pricing (PAN-3252)', () => {
+    it('should return spec rates for each ql-* model', () => {
+      const reason = getPricingSync('custom', 'ql-reason-70b');
+      expect(reason).toMatchObject({ inputPer1k: 0.008, outputPer1k: 0.024, cacheReadPer1k: 0.0008, cacheWrite5mPer1k: 0.010 });
+
+      const swift = getPricingSync('custom', 'ql-swift-8b');
+      expect(swift).toMatchObject({ inputPer1k: 0.002, outputPer1k: 0.006, cacheReadPer1k: 0.0002, cacheWrite5mPer1k: 0.0025 });
+
+      const nano = getPricingSync('custom', 'ql-nano-1b');
+      expect(nano).toMatchObject({ inputPer1k: 0.0004, outputPer1k: 0.0012, cacheReadPer1k: 0.00004, cacheWrite5mPer1k: 0.0005 });
+    });
+
+    it('should calculate $0.128 for 10k input + 2k output tokens on ql-reason-70b', () => {
+      const pricing = getPricingSync('custom', 'ql-reason-70b');
+      expect(pricing).not.toBeNull();
+      const cost = calculateCostSync({ inputTokens: 10000, outputTokens: 2000 }, pricing!);
+      // (10000/1000 * 0.008) + (2000/1000 * 0.024) = 0.08 + 0.048 = 0.128
+      expect(cost).toBeCloseTo(0.128, 10);
+    });
+
+    it('should price cache-read and 5m cache-write tokens on QL models', () => {
+      const pricing = getPricingSync('custom', 'ql-swift-8b');
+      expect(pricing).not.toBeNull();
+      const usage: TokenUsage = {
+        inputTokens: 1000,
+        outputTokens: 1000,
+        cacheReadTokens: 4000,
+        cacheWriteTokens: 2000,
+        cacheTTL: '5m',
+      };
+      const cost = calculateCostSync(usage, pricing!);
+      // 0.002 + 0.006 + (4000/1000 * 0.0002) + (2000/1000 * 0.0025) = 0.008 + 0.0008 + 0.005 = 0.0138
+      expect(cost).toBeCloseTo(0.0138, 10);
+    });
+  });
 });

@@ -136,6 +136,10 @@ or edit `~/.pi/agent/auth.json` manually.
 | Nous | `api_keys.nous` or `NOUS_API_KEY` | `NOUS_API_KEY` |
 | DashScope | `api_keys.dashscope` or `DASHSCOPE_API_KEY` | `DASHSCOPE_API_KEY` |
 | Google | `api_keys.google` or `GOOGLE_API_KEY` | `GEMINI_API_KEY` |
+| QuantumLlama | `api_keys.quantumllama` or `QUANTUMLLAMA_API_KEY` | `QUANTUMLLAMA_API_KEY` |
+
+QuantumLlama is a fictional benchmark provider (no live endpoint) used for
+pipeline testing — see `benchmarks/specs/quantumllama.md`.
 
 **Test:**
 ```bash

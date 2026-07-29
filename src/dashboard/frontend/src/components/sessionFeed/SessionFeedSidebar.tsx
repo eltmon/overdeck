@@ -6,8 +6,9 @@ import { formatBucketLabel, groupByContiguousLabel } from '../../lib/sessionFeed
 import { BucketSection } from './BucketSection';
 import type { SessionFeedEntry, SessionFeedTab } from './types';
 import { useMergedFeed } from './useMergedFeed';
-import { useDashboardStore, selectIssues } from '../../lib/store';
+import { useDashboardStore, selectIssues, type PendingInputSource } from '../../lib/store';
 import { usePendingInputSubjects } from '../../lib/useDecisions';
+import { navigateToDecisionSubject } from '../../lib/navigateToDecision';
 import { DecisionsPanel } from '../DecisionsPanel';
 import { describePendingInput } from '../../lib/pendingInput';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
@@ -224,6 +225,9 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
     const out: Array<{
       key: string;
       agentId: string;
+      // Carried so the click can route to the waiting subject (PAN-3276).
+      source: PendingInputSource;
+      issueId?: string;
       label: string;
       detail: string;
       count: number;
@@ -252,7 +256,16 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
       const dedupKey = (!auqResolved ? toolUseId : undefined) ?? (!planResolved ? planToolUseId : undefined) ?? `${subject.issueId ?? subject.agentId}::${label}::${detail}`;
       if (seen.has(dedupKey)) continue;
       seen.add(dedupKey);
-      out.push({ key: dedupKey, agentId: subject.agentId, label, detail, count, title: describePendingInput(subject.kinds) });
+      out.push({
+        key: dedupKey,
+        agentId: subject.agentId,
+        source: subject.source,
+        issueId: subject.issueId,
+        label,
+        detail,
+        count,
+        title: describePendingInput(subject.kinds),
+      });
     }
     return out;
   }, [scoped, answeredToolUseIds, dismissedSubjectIds, resolvedPlanToolUseIds, dismissedPlanSubjectIds, titleByIssueId]);
@@ -287,9 +300,18 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
               exit={{ opacity: 0, height: 0, y: -4 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
               type="button"
-              onClick={() => requestReopen(row.agentId)}
+              // PAN-3276 — go to the subject that is waiting, THEN ask for the
+              // dialog. Reopen alone did nothing for a terminal question or a
+              // permission prompt (no payload to reopen), so the row looked
+              // dead; navigating puts the operator on the session either way,
+              // and the dialog is app-level so it survives the route change.
+              onClick={() => {
+                navigateToDecisionSubject({ id: row.agentId, source: row.source, issueId: row.issueId });
+                requestReopen(row.agentId);
+              }}
               className="flex w-full flex-col items-start gap-0.5 overflow-hidden rounded border border-amber-500/30 bg-background px-2 py-1.5 text-left transition-colors hover:border-amber-500/60 hover:bg-amber-500/10"
-              title={row.title}
+              title={`${row.title} — click to open`}
+              data-testid={`needs-you-row-${row.agentId}`}
             >
               <span className="text-xs font-medium text-foreground">
                 {row.label}

@@ -171,12 +171,29 @@ describe('XBriefViewer: tab switching', () => {
     expect(screen.getByText(/test-1/)).toBeTruthy(); // JSON contains plan.id
   });
 
+  it('accepts a controlled tab while hiding its internal tab bar', () => {
+    render(<XBriefViewer doc={makeDoc()} activeTab="raw" showTabBar={false} />);
+
+    expect(screen.queryByRole('tab')).toBeNull();
+    expect(screen.getByText(/test-1/)).toBeTruthy();
+  });
+
   it('switches to DAG tab', () => {
     render(<XBriefViewer doc={makeDoc()} initialTab="list" />);
     const dagTab = screen.getByRole('tab', { name: /dag/i });
     fireEvent.click(dagTab);
     // DAG tab is selected
     expect(dagTab.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('fills the available viewer height while preserving the DAG minimum height', () => {
+    render(<XBriefViewer doc={makeDoc()} initialTab="dag" />);
+
+    const pane = screen.getByTestId('xbrief-dag-pane');
+    expect(pane.className).toContain('flex-1');
+    expect(pane.className).toContain('min-h-0');
+    expect(pane.style.minHeight).toBe('400px');
+    expect(pane.style.height).toBe('');
   });
 
   it('List tab is aria-selected when active', () => {

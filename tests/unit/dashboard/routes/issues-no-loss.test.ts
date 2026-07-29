@@ -28,6 +28,7 @@ const EXPECTED_ISSUES_ROUTES = [
   'POST /api/issues/:id/copy-settings',
   'POST /api/issues/:id/close-out',
   'POST /api/issues/bulk-close-out',
+  'GET /api/issues/:id/prd',
   'GET /api/issues/:id/tasks',
   'POST /api/issues/:id/tasks/:itemId/inspect',
   'GET /api/issues/:id/verification',
@@ -70,7 +71,7 @@ function enumerateIssuesRoutes(): Set<string> {
 }
 
 describe('PAN-2148 issues route no-loss audit', () => {
-  it('keeps all 34 issues + pipeline-membership method/path registrations', () => {
+  it('keeps all 35 issues + pipeline-membership method/path registrations', () => {
     const liveRoutes = enumerateIssuesRoutes();
     const allExpected = [...EXPECTED_ISSUES_ROUTES, ...EXPECTED_MEMBERSHIP_ROUTES];
     const expectedRoutes = new Set<string>(allExpected);
@@ -90,6 +91,6 @@ describe('PAN-2148 issues route no-loss audit', () => {
       ...unexpected.map((route) => `  unexpected: ${route}`),
     ].join('\n')).toEqual([]);
 
-    expect(liveRoutes.size).toBe(34);
+    expect(liveRoutes.size).toBe(35);
   });
 });

@@ -12,16 +12,11 @@ import { useEffect, useRef, useState } from 'react';
 import { CircleUserRound } from 'lucide-react';
 import { DecisionsPanel } from './DecisionsPanel';
 import { useDecisions, type Decision } from '../lib/useDecisions';
+import { navigateToDecisionSubject } from '../lib/navigateToDecision';
 
+/** Kept as the popover's entry point; the routing itself is shared (PAN-3276). */
 export function navigateForDecision(d: Decision): void {
-  const path = d.source === 'conversation'
-    ? `/conv/${encodeURIComponent(d.id)}`
-    : d.issueId
-      ? `/issues/${encodeURIComponent(d.issueId)}`
-      : null;
-  if (!path) return;
-  if (window.location.pathname !== path) window.history.pushState({}, '', path);
-  window.dispatchEvent(new PopStateEvent('popstate'));
+  navigateToDecisionSubject(d);
 }
 
 export function DecisionsIndicator() {

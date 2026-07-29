@@ -19,6 +19,7 @@ import {
   PAN_DIRNAME,
 } from '../../../lib/pan-dir/index.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
+import { findDraftPrd } from '../../../lib/prd-locations.js';
 import { listProjectsSync, resolveProjectFromIssueSync, type ProjectConfig, type ResolvedProject } from '../../../lib/projects.js';
 import {
   PLANNED_BACKLOG_SPEC_ONLY_REASON,
@@ -40,7 +41,7 @@ const RECENT_ACTIVITY_WINDOW_MS = 5_000;
 export { RECENCY_DAYS } from './resource-discovery-signals.js';
 export type { TaskTotals } from './resource-discovery-signals.js';
 
-export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'tasks' | 'docker' | 'remote-agent' | 'conversation';
+export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'prd' | 'vbrief' | 'tasks' | 'docker' | 'remote-agent' | 'conversation';
 
 export interface ResourcePullRequest {
   number: number;
@@ -58,6 +59,7 @@ export interface ResourceDetails {
   prs: ResourcePullRequest[];
   hasXbrief: boolean;
   hasTasks: boolean;
+  hasPrd: boolean;
   dockerContainerCount: number;
   /** Current HEAD of the agent's workspace, or null when no workspace exists. */
   actualBranch: string | null;
@@ -124,6 +126,7 @@ interface InternalResourceDetails {
   xbriefPath: string | null;
   xbriefMtime: number | null;
   tasksPath: string | null;
+  prdPath: string | null;
   dockerContainers: string[];
   actualBranch: string | null;
   branchDrifted: boolean;
@@ -235,6 +238,7 @@ function summarizeResourceDetails(details: InternalResourceDetails): ResourceDet
     })),
     hasXbrief: details.xbriefPath !== null,
     hasTasks: details.tasksPath !== null,
+    hasPrd: details.prdPath !== null,
     dockerContainerCount: details.dockerContainers.length,
     actualBranch: details.actualBranch,
     branchDrifted: details.branchDrifted,
@@ -498,6 +502,7 @@ async function computeResourceAllocatedIssues(
         xbriefPath: null,
         xbriefMtime: null,
         tasksPath: null,
+        prdPath: null,
         dockerContainers: [],
         actualBranch: null,
         branchDrifted: false,
@@ -688,6 +693,16 @@ async function computeResourceAllocatedIssues(
     }
   }
 
+  await Promise.all([...issueMap.values()].map(async (issue) => {
+    const project = resolveProjectRef(issue.issueId);
+    if (!project) return;
+    const draft = await Effect.runPromise(findDraftPrd(project.config.path, issue.issueId)).catch(() => null);
+    if (!draft) return;
+    issue.resourceSources.add('prd');
+    issue.resourceDetails.prdPath = draft.path;
+    issue.hasPrd = true;
+  }));
+
   // The canonical resolver owns pipeline inclusion whenever it returns a verdict.
   // While a project's membership is unavailable, retain only rows backed by a live
   // resource so a transient tracker failure cannot erase running work.
@@ -850,6 +865,7 @@ export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]
       })),
       hasXbrief: issue.resourceDetails.hasXbrief,
       hasTasks: issue.resourceDetails.hasTasks,
+      hasPrd: issue.resourceDetails.hasPrd,
       dockerContainerCount: issue.resourceDetails.dockerContainerCount,
       actualBranch: issue.resourceDetails.actualBranch,
       branchDrifted: issue.resourceDetails.branchDrifted,

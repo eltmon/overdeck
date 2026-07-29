@@ -3,7 +3,7 @@ import { useLiveFlash } from '../../../lib/useLiveFlash';
 import {
   Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge,
   ChevronRight, ChevronDown, FolderOpen, GitBranch,
-  BookText, Bug, Container, Radio, Workflow, MessageSquare,
+  BookText, Bug, Container, FileText, Radio, Workflow, MessageSquare,
 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
@@ -57,7 +57,7 @@ interface FeatureItemProps {
   onOpenPlanDialog?: (issueId: string) => void;
   containerStats?: Record<string, { id: string; name: string; cpuPercent: number; memoryUsage: number; status: 'running' | 'stopped' | 'unhealthy' | 'restarting' }>;
 }
-const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'remote-agent', 'vbrief', 'tasks', 'pr', 'docker'];
+const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'remote-agent', 'vbrief', 'prd', 'tasks', 'pr', 'docker'];
 
 function resourceColor(_feature: ProjectFeature): string {
   // v1.2 color restraint: resources are infrastructure facts, not status —
@@ -86,6 +86,8 @@ function resourceSummary(feature: ProjectFeature, source: ResourceSource): { lab
       return details.tmuxSessionCount > 0 ? { label: 'tmux', detail: `${details.tmuxSessionCount} session${details.tmuxSessionCount === 1 ? '' : 's'}` } : null;
     case 'vbrief':
       return details.hasXbrief ? { label: 'xBRIEF', detail: 'present' } : null;
+    case 'prd':
+      return details.hasPrd ? { label: 'PRD', detail: 'present' } : null;
     case 'tasks':
       return details.hasTasks ? { label: 'tasks', detail: 'present' } : null;
     case 'pr':
@@ -110,7 +112,15 @@ function isOrphanedFeature(feature: ProjectFeature): boolean {
   return state.includes('closed') || state.includes('done') || rawState.includes('closed') || rawState.includes('done');
 }
 
-function ResourceIcon({ source, feature }: { source: ResourceSource; feature: ProjectFeature }) {
+function ResourceIcon({
+  source,
+  feature,
+  onActivate,
+}: {
+  source: ResourceSource;
+  feature: ProjectFeature;
+  onActivate?: () => void;
+}) {
   const color = resourceColor(feature);
   const summary = resourceSummary(feature, source);
   if (!summary) return null;
@@ -119,13 +129,38 @@ function ResourceIcon({ source, feature }: { source: ResourceSource; feature: Pr
     : source === 'branch' ? <GitBranch {...props} />
       : source === 'tmux' ? <Radio {...props} />
         : source === 'vbrief' ? <BookText {...props} />
-          : source === 'tasks' ? <Bug {...props} />
+          : source === 'prd' ? <FileText {...props} />
+            : source === 'tasks' ? <Bug {...props} />
             : source === 'pr' ? <Workflow {...props} />
               : <Container {...props} />;
+  const label = source === 'pr' ? summary.detail.split(' ')[0]
+    : source === 'branch' ? `branch ${summary.detail}`
+      : source === 'docker' ? `stack ${summary.detail.split(' ')[0]}`
+        : summary.label;
+  const content = <>{icon}<span>{label}</span></>;
+
+  if (onActivate) {
+    return (
+      <button
+        type="button"
+        className={styles.featureResourceChip}
+        title={`${summary.label}: ${summary.detail}`}
+        aria-label={`Open ${summary.label} for ${feature.issueId}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onActivate();
+        }}
+        onFocus={(event) => event.stopPropagation()}
+        onBlur={(event) => event.stopPropagation()}
+      >
+        {content}
+      </button>
+    );
+  }
+
   return (
     <span className={styles.featureResourceChip} title={`${summary.label}: ${summary.detail}`}>
-      {icon}
-      <span>{source === 'pr' ? summary.detail.split(' ')[0] : source === 'branch' ? `branch ${summary.detail}` : source === 'docker' ? `stack ${summary.detail.split(' ')[0]}` : summary.label}</span>
+      {content}
     </span>
   );
 }
@@ -138,6 +173,9 @@ function ResourceStrip({
   onCleanupOrphanedResources?: (issueId: string) => void;
 }) {
   const details = feature.resourceDetails;
+  const openTasksViewer = useDashboardStore((state) => state.openTasksViewer);
+  const openPrdViewer = useDashboardStore((state) => state.openPrdViewer);
+  const openXbriefViewer = useDashboardStore((state) => state.openXbriefViewer);
   const resources = RESOURCE_ICON_ORDER.filter((source) => feature.resourceSources?.includes(source) && resourceSummary(feature, source));
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
@@ -208,6 +246,7 @@ function ResourceStrip({
     }
 
     if (details.hasXbrief) rows.push({ key: 'vbrief', label: 'xBRIEF present' });
+    if (details.hasPrd) rows.push({ key: 'prd', label: 'PRD present' });
     if (details.hasTasks) rows.push({ key: 'tasks', label: 'tasks present' });
     for (const pr of identifiers?.prs ?? details.prs) {
       rows.push({ key: `pr-${pr.number}`, label: `PR: #${pr.number} ${pr.title} (${formatPrState(pr)})` });
@@ -239,7 +278,18 @@ function ResourceStrip({
       }}
     >
       {resources.map((source) => (
-        <ResourceIcon key={source} source={source} feature={feature} />
+        <ResourceIcon
+          key={source}
+          source={source}
+          feature={feature}
+          onActivate={source === 'vbrief'
+            ? () => openXbriefViewer(feature.issueId)
+            : source === 'tasks'
+              ? () => openTasksViewer(feature.issueId)
+              : source === 'prd'
+                ? () => openPrdViewer(feature.issueId)
+                : undefined}
+        />
       ))}
       {details && popoverOpen && (
         <span className={styles.featureResourcePopover}>

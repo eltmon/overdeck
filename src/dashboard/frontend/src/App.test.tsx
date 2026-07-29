@@ -40,6 +40,12 @@ const {
       agentsWithPendingAskUserQuestion: [],
       agentsWithPendingProposedPlan: [],
       drawer: { issueId: null, tab: 'overview' },
+      tasksViewerIssueId: null,
+      prdViewerIssueId: null,
+      xbriefViewerIssueId: null,
+      closeTasksViewer: vi.fn(),
+      closePrdViewer: vi.fn(),
+      closeXbriefViewer: vi.fn(),
       openIssue: mockOpenIssue,
       openIssueFromRoute: mockOpenIssueFromRoute,
       syncDrawerFromUrl: vi.fn(),
@@ -200,6 +206,9 @@ beforeEach(() => {
   mockDashboardState.agentsWithPendingAskUserQuestion = []
   mockDashboardState.agentsWithPendingProposedPlan = []
   mockDashboardState.drawer = { issueId: null, tab: 'overview' }
+  mockDashboardState.tasksViewerIssueId = null
+  mockDashboardState.prdViewerIssueId = null
+  mockDashboardState.xbriefViewerIssueId = null
   mockDashboardState.openIssue = mockOpenIssue
   mockDashboardState.openIssueFromRoute = mockOpenIssueFromRoute
   mockDashboardState.syncDrawerFromUrl.mockClear()
