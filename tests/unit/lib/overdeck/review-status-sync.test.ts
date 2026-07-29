@@ -276,23 +276,24 @@ describe('overdeck review status sync', () => {
 
     // AC3: Verify returned history notes are truncated
     const hydrated = getReviewStatusFromDbSync('PAN-COMPOSITION-TEST');
-    if (hydrated?.history && hydrated.history.length > 0) {
-      const historyNote = hydrated.history[0]!.notes;
-      if (historyNote) {
-        expect(historyNote.length).toBeLessThanOrEqual(500);
-        expect(historyNote.endsWith('…')).toBe(true); // Should have ellipsis indicator
-      }
-    }
+    expect(hydrated).not.toBeNull();
+    expect(hydrated?.history).toBeDefined();
+    expect(hydrated?.history).toHaveLength(1); // Must have exactly one history entry
+    const historyNote = hydrated!.history![0]!.notes;
+    expect(historyNote).toBeDefined(); // Note must exist
+    expect(historyNote!.length).toBeLessThanOrEqual(500);
+    expect(historyNote!.endsWith('…')).toBe(true); // Should have ellipsis indicator
 
     // AC3: Verify raw status_history table has the full untrimmed note
     const rawRows = db.prepare(
       'SELECT notes FROM status_history WHERE issue_id = ?'
     ).all('PAN-COMPOSITION-TEST') as Array<{ notes: string | null }>;
 
+    // Must have exactly one row in status_history
+    expect(rawRows).toHaveLength(1);
+    expect(rawRows[0]?.notes).toBeDefined(); // Note must exist
     // The testNotes field in the raw row should have the complete 10,000-char note
-    if (rawRows[0]?.notes) {
-      expect(rawRows[0].notes.length).toBe(10000);
-      expect(rawRows[0].notes).toBe(longTestNote);
-    }
+    expect(rawRows[0]!.notes!.length).toBe(10000);
+    expect(rawRows[0]!.notes!).toBe(longTestNote);
   });
 });
