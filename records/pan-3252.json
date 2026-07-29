@@ -87,7 +87,7 @@
     "recordedAt": "2026-07-29T00:22:24.082Z"
   },
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-29T00:30:31.743Z",
+  "updated": "2026-07-29T00:30:33.987Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "passed",
@@ -96,8 +96,8 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-29T00:30:31.596Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-29T00:30:31.612Z",
     "reviewNotes": "Approved after main merge: feature patch unchanged, no blockers, focused tests/typecheck/lint and PR checks passed.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
@@ -169,7 +169,7 @@
       },
       "costAtCloseOut": {
         "usd": 51.729622,
-        "pricingAsOf": "2026-07-29T00:30:31.706Z"
+        "pricingAsOf": "2026-07-29T00:30:33.985Z"
       }
     },
     "merges": [
