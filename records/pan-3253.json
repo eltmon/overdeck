@@ -143,17 +143,14 @@
       "reason": "feedback",
       "note": "[2026-07-29T10:05Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-29T10:05:45.510Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T10:05:45Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3253\n\n# Code Review — PAN-3253 — 2026-07-29\n\n## Verdict: CHANGES REQUESTED — the composition acceptance test does not create a test-status transition and still fails\n\n## Context\n- Branch: `feature/pan-3253`\n- HEAD reviewed: `d0b71a9a910210285ef0c55b3c72199d609f3e0e`\n- PR: `#3279`\n- PR remote HEAD: `d0b71a9a910210285ef0c55b3c72199d609f3e0e`\n- Cycle: 13\n- Convergence note: this cycle fixes the `setReviewStatusSync(issueId, update)` call signature from cycle 12. The test now reaches production composition, but its update does not change `testStatus`, so the expected history note is never created.\n\n## Blocking Finding\n\n### ! [requirements / test correctness] The FR-2 test leaves `testStatus` at its default value, so `testNotes` is not appended to history — `tests/unit/lib/overdeck/review-status-sync.test.ts:266`\n\nA new issue starts with `reviewStatus: 'pending'` and `testStatus: 'pending'`. The test updates it to `reviewStatus: 'passed'` and `testStatus: 'pending'`. `setReviewStatusSync()` therefore appends one **review** transition with no `reviewNotes`; it does not append a test transition because `update.testStatus === status.testStatus`. The only history entry correctly has `notes: undefined`, and the unconditional assertion fails:\n\n```text\nAssertionError: expected undefined to be defined\n  at tests/unit/lib/overdeck/review-status-sync.test.ts:286\n\nTest Files  1 failed\nTests       1 failed | 8 passed\n```\n\nThis still does not prove `notes-cap.ac2` or `notes-cap.ac3`. Make the update perform one test transition, for example by leaving review status pending and setting `testStatus: 'passed'` with the 10,000-character `testNotes`. Then the existing exact-one-entry assertions can verify the bounded hydrated note and full raw `status_history.notes` from the same operation.\n\n## Correctness / Logic\n\nNo production-code defect survived review. The composition code appends notes only for actual transitions, which is correct and is why this test fails. Event-store bounding remains applied at append, appendAsync, appendOnce, and boot cleanup; canonical hydration is SQL-bounded; and the raw-versus-bounded status split preserves forensic notes while returning bounded history.\n\n## Security\n\nNo exploitable security issue was found. Internal payloads are parsed with catch-and-preserve handling, and the changes do not affect authentication, authorization, command execution, filesystem access, or secrets.\n\n## Requirements / Acceptance Criteria\n\n- FR-1: implemented and covered across append, appendAsync, appendOnce idempotency, non-review payload preservation, and malformed historical input.\n- FR-2: production behavior appears correct, but `notes-cap.ac2` and `notes-cap.ac3` remain unproved because the acceptance fixture does not create the transition that carries `testNotes`.\n- FR-3: implemented with bounded boot cleanup and second-run no-op coverage.\n- FR-4: documentation accurately describes bounded event history, canonical hydration, all persistence doors, boot cleanup, and the uncapped archival table.\n- D4 and all five NonGoals remain preserved.\n\n## Performance\n\nCanonical single-status hydration is bounded in SQL, and append-time bounding is linear in incoming payload size. The 16 KiB historical selector, seven-day retention, and 64 MB VACUUM trigger remain unchanged as required. The legacy bulk-reader advisory remains non-blocking because that module is not the canonical runtime hydration door for this change.\n\n## Verification\n\n- Local HEAD and PR HEAD both matched `d0b71a9a910210285ef0c55b3c72199d609f3e0e` at review start.\n- Focused five-file Vitest run: **1 failed, 64 passed**.\n- Isolated canonical review-status suite: **1 failed, 8 passed**, reproducing the blocker above.\n- ESLint on all changed TypeScript/test files: **passed**.\n- `git diff --check origin/main...HEAD`: **passed**.\n- GitHub guard, prompt-trailer, and clean-install smoke checks were green; build, lint, and main test checks were still running during review.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253/.pan/review/agent-pan-3253-review-d0b71a9a/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3253 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-29T10:08:38.887Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-allowlist.txt",
@@ -188,22 +185,22 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T10:08:36.918Z",
+  "updated": "2026-07-29T10:08:39.077Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T09:16:42.721Z",
-    "updatedAt": "2026-07-29T10:08:36.881Z",
+    "updatedAt": "2026-07-29T10:08:37.537Z",
     "reviewNotes": "Blocked: the FR-2 acceptance fixture keeps testStatus pending, so no test transition carries the 10,000-character testNotes; the exact PR HEAD still fails 1 of 65 focused tests and does not prove the bounded/raw note split.",
     "verificationNotes": "Verification FAILED at test (360449ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253\n\nNo test files found, exiting with code 0\n\n ❯ |root| tests/unit/lib/overdeck/review-status-sync.test.ts (9 tests | 1 failed) 3082ms\n     × verifies dbStatus/updated split and testNotes preservation (PAN-3253 notes-cap.ac2-ac3) 125ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-1ndBL4/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] comple\n…(604 chars elided)…\n/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-S7IgKi/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-S7IgKi/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-conte\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "lastVerifiedCommit": "14703dbb3871a0e90db6fb10d370b144c231ac3a",
-    "reviewSpawnedAt": "2026-07-29T10:02:36.999Z",
+    "reviewSpawnedAt": "2026-07-29T10:08:37.536Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt",
@@ -288,7 +285,7 @@
       },
       "costAtCloseOut": {
         "usd": 117.200767,
-        "pricingAsOf": "2026-07-29T10:08:36.914Z"
+        "pricingAsOf": "2026-07-29T10:08:39.072Z"
       }
     },
     "merges": [
