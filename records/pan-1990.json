@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T00:29:56.197Z",
+  "updated": "2026-07-29T00:35:06.997Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
     }
   ],
   "tasks": {
-    "sequence": 25,
-    "claims": {
-      "memory-contracts-nullable": {
-        "writerId": "agent-pan-1990",
-        "agentId": "agent-pan-1990",
-        "pid": 974996,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-28T23:55:37.543Z"
-      }
-    },
+    "sequence": 26,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -215,6 +207,16 @@
         "itemId": "cli-project-add-target",
         "outcome": "completed",
         "releasedAt": "2026-07-28T23:55:16.354Z"
+      },
+      {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 974996,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-28T23:55:37.543Z",
+        "itemId": "memory-contracts-nullable",
+        "outcome": "completed",
+        "releasedAt": "2026-07-29T00:35:06.997Z"
       }
     ],
     "statusReasons": {
@@ -272,6 +274,9 @@
     "cli-project-add-target": "completed",
     "cli-project-add-target.cli-project-add-target.ac1": "completed",
     "cli-project-add-target.cli-project-add-target.ac2": "completed",
-    "memory-contracts-nullable": "running"
+    "memory-contracts-nullable": "completed",
+    "memory-contracts-nullable.memory-contracts-nullable.ac1": "completed",
+    "memory-contracts-nullable.memory-contracts-nullable.ac2": "completed",
+    "memory-contracts-nullable.memory-contracts-nullable.ac3": "completed"
   }
 }
