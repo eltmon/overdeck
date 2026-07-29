@@ -244,32 +244,6 @@ export async function restartAgent(
       },
     }));
 
-    if (kimiExistingSessionsBefore) {
-      void (async () => {
-        try {
-          const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
-          const sessionId = await waitForNewKimiSessionAsync(
-            join(homedir(), '.kimi-code'),
-            agentState.workspace,
-            kimiExistingSessionsBefore!,
-          );
-          if (sessionId) {
-            writeKimiSessionId(normalizedId, sessionId);
-          } else {
-            logAgentLifecycleSync(
-              normalizedId,
-              'restartAgent: kimi-code session capture timed out after fresh relaunch — kimi-session-id pointer stays cleared; transcript lookup falls back to newest-session by mtime',
-            );
-          }
-        } catch (err) {
-          logAgentLifecycleSync(
-            normalizedId,
-            `restartAgent: kimi-code session capture failed after fresh relaunch: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
-      })();
-    }
-
     // PAN-2974 (root cause B): the fallback continue-prompt is phase-aware —
     // a handed-off agent (completed marker) gets a passive restore, not a
     // "pick up where you left off" that re-drives the pipeline.
@@ -306,6 +280,31 @@ export async function restartAgent(
       } else {
         await Effect.runPromise(sendKeys(normalizedId, prompt));
       }
+    }
+
+    // PAN-1837 review fix: keep the restart pending until the replacement
+    // Kimi session identity is actually captured, instead of reporting
+    // success while capture races on in the background. By this point Kimi
+    // has already become ready and received its continue prompt, so its
+    // session directory normally exists already and this resolves almost
+    // immediately; a genuine miss after the full poll window most likely
+    // means Kimi never started a real session, which is worth failing
+    // loudly for rather than silently leaving the pointer cleared and
+    // letting the newest-session-by-mtime fallback attribute a DIFFERENT
+    // same-cwd Kimi session's transcript/cost to this agent.
+    if (kimiExistingSessionsBefore) {
+      const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+      const sessionId = await waitForNewKimiSessionAsync(
+        join(homedir(), '.kimi-code'),
+        agentState.workspace,
+        kimiExistingSessionsBefore,
+      );
+      if (!sessionId) {
+        throw new Error(
+          `kimi-code session capture timed out after fresh relaunch for ${normalizedId} — no new session directory appeared under the workspace bucket`,
+        );
+      }
+      writeKimiSessionId(normalizedId, sessionId);
     }
 
     markAgentRunning(agentState);
