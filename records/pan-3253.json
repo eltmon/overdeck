@@ -128,9 +128,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-29T09:58:38.567Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-29T10:01Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-29T10:01:10.755Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-29T10:01:10Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3253\n\n# Code Review — PAN-3253 — 2026-07-29\n\n## Verdict: CHANGES REQUESTED — the composition acceptance test calls `setReviewStatusSync` with the wrong signature and fails\n\n## Context\n- Branch: `feature/pan-3253`\n- HEAD reviewed: `f8651793395e6c3df87ed88b1faa689d80bd7921`\n- PR: `#3279`\n- PR remote HEAD: `f8651793395e6c3df87ed88b1faa689d80bd7921`\n- Cycle: 12\n- Convergence note: this cycle makes the previously conditional history/table assertions unconditional, resolving the prior vacuous-test blocker. The test still cannot reach those assertions because its call into the production composition function uses the wrong argument shape.\n\n## Blocking Finding\n\n### ! [correctness / requirements] The composition test passes the update object as `issueId`, so the focused suite fails before exercising the raw/bounded split — `tests/unit/lib/overdeck/review-status-sync.test.ts:264`\n\n`setReviewStatusSync` is declared as:\n\n```ts\nsetReviewStatusSync(issueId: string, update: ReviewStatusUpdate, existing?: ReviewStatus)\n```\n\nThe new acceptance test calls it with one object containing `issueId`, `reviewStatus`, `testStatus`, and `testNotes`. Production therefore receives that object as the first `issueId` argument and throws at `issueId.toUpperCase()` before composition or persistence occurs.\n\nThe focused run against the exact PR HEAD fails:\n\n```text\nTypeError: issueId.toUpperCase is not a function\n  at setReviewStatusSync src/lib/review-status.ts:181\n  at tests/unit/lib/overdeck/review-status-sync.test.ts:264\n\nTest Files  1 failed | 4 passed\nTests       1 failed | 64 passed\n```\n\nCall `setReviewStatusSync('PAN-COMPOSITION-TEST', { reviewStatus: 'passed', testStatus: 'pending', testNotes: longTestNote, ... })`. The unconditional assertions added in this cycle should then prove all required outputs: full `status.testNotes`, one bounded history note ending in `…`, and one raw `status_history.notes` value equal to the complete 10,000-character string.\n\n## Correctness / Logic\n\nNo production-code defect survived review. The event-store applies one shared bounding function to `append()`, `appendAsync()`, `appendOnce()`, and boot cleanup; canonical hydration fetches only the newest bounded tail in SQL; and `setReviewStatusSync()` separates raw forensic history from bounded journal/event history. The malformed historical fixture now exceeds 16 KiB and reaches the parse-failure path. CodeRabbit's duplicate-declaration report does not exist in the committed source.\n\n## Security\n\nNo exploitable security issue was found. Payload parsing uses `JSON.parse` with catch-and-preserve behavior, and the changes do not affect authentication, authorization, command execution, filesystem access, or secrets.\n\n## Requirements / Acceptance Criteria\n\n- FR-1: implemented and covered across append, appendAsync, appendOnce idempotency, non-review payload preservation, and malformed historical input.\n- FR-2: production behavior appears correct, but `notes-cap.ac2` and `notes-cap.ac3` remain unproved because their composition test throws before the transition.\n- FR-3: implemented with bounded boot cleanup and second-run no-op coverage.\n- FR-4: documentation accurately describes the four enforcement points and uncapped archival table.\n- D4 and all five NonGoals remain preserved.\n\n## Performance\n\nCanonical single-status hydration is bounded in SQL, and append-time work is linear in incoming payload size. The unchanged 16 KiB historical selector, seven-day retention, and 64 MB VACUUM trigger satisfy the explicit constraints. The advisory request to scan every historical event conflicts with the required preservation of the 16 KiB threshold and is correctly not implemented.\n\n## Verification\n\n- Local HEAD and PR HEAD both match `f8651793395e6c3df87ed88b1faa689d80bd7921`.\n- Focused Vitest run: **1 failed, 64 passed**; failure is the blocking call-signature defect above.\n- ESLint on all changed TypeScript/test files: **passed**.\n- `git diff --check origin/main...HEAD`: **passed**.\n- GitHub guard, prompt-trailer, and clean-install smoke checks were green; build, lint, and test checks were still running during review.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253/.pan/review/agent-pan-3253-review-f8651793/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3253 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-allowlist.txt",
@@ -165,7 +178,7 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T10:01:09.898Z",
+  "updated": "2026-07-29T10:01:10.756Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "blocked",
