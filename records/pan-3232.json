@@ -299,7 +299,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T03:30:49.221Z",
+  "updated": "2026-07-29T03:30:51.636Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -308,9 +308,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T03:30:49.177Z",
+    "updatedAt": "2026-07-29T03:30:49.284Z",
     "reviewNotes": "Verification failed at incomplete-plan-items — fix and resubmit",
-    "verificationNotes": "Checklist completion check FAILED — 8 incomplete item(s) remain:\n\n  Incomplete plan items (8):\n    - live-tree-delta.live-tree-delta.ac1 The AgentEnrichmentChangedEvent schema accepts payloads both with and without issueId, and decoding a legacy payload without the field returns a valid event (pending)\n    - live-tree-delta.live-tree-delta.ac2 mapEventToDelta returns a pending_input_changed delta carrying awaitingInput, prompt, reason, and kinds for an enrichment event with issueId, and returns null when the payload lacks issueId (pending)\n    - live-tree-delta.live-tree-delta.ac3 applySessionTreeDelta merges the four pending-input fields onto the matched session and clears them when the delta omits them, returning the same tree object when no session matches (pending)\n    - live-tree-delta.live-tree-delta.ac4 The enrichment poller emits issueId on agent.enrichment_changed events for agents with a known issue (pending)\n    - specialist-pending-input.specialist-pending-input.ac1 Session-tree review orchestrator, test, and ship nodes carry the four awaiting-input fields when the agent snapshot reports hasPendingQuestion true (pending)\n    - specialist-pending-input.specialist-pending-input.ac2 buildReviewerNodes returns reviewer nodes that carry the four awaiting-input fields taken from the provided agentSnapshotsById map (pending)\n    - specialist-pending-input.specialist-pending-input.ac3 The activity route emits specialist sections carrying the same four fields for a pending specialist snapshot (pending)\n    - specialist-pending-input.specialist-pending-input.ac4 A specialist node whose agent has no snapshot or no pending question renders with awaitingInput false and produces no prompt, reason, or kinds fields (pending)",
     "conflictsSince": {
       "sha": "701cbb21f1deb79f90c821db2bf23db7d02d4886",
       "detectedAt": "2026-07-29T00:29:21.202Z",
@@ -454,7 +453,7 @@
       },
       "costAtCloseOut": {
         "usd": 260.426849,
-        "pricingAsOf": "2026-07-29T03:30:49.218Z"
+        "pricingAsOf": "2026-07-29T03:30:51.632Z"
       }
     },
     "merges": [
