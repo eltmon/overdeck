@@ -199,6 +199,20 @@ status, lifecycle events, and conversations. It is a disposable cache rebuilt
 from Git state, JSONL transcripts, tracker data, and tmux through the canonical
 domain resolvers.
 
+### Bounded review-status history (PAN-3253)
+
+The `review.status_changed` event payload embeds the full `status.history` array for replay.
+Uncapped history arrays caused database bloat (one machine's event store was 80% review events).
+All four enforcement points apply identical bounds to prevent silent drift:
+
+- **Composition limit** (20 entries, 500-char notes): `review-status.ts` caps notes when transitions are recorded
+- **Hydration limit** (20 entries, 500-char notes): `review-status-db.ts` caps notes when loading from `status_history` table
+- **Persistence limit** (20 entries, 500-char notes): `event-store.ts` bounds payloads in `append()`, `appendAsync()`, `appendOnce()`
+- **Boot-time migration** (20 entries, 500-char notes): `event-store.ts` trims historical oversized rows with `trimReviewStatusHistoryPayloads()`
+
+The canonical limits live in `src/lib/review-status-limits.ts` to ensure all enforcement points use identical values.
+The raw `status_history` table intentionally retains the full unbounded record for archival; only in-memory objects and event payloads are bounded.
+
 ### Agent spawn provenance
 
 Agent state records two complementary provenance fields:
