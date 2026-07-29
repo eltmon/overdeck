@@ -87,17 +87,17 @@
     "recordedAt": "2026-07-28T23:54:25.516Z"
   },
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-29T00:16:37.118Z",
+  "updated": "2026-07-29T00:16:44.648Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T00:16:35.967Z",
+    "updatedAt": "2026-07-29T00:16:44.626Z",
     "reviewNotes": "Approved after main merge: feature patch unchanged, no blockers, focused tests/typecheck/lint and PR checks passed.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
@@ -124,9 +124,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1514377,
-            "output": 59138,
-            "cacheRead": 24728576,
+            "input": 1517697,
+            "output": 59362,
+            "cacheRead": 25108480,
             "cacheWrite": 0
           }
         },
@@ -147,15 +147,15 @@
           "cacheWrite": 172477
         },
         "openai/gpt-5.6-sol": {
-          "input": 2260130,
-          "output": 113990,
-          "cacheRead": 45364224,
+          "input": 2263450,
+          "output": 114214,
+          "cacheRead": 45744128,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 44.314085999999996,
-        "pricingAsOf": "2026-07-29T00:16:36.054Z"
+        "usd": 44.527358,
+        "pricingAsOf": "2026-07-29T00:16:44.635Z"
       }
     },
     "merges": [
@@ -165,7 +165,7 @@
   },
   "workModel": "kimi-code/k3",
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3252",
