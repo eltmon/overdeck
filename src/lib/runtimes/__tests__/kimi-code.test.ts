@@ -428,12 +428,24 @@ describe('withKimiSessionCaptureLock (PAN-1837 review fix — concurrent same-cw
   // delay-based test — real setTimeout delays here (however small) keep the
   // test's timer/microtask state alive longer than necessary and are the
   // documented source of flake/OOM under parallel workers.
+  let previousOverdeckHome: string | undefined;
+  let lockOverdeckHome: string;
+
   beforeEach(() => {
     vi.useFakeTimers();
+    // PAN-1837 review fix (cycle 7): the lock is now a cross-process
+    // filesystem lock rooted at getOverdeckHome(), not an in-memory Map —
+    // point it at a throwaway home so these tests never touch the real
+    // ~/.overdeck/locks/kimi-capture/.
+    previousOverdeckHome = process.env.OVERDECK_HOME;
+    lockOverdeckHome = makeHome();
+    process.env.OVERDECK_HOME = lockOverdeckHome;
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    if (previousOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = previousOverdeckHome;
   });
 
   it('serializes two concurrent launches sharing one cwd so each captures its own distinct session id', async () => {

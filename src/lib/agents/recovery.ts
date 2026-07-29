@@ -601,16 +601,26 @@ export async function recoverAgent(
         if (sessionId) {
           writeKimiSessionId(normalizedId, sessionId);
         } else {
-          logAgentLifecycleSync(
-            normalizedId,
-            `recoverAgent: kimi-code session capture timed out after fresh relaunch for ${normalizedId} — transcript lookup falls back to newest-session by mtime`,
+          // PAN-1837 review fix: fail closed like restartAgent/spawnAgent — a
+          // missing capture would otherwise leave a running, unowned Kimi
+          // session whose transcript lookup falls back to
+          // newest-session-by-mtime, which cannot establish ownership in a
+          // shared cwd bucket and can display a different session's
+          // transcript/cost under this agent.
+          throw new Error(
+            `kimi-code session capture timed out after fresh relaunch for ${normalizedId} — no new session directory appeared under the workspace bucket`,
           );
         }
       }
     };
 
     const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
-    await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), state.workspace, launchAndCaptureKimiSession);
+    try {
+      await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), state.workspace, launchAndCaptureKimiSession);
+    } catch (err) {
+      await Effect.runPromise(stopAgent(normalizedId)).catch(() => undefined);
+      throw err;
+    }
 
     const delivery = await deliverInitialPromptWithRetry(
       normalizedId,

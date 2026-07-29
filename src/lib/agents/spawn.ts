@@ -875,14 +875,26 @@ async function spawnAgentWithoutConsentClaim(
       if (sessionId) {
         writeKimiSessionId(agentId, sessionId);
       } else {
-        console.warn(`[${agentId}] kimi-code session capture timed out — transcript lookup falls back to newest-session by mtime`);
+        // PAN-1837 review fix: fail closed like restartAgent — a missing
+        // capture would otherwise leave a running, unowned Kimi session whose
+        // transcript lookup falls back to newest-session-by-mtime, which
+        // cannot establish ownership in a shared cwd bucket and can display a
+        // different session's transcript/cost under this agent.
+        throw new Error(
+          `kimi-code session capture timed out for ${agentId} — no new session directory appeared under the workspace bucket`,
+        );
       }
     }
   };
 
   if (resolvedHarness === 'kimi-code') {
     const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
-    await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), options.workspace, launchAndCaptureKimiSession);
+    try {
+      await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), options.workspace, launchAndCaptureKimiSession);
+    } catch (err) {
+      await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
+      throw err;
+    }
   } else {
     await launchAndCaptureKimiSession();
   }

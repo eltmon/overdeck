@@ -27,9 +27,9 @@
 import { exec } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { readdir as readdirAsync, stat as statAsync } from 'node:fs/promises';
+import { mkdir as mkdirAsync, readdir as readdirAsync, readFile as readFileAsync, rm as rmAsync, stat as statAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 import type { AgentState } from '../agents/agent-state.js';
@@ -42,6 +42,7 @@ import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { parseKimiSessionSync } from '../cost-parsers/kimi-parser.js';
 import { getOverdeckHome } from '../paths.js';
+import { isPidDead } from '../pan-dir/fs-lock.js';
 import { getRuntimeBehavior } from './behavior.js';
 import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js';
 import type {
@@ -256,26 +257,105 @@ export function writeKimiSessionId(agentId: string, sessionId: string, overdeckH
 }
 
 /**
- * Per-bucket async mutex (PAN-1837 review fix): two Kimi conversations
- * launched concurrently in the same cwd both snapshot the same
- * "existing sessions" set, then both independently see both new session
- * directories as fresh and pick the same newest one — silently persisting
- * the SAME kimi-session-id for two different conversations. Serializing
- * the whole snapshot -> launch -> capture sequence per workDirKey bucket
- * makes each launch's "existing" snapshot include every prior launch's
+ * Cross-process per-bucket mutex (PAN-1837 review fix, cycle 7). Two Kimi
+ * launches sharing a cwd both snapshot the same "existing sessions" set,
+ * then both independently see both new session directories as fresh and
+ * pick the same newest one — silently persisting the SAME kimi-session-id
+ * for two different Overdeck identities. Serializing the whole
+ * snapshot -> launch -> capture sequence per workDirKey bucket makes each
+ * launch's "existing" snapshot include every prior launch's
  * already-captured directory, so only the true newcomer is ever fresh.
+ *
+ * This MUST be a filesystem lock, not an in-memory Map: the four Kimi launch
+ * owners run in separate Node processes that share no module state —
+ * `pan start`/`pan strike` spawn in the short-lived CLI process, dashboard
+ * conversations launch in the dashboard server process, and Deacon
+ * recovery/restart can launch in its own child process. An in-memory lock
+ * only serializes callers inside the ONE process that happens to hold it; it
+ * is silently absent for every other process, which is exactly the
+ * cross-process race this lock exists to close. Modeled on the cross-process
+ * per-issue record lock in pan-dir/fs-lock.ts (mkdir-based atomic acquire +
+ * PID-liveness stale-lock recovery), but with a much longer retry budget:
+ * a Kimi capture can legitimately hold the lock for up to
+ * SPAWN_READY_TIMEOUT_MS (60s) while it polls for the new session directory,
+ * so the record-lock's ~1s retry budget would starve a second launch on the
+ * same bucket almost immediately.
  */
-const kimiCaptureLocks = new Map<string, Promise<unknown>>();
+const KIMI_CAPTURE_LOCK_POLL_MS = 250;
+const KIMI_CAPTURE_LOCK_MAX_WAIT_MS = 90_000; // > SPAWN_READY_TIMEOUT_MS, so a single holder's worst case never starves a waiter
+
+interface KimiCaptureLockOwner {
+  pid: number;
+  acquiredAt: string;
+}
+
+export class KimiCaptureLockTimeoutError extends Error {
+  constructor(lockPath: string, waitedMs: number) {
+    super(`Timed out after ${waitedMs}ms waiting for the Kimi session-capture lock at ${lockPath} — another process is still holding it.`);
+    this.name = 'KimiCaptureLockTimeoutError';
+  }
+}
+
+/** Deterministic, filesystem-safe lock path for a Kimi session bucket. */
+function kimiCaptureLockPath(bucketKey: string): string {
+  const hash = createHash('sha256').update(bucketKey).digest('hex').slice(0, 24);
+  return join(getOverdeckHome(), 'locks', 'kimi-capture', `${hash}.lock`);
+}
+
+async function readKimiCaptureLockOwner(lockPath: string): Promise<Partial<KimiCaptureLockOwner>> {
+  try {
+    return JSON.parse(await readFileAsync(join(lockPath, 'owner.json'), 'utf8')) as Partial<KimiCaptureLockOwner>;
+  } catch {
+    return {};
+  }
+}
+
+async function acquireKimiCaptureLock(lockPath: string): Promise<void> {
+  await mkdirAsync(dirname(lockPath), { recursive: true, mode: 0o700 });
+  const deadline = Date.now() + KIMI_CAPTURE_LOCK_MAX_WAIT_MS;
+
+  for (;;) {
+    try {
+      await mkdirAsync(lockPath, { mode: 0o700 });
+      const owner: KimiCaptureLockOwner = { pid: process.pid, acquiredAt: new Date().toISOString() };
+      try {
+        await writeFileAsync(join(lockPath, 'owner.json'), JSON.stringify(owner, null, 2), 'utf8');
+      } catch (error) {
+        try { await rmAsync(lockPath, { recursive: true, force: true }); } catch { /* best effort */ }
+        throw error;
+      }
+      return;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      const owner = await readKimiCaptureLockOwner(lockPath);
+      if (isPidDead(owner.pid)) {
+        // The process that held this lock is gone (crashed CLI invocation,
+        // killed Deacon child, …) — reclaim rather than wait out the full
+        // budget for a holder that will never release it.
+        await rmAsync(lockPath, { recursive: true, force: true });
+        continue;
+      }
+    }
+
+    if (Date.now() >= deadline) {
+      throw new KimiCaptureLockTimeoutError(lockPath, KIMI_CAPTURE_LOCK_MAX_WAIT_MS);
+    }
+    await delay(KIMI_CAPTURE_LOCK_POLL_MS);
+  }
+}
+
+async function releaseKimiCaptureLock(lockPath: string): Promise<void> {
+  await rmAsync(lockPath, { recursive: true, force: true });
+}
 
 export async function withKimiSessionCaptureLock<T>(kimiHome: string, workspace: string, fn: () => Promise<T>): Promise<T> {
   const bucketKey = kimiSessionsRoot(kimiHome, workspace);
-  const prior = kimiCaptureLocks.get(bucketKey) ?? Promise.resolve();
-  const task = prior.catch(() => {}).then(fn);
-  kimiCaptureLocks.set(bucketKey, task);
+  const lockPath = kimiCaptureLockPath(bucketKey);
+  await acquireKimiCaptureLock(lockPath);
   try {
-    return await task;
+    return await fn();
   } finally {
-    if (kimiCaptureLocks.get(bucketKey) === task) kimiCaptureLocks.delete(bucketKey);
+    await releaseKimiCaptureLock(lockPath);
   }
 }
 
