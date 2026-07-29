@@ -207,6 +207,7 @@
   ],
   "scopeDrift": {
     "outsideDeclaredScope": [
+      "package.json",
       "scripts/dashboard-types-baseline.txt",
       "scripts/file-size-allowlist.txt",
       "src/dashboard/frontend/src/__tests__/fr7-conversation-pending-input.test.tsx",
@@ -252,6 +253,7 @@
     ],
     "actualChangedFiles": [
       "docs/ASKUSERQUESTION-DASHBOARD.md",
+      "package.json",
       "scripts/dashboard-types-baseline.txt",
       "scripts/file-size-allowlist.txt",
       "src/dashboard/frontend/src/__tests__/fr7-conversation-pending-input.test.tsx",
@@ -274,10 +276,10 @@
       "src/dashboard/server/services/agent-enrichment-service.ts",
       "src/dashboard/server/ws-rpc.ts"
     ],
-    "recordedAt": "2026-07-29T02:17:34.123Z"
+    "recordedAt": "2026-07-29T02:58:56.941Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T02:58:54.224Z",
+  "updated": "2026-07-29T02:58:56.943Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
