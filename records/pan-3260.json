@@ -10,8 +10,52 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".husky/_/pre-rebase",
+      "scripts/file-size-allowlist.txt",
+      "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/MARKDOWN-EDITOR-PANE.md",
+      "packages/contracts/src/rpc.ts",
+      "src/dashboard/frontend/src/components/Stage/StageDeckContext.tsx",
+      "src/dashboard/frontend/src/components/Stage/index.tsx",
+      "src/dashboard/frontend/src/components/Stage/panes/EditorPane.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx",
+      "src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx",
+      "src/dashboard/frontend/src/editorPreferences.ts",
+      "src/dashboard/frontend/src/lib/panesStore.ts",
+      "src/dashboard/server/services/__tests__/file-at-path.test.ts",
+      "src/dashboard/server/services/file-at-path.ts",
+      "src/dashboard/server/ws-rpc.ts"
+    ],
+    "actualChangedFiles": [
+      ".husky/_/pre-rebase",
+      "docs/MARKDOWN-EDITOR-PANE.md",
+      "packages/contracts/src/rpc.ts",
+      "scripts/file-size-allowlist.txt",
+      "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
+      "src/dashboard/frontend/src/components/Stage/StageDeckContext.tsx",
+      "src/dashboard/frontend/src/components/Stage/index.tsx",
+      "src/dashboard/frontend/src/components/Stage/panes/EditorPane.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx",
+      "src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx",
+      "src/dashboard/frontend/src/editorPreferences.ts",
+      "src/dashboard/frontend/src/lib/panesStore.ts",
+      "src/dashboard/server/services/__tests__/file-at-path.test.ts",
+      "src/dashboard/server/services/file-at-path.ts",
+      "src/dashboard/server/ws-rpc.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "recordedAt": "2026-07-29T01:09:34.738Z"
+  },
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T01:09:37.970Z",
+  "updated": "2026-07-29T01:09:42.341Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "pending",
@@ -21,8 +65,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T01:09:37.964Z",
+    "updatedAt": "2026-07-29T01:09:42.239Z",
     "inspectNotes": "AC1-3 verified: WS_METHODS.readFileAtPath/writeFileAtPath exported and both Rpcs registered in PanRpcGroup (36 requests, both present in dist .d.ts as literal-typed Rpc members); ReadFileAtPathResult rejects decode when mtimeMs or totalLines is missing and accepts the full struct; WriteFileAtPathInput decodes with and without expectedMtimeMs; contracts build + workspace root npm run typecheck exit 0 with no new dashboard/frontend ratchet errors.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3268",
     "reviewRequestedAt": "2026-07-29T01:09:37.964Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -67,8 +112,7 @@
         "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
       "recordedAt": "2026-07-29T01:09:34.738Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3268"
+    }
   },
   "closeOut": {
     "usage": {
@@ -83,10 +127,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 112,
-            "output": 20427,
-            "cacheRead": 10570422,
-            "cacheWrite": 204584
+            "input": 490,
+            "output": 118624,
+            "cacheRead": 71625207,
+            "cacheWrite": 747696
           }
         }
       },
@@ -98,18 +142,20 @@
           "cacheWrite": 184960
         },
         "anthropic/claude-sonnet-5": {
-          "input": 112,
-          "output": 20427,
-          "cacheRead": 10570422,
-          "cacheWrite": 204584
+          "input": 490,
+          "output": 118624,
+          "cacheRead": 71625207,
+          "cacheWrite": 747696
         }
       },
       "costAtCloseOut": {
-        "usd": 12.360138,
-        "pricingAsOf": "2026-07-29T00:30:00.562Z"
+        "usd": 26.911607,
+        "pricingAsOf": "2026-07-29T01:09:42.326Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3268"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -269,49 +315,5 @@
     "docs-markdown-editor": "completed",
     "docs-markdown-editor.docs-markdown-editor.ac1": "completed",
     "docs-markdown-editor.docs-markdown-editor.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      ".husky/_/pre-rebase",
-      "scripts/file-size-allowlist.txt",
-      "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
-      "tests/unit/lib/overdeck/no-loss-matrix.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/MARKDOWN-EDITOR-PANE.md",
-      "packages/contracts/src/rpc.ts",
-      "src/dashboard/frontend/src/components/Stage/StageDeckContext.tsx",
-      "src/dashboard/frontend/src/components/Stage/index.tsx",
-      "src/dashboard/frontend/src/components/Stage/panes/EditorPane.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx",
-      "src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx",
-      "src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx",
-      "src/dashboard/frontend/src/editorPreferences.ts",
-      "src/dashboard/frontend/src/lib/panesStore.ts",
-      "src/dashboard/server/services/__tests__/file-at-path.test.ts",
-      "src/dashboard/server/services/file-at-path.ts",
-      "src/dashboard/server/ws-rpc.ts"
-    ],
-    "actualChangedFiles": [
-      ".husky/_/pre-rebase",
-      "docs/MARKDOWN-EDITOR-PANE.md",
-      "packages/contracts/src/rpc.ts",
-      "scripts/file-size-allowlist.txt",
-      "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
-      "src/dashboard/frontend/src/components/Stage/StageDeckContext.tsx",
-      "src/dashboard/frontend/src/components/Stage/index.tsx",
-      "src/dashboard/frontend/src/components/Stage/panes/EditorPane.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx",
-      "src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx",
-      "src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx",
-      "src/dashboard/frontend/src/editorPreferences.ts",
-      "src/dashboard/frontend/src/lib/panesStore.ts",
-      "src/dashboard/server/services/__tests__/file-at-path.test.ts",
-      "src/dashboard/server/services/file-at-path.ts",
-      "src/dashboard/server/ws-rpc.ts",
-      "tests/unit/lib/overdeck/no-loss-matrix.ts"
-    ],
-    "recordedAt": "2026-07-29T01:09:34.738Z"
   }
 }
