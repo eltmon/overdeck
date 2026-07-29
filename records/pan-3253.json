@@ -125,15 +125,7 @@
       "timestamp": "2026-07-29T09:55:38.700Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T09:55:38Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3253\n\n# Code Review — PAN-3253 — 2026-07-29\n\n## Verdict: CHANGES REQUESTED — the requested revision fails its focused suite, and the PR advanced during review\n\n## Context\n- Branch: `feature/pan-3253`\n- Manifest HEAD reviewed: `f9bd92d8cbb3cefa1147da4038fbc60a841f36dd`\n- PR: `#3279`\n- PR HEAD at review start: `f9bd92d8cbb3cefa1147da4038fbc60a841f36dd`\n- PR HEAD before verdict: `d48df7477301a56fab35fc926ec12027d47cf43a`\n- Cycle: 11\n- Convergence note: this cycle directly addressed the two blockers from cycle 10. The malformed historical payload now exceeds 16 KiB and reaches the intended trim path. The composition test now calls `setReviewStatusSync()`, but the exact requested commit imports it from the wrong module and fails; the branch advanced with a correction while this review was running.\n\n## Blocking Findings\n\n### ! [correctness / verification] The exact requested commit imports `setReviewStatusSync` from a module that does not export it — `tests/unit/lib/overdeck/review-status-sync.test.ts:3`\n\nAt manifest HEAD `f9bd92d8`, the new composition-path test imports `setReviewStatusSync` from `src/lib/overdeck/review-status-sync.ts`. That module exports the low-level database functions but does not export `setReviewStatusSync`; the composition function lives in `src/lib/review-status.ts`.\n\nThe focused acceptance run against the requested revision fails accordingly:\n\n```text\nFAIL tests/unit/lib/overdeck/review-status-sync.test.ts\nTypeError: setReviewStatusSync is not a function\n  at tests/unit/lib/overdeck/review-status-sync.test.ts:264\n\nTest Files  1 failed | 4 passed\nTests       1 failed | 64 passed\n```\n\nCommit `d48df74773` corrected this import while the review was running, but it is outside this run's manifest and was not the revision exercised by the focused run. The pipeline must create a fresh review cycle for the new PR HEAD rather than approving a stale manifest.\n\n### ! [requirements / test correctness] The composition test makes both AC3 assertions conditional, so it can pass without proving either persisted output — `tests/unit/lib/overdeck/review-status-sync.test.ts:278`\n\nAfter the import is corrected, the test still wraps the bounded-history assertions in `if (hydrated?.history && hydrated.history.length > 0)` and the forensic-row assertions in `if (rawRows[0]?.notes)`. If `setReviewStatusSync()` stops appending history, fails to persist `status_history`, or stores a null note, those blocks execute no assertions and the test passes. That leaves the exact `notes-cap.ac2`/`notes-cap.ac3` regression from prior cycles unprotected.\n\nAssert the required artifacts before checking their contents: require the hydrated history entry and its note to exist, require the raw query to return the expected row, then assert the bounded note ends in `…` and the raw note equals the full 10,000-character value. These are required outputs, not optional states.\n\n## Correctness / Logic\n\nThe malformed historical-payload fixture now exceeds the preserved 16 KiB selector and verifies byte-identical retention with `trimmed: 0`, so the previous `append-door-bound.ac3` blocker is resolved. The append, appendAsync, appendOnce, canonical SQL-bounded hydration, raw-versus-bounded status split, and boot-trim production paths remain internally consistent. CodeRabbit's duplicate-`const parsed` report does not reproduce in the committed source or parser/test execution.\n\n## Security\n\nNo exploitable security issue was found. Malformed JSON is caught and retained without evaluation, and this change does not alter authentication, authorization, filesystem access, command execution, or secret handling.\n\n## Requirements / Acceptance Criteria\n\n- FR-1: production enforcement and append/appendAsync/appendOnce coverage are present; the malformed boot-trim test now reaches its intended path.\n- FR-2: production behavior appears correct, but the exact manifest revision's composition test fails before exercising it, and its conditional assertions can still pass without proving the required bounded and raw outputs.\n- FR-3: implemented with idempotent boot-trim coverage.\n- FR-4: documentation correctly identifies bounded event history, canonical hydration, and uncapped archival `status_history` rows.\n- D4 and all listed NonGoals remain preserved.\n\n## Performance\n\nCanonical single-status hydration is bounded in SQL, append-time bounding is linear in incoming payload size, and the required 16 KiB boot selector, seven-day retention, and 64 MB VACUUM trigger remain unchanged. CodeRabbit's suggestion to scan every historical review event conflicts with the explicit NonGoal preserving the 16 KiB threshold and does not block this review.\n\n## Verification\n\n- Manifest/initial PR HEAD: `f9bd92d8cbb3cefa1147da4038fbc60a841f36dd`.\n- PR advanced during review to `d48df7477301a56fab35fc926ec12027d47cf43a`.\n- Focused Vitest run on the requested revision: **1 failed, 64 passed**.\n- ESLint on changed TypeScript/test files: **passed**.\n- `git diff --check origin/main...HEAD`: **passed** at review start.\n- GitHub build, lint, guard, prompt-trailer, and smoke checks for the later revision are green; its main test check was still pending and cannot validate the stale manifest revision.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253/.pan/review/agent-pan-3253-review-f9bd92d8/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3253 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-allowlist.txt",
@@ -168,21 +160,20 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T09:55:44.350Z",
+  "updated": "2026-07-29T09:58:37.347Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T09:16:42.721Z",
-    "updatedAt": "2026-07-29T09:55:44.331Z",
+    "updatedAt": "2026-07-29T09:58:36.794Z",
     "reviewNotes": "Blocked: manifest HEAD f9bd92d8 fails the focused composition test because setReviewStatusSync is imported from the wrong module; the test's conditional assertions can also pass without proving bounded history or raw status_history persistence. Review: .pan/review/agent-pan-3253-review-f9bd92d8/review.md",
     "verificationNotes": "Verification FAILED at test (360449ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253\n\nNo test files found, exiting with code 0\n\n ❯ |root| tests/unit/lib/overdeck/review-status-sync.test.ts (9 tests | 1 failed) 3082ms\n     × verifies dbStatus/updated split and testNotes preservation (PAN-3253 notes-cap.ac2-ac3) 125ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-1ndBL4/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] comple\n…(604 chars elided)…\n/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-S7IgKi/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-S7IgKi/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-conte\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
-    "reviewedAtCommit": "d48df7477301a56fab35fc926ec12027d47cf43a",
     "lastVerifiedCommit": "14703dbb3871a0e90db6fb10d370b144c231ac3a",
     "reviewSpawnedAt": "2026-07-29T09:40:35.811Z",
     "scopeDrift": {
@@ -232,18 +223,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 9098467,
-            "output": 337323,
-            "cacheRead": 68770816,
+            "input": 9102621,
+            "output": 337673,
+            "cacheRead": 68972544,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2917,
-            "output": 139419,
-            "cacheRead": 66018421,
-            "cacheWrite": 3070286
+            "input": 2959,
+            "output": 141269,
+            "cacheRead": 66975436,
+            "cacheWrite": 3082363
           }
         }
       },
@@ -255,21 +246,21 @@
           "cacheWrite": 269290
         },
         "openai/gpt-5.6-sol": {
-          "input": 9098467,
-          "output": 337323,
-          "cacheRead": 68770816,
+          "input": 9102621,
+          "output": 337673,
+          "cacheRead": 68972544,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2917,
-          "output": 139419,
-          "cacheRead": 66018421,
-          "cacheWrite": 3070286
+          "input": 2959,
+          "output": 141269,
+          "cacheRead": 66975436,
+          "cacheWrite": 3082363
         }
       },
       "costAtCloseOut": {
-        "usd": 110.82237,
-        "pricingAsOf": "2026-07-29T09:55:44.341Z"
+        "usd": 111.074594,
+        "pricingAsOf": "2026-07-29T09:58:36.826Z"
       }
     },
     "merges": [
