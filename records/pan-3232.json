@@ -304,17 +304,17 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:13:05.171Z",
+  "updated": "2026-07-29T05:13:10.197Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:13:03.012Z",
+    "updatedAt": "2026-07-29T05:13:03.781Z",
     "reviewNotes": "Agent re-review request (2/25): FR-7 test coverage complete. Branch has 3 auto-commits for file-size-allowlist sync. Ready for review.",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -325,7 +325,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
     "reviewedAtCommit": "f62d4793235ea6644a96ca02a4706437d687b54d",
-    "reviewSpawnedAt": "2026-07-29T05:06:48.635Z"
+    "reviewSpawnedAt": "2026-07-29T05:13:03.780Z"
   },
   "closeOut": {
     "usage": {
@@ -385,7 +385,7 @@
       },
       "costAtCloseOut": {
         "usd": 275.168845,
-        "pricingAsOf": "2026-07-29T05:13:04.916Z"
+        "pricingAsOf": "2026-07-29T05:13:10.142Z"
       }
     },
     "merges": [
@@ -394,7 +394,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3232",
