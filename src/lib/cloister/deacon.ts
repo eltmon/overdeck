@@ -191,6 +191,7 @@ import { pruneTerminalStoppedAgents } from './agent-gc.js';
 import { shouldRunRecoveryJanitor } from './patrol-cadence.js';
 import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { reconcileOrphanProposedSpecs, spawnWorkAgentThroughAgentsEndpoint, triggerRebuildAndStart } from './orphan-proposed-reconciler.js';
+import { reconcilePendingPromotions } from './pending-promotion-reconciler.js';
 import { reconcileTestStatusFromGreenCiWithDeps } from './test-status-green-ci-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
 import { reconcileIdleWorkspaceStacks } from './idle-stack-reaper.js';
@@ -1752,13 +1753,37 @@ const DEAD_END_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
  * send the agent a nudge message with the correct resubmit command.
  * For CI-blocked merges: clear the stale merge failure and feedback files.
  */
-export async function checkDeadEndAgents(): Promise<string[]> {
+export interface CheckDeadEndAgentsDeps {
+  loadReviewStatuses?: typeof loadReviewStatuses;
+  sessionExistsSync?: typeof sessionExistsSync;
+  getAgentStateSync?: typeof getAgentStateSync;
+  getAgentDir?: typeof getAgentDir;
+  decideAgentAutonomousRedrive?: typeof decideAgentAutonomousRedrive;
+  recordDeadEndNeedsYou?: typeof recordDeadEndNeedsYou;
+  spawnWorkAgentThroughAgentsEndpoint?: typeof spawnWorkAgentThroughAgentsEndpoint;
+  setReviewStatusSync?: typeof setReviewStatusSync;
+  clearAgentTroubledSync?: typeof clearAgentTroubledSync;
+  saveAgentStateSync?: typeof saveAgentStateSync;
+  now?: () => number;
+}
+
+export async function checkDeadEndAgents(deps: CheckDeadEndAgentsDeps = {}): Promise<string[]> {
   const actions: string[] = [];
+  const readReviewStatuses = deps.loadReviewStatuses ?? loadReviewStatuses;
+  const hasSession = deps.sessionExistsSync ?? sessionExistsSync;
+  const readAgentState = deps.getAgentStateSync ?? getAgentStateSync;
+  const resolveAgentDir = deps.getAgentDir ?? getAgentDir;
+  const decideRedrive = deps.decideAgentAutonomousRedrive ?? decideAgentAutonomousRedrive;
+  const recordNeedsYou = deps.recordDeadEndNeedsYou ?? recordDeadEndNeedsYou;
+  const spawnWorkAgent = deps.spawnWorkAgentThroughAgentsEndpoint ?? spawnWorkAgentThroughAgentsEndpoint;
+  const updateReviewStatus = deps.setReviewStatusSync ?? setReviewStatusSync;
+  const clearAgentTroubled = deps.clearAgentTroubledSync ?? clearAgentTroubledSync;
+  const saveAgentState = deps.saveAgentStateSync ?? saveAgentStateSync;
 
   try {
-    const statuses = loadReviewStatuses();
+    const statuses = readReviewStatuses();
 
-    const now = Date.now();
+    const now = deps.now?.() ?? Date.now();
 
     for (const [key, status] of Object.entries(statuses)) {
       // Only act on blocked/failed reviews, failed tests, or CI-blocked merges.
@@ -1823,29 +1848,39 @@ export async function checkDeadEndAgents(): Promise<string[]> {
         statusType = 'merge CI blocked';
       }
 
-      if (!sessionExistsSync(agentSessionName)) {
+      if (!hasSession(agentSessionName)) {
         // PAN-2209: respawn a dead work agent whose pending rework kickoff drains
         // `.pan/feedback` so it addresses the review. Merge-CI dead-ends need no
         // work session and keep their prior no-session behavior (they fall through
         // to `continue`; the merge-CI branch below requires a live session).
         if (isReviewBlocked || isVerificationFailed || isTestFailed) {
-          const agentState = getAgentStateSync(agentSessionName);
-          const gateDecision = decideAgentAutonomousRedrive(agentState ?? {}, getAgentDir(agentSessionName), true);
+          const agentState = readAgentState(agentSessionName);
+          const gateDecision = await decideRedrive(agentState ?? {}, resolveAgentDir(agentSessionName), true);
           if (gateDecision.decision === 'defer') {
             console.log(`[deacon] PAN-2209: ${issueId} (${statusType}) re-drive deferred — ${gateDecision.reason}`);
-            const trip = gateDecision.needsYou && await recordDeadEndNeedsYou(issueId, 'operator-stopped-rework', status.updatedAt ?? statusType, `Dead-end recovery needs-you: ${issueId} was explicitly stopped before handoff`);
+            const pendingOperatorDecision = gateDecision.reason.startsWith('agent is waiting on an operator decision');
+            const recoveryPath = pendingOperatorDecision ? 'pending-operator-decision' : 'operator-stopped-rework';
+            const needsYouMessage = pendingOperatorDecision
+              ? `Dead-end recovery needs-you: ${issueId} ${gateDecision.reason}. Answer it with 'pan answer ${issueId}'.`
+              : `Dead-end recovery needs-you: ${issueId} was explicitly stopped before handoff`;
+            const trip = gateDecision.needsYou && await recordNeedsYou(
+              issueId,
+              recoveryPath,
+              status.updatedAt ?? statusType,
+              needsYouMessage,
+            );
             if (trip) actions.push(trip);
           } else {
-            if (gateDecision.gateDecision.clearStoppedByUser && agentState) { delete agentState.stoppedByUser; saveAgentStateSync(agentState); }
+            if (gateDecision.gateDecision.clearStoppedByUser && agentState) { delete agentState.stoppedByUser; saveAgentState(agentState); }
             deadEndCooldowns.set(key, now); // Engage the shared circuit breaker so a chronically-dying agent
             // cannot be respawned forever (>=25 requeues halts, checked above).
-            setReviewStatusSync(issueId, { autoRequeueCount: autoRequeueCount + 1 });
+            updateReviewStatus(issueId, { autoRequeueCount: autoRequeueCount + 1 });
             // Clear only the system-set `troubled` gate (resume-failure counter
             // after completion) — the false state that strands the rework, per
             // PAN-2209 evidence. Paused agents were already excluded above.
-            clearAgentTroubledSync(agentSessionName);
+            clearAgentTroubled(agentSessionName);
             try {
-              const spawn = await spawnWorkAgentThroughAgentsEndpoint(issueId);
+              const spawn = await spawnWorkAgent(issueId);
               if (spawn.spawned) {
                 actions.push(`Dead-end recovery (PAN-2209): respawned dead work agent for ${issueId} (${statusType}) to address feedback`);
                 console.log(`[deacon] PAN-2209: respawned dead work agent for ${issueId} (${statusType})`);
@@ -2656,9 +2691,8 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...livenessActions);
   for (const a of livenessActions) addLog('action', a, state.patrolCycle);
 
-  const orphanProposedActions = await reconcileOrphanProposedSpecs();
-  actions.push(...orphanProposedActions);
-  for (const a of orphanProposedActions) addLog('action', a, state.patrolCycle);
+  for (const a of await reconcileOrphanProposedSpecs()) { actions.push(a); addLog('action', a, state.patrolCycle); }
+  for (const a of await reconcilePendingPromotions()) { actions.push(a); addLog('action', a, state.patrolCycle); }
 
   const closedIssueAgentActions = await reconcileClosedIssueAgents();
   actions.push(...closedIssueAgentActions);

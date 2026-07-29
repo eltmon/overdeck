@@ -36,6 +36,10 @@ import {
 } from './agent-state.js';
 import { deliverAgentMessage, deliverInitialPromptWithRetry, resilientDeliveryMethod } from './delivery.js';
 import { clearReadySignal, normalizeAgentId } from './identity.js';
+import {
+  detectPendingOperatorDecision,
+  type PendingOperatorDecision,
+} from './pending-decision-gate.js';
 import { listRunningAgentsSync } from './queries.js';
 import { getProviderEnvForModel, getProviderExportsForModel } from './provider-env.js';
 import { saveAgentRuntimeState } from './runtime-state.js';
@@ -57,6 +61,26 @@ export interface RestartAgentOptions {
   harness?: RuntimeName;
   graceful?: boolean;
   message?: string;
+  force?: boolean;
+}
+
+export interface RestartAgentResult {
+  success: boolean;
+  error?: string;
+  code?: 'pending-operator-decision';
+  pendingDecision?: PendingOperatorDecision;
+}
+
+export interface RestartAgentDeps {
+  detectPendingOperatorDecision?: (agentId: string) => Promise<PendingOperatorDecision | null>;
+  getAgentStateSync?: typeof getAgentStateSync;
+  logAgentLifecycleSync?: typeof logAgentLifecycleSync;
+  assertWorkspaceStackHealthyForSpawn?: typeof assertWorkspaceStackHealthyForSpawn;
+  resolveHarness?: typeof resolveHarness;
+  prepareHarnessLaunch?: typeof prepareHarnessLaunch;
+  sessionExists?: (agentId: string) => Promise<boolean>;
+  sendGracefulRestartWarning?: typeof sendGracefulRestartWarning;
+  stopAgent?: (agentId: string) => Promise<unknown>;
 }
 
 export function resolveRecoveryResumeSessionId(agentId: string, harness: RuntimeName): string | undefined {
@@ -67,29 +91,61 @@ export function resolveRecoveryResumeSessionId(agentId: string, harness: Runtime
 export async function restartAgent(
   agentId: string,
   opts: RestartAgentOptions = {},
-): Promise<{ success: boolean; error?: string }> {
+  deps: RestartAgentDeps = {},
+): Promise<RestartAgentResult> {
   const normalizedId = normalizeAgentId(agentId);
-  const { graceful = true, model: rawNewModel, harness: newHarness, message } = opts;
+  const { graceful = true, model: rawNewModel, harness: newHarness, message, force = false } = opts;
   const newModel = normalizeModelOverrideSync(rawNewModel);
+  const readAgentState = deps.getAgentStateSync ?? getAgentStateSync;
+  const detectPendingDecision = deps.detectPendingOperatorDecision ?? detectPendingOperatorDecision;
+  const logLifecycle = deps.logAgentLifecycleSync ?? logAgentLifecycleSync;
+  const assertWorkspaceHealthy = deps.assertWorkspaceStackHealthyForSpawn
+    ?? assertWorkspaceStackHealthyForSpawn;
+  const resolveRestartHarness = deps.resolveHarness ?? resolveHarness;
+  const prepareRestartHarness = deps.prepareHarnessLaunch ?? prepareHarnessLaunch;
+  const restartSessionExists = deps.sessionExists
+    ?? ((id: string) => Effect.runPromise(sessionExists(id)));
+  const sendRestartWarning = deps.sendGracefulRestartWarning ?? sendGracefulRestartWarning;
+  const stopRestartAgent = deps.stopAgent
+    ?? ((id: string) => Effect.runPromise(stopAgent(id)));
 
-  const agentState = getAgentStateSync(normalizedId);
+  const agentState = readAgentState(normalizedId);
   if (!agentState) {
     return { success: false, error: `Agent ${normalizedId} not found` };
   }
   const gateDecision = decideResumeGate(getAgentResumeGateBlockReason(agentState), 'operator-start');
   if (gateDecision.decision === 'block') {
     const reason = `Cannot restart ${normalizedId}: ${gateDecision.reason}. Clear the gate before restarting.`;
-    logAgentLifecycleSync(normalizedId, `restartAgent BLOCKED: ${reason}`);
+    logLifecycle(normalizedId, `restartAgent BLOCKED: ${reason}`);
     return { success: false, error: reason };
   }
+  const checkPendingDecision = async (): Promise<RestartAgentResult | null> => {
+    if (force) return null;
+    const pendingDecision = await detectPendingDecision(normalizedId);
+    if (!pendingDecision) return null;
+
+    const pendingReason = pendingDecision.reason.replaceAll('_', ' ');
+    const issueId = agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
+    const reason = `Agent ${normalizedId} is waiting on an operator decision (${pendingReason}). Answer it with 'pan answer ${issueId}' or open the Decisions panel; pass force to discard it deliberately.`;
+    logLifecycle(normalizedId, `restartAgent BLOCKED: ${reason}`);
+    return {
+      success: false,
+      error: reason,
+      code: 'pending-operator-decision',
+      pendingDecision,
+    };
+  };
+
+  const initialPendingDecision = await checkPendingDecision();
+  if (initialPendingDecision) return initialPendingDecision;
   if (!agentState.workspace || !existsSync(agentState.workspace)) {
     return { success: false, error: `Agent workspace missing: ${agentState.workspace}` };
   }
 
-  logAgentLifecycleSync(normalizedId, `restartAgent called (graceful=${graceful}, model=${newModel || 'unchanged'}, harness=${newHarness || 'unchanged'})`);
+  logLifecycle(normalizedId, `restartAgent called (graceful=${graceful}, model=${newModel || 'unchanged'}, harness=${newHarness || 'unchanged'})`);
 
   try {
-    await assertWorkspaceStackHealthyForSpawn(
+    await assertWorkspaceHealthy(
       agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
       agentState.role ?? 'work',
       agentState.hostOverride === true,
@@ -97,23 +153,27 @@ export async function restartAgent(
     );
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    logAgentLifecycleSync(normalizedId, `restartAgent BLOCKED: ${reason}`);
+    logLifecycle(normalizedId, `restartAgent BLOCKED: ${reason}`);
     return { success: false, error: reason };
   }
 
   const effectiveModel = newModel || requireModelOverrideSync(agentState.model || 'claude-sonnet-4-6');
-  const effectiveHarness = await resolveHarness({
+  const effectiveHarness = await resolveRestartHarness({
     explicit: newHarness ?? agentState.harness,
     role: agentState.role,
     model: effectiveModel,
   });
-  const harnessLaunch = await prepareHarnessLaunch(effectiveHarness);
+  const harnessLaunch = await prepareRestartHarness(effectiveHarness);
 
-  if (graceful && await Effect.runPromise(sessionExists(normalizedId))) {
-    await sendGracefulRestartWarning(normalizedId, agentState.harness, agentState.workspace);
+  if (graceful && await restartSessionExists(normalizedId)) {
+    const warningPendingDecision = await checkPendingDecision();
+    if (warningPendingDecision) return warningPendingDecision;
+    await sendRestartWarning(normalizedId, agentState.harness, agentState.workspace);
   }
 
-  await Effect.runPromise(stopAgent(normalizedId));
+  const stopPendingDecision = await checkPendingDecision();
+  if (stopPendingDecision) return stopPendingDecision;
+  await stopRestartAgent(normalizedId);
 
   if (newModel && newModel !== agentState.model) {
     agentState.model = newModel;
@@ -200,12 +260,12 @@ export async function restartAgent(
       lastActivity: new Date().toISOString(),
     });
 
-    logAgentLifecycleSync(normalizedId, `restartAgent SUCCESS: model=${effectiveModel}`);
+    logLifecycle(normalizedId, `restartAgent SUCCESS: model=${effectiveModel}`);
     return { success: true };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     await Effect.runPromise(stopAgent(normalizedId)).catch(() => undefined);
-    logAgentLifecycleSync(normalizedId, `restartAgent FAILED: ${msg}`);
+    logLifecycle(normalizedId, `restartAgent FAILED: ${msg}`);
     return { success: false, error: `Failed to restart agent: ${msg}` };
   }
 }
@@ -239,7 +299,7 @@ export function detectCrashedAgents(): AgentState[] {
  */
 export async function recoverAgent(
   agentId: string,
-  opts: { modelOverride?: string } = {},
+  opts: { modelOverride?: string; force?: boolean } = {},
 ): Promise<AgentState | null> {
   const normalizedId = normalizeAgentId(agentId);
   logAgentLifecycleSync(normalizedId, 'recoverAgent called');
@@ -256,6 +316,13 @@ export async function recoverAgent(
   if (gateDecision.decision === 'block') {
     logAgentLifecycleSync(normalizedId, `recoverAgent BLOCKED: Cannot recover ${normalizedId}: ${gateDecision.reason}. Clear the gate before recovering.`);
     return null;
+  }
+  if (!opts.force) {
+    const pendingDecision = await detectPendingOperatorDecision(normalizedId);
+    if (pendingDecision) {
+      logAgentLifecycleSync(normalizedId, `recoverAgent BLOCKED: pending operator decision (${pendingDecision.reason})`);
+      return null;
+    }
   }
   const modelOverride = normalizeModelOverrideSync(opts.modelOverride);
   if (modelOverride) {
