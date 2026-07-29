@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T00:18:20.729Z",
+  "updated": "2026-07-29T00:20:31.383Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "pending",
@@ -61,5 +61,20 @@
       "open": true,
       "needsYouEmittedAt": "2026-07-29T00:14:52.244Z"
     }
-  ]
+  ],
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "contracts-file-rpcs": {
+        "writerId": "agent-pan-3260",
+        "agentId": "agent-pan-3260",
+        "pid": 1829818,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T00:20:31.383Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "contracts-file-rpcs": "running"
+  }
 }
