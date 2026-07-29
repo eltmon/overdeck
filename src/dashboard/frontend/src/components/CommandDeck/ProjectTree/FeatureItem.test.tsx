@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
@@ -305,6 +306,7 @@ describe('FeatureItem', () => {
       drawer: { issueId: null, tab: 'overview' },
       tasksViewerIssueId: null,
       prdViewerIssueId: null,
+      xbriefViewerIssueId: null,
     });
     vi.restoreAllMocks();
     vi.mocked(refreshDashboardState).mockClear();
@@ -1027,6 +1029,52 @@ describe('FeatureItem', () => {
     expect(screen.getByText('docker: pan-821-db')).toBeInTheDocument();
     expect(screen.getByText('docker: pan-821-cache')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-821/resource-details');
+  });
+
+  it('opens the xBRIEF viewer from keyboard-accessible chip without selecting the row', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          resourceSources: ['workspace', 'vbrief'],
+          resourceDetails: {
+            hasWorkspace: true,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasXbrief: true,
+            hasTasks: false,
+            hasPrd: false,
+            dockerContainerCount: 0,
+            conversations: [],
+          },
+        })}
+        isSelected={false}
+        onSelect={onSelect}
+      />,
+    );
+
+    const workspaceChip = screen.getByTitle('workspace: allocated');
+    const xbriefChip = screen.getByRole('button', { name: 'Open xBRIEF for PAN-821' });
+    expect(workspaceChip.tagName).toBe('SPAN');
+
+    fireEvent.mouseEnter(xbriefChip.parentElement!);
+    expect(await screen.findByText('xBRIEF present')).toBeInTheDocument();
+    await user.click(xbriefChip);
+    expect(useDashboardStore.getState().xbriefViewerIssueId).toBe('PAN-821');
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByText('xBRIEF present')).toBeInTheDocument();
+
+    useDashboardStore.getState().closeXbriefViewer();
+    xbriefChip.focus();
+    await user.keyboard('{Enter}');
+    expect(useDashboardStore.getState().xbriefViewerIssueId).toBe('PAN-821');
+
+    useDashboardStore.getState().closeXbriefViewer();
+    await user.keyboard(' ');
+    expect(useDashboardStore.getState().xbriefViewerIssueId).toBe('PAN-821');
   });
 
   it('opens the tasks viewer from the tasks chip without selecting the issue row', () => {

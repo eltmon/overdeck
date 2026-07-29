@@ -9,4 +9,4 @@
 1315 src/lib/tmux.ts # PAN-3212
 1116 src/lib/lifecycle/workflows.ts # PAN-3215
 849 src/lib/overdeck/planning-promotion.ts # PAN-3229
-1348 src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx # PAN-3231
+1351 src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx # PAN-3231

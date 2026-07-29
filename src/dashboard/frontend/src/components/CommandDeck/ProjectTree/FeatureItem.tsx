@@ -175,6 +175,7 @@ function ResourceStrip({
   const details = feature.resourceDetails;
   const openTasksViewer = useDashboardStore((state) => state.openTasksViewer);
   const openPrdViewer = useDashboardStore((state) => state.openPrdViewer);
+  const openXbriefViewer = useDashboardStore((state) => state.openXbriefViewer);
   const resources = RESOURCE_ICON_ORDER.filter((source) => feature.resourceSources?.includes(source) && resourceSummary(feature, source));
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
@@ -281,11 +282,13 @@ function ResourceStrip({
           key={source}
           source={source}
           feature={feature}
-          onActivate={source === 'tasks'
-            ? () => openTasksViewer(feature.issueId)
-            : source === 'prd'
-              ? () => openPrdViewer(feature.issueId)
-              : undefined}
+          onActivate={source === 'vbrief'
+            ? () => openXbriefViewer(feature.issueId)
+            : source === 'tasks'
+              ? () => openTasksViewer(feature.issueId)
+              : source === 'prd'
+                ? () => openPrdViewer(feature.issueId)
+                : undefined}
         />
       ))}
       {details && popoverOpen && (
