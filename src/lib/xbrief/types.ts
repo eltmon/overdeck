@@ -142,6 +142,8 @@ export interface XBriefPlan {
   metadata?: {
     /** Issue-keyed `.xbrief.json` filename used in `specs/` on `overdeck-state`. Set by plan finalization. */
     canonicalFilename?: string;
+    /** Whether finalization should promote automatically or wait for an explicit operator action. */
+    promotionIntent?: 'automatic' | 'manual';
     /** Why the plan carries no documentation item. Set only when the change alters no documented surface; waives the docs-item-missing quality gate. */
     docsJustification?: string;
     [key: string]: unknown;
