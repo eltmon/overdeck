@@ -379,19 +379,19 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T06:45:40.187Z",
+  "updated": "2026-07-29T06:57:00.208Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-29T06:12:06.508Z",
-    "updatedAt": "2026-07-29T06:45:40.166Z",
+    "updatedAt": "2026-07-29T06:56:59.963Z",
     "reviewNotes": "Verification infrastructure error: Verification worker bundle missing at /home/eltmon/.overdeck/deployments/dashboard/.pan-reload-generation-a/dist/verification-worker.js; run npm run build",
-    "testNotes": "Gates run from workspace feature-pan-3232 (HEAD 3f05c046f6, review passed, reviewedAtCommit matches). npm run typecheck PASSED (root, hooks, evals, dashboard-types guard 58 known/0 new, frontend-types guard 0 known/0 new). npm run lint PASSED (eslint + all custom guards, exit 0). npm test PASSED: root vitest suite 1285 files / 12044 tests passed (3 skipped); frontend targeted subset (issueActions.test.ts, issueActions.no-actions-lost.test.ts, issueActions.parity.test.tsx, fr7-conversation-pending-input.test.tsx) 4 files / 59 tests passed, including the previously-failing AC-3 ConversationDock case in fr7-conversation-pending-input.test.tsx, now fixed by commit 3f05c046f6 (scoped the ambiguous 'agent-test-1' query). No browser UAT performed: the PRD (drafts/PAN-3232.md) and GitHub issue #3232 do not request live/browser verification; verify_commands across all xBRIEF items specify only vitest/typecheck/grep; the two items requiring live runtime behavior (live-tree-delta, specialist-pending-input) were deliberately cancelled/deferred as out of this branch's shipped scope, and the shipped rendering-layer fixes are fully covered by component-level unit tests mocking the exact prop shapes named in the issue's acceptance criteria.",
+    "testNotes": "Gates run from workspace feature-pan-3232 (HEAD 3322b75b00, matches reviewedAtCommit; review passed). bun install OK, packages/contracts unchanged vs origin/main so no rebuild needed. npm run typecheck PASSED (root tsc, hooks, evals, dashboard-types guard 58 known/0 new, frontend-types guard 0 known/0 new). npm run lint PASSED (eslint + all custom guards: skills, slash-commands, prompts, prompt-trailer, file-size, source-introspection, no-coderabbit-merge-gate, circular-deps 77 baselined/0 new, ratchet-audit, quarantine-audit). npm test PASSED: root vitest 1286 files/12067 tests passed (3 files/50 tests skipped, pre-existing quarantine); frontend targeted subset (issueActions.test.ts, issueActions.no-actions-lost.test.ts, issueActions.parity.test.tsx, fr7-conversation-pending-input.test.tsx) 4 files/59 tests passed. No browser UAT performed: PRD (drafts/PAN-3232.md) and GitHub issue #3232 contain no UAT/browser/Playwright/manual-test language; every xBRIEF item's verify_commands is vitest/typecheck/grep only; the two items whose acceptance criteria describe live push-based runtime behavior (live-tree-delta: pending_input_changed SessionTreeDelta; specialist-pending-input: review/test/ship node awaiting-input fields) were deliberately cancelled and deferred to follow-up work (recorded in tasks.claimHistory with reasons), a scope reduction already reviewed and passed on this exact commit. The 6 shipped items (issue-view-awaiting-fields, decisions-prompt-threading, session-panel-kind-label, remove-project-pending-input, widen-direct-selector-surfaces, docs-askuserquestion-dashboard) are fully covered by component-level unit tests mocking the exact prop shapes named in the issue's acceptance criteria.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
     "reviewedAtCommit": "3322b75b00bc87a2e0095159948d4e458d133694",
     "reviewRequestedAt": "2026-07-29T06:12:06.508Z",
@@ -426,10 +426,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 110,
-            "output": 15340,
-            "cacheRead": 5731878,
-            "cacheWrite": 291449
+            "input": 144,
+            "output": 22066,
+            "cacheRead": 8361558,
+            "cacheWrite": 448429
           }
         },
         "work": {
@@ -461,15 +461,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 110,
-          "output": 15340,
-          "cacheRead": 5731878,
-          "cacheWrite": 291449
+          "input": 144,
+          "output": 22066,
+          "cacheRead": 8361558,
+          "cacheWrite": 448429
         }
       },
       "costAtCloseOut": {
-        "usd": 324.077221,
-        "pricingAsOf": "2026-07-29T06:45:40.178Z"
+        "usd": 325.062936,
+        "pricingAsOf": "2026-07-29T06:57:00.142Z"
       }
     },
     "merges": [
