@@ -54,15 +54,7 @@
       "timestamp": "2026-07-29T00:28:01.507Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T00:28:01Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1837\n\n# Code Review — PAN-1837\n\n## Verdict: CHANGES REQUESTED\n\nReviewed branch `feature/pan-1837` at local HEAD `a33cd789c9b88f7116b1c73fb75cb4b8e7c11aa1` across correctness, security, requirements, and performance. The rework fixes most of the prior cycle’s launcher, native-auth, model-alias, context-rendering, documentation, and duplicate-parse defects, but the feature is still incomplete: dashboard Kimi conversations cannot resolve their native transcript, explicit incompatible selections are silently coerced, one public harness validator still drops `kimi-code`, and the committed branch does not pass its file-size gate. The reviewed fixes are also absent from the remote PR.\n\n## Blocking findings\n\n### P1 — Native Kimi dashboard conversations cannot resolve or pin their `wire.jsonl`\n\n**Locations:** `src/lib/overdeck/conversation-runtime.ts:804-840`, `src/lib/overdeck/conversation-reads.ts:158-163`, `src/dashboard/server/routes/jsonl-resolver.ts:237-255`, `src/dashboard/server/routes/jsonl-resolver.ts:352-375`\n\nThe conversation launcher now builds a valid native Kimi command and waits for the Kimi TUI, but it never snapshots the cwd’s existing Kimi sessions, calls `waitForNewKimiSession`, or persists a conversation-specific `kimi-session-id`. The read path then calls `resolveKimiWirePath(conv.tmuxSession)`. That resolver gets its workspace exclusively from `getAgentStateSync(agentId)`, while dashboard conversations are stored as Conversation rows and do not have an AgentState row, so `readRecordedState()` returns no workspace and `resolveKimiWirePath()` returns `null` before inspecting Kimi’s session tree.\n\nEven supplying `conv.cwd` alone would remain nondeterministic because multiple Kimi conversations in the same cwd need distinct captured session IDs; the resolver’s newest-session fallback would otherwise make every conversation point at whichever Kimi session wrote most recently. This fails the issue’s first-class conversation requirement and FR-7/FR-8: the terminal can be live while the Conversation tab has no transcript or shows another conversation’s transcript/cost. Capture the generated Kimi session at conversation spawn, persist it under the conversation-owned runtime directory or Conversation record, and resolve with both `conv.cwd` and that pinned ID. Add a test with two Kimi conversations sharing one cwd.\n\n### P1 — Dashboard work-agent routes silently coerce an incompatible explicit `kimi-code` selection to `claude-code`\n\n**Locations:** `src/dashboard/server/routes/agents/spawn.ts:752-770`, `src/dashboard/server/routes/agents/lifecycle-restart.ts:531-555`\n\nBoth explicit dashboard launch paths call `canUseHarnessSync()`, but on a denied decision they assign `'claude-code'` and continue spawning:\n\n```ts\neffectiveHarness = harnessDecision.allowed ? userPickedHarness : 'claude-code';\n```\n\nThe fresh-restart route has the same fallback. A request such as `{ harness: 'kimi-code', model: 'claude-sonnet-5' }` is therefore accepted and runs a different harness instead of returning the policy reason. The nearby spawn comment says the route should “fail fast,” and NFR-2 explicitly requires an unsupported `{kimi-code, non-Kimi model}` pair to block with a clear reason and never coerce. Return a 4xx response containing `harnessDecision.reason`; do not substitute another harness. Lock both normal spawn and fresh restart with route tests.\n\n### P1 — The FR-1 hand-maintained validator audit still omits artifact provenance\n\n**Locations:** `packages/contracts/src/artifacts.ts:12-16`, `src/lib/artifacts/lifecycle.ts:202-214`\n\n`ArtifactAgentHarness` still accepts only `claude-code`, `pi`, `ohmypi`, `codex`, `acp`, and `user`, and `parseAgentHarness()` mirrors that list. A Kimi agent publishing an artifact therefore either fails schema decoding when `agentHarness: 'kimi-code'` is supplied explicitly or silently records `null` when provenance comes from `PAN_AGENT_HARNESS`.\n\nFR-1 requires `kimi-code` in the Harness union and every hand-maintained validator. Add it to both artifact surfaces and add a no-loss test derived from the canonical harness union so future harness additions cannot silently lose artifact provenance.\n\n### P1 — The committed HEAD fails the file-size quality gate; the only repair is uncommitted\n\n**Locations:** `scripts/file-size-allowlist.txt:13-17`, `scripts/lint-file-size.sh:48-84`\n\nAt committed HEAD, the allowlist permits 1208 lines for `src/lib/sync.ts`, 1023 for `src/lib/agents/spawn.ts`, and 1015 for `src/lib/agents/runtime-command.ts`, while the committed files contain 1211, 1035, and 1016 lines. The committed allowlist has no entries for the now-oversized `src/lib/model-capabilities.ts` (1388 lines) or `src/lib/overdeck/conversation-runtime.ts` (1004 lines). The file-size guard rejects every file over its audited allowance.\n\nThe working tree contains exactly the needed allowlist update, but `scripts/file-size-allowlist.txt` is modified and uncommitted. Review and tests evaluate committed HEAD, so the branch is currently red. The work agent must either shrink the files or commit the audited PAN-1837 allowances; the reviewer must not absorb this dirty change.\n\n### P1 — The reviewed rework is not present on the remote PR\n\n**Pipeline state:** local HEAD `a33cd789c9b88f7116b1c73fb75cb4b8e7c11aa1`; PR #3255 remote head `c2d53ce557c173f99c9a4ac67af9e030767dcc36`\n\nThe local branch is 91 commits ahead of `origin/feature/pan-1837`, while the open PR still points to the previous review’s blocked SHA and GitHub reports the PR as conflicting. Passing this review would approve local code that the merge surface cannot fetch or merge; the remote PR still contains the defects rejected in the prior cycle. Commit the outstanding allowlist repair, push `feature/pan-1837`, and verify PR #3255 advances to the reviewed SHA before requesting review again.\n\n## Non-blocking finding\n\n### P2 — The async dashboard resolver delegates Kimi discovery to synchronous directory scans\n\n**Locations:** `src/dashboard/server/routes/jsonl-resolver.ts:25-28`, `src/dashboard/server/routes/jsonl-resolver.ts:362-375`, `src/lib/runtimes/kimi-code.ts:93-122`\n\n`jsonl-resolver.ts` documents the route as async-only because it runs on the dashboard event loop, but `resolveKimiWirePath()` dynamically imports `findKimiWirePath()`, which uses `readdirSync` and `statSync` to scan the Kimi session bucket. Command Deck polling repeats transcript resolution, so session history growth turns this into repeated event-loop blocking. Keep the runtime’s synchronous contract where required, but provide an async discovery function for dashboard callers using `fs/promises`.\n\n## Security review\n\nNo blocking security issue survived review. Launcher arguments remain shell-quoted, the native provider path no longer injects the Anthropic-compatible Kimi credentials, binary resolution uses the existing resolver, and no new destructive or synchronous tmux delivery primitive was added.\n\n## Coverage\n\nReviewed the high-risk spawn owners for work, planning, specialist roles, and conversations; launcher/runtime behavior; model aliases and provider auth; transcript and cost resolution; policy and dashboard gates; context and skill synchronization; public contracts and hand-maintained validators; documentation; changed tests; and current local/remote branch state. The prior double-read performance finding is fixed by reusing parsed Kimi entries for usage summarization.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1837/.pan/review/agent-pan-1837-review-a33cd789/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1837 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -277,10 +269,10 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T00:28:10.776Z",
+  "updated": "2026-07-29T00:50:58.274Z",
   "pipeline": {
     "issueId": "PAN-1837",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -288,7 +280,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T00:28:07.165Z",
+    "updatedAt": "2026-07-29T00:50:57.933Z",
     "reviewNotes": "Reviewed fixes are not pushed to PR #3255; native Kimi conversations also lack deterministic wire-session resolution, incompatible dashboard selections are silently coerced, artifact provenance omits kimi-code, and committed HEAD fails the file-size gate.",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
@@ -299,7 +291,6 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
-    "reviewedAtCommit": "900554f76eef6a96b91387ea58b696b9b9a5a776",
     "reviewSpawnedAt": "2026-07-29T00:14:00.977Z"
   },
   "closeOut": {
@@ -315,18 +306,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4304678,
-            "output": 188930,
-            "cacheRead": 71252992,
+            "input": 4310700,
+            "output": 189190,
+            "cacheRead": 71555072,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 2754,
-            "output": 568062,
-            "cacheRead": 704931182,
-            "cacheWrite": 3083222
+            "input": 2924,
+            "output": 603761,
+            "cacheRead": 770643373,
+            "cacheWrite": 3864031
           }
         }
       },
@@ -338,21 +329,21 @@
           "cacheWrite": 187167
         },
         "openai/gpt-5.6-sol": {
-          "input": 4304678,
-          "output": 188930,
-          "cacheRead": 71252992,
+          "input": 4310700,
+          "output": 189190,
+          "cacheRead": 71555072,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2754,
-          "output": 568062,
-          "cacheRead": 704931182,
-          "cacheWrite": 3083222
+          "input": 2924,
+          "output": 603761,
+          "cacheRead": 770643373,
+          "cacheWrite": 3864031
         }
       },
       "costAtCloseOut": {
-        "usd": 224.871284,
-        "pricingAsOf": "2026-07-29T00:28:07.175Z"
+        "usd": 240.512032,
+        "pricingAsOf": "2026-07-29T00:50:57.963Z"
       }
     },
     "merges": [
