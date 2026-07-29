@@ -265,10 +265,10 @@
     "recordedAt": "2026-07-29T05:44:27.078Z"
   },
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T05:48:05.781Z",
+  "updated": "2026-07-29T06:02:39.342Z",
   "pipeline": {
     "issueId": "PAN-1990",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -276,10 +276,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T05:45:20.146Z",
-    "updatedAt": "2026-07-29T05:47:59.285Z",
+    "updatedAt": "2026-07-29T06:02:39.244Z",
+    "reviewNotes": "AC-1 is incomplete: agents.workspace_id is deliberately omitted, with additional broken workspace and memory paths detailed in review.md",
     "inspectNotes": "AC1: MemoryIdentity/MemoryObservation issueId -> Schema.NullOr(IssueId) in packages/contracts/src/memory.ts; new contracts memory.test.ts passes 4/4 (decodes null and a real PAN-1990 for both structs). AC2: src/lib/memory/injection.ts:110 replaces the sibling search with Promise.resolve([]) when issueId is null, so the branch is skipped rather than widened; tests/lib/memory/injection.test.ts 18/18 pass including the new null-issueId case, which seeds the same PAN-999 sibling row the positive test retrieves and asserts hitCounts.sibling===0 and no sibling docType. AC3: npm run typecheck exits 0 - contracts dts rebuild, root tsc --noEmit, hooks, evals, dashboard ratchet (61 known, none new), frontend ratchet (0). New imports verified real: getProjectSync src/lib/projects.ts:601, resolveProjectPath src/lib/projects.ts:508. Non-blocking note: the ?? workspaceId fallbacks for paths/event keys are documented as deferred to memory-paths-rekey and events-workspaceid, but updateMemoryHealth returning EMPTY_HEALTH on a null issueId drops health tracking for main/scratch turns rather than relocating it - confirm a follow-on bead owns that.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3277",
-    "reviewRequestedAt": "2026-07-29T05:45:20.146Z",
     "reviewSpawnedAt": "2026-07-29T05:47:58.586Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -542,12 +542,20 @@
             "cacheWrite": 194048
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 1814902,
+            "output": 72638,
+            "cacheRead": 24764928,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 4224,
-            "output": 1021882,
-            "cacheRead": 1115870121,
-            "cacheWrite": 8570959
+            "input": 4232,
+            "output": 1023925,
+            "cacheRead": 1117784696,
+            "cacheWrite": 8669060
           }
         }
       },
@@ -558,16 +566,22 @@
           "cacheRead": 3601034,
           "cacheWrite": 194048
         },
+        "openai/gpt-5.6-sol": {
+          "input": 1814902,
+          "output": 72638,
+          "cacheRead": 24764928,
+          "cacheWrite": 0
+        },
         "anthropic/claude-sonnet-5": {
-          "input": 4224,
-          "output": 1021882,
-          "cacheRead": 1115870121,
-          "cacheWrite": 8570959
+          "input": 4232,
+          "output": 1023925,
+          "cacheRead": 1117784696,
+          "cacheWrite": 8669060
         }
       },
       "costAtCloseOut": {
-        "usd": 263.28539,
-        "pricingAsOf": "2026-07-29T05:48:02.529Z"
+        "usd": 287.570118,
+        "pricingAsOf": "2026-07-29T06:02:39.330Z"
       }
     },
     "merges": [
@@ -576,7 +590,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-1990",
