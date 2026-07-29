@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   getReviewStatusFromDbSync,
+  setReviewStatusSync,
   upsertReviewStatusSync,
 } from '../../../../src/lib/overdeck/review-status-sync.js';
 import {
@@ -240,9 +241,11 @@ describe('overdeck review status sync', () => {
     });
   });
 
-  it('preserves raw full-length notes in database while bounding hydrated history (PAN-3253 notes-cap.ac2-ac3)', () => {
-    // This test verifies the split between dbStatus (raw) and updated (bounded)
-    // that happens in review-status.ts:setReviewStatusSync()
+  it('verifies dbStatus/updated split and testNotes preservation (PAN-3253 notes-cap.ac2-ac3)', () => {
+    // This test exercises the real setReviewStatusSync() composition path
+    // and verifies the split between dbStatus (raw, full notes) and updated (bounded, truncated notes)
+    // It also verifies notes-cap.ac2: status.testNotes stays complete at 10,000 chars
+    // while the appended history note is capped at ≤500
 
     const now = Date.now();
     const db = odb.raw();
@@ -256,25 +259,22 @@ describe('overdeck review status sync', () => {
 
     const longTestNote = 'x'.repeat(10000); // Far exceeds 500-char limit
 
-    // Write a long note through upsertReviewStatusSync
-    upsertReviewStatusSync({
+    // Call setReviewStatusSync() with a long testNotes to exercise the composition path
+    // This triggers the dbStatus/updated split in review-status.ts
+    const updated = setReviewStatusSync({
       issueId: 'PAN-COMPOSITION-TEST',
       reviewStatus: 'passed',
       testStatus: 'pending',
-      testNotes: longTestNote,
-      history: [
-        {
-          type: 'test',
-          status: 'pending',
-          timestamp: new Date(now).toISOString(),
-          notes: longTestNote,
-        },
-      ],
+      testNotes: longTestNote, // 10,000 chars - should NOT be truncated in returned status
       updatedAt: new Date().toISOString(),
       readyForMerge: false,
     });
 
-    // Verify hydrated history is truncated
+    // AC2: Verify returned status.testNotes is complete (≤ 500 rule only applies to history notes, not testNotes)
+    expect(updated.testNotes).toBe(longTestNote);
+    expect(updated.testNotes.length).toBe(10000);
+
+    // AC3: Verify returned history notes are truncated
     const hydrated = getReviewStatusFromDbSync('PAN-COMPOSITION-TEST');
     if (hydrated?.history && hydrated.history.length > 0) {
       const historyNote = hydrated.history[0]!.notes;
@@ -284,16 +284,15 @@ describe('overdeck review status sync', () => {
       }
     }
 
-    // Verify raw status_history table has the full untrun note
+    // AC3: Verify raw status_history table has the full untrimmed note
     const rawRows = db.prepare(
       'SELECT notes FROM status_history WHERE issue_id = ?'
     ).all('PAN-COMPOSITION-TEST') as Array<{ notes: string | null }>;
 
-    // The first (and only) row should have the complete 10,000-char note
+    // The testNotes field in the raw row should have the complete 10,000-char note
     if (rawRows[0]?.notes) {
       expect(rawRows[0].notes.length).toBe(10000);
       expect(rawRows[0].notes).toBe(longTestNote);
     }
   });
 });
-

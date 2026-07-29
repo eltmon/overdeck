@@ -379,9 +379,12 @@ describe('append() bounding of review.status_changed (PAN-3253 append-door-bound
   it('handles malformed stored JSON gracefully during boot trim (PAN-3253 append-door-bound.ac3)', () => {
     // Malformed JSON is reachable through boot-trim, not through typed append()
     // This test inserts malformed review.status_changed directly into the database
+    // Make it exceed 16 KiB so trimReviewStatusHistoryPayloads selects and processes it
     // and verifies trimReviewStatusHistoryPayloads() preserves it byte-identically
 
-    const malformedPayload = '{"status": {"history": [{"notes": "' + 'x'.repeat(1000) + '}'; // Malformed JSON
+    // Create payload > 16 KiB (16384 chars) that is malformed JSON
+    // This ensures it exceeds OVERSIZED_REVIEW_PAYLOAD_CHARS threshold
+    const malformedPayload = '{"status": {"history": [{"notes": "' + 'x'.repeat(20000) + '}'; // Malformed, >16KiB
 
     db.prepare('INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)')
       .run('review.status_changed', Date.now(), malformedPayload);
@@ -392,8 +395,10 @@ describe('append() bounding of review.status_changed (PAN-3253 append-door-bound
     const originalBytes = original.payload;
 
     // trimReviewStatusHistoryPayloads should handle this gracefully
+    // The row should be selected (> 16 KiB), passed to boundReviewStatusPayload for parsing,
+    // catch the JSON error, and preserve the row byte-identically
     const result = trimReviewStatusHistoryPayloads(db as unknown as DbAdapter);
-    expect(result.trimmed).toBeGreaterThanOrEqual(0); // Should not throw
+    expect(result.trimmed).toBe(0); // No rows were successfully trimmed (malformed prevented changes)
 
     // The malformed row should survive byte-identically
     const afterTrim = db.prepare('SELECT payload FROM events WHERE type = ?')
