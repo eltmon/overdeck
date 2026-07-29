@@ -69,17 +69,18 @@
     "recordedAt": "2026-07-28T20:52:11.749Z"
   },
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-29T05:44:03.393Z",
+  "updated": "2026-07-29T05:48:56.185Z",
   "pipeline": {
     "issueId": "PAN-3242",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:52:32.420Z",
-    "updatedAt": "2026-07-29T05:44:02.353Z",
+    "updatedAt": "2026-07-29T05:48:56.123Z",
+    "reviewNotes": "The keyed cross-book fix still changes OrderBookPage.tsx despite the unrevised must-not constraint",
     "conflictsSince": {
       "sha": "3e981e26c497dc13d6dad0f66cd114112ce68983",
       "detectedAt": "2026-07-29T01:16:19.128Z",
@@ -105,9 +106,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2332688,
-            "output": 156407,
-            "cacheRead": 20097024,
+            "input": 2832941,
+            "output": 215105,
+            "cacheRead": 26796032,
             "cacheWrite": 0
           }
         },
@@ -128,9 +129,9 @@
           "cacheWrite": 198801
         },
         "openai/gpt-5.6-sol": {
-          "input": 2332688,
-          "output": 156407,
-          "cacheRead": 20097024,
+          "input": 2832941,
+          "output": 215105,
+          "cacheRead": 26796032,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -141,8 +142,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 54.365873,
-        "pricingAsOf": "2026-07-29T05:44:02.364Z"
+        "usd": 61.977582,
+        "pricingAsOf": "2026-07-29T05:48:56.159Z"
       }
     },
     "merges": [
@@ -151,7 +152,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3242",
