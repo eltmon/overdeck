@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T02:03:04.835Z",
+  "updated": "2026-07-29T02:16:10.243Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
     }
   ],
   "tasks": {
-    "sequence": 29,
-    "claims": {
-      "rebuild-workspaces-cmd": {
-        "writerId": "agent-pan-1990",
-        "agentId": "agent-pan-1990",
-        "pid": 1052944,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T02:03:04.835Z"
-      }
-    },
+    "sequence": 30,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -235,6 +227,16 @@
         "itemId": "memory-paths-rekey",
         "outcome": "completed",
         "releasedAt": "2026-07-29T02:02:52.518Z"
+      },
+      {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 1052944,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T02:03:04.835Z",
+        "itemId": "rebuild-workspaces-cmd",
+        "outcome": "completed",
+        "releasedAt": "2026-07-29T02:16:10.243Z"
       }
     ],
     "statusReasons": {
@@ -301,6 +303,9 @@
     "memory-paths-rekey.memory-paths-rekey.ac2": "completed",
     "memory-paths-rekey.memory-paths-rekey.ac3": "completed",
     "memory-paths-rekey.memory-paths-rekey.ac4": "completed",
-    "rebuild-workspaces-cmd": "running"
+    "rebuild-workspaces-cmd": "completed",
+    "rebuild-workspaces-cmd.rebuild-workspaces-cmd.ac1": "completed",
+    "rebuild-workspaces-cmd.rebuild-workspaces-cmd.ac2": "completed",
+    "rebuild-workspaces-cmd.rebuild-workspaces-cmd.ac3": "completed"
   }
 }
