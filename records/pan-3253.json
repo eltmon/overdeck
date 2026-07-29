@@ -63,17 +63,14 @@
       "reason": "feedback",
       "note": "[2026-07-29T08:15Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-29T08:15:40.609Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T08:15:40Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3253\n\n# Code Review — PAN-3253 — 2026-07-29\n\n## Verdict: CHANGES REQUESTED — FR-2 was implemented in the legacy DB module while the canonical runtime path remains unbounded, and new writes now truncate the forensic table\n\n## Context\n- Branch: `feature/pan-3253`\n- HEAD reviewed: `58b23fbb019a2efab08d55a90124d0b4615a0b9f`\n- PR: `#3279`\n- Cycle: 6\n- Prior blockers: the leaf module, append-door tests, FR-2 code, and docs were added, but the implementation targets the wrong hydration module and violates the full-record NonGoal.\n- Convergence gate: every blocker below concerns code or tests added since the previous reviewed HEAD `cde48b2488a78f423607d229f8a86c0c7d286085`.\n\n## Blocking Findings\n\n### ! [correctness / requirements / performance] Hydration bounding was added to the legacy mirror, not the canonical review-status read door — `src/lib/database/review-status-db.ts:325`\n\nThe new note truncation is implemented in `src/lib/database/review-status-db.ts`, but production review status reads and writes do not use that module. `src/lib/review-status.ts` imports `getReviewStatusFromDbSync`, `getAllReviewStatusesFromDb`, `getReviewStatusesFromDb`, and `upsertReviewStatusSync` from `src/lib/overdeck/review-status-sync.ts`; no production source imports `database/review-status-db.ts`.\n\nThe canonical `getHistorySync()` in `src/lib/overdeck/review-status-sync.ts:154-172` still selects every `status_history` row with no limit and returns raw notes. FR-2 therefore remains unsatisfied on the live read path, and a high-churn issue still allocates and hydrates its complete history before append-time bounding discards the excess. Move the history-tail and note bounds to the canonical `overdeck/review-status-sync.ts` read door and add tests against that module rather than its legacy mirror.\n\n### ! [correctness / must-not constraint] Composition truncation now destroys full notes before the canonical `status_history` writer sees them — `src/lib/review-status.ts:262`\n\n`updateReviewStatus()` now stores only `truncateHistoryNote(update.reviewNotes)` and the equivalent truncated test/UAT/release notes in `updated.history`. It then calls the canonical `upsertReviewStatusSync(updated)`, whose loop at `src/lib/overdeck/review-status-sync.ts:313-320` inserts those already-truncated entries into `status_history`.\n\nThis directly violates NonGoal 2 and the new documentation claim that `status_history` keeps the full uncapped forensic record. Preserve the raw transition note for the table write while exposing only the bounded copy in the in-memory status and `review.status_changed` payload. Add a regression test that writes a note longer than 500 characters, verifies the hydrated/event-facing history is capped, and verifies the raw `status_history.notes` value remains byte-for-byte complete.\n\n### ! [correctness / requirements] The new leaf module is not yet the single canonical source for the history limit — `src/lib/review-status-limits.ts:13`\n\n`review-status-limits.ts` declares `REVIEW_STATUS_HISTORY_LIMIT = 20`, but `src/lib/review-status-reconcile.ts:30` still independently declares and exports another `REVIEW_STATUS_HISTORY_LIMIT = 20`. `review-status.ts`, `database/review-status-db.ts`, and existing tests continue importing the old declaration, while `event-store.ts` imports the new one. The silent-drift risk called out by D4 therefore remains.\n\nRemove the duplicate declaration and re-export the leaf-module constant from `review-status-reconcile.ts` to preserve the existing import surface, exactly as the implementation checkpoint specifies.\n\n### ! [requirements / test correctness] The append-door tests still do not cover the new async/idempotent branches, and the “unparseable” test is neither unparseable nor byte-identity proof — `tests/unit/event-store.test.ts:229`\n\nThe new tests exercise only `append()`. They do not exercise `appendAsync()` or `appendOnce()`, although this PR added bounding branches to both. The third test passes a normal parseable object without `history`, then asserts only that no exception occurred and at least one row exists; it does not supply malformed serialized input and does not compare the persisted bytes.\n\nAdd regression coverage for `appendOnce()` and `appendAsync()` that inspects persisted and subscriber-visible bounded payloads. Replace or relocate the malformed-input case so it actually reaches `boundReviewStatusPayload()` with malformed stored JSON—boot trim is the reachable path for that state—and assert byte identity rather than row existence.\n\n## Security\n\nNo exploitable security issue was found. Payload handling remains internal, malformed JSON is caught, and the diff does not alter authentication, authorization, command execution, filesystem permissions, or secrets.\n\n## Requirements / Acceptance Criteria\n\n- FR-1: append-time logic is present for `append()`, `appendAsync()`, and `appendOnce()`, but two branches remain untested.\n- FR-2: **not satisfied on the canonical runtime hydration path**; composition truncation also violates the full-table NonGoal.\n- FR-3: satisfied by the shared helper and passing boot-trim convergence coverage.\n- FR-4: documentation was added, but its claim that the raw table retains full notes is false under the current write flow.\n- D4: **not satisfied** because two separately defined history-limit constants remain.\n- NonGoal 2: **violated** for newly composed long notes written to `status_history`.\n- The other listed NonGoals are preserved.\n\n## Performance\n\nThe append-door helper is linear in incoming payload size and appropriately prevents quadratic event-log growth. The canonical hydration path still loads the entire retained `status_history` series, so the intended memory and scan bound is not achieved for live review-status reads.\n\n## Verification\n\n- `npx vitest run tests/unit/event-store.test.ts tests/dashboard/event-store.test.ts tests/unit/lib/database/review-status-history-cap.test.ts --reporter=verbose`: **44 passed**.\n- `npx eslint` on all changed TypeScript files: **passed**.\n- `git diff --check origin/main...HEAD`: **passed**.\n\nThe passing hydration tests target `src/lib/database/review-status-db.ts`, not the canonical `src/lib/overdeck/review-status-sync.ts`, so they do not cover the production defect above.\n\n## Non-blocking Findings\n\n### ~ [documentation] `src/lib/review-status-limits.ts` says the limits are enforced at “three points” and then lists four. Correct the count while touching the file again.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253/.pan/review/agent-pan-3253-review-58b23fbb/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3253 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-29T08:20:43.939Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [
@@ -99,21 +96,21 @@
     "recordedAt": "2026-07-29T07:45:29.088Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T08:20:42.317Z",
+  "updated": "2026-07-29T08:20:44.373Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T07:47:05.835Z",
-    "updatedAt": "2026-07-29T08:20:42.270Z",
+    "updatedAt": "2026-07-29T08:20:42.866Z",
     "reviewNotes": "FR-2 was applied to unused database/review-status-db.ts while canonical overdeck/review-status-sync.ts remains unbounded; composition also writes truncated notes into the forensic status_history table, and duplicate limits/tests remain incomplete.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "lastVerifiedCommit": "58b23fbb019a2efab08d55a90124d0b4615a0b9f",
-    "reviewSpawnedAt": "2026-07-29T08:07:24.745Z",
+    "reviewSpawnedAt": "2026-07-29T08:20:42.865Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [
@@ -189,7 +186,7 @@
       },
       "costAtCloseOut": {
         "usd": 50.222362,
-        "pricingAsOf": "2026-07-29T08:20:42.312Z"
+        "pricingAsOf": "2026-07-29T08:20:44.370Z"
       }
     },
     "merges": [
