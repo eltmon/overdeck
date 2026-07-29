@@ -112,17 +112,14 @@
       "reason": "feedback",
       "note": "[2026-07-29T03:56Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-29T03:56:48.610Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T03:56:48Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1837\n\n# Code Review — PAN-1837\n\n## Verdict: CHANGES REQUESTED\n\nReviewed `feature/pan-1837` at HEAD `96f15e4b7bc5cbcc7d8167c5deb2966b4779434c` across correctness, security, requirements, and performance. The sixth-cycle rework routes every in-process Kimi launch owner through the shared per-workDirKey mutex, makes failed resume delivery fatal, fixes artifact help, and adds the requested cross-owner regression shape. The identity race is not fully closed, however: the mutex is an in-memory `Map`, while supported launch owners execute in separate Node processes. `pan start`/`pan strike` launch directly in the CLI process, dashboard conversations launch in the server process, and Deacon recovery can launch in its child process. Those processes do not share the map, so the original same-cwd capture race remains across process boundaries.\n\n## Blocking finding\n\n### P1 — The “shared” Kimi capture lock is process-local, but launch owners run in different processes\n\n**Locations:** `src/lib/runtimes/kimi-code.ts:258-280`, `src/lib/agents/spawn.ts:826-887`, `src/lib/agents/recovery.ts:209-272`, `src/lib/agents/recovery.ts:545-613`, `src/lib/overdeck/conversation-runtime.ts:718-838`, `src/cli/commands/start.ts:1181-1202`, `src/cli/commands/strike.ts:215-232`\n\n`withKimiSessionCaptureLock()` stores its queue in a module-level `Map<string, Promise<unknown>>`. The sixth-cycle change correctly sends work spawn, restart, recovery, and conversation capture through that function, but module state is shared only inside one JavaScript process.\n\nOverdeck supports launch paths in distinct processes:\n\n- `pan start` and `pan strike` import and call `spawnAgent()` directly in the short-lived CLI process.\n- Dashboard conversations call `spawnConversationSession()` in the dashboard server process.\n- Deacon patrol/recovery runs in its spawned child process and can enter the recovery launch path.\n\nA CLI work launch and a dashboard conversation can therefore acquire separate in-memory locks for the same Kimi workDirKey, take the same pre-launch directory snapshot, create two native sessions, and both select the same newest fresh directory. The new cross-owner test calls both owners through one imported lock instance in one Vitest worker, so it proves only in-process serialization and cannot reproduce this production topology.\n\nThis still violates FR-5/FR-7 and the requirement that each Overdeck identity read only its owning `agents/main/wire.jsonl`; it can attach another process's transcript and cost to the wrong work agent or conversation. Replace the process-local map with an inter-process ownership primitive—such as an atomic filesystem lock scoped to the resolved Kimi bucket—or route all Kimi launches through one process-owned launch door. Add a regression test using two child processes contending for the same workDirKey and prove they persist distinct IDs.\n\n## Non-blocking finding\n\n### P2 — Capture timeout still creates an unowned running Kimi session in two fresh-launch paths\n\n**Locations:** `src/lib/agents/spawn.ts:868-879`, `src/lib/agents/recovery.ts:594-608`\n\n`restartAgent()` treats a missing captured ID as failure, but initial `spawnAgent()` only warns and `recoverAgent()` only logs before continuing to mark the agent running. Both then leave transcript lookup on the newest-session-by-mtime fallback. That fallback cannot establish ownership in a shared cwd bucket, especially after the lock times out and releases, so a later session can become the displayed transcript.\n\nUse the same fail-closed capture contract for every fresh native Kimi launch: if the session ID cannot be captured, stop the launched process and report the launch/recovery failure instead of presenting an unowned session as healthy.\n\n## Security review\n\nNo command injection, credential exposure, authentication bypass, destructive JSONL behavior, duplicate prerequisite, `execSync`, or new synchronous tmux-delivery defect survived review. Model and session arguments remain shell-quoted, the binary still resolves through the canonical resolver, and ACP remains separate. The P1 defect is security-relevant because cross-process misattribution can expose one same-cwd session's prompts, transcript, usage, and cost under another Overdeck identity.\n\n## Requirements and no-loss review\n\nThe union, behavior matrix, resolver, policy gate, launcher, provider environment, parser/runtime, context layer, prerequisite, frontend, artifact, planning, specialist, conversation, resume, and documentation surfaces were covered across this and the preceding review cycles. The sixth-cycle changes satisfy the prior happy-path and validator findings, but native session ownership is still not guaranteed across supported process boundaries, so FR-5/FR-7 and the main-wire-only identity requirement remain incomplete.\n\n## Performance review\n\nThe new polling remains asynchronous, and per-workDirKey serialization preserves parallel launches for different workspaces. No event-loop blocking or algorithmic blocker survived review. An inter-process fix should retain per-bucket granularity rather than introducing a machine-global lock.\n\n## Verification and coverage\n\nReviewed all five high-risk launch owners, the medium-risk policy/context/transcript/provider surfaces, the full sixth-cycle delta from `aa65ccfa54` to `96f15e4b7b`, and the process boundaries of the live callers. Focused Vitest coverage passed: 6 files and 54 tests. `npm run typecheck`, `npm run lint`, `npm run lint:file-size`, and `git diff --check origin/main...HEAD` passed. GitHub build, lint, smoke, state-plane, prompt-trailer, flake-lane, and CodeRabbit checks are green at the exact reviewed SHA; the full GitHub test job was still running when the verdict was written. The branch matches `origin/feature/pan-1837`, PR #3255 is mergeable, and the worktree is clean. No test role was queued.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1837/.pan/review/agent-pan-1837-review-96f15e4b/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1837 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-29T04:06:28.402Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -337,10 +334,10 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T04:06:25.231Z",
+  "updated": "2026-07-29T04:06:28.419Z",
   "pipeline": {
     "issueId": "PAN-1837",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -348,7 +345,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T04:06:25.195Z",
+    "updatedAt": "2026-07-29T04:06:27.016Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
@@ -361,7 +358,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
     "reviewedAtCommit": "96f15e4b7bc5cbcc7d8167c5deb2966b4779434c",
     "lastVerifiedCommit": "96f15e4b7bc5cbcc7d8167c5deb2966b4779434c",
-    "reviewSpawnedAt": "2026-07-29T03:51:42.658Z"
+    "reviewSpawnedAt": "2026-07-29T04:06:27.015Z"
   },
   "closeOut": {
     "usage": {
@@ -413,7 +410,7 @@
       },
       "costAtCloseOut": {
         "usd": 391.568616,
-        "pricingAsOf": "2026-07-29T04:06:25.228Z"
+        "pricingAsOf": "2026-07-29T04:06:27.058Z"
       }
     },
     "merges": [
@@ -422,7 +419,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-1837",
