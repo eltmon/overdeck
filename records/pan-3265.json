@@ -1,19 +1,30 @@
 {
   "issueId": "PAN-3265",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-07-29T00:52:26.127Z",
-  "updated": "2026-07-29T00:52:26.127Z",
+  "updated": "2026-07-29T01:20:49.083Z",
   "pipeline": {
     "issueId": "PAN-3265",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T00:52:26.127Z"
+    "updatedAt": "2026-07-29T01:20:49.061Z",
+    "strikeReadyHead": "a2e2970e3245966ea4dd41795610b3a2a32ade5c",
+    "strikeReadyAt": "2026-07-29T01:20:49.060Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
   },
   "closeOut": {
     "usage": {
       "byStage": {},
-      "totals": {}
+      "totals": {},
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-07-29T01:20:49.080Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
