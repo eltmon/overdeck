@@ -2,7 +2,7 @@
   "issueId": "PAN-3253",
   "schemaVersion": 2,
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T00:16:53.872Z",
+  "updated": "2026-07-29T00:17:04.352Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3253: review.status_changed embeds the unbounded review history array — one event type is 80% of a 1.3 GB overdeck.db",
       "timestamp": "2026-07-29T00:16:53.872Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
