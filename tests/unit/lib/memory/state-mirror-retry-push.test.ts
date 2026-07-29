@@ -1,12 +1,19 @@
 /**
- * PAN-1990 review fix (cycle 3, durability/correctness): removeMemoryStateMirror
- * can have already `rm`'d the local file and committed that removal in a PRIOR
- * call, then failed only at the push step. On retry, the file no longer exists
- * locally, so a plain "nothing to do" would silently strand the unpushed commit
- * forever — deleteWorkspace would go on to delete the canonical workspace/pin
- * rows with no way left to discover or retry the stuck push. This must instead
- * retry the PUSH itself (pushPendingStateCommits) and only succeed once that's
- * confirmed, or once there was genuinely nothing to push.
+ * PAN-1990 review fix (cycle 3, corrected in cycle 4): removeMemoryStateMirror
+ * can have already `rm`'d the local file in a PRIOR call and then failed in one
+ * of two different ways:
+ *
+ *   (a) the deletion was fully committed locally, only the PUSH failed — on
+ *       retry there is nothing new to add/commit, so the retry must fall back
+ *       to pushing the already-committed change.
+ *   (b) `git add`/`git commit` itself failed (index lock, hook/signing
+ *       failure, branch mismatch) — NOTHING was committed at all. On retry,
+ *       `git add` on the already-missing-from-disk path still stages the
+ *       deletion (same as `git rm`), so re-running add+commit+push is what
+ *       actually recovers this case. A cycle-3 bug treated (a) and (b) the
+ *       same way (push-only retry), which silently "succeeds" for (b): there
+ *       is nothing ahead to push, so `git push` trivially reports success
+ *       while the remote mirror was never actually removed.
  */
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -40,6 +47,9 @@ beforeEach(() => {
   mockQueueAutoCommit.mockReset();
   mockFlushAutoCommits.mockReset();
   mockPushPendingStateCommits.mockReset();
+  // Default: nothing new to add/commit for the (already-missing) target this
+  // attempt — most tests below want to reach the push-only fallback branch.
+  mockFlushAutoCommits.mockReturnValue(Effect.succeed({ committed: false, reason: 'no diff' }));
 });
 
 afterEach(() => {
@@ -47,24 +57,21 @@ afterEach(() => {
   rmSync(projectRoot, { recursive: true, force: true });
 });
 
-describe('removeMemoryStateMirror retry-push (cycle 3 review fix)', () => {
-  it('retries the push (not a silent no-op) when the target is already gone from a prior committed-but-unpushed attempt', async () => {
+describe('removeMemoryStateMirror retry (case a: already committed, push failed)', () => {
+  it('retries the push (not a silent no-op) when the target is already gone and the deletion was already committed', async () => {
     const { removeMemoryStateMirror } = await import('../../../../src/lib/memory/state-mirror.js');
     const relativePath = 'pins/already-gone.json';
     const target = join(projectRoot, '.pan', 'memory', relativePath);
-    // Simulate: a prior attempt already `rm`'d and committed this removal
-    // locally — the file does not exist, but nothing has confirmed it reached
-    // the remote yet.
     expect(existsSync(target)).toBe(false);
 
     mockPushPendingStateCommits.mockReturnValue(Effect.succeed({ pushed: true }));
 
     await expect(removeMemoryStateMirror(PROJECT_KEY, relativePath, 'chore(memory): unmirror pin')).resolves.toBeUndefined();
 
+    // The retry re-attempted add+commit first (mocked as "no diff"), THEN
+    // fell back to the push-only retry once it found nothing new to commit.
+    expect(mockQueueAutoCommit).toHaveBeenCalledWith(expect.objectContaining({ projectRoot, paths: [target] }));
     expect(mockPushPendingStateCommits).toHaveBeenCalledWith(projectRoot);
-    // No new file write/commit was attempted — there's nothing to add, only
-    // the earlier stuck commit needed pushing.
-    expect(mockQueueAutoCommit).not.toHaveBeenCalled();
   });
 
   it('still throws (does not silently succeed) when the retry-push also fails', async () => {
@@ -85,8 +92,57 @@ describe('removeMemoryStateMirror retry-push (cycle 3 review fix)', () => {
 
     await expect(removeMemoryStateMirror(PROJECT_KEY, relativePath, 'chore(memory): unmirror pin')).resolves.toBeUndefined();
   });
+});
 
-  it('the normal path (file still present) commits+pushes as before and never calls pushPendingStateCommits', async () => {
+describe('removeMemoryStateMirror retry (case b: add/commit itself failed — cycle 4 review fix)', () => {
+  it('re-commits and pushes successfully when the retry find a real diff to stage (add/commit failed last time, never actually committed)', async () => {
+    const { removeMemoryStateMirror } = await import('../../../../src/lib/memory/state-mirror.js');
+    const relativePath = 'pins/add-failed-last-time.json';
+
+    // This time, staging the already-missing path succeeds and produces a
+    // real commit that gets pushed — proving the retry actually re-attempts
+    // the commit rather than assuming it already happened.
+    mockFlushAutoCommits.mockReturnValue(Effect.succeed({ committed: true, pushed: true }));
+
+    await expect(removeMemoryStateMirror(PROJECT_KEY, relativePath, 'chore(memory): unmirror pin')).resolves.toBeUndefined();
+
+    expect(mockQueueAutoCommit).toHaveBeenCalled();
+    // A fresh commit was made and confirmed pushed — no need to also call
+    // the push-only fallback.
+    expect(mockPushPendingStateCommits).not.toHaveBeenCalled();
+  });
+
+  it('throws immediately on an add/commit error, WITHOUT falling through to the push-only retry (the exact bug this cycle fixes)', async () => {
+    const { removeMemoryStateMirror } = await import('../../../../src/lib/memory/state-mirror.js');
+    const relativePath = 'pins/index-locked.json';
+
+    // Simulates git add/commit itself failing (e.g. index.lock present).
+    mockFlushAutoCommits.mockReturnValue(Effect.succeed({ committed: false, errored: true, reason: 'index.lock exists' }));
+    // If the bug were still present, the code would ignore this error and
+    // fall back to pushPendingStateCommits, which would report a false
+    // success since nothing was ever actually committed.
+    mockPushPendingStateCommits.mockReturnValue(Effect.succeed({ pushed: true }));
+
+    await expect(removeMemoryStateMirror(PROJECT_KEY, relativePath, 'chore(memory): unmirror pin'))
+      .rejects.toThrow('index.lock exists');
+
+    expect(mockPushPendingStateCommits).not.toHaveBeenCalled();
+  });
+
+  it('re-commits successfully but throws when THAT push fails', async () => {
+    const { removeMemoryStateMirror } = await import('../../../../src/lib/memory/state-mirror.js');
+    const relativePath = 'pins/recommit-push-fails.json';
+
+    mockFlushAutoCommits.mockReturnValue(Effect.succeed({ committed: true, pushed: false, reason: 'non-fast-forward on retry' }));
+
+    await expect(removeMemoryStateMirror(PROJECT_KEY, relativePath, 'chore(memory): unmirror pin'))
+      .rejects.toThrow('non-fast-forward on retry');
+    expect(mockPushPendingStateCommits).not.toHaveBeenCalled();
+  });
+});
+
+describe('removeMemoryStateMirror normal path (file still present)', () => {
+  it('commits+pushes as before and never calls pushPendingStateCommits', async () => {
     const { removeMemoryStateMirror } = await import('../../../../src/lib/memory/state-mirror.js');
     const relativePath = 'pins/present.json';
     const target = join(projectRoot, '.pan', 'memory', relativePath);

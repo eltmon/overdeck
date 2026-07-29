@@ -178,4 +178,38 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
     // backfill, and a retry would collide with the existing path.
     expect(getWorkspaceForIssue('PAN-6000')).not.toBeNull();
   });
+
+  it('keeps the workspace row for a partial polyrepo failure (repo A created, repo B fails) (cycle-4 review fix)', async () => {
+    upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (typeof command === 'string' && command.includes('git worktree add') && command.includes('repo-b')) {
+        throw new Error('fatal: repo-b worktree failed');
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await createWorkspacePromise({
+      projectConfig: {
+        name: 'Test',
+        path: tempDir,
+        workspace: {
+          workspaces_dir: 'workspaces',
+          type: 'polyrepo',
+          repos: [
+            { name: 'repo-a', path: 'repo-a', link_type: 'worktree' },
+            { name: 'repo-b', path: 'repo-b', link_type: 'worktree' },
+          ],
+        },
+      } as any,
+      featureName: 'pan-7000',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.errors.join(' ')).toContain('repo-b');
+    // repo-a's worktree (and the polyrepo container directory) are real,
+    // on-disk content — deleting the row here would strand the registry
+    // blind to them until a later boot backfill, and a retry would collide
+    // with the existing non-metadata path.
+    expect(getWorkspaceForIssue('PAN-7000')).not.toBeNull();
+  });
 });

@@ -221,8 +221,14 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
   // `result.errors` post-worktree) — deleting the row at that point would
   // stroke the registry blind to a real, on-disk worktree until a later boot
   // backfill, and a retry would collide with the existing non-metadata path.
-  // `worktreeCreated` is set true only once `createWorktree`/the polyrepo
-  // per-repo worktree loop has actually succeeded.
+  //
+  // Review fix (cycle 4): `worktreeCreated` must be set true as soon as ANY
+  // durable content exists on disk, not only once the ENTIRE worktree step
+  // succeeds — for polyrepo, that's the container directory itself (set
+  // right after `mkdirSync`, below), since a later sub-repo failing after an
+  // earlier one succeeded still leaves real worktrees/symlinks under it. For
+  // monorepo, `createWorktree` either creates the whole thing atomically or
+  // not, so the single post-loop checkpoint is correct there.
   let createdWorkspaceRowId: string | null = null;
   let worktreeCreated = false;
   if (!getWorkspaceForIssue(issueId)) {
@@ -274,6 +280,14 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     // symlinks. Monorepo worktrees must let git create the target directory.
     mkdirSync(workspacePath, { recursive: true });
     result.steps.push('Created workspace directory');
+    // Review fix (cycle 4): mark preservation as soon as the polyrepo
+    // container directory exists, not only after every sub-repo succeeds.
+    // If repo A's worktree (or a symlink) is created before repo B fails,
+    // `result.success` becomes false and the function returns before the
+    // single post-loop checkpoint below ever runs — real content already
+    // exists on disk at this path regardless of how many repos ultimately
+    // succeed, so compensation must never delete the row for it.
+    worktreeCreated = true;
 
     // Determine which repos to create: in progressive mode, only always_include repos
     const reposToCreate = workspaceConfig.progressive && workspaceConfig.always_include

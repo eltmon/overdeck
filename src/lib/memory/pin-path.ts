@@ -1,3 +1,4 @@
+import { constants as fsConstants } from 'node:fs';
 import { open, realpath, stat } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
 
@@ -65,6 +66,15 @@ export async function verifyPinPathContainment(projectRoot: string, docPath: str
  * second path-based lookup exists for anything to race. Returns null on any
  * escape, missing path, or non-regular-file target, exactly like
  * verifyPinPathContainment.
+ *
+ * Review fix (cycle 4 non-blocking): `realTarget` is still a pathname, and a
+ * concurrent local writer could replace its final component with a symlink
+ * between the `realpath()` call and this `open()` call. O_NOFOLLOW makes
+ * that race fail closed instead of silently following the swapped-in
+ * symlink — `open` errors (caught below, returns null) rather than
+ * succeeding on an attacker-controlled target. This does not protect
+ * replaceable PARENT directory components (a full openat-style walk would),
+ * which is why this remains a narrowed, not eliminated, advisory.
  */
 export async function readVerifiedPinFile(projectRoot: string, docPath: string): Promise<string | null> {
   const relativePath = resolveContainedPinPath(projectRoot, docPath);
@@ -84,7 +94,7 @@ export async function readVerifiedPinFile(projectRoot: string, docPath: string):
 
   let handle;
   try {
-    handle = await open(realTarget, 'r');
+    handle = await open(realTarget, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
     const info = await handle.stat();
     if (!info.isFile()) return null;
     return await handle.readFile('utf8');
