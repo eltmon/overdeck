@@ -224,7 +224,7 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T02:05:31.135Z",
+  "updated": "2026-07-29T02:05:36.751Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -234,7 +234,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T02:05:30.393Z",
+    "updatedAt": "2026-07-29T02:05:36.722Z",
     "reviewNotes": "ConversationDock drops the pending conversation whenever its issue is already docked, and the green test repair deleted required SimpleHome and agent-preservation cases",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
@@ -245,7 +245,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "26dc21125433a3a92c4135de0a5c629e33df89e3",
+    "reviewedAtCommit": "10c51d3f55119efe24f769a3b7b007022a3c59c1",
     "reviewSpawnedAt": "2026-07-29T02:01:55.249Z"
   },
   "closeOut": {
@@ -306,7 +306,7 @@
       },
       "costAtCloseOut": {
         "usd": 209.747852,
-        "pricingAsOf": "2026-07-29T02:05:30.416Z"
+        "pricingAsOf": "2026-07-29T02:05:36.744Z"
       }
     },
     "merges": [
