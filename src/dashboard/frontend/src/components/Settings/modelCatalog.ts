@@ -130,6 +130,14 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'grok-build-0.1' as ModelId, name: 'Grok Build 0.1', icon: Zap, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context', 'vision'], description: 'xAI\'s agentic coding model (May 2026). 256K context, reasoning always active.' },
     ],
   },
+  quantumllama: {
+    name: 'QuantumLlama',
+    models: [
+      { id: 'ql-reason-70b' as ModelId, name: 'QL Reason 70B', icon: FlaskConical, tier: 'premium', costPer1MTokens: 16, capabilities: ['reasoning', 'code', 'large-context'], description: 'Fictional benchmark provider (PAN-3252) — no live endpoint. 200K context, $8 in / $24 out per 1M.' },
+      { id: 'ql-swift-8b' as ModelId, name: 'QL Swift 8B', icon: FlaskConical, tier: 'balanced', costPer1MTokens: 4, capabilities: ['code', 'fast'], description: 'Fictional benchmark provider (PAN-3252) — no live endpoint. 128K context, $2 in / $6 out per 1M.' },
+      { id: 'ql-nano-1b' as ModelId, name: 'QL Nano 1B', icon: FlaskConical, tier: 'fast', costPer1MTokens: 0.8, capabilities: ['fast', 'cost-efficient'], description: 'Fictional benchmark provider (PAN-3252) — no live endpoint. 32K context, $0.40 in / $1.20 out per 1M.' },
+    ],
+  },
 };
 
 /** Look up a model definition by id across all providers. */

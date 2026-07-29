@@ -18,6 +18,7 @@ const EXPECTED_DEFAULT_HARNESSES: Record<ProviderName, RuntimeName> = {
   groq: 'ohmypi',
   cerebras: 'ohmypi',
   mistral: 'ohmypi',
+  quantumllama: 'claude-code',
 };
 
 describe('providers', () => {
