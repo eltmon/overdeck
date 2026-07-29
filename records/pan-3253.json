@@ -99,7 +99,7 @@
     "recordedAt": "2026-07-29T07:45:29.088Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T08:15:40.610Z",
+  "updated": "2026-07-29T08:15:46.198Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "blocked",
@@ -109,10 +109,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T07:47:05.835Z",
-    "updatedAt": "2026-07-29T08:15:39.814Z",
+    "updatedAt": "2026-07-29T08:15:46.187Z",
     "reviewNotes": "FR-2 was applied to unused database/review-status-db.ts while canonical overdeck/review-status-sync.ts remains unbounded; composition also writes truncated notes into the forensic status_history table, and duplicate limits/tests remain incomplete.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
-    "reviewedAtCommit": "cde48b2488a78f423607d229f8a86c0c7d286085",
+    "reviewedAtCommit": "58b23fbb019a2efab08d55a90124d0b4615a0b9f",
     "lastVerifiedCommit": "58b23fbb019a2efab08d55a90124d0b4615a0b9f",
     "reviewSpawnedAt": "2026-07-29T08:07:24.745Z",
     "scopeDrift": {
@@ -190,7 +190,7 @@
       },
       "costAtCloseOut": {
         "usd": 48.163471,
-        "pricingAsOf": "2026-07-29T08:15:39.837Z"
+        "pricingAsOf": "2026-07-29T08:15:46.192Z"
       }
     },
     "merges": [
