@@ -32,17 +32,17 @@
     "recordedAt": "2026-07-29T03:31:46.073Z"
   },
   "created": "2026-07-29T00:18:00.558Z",
-  "updated": "2026-07-29T03:50:46.515Z",
+  "updated": "2026-07-29T03:53:07.230Z",
   "pipeline": {
     "issueId": "PAN-3254",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T03:50:46.424Z",
+    "updatedAt": "2026-07-29T03:53:06.427Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3254-review",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3275",
@@ -74,18 +74,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1571599,
-            "output": 47444,
-            "cacheRead": 6619648,
+            "input": 1578759,
+            "output": 47951,
+            "cacheRead": 7133696,
             "cacheWrite": 0
           }
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 54,
-            "output": 6911,
-            "cacheRead": 3731795,
-            "cacheWrite": 131988
+            "input": 64,
+            "output": 7943,
+            "cacheRead": 4549985,
+            "cacheWrite": 137486
           }
         },
         "work": {
@@ -105,16 +105,16 @@
           "cacheWrite": 129386
         },
         "openai/gpt-5.6-sol": {
-          "input": 1571599,
-          "output": 47444,
-          "cacheRead": 6619648,
+          "input": 1578759,
+          "output": 47951,
+          "cacheRead": 7133696,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 54,
-          "output": 6911,
-          "cacheRead": 3731795,
-          "cacheWrite": 131988
+          "input": 64,
+          "output": 7943,
+          "cacheRead": 4549985,
+          "cacheWrite": 137486
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 621,
@@ -124,8 +124,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 20.399846,
-        "pricingAsOf": "2026-07-29T03:50:46.498Z"
+        "usd": 20.895604,
+        "pricingAsOf": "2026-07-29T03:53:06.660Z"
       }
     },
     "merges": [
