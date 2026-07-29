@@ -31,18 +31,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-29T01:29:15.256Z",
+  "updated": "2026-07-29T01:37:28.934Z",
   "pipeline": {
     "issueId": "PAN-3231",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "failed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T01:29:15.226Z",
-    "inspectNotes": "AC1-AC4 pass; AC5 (approved-mockup fidelity) fails. The operator-approved mockup docs/design/pan-3231-xbrief-fullscreen.html (committed 89397c2878, approval recorded as decision D9) specifies a topbar the shell does not build. (1) Header composition: XBriefFullscreen.tsx:66-84 renders a generic 'Full-screen xBRIEF' heading with the issue id as a mono subtitle; mockup lines 321-331 specify an identity block — document mark, eyebrow 'xBRIEF · active plan', and the mono issue id inline with the issue TITLE. (2) Toggle placement: mockup lines 332-345 place the List/DAG/Raw nav inside the topbar between identity and the top actions; the shell renders no toggle and leaves it in XBriefViewer's own tab strip below the header (XBriefViewer.tsx:49-66). (3) Status legibility: the mockup's summary strip (lines 358-369: 'N / M items complete' + progress track + happening-now / ready / waiting-on-edges counts + lane count) has no counterpart anywhere in XBriefFullscreen.tsx. (4) Close affordance: mockup lines 351-354 pair the close button with an 'esc' key hint; XBriefFullscreen.tsx:76-83 renders a bare X. Required fix: build the shell topbar to the approved composition (identity + eyebrow + issue title, in-topbar view toggle driving XBriefViewer, summary/status strip, esc-hinted close), or re-run the mockups AskUserQuestion gate to get an amended mockup approved and record that decision. Non-blocking note on AC4: swapping calc(100vh-280px) for flex-1 + minHeight 400 (XBriefViewer.tsx:88) leaves XBriefTab.tsx:73 and DrawerSecondaryPanels.tsx:22 mounting the viewer in auto-height parents, so their DAG lands exactly on the 400px floor (meets 'at least 400px' but is a visible shrink), and no test in this diff measures DAG height in the three pre-existing mounts."
+    "updatedAt": "2026-07-29T01:37:28.919Z",
+    "inspectNotes": "Inspecting item xbrief-fullscreen-shell"
   },
   "closeOut": {
     "usage": {
@@ -57,9 +57,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6095622,
-            "output": 281011,
-            "cacheRead": 125871616,
+            "input": 6294537,
+            "output": 323103,
+            "cacheRead": 138813952,
             "cacheWrite": 0
           }
         }
@@ -72,15 +72,15 @@
           "cacheWrite": 379189
         },
         "openai/gpt-5.6-sol": {
-          "input": 6095622,
-          "output": 281011,
-          "cacheRead": 125871616,
+          "input": 6294537,
+          "output": 323103,
+          "cacheRead": 138813952,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 117.170777,
-        "pricingAsOf": "2026-07-29T01:29:15.253Z"
+        "usd": 125.89928,
+        "pricingAsOf": "2026-07-29T01:37:28.927Z"
       }
     },
     "merges": [],
