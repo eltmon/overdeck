@@ -32,17 +32,18 @@
     "recordedAt": "2026-07-29T03:31:46.073Z"
   },
   "created": "2026-07-29T00:18:00.558Z",
-  "updated": "2026-07-29T03:53:09.605Z",
+  "updated": "2026-07-29T04:37:06.172Z",
   "pipeline": {
     "issueId": "PAN-3254",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T03:53:06.455Z",
+    "updatedAt": "2026-07-29T04:37:04.428Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3254-review",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3275",
@@ -82,10 +83,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 64,
-            "output": 7943,
-            "cacheRead": 4549985,
-            "cacheWrite": 137486
+            "input": 68,
+            "output": 8635,
+            "cacheRead": 4886876,
+            "cacheWrite": 138671
           }
         },
         "work": {
@@ -111,10 +112,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 64,
-          "output": 7943,
-          "cacheRead": 4549985,
-          "cacheWrite": 137486
+          "input": 68,
+          "output": 8635,
+          "cacheRead": 4886876,
+          "cacheWrite": 138671
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 621,
@@ -124,8 +125,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 20.895604,
-        "pricingAsOf": "2026-07-29T03:53:09.602Z"
+        "usd": 20.972873,
+        "pricingAsOf": "2026-07-29T04:37:04.988Z"
       }
     },
     "merges": [
