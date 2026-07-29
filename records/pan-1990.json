@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T04:27:41.365Z",
+  "updated": "2026-07-29T04:42:47.858Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
     }
   ],
   "tasks": {
-    "sequence": 47,
-    "claims": {
-      "dashboard-sidebar": {
-        "writerId": "agent-pan-1990",
-        "agentId": "agent-pan-1990",
-        "pid": 945278,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T04:27:41.365Z"
-      }
-    },
+    "sequence": 48,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -325,6 +317,16 @@
         "itemId": "events-workspaceid",
         "outcome": "completed",
         "releasedAt": "2026-07-29T04:27:24.820Z"
+      },
+      {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 945278,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T04:27:41.365Z",
+        "itemId": "dashboard-sidebar",
+        "outcome": "completed",
+        "releasedAt": "2026-07-29T04:42:47.858Z"
       }
     ],
     "statusReasons": {
@@ -429,6 +431,10 @@
     "events-workspaceid": "completed",
     "events-workspaceid.events-workspaceid.ac1": "completed",
     "events-workspaceid.events-workspaceid.ac2": "completed",
-    "dashboard-sidebar": "running"
+    "dashboard-sidebar": "completed",
+    "dashboard-sidebar.dashboard-sidebar.ac1": "completed",
+    "dashboard-sidebar.dashboard-sidebar.ac2": "completed",
+    "dashboard-sidebar.dashboard-sidebar.ac3": "completed",
+    "dashboard-sidebar.dashboard-sidebar.ac4": "completed"
   }
 }
