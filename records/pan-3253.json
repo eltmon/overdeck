@@ -86,18 +86,18 @@
     "recordedAt": "2026-07-29T07:45:29.088Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T08:07:36.109Z",
+  "updated": "2026-07-29T08:15:39.858Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T07:47:05.835Z",
-    "updatedAt": "2026-07-29T08:07:30.043Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed all review findings: canonical limits module, FR-2 note truncation, append-door tests, and documentation",
+    "updatedAt": "2026-07-29T08:15:39.814Z",
+    "reviewNotes": "FR-2 was applied to unused database/review-status-db.ts while canonical overdeck/review-status-sync.ts remains unbounded; composition also writes truncated notes into the forensic status_history table, and duplicate limits/tests remain incomplete.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewedAtCommit": "cde48b2488a78f423607d229f8a86c0c7d286085",
     "lastVerifiedCommit": "58b23fbb019a2efab08d55a90124d0b4615a0b9f",
@@ -140,9 +140,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1608076,
-            "output": 133075,
-            "cacheRead": 23154176,
+            "input": 1965009,
+            "output": 158047,
+            "cacheRead": 35892736,
             "cacheWrite": 0
           }
         },
@@ -163,9 +163,9 @@
           "cacheWrite": 269290
         },
         "openai/gpt-5.6-sol": {
-          "input": 1608076,
-          "output": 133075,
-          "cacheRead": 23154176,
+          "input": 1965009,
+          "output": 158047,
+          "cacheRead": 35892736,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -176,8 +176,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 39.260366,
-        "pricingAsOf": "2026-07-29T08:07:36.106Z"
+        "usd": 48.163471,
+        "pricingAsOf": "2026-07-29T08:15:39.837Z"
       }
     },
     "merges": [
