@@ -211,10 +211,20 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
   // backfill to retroactively guess it from the directory.
   const issueId = featureName.toUpperCase();
   // Non-blocking review fix: track the row WE created here so it can be
-  // compensated (deleted) if anything below fails — otherwise a failed
-  // worktree creation leaves an active-looking issue workspace row whose
-  // path was never actually created.
+  // compensated (deleted) if the worktree itself never gets created —
+  // otherwise a failed worktree creation leaves an active-looking issue
+  // workspace row whose path was never actually created.
+  //
+  // Review fix (cycle 3): compensation must NOT fire for a failure that
+  // happens AFTER the worktree already exists on disk (port assignment,
+  // devcontainer rendering, tunnel/Hume setup, Docker startup all add
+  // `result.errors` post-worktree) — deleting the row at that point would
+  // stroke the registry blind to a real, on-disk worktree until a later boot
+  // backfill, and a retry would collide with the existing non-metadata path.
+  // `worktreeCreated` is set true only once `createWorktree`/the polyrepo
+  // per-repo worktree loop has actually succeeded.
   let createdWorkspaceRowId: string | null = null;
+  let worktreeCreated = false;
   if (!getWorkspaceForIssue(issueId)) {
     let project = getProjectByPath(projectConfig.path);
     if (!project) {
@@ -320,6 +330,9 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     return result;
   }
 
+  // The worktree (or every polyrepo sub-repo worktree/symlink) now exists on
+  // disk — any failure from here on must not delete the workspace row.
+  worktreeCreated = true;
   restorePreWorktreeMetadataSync(stagedMetadataPath, workspacePath);
 
   if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
@@ -774,7 +787,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
   return result;
   })();
 
-  if (!outcome.success && createdWorkspaceRowId) {
+  if (!outcome.success && createdWorkspaceRowId && !worktreeCreated) {
     try {
       await deleteWorkspace(createdWorkspaceRowId);
     } catch (err) {

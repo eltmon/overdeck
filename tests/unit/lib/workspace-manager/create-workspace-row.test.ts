@@ -149,4 +149,33 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
     // otherwise the registry advertises a workspace whose path was never created.
     expect(getWorkspaceForIssue('PAN-5000')).toBeNull();
   });
+
+  it('keeps the workspace row when a failure occurs AFTER the worktree already exists on disk (cycle-3 review fix)', async () => {
+    upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (typeof command === 'string' && command.includes('git worktree add')) {
+        // Real git isn't run in this mocked harness, so the worktree
+        // directory itself must exist for later steps to run inside it.
+        const { mkdirSync } = await import('node:fs');
+        mkdirSync(join(tempDir, 'workspaces', 'feature-pan-6000'), { recursive: true });
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await createWorkspacePromise({
+      // An inverted port range (start > end) makes assignPort's search loop
+      // never execute, throwing immediately — a real post-worktree failure
+      // path (ports/devcontainer/tunnel/Docker) that pushes to result.errors
+      // without an early return, exactly the class of bug this fix closes.
+      projectConfig: { name: 'Test', path: tempDir, workspace: { workspaces_dir: 'workspaces', ports: { app: { range: [3000, 2999] } } } as any },
+      featureName: 'pan-6000',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.errors.join(' ')).toContain('Failed to assign app port');
+    // The worktree itself was created — deleting the row here would strand
+    // the registry blind to a real on-disk worktree until a later boot
+    // backfill, and a retry would collide with the existing path.
+    expect(getWorkspaceForIssue('PAN-6000')).not.toBeNull();
+  });
 });

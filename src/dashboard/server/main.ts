@@ -530,18 +530,26 @@ console.log('[overdeck] Workspaces boot seeding started');
 
 // PAN-1990 WI-6 review fix: migration reads issue-workspace rows that
 // backfillIssueWorkspaces() creates, so it must not start until backfill has
-// finished — two independent fire-and-forget promises let migration reach
-// getWorkspaceForIssue() first and permanently mark still-unbackfilled
-// legacy homes as unresolvable. No-ops after the first successful boot
-// (migrateMemoryHomesToWorkspacesOnce's own marker file), so this never
-// re-scans every project's memory home on a normal restart.
-void backfillIssueWorkspaces()
-  .catch(err => console.warn('[workspaces] issue-worktree backfill failed:', err?.message ?? err))
-  .then(() => migrateMemoryHomesToWorkspacesOnce())
-  .then((result) => {
+// SUCCEEDED — a `.catch().then()` chain (cycle 2's version of this) still
+// starts migration after a backfill rejection, causing an avoidable partial
+// scan against issue rows that were never created this boot. A skipped
+// migration here is still retried on the next boot: migrateMemoryHomesToWorkspacesOnce's
+// marker is only written once every scanned legacy home resolves, so no boot
+// can silently strand one.
+void (async () => {
+  try {
+    await backfillIssueWorkspaces();
+  } catch (err) {
+    console.warn('[workspaces] issue-worktree backfill failed:', (err as Error)?.message ?? err);
+    return;
+  }
+  try {
+    const result = await migrateMemoryHomesToWorkspacesOnce();
     if (result) console.log(`[memory-migration] migrated ${result.migrated}/${result.scanned} legacy memory home(s), ${result.unresolvable.length} unresolvable`);
-  })
-  .catch(err => console.warn('[memory-migration] boot migration failed:', err?.message ?? err));
+  } catch (err) {
+    console.warn('[memory-migration] boot migration failed:', (err as Error)?.message ?? err);
+  }
+})();
 
 void syncTranscriptPollerRegistry().catch(err => console.warn('[memory-poller] initial registry sync failed:', err?.message ?? err));
 void reconcileStaleTranscriptCheckpoints({ log: (message) => console.log(message) })

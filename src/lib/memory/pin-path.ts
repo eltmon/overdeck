@@ -1,4 +1,4 @@
-import { realpath, stat } from 'node:fs/promises';
+import { open, realpath, stat } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
 
 /**
@@ -52,4 +52,45 @@ export async function verifyPinPathContainment(projectRoot: string, docPath: str
   if (!info || !info.isFile()) return null;
 
   return relativePath;
+}
+
+/**
+ * Symlink-safe containment check AND read, combined into a single verified
+ * file descriptor. verifyPinPathContainment (path-in, path-out) still leaves
+ * a time-of-check/time-of-use gap for a caller that separately re-opens the
+ * path afterward — a concurrent local process could retarget a symlink in
+ * between (review fix, cycle 3 non-blocking). This opens the realpath-
+ * resolved (symlink-free) target once, verifies it's a regular file via
+ * `fstat` on that SAME open handle, and reads from that SAME handle — no
+ * second path-based lookup exists for anything to race. Returns null on any
+ * escape, missing path, or non-regular-file target, exactly like
+ * verifyPinPathContainment.
+ */
+export async function readVerifiedPinFile(projectRoot: string, docPath: string): Promise<string | null> {
+  const relativePath = resolveContainedPinPath(projectRoot, docPath);
+  if (relativePath === null) return null;
+
+  let realRoot: string;
+  let realTarget: string;
+  try {
+    realRoot = await realpath(resolve(projectRoot));
+    realTarget = await realpath(resolve(projectRoot, relativePath));
+  } catch {
+    return null;
+  }
+
+  const relFromRealRoot = relative(realRoot, realTarget);
+  if (relFromRealRoot === '' || relFromRealRoot.startsWith('..') || isAbsolute(relFromRealRoot)) return null;
+
+  let handle;
+  try {
+    handle = await open(realTarget, 'r');
+    const info = await handle.stat();
+    if (!info.isFile()) return null;
+    return await handle.readFile('utf8');
+  } catch {
+    return null;
+  } finally {
+    await handle?.close().catch(() => {});
+  }
 }

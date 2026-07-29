@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { resolveContainedPinPath, verifyPinPathContainment } from '../../../../src/lib/memory/pin-path.js';
+import { readVerifiedPinFile, resolveContainedPinPath, verifyPinPathContainment } from '../../../../src/lib/memory/pin-path.js';
 
 const PROJECT_ROOT = '/repo/overdeck';
 
@@ -89,5 +89,50 @@ describe('verifyPinPathContainment (symlink-safe, review fix cycle 2)', () => {
 
   it('rejects a lexically-escaping path before ever touching the filesystem', async () => {
     expect(await verifyPinPathContainment(projectRoot, '../../../../etc/passwd')).toBeNull();
+  });
+});
+
+describe('readVerifiedPinFile (verify + read via one handle, review fix cycle 3 non-blocking)', () => {
+  let projectRoot: string;
+  let outsideDir: string;
+
+  beforeEach(() => {
+    projectRoot = mkdtempSync(join(tmpdir(), 'pan-1990-pin-read-'));
+    outsideDir = mkdtempSync(join(tmpdir(), 'pan-1990-pin-read-outside-'));
+  });
+
+  afterEach(() => {
+    rmSync(projectRoot, { recursive: true, force: true });
+    rmSync(outsideDir, { recursive: true, force: true });
+  });
+
+  it('returns the content of a real regular file inside the project root', async () => {
+    mkdirSync(join(projectRoot, 'docs'), { recursive: true });
+    writeFileSync(join(projectRoot, 'docs', 'NOTES.md'), 'hello world\n', 'utf8');
+
+    expect(await readVerifiedPinFile(projectRoot, 'docs/NOTES.md')).toBe('hello world\n');
+  });
+
+  it('returns null for an in-project symlink whose real target is outside the project root', async () => {
+    const outsideFile = join(outsideDir, 'id_rsa');
+    writeFileSync(outsideFile, 'not a real key\n', 'utf8');
+    mkdirSync(join(projectRoot, 'docs'), { recursive: true });
+    symlinkSync(outsideFile, join(projectRoot, 'docs', 'private'));
+
+    expect(await readVerifiedPinFile(projectRoot, 'docs/private')).toBeNull();
+  });
+
+  it('returns null for a missing path', async () => {
+    expect(await readVerifiedPinFile(projectRoot, 'docs/missing.md')).toBeNull();
+  });
+
+  it('returns null for a directory', async () => {
+    mkdirSync(join(projectRoot, 'docs'), { recursive: true });
+
+    expect(await readVerifiedPinFile(projectRoot, 'docs')).toBeNull();
+  });
+
+  it('returns null for a lexically-escaping path before ever touching the filesystem', async () => {
+    expect(await readVerifiedPinFile(projectRoot, '../../../../etc/passwd')).toBeNull();
   });
 });

@@ -5,7 +5,7 @@ import { parse as parseYaml } from 'yaml';
 import type { MemoryIdentity, MemoryStatus, RagDecision, RagDecisionSource } from '@overdeck/contracts';
 import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from './paths.js';
 import { expandMemoryQuery, type QueryExpansionCall, type QueryExpansionResult } from './query-expansion.js';
-import { verifyPinPathContainment } from './pin-path.js';
+import { readVerifiedPinFile } from './pin-path.js';
 import { searchMemory, type MemorySearchHit } from './search.js';
 import { isMemoryKnowledgeIndexEnabled, isMemoryPromptTimeInjectionEnabled } from './settings.js';
 import { findProjectByPathSync, getProjectSync, loadProjectsConfigSync, resolveProjectFromIssueSync, resolveProjectPath } from '../projects.js';
@@ -498,28 +498,24 @@ async function readPinnedDocCandidates(identity: MemoryIdentity): Promise<Candid
     // containment, but never trust a stored value as pre-validated — a stale
     // row from before that guard, or any other writer of the pinned_docs
     // table, must not be able to read arbitrary local files (e.g.
-    // ~/.ssh/id_rsa) into prompt-time context. Symlink-safe: resolves the
-    // REAL target, not just the path string, so an in-project symlink
-    // pointing outside the project is refused too.
-    const containedPath = await verifyPinPathContainment(projectPath, pin.docPath);
-    if (containedPath === null) continue;
-    try {
-      const text = await readFile(resolve(projectPath, containedPath), 'utf8');
-      candidates.push({
-        key: 'knowledgeIndex',
-        title: `Pinned doc: ${pin.docPath}`,
-        text,
-        source: {
-          id: `pin:${pin.id}`,
-          docType: 'knowledge',
-          scope: pin.scope,
-          score: 1,
-          tokens: estimateTokens(text),
-        },
-      });
-    } catch {
-      // missing/unreadable pinned doc — skip, don't fail injection
-    }
+    // ~/.ssh/id_rsa) into prompt-time context. readVerifiedPinFile verifies
+    // AND reads through one open file handle (no separate check-then-open
+    // path lookup a concurrent local process could race against — review
+    // fix, cycle 3 non-blocking).
+    const text = await readVerifiedPinFile(projectPath, pin.docPath);
+    if (text === null) continue;
+    candidates.push({
+      key: 'knowledgeIndex',
+      title: `Pinned doc: ${pin.docPath}`,
+      text,
+      source: {
+        id: `pin:${pin.id}`,
+        docType: 'knowledge',
+        scope: pin.scope,
+        score: 1,
+        tokens: estimateTokens(text),
+      },
+    });
   }
   return candidates;
 }

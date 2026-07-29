@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 import { Effect } from 'effect';
 import { getProjectSync, type ProjectConfig } from '../projects.js';
 import { resolveStateDomainPathSync } from '../state-home.js';
-import { queueAutoCommit, flushAutoCommits } from '../pan-dir/auto-commit.js';
+import { flushAutoCommits, pushPendingStateCommits, queueAutoCommit } from '../pan-dir/auto-commit.js';
 import type { PinScope } from '../workspaces/types.js';
 
 const MEMORY_STATE_DOMAIN = 'memory';
@@ -53,13 +53,32 @@ export async function writeMemoryStateMirror(projectId: string, relativePath: st
   await commitMirror(project, target, subject);
 }
 
-/** Deletes `relativePath` under the project's memory state-domain and commits+pushes the removal. */
+/**
+ * Deletes `relativePath` under the project's memory state-domain and
+ * commits+pushes the removal.
+ *
+ * Review fix (cycle 3): a prior call can have already deleted `target` and
+ * committed that removal locally, then failed to push (lock contention,
+ * non-fast-forward, network). On retry `target` no longer exists, so a plain
+ * "nothing to do" here would strand that commit unpushed forever — the
+ * caller (deleteWorkspace) would go on to delete the canonical row, leaving
+ * no way to discover or retry the stuck push. Instead, retry the PUSH itself
+ * (pushPendingStateCommits carries along any earlier stuck commit on the
+ * same branch, even with nothing new to stage) and only return successfully
+ * once that's confirmed — or there was genuinely nothing to push.
+ */
 export async function removeMemoryStateMirror(projectId: string, relativePath: string, subject: string): Promise<void> {
   assertMirrorable(relativePath);
   const project = getProjectSync(projectId);
   if (!project) return;
   const target = join(resolveStateDomainPathSync(project, MEMORY_STATE_DOMAIN), relativePath);
-  if (!existsSync(target)) return;
+  if (!existsSync(target)) {
+    const push = await Effect.runPromise(pushPendingStateCommits(project.path));
+    if (push && !push.pushed) {
+      throw new Error(push.reason ?? `memory state mirror retry-push was not confirmed: ${target}`);
+    }
+    return;
+  }
   await rm(target);
   await commitMirror(project, target, subject);
 }
