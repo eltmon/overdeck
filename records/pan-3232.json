@@ -154,7 +154,7 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T00:31:10.909Z",
+  "updated": "2026-07-29T00:31:21.600Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -164,7 +164,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T00:31:10.859Z",
+    "updatedAt": "2026-07-29T00:31:21.484Z",
     "reviewNotes": "This cycle changes only the allowlist; FR-7 still uses an unregistered conversation route and prior blockers remain",
     "blockerReasons": [
       {
@@ -241,7 +241,7 @@
       },
       "costAtCloseOut": {
         "usd": 80.80052,
-        "pricingAsOf": "2026-07-29T00:31:10.903Z"
+        "pricingAsOf": "2026-07-29T00:31:21.508Z"
       }
     },
     "merges": [
