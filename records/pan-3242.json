@@ -64,7 +64,7 @@
     "recordedAt": "2026-07-28T20:52:11.749Z"
   },
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-29T05:43:51.395Z",
+  "updated": "2026-07-29T05:43:53.996Z",
   "pipeline": {
     "issueId": "PAN-3242",
     "reviewStatus": "pending",
@@ -155,6 +155,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-07-28T20:05:51.073Z"
+    },
+    {
+      "issue": "PAN-3242",
+      "recoveryPath": "stuck-remediation",
+      "obligationGeneration": "2026-07-29T02:37:14.000Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-29T05:43:53.995Z"
     }
   ],
   "tasks": {
