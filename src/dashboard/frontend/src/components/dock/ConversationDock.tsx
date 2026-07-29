@@ -101,29 +101,45 @@ export function ConversationDock() {
     }
 
     const result: DockItem[] = [];
-    const dockedIssueIds = new Set<string>();
+    const dockedIssueIds = new Map<string, { type: 'issue'; issueId: string; agents: Agent[] }>();
 
     // Add explicitly docked issues
     for (const item of items) {
-      dockedIssueIds.add(item.issueId.toLowerCase());
-      result.push({
-        type: 'issue',
+      const key = item.issueId.toLowerCase();
+      const issueItem = {
+        type: 'issue' as const,
         issueId: item.issueId,
-        agents: agentsByIssue.get(item.issueId.toLowerCase()) ?? [],
-      });
+        agents: agentsByIssue.get(key) ?? [],
+      };
+      dockedIssueIds.set(key, issueItem);
+      result.push(issueItem);
     }
 
     // Add conversation-only subjects with pending questions
-    // Only if the issue is not already docked and has no agent
+    // If issue is already docked with no agents and has a pending conversation, promote to conversation entry
     for (const s of pendingSubjects ?? []) {
-      if (s.pendingAskUserQuestion && s.issueId && !agentsByIssue.has(s.issueId.toLowerCase()) && !dockedIssueIds.has(s.issueId.toLowerCase())) {
-        const issue = issues.find((i) => i.identifier.toLowerCase() === s.issueId?.toLowerCase());
+      if (s.pendingAskUserQuestion && s.issueId && !agentsByIssue.has(s.issueId.toLowerCase())) {
+        const issueKey = s.issueId.toLowerCase();
+        const issue = issues.find((i) => i.identifier.toLowerCase() === issueKey);
         if (issue) {
-          result.push({
-            type: 'conversation',
+          const conversationItem = {
+            type: 'conversation' as const,
             conversationName: s.agentId,
             issueId: s.issueId,
-          });
+          };
+
+          // If already docked, replace the issue entry with conversation entry
+          if (dockedIssueIds.has(issueKey)) {
+            const indexToReplace = result.findIndex(
+              (item) => item.type === 'issue' && item.issueId.toLowerCase() === issueKey
+            );
+            if (indexToReplace !== -1) {
+              result[indexToReplace] = conversationItem;
+            }
+          } else {
+            // Not docked, add as new conversation entry
+            result.push(conversationItem);
+          }
         }
       }
     }
