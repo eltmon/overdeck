@@ -147,6 +147,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-29T05:00:45.342Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-29T15:28:38.099Z"
     }
   ],
   "feedback": [],
@@ -364,10 +369,10 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T15:28:35.540Z",
+  "updated": "2026-07-29T15:28:38.126Z",
   "pipeline": {
     "issueId": "PAN-1837",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -375,29 +380,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T15:28:35.459Z",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-07-29T11:40:50.904Z"
-      },
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since ffc4ec7 (1 path): scripts/file-size-allowlist.txt",
-        "detectedAt": "2026-07-29T15:25:25.726Z"
-      }
-    ],
-    "conflictsSince": {
-      "sha": "ffc4ec7f593609a737880ff7027b3c4277205230",
-      "detectedAt": "2026-07-29T15:25:25.726Z",
-      "paths": [
-        "scripts/file-size-allowlist.txt"
-      ]
-    },
+    "updatedAt": "2026-07-29T15:28:36.552Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
     "lastVerifiedCommit": "62879baf9058e9812fa2818ec0f41147059117ce",
-    "reviewSpawnedAt": "2026-07-29T05:00:44.143Z"
+    "reviewSpawnedAt": "2026-07-29T15:28:36.550Z"
   },
   "closeOut": {
     "usage": {
@@ -449,7 +435,7 @@
       },
       "costAtCloseOut": {
         "usd": 470.661971,
-        "pricingAsOf": "2026-07-29T15:28:35.535Z"
+        "pricingAsOf": "2026-07-29T15:28:38.016Z"
       }
     },
     "merges": [
@@ -458,7 +444,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-1837",
