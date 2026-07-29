@@ -222,7 +222,7 @@
     "recordedAt": "2026-07-29T15:41:58.832Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T15:41:59.764Z",
+  "updated": "2026-07-29T15:42:03.641Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -231,7 +231,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T15:41:59.761Z",
+    "updatedAt": "2026-07-29T15:42:01.988Z",
     "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "conflictsSince": {
@@ -243,7 +243,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "lastVerifiedCommit": "7d4c9e95bfe58d87dd42e7b33ced7901a8bf6503",
-    "reviewRequestedAt": "2026-07-29T15:41:59.761Z",
+    "reviewRequestedAt": "2026-07-29T15:42:01.446Z",
     "reviewSpawnedAt": "2026-07-29T10:10:29.425Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -302,10 +302,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3630,
-            "output": 170424,
-            "cacheRead": 82681980,
-            "cacheWrite": 4140676
+            "input": 3641,
+            "output": 170608,
+            "cacheRead": 83013253,
+            "cacheWrite": 4141181
           }
         }
       },
@@ -323,15 +323,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3630,
-          "output": 170424,
-          "cacheRead": 82681980,
-          "cacheWrite": 4140676
+          "input": 3641,
+          "output": 170608,
+          "cacheRead": 83013253,
+          "cacheWrite": 4141181
         }
       },
       "costAtCloseOut": {
-        "usd": 122.689465,
-        "pricingAsOf": "2026-07-29T15:41:44.262Z"
+        "usd": 122.724155,
+        "pricingAsOf": "2026-07-29T15:42:03.638Z"
       }
     },
     "merges": [
