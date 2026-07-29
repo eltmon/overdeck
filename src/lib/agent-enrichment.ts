@@ -14,13 +14,14 @@
 import { existsSync } from 'fs'
 import { readdir, readFile, stat } from 'fs/promises'
 import { homedir } from 'os'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { encodeClaudeProjectDir } from './paths.js'
 import { promisify } from 'util'
 import { exec } from 'child_process'
 import { Effect } from 'effect'
 import { FsError } from './errors.js'
-import { getAgentRuntimeState, getAgentDir, getAgentStateSync } from './agents.js'
+import { getAgentDir, getAgentStateSync } from './agents/agent-state.js'
+import { getAgentRuntimeState } from './agents/runtime-state.js'
 import {
   detectAwaitingInputForAgent,
   normalizeAwaitingInputPrompt,
@@ -58,6 +59,10 @@ export type PendingInputKind =
   // only kind for a question asked in prose, which carries no tool call and no
   // modal, and is therefore invisible to every other detector.
   | 'agentTurnEnded'
+  // PAN-3233 — a question/confirmation/disambiguation prompt detected from the
+  // pane or runtime state, with no structured payload. Answered in the
+  // terminal, not through a dashboard control.
+  | 'paneQuestion'
 
 export interface PendingAskUserQuestionSnapshot {
   toolUseId: string
@@ -114,6 +119,17 @@ export function appendPaneDetectionKind(detection: AwaitingInputDetection | null
   // frozen agent as working. Folding it in once makes the surfaces agree.
   if (detection?.reason === 'tool_permission' && !kinds.includes('permissionRequest')) {
     kinds.push('permissionRequest')
+  }
+  // PAN-3233 — question-family detections previously yielded NO kind, making
+  // the agent invisible to Decisions (kinds.length > 0 gate) and unreapable
+  // (pendingInputCount > 0 gate). Guarded so a JSONL-backed AskUserQuestion is
+  // not double-represented.
+  if (
+    (detection?.reason === 'user_question' || detection?.reason === 'confirmation'
+      || detection?.reason === 'disambiguation' || detection?.reason === 'planning_done')
+    && !kinds.includes('askUserQuestion') && !kinds.includes('paneQuestion')
+  ) {
+    kinds.push('paneQuestion')
   }
 }
 
@@ -306,6 +322,46 @@ export const countPendingAskUserQuestionsForAgent = (
   agentId: string,
 ): Effect.Effect<number> =>
   Effect.promise(() => countPendingAskUserQuestionsForAgentPromise(agentId))
+
+/**
+ * Count pending AskUserQuestions only in the current agent session generation.
+ * A forced fresh start preserves historical JSONLs while replacing the agent
+ * state directory, so an unpinned fallback transcript older than startedAt
+ * belongs to the discarded generation and must not recreate the decision gate.
+ */
+async function countPendingAskUserQuestionsForCurrentAgentSessionPromise(
+  agentId: string,
+): Promise<number> {
+  const jsonlPath = await getAgentJsonlPathPromise(agentId)
+  if (!jsonlPath) return 0
+
+  const currentSessionId = getLatestSessionIdSync(agentId)
+  const isPinnedCurrentSession = currentSessionId !== null
+    && basename(jsonlPath) === `${currentSessionId}.jsonl`
+  if (!isPinnedCurrentSession) {
+    const startedAtMs = Date.parse(getAgentStateSync(agentId)?.startedAt ?? '')
+    if (Number.isFinite(startedAtMs)) {
+      try {
+        if ((await stat(jsonlPath)).mtimeMs < startedAtMs) return 0
+      } catch {
+        return 0
+      }
+    }
+  }
+
+  try {
+    const scan = await scanPendingInputsPromise(jsonlPath)
+    return scan.askUserQuestions.length
+  } catch {
+    return 0
+  }
+}
+
+/** Effect-native: count pending AskUserQuestions in the current agent session generation. */
+export const countPendingAskUserQuestionsForCurrentAgentSession = (
+  agentId: string,
+): Effect.Effect<number> =>
+  Effect.promise(() => countPendingAskUserQuestionsForCurrentAgentSessionPromise(agentId))
 
 // ─── JSONL scanning ───────────────────────────────────────────────────────────
 
@@ -623,7 +679,17 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   // better than the generic turn-end phrasing, so it only speaks when nothing
   // more specific did.
   const detection = questionDetection ?? runtimeDetection ?? paneDetection ?? fallbackDetection ?? turnEndedDetection
-  const shouldSuppressPendingInput = hasActiveSpecialist === true && !isOwnActiveSpecialist(role)
+  // PAN-1834 — suppresses every surface derived from the parked agent's stale
+  // JSONL/runtime/fallback/turn-end state while a specialist is active.
+  const isSpecialistSuppressed = hasActiveSpecialist === true && !isOwnActiveSpecialist(role)
+  // PAN-3233 — a live blocking pane modal (tool_permission foremost) is fresh
+  // evidence the agent is frozen RIGHT NOW, unlike the stale surfaces above, so
+  // it bypasses suppression. Review fix: this exemption is scoped to ONLY the
+  // pane detection's own fingerprint/kind (below) — it must never also expose
+  // unrelated stale JSONL state (a pending ExitPlanMode, an old AskUserQuestion)
+  // that happens to be sitting in the same scan.
+  const hasBlockingPaneDetection = paneDetection !== null && BLOCKING_AWAITING_INPUT_REASONS.has(paneDetection.reason)
+  const shouldSuppressPendingInput = isSpecialistSuppressed && !hasBlockingPaneDetection
   const hasPendingQuestion = !shouldSuppressPendingInput && detection !== null
 
   // PAN-1520 — fold every blocking surface into a uniform set.
@@ -632,7 +698,11 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   // here owns the JSONL-derived kinds plus pane/runtime fallbacks.
   const pendingInputKinds: PendingInputKind[] = []
   let pendingAskUserQuestion: PendingAskUserQuestionSnapshot | undefined
-  if (!shouldSuppressPendingInput) {
+  // PAN-3233 review fix — gated on isSpecialistSuppressed, NOT the pane-exempt
+  // shouldSuppressPendingInput: these are all derived from the JSONL scan, which
+  // describes the parked agent's stale state regardless of what the live pane
+  // currently shows. The pane exemption must not leak them.
+  if (!isSpecialistSuppressed) {
     if (pendingQuestions.length > 0) {
       pendingInputKinds.push('askUserQuestion')
       const first = pendingQuestions[0]
@@ -652,24 +722,38 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     // Only when nothing more specific is open — an agent parked on a permission
     // prompt is idle too, and must read as the permission, not as a bare turn-end.
     if (turnEndedWaiting && pendingInputKinds.length === 0) pendingInputKinds.push('agentTurnEnded')
-    // PAN-1520 (covers #1197) — promote pane-detected session-resume dialogs
-    // into the unified pending-input set so the indicator fires.
-    // PAN-1834 — also promote pane-detected rate-limit / model-switch modals.
+  }
+  // PAN-1520 (covers #1197) — promote pane-detected session-resume dialogs
+  // into the unified pending-input set so the indicator fires.
+  // PAN-1834 — also promote pane-detected rate-limit / model-switch modals.
+  // PAN-3233 — gated on the pane-exempt shouldSuppressPendingInput (not
+  // isSpecialistSuppressed): this is the one surface the exemption exists for.
+  if (!shouldSuppressPendingInput) {
     appendPaneDetectionKind(detection, pendingInputKinds)
   }
 
   return {
     role,
     hasPendingQuestion,
-    pendingQuestionCount: pendingQuestions.length,
-    pendingQuestionPrompt: detection?.prompt,
-    pendingQuestionReason: detection?.reason,
+    // PAN-3233 — pane/runtime blocking detections carry no JSONL AskUserQuestion
+    // entries, so this used to report count 0 even when hasPendingQuestion was
+    // true. Fold them in: JSONL count when present, else 1 for a blocking
+    // detection, else 0 (including when suppressed).
+    pendingQuestionCount: shouldSuppressPendingInput
+      ? 0
+      : pendingQuestions.length > 0
+        ? pendingQuestions.length
+        : (isBlockedOnPendingInput({ hasPendingQuestion, pendingQuestionReason: detection?.reason }) ? 1 : 0),
+    pendingQuestionPrompt: shouldSuppressPendingInput ? undefined : detection?.prompt,
+    pendingQuestionReason: shouldSuppressPendingInput ? undefined : detection?.reason,
     pendingInputCount: pendingInputKinds.length,
     pendingInputKinds,
     pendingAskUserQuestion,
-    // Suppressed alongside every other pending surface: when a specialist owns
-    // the issue the work agent is parked, not asking.
-    pendingProposedPlan: shouldSuppressPendingInput ? undefined : scan.pendingProposedPlan,
+    // Suppressed alongside every other JSONL-derived surface: when a specialist
+    // owns the issue the work agent is parked, not asking. PAN-3233 review fix —
+    // gated on isSpecialistSuppressed, not the pane exemption: a live blocking
+    // pane prompt is not evidence that a stale proposed plan is still relevant.
+    pendingProposedPlan: isSpecialistSuppressed ? undefined : scan.pendingProposedPlan,
     // PAN-3070 — an agent holding an unanswered blocking prompt is not working.
     // The runtime resolution is written by the stop hook and stays at whatever
     // it last was, so a frozen agent kept reporting `working` for hours; the

@@ -49,6 +49,7 @@ Verbs that **don't** get wrapped (current exclusion list, with rationale):
 
 | Verb | Why no skill |
 |---|---|
+| `pan answer` | `--help` is sufficient; the command lists the live menu before accepting a numbered choice. |
 | `pan backup`, `pan restore` | `--help` is sufficient; no judgment calls. |
 | `pan caveman-compress` | Internal-only utility. |
 | `pan fork`, `pan unarchive-conversation`, `pan resume` | Single-purpose, output is self-explanatory. |

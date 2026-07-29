@@ -6,6 +6,10 @@ describe('describePendingInput', () => {
     expect(describePendingInput(['rateLimit'])).toBe(PENDING_INPUT_KIND_LABEL.rateLimit);
   });
 
+  it('returns the human label for the paneQuestion kind', () => {
+    expect(describePendingInput(['paneQuestion'])).toBe(PENDING_INPUT_KIND_LABEL.paneQuestion);
+  });
+
   it('joins multiple kinds with their labels', () => {
     expect(describePendingInput(['askUserQuestion', 'rateLimit'])).toBe(
       `${PENDING_INPUT_KIND_LABEL.askUserQuestion}, ${PENDING_INPUT_KIND_LABEL.rateLimit}`,
