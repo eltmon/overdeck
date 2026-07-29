@@ -154,7 +154,7 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T00:31:21.600Z",
+  "updated": "2026-07-29T00:31:23.709Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -164,15 +164,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T00:31:21.484Z",
-    "reviewNotes": "This cycle changes only the allowlist; FR-7 still uses an unregistered conversation route and prior blockers remain",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 701cbb2 (1 path): scripts/file-size-allowlist.txt",
-        "detectedAt": "2026-07-29T00:29:21.202Z"
-      }
-    ],
+    "updatedAt": "2026-07-29T00:31:21.487Z",
+    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch; conflict resolver already running; resolver prompt delivered",
     "conflictsSince": {
       "sha": "701cbb21f1deb79f90c821db2bf23db7d02d4886",
       "detectedAt": "2026-07-29T00:29:21.202Z",
@@ -241,7 +234,7 @@
       },
       "costAtCloseOut": {
         "usd": 80.80052,
-        "pricingAsOf": "2026-07-29T00:31:21.508Z"
+        "pricingAsOf": "2026-07-29T00:31:22.706Z"
       }
     },
     "merges": [
