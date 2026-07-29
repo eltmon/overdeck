@@ -299,7 +299,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T03:32:35.263Z",
+  "updated": "2026-07-29T03:32:37.902Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -308,7 +308,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T03:30:54.326Z",
+    "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
+    "updatedAt": "2026-07-29T03:32:35.255Z",
     "reviewNotes": "Verification failed at incomplete-plan-items — fix and resubmit",
     "conflictsSince": {
       "sha": "701cbb21f1deb79f90c821db2bf23db7d02d4886",
@@ -393,8 +394,7 @@
         "src/dashboard/server/ws-rpc.ts"
       ],
       "recordedAt": "2026-07-29T03:30:44.354Z"
-    },
-    "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -454,7 +454,7 @@
       },
       "costAtCloseOut": {
         "usd": 260.623426,
-        "pricingAsOf": "2026-07-29T03:30:55.765Z"
+        "pricingAsOf": "2026-07-29T03:32:37.899Z"
       }
     },
     "merges": [
