@@ -64,26 +64,10 @@ export function ConversationDock() {
     [pendingSubjects],
   );
 
-  // Detect conversation-only pending subjects and add synthetic dock entries
-  const conversationOnlyItems = useMemo(
-    () => (pendingSubjects ?? [])
-      .filter((s) => s.pendingAskUserQuestion && s.issueId && !items.some((i) => i.issueId.toLowerCase() === s.issueId?.toLowerCase()))
-      .map((s) => ({
-        issueId: s.issueId!,
-        conversationName: s.agentId,
-        addedAt: Date.parse(s.since || '2000-01-01'),
-        needsYou: true,
-      })),
-    [pendingSubjects, items],
-  );
-
-  const allItems = [...items, ...conversationOnlyItems];
   const ordered = useMemo(
-    () => [...allItems].sort((a, b) => Number(needsYouIds.has(b.issueId.toLowerCase())) - Number(needsYouIds.has(a.issueId.toLowerCase())) || b.addedAt - a.addedAt),
-    [allItems, needsYouIds],
+    () => [...items].sort((a, b) => Number(needsYouIds.has(b.issueId.toLowerCase())) - Number(needsYouIds.has(a.issueId.toLowerCase())) || b.addedAt - a.addedAt),
+    [items, needsYouIds],
   );
-
-  const displayCount = items.length + conversationOnlyItems.length;
 
   if (!expanded) {
     return (
@@ -94,7 +78,7 @@ export function ConversationDock() {
         className="fixed bottom-6 right-0 z-40 flex items-center gap-1.5 rounded-l-lg border border-r-0 border-border bg-card px-2.5 py-2 text-[11px] text-muted-foreground shadow-lg hover:text-foreground"
       >
         <MessageSquare size={13} />
-        {displayCount > 0 && <span className="font-mono text-[10px]">{displayCount}</span>}
+        {items.length > 0 && <span className="font-mono text-[10px]">{items.length}</span>}
       </button>
     );
   }
@@ -123,7 +107,7 @@ export function ConversationDock() {
         )}
         {ordered.map((item) => (
           <DockPanel
-            key={`${item.issueId}${(item as any).conversationName ? `-${(item as any).conversationName}` : ''}`}
+            key={item.issueId}
             issueId={item.issueId}
             needsYou={needsYouIds.has(item.issueId.toLowerCase())}
             onClose={() => remove(item.issueId)}

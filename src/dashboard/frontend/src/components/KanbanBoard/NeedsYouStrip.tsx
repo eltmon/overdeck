@@ -106,13 +106,17 @@ function NeedsYouRow({
   );
 }
 
+type NeedsYouItem =
+  | { source: 'agent'; derivation: SimpleIssueDerivation; kind: NeedsYouKind }
+  | { source: 'conversation'; derivation: SimpleIssueDerivation; kind: NeedsYouKind; conversationName: string; subjectId: string };
+
 export function NeedsYouStrip({ onOpenIssue }: { onOpenIssue: (id: string) => void }) {
   const issuesRaw = useDashboardStore((s) => s.issuesRaw);
   const agentsById = useDashboardStore((s) => s.agentsById);
   const reviewByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
   const pendingSubjects = usePendingInputSubjects();
 
-  const { items, questions, conversationItems } = useMemo(() => {
+  const { items, questions } = useMemo(() => {
     const issues = (issuesRaw as Issue[]) ?? [];
     const allAgents = Object.values(agentsById ?? {}) as AgentSnapshot[];
     const agentsByIssue = new Map<string, AgentSnapshot[]>();
@@ -127,55 +131,53 @@ export function NeedsYouStrip({ onOpenIssue }: { onOpenIssue: (id: string) => vo
       deriveSimpleIssue(issue, agentsByIssue.get(issue.identifier.toLowerCase()) ?? [], reviewByIssueId?.[issue.identifier]),
     );
     const needs = bucketSimpleHome(derivations).needsYou;
-    const questionByIssue = new Map<string, string>();
-    const convItems: Array<{ derivation: SimpleIssueDerivation; kind: NeedsYouKind; conversationName: string }> = [];
+    const questionBySubject = new Map<string, string>();
+    const allItems: NeedsYouItem[] = [...needs.map((n) => ({ source: 'agent' as const, ...n }))];
 
     for (const s of pendingSubjects ?? []) {
       const q = s.pendingAskUserQuestion?.questions?.[0]?.question;
-      if (s.issueId && q) questionByIssue.set(s.issueId.toLowerCase(), q);
+      if (q) questionBySubject.set(s.agentId, q);
 
       // Detect conversation-only subjects with pending questions
       if (s.pendingAskUserQuestion && s.issueId && !agentsByIssue.has(s.issueId.toLowerCase())) {
         const issue = issues.find((i) => i.identifier.toLowerCase() === s.issueId?.toLowerCase());
         if (issue) {
           const syntheticDerivation = deriveSimpleIssue(issue, [], reviewByIssueId?.[issue.identifier]);
-          convItems.push({
+          allItems.push({
+            source: 'conversation',
             derivation: syntheticDerivation,
             kind: 'question',
             conversationName: s.agentId,
+            subjectId: s.agentId,
           });
         }
       }
     }
 
-    return { items: needs, questions: questionByIssue, conversationItems: convItems };
+    return { items: allItems, questions: questionBySubject };
   }, [issuesRaw, agentsById, reviewByIssueId, pendingSubjects]);
 
-  const allItems = [...items, ...conversationItems.map((c) => ({ derivation: c.derivation, kind: c.kind }))];
-  if (allItems.length === 0) return null;
+  if (items.length === 0) return null;
 
   return (
     <div className="mb-3 flex items-stretch gap-2.5 overflow-x-auto border-b border-border bg-warning/5 px-4 py-3" data-component="needs-you-strip">
       <div className="flex flex-none flex-col justify-center pr-1">
         <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Needs you</span>
-        <span className="text-xl font-medium text-warning-foreground">{allItems.length}</span>
+        <span className="text-xl font-medium text-warning-foreground">{items.length}</span>
       </div>
-      {allItems.slice(0, 6).map(({ derivation, kind }, idx) => {
-        const convItem = conversationItems.find((c) => c.derivation.issue.identifier === derivation.issue.identifier);
-        return (
-          <NeedsYouRow
-            key={`${derivation.issue.identifier}-${idx}`}
-            item={derivation}
-            kind={kind}
-            question={questions.get(derivation.issue.identifier.toLowerCase())}
-            onOpen={onOpenIssue}
-            isConversation={!!convItem}
-            conversationName={convItem?.conversationName}
-          />
-        );
-      })}
-      {allItems.length > 6 && (
-        <div className="flex flex-none items-center px-2 text-xs text-muted-foreground">+{allItems.length - 6} more</div>
+      {items.slice(0, 6).map((item) => (
+        <NeedsYouRow
+          key={item.source === 'conversation' ? `${item.subjectId}` : item.derivation.issue.identifier}
+          item={item.derivation}
+          kind={item.kind}
+          question={item.source === 'conversation' ? questions.get(item.subjectId) : questions.get(item.derivation.issue.identifier.toLowerCase())}
+          onOpen={onOpenIssue}
+          isConversation={item.source === 'conversation'}
+          conversationName={item.source === 'conversation' ? item.conversationName : undefined}
+        />
+      ))}
+      {items.length > 6 && (
+        <div className="flex flex-none items-center px-2 text-xs text-muted-foreground">+{items.length - 6} more</div>
       )}
     </div>
   );
