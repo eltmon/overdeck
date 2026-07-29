@@ -52,6 +52,11 @@
       "reason": "feedback",
       "note": "[2026-07-29T00:28Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-29T00:28:01.507Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-29T00:50:59.334Z"
     }
   ],
   "feedback": [],
@@ -269,10 +274,10 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T00:50:58.274Z",
+  "updated": "2026-07-29T00:51:00.017Z",
   "pipeline": {
     "issueId": "PAN-1837",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -280,7 +285,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T00:50:57.933Z",
+    "updatedAt": "2026-07-29T00:50:58.301Z",
     "reviewNotes": "Reviewed fixes are not pushed to PR #3255; native Kimi conversations also lack deterministic wire-session resolution, incompatible dashboard selections are silently coerced, artifact provenance omits kimi-code, and committed HEAD fails the file-size gate.",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
@@ -291,7 +296,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
-    "reviewSpawnedAt": "2026-07-29T00:14:00.977Z"
+    "reviewSpawnedAt": "2026-07-29T00:50:58.299Z"
   },
   "closeOut": {
     "usage": {
@@ -343,7 +348,7 @@
       },
       "costAtCloseOut": {
         "usd": 240.512032,
-        "pricingAsOf": "2026-07-29T00:50:57.963Z"
+        "pricingAsOf": "2026-07-29T00:51:00.013Z"
       }
     },
     "merges": [
