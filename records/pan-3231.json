@@ -31,7 +31,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-29T01:57:28.713Z",
+  "updated": "2026-07-29T01:59:35.229Z",
   "pipeline": {
     "issueId": "PAN-3231",
     "reviewStatus": "pending",
@@ -100,16 +100,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "docs": {
-        "writerId": "agent-pan-3231",
-        "agentId": "agent-pan-3231",
-        "pid": 939800,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T01:57:28.713Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3231",
@@ -220,6 +212,17 @@
         "outcome": "completed",
         "reason": "Added accessible full-screen expand controls to DrawerPlanPanel and PlanMapCard, preserved both no-loss section markers, and covered both store actions with focused tests.",
         "releasedAt": "2026-07-29T01:57:17.930Z"
+      },
+      {
+        "writerId": "agent-pan-3231",
+        "agentId": "agent-pan-3231",
+        "pid": 939800,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T01:57:28.713Z",
+        "itemId": "docs",
+        "outcome": "completed",
+        "reason": "Documented all xBRIEF entry points, the store-driven XBriefFullscreen mount, protected issue-view origins, and tasks/PRD artifact viewers in the required three files.",
+        "releasedAt": "2026-07-29T01:59:35.229Z"
       }
     ],
     "statusReasons": {
@@ -254,6 +257,10 @@
       "embedded-expand": {
         "reason": "Added accessible full-screen expand controls to DrawerPlanPanel and PlanMapCard, preserved both no-loss section markers, and covered both store actions with focused tests.",
         "updatedAt": "2026-07-29T01:57:17.930Z"
+      },
+      "docs": {
+        "reason": "Documented all xBRIEF entry points, the store-driven XBriefFullscreen mount, protected issue-view origins, and tasks/PRD artifact viewers in the required three files.",
+        "updatedAt": "2026-07-29T01:59:35.229Z"
       }
     }
   },
@@ -297,6 +304,9 @@
     "embedded-expand.embedded-expand.ac1": "completed",
     "embedded-expand.embedded-expand.ac2": "completed",
     "embedded-expand.embedded-expand.ac3": "completed",
-    "docs": "running"
+    "docs": "completed",
+    "docs.docs.ac1": "completed",
+    "docs.docs.ac2": "completed",
+    "docs.docs.ac3": "completed"
   }
 }
