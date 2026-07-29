@@ -835,15 +835,17 @@ describe('gatherProjectLensSignals', () => {
     expect(membership).toEqual(expect.objectContaining({
       bucket: 'post_merge_limbo',
     }));
-    // Both convention heads are queried in both GitLab repos.
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(4);
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/frontend', ['feature/min-896']);
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/frontend', ['strike/min-896']);
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['feature/min-896']);
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['strike/min-896']);
+    // PAN-3267: one call per GitLab repo carrying every convention head, not one
+    // call per (repo × head) — the per-head fan-out stalled membership refresh
+    // and failed it outright somewhere in the fan-out on every cycle.
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(2);
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/frontend', ['feature/min-896', 'strike/min-896']);
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['feature/min-896', 'strike/min-896']);
   });
 
   it('limits merged-MR lookups to five concurrent calls across GitLab repos', async () => {
+    // PAN-3267: lookups are one-per-repo now, so the concurrency cap only binds
+    // once a project has more GitLab repos than the limit.
     const mocked = deps();
     mocked.listTrackerIssues = vi.fn().mockResolvedValue([
       { issueId: 'MIN-1', state: 'open', labels: [] },
@@ -877,8 +879,13 @@ describe('gatherProjectLensSignals', () => {
       workspace: {
         type: 'polyrepo',
         repos: [
-          { name: 'fe', path: 'frontend' },
-          { name: 'api', path: 'api' },
+          { name: 'r1', path: 'r1' },
+          { name: 'r2', path: 'r2' },
+          { name: 'r3', path: 'r3' },
+          { name: 'r4', path: 'r4' },
+          { name: 'r5', path: 'r5' },
+          { name: 'r6', path: 'r6' },
+          { name: 'r7', path: 'r7' },
           { name: 'docs', path: 'docs', remote: 'github' },
         ],
       },
@@ -892,7 +899,8 @@ describe('gatherProjectLensSignals', () => {
     releaseLookups();
     await gatherPromise;
 
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(12);
+    // One lookup per GitLab repo — the github-remote repo is never queried.
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(7);
     expect(maxActive).toBe(5);
     expect(mocked.listMergedMergeRequestHeads).not.toHaveBeenCalledWith('/test/docs', expect.any(Array));
   });
@@ -993,10 +1001,9 @@ describe('gatherProjectLensSignals', () => {
 
     await gatherProjectLensSignals(mixedPolyrepo, mocked);
 
-    // Only the api repo (GitLab forge) is queried, once for each convention head.
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(2);
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['feature/test-1']);
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['strike/test-1']);
+    // Only the api repo (GitLab forge) is queried, once, carrying both convention heads.
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(1);
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith('/test/api', ['feature/test-1', 'strike/test-1']);
     expect(mocked.listMergedMergeRequestHeads).not.toHaveBeenCalledWith('/test/frontend', expect.any(Array));
   });
 
@@ -1240,9 +1247,13 @@ describe('gatherProjectLensSignals', () => {
 
     await gatherProjectLensSignals(gitlabPolyrepo, mocked);
 
-    // 10 issues × 2 candidate heads per issue = 20 heads
-    // 3 repos × 20 heads = 60 total (repo, head) pairs queried
-    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(60);
+    // PAN-3267: 10 issues × 2 convention heads = 20 heads, but they ride one
+    // lookup per repo — 3 calls, not the 60 (repo, head) pairs this used to cost.
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledTimes(3);
+    expect(mocked.listMergedMergeRequestHeads).toHaveBeenCalledWith(
+      '/test/test/api', // this fixture's repo.path is absolute, so it joins under project.path
+      expect.arrayContaining(['feature/min-1', 'strike/min-1', 'feature/min-10', 'strike/min-10']),
+    );
     // Concurrency limit is 5, so max concurrent calls should not exceed 5
     expect(maxConcurrentCalls).toBeLessThanOrEqual(5);
   });
