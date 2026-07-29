@@ -4,17 +4,17 @@
     "created": "2026-07-28T18:36:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3233: Enrichment classification defects hide genuinely frozen agents: specialist suppression zeroes the work agent's permission prompt, user_question yields empty kinds (35 agents invisible + unreapable), count semantics exclude pane prompts",
-    "updated": "2026-07-28T18:27:45.208Z"
+    "updated": "2026-07-29T00:10:45.668Z"
   },
   "plan": {
     "id": "pan-3233",
     "title": "Enrichment classification defects hide genuinely frozen agents (suppression, empty kinds, count semantics)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "fac9c034-de34-4924-be96-beb8cc165804",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-28T18:36:00.000Z",
-    "updated": "2026-07-28T18:27:45.208Z",
+    "updated": "2026-07-29T00:10:45.668Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3233",
@@ -498,5 +498,5 @@
       "canonicalFilename": "2026-07-28-PAN-3233-enrichment-classification-defects-hide-genuinely-frozen-agents-specialist-suppression-zeroes-the-work-agent-s-permission-prompt-user-question-yields-empty-kinds-35-agents-invisible-unreapable-count-semantics-exclude-pane-prompts.xbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
