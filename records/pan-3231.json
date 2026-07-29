@@ -31,7 +31,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-29T01:50:04.615Z",
+  "updated": "2026-07-29T01:57:17.930Z",
   "pipeline": {
     "issueId": "PAN-3231",
     "reviewStatus": "pending",
@@ -100,16 +100,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "embedded-expand": {
-        "writerId": "agent-pan-3231",
-        "agentId": "agent-pan-3231",
-        "pid": 612128,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T01:50:04.614Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3231",
@@ -209,6 +201,17 @@
         "outcome": "completed",
         "reason": "Wired the xBRIEF resource chip to open the shared full-screen viewer while preserving row selection and popover state; tests cover mouse, Enter, Space, and noninteractive resource spans.",
         "releasedAt": "2026-07-29T01:49:52.136Z"
+      },
+      {
+        "writerId": "agent-pan-3231",
+        "agentId": "agent-pan-3231",
+        "pid": 612128,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T01:50:04.614Z",
+        "itemId": "embedded-expand",
+        "outcome": "completed",
+        "reason": "Added accessible full-screen expand controls to DrawerPlanPanel and PlanMapCard, preserved both no-loss section markers, and covered both store actions with focused tests.",
+        "releasedAt": "2026-07-29T01:57:17.930Z"
       }
     ],
     "statusReasons": {
@@ -239,6 +242,10 @@
       "xbrief-chip-click": {
         "reason": "Wired the xBRIEF resource chip to open the shared full-screen viewer while preserving row selection and popover state; tests cover mouse, Enter, Space, and noninteractive resource spans.",
         "updatedAt": "2026-07-29T01:49:52.136Z"
+      },
+      "embedded-expand": {
+        "reason": "Added accessible full-screen expand controls to DrawerPlanPanel and PlanMapCard, preserved both no-loss section markers, and covered both store actions with focused tests.",
+        "updatedAt": "2026-07-29T01:57:17.930Z"
       }
     }
   },
@@ -278,6 +285,9 @@
     "xbrief-chip-click.xbrief-chip-click.ac2": "completed",
     "xbrief-chip-click.xbrief-chip-click.ac3": "completed",
     "xbrief-chip-click.xbrief-chip-click.ac4": "completed",
-    "embedded-expand": "running"
+    "embedded-expand": "completed",
+    "embedded-expand.embedded-expand.ac1": "completed",
+    "embedded-expand.embedded-expand.ac2": "completed",
+    "embedded-expand.embedded-expand.ac3": "completed"
   }
 }
