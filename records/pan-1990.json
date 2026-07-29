@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T03:17:10.292Z",
+  "updated": "2026-07-29T03:27:52.062Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
     }
   ],
   "tasks": {
-    "sequence": 37,
-    "claims": {
-      "memory-search-scopes": {
-        "writerId": "agent-pan-1990",
-        "agentId": "agent-pan-1990",
-        "pid": 3431185,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T03:17:10.292Z"
-      }
-    },
+    "sequence": 38,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -275,6 +267,16 @@
         "itemId": "memory-pins",
         "outcome": "completed",
         "releasedAt": "2026-07-29T03:16:58.695Z"
+      },
+      {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 3431185,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T03:17:10.292Z",
+        "itemId": "memory-search-scopes",
+        "outcome": "completed",
+        "releasedAt": "2026-07-29T03:27:52.062Z"
       }
     ],
     "statusReasons": {
@@ -358,6 +360,9 @@
     "memory-pins": "completed",
     "memory-pins.memory-pins.ac1": "completed",
     "memory-pins.memory-pins.ac2": "completed",
-    "memory-search-scopes": "running"
+    "memory-search-scopes": "completed",
+    "memory-search-scopes.memory-search-scopes.ac1": "completed",
+    "memory-search-scopes.memory-search-scopes.ac2": "completed",
+    "memory-search-scopes.memory-search-scopes.ac3": "completed"
   }
 }
