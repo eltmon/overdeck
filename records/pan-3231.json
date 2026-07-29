@@ -31,7 +31,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-29T01:42:56.896Z",
+  "updated": "2026-07-29T01:49:52.136Z",
   "pipeline": {
     "issueId": "PAN-3231",
     "reviewStatus": "pending",
@@ -100,16 +100,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "xbrief-chip-click": {
-        "writerId": "agent-pan-3231",
-        "agentId": "agent-pan-3231",
-        "pid": 401575,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T01:42:56.896Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3231",
@@ -198,6 +190,17 @@
         "outcome": "completed",
         "reason": "Added the approved store-driven full-screen xBRIEF modal, canonical workspace-plan query and inspection-policy cache writes, focused close behavior, and flex-fill DAG layout with tests.",
         "releasedAt": "2026-07-29T01:26:08.986Z"
+      },
+      {
+        "writerId": "agent-pan-3231",
+        "agentId": "agent-pan-3231",
+        "pid": 401575,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T01:42:56.896Z",
+        "itemId": "xbrief-chip-click",
+        "outcome": "completed",
+        "reason": "Wired the xBRIEF resource chip to open the shared full-screen viewer while preserving row selection and popover state; tests cover mouse, Enter, Space, and noninteractive resource spans.",
+        "releasedAt": "2026-07-29T01:49:52.136Z"
       }
     ],
     "statusReasons": {
@@ -224,6 +227,10 @@
       "xbrief-fullscreen-shell": {
         "reason": "Added the approved store-driven full-screen xBRIEF modal, canonical workspace-plan query and inspection-policy cache writes, focused close behavior, and flex-fill DAG layout with tests.",
         "updatedAt": "2026-07-29T01:26:08.986Z"
+      },
+      "xbrief-chip-click": {
+        "reason": "Wired the xBRIEF resource chip to open the shared full-screen viewer while preserving row selection and popover state; tests cover mouse, Enter, Space, and noninteractive resource spans.",
+        "updatedAt": "2026-07-29T01:49:52.136Z"
       }
     }
   },
@@ -258,6 +265,10 @@
     "xbrief-fullscreen-shell.xbrief-fullscreen-shell.ac3": "completed",
     "xbrief-fullscreen-shell.xbrief-fullscreen-shell.ac4": "completed",
     "xbrief-fullscreen-shell.xbrief-fullscreen-shell.ac5": "completed",
-    "xbrief-chip-click": "running"
+    "xbrief-chip-click": "completed",
+    "xbrief-chip-click.xbrief-chip-click.ac1": "completed",
+    "xbrief-chip-click.xbrief-chip-click.ac2": "completed",
+    "xbrief-chip-click.xbrief-chip-click.ac3": "completed",
+    "xbrief-chip-click.xbrief-chip-click.ac4": "completed"
   }
 }
