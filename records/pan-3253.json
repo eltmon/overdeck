@@ -30,15 +30,7 @@
       "timestamp": "2026-07-29T07:28:25.193Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T07:28:25Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3253\n\n# Code Review — PAN-3253 — 2026-07-29\n\n## Verdict: CHANGES REQUESTED — the new regression test is red because boot-time trimming still leaves notes unbounded\n\n## Context\n- Branch: `feature/pan-3253`\n- HEAD reviewed: `c1eb06e8cbf6ac7ca7669a293a980374ae64fcf7`\n- PR: `#3279`\n- Changed file: `tests/unit/event-store.test.ts`\n\n## Blocking Findings\n\n### ! [correctness / requirements / performance] Boot-time trim declares convergence while 1,000-character notes remain — `tests/unit/event-store.test.ts:162`\n\nThe added test correctly seeds an oversized `review.status_changed` payload with 30 entries carrying 1,000-character notes, but it fails because `trimReviewStatusHistoryPayloads()` only slices the history array to 20 entries. The implementation at `src/dashboard/server/event-store.ts:188-193` never delegates the payload through the shared bounding helper, so the notes remain twice the required 500-character maximum.\n\nThe first pass reduces the history length, then the second pass reports `trimmed: 0` solely because the array is already 20 entries long. That is not the bounded fixed point required by `boot-trim-notes.ac1` and `boot-trim-notes.ac2`: the migrated payload still contains oversized notes and remains substantially larger than specified.\n\nFocused verification fails deterministically:\n\n```text\nnpx vitest run tests/unit/event-store.test.ts --reporter=verbose\nTest Files  1 failed (1)\nTests       1 failed | 10 passed (11)\nAssertionError: expected 1000 to be less than or equal to 500\n  at tests/unit/event-store.test.ts:194\n```\n\nGitHub CI's `test` check is also red at this HEAD. Implement the planned bounding-helper delegation in `trimReviewStatusHistoryPayloads()`, update only when the bounded serialization differs, and keep non-review payloads byte-identical. The focused test and CI test check must pass before approval.\n\n## Security\n\nNo security vulnerability was found. The diff adds deterministic SQLite test data and does not alter authentication, authorization, external input handling, command execution, or secrets.\n\n## Requirements / Acceptance Criteria\n\n- `boot-trim-notes.ac1`: **failed** — the persisted history entries retain 1,000-character notes instead of notes `<= 500`.\n- `boot-trim-notes.ac2`: **failed as a bounded-convergence claim** — the second run reports a no-op while the payload remains outside the required note bound.\n- `boot-trim-notes.ac3`: existing coverage preserves an oversized non-review event byte-identically.\n- No listed NonGoal is violated.\n\n## Performance\n\nThe unresolved note cap leaves historical event rows larger than the specified bound and makes boot-time migration stop processing them after only the array length is reduced. The test itself adds negligible runtime and memory overhead.\n\n## Non-blocking Findings\n\n### ~ [test clarity] The test comment says the payload remains identical after the second run, but the test does not compare the serialized payload before and after that run. The `trimmed: 0` and `savedChars: 0` assertions cover the stated AC2 return-value contract, so this is advisory.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253/.pan/review/agent-pan-3253-review-c1eb06e8/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3253 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".husky/_/pre-rebase"
@@ -67,20 +59,19 @@
     "recordedAt": "2026-07-29T06:18:50.753Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T07:28:30.773Z",
+  "updated": "2026-07-29T07:31:01.967Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T07:28:30.766Z",
+    "updatedAt": "2026-07-29T07:31:01.631Z",
     "reviewNotes": "Boot-time trim still leaves 1,000-character notes unbounded; the new focused test and GitHub CI test check fail, so boot-trim-notes.ac1/ac2 are not satisfied.",
     "verificationNotes": "Acceptance criteria check FAILED — 3/12 AC incomplete:\n\n### Extend trimReviewStatusHistoryPayloads to delegate to the bounding helper (3/3 incomplete)\n  - [ ] Given a seeded oversized row with 25 entries carrying 3,697-char notes, the trim persists a smaller payload that parses back to <= 20 entries with <= 500-char notes\n  - [ ] Running the trim a second time over already-trimmed rows returns trimmed: 0 (converges to a no-op)\n  - [ ] An oversized row of a non-review event type survives the trim byte-identically",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
-    "reviewedAtCommit": "c1eb06e8cbf6ac7ca7669a293a980374ae64fcf7",
     "reviewSpawnedAt": "2026-07-29T07:26:34.963Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -123,18 +114,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1058877,
-            "output": 64734,
-            "cacheRead": 10300928,
+            "input": 1077335,
+            "output": 66780,
+            "cacheRead": 10958336,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1017,
-            "output": 45923,
-            "cacheRead": 22217339,
-            "cacheWrite": 643302
+            "input": 1111,
+            "output": 49903,
+            "cacheRead": 24145668,
+            "cacheWrite": 741788
           }
         }
       },
@@ -146,21 +137,21 @@
           "cacheWrite": 269290
         },
         "openai/gpt-5.6-sol": {
-          "input": 1058877,
-          "output": 64734,
-          "cacheRead": 10300928,
+          "input": 1077335,
+          "output": 66780,
+          "cacheRead": 10958336,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1017,
-          "output": 45923,
-          "cacheRead": 22217339,
-          "cacheWrite": 643302
+          "input": 1111,
+          "output": 49903,
+          "cacheRead": 24145668,
+          "cacheWrite": 741788
         }
       },
       "costAtCloseOut": {
-        "usd": 25.328577,
-        "pricingAsOf": "2026-07-29T07:28:30.770Z"
+        "usd": 26.146885,
+        "pricingAsOf": "2026-07-29T07:31:01.657Z"
       }
     },
     "merges": [
