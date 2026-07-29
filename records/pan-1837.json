@@ -337,7 +337,7 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T03:56:48.611Z",
+  "updated": "2026-07-29T03:56:54.208Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "blocked",
@@ -348,7 +348,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T03:56:47.864Z",
+    "updatedAt": "2026-07-29T03:56:54.197Z",
     "reviewNotes": "The Kimi capture mutex is process-local, but pan start/strike, dashboard conversations, and Deacon recovery launch in separate processes, so same-cwd sessions can still capture each other's transcript identity. See review.md.",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
@@ -359,7 +359,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
-    "reviewedAtCommit": "aa65ccfa54a4ed05f33764fbbf6c15de3508f913",
+    "reviewedAtCommit": "96f15e4b7bc5cbcc7d8167c5deb2966b4779434c",
     "lastVerifiedCommit": "aa65ccfa54a4ed05f33764fbbf6c15de3508f913",
     "reviewSpawnedAt": "2026-07-29T03:51:42.658Z"
   },
@@ -413,7 +413,7 @@
       },
       "costAtCloseOut": {
         "usd": 385.654347,
-        "pricingAsOf": "2026-07-29T03:56:47.897Z"
+        "pricingAsOf": "2026-07-29T03:56:54.205Z"
       }
     },
     "merges": [
