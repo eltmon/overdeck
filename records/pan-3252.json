@@ -87,7 +87,7 @@
     "recordedAt": "2026-07-29T00:22:24.082Z"
   },
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-07-29T00:30:33.987Z",
+  "updated": "2026-07-29T00:45:20.536Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "passed",
@@ -97,9 +97,14 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T00:30:31.612Z",
-    "reviewNotes": "Approved after main merge: feature patch unchanged, no blockers, focused tests/typecheck/lint and PR checks passed.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-29T00:45:20.453Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-29T00:45:20.453Z"
+      }
+    ],
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
       "detectedAt": "2026-07-29T00:03:35.975Z",
@@ -132,17 +137,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 56,
-            "output": 8268,
-            "cacheRead": 4115695,
-            "cacheWrite": 152052
+            "input": 60,
+            "output": 9174,
+            "cacheRead": 4481645,
+            "cacheWrite": 153387
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 891304,
-            "output": 83382,
-            "cacheRead": 29300736,
+            "input": 1236474,
+            "output": 83999,
+            "cacheRead": 29737984,
             "cacheWrite": 0
           }
         }
@@ -155,21 +160,21 @@
           "cacheWrite": 172477
         },
         "openai/gpt-5.6-sol": {
-          "input": 2409001,
-          "output": 142744,
-          "cacheRead": 54409216,
+          "input": 2754171,
+          "output": 143361,
+          "cacheRead": 54846464,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 56,
-          "output": 8268,
-          "cacheRead": 4115695,
-          "cacheWrite": 152052
+          "input": 60,
+          "output": 9174,
+          "cacheRead": 4481645,
+          "cacheWrite": 153387
         }
       },
       "costAtCloseOut": {
-        "usd": 51.729622,
-        "pricingAsOf": "2026-07-29T00:30:33.985Z"
+        "usd": 53.778201,
+        "pricingAsOf": "2026-07-29T00:45:20.497Z"
       }
     },
     "merges": [
