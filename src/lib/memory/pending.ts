@@ -51,7 +51,9 @@ export function setStatusRollupProcessor(processor: StatusRollupProcessor | unde
 }
 
 export async function writePendingTurn(turn: PendingTurn, options: StatusRollupTriggerOptions = {}): Promise<WritePendingTurnResult> {
-  const dir = resolvePendingDir(turn.identity.projectId, turn.identity.issueId);
+  // Null issueId (main/scratch workspace turn, PRD D-6) falls back to
+  // workspaceId as the path segment until memory-paths-rekey lands.
+  const dir = resolvePendingDir(turn.identity.projectId, turn.identity.issueId ?? turn.identity.workspaceId);
   await ensureDir(dir);
 
   const existing = await findExistingPendingTurn(dir, turn);
@@ -72,7 +74,7 @@ export async function maybeTriggerStatusRollup(
   options: StatusRollupTriggerOptions = {},
 ): Promise<StatusRollupTriggerResult> {
   const threshold = await loadThreshold(options);
-  const pendingTurns = await readPendingTurns(identity.projectId, identity.issueId);
+  const pendingTurns = await readPendingTurns(identity.projectId, identity.issueId ?? identity.workspaceId);
   const pendingCount = pendingTurns.length;
 
   if (pendingCount < threshold) return { status: 'below-threshold', pendingCount, threshold };
@@ -149,13 +151,16 @@ async function enqueueStatusRollupEvent(job: StatusRollupJob): Promise<void> {
   const { initEventStore } = await import('../../dashboard/server/event-store.js');
   const { synthesizeStatusRollup, commitStatusRollup } = await import('./rollup.js');
   const store = await initEventStore();
+  // The rollup event/reducer keying by issueId is still issue-only (events-workspaceid
+  // covers widening it); fall back to workspaceId for a null issueId in the meantime.
+  const eventIssueId = job.identity.issueId ?? job.identity.workspaceId;
   await store.appendAsync({
     type: 'memory.rollup_triggered',
     timestamp: new Date().toISOString(),
     payload: {
       projectId: job.identity.projectId,
       workspaceId: job.identity.workspaceId,
-      issueId: job.identity.issueId,
+      issueId: eventIssueId,
       pendingCount: job.pendingTurns.length,
       turnIds: job.pendingTurns.map((turn) => turn.id),
       threshold: job.threshold,
@@ -165,7 +170,7 @@ async function enqueueStatusRollupEvent(job: StatusRollupJob): Promise<void> {
   const identity = job.pendingTurns[0]?.identity;
   const result = await synthesizeStatusRollup({
     projectId: job.identity.projectId,
-    issueId: job.identity.issueId,
+    issueId: eventIssueId,
     pendingTurns: job.pendingTurns,
     identity,
   });

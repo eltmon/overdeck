@@ -467,7 +467,7 @@ export const MemoryResolverLive = Layer.effect(
         const hits = yield* search({
           query: input.prompt,
           projectId: input.identity.projectId,
-          issueId: input.identity.issueId,
+          issueId: input.identity.issueId ?? undefined,
           limit: 10,
         })
         const chunks = hits.map((h) => h.content)
@@ -881,7 +881,9 @@ export const MemoryFilesLive = Layer.succeed(
       Effect.promise(async () => {
         const o = observation as MemoryObservation
         const date = o.timestamp.slice(0, 10)
-        const jsonlPath = join(resolveIssueMemoryRoot(o.projectId, o.issueId), 'observations', `${date}.jsonl`)
+        // A null issueId (main/scratch workspace turn, PRD D-6) falls back to
+        // workspaceId until memory-paths-rekey moves storage onto the pair.
+        const jsonlPath = join(resolveIssueMemoryRoot(o.projectId, o.issueId ?? o.workspaceId), 'observations', `${date}.jsonl`)
         await mkdir(dirname(jsonlPath), { recursive: true })
 
         // Idempotent: if this observation id is already in the file, return its offset.
@@ -909,7 +911,7 @@ export const MemoryFilesLive = Layer.succeed(
         const o = observation as MemoryObservation
         const date = o.timestamp.slice(0, 10)
         const mdPath = join(
-          resolveIssueMemoryRoot(o.projectId, o.issueId),
+          resolveIssueMemoryRoot(o.projectId, o.issueId ?? o.workspaceId),
           'observations',
           `${date}.md`,
         )

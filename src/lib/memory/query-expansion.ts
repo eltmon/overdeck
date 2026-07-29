@@ -243,6 +243,10 @@ async function logQueryExpansion(input: QueryExpansionInput, result: QueryExpans
     return;
   }
 
+  // rag-runs logging is issue-scoped; a null issueId (main/scratch workspace
+  // turn, PRD D-6) has no per-issue log file to write to.
+  if (input.identity.issueId === null) return;
+
   await appendJsonl(resolveRagRunsFile(input.identity.projectId, input.identity.issueId, entry.timestamp), entry);
 }
 

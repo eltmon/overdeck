@@ -7,7 +7,7 @@ import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from './paths.
 import { expandMemoryQuery, type QueryExpansionCall, type QueryExpansionResult } from './query-expansion.js';
 import { searchMemory, type MemorySearchHit } from './search.js';
 import { isMemoryKnowledgeIndexEnabled, isMemoryPromptTimeInjectionEnabled } from './settings.js';
-import { findProjectByPathSync, loadProjectsConfigSync, resolveProjectFromIssueSync } from '../projects.js';
+import { findProjectByPathSync, getProjectSync, loadProjectsConfigSync, resolveProjectFromIssueSync, resolveProjectPath } from '../projects.js';
 
 export const PROMPT_TIME_MEMORY_BUDGETS = {
   status: 2000,
@@ -94,8 +94,11 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
 
   const search = input.search ?? searchMemory;
   const knowledgeEnabled = await (input.loadKnowledgeIndexEnabled ?? isMemoryKnowledgeIndexEnabled)();
+  const { issueId } = input.identity;
   const [status, knowledgeIndex, sameProjectHits, siblingHits] = await Promise.all([
-    (input.loadStatus ?? readStatus)(input.identity.projectId, input.identity.issueId).catch(() => null),
+    issueId !== null
+      ? (input.loadStatus ?? readStatus)(input.identity.projectId, issueId).catch(() => null)
+      : Promise.resolve(null),
     knowledgeEnabled
       ? (input.loadKnowledgeIndex ?? readKnowledgeIndex)(input.identity).catch(() => null)
       : Promise.resolve(null),
@@ -103,18 +106,22 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
       query: expansion.query,
       projectId: input.identity.projectId,
       workspaceId: input.identity.workspaceId,
-      issueId: input.identity.issueId,
+      issueId: issueId ?? undefined,
       limit: 12,
     }).catch(() => []),
-    search({
-      query: expansion.query,
-      projectId: input.identity.projectId,
-      workspaceId: input.identity.workspaceId,
-      issueId: input.identity.issueId,
-      sibling: true,
-      siblingTokenBudget: budgets.sibling,
-      limit: 6,
-    }).catch(() => []),
+    // Sibling-issue summary injection is inherently issue-scoped — skip it
+    // entirely for a null issueId (main/scratch workspace turn, PRD D-6).
+    issueId !== null
+      ? search({
+          query: expansion.query,
+          projectId: input.identity.projectId,
+          workspaceId: input.identity.workspaceId,
+          issueId,
+          sibling: true,
+          siblingTokenBudget: budgets.sibling,
+          limit: 6,
+        }).catch(() => [])
+      : Promise.resolve([]),
   ]);
 
   const candidates = [
@@ -421,6 +428,10 @@ async function writeDecision(input: PromptTimeMemoryInjectionInput, decision: Pr
     return;
   }
 
+  // rag-runs logging is issue-scoped; a null issueId (main/scratch workspace
+  // turn) has no per-issue log file to write to.
+  if (input.identity.issueId === null) return;
+
   const filePath = resolveRagRunsFile(input.identity.projectId, input.identity.issueId, decision.timestamp);
   await ensureParentDir(filePath);
   void appendFile(filePath, `${JSON.stringify(decision)}\n`, 'utf8').catch(() => {});
@@ -468,11 +479,18 @@ export async function resolveKnowledgeBundleRoot(
   let projectPath: string;
   let knowledgeRepo: string | undefined;
 
-  if ('issueId' in identity) {
+  if ('issueId' in identity && identity.issueId !== null) {
     const resolved = resolveProjectFromIssueSync(identity.issueId);
     if (!resolved) return null;
     projectPath = resolved.projectPath;
     knowledgeRepo = loadProjectsConfigSync().projects[resolved.projectKey]?.knowledge_repo;
+  } else if ('issueId' in identity) {
+    // Null issueId means a main/scratch workspace turn (PRD D-6) — resolve the
+    // project directly by projectId (the project registry key) instead of via issue.
+    const project = getProjectSync(identity.projectId);
+    if (!project) return null;
+    projectPath = resolveProjectPath(project);
+    knowledgeRepo = project.knowledge_repo;
   } else {
     const project = findProjectByPathSync(identity.projectPath);
     projectPath = project?.path ?? identity.projectPath;

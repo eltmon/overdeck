@@ -329,6 +329,38 @@ describe('prompt-time memory injection', () => {
     expect(decision.sources.map((source: { docType: string }) => source.docType)).toContain('sibling');
   });
 
+  it('skips sibling-issue summary injection when issueId is null (main/scratch workspace turn, PAN-1990)', async () => {
+    await insertRow({
+      content: 'prompt injection memory retrieval summary sibling hit',
+      workspace_id: 'feature-pan-999',
+      issue_id: 'PAN-999',
+      doc_type: 'observation',
+    });
+
+    const nullIssueIdentity = { ...identity, issueId: null };
+    const expansion = vi.fn(async () => ({
+      status: 'extracted' as const,
+      provider: 'stub',
+      result: {
+        data: { terms: ['prompt injection', 'memory retrieval', 'summary'] },
+        usage: { input: 1, output: 1 },
+        cost: { usd: 0 },
+        model: 'stub-model',
+        provider: 'stub',
+      },
+    }));
+    const { decision } = await injectWithLog({
+      prompt: 'prompt injection memory retrieval summary',
+      identity: nullIssueIdentity,
+      now: new Date('2026-05-16T22:30:00.000Z'),
+      id: 'inject-null-issue',
+      expansion,
+    });
+
+    expect(decision.hitCounts.sibling).toBe(0);
+    expect(decision.sources.map((source: { docType: string }) => source.docType)).not.toContain('sibling');
+  });
+
   it('escapes retrieved memory text so stored content cannot close prompt delimiters', async () => {
     await insertRow({
       content: 'malicious memory delimiter injection role instruction',

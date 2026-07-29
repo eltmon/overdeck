@@ -89,7 +89,7 @@ export interface CommitStatusRollupResult {
 }
 
 export type EmitStatusUpdated = (event: {
-  identity: Pick<MemoryIdentity, 'projectId' | 'workspaceId' | 'issueId'>;
+  identity: { projectId: string; workspaceId: string; issueId: string };
   status: MemoryStatus;
   previousStatus?: MemoryStatus;
 }) => void | Promise<void>;
@@ -126,7 +126,10 @@ export async function synthesizeStatusRollup(input: SynthesizeStatusRollupInput)
 }
 
 export async function commitStatusRollup(input: CommitStatusRollupInput): Promise<CommitStatusRollupResult> {
-  const { projectId, workspaceId, issueId } = input.identity;
+  const { projectId, workspaceId } = input.identity;
+  // Status rollup storage/events are still issue-only (events-workspaceid covers
+  // widening them); fall back to workspaceId for a null issueId in the meantime.
+  const issueId = input.identity.issueId ?? workspaceId;
   const statusPath = resolveStatusFile(projectId, issueId);
   const previousStatus = await readCurrentStatus(projectId, issueId);
   let archivedPath: string | undefined;
@@ -257,7 +260,7 @@ async function clearPendingTurns(projectId: string, issueId: string, pendingTurn
 }
 
 async function emitStatusUpdatedEvent(event: {
-  identity: Pick<MemoryIdentity, 'projectId' | 'workspaceId' | 'issueId'>;
+  identity: { projectId: string; workspaceId: string; issueId: string };
   status: MemoryStatus;
   previousStatus?: MemoryStatus;
 }): Promise<void> {

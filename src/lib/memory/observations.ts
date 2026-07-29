@@ -20,7 +20,10 @@ export interface WriteObservationOptions {
 }
 
 export async function writeObservation(observation: MemoryObservation, options: WriteObservationOptions = {}): Promise<WriteObservationResult> {
-  const jsonlPath = resolveObservationsFile(observation.projectId, observation.issueId, observation.timestamp);
+  // A null issueId (main/scratch workspace turn, PRD D-6) has no issue segment
+  // to key the path on yet — fall back to workspaceId until memory-paths-rekey
+  // moves storage onto the projectId+workspaceId identity pair.
+  const jsonlPath = resolveObservationsFile(observation.projectId, observation.issueId ?? observation.workspaceId, observation.timestamp);
   const markdownPath = observationMarkdownPath(observation);
 
   await ensureParentDir(jsonlPath);
@@ -42,8 +45,8 @@ export async function writeObservation(observation: MemoryObservation, options: 
   return { jsonlPath, markdownPath };
 }
 
-export function observationMarkdownPath(observation: Pick<MemoryObservation, 'projectId' | 'issueId' | 'timestamp'>): string {
-  return resolveObservationsFile(observation.projectId, observation.issueId, observation.timestamp).replace(/\.jsonl$/, '.md');
+export function observationMarkdownPath(observation: Pick<MemoryObservation, 'projectId' | 'issueId' | 'workspaceId' | 'timestamp'>): string {
+  return resolveObservationsFile(observation.projectId, observation.issueId ?? observation.workspaceId, observation.timestamp).replace(/\.jsonl$/, '.md');
 }
 
 export function renderObservationMarkdownLine(observation: MemoryObservation): string {

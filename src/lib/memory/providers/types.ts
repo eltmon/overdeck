@@ -108,7 +108,9 @@ export function recordExtractionCost(input: {
     ts: new Date().toISOString(),
     type: 'cost',
     agentId: input.identity.sessionId,
-    issueId: input.identity.issueId,
+    // Cost events require an issueId; a null issueId (main/scratch workspace
+    // turn, PRD D-6) falls back to workspaceId until cost tracking widens too.
+    issueId: input.identity.issueId ?? input.identity.workspaceId,
     sessionType: 'memory-extraction',
     source: 'memory-extraction',
     provider: input.provider,

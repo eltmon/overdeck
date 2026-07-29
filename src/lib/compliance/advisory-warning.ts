@@ -22,17 +22,20 @@ export interface ResolveComplianceAdvisoryWarningInput {
 }
 
 export async function resolveComplianceAdvisoryWarning(input: ResolveComplianceAdvisoryWarningInput): Promise<string | null> {
+  const { issueId } = input.identity;
+  if (issueId === null) return null;
+
   const mode = await (input.loadComplianceMode ?? loadComplianceMode)();
   if (mode === 'off') return null;
 
-  const observations = await (input.readObservations ?? readRecentObservations)(input.identity.projectId, input.identity.issueId, 100);
-  const markers = await (input.readMarkers ?? readComplianceWarningMarkers)(input.identity.projectId, input.identity.issueId);
+  const observations = await (input.readObservations ?? readRecentObservations)(input.identity.projectId, issueId, 100);
+  const markers = await (input.readMarkers ?? readComplianceWarningMarkers)(input.identity.projectId, issueId);
   const warned = new Set(markers.warnedObservationIds);
   const miss = [...observations].reverse().find((observation) => isCurrentSessionMiss(observation, input.identity) && !warned.has(observation.id));
   if (!miss) return null;
 
   warned.add(miss.id);
-  await (input.writeMarkers ?? writeComplianceWarningMarkers)(input.identity.projectId, input.identity.issueId, {
+  await (input.writeMarkers ?? writeComplianceWarningMarkers)(input.identity.projectId, issueId, {
     warnedObservationIds: [...warned],
   });
   return COMPLIANCE_ADVISORY_WARNING;

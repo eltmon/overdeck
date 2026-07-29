@@ -51,7 +51,11 @@ export async function updateMemoryHealth(
   update: MemoryHealthUpdate,
   options: MemoryHealthUpdateOptions = {},
 ): Promise<MemoryHealthSnapshot> {
-  const path = getMemoryHealthPath(identity);
+  // Health tracking is issue-scoped (resolveIssueMemoryRoot); a null issueId
+  // means a main/scratch workspace turn with no per-issue health file to track.
+  if (identity.issueId === null) return { ...EMPTY_HEALTH, failed_by_reason: {} };
+
+  const path = getMemoryHealthPath({ projectId: identity.projectId, issueId: identity.issueId });
   const current = await readMemoryHealth(path);
   const now = (options.now ?? new Date()).toISOString();
   // Preserve the prior failure detail when a later detail-less failure write
@@ -98,11 +102,11 @@ export async function updateMemoryHealth(
   return next;
 }
 
-export async function readMemoryHealthSnapshot(identity: Pick<MemoryIdentity, 'projectId' | 'issueId'>): Promise<MemoryHealthSnapshot> {
+export async function readMemoryHealthSnapshot(identity: { projectId: string; issueId: string }): Promise<MemoryHealthSnapshot> {
   return readMemoryHealth(getMemoryHealthPath(identity));
 }
 
-export function getMemoryHealthPath(identity: Pick<MemoryIdentity, 'projectId' | 'issueId'>): string {
+export function getMemoryHealthPath(identity: { projectId: string; issueId: string }): string {
   return join(resolveIssueMemoryRoot(identity.projectId, identity.issueId), 'health.json');
 }
 

@@ -4,7 +4,7 @@ import { IssueId, Role } from "./types"
 export const MemoryIdentity = Schema.Struct({
   projectId: Schema.String,
   workspaceId: Schema.String,
-  issueId: IssueId,
+  issueId: Schema.NullOr(IssueId),
   runId: Schema.String,
   sessionId: Schema.String,
   agentRole: Role,
@@ -24,7 +24,7 @@ export const MemoryObservation = Schema.Struct({
   timestamp: Schema.String,
   projectId: Schema.String,
   workspaceId: Schema.String,
-  issueId: IssueId,
+  issueId: Schema.NullOr(IssueId),
   runId: Schema.String,
   sessionId: Schema.String,
   agentRole: Role,
