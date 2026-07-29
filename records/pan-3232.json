@@ -327,18 +327,18 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:22:49.836Z",
+  "updated": "2026-07-29T05:23:37.485Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:22:49.822Z",
-    "reviewNotes": "Both new FR-7 regression tests fail before proving SimpleHomePage and ConversationDock acceptance paths",
+    "updatedAt": "2026-07-29T05:23:37.445Z",
+    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
       "detectedAt": "2026-07-29T05:03:44.105Z",
@@ -371,27 +371,27 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 29414260,
-            "output": 887299,
-            "cacheRead": 161422336,
+            "input": 29420036,
+            "output": 887454,
+            "cacheRead": 162157056,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 5114,
-            "output": 244853,
-            "cacheRead": 98520667,
-            "cacheWrite": 6010677
+            "input": 5161,
+            "output": 248440,
+            "cacheRead": 99601439,
+            "cacheWrite": 6143326
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 5548,
-          "output": 272726,
-          "cacheRead": 108641870,
-          "cacheWrite": 6320490
+          "input": 5595,
+          "output": 276313,
+          "cacheRead": 109722642,
+          "cacheWrite": 6453139
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -400,15 +400,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 29414260,
-          "output": 887299,
-          "cacheRead": 161422336,
+          "input": 29420036,
+          "output": 887454,
+          "cacheRead": 162157056,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 284.743915,
-        "pricingAsOf": "2026-07-29T05:22:49.830Z"
+        "usd": 285.436676,
+        "pricingAsOf": "2026-07-29T05:23:37.481Z"
       }
     },
     "merges": [
