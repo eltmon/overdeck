@@ -49,7 +49,7 @@
     "recordedAt": "2026-07-29T06:18:50.753Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T07:11:21.537Z",
+  "updated": "2026-07-29T07:11:23.586Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -58,8 +58,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T07:11:21.484Z",
-    "reviewNotes": "Agent re-review request (1/25): Completed boot-trim-notes acceptance criteria with idempotency test",
+    "updatedAt": "2026-07-29T07:11:21.760Z",
+    "reviewNotes": "Verification infrastructure error: Verification worker 588442 exited before writing a result",
     "verificationNotes": "Acceptance criteria check FAILED — 3/12 AC incomplete:\n\n### Extend trimReviewStatusHistoryPayloads to delegate to the bounding helper (3/3 incomplete)\n  - [ ] Given a seeded oversized row with 25 entries carrying 3,697-char notes, the trim persists a smaller payload that parses back to <= 20 entries with <= 500-char notes\n  - [ ] Running the trim a second time over already-trimmed rows returns trimmed: 0 (converges to a no-op)\n  - [ ] An oversized row of a non-review event type survives the trim byte-identically",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewedAtCommit": "ee73b706cf17d7bd988552a04ccc822341f05546",
@@ -142,7 +142,7 @@
       },
       "costAtCloseOut": {
         "usd": 16.725816,
-        "pricingAsOf": "2026-07-29T07:11:21.531Z"
+        "pricingAsOf": "2026-07-29T07:11:23.582Z"
       }
     },
     "merges": [
