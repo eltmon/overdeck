@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T01:09:34.740Z",
+  "updated": "2026-07-29T01:09:37.970Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "pending",
@@ -21,8 +21,54 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T00:30:00.461Z",
-    "inspectNotes": "AC1-3 verified: WS_METHODS.readFileAtPath/writeFileAtPath exported and both Rpcs registered in PanRpcGroup (36 requests, both present in dist .d.ts as literal-typed Rpc members); ReadFileAtPathResult rejects decode when mtimeMs or totalLines is missing and accepts the full struct; WriteFileAtPathInput decodes with and without expectedMtimeMs; contracts build + workspace root npm run typecheck exit 0 with no new dashboard/frontend ratchet errors."
+    "updatedAt": "2026-07-29T01:09:37.964Z",
+    "inspectNotes": "AC1-3 verified: WS_METHODS.readFileAtPath/writeFileAtPath exported and both Rpcs registered in PanRpcGroup (36 requests, both present in dist .d.ts as literal-typed Rpc members); ReadFileAtPathResult rejects decode when mtimeMs or totalLines is missing and accepts the full struct; WriteFileAtPathInput decodes with and without expectedMtimeMs; contracts build + workspace root npm run typecheck exit 0 with no new dashboard/frontend ratchet errors.",
+    "reviewRequestedAt": "2026-07-29T01:09:37.964Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        ".husky/_/pre-rebase",
+        "scripts/file-size-allowlist.txt",
+        "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/MARKDOWN-EDITOR-PANE.md",
+        "packages/contracts/src/rpc.ts",
+        "src/dashboard/frontend/src/components/Stage/StageDeckContext.tsx",
+        "src/dashboard/frontend/src/components/Stage/index.tsx",
+        "src/dashboard/frontend/src/components/Stage/panes/EditorPane.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx",
+        "src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx",
+        "src/dashboard/frontend/src/editorPreferences.ts",
+        "src/dashboard/frontend/src/lib/panesStore.ts",
+        "src/dashboard/server/services/__tests__/file-at-path.test.ts",
+        "src/dashboard/server/services/file-at-path.ts",
+        "src/dashboard/server/ws-rpc.ts"
+      ],
+      "actualChangedFiles": [
+        ".husky/_/pre-rebase",
+        "docs/MARKDOWN-EDITOR-PANE.md",
+        "packages/contracts/src/rpc.ts",
+        "scripts/file-size-allowlist.txt",
+        "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
+        "src/dashboard/frontend/src/components/Stage/StageDeckContext.tsx",
+        "src/dashboard/frontend/src/components/Stage/index.tsx",
+        "src/dashboard/frontend/src/components/Stage/panes/EditorPane.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx",
+        "src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx",
+        "src/dashboard/frontend/src/editorPreferences.ts",
+        "src/dashboard/frontend/src/lib/panesStore.ts",
+        "src/dashboard/server/services/__tests__/file-at-path.test.ts",
+        "src/dashboard/server/services/file-at-path.ts",
+        "src/dashboard/server/ws-rpc.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts"
+      ],
+      "recordedAt": "2026-07-29T01:09:34.738Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3268"
   },
   "closeOut": {
     "usage": {
