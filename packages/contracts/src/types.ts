@@ -86,7 +86,7 @@ export type VerificationStatusValue = typeof VerificationStatusValue.Type
 
 export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code'
 
-const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code'])
+export const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code'])
 
 /**
  * Normalize a snapshot's runtime field to a known Harness value.

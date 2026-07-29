@@ -537,7 +537,12 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
       const harnessDecision = yield* Effect.promise(async () =>
         canUseHarnessSync(harness, spawnModel, await getProviderAuthMode(spawnModel)),
       );
-      effectiveHarness = harnessDecision.allowed ? harness : 'claude-code';
+      // PAN-1837 review fix (NFR-2): fail loudly on a denied explicit
+      // harness instead of silently substituting claude-code.
+      if (!harnessDecision.allowed) {
+        return jsonResponse({ error: harnessDecision.reason ?? `Harness "${harness}" is not allowed for model "${spawnModel}".` }, { status: 400 });
+      }
+      effectiveHarness = harness;
     }
 
     const agentSessionName = `agent-${issueId.toLowerCase()}`;

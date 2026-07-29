@@ -27,6 +27,7 @@
 import { exec } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { readdir as readdirAsync, stat as statAsync } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -111,6 +112,49 @@ export function findLatestKimiSession(kimiHome: string, workspace: string): stri
     let mtimeMs: number;
     try {
       mtimeMs = statSync(wirePath).mtimeMs;
+    } catch {
+      continue;
+    }
+    if (!newest || mtimeMs > newest.mtimeMs) newest = { path: wirePath, mtimeMs };
+  }
+  return newest?.path ?? null;
+}
+
+/**
+ * Async twin of {@link findKimiWirePath} (PAN-1837 review fix, P2). The
+ * dashboard's transcript resolver runs on the event loop and Command Deck
+ * polling re-resolves the same session repeatedly, so the sync
+ * readdirSync/statSync walk here would block the loop on every poll as a
+ * session's history grows. Runtime-side sync callers (kill/spawn lifecycle)
+ * keep using the sync versions above — this pair exists only for dashboard
+ * routes, per the runtime's own documented sync contract.
+ */
+export async function findKimiWirePathAsync(kimiHome: string, workspace: string, sessionId: string | null): Promise<string | null> {
+  if (sessionId) {
+    const candidate = join(kimiSessionsRoot(kimiHome, workspace), sessionId, 'agents', 'main', 'wire.jsonl');
+    try {
+      await statAsync(candidate);
+      return candidate;
+    } catch { /* fall through to newest-session fallback */ }
+  }
+  return findLatestKimiSessionAsync(kimiHome, workspace);
+}
+
+/** Async twin of {@link findLatestKimiSession} — see {@link findKimiWirePathAsync}. */
+export async function findLatestKimiSessionAsync(kimiHome: string, workspace: string): Promise<string | null> {
+  const bucketDir = kimiSessionsRoot(kimiHome, workspace);
+  let entries: string[];
+  try {
+    entries = await readdirAsync(bucketDir);
+  } catch {
+    return null;
+  }
+  let newest: { path: string; mtimeMs: number } | null = null;
+  for (const entry of entries) {
+    const wirePath = join(bucketDir, entry, 'agents', 'main', 'wire.jsonl');
+    let mtimeMs: number;
+    try {
+      mtimeMs = (await statAsync(wirePath)).mtimeMs;
     } catch {
       continue;
     }

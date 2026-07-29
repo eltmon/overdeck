@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { exec, execFile } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
-import { mkdir, writeFile, readFile, stat, realpath, rename, rm } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, readdir, stat, realpath, rename, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -695,6 +695,22 @@ export async function spawnConversationSession(
     writeBridgeTokenSync(tmuxSession);
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, tmuxSession);
   }
+  // PAN-1837 review fix: conversations have no AgentState row, so the
+  // dashboard can't resolve their wire.jsonl without a conversation-owned
+  // captured session id — snapshot the bucket now (before the tmux session
+  // exists) so the post-launch discovery below can diff against it instead
+  // of guessing from mtime, which would misfire when multiple Kimi
+  // conversations share one cwd.
+  let kimiExistingSessionsBefore: Set<string> | undefined;
+  if (kimiCodeFields) {
+    try {
+      const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
+      kimiExistingSessionsBefore = new Set(await readdir(kimiSessionsRoot(join(homedir(), '.kimi-code'), cwd)));
+    } catch {
+      kimiExistingSessionsBefore = new Set();
+    }
+  }
+
   const launcherTmp = `${launcherScript}.${randomUUID()}.tmp`;
   await writeFile(
     launcherTmp,
@@ -770,6 +786,23 @@ export async function spawnConversationSession(
           const threadId = extractThreadIdFromRollout(rollout);
           if (threadId) writeThreadId(tmuxSession, threadId);
         }
+      } catch {
+      }
+    })();
+  }
+  if (kimiCodeFields && kimiExistingSessionsBefore) {
+    // PAN-1837 review fix: same shape as the codex block above — poll for the
+    // new session directory Kimi writes under this conversation's cwd bucket
+    // and persist its id (into the shared per-id `~/.overdeck/agents/<id>/`
+    // scratch dir codex's writeThreadId already uses for conversations) so
+    // resolveKimiWirePath's fast path finds it instead of relying on the
+    // newest-mtime fallback, which would misattribute the transcript when
+    // multiple Kimi conversations share one cwd.
+    void (async () => {
+      try {
+        const { waitForNewKimiSession, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+        const sessionId = await waitForNewKimiSession(join(homedir(), '.kimi-code'), cwd, kimiExistingSessionsBefore);
+        if (sessionId) writeKimiSessionId(tmuxSession, sessionId);
       } catch {
       }
     })();

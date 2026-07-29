@@ -44,6 +44,13 @@ export interface ResolveJsonlPathOptions {
   claudeProjectsDirOverride?: string;
   /** Override the ~/.kimi-code directory (test hook). */
   kimiHomeOverride?: string;
+  /**
+   * Explicit workspace path for resolveKimiWirePath. Conversation rows have
+   * no AgentState (readRecordedState/getAgentStateSync return nothing), so
+   * dashboard conversation callers must supply conv.cwd directly instead of
+   * relying on the agent-state lookup (PAN-1837 review fix).
+   */
+  workspaceOverride?: string;
   /** Override the runtime-state lookup (test hook). */
   getRuntimeStateAsync?: (agentId: string) => Promise<{ claudeSessionId?: string } | null>;
   /** Override forensic logging (test hook). */
@@ -363,15 +370,19 @@ export async function resolveKimiWirePath(
   agentId: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
-  const workspace = (await readRecordedState(agentId, opts)).workspace;
+  const workspace = opts.workspaceOverride ?? (await readRecordedState(agentId, opts)).workspace;
   if (!workspace) return null;
 
   const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
   const sessionId = (await readOptional(join(agentsRoot, agentId, 'kimi-session-id')))?.trim() || null;
   const kimiHome = opts.kimiHomeOverride ?? join(homedir(), '.kimi-code');
 
-  const { findKimiWirePath } = await import('../../../lib/runtimes/kimi-code.js');
-  return findKimiWirePath(kimiHome, workspace, sessionId);
+  // PAN-1837 review fix (P2): use the async twin here — this resolver runs on
+  // the dashboard event loop and Command Deck polling re-resolves the same
+  // session repeatedly, so a sync readdirSync/statSync walk would block the
+  // loop on every poll as a session's history grows.
+  const { findKimiWirePathAsync } = await import('../../../lib/runtimes/kimi-code.js');
+  return findKimiWirePathAsync(kimiHome, workspace, sessionId);
 }
 
 /**

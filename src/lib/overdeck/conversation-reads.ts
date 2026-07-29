@@ -158,7 +158,10 @@ export async function resolveSessionFile(conv: Conversation): Promise<string | n
   // Native kimi-code conversations write wire.jsonl under Kimi's own
   // ~/.kimi-code/sessions/<workDirKey>/<sessionId>/agents/main/ tree.
   if (getHarnessBehavior(conv.harness).transcriptKind === 'kimi-wire-jsonl') {
-    const kimiPath = await resolveKimiWirePath(conv.tmuxSession);
+    // Conversations have no AgentState row, so resolveKimiWirePath's default
+    // workspace lookup (getAgentStateSync) returns nothing — pass conv.cwd
+    // directly (PAN-1837 review fix).
+    const kimiPath = await resolveKimiWirePath(conv.tmuxSession, { workspaceOverride: conv.cwd });
     if (kimiPath) return kimiPath;
     // Fall through if wire.jsonl not found — same stale-harness recovery.
   }

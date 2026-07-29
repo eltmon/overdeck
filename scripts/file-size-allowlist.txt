@@ -14,5 +14,5 @@
 1035 src/lib/agents/spawn.ts # PAN-1837
 1016 src/lib/agents/runtime-command.ts # PAN-1837
 1388 src/lib/model-capabilities.ts # PAN-1837
-1004 src/lib/overdeck/conversation-runtime.ts # PAN-1837
+1037 src/lib/overdeck/conversation-runtime.ts # PAN-1837
 849 src/lib/overdeck/planning-promotion.ts # PAN-3229

@@ -25,7 +25,9 @@ vi.mock('../../agents/agent-state.js', () => ({
 import {
   createKimiCodeRuntimeSync,
   findKimiWirePath,
+  findKimiWirePathAsync,
   findLatestKimiSession,
+  findLatestKimiSessionAsync,
   kimiSessionsRoot,
   kimiWorkDirKey,
   KimiCodeRuntimeSync,
@@ -100,6 +102,33 @@ describe('findKimiWirePath / findLatestKimiSession', () => {
   it('returns null when the bucket does not exist', () => {
     const kimiHome = makeHome();
     expect(findLatestKimiSession(kimiHome, '/tmp/never-launched')).toBeNull();
+  });
+});
+
+describe('findKimiWirePathAsync / findLatestKimiSessionAsync (PAN-1837 review fix, P2)', () => {
+  it('resolves the captured session id under the workspace bucket', async () => {
+    const kimiHome = makeHome();
+    const workDir = '/tmp/some-workspace';
+    const wirePath = writeWireFixture(kimiHome, workDir, 'session_captured');
+    writeWireFixture(kimiHome, workDir, 'session_other');
+
+    await expect(findKimiWirePathAsync(kimiHome, workDir, 'session_captured')).resolves.toBe(wirePath);
+  });
+
+  it('falls back to the newest session dir when no id is captured, matching the sync version', async () => {
+    const kimiHome = makeHome();
+    const workDir = '/tmp/some-workspace';
+    writeWireFixture(kimiHome, workDir, 'session_older');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const newer = writeWireFixture(kimiHome, workDir, 'session_newer');
+
+    await expect(findKimiWirePathAsync(kimiHome, workDir, null)).resolves.toBe(newer);
+    await expect(findLatestKimiSessionAsync(kimiHome, workDir)).resolves.toBe(newer);
+  });
+
+  it('returns null when the bucket does not exist', async () => {
+    const kimiHome = makeHome();
+    await expect(findLatestKimiSessionAsync(kimiHome, '/tmp/never-launched')).resolves.toBeNull();
   });
 });
 
