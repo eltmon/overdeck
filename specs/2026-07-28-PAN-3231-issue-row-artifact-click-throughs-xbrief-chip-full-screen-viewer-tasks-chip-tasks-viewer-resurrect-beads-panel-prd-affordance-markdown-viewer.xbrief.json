@@ -4,17 +4,17 @@
     "created": "2026-07-28T17:16:51Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3231: Issue-row artifact click-throughs: xBRIEF chip → full-screen viewer, tasks chip → tasks viewer (resurrect beads panel), PRD affordance → markdown viewer",
-    "updated": "2026-07-28T17:25:27.738Z"
+    "updated": "2026-07-29T04:43:51.252Z"
   },
   "plan": {
     "id": "pan-3231",
     "title": "Issue-row artifact click-throughs: xBRIEF chip → full-screen viewer, tasks chip → tasks viewer (resurrect beads panel), PRD affordance → markdown viewer",
-    "status": "running",
+    "status": "completed",
     "uid": "80489f2b-3f5c-4208-9383-252171741a3b",
     "author": "agent:claude-fable-5",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-28T17:16:51Z",
-    "updated": "2026-07-28T17:25:27.738Z",
+    "updated": "2026-07-29T04:43:51.252Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3231",
@@ -753,5 +753,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }
