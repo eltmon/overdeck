@@ -43,6 +43,7 @@ import {
   claudeSystemPromptFiles,
   getAcpLauncherFields,
   getCodexLauncherFields,
+  getKimiCodeLauncherFields,
   getOhmypiLauncherFields,
   getProviderAuthMode,
   getRoleRuntimeBaseCommand,
@@ -246,6 +247,7 @@ async function spawnRunWithoutConsentClaim(
   const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'ohmypi';
   const shouldDeliverPromptViaCodexTui = shouldRegisterConversation && resolvedHarness === 'codex';
+  const shouldDeliverPromptViaKimiCode = shouldRegisterConversation && resolvedHarness === 'kimi-code';
   const shouldDeliverPromptViaAcp = resolvedHarness === 'acp';
   const prompt = options.prompt
     ? await withSpawnTimeMemoryContext({
@@ -260,7 +262,7 @@ async function spawnRunWithoutConsentClaim(
 
   let promptFile: string | undefined;
   const tracksKickoffDelivery = role === 'flywheel';
-  if (prompt && !shouldDeliverPromptViaAcp && (tracksKickoffDelivery || (!shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi && !shouldDeliverPromptViaCodexTui))) {
+  if (prompt && !shouldDeliverPromptViaAcp && (tracksKickoffDelivery || (!shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi && !shouldDeliverPromptViaCodexTui && !shouldDeliverPromptViaKimiCode))) {
     promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
     await writeFileAsync(promptFile, prompt);
   }
@@ -300,6 +302,13 @@ async function spawnRunWithoutConsentClaim(
         harnessLaunch.binaryPath,
         role,
       )
+    : {};
+  // PAN-1837 review fix: role runs (review/test/ship/plan/flywheel) reached
+  // this launcher path without a Kimi field spread, so buildKimiCodeCommand()
+  // threw 'kimi-code launcher requires kimiCodeModel' before a session could
+  // even be created.
+  const kimiCodeLauncherFields = resolvedHarness === 'kimi-code'
+    ? getKimiCodeLauncherFields(selectedModel)
     : {};
 
   // Create a conversation record for every specialist role — sub-role reviewers,
@@ -390,6 +399,7 @@ async function spawnRunWithoutConsentClaim(
     ...piLauncherFields,
     ...codexLauncherFields,
     ...acpLauncherFields,
+    ...kimiCodeLauncherFields,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
@@ -463,7 +473,7 @@ async function spawnRunWithoutConsentClaim(
       } catch (err) {
         console.error(`[${agentId}] ohmypi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       }
-    } else if (shouldDeliverPromptViaTmux || shouldDeliverPromptViaCodexTui) {
+    } else if (shouldDeliverPromptViaTmux || shouldDeliverPromptViaCodexTui || shouldDeliverPromptViaKimiCode) {
       if (tracksKickoffDelivery) {
         const delivery = await deliverInitialPromptWithRetry(agentId, prompt, 'spawnRun:initial-prompt');
         if (delivery.ok) {
@@ -476,12 +486,14 @@ async function spawnRunWithoutConsentClaim(
       } else {
         // PAN-1594: wait for the hook-written ready.json (session-start hook),
         // not a tmux pane-scrape. No dependency on permission-mode footer text.
+        // Kimi Code's own readiness (readinessKind 'kimi-session-signal') is a
+        // pane-scan, not a hook file — waitForPromptReady dispatches correctly.
         const ready = await waitForPromptReady(agentId, resolvedHarness, 30);
         if (ready) {
           await new Promise<void>((resolve) => setTimeout(resolve, 500));
           await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
         } else {
-          console.error(`[${agentId}] ${resolvedHarness === 'codex' ? 'Codex' : 'Claude'} did not become ready within 30s`);
+          console.error(`[${agentId}] ${getHarnessBehavior(resolvedHarness).displayName} did not become ready within 30s`);
         }
       }
     }

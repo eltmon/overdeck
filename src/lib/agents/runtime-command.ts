@@ -24,7 +24,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { requireModelOverrideSync, shellQuoteModelIdSync } from '../model-validation.js';
 import { getOpenAIAuthStatus } from '../openai-auth.js';
 import { getOverdeckHome, packageRoot, resolveOhmypiExtensionPath, resolvePiExtensionPath } from '../paths.js';
-import { getProviderForModelSync } from '../providers.js';
+import { getProviderForModelSync, resolveKimiCodeModelAlias } from '../providers.js';
 import type { AuthMode } from '../subscription-types.js';
 import { capturePane, sessionExists } from '../tmux.js';
 import { getAgentDir, getAgentStateSync, type Role } from './agent-state.js';
@@ -252,9 +252,10 @@ export function getKimiCodeLauncherFields(model: string): {
   model: string;
   unsetProviderEnv: true;
 } {
+  const kimiCodeModel = resolveKimiCodeModelAlias(model);
   return {
     harness: 'kimi-code',
-    kimiCodeModel: model,
+    kimiCodeModel,
     kimiCodeYolo: true,
     model,
     unsetProviderEnv: true,

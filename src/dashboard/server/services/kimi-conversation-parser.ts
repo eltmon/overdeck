@@ -21,7 +21,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import type { ChatMessage, CompactBoundary, WorkLogEntry } from '@overdeck/contracts';
 import type { ParseResult } from './conversation/types.js';
-import { parseKimiSessionSync } from '../../../lib/cost-parsers/kimi-parser.js';
+import { summarizeKimiEntries } from '../../../lib/cost-parsers/kimi-parser.js';
 
 interface KimiLoopEvent {
   type?: string;
@@ -75,6 +75,7 @@ export async function parseKimiConversationMessages(sessionFile: string): Promis
   const workLog: WorkLogEntry[] = [];
   const compactBoundaries: CompactBoundary[] = [];
   const toolCallsByCallId = new Map<string, WorkLogEntry>();
+  const parsedEntries: KimiWireEntry[] = [];
   let sequence = 0;
   let lastAssistantCompletedAt: string | undefined;
 
@@ -86,6 +87,7 @@ export async function parseKimiConversationMessages(sessionFile: string): Promis
       continue;
     }
     if (!entry || typeof entry !== 'object') continue;
+    parsedEntries.push(entry);
     const createdAt = typeof entry.time === 'number' ? new Date(entry.time).toISOString() : new Date().toISOString();
 
     if (entry.type === 'turn.prompt') {
@@ -172,7 +174,11 @@ export async function parseKimiConversationMessages(sessionFile: string): Promis
 
   // Cost/tokens come from the canonical Kimi parser (single source of truth
   // for wire.jsonl usage.record accounting) rather than being re-derived here.
-  const usage = parseKimiSessionSync(sessionFile);
+  // Reuses the entries already parsed above instead of re-reading and
+  // re-parsing the whole file a second time per update (PAN-1837 review fix
+  // — the previous parseKimiSessionSync(sessionFile) call did its own
+  // synchronous full-file read/parse on every wire.jsonl append).
+  const usage = summarizeKimiEntries(parsedEntries, sessionFile);
   const totalCost = usage?.cost_v2 ?? usage?.cost ?? 0;
   const totalTokens = usage
     ? usage.usage.inputTokens + usage.usage.outputTokens + (usage.usage.cacheReadTokens ?? 0) + (usage.usage.cacheWriteTokens ?? 0)

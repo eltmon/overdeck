@@ -27,7 +27,8 @@ export type OpenAIModel =
   | 'gpt-4o'
   | 'gpt-4o-mini';
 export type GoogleModel = 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite-preview' | 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
-export type KimiModel = 'k3' | 'k3[1m]' | 'kimi-k2.7-code' | 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2';
+export type KimiModel = 'k3' | 'k3[1m]' | 'kimi-k2.7-code' | 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2'
+  | 'kimi-code/k3' | 'kimi-code/k3-256k' | 'kimi-code/kimi-for-coding' | 'kimi-code/kimi-for-coding-highspeed';
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed' | 'MiniMax-M3';
 export type ZAIModel = 'glm-5.2' | 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
 export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';

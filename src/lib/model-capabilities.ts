@@ -858,6 +858,17 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   // Legacy Kimi ID — kimi-k2 deprecated in favor of kimi-k2.5
   'kimi-k2': { model: 'kimi-k2', provider: 'kimi', displayName: 'Kimi K2 (deprecated)', costPer1MTokens: 1.6, contextWindow: 128000, skills: { 'code-generation': 88, 'code-review': 86, debugging: 86, planning: 84, documentation: 84, testing: 84, security: 78, performance: 80, synthesis: 88, speed: 72, 'context-length': 80 }, notes: '65.8% SWE-bench. Superseded by Kimi K2.5.' },
 
+  // KIMI-CODE NATIVE ALIASES (PAN-1837) — the installed kimi-code CLI's own
+  // config.toml model catalog, namespaced `kimi-code/<alias>`, verified via
+  // `kimi provider list --json` against the installed 0.29.2 binary. This is
+  // a SEPARATE, smaller catalog than the claude-code-routed Kimi ids above —
+  // the native CLI does not expose kimi-k2.6/kimi-k2.5/kimi-k2/K2.6-code-preview
+  // at all, only these four.
+  'kimi-code/k3': { model: 'kimi-code/k3', provider: 'kimi', displayName: 'Kimi K3 (native)', costPer1MTokens: 9, contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 100 }, notes: 'Native kimi-code harness alias for K3 at its full 1M context (maxContextSize=1048576 per `kimi provider list --json`). Launched via `kimi -m kimi-code/k3 --yolo`.' },
+  'kimi-code/k3-256k': { model: 'kimi-code/k3-256k', provider: 'kimi', displayName: 'Kimi K3 (native, 256K)', costPer1MTokens: 9, contextWindow: 262144, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 98 }, notes: 'Native kimi-code harness alias for K3 at the smaller 256K context tier (maxContextSize=262144 per `kimi provider list --json`). Same per-token pricing as kimi-code/k3.' },
+  'kimi-code/kimi-for-coding': { model: 'kimi-code/kimi-for-coding', provider: 'kimi', displayName: 'K2.7 Coding (native)', costPer1MTokens: 2.5, contextWindow: 262144, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 75, 'context-length': 98 }, notes: 'Native kimi-code harness alias; displayName "K2.7 Coding" per `kimi provider list --json` — the CLI-native successor to the claude-code-routed kimi-k2.7-code id.' },
+  'kimi-code/kimi-for-coding-highspeed': { model: 'kimi-code/kimi-for-coding-highspeed', provider: 'kimi', displayName: 'K2.7 Coding Highspeed (native)', costPer1MTokens: 2.5, contextWindow: 262144, skills: { 'code-generation': 93, 'code-review': 91, debugging: 91, planning: 88, documentation: 88, testing: 88, security: 83, performance: 90, synthesis: 92, speed: 88, 'context-length': 98 }, notes: 'Native kimi-code harness alias; displayName "K2.7 Coding Highspeed" per `kimi provider list --json` — a faster-inference variant of kimi-code/kimi-for-coding. No published pricing yet; reuses that alias\'s rate as a placeholder.' },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // MINIMAX MODELS
   // ═══════════════════════════════════════════════════════════════════════════

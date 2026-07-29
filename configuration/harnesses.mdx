@@ -23,7 +23,7 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 | `ohmypi` | [oh-my-pi](https://github.com/oh-my-pi/pi-coding-agent) (`omp`) | Multi-provider work, large workspaces | Adds oh-my-pi RPC over a named pipe; reads `~/.claude/skills` for skill parity. |
 | `codex` | [OpenAI Codex CLI](https://github.com/openai/codex) (`codex`) | OpenAI-model work | Uses persistent `codex app-server` sessions by default; requires Codex CLI `0.144.0` or newer. |
 | `acp` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Opt-in Kimi work | Uses the open Agent Client Protocol over a persistent authenticated host; Kimi is the first wired ACP agent. |
-| `kimi-code` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Kimi-only work (opt-in) | Drives Kimi's own native terminal UI directly — no ACP host, no Anthropic-compatibility endpoint. Kimi models only. |
+| `kimi-code` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Kimi models (built-in default) | Drives Kimi's own native terminal UI directly — no ACP host, no Anthropic-compatibility endpoint. Kimi models only. Set `providerHarnesses.kimi` to `acp` or `claude-code` to opt back out. |
 
 ## Composer commands across harnesses
 
@@ -152,8 +152,8 @@ been completed, Overdeck stops the launch with an authentication-required error
 rather than silently switching harnesses. `pan doctor` probes whether the
 optional `kimi` prerequisite is available on `PATH`.
 
-Kimi remains on its built-in `claude-code` default until you opt its provider
-into ACP in `~/.overdeck/config.yaml`:
+Kimi's built-in default is the native `kimi-code` harness (below); opt its
+provider into ACP instead in `~/.overdeck/config.yaml`:
 
 ```yaml
 providers:
@@ -200,8 +200,8 @@ the same `kimi` binary:
 | Why pick it | Portable across any ACP-capable agent | Reaches Kimi-specific behavior the ACP lowest-common-denominator surface can't |
 
 Neither replaces `claude-code` pointed at Kimi's Anthropic-compatibility
-endpoint (`ANTHROPIC_BASE_URL` + `KIMI_API_KEY`, still supported and still the
-built-in default — see [When to pick which](#when-to-pick-which)): that route
+endpoint (`ANTHROPIC_BASE_URL` + `KIMI_API_KEY`, still supported as an
+operator override — see [When to pick which](#when-to-pick-which)): that route
 runs the Claude Code binary itself against Kimi's models, forfeiting Kimi's
 own server-side context cache accounting that `kimi-code` and `acp` both keep.
 
@@ -232,17 +232,31 @@ Terms of Service one, but it is enforced identically at every spawn entry
 point and every picker). Pick a Kimi model, or use the model's supported
 harness.
 
-Opt a Kimi provider into the native harness in `~/.overdeck/config.yaml`:
+`kimi-code` is the **built-in default** for Kimi models — no config change is
+needed to use it. This is a behavior change: a Kimi model that previously
+resolved to `claude-code` (routed through Kimi's Anthropic-compatibility
+endpoint) now resolves to the native `kimi-code` harness by default, which
+requires the installed `kimi` binary and its own `kimi login` — not
+`config.apiKeys.kimi`.
+
+Migration note for existing model pins: the native CLI's own catalog only
+exposes `kimi-code/k3`, `kimi-code/k3-256k`, `kimi-code/kimi-for-coding`, and
+`kimi-code/kimi-for-coding-highspeed`. A role pinned to the claude-code-routed
+`k3` or `k3[1m]` id is remapped automatically to the matching native alias
+(`kimi-code/k3-256k` and `kimi-code/k3` respectively — the context-window
+sizes, not the bare-string names, decide the mapping). A role pinned to
+`kimi-k2.7-code`, `kimi-k2.6`, `kimi-k2.5`, `kimi-k2`, or `K2.6-code-preview`
+has no native equivalent and fails loudly at spawn with the list of valid
+native aliases, rather than silently launching the wrong model.
+
+To opt back out to `claude-code` or `acp`, override the provider's harness in
+`~/.overdeck/config.yaml`:
 
 ```yaml
 providers:
   kimi:
-    harness: kimi-code
+    harness: acp   # or claude-code
 ```
-
-Kimi remains on its built-in `claude-code` default until you set this — the
-native harness is opt-in while its end-to-end path is proven out, the same
-posture `acp` shipped under.
 
 Runtime adapter is `src/lib/runtimes/kimi-code.ts`; the per-agent
 `kimi-session-id` file (captured post-launch, since Kimi generates its own

@@ -54,6 +54,18 @@ describe('renderForHarness', () => {
     expect(renderForHarness(c, 'codex')).not.toContain('kimi-only');
     expect(renderForHarness(c, 'acp')).not.toContain('kimi-only');
   });
+
+  it('renders a union of harnesses when given an array — a kimi-only span survives AGENTS.md rendered for [ohmypi, kimi-code] (PAN-1837 review fix)', () => {
+    const c = 'shared\n{{#harness:kimi-code}}\nkimi-only\n{{/harness:kimi-code}}\n{{#harness:ohmypi}}\nohmypi-only\n{{/harness:ohmypi}}\n{{#harness:codex}}\ncodex-only\n{{/harness:codex}}';
+    const rendered = renderForHarness(c, ['ohmypi', 'kimi-code']);
+    expect(rendered).toContain('shared');
+    expect(rendered).toContain('kimi-only');
+    expect(rendered).toContain('ohmypi-only');
+    expect(rendered).not.toContain('codex-only');
+    // Rendering for either harness alone must still drop the other's exclusive span.
+    expect(renderForHarness(c, 'ohmypi')).not.toContain('kimi-only');
+    expect(renderForHarness(c, 'kimi-code')).not.toContain('ohmypi-only');
+  });
 });
 
 describe('validateTemplate', () => {

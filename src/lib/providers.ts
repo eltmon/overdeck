@@ -258,6 +258,50 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   },
 };
 
+/**
+ * PAN-1837: the native kimi-code CLI's own model catalog (verified via `kimi
+ * provider list --json` against the installed 0.29.2 binary) is a smaller,
+ * DIFFERENT id space than the claude-code-routed Kimi ids in
+ * PROVIDERS.kimi.models — it exposes only kimi-code/k3, kimi-code/k3-256k,
+ * kimi-code/kimi-for-coding, and kimi-code/kimi-for-coding-highspeed. Since
+ * wi7b flipped the built-in default to kimi-code, an existing role/config
+ * pinned to a bare claude-code-routed id (e.g. `kimi-k2.6`) now resolves to
+ * kimi-code but `kimi -m kimi-k2.6` fails — the native binary has never heard
+ * of that id.
+ *
+ * Only remap ids with a defensible 1:1 native correspondence. Reviewed
+ * against `kimi provider list --json`: kimi-code/k3 reports
+ * maxContextSize=1048576 (matches the claude-routed k3[1m] alias's 1M
+ * context), kimi-code/k3-256k reports maxContextSize=262144 (matches the
+ * claude-routed k3 alias's 256K context) — so the context tiers, not the
+ * bare-string similarity, decide the mapping.
+ */
+const KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS: Record<string, string> = {
+  'k3': 'kimi-code/k3-256k',
+  'k3[1m]': 'kimi-code/k3',
+};
+
+/**
+ * Resolve a model id to what the kimi-code CLI's `-m` flag will actually
+ * accept. Already-native `kimi-code/<alias>` ids pass through unchanged.
+ * Legacy claude-code-routed ids with a defensible native counterpart
+ * (KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS) are remapped. Every other legacy id
+ * (kimi-k2.7-code, kimi-k2.6, kimi-k2.5, kimi-k2, K2.6-code-preview) has no
+ * native equivalent in the installed CLI's catalog — fail loudly (matching
+ * the existing PAN-1871 fail-loud-over-silent-wrong-launch philosophy)
+ * instead of guessing an alias the operator never chose.
+ */
+export function resolveKimiCodeModelAlias(model: string): string {
+  if (model.startsWith('kimi-code/')) return model;
+  const mapped = KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS[model];
+  if (mapped) return mapped;
+  throw new Error(
+    `Model "${model}" has no native kimi-code CLI equivalent — the installed binary's catalog only exposes `
+    + `kimi-code/k3, kimi-code/k3-256k, kimi-code/kimi-for-coding, and kimi-code/kimi-for-coding-highspeed. `
+    + `Pick one of those models, or set providerHarnesses.kimi to 'claude-code' or 'acp' in config.yaml to keep using "${model}".`,
+  );
+}
+
 export function getBuiltInDefaultHarness(provider: ProviderName | string): RuntimeName {
   if (provider in PROVIDERS) {
     return PROVIDERS[provider as ProviderName].defaultHarness;

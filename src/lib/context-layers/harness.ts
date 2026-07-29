@@ -42,14 +42,19 @@ export const KNOWN_HARNESS_MARKERS: ReadonlySet<string> = new Set<HarnessMarker>
 const MARKER_RE = /\{\{([#/])harness:([a-zA-Z0-9_-]+)\}\}/g;
 
 /**
- * Render a canonical layer body for a single harness.
- *
- * Strips every `{{#harness:*}}` / `{{/harness:*}}` marker and drops the spans
- * that are not covered by the target harness. Runs of 3+ blank lines left by
- * removed spans collapse to a single blank line so output stays tidy.
+ * Render a canonical layer body for one harness, or a union of harnesses
+ * sharing one physical target file (e.g. AGENTS.md, read natively by both
+ * ohmypi and kimi-code — PAN-1837 review fix: rendering AGENTS.md for
+ * 'ohmypi' alone stripped every span authored only under
+ * {{#harness:kimi-code}}, so Kimi-specific context never survived `pan
+ * sync`). A span is kept when it is covered by no harness marker (always-on)
+ * or by a marker naming any of the target harnesses; every marker is
+ * stripped from the output. Runs of 3+ blank lines left by removed spans
+ * collapse to a single blank line so output stays tidy.
  */
-export function renderForHarness(content: string, harness: Harness): string {
-  const target = HARNESS_MARKERS[harness];
+export function renderForHarness(content: string, harness: Harness | readonly Harness[]): string {
+  const harnessList: readonly Harness[] = Array.isArray(harness) ? harness : [harness as Harness];
+  const targets = new Set<string>(harnessList.map((h) => HARNESS_MARKERS[h]));
   const openCounts = new Map<string, number>();
   let out = '';
   let lastIndex = 0;
@@ -63,7 +68,7 @@ export function renderForHarness(content: string, harness: Harness): string {
     for (const [name, count] of openCounts) {
       if (count > 0) {
         anyOpen = true;
-        if (name === target) covered = true;
+        if (targets.has(name)) covered = true;
       }
     }
     if (!anyOpen || covered) out += text;

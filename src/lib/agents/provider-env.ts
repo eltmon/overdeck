@@ -28,6 +28,17 @@ export async function getProviderEnvForModel(model: string, harness?: RuntimeNam
   const provider = getProviderForModelSync(model);
   if (provider.name === 'anthropic') return {};
 
+  // PAN-1837 review fix: native kimi-code auth is host-owned via `kimi login`
+  // (~/.kimi-code/config.toml) — it does not need config.apiKeys.kimi at all.
+  // Without this short-circuit, a correctly logged-in operator with no
+  // apiKeys.kimi configured hit "No API key configured for Kimi" (line ~81
+  // below) before ever reaching getProviderEnvSync's own isKimiCode gate,
+  // which only skips the Anthropic-compat env — it never bypassed this
+  // upstream API-key requirement.
+  if (provider.name === 'kimi' && harness === 'kimi-code') {
+    return getProviderEnvSync(provider, '', harness);
+  }
+
   const { config } = loadYamlConfig();
 
   // OpenRouter API key is stored in config.yaml under providers.openrouter.api_key

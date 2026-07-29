@@ -39,7 +39,7 @@ interface KimiUsageFields {
   inputCacheCreation?: number;
 }
 
-interface KimiWireEntry {
+export interface KimiWireEntry {
   type?: string;
   time?: number;
   created_at?: number;
@@ -89,7 +89,19 @@ export function parseKimiSessionSync(sessionFile: string): SessionUsage | null {
   } catch {
     return null;
   }
+  return summarizeKimiEntries(entries, sessionFile);
+}
 
+/**
+ * Aggregate already-parsed wire.jsonl entries into the shared SessionUsage
+ * shape. Split out of {@link parseKimiSessionSync} (PAN-1837 review fix) so a
+ * caller that has already read and parsed the file (the conversation-feed
+ * adapter, which re-parses on every wire.jsonl append) can reuse those
+ * entries instead of re-reading and re-parsing the whole file a second time
+ * per update — that was quadratic over a long session and blocked the
+ * dashboard event loop on the second, synchronous pass.
+ */
+export function summarizeKimiEntries(entries: KimiWireEntry[], sessionFile: string): SessionUsage | null {
   let model = '';
   let startTime = '';
   let endTime = '';

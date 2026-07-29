@@ -58,7 +58,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { piFifoPaths } from '../runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
-import { getAcpLauncherFields, waitForAcpHostReady } from '../agents/runtime-command.js';
+import { getAcpLauncherFields, waitForAcpHostReady, waitForPromptReady } from '../agents/runtime-command.js';
 import { workspaceContextFile, piGlobalContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import { sessionFilePath, getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
@@ -321,6 +321,15 @@ export async function waitForConversationRuntimeReady(tmuxSession: string, harne
       );
     }
   }
+  else if (transcriptKind === 'kimi-wire-jsonl') {
+    // PAN-1837 review fix: this readiness dispatcher had no Kimi branch, so it
+    // fell through to waitForClaudeReady() and waited for Claude Code's own
+    // ready markers, which the native kimi binary never produces.
+    const ready = await waitForPromptReady(tmuxSession, 'kimi-code', 30);
+    if (!ready) {
+      throw new Error(`Kimi Code did not become interactive in ${tmuxSession} within the startup window.`);
+    }
+  }
   else if (transcriptKind !== 'codex-rollout-jsonl' && mode === 'spawn') {
     await waitForClaudeReady(tmuxSession);
     console.log(`[conversations] Claude ready in ${tmuxSession}`);
@@ -567,6 +576,7 @@ export async function spawnConversationSession(
     resumeSessionId?: string;
   } | undefined;
   let acpFields: (ReturnType<typeof getAcpLauncherFields> & { resumeSessionId?: string }) | undefined;
+  let kimiCodeFields: { harness: 'kimi-code'; kimiCodeModel: string; kimiCodeYolo: true } | undefined;
   let codexTransport: 'app-server' | 'tui' | undefined;
   if (behavior.launchCommandKind === 'acp-host') {
     if (!model) throw new Error('ACP conversation requires a model');
@@ -590,7 +600,7 @@ export async function spawnConversationSession(
     if (!runtimeCommand.includes('--permission-mode')) {
       runtimeCommand = `${runtimeCommand} --permission-mode ${mode === 'auto' ? 'auto' : BYPASS_PERMISSION_MODE}`;
     }
-    providerExportsStr = (await getProviderExportsForModel(model)).trim();
+    providerExportsStr = (await getProviderExportsForModel(model, harness)).trim();
     if (behavior.transcriptKind === 'ohmypi-jsonl') {
       if (getProviderForModelSync(model).name === 'openai') {
         const auth = await getOhmypiCodexAuthStatus({ refreshIfExpired: true });
@@ -644,6 +654,12 @@ export async function spawnConversationSession(
         codexSessionDir: join(codexHome, 'sessions'),
         resumeSessionId,
       };
+    } else if (behavior.launchCommandKind === 'kimi-code-tui') {
+      // PAN-1837 review fix: conversations reached this launcher path without
+      // a Kimi field spread, so buildKimiCodeCommand() threw 'kimi-code
+      // launcher requires kimiCodeModel' before a session could be created.
+      // No resume support (D2: Kimi's session id is not presettable at spawn).
+      kimiCodeFields = { harness: 'kimi-code', kimiCodeModel: model, kimiCodeYolo: true };
     }
   }
   let launcherModel = model;
@@ -665,6 +681,7 @@ export async function spawnConversationSession(
     !piFields &&
     !codexFields &&
     !acpFields &&
+    !kimiCodeFields &&
     !plainFork &&
     isClaudeCodeChannelsEnabled() &&
     (!model || getProviderForModelSync(model).name === 'anthropic') &&
@@ -697,15 +714,15 @@ export async function spawnConversationSession(
       baseCommand: runtimeCommand,
       appendSystemPromptFiles: piFields
         ? await piConversationSystemPromptFiles(cwd)
-        : codexFields || acpFields
+        : codexFields || acpFields || kimiCodeFields
           ? []
           : await claudeConversationSystemPromptFiles(cwd),
       model: launcherModel,
-      ...(piFields ?? codexFields ?? acpFields ?? {
+      ...(piFields ?? codexFields ?? acpFields ?? kimiCodeFields ?? {
         resumeSessionId: resume ? claudeSessionId : undefined,
         sessionId: resume ? undefined : claudeSessionId,
       }),
-      extraArgs: !piFields && !acpFields && effort ? `--effort "${effort}"` : undefined,
+      extraArgs: !piFields && !acpFields && !kimiCodeFields && effort ? `--effort "${effort}"` : undefined,
       keepAlive: true,
       fileMode: 0o700,
       channelsBridgeMcpConfig,

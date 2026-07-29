@@ -624,6 +624,9 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
 
   // PAN-1837 (D6): kimi-code intentionally gets no dedicated global render file here —
   // it reads the shared AGENTS.md layer natively via ~/.agents/skills discovery, same as acp.
+  // PAN-1837 review fix: AGENTS.md itself must therefore render as the UNION of every
+  // harness that reads it (ohmypi + kimi-code), not ohmypi alone — rendering for 'ohmypi'
+  // in isolation stripped every span authored only under {{#harness:kimi-code}}.
 
   // Clean stale agent instructions in every project; Beads itself remains installed.
   for (const { config } of listProjectsSync()) {
@@ -635,7 +638,7 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
         if (cleanup) result.legacyBeadsCleanups.push(cleanup);
       }
       const claudeManaged = renderProjectLayer(config.path, 'claude-code');
-      const piManaged = renderProjectLayer(config.path, 'ohmypi');
+      const piManaged = renderProjectLayer(config.path, ['ohmypi', 'kimi-code']);
       if (claudeManaged) {
         wrote = writeManagedTargetSync(join(config.path, 'CLAUDE.md'), claudeManaged, result, backupTimestamp) || wrote;
       }

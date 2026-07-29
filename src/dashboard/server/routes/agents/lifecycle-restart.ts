@@ -237,7 +237,7 @@ export const postAgentRestartRoute = HttpRouter.add(
 
     const { model, harness, graceful = true, message } = body as {
       model?: string;
-      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp';
+      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
       graceful?: boolean;
       message?: string;
     };
@@ -408,7 +408,7 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     const { spawn: spawnFlag, model: rawModel, harness } = body as {
       spawn?: boolean;
       model?: string;
-      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp';
+      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
     };
     const wantsSpawn = spawnFlag !== false; // default to spawn when omitted (picker path)
 
@@ -477,7 +477,7 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     // We don't go through HTTP — we call the spawn primitives directly so
     // the caller gets a single 200 with both wipe and spawn confirmed.
     const spawnModel = newModel ?? agentState.model ?? 'claude-sonnet-5';
-    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | null = null;
+    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | null = null;
     if (harness) {
       const harnessDecision = yield* Effect.promise(async () =>
         canUseHarnessSync(harness, spawnModel, await getProviderAuthMode(spawnModel)),
