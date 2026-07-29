@@ -299,7 +299,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:06:50.178Z",
+  "updated": "2026-07-29T05:06:57.923Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "reviewing",
@@ -309,7 +309,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:06:48.636Z",
+    "updatedAt": "2026-07-29T05:06:57.808Z",
     "reviewNotes": "Agent re-review request (1/25): Synced with latest main and resolved file-size-allowlist.txt. Ready for review.",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -380,7 +380,7 @@
       },
       "costAtCloseOut": {
         "usd": 262.013662,
-        "pricingAsOf": "2026-07-29T05:06:48.756Z"
+        "pricingAsOf": "2026-07-29T05:06:57.866Z"
       }
     },
     "merges": [
@@ -389,7 +389,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3232",
