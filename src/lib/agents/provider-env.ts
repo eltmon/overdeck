@@ -119,6 +119,7 @@ const PROVIDER_ENV_KEYS = [
   'OPENROUTER_API_KEY',
   'NOUS_API_KEY',
   'DASHSCOPE_API_KEY',
+  'QUANTUMLLAMA_API_KEY',
 ] as const;
 
 // PAN-3057: the harness pin and the capability table are ONE number now. They

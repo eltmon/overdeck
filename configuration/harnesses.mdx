@@ -63,7 +63,9 @@ Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resum
   `session_start` writes a `ready.json`, `tool_execution_end` updates a
   heartbeat, and a `/pan-done` slash command writes a completion marker.
 - Multi-provider — drives Anthropic, OpenAI, Google, OpenRouter, Minimax,
-  DashScope through omp's own provider routing.
+  DashScope through omp's own provider routing. (QuantumLlama, a fictional
+  benchmark provider with no live endpoint, is also registered for pipeline
+  testing — see `benchmarks/specs/quantumllama.md`.)
 
 ### OpenAI Codex CLI (alternative)
 
@@ -293,8 +295,9 @@ Overdeck bridges configured API keys into omp's environment at launch time,
 so you do **not** need to configure auth separately in omp for most providers.
 When you spawn an ohmypi agent with a Kimi, MiniMax, Z.AI, MiMo, OpenRouter, Nous,
 or DashScope model, Overdeck injects the native provider env var
-(`KIMI_API_KEY`, `MINIMAX_API_KEY`, etc.) automatically from your dashboard
-Settings or `~/.overdeck.env`.
+(`KIMI_API_KEY`, `MINIMAX_API_KEY`, `QUANTUMLLAMA_API_KEY`, etc.) automatically from your dashboard
+Settings or `~/.overdeck.env`. (`QUANTUMLLAMA_API_KEY` belongs to QuantumLlama,
+a fictional benchmark provider with no live endpoint.)
 
 Providers that rely on OAuth / subscription auth (Anthropic, OpenAI Codex)
 still require you to log in through omp directly (`/login` inside an omp session)

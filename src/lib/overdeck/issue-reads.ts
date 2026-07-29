@@ -21,6 +21,7 @@ import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../rem
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { readIssueRecordSync } from '../pan-dir/record.js';
+import { findPrdAnywhereSync, readPrdContent } from '../prd-locations.js';
 
 function isGitHubIssue(issueId: string): {
   isGitHub: boolean;
@@ -235,6 +236,30 @@ export function getIssueTasks(id: string) {
       source: 'vbrief',
       isRemote: isRemoteWorkspace,
       sequence: record?.tasks?.sequence ?? 0,
+    });
+  });
+}
+
+export function getIssuePrd(id: string) {
+  return Effect.gen(function* () {
+    const resolvedProject = resolveProjectFromIssueSync(id);
+    const projectPath = resolvedProject?.projectPath ?? resolveIssueProjectPathSync(id);
+    const location = projectPath ? findPrdAnywhereSync(projectPath, id) : null;
+    if (!location) {
+      return jsonResponse({ hasPrd: false, error: `No PRD draft for ${id}.` }, { status: 404 });
+    }
+
+    const content = yield* Effect.promise(() => readPrdContent(location));
+    if (content === null) {
+      return jsonResponse({ hasPrd: false, error: `The PRD draft for ${id} is unreadable.` }, { status: 404 });
+    }
+
+    return jsonResponse({
+      hasPrd: true,
+      content,
+      path: location.path,
+      status: location.status,
+      format: location.format,
     });
   });
 }

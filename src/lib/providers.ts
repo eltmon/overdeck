@@ -15,7 +15,7 @@ import { FsError } from './errors.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 import { MODEL_DEPRECATIONS } from './model-capabilities.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama';
 
 /**
  * Provider configuration
@@ -256,6 +256,20 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     tested: false,
     description: 'Route via omp using MISTRAL_API_KEY.',
   },
+
+  quantumllama: {
+    name: 'quantumllama',
+    displayName: 'QuantumLlama',
+    compatibility: 'direct',
+    defaultHarness: 'claude-code',
+    baseUrl: 'https://api.quantumllama.ai/v1',
+    authType: 'static',
+    models: ['ql-reason-70b', 'ql-swift-8b', 'ql-nano-1b'],
+    haikuModel: 'ql-nano-1b',
+    tierModels: { opus: 'ql-reason-70b', sonnet: 'ql-swift-8b', haiku: 'ql-nano-1b' },
+    tested: false,
+    description: 'Route directly to the QuantumLlama Anthropic-compatible endpoint using QUANTUMLLAMA_API_KEY. Synthetic benchmark provider (PAN-3252); no live endpoint exists.',
+  },
 };
 
 /**
@@ -437,6 +451,11 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
     return PROVIDERS.mistral;
   }
 
+  // Check QuantumLlama models (synthetic benchmark provider, PAN-3252)
+  if (['ql-reason-70b', 'ql-swift-8b', 'ql-nano-1b'].includes(modelId)) {
+    return PROVIDERS.quantumllama;
+  }
+
   throw new UnknownModelError(String(modelId), nearestKnownModelId(String(modelId)));
 }
 
@@ -522,6 +541,8 @@ export function getProviderEnvSync(
     env.CEREBRAS_API_KEY = apiKey;
   } else if (provider.name === 'mistral') {
     env.MISTRAL_API_KEY = apiKey;
+  } else if (provider.name === 'quantumllama') {
+    env.QUANTUMLLAMA_API_KEY = apiKey;
   }
 
   // MiniMax, Z.AI, and MiMo recommend longer timeouts

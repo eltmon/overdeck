@@ -35,7 +35,8 @@ export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';
 export type NousModel = 'qwen/qwen3.6-plus';
 export type DashScopeModel = 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max';
 export type GrokModel = 'grok-build-0.1';
-export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel;
+export type QuantumLlamaModel = 'ql-reason-70b' | 'ql-swift-8b' | 'ql-nano-1b';
+export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | QuantumLlamaModel;
 
 // Task complexity levels
 export type ComplexityLevel = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
@@ -69,6 +70,7 @@ export interface ApiKeysConfig {
   nous?: string;
   dashscope?: string;
   xai?: string;
+  quantumllama?: string;
 }
 
 // Complete settings structure
@@ -164,6 +166,7 @@ export function loadSettingsSync(): SettingsConfig {
   if (process.env.NOUS_API_KEY) envApiKeys.nous = process.env.NOUS_API_KEY;
   if (process.env.DASHSCOPE_API_KEY) envApiKeys.dashscope = process.env.DASHSCOPE_API_KEY;
   if (process.env.XAI_API_KEY) envApiKeys.xai = process.env.XAI_API_KEY;
+  if (process.env.QUANTUMLLAMA_API_KEY) envApiKeys.quantumllama = process.env.QUANTUMLLAMA_API_KEY;
 
   // Merge env vars as fallback (settings.json takes precedence)
   settings.api_keys = {
@@ -243,6 +246,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
   nous: NousModel[];
   dashscope: DashScopeModel[];
   xai: GrokModel[];
+  quantumllama: QuantumLlamaModel[];
 } {
   const anthropicModels: AnthropicModel[] = [
     'claude-fable-5',
@@ -287,6 +291,10 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     ? ['grok-build-0.1']
     : [];
 
+  const quantumllamaModels: QuantumLlamaModel[] = settings.api_keys.quantumllama
+    ? ['ql-reason-70b', 'ql-swift-8b', 'ql-nano-1b']
+    : [];
+
   return {
     anthropic: anthropicModels,
     openai: openaiModels,
@@ -297,6 +305,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     nous: nousModels,
     dashscope: dashscopeModels,
     xai: xaiModels,
+    quantumllama: quantumllamaModels,
   };
 }
 

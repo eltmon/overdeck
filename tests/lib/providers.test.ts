@@ -181,4 +181,24 @@ describe('providers', () => {
       CLAUDE_CODE_SUBAGENT_MODEL: 'grok-build-0.1',
     });
   });
+
+  it('resolves the quantumllama provider for all ql-* model ids', () => {
+    for (const model of ['ql-reason-70b', 'ql-swift-8b', 'ql-nano-1b']) {
+      expect(getProviderForModelSync(model)).toBe(PROVIDERS.quantumllama);
+    }
+  });
+
+  it('routes QuantumLlama through its direct Anthropic-compatible endpoint', () => {
+    expect(PROVIDERS.quantumllama.compatibility).toBe('direct');
+    expect(getProviderEnvSync(PROVIDERS.quantumllama, 'ql-test-key')).toEqual({
+      ANTHROPIC_BASE_URL: 'https://api.quantumllama.ai/v1',
+      ANTHROPIC_AUTH_TOKEN: 'ql-test-key',
+      QUANTUMLLAMA_API_KEY: 'ql-test-key',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'ql-reason-70b',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'ql-swift-8b',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'ql-nano-1b',
+      ANTHROPIC_SMALL_FAST_MODEL: 'ql-nano-1b',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'ql-nano-1b',
+    });
+  });
 });

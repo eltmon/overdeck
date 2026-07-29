@@ -14,7 +14,7 @@ import type { SubscriptionPlan } from './subscription-types.js';
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama';
 
 /**
  * Map of model ID to provider
@@ -97,6 +97,11 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // xAI models
   'grok-build-0.1': 'xai',
+
+  // QuantumLlama models (synthetic benchmark provider, PAN-3252)
+  'ql-reason-70b': 'quantumllama',
+  'ql-swift-8b': 'quantumllama',
+  'ql-nano-1b': 'quantumllama',
 } as Record<ModelId | string, ModelProvider>;
 
 /**
@@ -179,6 +184,11 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 
   // xAI → Anthropic
   'grok-build-0.1': 'claude-sonnet-5', // Coding flagship → Sonnet
+
+  // QuantumLlama → Anthropic (synthetic benchmark provider, PAN-3252)
+  'ql-reason-70b': 'claude-sonnet-5', // Flagship reasoning → Sonnet
+  'ql-swift-8b': 'claude-haiku-4-5', // Mid-tier → Haiku
+  'ql-nano-1b': 'claude-haiku-4-5', // Economy tier → Haiku
 };
 
 /**
@@ -246,6 +256,7 @@ export function getModelProviderSync(modelId: ModelId | string): ModelProvider {
   if (modelId.toLowerCase().startsWith('minimax')) return 'minimax';
   if (modelId.startsWith('mimo-')) return 'mimo';
   if (modelId.startsWith('grok-')) return 'xai';
+  if (modelId.startsWith('ql-')) return 'quantumllama';
   return 'anthropic';
 }
 
@@ -458,6 +469,7 @@ export function detectEnabledProvidersSync(apiKeys: {
   mimo?: string;
   nous?: string;
   xai?: string;
+  quantumllama?: string;
 }): Set<ModelProvider> {
   const enabled = new Set<ModelProvider>(['anthropic']); // Always enabled
 
@@ -488,6 +500,9 @@ export function detectEnabledProvidersSync(apiKeys: {
   }
   if (apiKeys.xai && apiKeys.xai.trim()) {
     enabled.add('xai');
+  }
+  if (apiKeys.quantumllama && apiKeys.quantumllama.trim()) {
+    enabled.add('quantumllama');
   }
 
   return enabled;
