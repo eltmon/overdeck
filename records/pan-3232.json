@@ -299,15 +299,7 @@
       "timestamp": "2026-07-29T05:58:19.693Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "test-agent",
-      "outcome": "failed",
-      "timestamp": "2026-07-29T05:58:19Z",
-      "markdownBody": "# Test failure\n\nGates run from workspace feature-pan-3232 (HEAD d814ebec88): npm run typecheck PASSED (root, hooks, evals, dashboard, frontend). npm run lint PASSED (eslint + all custom guards, exit 0). npm test FAILED: root vitest suite passed cleanly (1285 files / 12044 tests, 3 skipped), but the frontend targeted subset failed 1 of 59 tests. FAILING TEST: src/__tests__/fr7-conversation-pending-input.test.tsx > FR-7: Conversation-only pending input surfaces > ConversationDock: AC-3 > 'AC-3: preserves agent-backed dock panel when agent exists for docked issue' (line 450). TestingLibraryElementError: screen.getByText('agent-test-1') matches two elements - the panel header's agent-id label (div.truncate.font-mono) and the mocked DrawerAgentSession component body, which also renders the literal text 'agent-test-1'. This is a query-ambiguity bug in the test itself (needs getAllByText or a scoped query), introduced by this branch's own fix(fr7) commits at HEAD (d814ebec88, b3c3ac68c5, 0450d10a8e). No browser UAT was performed: the PRD (drafts/PAN-3232.md) and GitHub issue #3232 do not request live/browser verification, verify_commands across all xBRIEF items specify only vitest/typecheck/grep, and the two items requiring live runtime behavior (live-tree-delta, specialist-pending-input) were explicitly cancelled/deferred per PR comments as out of this branch's shipped scope - the shipped rendering fixes are fully covered by component-level unit tests mocking the exact prop shapes in the issue's acceptance criteria. Blocking this failure: work agent must fix the ambiguous query in fr7-conversation-pending-input.test.tsx:450 (e.g. scope to within(screen.getByTestId('drawer-agent-session')) or use getAllByText) and re-run npm test.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-3232`."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "package.json",
@@ -382,21 +374,21 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T06:42:19.749Z",
+  "updated": "2026-07-29T06:42:23.465Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T06:12:06.508Z",
-    "updatedAt": "2026-07-29T06:42:19.722Z",
+    "updatedAt": "2026-07-29T06:42:23.330Z",
     "reviewNotes": "Verification infrastructure error: Verification worker bundle missing at /home/eltmon/.overdeck/deployments/dashboard/.pan-reload-generation-a/dist/verification-worker.js; run npm run build",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
     "reviewRequestedAt": "2026-07-29T06:12:06.508Z",
-    "reviewSpawnedAt": "2026-07-29T05:56:22.577Z"
+    "reviewSpawnedAt": "2026-07-29T06:42:23.329Z"
   },
   "closeOut": {
     "usage": {
@@ -470,7 +462,7 @@
       },
       "costAtCloseOut": {
         "usd": 321.650068,
-        "pricingAsOf": "2026-07-29T06:42:19.740Z"
+        "pricingAsOf": "2026-07-29T06:42:23.417Z"
       }
     },
     "merges": [
