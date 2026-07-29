@@ -299,7 +299,7 @@
     "recordedAt": "2026-07-29T03:14:07.085Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T03:20:56.314Z",
+  "updated": "2026-07-29T03:21:01.519Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -309,7 +309,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:14:32.983Z",
-    "updatedAt": "2026-07-29T03:20:55.636Z",
+    "updatedAt": "2026-07-29T03:21:01.506Z",
     "reviewNotes": "AC-3 test coverage was incomplete in this cycle; new commits add agent-backed test",
     "conflictsSince": {
       "sha": "701cbb21f1deb79f90c821db2bf23db7d02d4886",
@@ -319,7 +319,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "f8796565d4ebbec9509fd5e4ac6bcdf6f22a2cb2",
+    "reviewedAtCommit": "f62d4793235ea6644a96ca02a4706437d687b54d",
     "reviewRequestedAt": "2026-07-29T03:14:32.983Z",
     "reviewSpawnedAt": "2026-07-29T02:59:04.794Z",
     "scopeDrift": {
@@ -454,7 +454,7 @@
       },
       "costAtCloseOut": {
         "usd": 260.03429,
-        "pricingAsOf": "2026-07-29T03:20:55.663Z"
+        "pricingAsOf": "2026-07-29T03:21:01.514Z"
       }
     },
     "merges": [
