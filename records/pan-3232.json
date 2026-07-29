@@ -62,9 +62,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-29T00:11:58.662Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-29T00:15Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-29T00:15:12.424Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-29T00:15:12Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3232\n\n# Review — PAN-3232 — Cycle 5\n\n## Verdict: CHANGES REQUESTED — this cycle changes only the file-size allowlist, so every prior implementation blocker remains unresolved\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3232/.pan/review/agent-pan-3232-review-0f552fdb/context.json`\n- Branch: `feature/pan-3232`\n- PR: `#3251`\n- HEAD reviewed: `0f552fdb940234e6c5cc83054cb22e0a0be92b37`\n- Prior reviewed HEAD: `f2a3bffa861b4553e52947b3be0df57ec50aa888`\n- Cycle diff: `scripts/file-size-allowlist.txt` only; no implementation or test file changed\n- Dimensions reviewed: correctness, security, requirements/acceptance criteria, and performance\n- The top implementation blocker could not have been raised in cycle 1: the broken conversation-routing branch was introduced by `b11955436d` after the cycle-2 verdict. The current cycle does not alter that code.\n\n## Blocking Findings\n\n### ! [correctness/requirements] FR-7 still posts conversation answers to an unregistered route and cannot surface conversation-only strip entries — `src/dashboard/frontend/src/lib/simple/useSimpleActions.ts:59`\n**Scope:** in_pr_scope; unresolved blocker carried forward from the prior verdict  \n**Evidence tier:** Tier 1 — direct route/consumer trace  \n**Requirement:** FR-7 and `widen-direct-selector-surfaces.ac1` require NeedsYouStrip, SimpleHomePage, and ConversationDock to render and act on a conversation pending-input row while the agent store is empty.\n\nThe current cycle changes only the file-size allowlist, so the prior main-path failures are unchanged:\n\n- `useSimpleActions.ts:61-64` posts to `POST /api/conversations/:name/answer-question` with `{ answers: [text] }`. No such route exists. The registered conversation write door is `POST /api/conversations/:name/message` at `src/dashboard/server/routes/conversations.ts:569-583`, whose handler requires `{ message: string }`.\n- `NeedsYouStrip.tsx:23-39,61-67` adds and forwards `isConversation` only behind `item.pendingInputAgent`; a conversation-only subject has no pending agent, the render site never supplies a conversation target, and the component still derives rows from agent-backed needs-you items.\n- `ConversationDock` still only annotates already-docked issue rows; it does not synthesize or render the pending conversation itself.\n\n**Impact:** SimpleHomePage exposes an Answer action that always returns 404 for a conversation, while NeedsYouStrip and ConversationDock remain blind to the conversation-only state named by the acceptance criterion.\n\n**Fix:** Use the registered conversation message door and its actual body shape, preserve subject source/identity through the UI, synthesize a conversation-backed strip row without requiring `pendingInputAgent`, and render/open the pending conversation in ConversationDock. Add the required empty-agent-store regression cases.\n\n### ! [correctness] Reviewer pending-input fields still violate the declared `ReviewerNode` contract — `src/dashboard/server/routes/reviewer-tree.ts:456`\n**Scope:** in_pr_scope; unresolved blocker carried forward from cycle 2  \n**Evidence tier:** Tier 1 — compiler-confirmed  \n\n`buildReviewerNodes` assigns `awaitingInput`, `awaitingInputPrompt`, `awaitingInputReason`, and `pendingInputKinds`, but `ReviewerNode` at `reviewer-tree.ts:128-142` declares none of them. The current raw server TypeScript check still reports:\n\n```text\nsrc/dashboard/server/routes/reviewer-tree.ts(456,9): error TS2353: Object literal may only specify known properties, and 'awaitingInput' does not exist in type 'ReviewerNode'.\n```\n\nAdd the four optional fields with types matching `SessionNode`; the downstream cast is not a substitute for a valid source contract.\n\n### ! [requirements] The xBRIEF-promised regression coverage remains absent — `PAN-3232 xBRIEF items WI-1 through WI-5 and WI-7`\n**Scope:** in_pr_scope; unresolved blocker carried forward from earlier cycles  \n**Evidence tier:** Tier 1 — xBRIEF and changed-test inventory  \n\nThe current cycle adds no tests, and the full PR still lacks the named regression coverage for issue-view projection, Decisions prompt precedence, SessionPanel labels, enrichment event compatibility and producer payloads, delta mapping/clearing/client merging, specialist projection, and conversation-only behavior on all three widened surfaces. The planned `src/dashboard/server/__tests__/session-tree-specialist-pending-input.test.ts` still does not exist; the only added test covers an unrelated SubagentTranscript layout.\n\nThe absent acceptance gate has allowed the incomplete FR-4 slice, invalid reviewer type contract, and nonexistent conversation route through successive implementation cycles. Add the xBRIEF's executable cases before merge.\n\n## Non-blocking Findings\n\n### ~ [maintenance] The cycle duplicated all four PAN-3232 allowlist entries — `scripts/file-size-allowlist.txt:12`\nLines 12-15 are repeated verbatim at lines 16-19. The parser stores entries in an associative array, so the second copy merely overwrites the same values and `scripts/lint-file-size.sh` still passes. Remove the duplicates to keep the audited-exception inventory single-valued and reviewable.\n\n### ~ [correctness, previously reviewed] SessionPanel can discard independent Channels permission evidence — `src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx:338`\n`session.pendingInputKinds ?? ...` treats an empty or incomplete enrichment array as authoritative even when `hasPendingPermission` is true. This was already reviewed and is not promoted in a cycle whose implementation diff is empty.\n\n### ~ [correctness, previously reviewed] NeedsYouStrip drops enrichment-only prompt text — `src/dashboard/frontend/src/components/KanbanBoard/NeedsYouStrip.tsx:128`\nThe prompt map reads only the explicit AskUserQuestion payload and ignores `pendingQuestionPrompt`. This remains advisory under the convergence gate.\n\n### ~ [documentation] Two added fenced blocks omit language identifiers\n`docs/ASKUSERQUESTION-DASHBOARD.md:330` and `docs/FLYWHEEL-STATE.md:8091` still use bare fences and trigger markdownlint MD040.\n\n## Security Review\nNo blocking security issue found. This cycle changes only a static lint allowlist. Across the PR, prompt values remain React text, identifiers are encoded, and no authentication, authorization, destructive endpoint, filesystem boundary, command execution, or secret-bearing transport changes were introduced.\n\n## Performance Review\nNo blocking performance regression found. The allowlist duplicates have no runtime effect. The feature's live delta path still updates cached tree state without query invalidation, the conversation query uses the shared React Query key, specialist projection performs bounded map lookups, and no new polling key or synchronous server primitive was added.\n\n## Requirements Coverage\n- FR-1: implemented.\n- FR-2: implemented.\n- FR-3: base acceptance behavior implemented, with the non-blocking evidence-merge caveat above.\n- FR-4 / NFR-1 / NFR-2: implemented as a push-based in-place delta.\n- FR-5: runtime projection exists, but the reviewer contract and required tests remain blocking.\n- FR-6 / NFR-3: implemented.\n- FR-7: failed; conversation-only visibility and answer routing remain broken.\n- FR-8: implemented, subject to the markdownlint nits.\n- Non-goals remain respected: no classifier, GodView/AgentCard, recovery-path, shared awaiting-input helper, or new polling-loop change.\n\n## Verification Performed\n- The prior-to-current cycle diff contains only `scripts/file-size-allowlist.txt`.\n- `git diff --check` passed.\n- `bash scripts/lint-file-size.sh` passed; duplicate allowlist entries are silently overwritten.\n- A filtered raw server TypeScript check still confirms the `ReviewerNode` error above.\n- The registered conversation route and the incorrect frontend route were re-verified at the current HEAD.\n- No implementation files were modified and no test role was queued.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3232/.pan/review/agent-pan-3232-review-0f552fdb/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3232 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -141,18 +154,18 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T00:11:58.688Z",
+  "updated": "2026-07-29T00:15:12.424Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T00:11:57.107Z",
-    "reviewNotes": "Agent re-review request (6/25): Resolved main merge conflict in allowlist",
+    "updatedAt": "2026-07-29T00:15:11.488Z",
+    "reviewNotes": "This cycle changes only the allowlist; FR-7 still uses an unregistered conversation route and prior blockers remain",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
       "detectedAt": "2026-07-29T00:03:35.975Z",
@@ -185,27 +198,27 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4392015,
-            "output": 215329,
-            "cacheRead": 50245632,
+            "input": 5385620,
+            "output": 236274,
+            "cacheRead": 54464512,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1762,
-            "output": 61285,
-            "cacheRead": 41271794,
-            "cacheWrite": 1957887
+            "input": 1824,
+            "output": 63298,
+            "cacheRead": 41775884,
+            "cacheWrite": 2068994
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2196,
-          "output": 89158,
-          "cacheRead": 51392997,
-          "cacheWrite": 2267700
+          "input": 2258,
+          "output": 91171,
+          "cacheRead": 51897087,
+          "cacheWrite": 2378807
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -214,15 +227,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 4392015,
-          "output": 215329,
-          "cacheRead": 50245632,
+          "input": 5385620,
+          "output": 236274,
+          "cacheRead": 54464512,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 72.173166,
-        "pricingAsOf": "2026-07-29T00:11:57.130Z"
+        "usd": 80.078401,
+        "pricingAsOf": "2026-07-29T00:15:11.599Z"
       }
     },
     "merges": [
@@ -231,7 +244,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3232",
