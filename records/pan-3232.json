@@ -152,9 +152,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-29T02:16:07.708Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-29T02:16Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-07-29T02:16:47.392Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-07-29T02:16:47.507Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-29T02:16:47Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-3232 (attempt 3/3):\n\nFailed check: incomplete-plan-items\n\nChecklist completion check FAILED — 8 incomplete item(s) remain:\n\n  Incomplete plan items (8):\n    - live-tree-delta.live-tree-delta.ac1 The AgentEnrichmentChangedEvent schema accepts payloads both with and without issueId, and decoding a legacy payload without the field returns a valid event (pending)\n    - live-tree-delta.live-tree-delta.ac2 mapEventToDelta returns a pending_input_changed delta carrying awaitingInput, prompt, reason, and kinds for an enrichment event with issueId, and returns null when the payload lacks issueId (pending)\n    - live-tree-delta.live-tree-delta.ac3 applySessionTreeDelta merges the four pending-input fields onto the matched session and clears them when the delta omits them, returning the same tree object when no session matches (pending)\n    - live-tree-delta.live-tree-delta.ac4 The enrichment poller emits issueId on agent.enrichment_changed events for agents with a known issue (pending)\n    - specialist-pending-input.specialist-pending-input.ac1 Session-tree review orchestrator, test, and ship nodes carry the four awaiting-input fields when the agent snapshot reports hasPendingQuestion true (pending)\n    - specialist-pending-input.specialist-pending-input.ac2 buildReviewerNodes returns reviewer nodes that carry the four awaiting-input fields taken from the provided agentSnapshotsById map (pending)\n    - specialist-pending-input.specialist-pending-input.ac3 The activity route emits specialist sections carrying the same four fields for a pending specialist snapshot (pending)\n    - specialist-pending-input.specialist-pending-input.ac4 A specialist node whose agent has no snapshot or no pending question renders with awaitingInput false and produces no prompt, reason, or kinds fields (pending)\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3232 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -231,7 +249,7 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T02:16:46.799Z",
+  "updated": "2026-07-29T02:16:47.508Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "reviewing",
