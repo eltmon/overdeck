@@ -31,7 +31,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-29T01:18:27.111Z",
+  "updated": "2026-07-29T01:26:08.986Z",
   "pipeline": {
     "issueId": "PAN-3231",
     "reviewStatus": "pending",
@@ -98,16 +98,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "xbrief-fullscreen-shell": {
-        "writerId": "agent-pan-3231",
-        "agentId": "agent-pan-3231",
-        "pid": 2710465,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-29T01:18:27.111Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3231",
@@ -185,6 +177,17 @@
         "outcome": "completed",
         "reason": "Operator explicitly approved the committed, browser-verified List/DAG/Raw mockup; approval is recorded as decision D9 in workspace continue state.",
         "releasedAt": "2026-07-29T01:18:05.339Z"
+      },
+      {
+        "writerId": "agent-pan-3231",
+        "agentId": "agent-pan-3231",
+        "pid": 2710465,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T01:18:27.111Z",
+        "itemId": "xbrief-fullscreen-shell",
+        "outcome": "completed",
+        "reason": "Added the approved store-driven full-screen xBRIEF modal, canonical workspace-plan query and inspection-policy cache writes, focused close behavior, and flex-fill DAG layout with tests.",
+        "releasedAt": "2026-07-29T01:26:08.986Z"
       }
     ],
     "statusReasons": {
@@ -207,6 +210,10 @@
       "prd-chip-viewer": {
         "reason": "Added the canonical PRD chip signal, store-driven global ChatMarkdown viewer, 404 empty state, accessible close behavior, and focused tests.",
         "updatedAt": "2026-07-28T23:17:47.890Z"
+      },
+      "xbrief-fullscreen-shell": {
+        "reason": "Added the approved store-driven full-screen xBRIEF modal, canonical workspace-plan query and inspection-policy cache writes, focused close behavior, and flex-fill DAG layout with tests.",
+        "updatedAt": "2026-07-29T01:26:08.986Z"
       }
     }
   },
@@ -235,6 +242,11 @@
     "mockups.mockups.ac2": "completed",
     "mockups.mockups.ac3": "completed",
     "mockups.mockups.ac4": "completed",
-    "xbrief-fullscreen-shell": "running"
+    "xbrief-fullscreen-shell": "completed",
+    "xbrief-fullscreen-shell.xbrief-fullscreen-shell.ac1": "completed",
+    "xbrief-fullscreen-shell.xbrief-fullscreen-shell.ac2": "completed",
+    "xbrief-fullscreen-shell.xbrief-fullscreen-shell.ac3": "completed",
+    "xbrief-fullscreen-shell.xbrief-fullscreen-shell.ac4": "completed",
+    "xbrief-fullscreen-shell.xbrief-fullscreen-shell.ac5": "completed"
   }
 }
