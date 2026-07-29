@@ -274,17 +274,17 @@
     "recordedAt": "2026-07-29T02:58:56.941Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T02:59:36.131Z",
+  "updated": "2026-07-29T03:01:32.515Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T02:59:06.432Z",
-    "reviewNotes": "Verification failed at incomplete-plan-items — fix and resubmit",
+    "updatedAt": "2026-07-29T03:01:32.474Z",
+    "reviewNotes": "The FR-7 suite still omits SimpleHomePage conversation coverage and real agent-preservation tests; its AC-3 case is a conversation assertion.",
     "conflictsSince": {
       "sha": "701cbb21f1deb79f90c821db2bf23db7d02d4886",
       "detectedAt": "2026-07-29T00:29:21.202Z",
@@ -294,7 +294,6 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
     "reviewedAtCommit": "a80c44d9ee5b56ee36e41614dc49eb7e4ff66ef0",
-    "reviewRequestedAt": "2026-07-29T02:58:57.721Z",
     "reviewSpawnedAt": "2026-07-29T02:59:04.794Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -391,9 +390,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 26578186,
-            "output": 809832,
-            "cacheRead": 135310336,
+            "input": 27737541,
+            "output": 824906,
+            "cacheRead": 137708544,
             "cacheWrite": 0
           }
         },
@@ -420,15 +419,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 26578186,
-          "output": 809832,
-          "cacheRead": 135310336,
+          "input": 27737541,
+          "output": 824906,
+          "cacheRead": 137708544,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 250.615637,
-        "pricingAsOf": "2026-07-29T02:59:08.869Z"
+        "usd": 258.063736,
+        "pricingAsOf": "2026-07-29T03:01:32.499Z"
       }
     },
     "merges": [
