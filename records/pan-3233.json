@@ -70,7 +70,7 @@
     "recordedAt": "2026-07-28T20:46:26.914Z"
   },
   "created": "2026-07-28T18:18:59.531Z",
-  "updated": "2026-07-29T00:01:49.618Z",
+  "updated": "2026-07-29T00:11:07.541Z",
   "pipeline": {
     "issueId": "PAN-3233",
     "reviewStatus": "passed",
@@ -81,10 +81,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:48:00.219Z",
-    "updatedAt": "2026-07-29T00:01:49.567Z",
+    "updatedAt": "2026-07-29T00:11:07.509Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3247",
     "reviewedAtCommit": "66cb23d0d69083300e7175959f38616b00b19956",
-    "reviewSpawnedAt": "2026-07-28T21:23:12.987Z"
+    "reviewSpawnedAt": "2026-07-28T21:23:12.987Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-29T00:11:07.509Z"
   },
   "closeOut": {
     "usage": {
@@ -150,7 +152,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3247"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-29T00:11:07.533Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed (no lastVerifiedCommit recorded)",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3247 MERGED at 2026-07-29T00:01:49Z",
+          "status": "pass",
+          "mergedAt": "2026-07-29T00:01:49Z",
+          "mergeCommit": "82bb0a0f48c081efa034ebc71ab18f2d46b982e9"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: in_review; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "no CI check-runs on merge commit 82bb0a0f48c081efa034ebc71ab18f2d46b982e9",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit c109ed6a contains merge 82bb0a0f",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 4 agent state directories; No strike branch strike/pan-3233 found; Pruned 117 checkpoint ref(s) for agent-pan-3233, planning-pan-3233, strike-pan-3233; No specialist registry entries for PAN-3233"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "claude-sonnet-5",
