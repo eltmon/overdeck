@@ -156,17 +156,18 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T00:48:47.581Z",
+  "updated": "2026-07-29T00:52:05.025Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T00:48:46.455Z",
+    "updatedAt": "2026-07-29T00:52:04.981Z",
+    "reviewNotes": "The new regression suite tests only hand-written literals while NeedsYouStrip and ConversationDock still fail FR-7",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -205,9 +206,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5390842,
-            "output": 236472,
-            "cacheRead": 54850560,
+            "input": 6837121,
+            "output": 297980,
+            "cacheRead": 63969792,
             "cacheWrite": 0
           }
         },
@@ -234,15 +235,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 5390842,
-          "output": 236472,
-          "cacheRead": 54850560,
+          "input": 6837121,
+          "output": 297980,
+          "cacheRead": 63969792,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 81.040127,
-        "pricingAsOf": "2026-07-29T00:48:46.464Z"
+        "usd": 94.676378,
+        "pricingAsOf": "2026-07-29T00:52:05.003Z"
       }
     },
     "merges": [
@@ -251,7 +252,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3232",
