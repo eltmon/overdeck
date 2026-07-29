@@ -64,15 +64,7 @@
       "timestamp": "2026-07-29T00:57:12.989Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T00:57:12Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1837\n\n# Code Review — PAN-1837\n\n## Verdict: CHANGES REQUESTED\n\nReviewed `feature/pan-1837` at `6a313cf906a1883c5f744e9f3def57851f53144c` across correctness, security, requirements, and performance. The branch is clean, pushed, mergeable, and the focused Kimi/provenance tests plus the file-size gate pass. The second-cycle fixes close the artifact, file-size, route-coercion, and async-resolver findings, but the new conversation session-capture algorithm is race-prone, fresh restart now mutates state before rejecting an invalid harness, and the required no-loss harness audit still leaves planning, conversation persistence, and agent recovery unable to preserve `kimi-code`.\n\n## Blocking findings\n\n### P1 — The new conversation session capture assigns the same Kimi session to concurrent conversations\n\n**Locations:** `src/lib/overdeck/conversation-runtime.ts:704-716`, `src/lib/overdeck/conversation-runtime.ts:791-810`, `src/lib/runtimes/kimi-code.ts:177-211`\n\nThis blocker could not have been raised in cycle 1: the snapshot/diff capture algorithm was introduced by the current `6a313cf9` rework.\n\nEach Kimi conversation snapshots the cwd bucket before launch, then independently calls `waitForNewKimiSession()` and chooses the newest directory among all entries absent from its snapshot. Two conversations started concurrently in the same project can both snapshot the same original set. Once both Kimi processes create directories, both waiters see both directories as “fresh” and both choose the same newest one, so both persist the same `kimi-session-id`. The Conversation tabs then render one session’s transcript and cost for both conversations—the exact cross-conversation misattribution the previous review required the fix to prevent.\n\nThe added tests cover one waiter and one workspace only; there is no two-conversation same-cwd race test. Session ownership needs a deterministic association rather than independent newest-directory selection—for example, serialize Kimi launches per workDirKey until each captures its directory, or correlate the new directory to the launched process/session metadata. Add a concurrency test where two launches share a pre-snapshot and prove distinct IDs are persisted.\n\n### P1 — Fresh restart wipes the agent before validating the explicit model/harness pair\n\n**Location:** `src/dashboard/server/routes/agents/lifecycle-restart.ts:500-545`\n\nThis blocker also comes from the current rework: the new fail-loud policy return was inserted after the existing wipe.\n\n`postAgentRestartFreshRoute` kills the zombie session and calls `wipeAgentStateDirs(issueId)` at lines 507-517, then evaluates `canUseHarnessSync()` at lines 534-543. An invalid request such as `{ spawn: true, harness: 'kimi-code', model: 'claude-sonnet-5' }` now returns the required 400 reason only after deleting the work agent’s state directory. No replacement agent is spawned, so a rejected selection still destroys session pointers, runtime files, and recovery metadata.\n\nValidation must happen before every mutation: resolve `spawnModel`, check the explicit harness, and return the 400 before killing or wiping anything. Add a route test asserting `wipeAgentStateDirs` and `killSession` are not called when policy denies the pair.\n\n### P1 — The FR-1/no-loss audit is still incomplete: core planning and conversation doors drop `kimi-code`\n\n**Locations:** `src/lib/overdeck/planning-sessions.ts:138-153`, `src/lib/overdeck/planning-sessions.ts:387-403`, `src/lib/overdeck/conversations.ts:94-134`, `src/lib/overdeck/conversations.ts:855-905`, `src/lib/overdeck/__tests__/normalize-harness.test.ts:4-32`\n\nThis is the unresolved form of the prior cycles’ explicit “every hand-maintained validator” blocker, not a new category. The artifact-specific no-loss tests now pass, but they do not audit other canonical harness consumers:\n\n- Dashboard planning accepts `kimi-code` in `PlanDialog`, but `startPlanningForIssue()` recognizes only `ohmypi`, `claude-code`, `codex`, and `acp`; every Kimi selection becomes `claude-code` at line 152. The later policy branch also silently substitutes `claude-code` on denial at line 391. The newly fixed Kimi launcher in `spawn-planning-session.ts` is therefore unreachable from this required dashboard path, violating the first-class planning requirement and NFR-2.\n- The canonical Conversations domain schema still accepts `['claude-code', 'pi', 'codex', 'kimi']`, not the current Harness union. Its legacy read-door normalizer accepts `claude-code`, `codex`, and `acp` but returns `null` for `kimi-code`. `createConversation()` stores the requested raw value, then immediately reads it through `rowToLegacyConversation()`, so a newly created Kimi conversation is returned and subsequently listed with `harness: null`; dashboard transcript routing then treats it as Claude. The Effect resolver’s schema decode can also fail on the persisted value.\n- The normalize-harness test enumerates every old literal individually but has no canonical-union no-loss assertion, so this omission remains green.\n\nRoute these surfaces through the canonical Harness union/normalizer and fail rather than coerce. Add planning-route coverage and a conversation create/read round trip for `kimi-code`; the no-loss test should derive from `KNOWN_HARNESSES`, as the artifact fix now does.\n\n### P1 — Native Kimi agents cannot survive normal resume/recovery paths\n\n**Locations:** `src/lib/agents/resume.ts:216-228`, `src/lib/agents/resume.ts:421-459`, `src/lib/agents/recovery.ts:86-88`, `src/lib/agents/recovery.ts:379-400`, `src/lib/agents/recovery.ts:484-513`\n\nThis remains part of the previously blocked “first-class every spawn/lifecycle path” requirement. Fresh spawn persists the generated ID only as `kimi-session-id`, but generic `resumeAgent()` reads `getLatestSessionIdSync()`—which has no Kimi source—and returns “no resumable session id” before relaunching. The installed Kimi CLI explicitly supports `-S, --session <id>` for resuming an existing session, but the Kimi launcher has no resume field and ignores `SpawnConfig.sessionId`.\n\nCrash recovery is also broken for Kimi. `recoverAgent()` obtains provider env without passing the harness, omits Kimi launcher fields from `generateLauncherScriptSync()`, and routes Kimi through the default branch. That branch can require the unrelated Anthropic-compatible API key and generates a Claude-shaped launcher instead of `kimi -m <alias> --yolo`; it also never captures a replacement Kimi session ID. `restartAgent()` builds a valid fresh launcher, but sends its continue prompt through the legacy synchronous `sendKeys` branch and likewise leaves the prior `kimi-session-id` pinned to the old transcript.\n\nA first-class work harness must preserve its native session through operator restart, Deacon auto-resume, and crash recovery. Teach the shared session resolver about `kimi-session-id`, pass the captured ID as Kimi `-S <id>` on true resume, use the harness-aware provider/launcher builders in recovery, recapture only on an intentional fresh session, and deliver through `deliverAgentMessage`/the PTY supervisor. Add focused resume, restart, and recovery tests; current Kimi tests cover fresh spawn only.\n\n### P1 — Kimi conversation forks/handoffs are parsed with the Claude transcript adapter\n\n**Location:** `src/lib/conversations/transcript-adapter.ts:341-357`\n\nThe transcript-adapter registry contains Claude, Pi, Codex, and ACP only. `getTranscriptAdapter('kimi-code')` therefore falls back to the Claude JSONL parser, but Kimi’s `wire.jsonl` is an event stream with `turn.prompt` and `context.append_loop_event` records. Summary forks and handoff authoring from a Kimi conversation consequently produce empty or malformed source text even after the Conversation tab parser works.\n\nThis is another surviving FR-1 cross-cutting omission. Register a Kimi adapter that resolves the pinned native wire and serializes the normalized Kimi events, with a Kimi conversation fork/handoff test. The existing “four-harness” composer matrix at `src/lib/composer-commands/__tests__/harness-matrix.test.ts:78` should also be derived from the canonical harness set so the required fifth harness cannot disappear from parity coverage.\n\n## Non-blocking finding\n\n### P2 — Conversation session discovery polls with synchronous filesystem calls on the server event loop\n\n**Locations:** `src/lib/overdeck/conversation-runtime.ts:791-810`, `src/lib/runtimes/kimi-code.ts:177-211`\n\nThe dashboard resolver now correctly uses the async Kimi path, but the new conversation capture task calls `waitForNewKimiSession()`, whose 250 ms loop uses `readdirSync` and `statSync`. Every concurrent Kimi launch can therefore block the dashboard event loop repeatedly for up to 60 seconds while scanning a growing cwd bucket. Reuse an async watcher/poller for the server conversation path; runtime-side synchronous introspection can retain the sync helper where its contract requires it.\n\n## Security review\n\nNo command-injection or credential-exposure blocker survived review: launcher values remain quoted, native Kimi auth no longer receives the Anthropic-compatible environment, and binary resolution stays behind the existing resolver. The fresh-restart ordering defect above is the security/safety concern: an invalid request mutates and deletes runtime state before authorization-policy validation completes.\n\n## Verification and coverage\n\nReviewed the five high-risk spawn files, all medium-risk files, the current rework delta, and the adjacent canonical planning/conversation/recovery doors required to verify the stated first-class lifecycle. Focused Vitest coverage passed (79 tests across the root-selected Kimi resolver/runtime and artifact lifecycle files), `npm run lint:file-size` passed, `git diff --check` passed, the worktree is clean, and PR #3255 points at the reviewed SHA and is mergeable. CI build, lint, smoke, state-plane guard, prompt trailer, and non-blocking flake jobs are green; the main CI test job was still pending during review. No test role was queued.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1837/.pan/review/agent-pan-1837-review-6a313cf9/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1837 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -287,10 +279,10 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T01:55:46.330Z",
+  "updated": "2026-07-29T01:56:53.015Z",
   "pipeline": {
     "issueId": "PAN-1837",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -298,7 +290,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T01:55:32.711Z",
+    "updatedAt": "2026-07-29T01:56:52.991Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
@@ -311,7 +303,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
     "reviewedAtCommit": "7f5c4b6d87b811f9621fbeb0fa46d433624b2641",
-    "reviewSpawnedAt": "2026-07-29T00:50:58.299Z"
+    "reviewSpawnedAt": "2026-07-29T01:56:52.989Z"
   },
   "closeOut": {
     "usage": {
@@ -363,7 +355,7 @@
       },
       "costAtCloseOut": {
         "usd": 287.10312700000003,
-        "pricingAsOf": "2026-07-29T01:55:33.993Z"
+        "pricingAsOf": "2026-07-29T01:56:53.002Z"
       }
     },
     "merges": [
@@ -372,7 +364,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-1837",
