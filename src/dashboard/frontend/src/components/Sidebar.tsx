@@ -146,7 +146,7 @@ interface SidebarProps {
 }
 
 /** PAN-1990: a GET /api/workspace-registry row (src/dashboard/server/routes/workspace-registry.ts). */
-interface WorkspaceRegistryRow {
+export interface WorkspaceRegistryRow {
   id: string;
   projectId: string;
   kind: 'main' | 'issue' | 'scratch';
@@ -166,7 +166,7 @@ const WORKSPACE_KIND_ICONS: Record<WorkspaceRegistryRow['kind'], LucideIcon> = {
 
 const WORKSPACES_GROUPED_KEY = 'overdeck.ui.sidebarWorkspacesGrouped';
 
-function sortWorkspaces(rows: WorkspaceRegistryRow[]): WorkspaceRegistryRow[] {
+export function sortWorkspaces(rows: WorkspaceRegistryRow[]): WorkspaceRegistryRow[] {
   return [...rows].sort((a, b) => {
     if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
     return b.lastAccessedAt - a.lastAccessedAt;

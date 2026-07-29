@@ -981,6 +981,7 @@ export default function App() {
           if (issueId) openIssue(issueId);
         }}
         onOpenConversationHit={handleOpenConversationHit}
+        onSelectWorkspace={onSelectWorkspace}
       />
 
       {/* Emergency STOP hotkey (Cmd/Ctrl+Shift+.) — kills all agents, freezes auto-resume */}

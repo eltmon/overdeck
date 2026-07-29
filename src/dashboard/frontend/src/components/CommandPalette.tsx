@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { isAgentRunningStatus } from '../lib/pipeline-state';
 import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
+import { sortWorkspaces, type WorkspaceRegistryRow } from './Sidebar';
 import type { Issue, Agent } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -76,6 +77,8 @@ interface CommandPaletteProps {
   onOpenConversationHit?: (hit: ConversationPaletteOpenRequest) => void | Promise<void>;
   /** PAN-2908 C-CONVO: preset scope on open (⌘J jumps to conversations). */
   initialScope?: PaletteScope;
+  /** PAN-1990: activate a workspace-registry row and open its Workspace view. */
+  onSelectWorkspace?: (workspaceId: string) => void;
 }
 
 interface PanCommandEntry {
@@ -179,13 +182,14 @@ function formatHitDate(ts: string | null): string {
 
 // ─── Result-type scoping (filter chips) ─────────────────────────────────────────
 
-type PaletteScope = 'all' | 'actions' | 'commands' | 'issues' | 'conversations' | 'memory';
+type PaletteScope = 'all' | 'actions' | 'commands' | 'issues' | 'workspaces' | 'conversations' | 'memory';
 
 const SCOPE_LABEL: Record<PaletteScope, string> = {
   all: 'All',
   actions: 'Actions',
   commands: 'Commands',
   issues: 'Issues',
+  workspaces: 'Workspaces',
   conversations: 'Conversations',
   memory: 'Memory',
 };
@@ -194,6 +198,9 @@ const SCOPE_LABEL: Record<PaletteScope, string> = {
 function groupScope(group: string): Exclude<PaletteScope, 'all'> {
   if (group === 'Conversations') return 'conversations';
   if (group.startsWith('Commands · ')) return 'commands';
+  // PAN-1990: the workspaces-registry rail, distinct from the legacy "Active
+  // Workspaces" group (running-agent issue worktrees) below.
+  if (group === 'Workspaces') return 'workspaces';
   if (group === 'Issues' || group === 'Active Workspaces' || group === 'Running Agents') return 'issues';
   if (group === 'Memory' || group === 'Memory · Summaries' || group === 'Observations') return 'memory';
   return 'actions';
@@ -206,6 +213,7 @@ function accentForGroup(group: string): { box: string; icon: string } {
     case 'conversations': return { box: 'bg-indigo-500/15', icon: 'text-indigo-400' };
     case 'memory':        return { box: 'bg-amber-500/15',  icon: 'text-amber-400' };
     case 'issues':        return { box: 'bg-sky-500/15',    icon: 'text-sky-400' };
+    case 'workspaces':    return { box: 'bg-violet-500/15', icon: 'text-violet-400' };
     case 'commands':      return { box: 'bg-emerald-500/15', icon: 'text-emerald-400' };
     default:              return { box: 'bg-muted',          icon: 'text-muted-foreground' };
   }
@@ -227,6 +235,18 @@ async function fetchPanCommands(): Promise<PanCommandEntry[]> {
     if (!res.ok) return [];
     const data = await res.json() as { commands?: PanCommandEntry[] };
     return Array.isArray(data.commands) ? data.commands : [];
+  } catch {
+    return [];
+  }
+}
+
+/** PAN-1990: workspace-registry rows for the Workspaces switcher section. */
+async function fetchWorkspaceRegistry(): Promise<WorkspaceRegistryRow[]> {
+  try {
+    const res = await fetch('/api/workspace-registry');
+    if (!res.ok) return [];
+    const data = await res.json() as { workspaces?: WorkspaceRegistryRow[] };
+    return Array.isArray(data.workspaces) ? data.workspaces : [];
   } catch {
     return [];
   }
@@ -325,7 +345,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversationHit, initialScope = 'all' }: CommandPaletteProps) {
+export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversationHit, initialScope = 'all', onSelectWorkspace }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query, 120);
   const agents = useDashboardStore((state) => isOpen ? selectAgents(state) : EMPTY_AGENTS) as unknown as Agent[];
@@ -333,12 +353,14 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
   const openIssue = useDashboardStore((state) => state.openIssue);
 
   const [panCommands, setPanCommands] = useState<PanCommandEntry[]>([]);
+  const [workspaceRows, setWorkspaceRows] = useState<WorkspaceRegistryRow[]>([]);
   const [searchResults, setSearchResults] = useState<PaletteSearchResponse>(EMPTY_SEARCH);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [scope, setScope] = useState<PaletteScope>(initialScope);
 
   // Reset query when opened, and lazy-load the pan command catalog the first
-  // time the palette is shown.
+  // time the palette is shown. Workspaces are re-fetched every open — most-
+  // recent-first ordering depends on lastAccessedAt, which changes often.
   useEffect(() => {
     if (!isOpen) return;
     setQuery('');
@@ -347,6 +369,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     if (panCommands.length === 0) {
       void fetchPanCommands().then(setPanCommands);
     }
+    void fetchWorkspaceRegistry().then(setWorkspaceRows);
   }, [isOpen, initialScope, panCommands.length]);
 
   // Fan out to the unified search endpoint as the user types.
@@ -534,6 +557,22 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     return { issueActions: issueActs, agentActions: agentActs };
   }, [agents, issues, openIssue, onNavigate]);
 
+  // ─── Dynamic: workspaces (PAN-1990) ─────────────────────────────────────────
+  // Favorites first, then most-recent-first (same ordering as the Sidebar rail).
+
+  const workspaceActions = useMemo<PaletteAction[]>(() => sortWorkspaces(workspaceRows).map((ws) => ({
+    id: `workspace-${ws.id}`,
+    label: ws.title ?? ws.name,
+    description: ws.issueId ?? ws.kind,
+    icon: Clock,
+    group: 'Workspaces',
+    keywords: [ws.name, ws.issueId ?? '', ws.title ?? '', ws.kind],
+    onSelect: () => {
+      void fetch(`/api/workspace-registry/${ws.id}/activate`, { method: 'POST' });
+      onSelectWorkspace?.(ws.id);
+    },
+  })), [workspaceRows, onSelectWorkspace]);
+
   // ─── Dynamic: pan commands ────────────────────────────────────────────────
 
   const commandActions = useMemo<PaletteAction[]>(() => panCommands.map((cmd, index) => ({
@@ -636,10 +675,11 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
   const allActions = useMemo(() => [
     ...staticActions,
     ...commandActions,
+    ...workspaceActions,
     ...issueActions,
     ...agentActions,
     ...memoryActions,
-  ], [staticActions, commandActions, issueActions, agentActions, memoryActions]);
+  ], [staticActions, commandActions, workspaceActions, issueActions, agentActions, memoryActions]);
 
   const filtered = useMemo(() => {
     const trimmed = query.trim();
@@ -671,7 +711,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
   const groupOrder = useMemo(() => {
     const seen = new Set(filtered.map((a) => a.group));
     const ordered: string[] = [];
-    const preferred = ['Actions', 'Orchestration', 'Navigation', 'Active Workspaces', 'Issues', 'Running Agents'];
+    const preferred = ['Actions', 'Orchestration', 'Navigation', 'Workspaces', 'Active Workspaces', 'Issues', 'Running Agents'];
     for (const g of preferred) if (seen.has(g)) { ordered.push(g); seen.delete(g); }
     const commandGroups = [...seen].filter((g) => g.startsWith('Commands · ')).sort();
     for (const g of commandGroups) { ordered.push(g); seen.delete(g); }
@@ -685,7 +725,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
   const availableScopes = useMemo<PaletteScope[]>(() => {
     const present = new Set<PaletteScope>();
     for (const g of groupOrder) present.add(groupScope(g));
-    const ordered = (['actions', 'commands', 'issues', 'conversations', 'memory'] as const).filter((s) => present.has(s));
+    const ordered = (['actions', 'commands', 'workspaces', 'issues', 'conversations', 'memory'] as const).filter((s) => present.has(s));
     return ordered.length > 1 ? ['all', ...ordered] : [];
   }, [groupOrder]);
 
