@@ -84,15 +84,7 @@
       "timestamp": "2026-07-29T02:48:48.712Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T02:48:48Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1837\n\n# Code Review — PAN-1837\n\n## Verdict: CHANGES REQUESTED\n\nReviewed `feature/pan-1837` at local HEAD `a91349119598898b09353f75fe2c0a4fdeed599c` across correctness, security, requirements, and performance. The fourth-cycle rework correctly resumes native Kimi conversations with `kimi -S <captured-id>`, skips replacement capture on that path, moves explicit planning policy validation before state mutation, and converts the new delay tests to fake timers. The reviewed tree passes typecheck, lint, the file-size gate, 127 focused lifecycle tests, and a full rerun of 12,145 root tests plus 51 frontend tests; remote CI is green. Three blockers remain: the main `resumeAgent()` path still uses Claude-only readiness/transcript confirmation for Kimi, hand-maintained context/artifact validators still omit the canonical harness, and the reviewed merge commit is not on the PR.\n\n## Blocking findings\n\n### P1 — Normal Kimi work-agent resume launches the saved session but never delivers its continue message\n\n**Locations:** `src/lib/agents/resume.ts:421-436`, `src/lib/agents/resume.ts:467-532`, `src/lib/agents/__tests__/resume.test.ts:61-77`\n\n`resumeAgent()` now obtains the persisted Kimi session ID and passes it through `buildAgentLaunchConfig()` as `resumeSessionId`, so the launcher correctly emits `kimi -S <id>`. The live resume path then omits `kimi-code` from every harness-specific delivery branch. A saved Kimi session falls through to the final Claude branch, waits for the Claude `SessionStart` hook with `waitForReadySignal()`, and attempts `deliverResumeMessageWithTranscriptConfirmation()` against Claude JSONL. Native Kimi does not fire that hook or write Claude JSONL, so the wait expires, `messageDelivered` remains false, and the function still marks the agent running and returns success.\n\nThis affects `pan resume`, `pan unpause`, Deacon recovery, and stopped-agent auto-resume used to deliver review/rework feedback. The native session process comes back, but the continue/rework prompt does not land; callers either leave the resumed agent idle or put the message back in mail while reporting a successful resume. That violates the requirement to preserve operational continuity through stop/resume and recovery.\n\nAdd a `kimi-code` delivery branch using the native readiness path and PTY-supervisor delivery, with failure treated consistently rather than marking an undelivered resume healthy. The regression test must exercise `resumeAgent()` end to end and prove `-S <kimi-session-id>` plus successful continue-message delivery; the current test covers only `resolveRecoveryResumeSessionId()` in the separate restart/recovery module and cannot catch this path.\n\n### P1 — Two hand-maintained harness surfaces still reject or omit `kimi-code`\n\n**Locations:** `src/cli/commands/artifacts.ts:388-391`, `packages/contracts/src/context-layers.ts:4-10`, `src/cli/commands/context-layers.ts:44-59`, `packages/contracts/src/context-layers.test.ts:96-108`\n\nThe canonical `Harness` and artifact contract unions include `kimi-code`, but `parseAgentHarness()` still accepts only `claude-code`, legacy `pi`, `codex`, `acp`, and `user`. Consequently, `pan artifacts create --agent-harness kimi-code` throws `Invalid --agent-harness`, so native Kimi artifacts cannot record the provenance the contract now promises.\n\nThe context preview list is likewise frozen at `claude-code`, `ohmypi`, `codex`, and `acp`, and `contextDiffHarnesses()` does not recognize `kimi-code`. Context sync itself now renders Kimi markers correctly, but `pan context diff --harness kimi-code` falls back to the entire non-Kimi preview set, and the dashboard/contract preview cannot expose Kimi-specific rendered blocks at all. This directly misses WI-1's requirement to add the canonical harness to every hand-maintained validator and WI-9's context-layer surface.\n\nDerive these surfaces from the canonical harness inventory where their semantics permit it, or add `kimi-code` explicitly with no-loss tests that fail whenever a canonical harness is absent.\n\n### P1 — The reviewed HEAD is still not on PR #3255\n\n**Pipeline state:** local HEAD `a91349119598898b09353f75fe2c0a4fdeed599c`; remote PR head `001d371fd9b2d77db4291954bebca38b07223add`\n\nThe fourth-cycle implementation commit is pushed and its CI is green, but the local branch is two commits ahead of `origin/feature/pan-1837`: it also contains current `origin/main` commit `8ad7d847e8` and merge commit `a913491195`. The open PR therefore does not contain the exact tree reviewed in this run. Passing would approve a local merge surface different from the branch GitHub can merge and would violate the managed-work durability requirement. Push the feature branch and verify PR #3255 advances to the reviewed SHA before requesting another review.\n\n## Non-blocking finding\n\n### P2 — Fresh Kimi restart still reports success before session identity capture completes\n\n**Location:** `src/lib/agents/recovery.ts:209-270`\n\nThe rework removes the stale pointer before a fresh restart and switches directory polling to async I/O, which prevents the old wire from remaining permanently pinned. Capture remains fire-and-forget, however, so `restartAgent()` can return success and mark the agent running before a replacement `kimi-session-id` exists. If capture times out or fails, the code only logs the error and leaves transcript resolution on the newest-session-by-mtime fallback. Because Kimi buckets are keyed by cwd and can contain work-agent and conversation sessions together, that fallback can temporarily or permanently attribute another native session's transcript and cost to this agent.\n\nKeep the restart pending until the new identity is captured, or persist an explicit capture-failure state that prevents an unpinned cross-session fallback from being presented as authoritative. Add a restart-level test for timeout/failure, not only runtime-helper tests.\n\n## Security review\n\nNo command-injection, credential-exposure, destructive-operation, or authentication-bypass blocker survived review. Kimi model/session arguments are shell-quoted, binary launch still goes through the resolver, native authentication remains separated from Anthropic-compatible environment variables, and no new `execSync` or synchronous tmux delivery was introduced. The unpinned newest-session fallback in the P2 finding is the remaining transcript-isolation concern because it can display another same-cwd Kimi session under the wrong agent identity.\n\n## Verification and coverage\n\nReviewed all prior high-risk spawn, planning, conversation, transcript, provider, policy, and recovery owners plus the complete fourth-cycle delta and its merge from current `origin/main`. Focused Vitest coverage passed: 7 files and 127 tests. `npm run typecheck`, `npm run lint`, `npm run lint:file-size`, and `git diff --check origin/main...HEAD` passed. One compressed `npm test` invocation exited 1 without preserving a usable failure tail; the immediate uncompressed rerun passed 1,292 root test files (12,145 tests) and all 3 frontend test files (51 tests), and GitHub's build, lint, test, smoke, state-plane, prompt-trailer, flake-lane, and CodeRabbit checks are green for remote SHA `001d371fd9`. The worktree is clean. No test role was queued.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1837/.pan/review/agent-pan-1837-review-a9134911/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1837 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -307,10 +299,10 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T03:10:54.755Z",
+  "updated": "2026-07-29T03:11:42.267Z",
   "pipeline": {
     "issueId": "PAN-1837",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -318,7 +310,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T03:10:52.521Z",
+    "updatedAt": "2026-07-29T03:11:42.210Z",
     "reviewNotes": "Review blocked: normal kimi-code resume uses Claude-only readiness/transcript confirmation and drops continue prompts; artifact/context validators still omit kimi-code; reviewed merge SHA a913491195 is not pushed to PR #3255. See .pan/review/agent-pan-1837-review-a9134911/review.md.",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
@@ -331,7 +323,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
     "reviewedAtCommit": "a91349119598898b09353f75fe2c0a4fdeed599c",
-    "reviewSpawnedAt": "2026-07-29T02:26:08.078Z"
+    "reviewSpawnedAt": "2026-07-29T03:11:42.209Z"
   },
   "closeOut": {
     "usage": {
@@ -383,7 +375,7 @@
       },
       "costAtCloseOut": {
         "usd": 339.84203,
-        "pricingAsOf": "2026-07-29T03:10:52.941Z"
+        "pricingAsOf": "2026-07-29T03:11:42.243Z"
       }
     },
     "merges": [
