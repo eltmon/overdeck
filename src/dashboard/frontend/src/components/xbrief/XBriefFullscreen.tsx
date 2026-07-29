@@ -161,7 +161,7 @@ export function XBriefFullscreen() {
                 xBRIEF · active plan
               </div>
               <h2 id="xbrief-fullscreen-title" className="truncate text-base font-medium text-foreground">
-                <span className="mr-2 font-mono text-xs text-muted-foreground">{issueId}</span>
+                <span className="mr-2 font-mono text-xs text-muted-foreground">{issueId}</span>{' '}
                 {data?.plan.title ?? 'Plan'}
               </h2>
             </div>
