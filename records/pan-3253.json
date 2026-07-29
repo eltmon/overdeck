@@ -155,18 +155,18 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T09:54:23.959Z",
+  "updated": "2026-07-29T09:55:38.000Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T09:16:42.721Z",
-    "updatedAt": "2026-07-29T09:54:23.906Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
+    "updatedAt": "2026-07-29T09:55:37.962Z",
+    "reviewNotes": "Blocked: manifest HEAD f9bd92d8 fails the focused composition test because setReviewStatusSync is imported from the wrong module; the test's conditional assertions can also pass without proving bounded history or raw status_history persistence. Review: .pan/review/agent-pan-3253-review-f9bd92d8/review.md",
     "verificationNotes": "Verification FAILED at test (360449ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253\n\nNo test files found, exiting with code 0\n\n ❯ |root| tests/unit/lib/overdeck/review-status-sync.test.ts (9 tests | 1 failed) 3082ms\n     × verifies dbStatus/updated split and testNotes preservation (PAN-3253 notes-cap.ac2-ac3) 125ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-1ndBL4/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] comple\n…(604 chars elided)…\n/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-S7IgKi/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-S7IgKi/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-conte\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "lastVerifiedCommit": "14703dbb3871a0e90db6fb10d370b144c231ac3a",
@@ -218,18 +218,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 9091991,
-            "output": 334825,
-            "cacheRead": 68373504,
+            "input": 9098467,
+            "output": 337323,
+            "cacheRead": 68770816,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2895,
-            "output": 138434,
-            "cacheRead": 65729789,
-            "cacheWrite": 2964303
+            "input": 2917,
+            "output": 139419,
+            "cacheRead": 66018421,
+            "cacheWrite": 3070286
           }
         }
       },
@@ -241,21 +241,21 @@
           "cacheWrite": 269290
         },
         "openai/gpt-5.6-sol": {
-          "input": 9091991,
-          "output": 334825,
-          "cacheRead": 68373504,
+          "input": 9098467,
+          "output": 337323,
+          "cacheRead": 68770816,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2895,
-          "output": 138434,
-          "cacheRead": 65729789,
-          "cacheWrite": 2964303
+          "input": 2917,
+          "output": 139419,
+          "cacheRead": 66018421,
+          "cacheWrite": 3070286
         }
       },
       "costAtCloseOut": {
-        "usd": 110.350104,
-        "pricingAsOf": "2026-07-29T09:54:23.954Z"
+        "usd": 110.82237,
+        "pricingAsOf": "2026-07-29T09:55:37.987Z"
       }
     },
     "merges": [
