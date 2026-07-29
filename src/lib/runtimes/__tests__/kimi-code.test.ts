@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { readdir as readdirAsync } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -29,6 +29,7 @@ import {
   findKimiWirePathAsync,
   findLatestKimiSession,
   findLatestKimiSessionAsync,
+  kimiCaptureLockPath,
   kimiSessionsRoot,
   kimiWorkDirKey,
   KimiCodeRuntimeSync,
@@ -558,5 +559,89 @@ describe('withKimiSessionCaptureLock (PAN-1837 review fix — concurrent same-cw
     expect(workCaptured).not.toBe(conversationCaptured);
     expect(readFileSync(join(overdeckHome, 'agents', 'agent-work-1', 'kimi-session-id'), 'utf-8').trim()).toBe(workCaptured);
     expect(readFileSync(join(overdeckHome, 'agents', 'conv-abc', 'kimi-session-id'), 'utf-8').trim()).toBe(conversationCaptured);
+  });
+
+  // PAN-1837 review fix (P2): a lock directory can exist with no owner.json
+  // (the holder died between mkdir succeeding and the owner record being
+  // written) or a corrupt owner.json (a torn write from a hard kill mid-write,
+  // pre-atomic-rename). Either way the lock must still be reclaimable once its
+  // directory mtime is older than KIMI_CAPTURE_LOCK_STALE_AGE_MS — otherwise a
+  // single crashed holder wedges every future launch against that cwd forever.
+  it('reclaims a stale lock directory that has no owner.json (holder died before writing it)', async () => {
+    const kimiHome = makeHome();
+    const workDir = '/tmp/ownerless-lock-workspace';
+    const bucketKey = kimiSessionsRoot(kimiHome, workDir);
+    const lockPath = kimiCaptureLockPath(bucketKey);
+
+    // Simulate a crashed holder: the lock directory exists (mkdir succeeded)
+    // but no owner.json was ever written inside it.
+    mkdirSync(lockPath, { recursive: true, mode: 0o700 });
+    const staleMtime = new Date(Date.now() - 90_000);
+    utimesSync(lockPath, staleMtime, staleMtime);
+
+    const result = withKimiSessionCaptureLock(kimiHome, workDir, async () => 'acquired-after-ownerless-reclaim');
+    await drainFakeTimersUntilSettled(result);
+
+    await expect(result).resolves.toBe('acquired-after-ownerless-reclaim');
+    // The lock is released again once the callback completes.
+    expect(existsSync(lockPath)).toBe(false);
+  });
+
+  it('reclaims a stale lock directory whose owner.json is corrupt JSON', async () => {
+    const kimiHome = makeHome();
+    const workDir = '/tmp/corrupt-owner-lock-workspace';
+    const bucketKey = kimiSessionsRoot(kimiHome, workDir);
+    const lockPath = kimiCaptureLockPath(bucketKey);
+
+    mkdirSync(lockPath, { recursive: true, mode: 0o700 });
+    // A torn/partial write — not valid JSON — mirrors a holder killed mid-write
+    // before the atomic write-then-rename in acquireKimiCaptureLock existed.
+    writeFileSync(join(lockPath, 'owner.json'), '{"pid": 123, "acquiredA', 'utf-8');
+    const staleMtime = new Date(Date.now() - 90_000);
+    utimesSync(lockPath, staleMtime, staleMtime);
+
+    const result = withKimiSessionCaptureLock(kimiHome, workDir, async () => 'acquired-after-corrupt-owner-reclaim');
+    await drainFakeTimersUntilSettled(result);
+
+    await expect(result).resolves.toBe('acquired-after-corrupt-owner-reclaim');
+    expect(existsSync(lockPath)).toBe(false);
+  });
+
+  it('does NOT reclaim a lock directory still owned by a live process, even once its directory mtime is stale', async () => {
+    // Guards against a regression that reclaims by directory age alone,
+    // ignoring a valid owner.json for a still-alive PID. The current process
+    // (process.pid) is unambiguously alive for the duration of this test.
+    const kimiHome = makeHome();
+    const workDir = '/tmp/live-owner-lock-workspace';
+    const bucketKey = kimiSessionsRoot(kimiHome, workDir);
+    const lockPath = kimiCaptureLockPath(bucketKey);
+
+    mkdirSync(lockPath, { recursive: true, mode: 0o700 });
+    writeFileSync(
+      join(lockPath, 'owner.json'),
+      JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }, null, 2),
+      'utf-8',
+    );
+    const staleMtime = new Date(Date.now() - 90_000);
+    utimesSync(lockPath, staleMtime, staleMtime);
+
+    let acquired = false;
+    const result = withKimiSessionCaptureLock(kimiHome, workDir, async () => {
+      acquired = true;
+      return 'should-not-happen';
+    });
+    result.catch(() => {});
+
+    // Drain only up to just under the wait budget — the lock must still be
+    // held by the "live" owner throughout, never reclaimed by age alone.
+    for (let i = 0; i < 80; i++) {
+      await vi.advanceTimersByTimeAsync(1_000);
+    }
+    expect(acquired).toBe(false);
+
+    // Release the simulated live owner's lock manually so the pending
+    // acquire (and its timeout timer) don't leak past this test.
+    rmSync(lockPath, { recursive: true, force: true });
+    await drainFakeTimersUntilSettled(result);
   });
 });

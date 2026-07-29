@@ -311,7 +311,7 @@ export class KimiCaptureLockTimeoutError extends Error {
 }
 
 /** Deterministic, filesystem-safe lock path for a Kimi session bucket. */
-function kimiCaptureLockPath(bucketKey: string): string {
+export function kimiCaptureLockPath(bucketKey: string): string {
   const hash = createHash('sha256').update(bucketKey).digest('hex').slice(0, 24);
   return join(getOverdeckHome(), 'locks', 'kimi-capture', `${hash}.lock`);
 }
