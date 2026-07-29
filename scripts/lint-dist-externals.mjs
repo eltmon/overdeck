@@ -161,6 +161,29 @@ const missing = [...externals.keys()]
 
 const staleAllowlist = [...allowed.keys()].filter((name) => !externals.has(name)).sort();
 
+// The third half of the same contract: a declaration only helps if the package
+// is actually installed where the bundle will be loaded from. PAN-3264 shipped
+// a deploy that passed this check ("20 external packages, all declared") and
+// then boot-crashed on `Cannot find package 'effect'` because the deployment's
+// node_modules entries were dangling symlinks into a deleted Bun store. Declared
+// is not installed, so probe resolution too. Restricted to `dependencies`:
+// optional and peer deps may legitimately be absent from a given install.
+const runtimeDependencies = new Set(Object.keys(pkg.dependencies ?? {}));
+const resolvesFrom = (name) => {
+  let dir = root;
+  while (true) {
+    // existsSync follows symlinks, so a dangling one reads as absent — exactly
+    // the state a gutted Bun store leaves behind.
+    if (existsSync(join(dir, 'node_modules', name, 'package.json'))) return true;
+    const parent = dirname(dir);
+    if (parent === dir) return false;
+    dir = parent;
+  }
+};
+const unresolvable = [...externals.keys()]
+  .filter((name) => runtimeDependencies.has(name) && !allowed.has(name) && !resolvesFrom(name))
+  .sort();
+
 const errors = [
   ...malformed,
   ...unresolvableSpecs.map(
@@ -174,6 +197,11 @@ const errors = [
       : 'it is not declared anywhere in package.json';
     return `${name} is imported by dist (${importers}) but ${classification}.`;
   }),
+  ...unresolvable.map(
+    (name) =>
+      `${name} is declared in dependencies and imported by dist, but does not resolve from ${root} — ` +
+      'the built server would crash on boot with ERR_MODULE_NOT_FOUND (PAN-3264). Run `bun install` here.',
+  ),
   ...staleAllowlist.map(
     (name) =>
       `${name} is in scripts/dist-externals-allowlist.txt but no dist bundle imports it — delete the stale entry.`,
@@ -197,7 +225,7 @@ if (errors.length > 0) {
 }
 
 console.log(
-  `✓ dist externals OK — ${externals.size} external package${externals.size === 1 ? '' : 's'} across ${files.length} dist files, all declared` +
+  `✓ dist externals OK — ${externals.size} external package${externals.size === 1 ? '' : 's'} across ${files.length} dist files, all declared and resolvable` +
     (allowed.size > 0 ? ` (${allowed.size} allowlisted)` : '') +
     '.',
 );

@@ -24,7 +24,23 @@ function makeRoot(pkg: Record<string, unknown>): string {
   mkdirSync(join(root, 'scripts'), { recursive: true });
   mkdirSync(join(root, 'dist'), { recursive: true });
   writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'fixture', type: 'module', ...pkg }));
+  // Declared runtime deps are installed by default: the guard also checks that
+  // they resolve (PAN-3264), and a fixture that declares without installing is
+  // the exception a test opts into via uninstallPackage().
+  for (const name of Object.keys((pkg.dependencies ?? {}) as Record<string, string>)) {
+    installPackage(root, name);
+  }
   return root;
+}
+
+function installPackage(root: string, name: string): void {
+  const packageDir = join(root, 'node_modules', name);
+  mkdirSync(packageDir, { recursive: true });
+  writeFileSync(join(packageDir, 'package.json'), JSON.stringify({ name, main: 'index.js' }));
+}
+
+function uninstallPackage(root: string, name: string): void {
+  rmSync(join(root, 'node_modules', name), { recursive: true, force: true });
 }
 
 function writeDistFile(root: string, relativePath: string, source: string): void {
@@ -68,6 +84,22 @@ describe('lint-dist-externals', () => {
 
     expect(ok).toBe(true);
     expect(output).toContain('dist externals OK');
+  });
+
+  // PAN-3264: a deploy passed this check ("20 external packages, all declared")
+  // and then boot-crashed on `Cannot find package 'effect'` — the deployment's
+  // node_modules entries were dangling symlinks into a deleted Bun store.
+  // Declared is not installed.
+  it('fails when a declared runtime dependency does not resolve from the root', () => {
+    const root = makeRoot({ dependencies: { effect: '^4.0.0' } });
+    writeDistFile(root, 'dist/dashboard/server.js', 'import { Effect } from "effect";\n');
+    uninstallPackage(root, 'effect');
+
+    const { ok, output } = run(root);
+
+    expect(ok).toBe(false);
+    expect(output).toContain('effect');
+    expect(output).toContain('does not resolve');
   });
 
   it('rejects a devDependency as satisfying a dist import', () => {
