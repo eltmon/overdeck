@@ -2,9 +2,8 @@
  * FR-7: Conversation-only pending input surfaces.
  * Tests that NeedsYouStrip and ConversationDock:
  * 1. Materialize conversation-only entries with empty agent store (AC-1)
- * 2. Preserve agent-backed pending input entries (AC-3)
- * 3. Distinguish conversation and agent sources correctly
- * 4. Handle multiple conversations per docked issue (Cycle 13 regression)
+ * 2. Preserve and route agent-backed entries correctly (AC-3)
+ * 3. Handle multiple conversations per docked issue (regression from cycle 13)
  */
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -48,14 +47,6 @@ const mockIssue = {
   updatedAt: new Date().toISOString(),
 };
 
-const mockAgent = {
-  id: 'agent-test-1',
-  issueId: 'PAN-1',
-  status: 'running' as const,
-  name: 'test-agent',
-  pendingInputKinds: ['question'] as const,
-} as any;
-
 describe('FR-7: Conversation-only pending input surfaces', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -85,7 +76,7 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
     } as any);
   });
 
-  describe('NeedsYouStrip: conversation and agent sources', () => {
+  describe('NeedsYouStrip: AC-1 and AC-3', () => {
     it('AC-1: renders conversation-only question without agent in store', () => {
       vi.mocked(decisions.usePendingInputSubjects).mockReturnValue([
         {
@@ -130,7 +121,7 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
       expect(screen.getByText('Second conversation')).toBeInTheDocument();
     });
 
-    it('routes conversation answer with isConversation flag', () => {
+    it('AC-3: routes conversation answer with isConversation true', () => {
       const answerMutate = vi.fn();
       vi.mocked(simpleActions.useSimpleActions).mockReturnValue({
         tell: { mutate: vi.fn(), isPending: false },
@@ -156,6 +147,7 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
       fireEvent.change(input, { target: { value: 'yes' } });
       fireEvent.click(screen.getByRole('button', { name: 'Answer' }));
 
+      // Conversation ID routes with isConversation: true (AC-3: preserved and routed correctly)
       expect(answerMutate).toHaveBeenCalledWith(
         expect.objectContaining({
           agentId: 'conv-route-test',
@@ -166,7 +158,7 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
     });
   });
 
-  describe('ConversationDock: conversation rendering and docked replacement', () => {
+  describe('ConversationDock: AC-1 and AC-3', () => {
     it('AC-1: materializes conversation-only entry without agent', () => {
       vi.mocked(decisions.usePendingInputSubjects).mockReturnValue([
         {
