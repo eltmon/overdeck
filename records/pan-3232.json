@@ -194,17 +194,17 @@
     "recordedAt": "2026-07-28T21:11:50.152Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T01:19:18.236Z",
+  "updated": "2026-07-29T01:22:44.580Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T21:12:13.614Z",
-    "updatedAt": "2026-07-29T01:19:17.915Z",
+    "updatedAt": "2026-07-29T01:22:44.545Z",
     "reviewNotes": "ConversationDock discards the synthetic conversation target and still renders an empty issue/agent panel; tests also bypass production code",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
@@ -215,7 +215,6 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "8c41249bbc5f5488d89d3dce96fd68a0275a7e82",
     "reviewSpawnedAt": "2026-07-29T01:10:58.401Z"
   },
   "closeOut": {
@@ -276,7 +275,7 @@
       },
       "costAtCloseOut": {
         "usd": 153.406405,
-        "pricingAsOf": "2026-07-29T01:19:18.008Z"
+        "pricingAsOf": "2026-07-29T01:22:44.576Z"
       }
     },
     "merges": [
