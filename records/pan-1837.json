@@ -297,10 +297,10 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T02:02:20.174Z",
+  "updated": "2026-07-29T02:25:37.868Z",
   "pipeline": {
     "issueId": "PAN-1837",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -308,8 +308,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T02:02:19.838Z",
-    "reviewNotes": "Kimi conversation resume still fresh-launches instead of using the captured -S session, denied planning pairs mutate state before validation, and the reviewed merge commit is not pushed to PR #3255.",
+    "updatedAt": "2026-07-29T02:25:37.807Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
@@ -344,10 +344,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 3524,
-            "output": 759358,
-            "cacheRead": 895683845,
-            "cacheWrite": 4633870
+            "input": 3696,
+            "output": 824082,
+            "cacheRead": 934389062,
+            "cacheWrite": 4739552
           }
         }
       },
@@ -365,15 +365,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 3524,
-          "output": 759358,
-          "cacheRead": 895683845,
-          "cacheWrite": 4633870
+          "input": 3696,
+          "output": 824082,
+          "cacheRead": 934389062,
+          "cacheWrite": 4739552
         }
       },
       "costAtCloseOut": {
-        "usd": 301.175831,
-        "pricingAsOf": "2026-07-29T02:02:19.972Z"
+        "usd": 309.828666,
+        "pricingAsOf": "2026-07-29T02:25:37.864Z"
       }
     },
     "merges": [
