@@ -287,7 +287,7 @@
     "recordedAt": "2026-07-29T02:58:56.941Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T03:01:33.213Z",
+  "updated": "2026-07-29T03:01:38.821Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -296,7 +296,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T03:01:32.474Z",
+    "updatedAt": "2026-07-29T03:01:38.805Z",
     "reviewNotes": "The FR-7 suite still omits SimpleHomePage conversation coverage and real agent-preservation tests; its AC-3 case is a conversation assertion.",
     "conflictsSince": {
       "sha": "701cbb21f1deb79f90c821db2bf23db7d02d4886",
@@ -306,7 +306,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "a80c44d9ee5b56ee36e41614dc49eb7e4ff66ef0",
+    "reviewedAtCommit": "f8796565d4ebbec9509fd5e4ac6bcdf6f22a2cb2",
     "reviewSpawnedAt": "2026-07-29T02:59:04.794Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -440,7 +440,7 @@
       },
       "costAtCloseOut": {
         "usd": 258.063736,
-        "pricingAsOf": "2026-07-29T03:01:32.499Z"
+        "pricingAsOf": "2026-07-29T03:01:38.814Z"
       }
     },
     "merges": [
