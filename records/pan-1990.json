@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T02:28:49.240Z",
+  "updated": "2026-07-29T02:28:57.955Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "pending",
@@ -84,8 +84,16 @@
     }
   ],
   "tasks": {
-    "sequence": 32,
-    "claims": {},
+    "sequence": 33,
+    "claims": {
+      "memory-capture-nonissue": {
+        "writerId": "agent-pan-1990",
+        "agentId": "agent-pan-1990",
+        "pid": 1964411,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-29T02:28:57.955Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1990",
@@ -321,6 +329,7 @@
     "memory-home-migration.memory-home-migration.ac1": "completed",
     "memory-home-migration.memory-home-migration.ac2": "completed",
     "memory-home-migration.memory-home-migration.ac3": "completed",
-    "memory-home-migration.memory-home-migration.ac4": "completed"
+    "memory-home-migration.memory-home-migration.ac4": "completed",
+    "memory-capture-nonissue": "running"
   }
 }
