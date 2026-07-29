@@ -1,0 +1,321 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-29T06:05:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3253: review.status_changed embeds the unbounded review history array — one event type is 80% of a 1.3 GB overdeck.db",
+    "updated": "2026-07-29T05:53:27.736Z"
+  },
+  "plan": {
+    "id": "pan-3253",
+    "title": "Bound review.status_changed payloads at every door (residual hardening after 4b9b740129)",
+    "status": "proposed",
+    "uid": "ec9e837b-74f1-4046-bb72-b5874d7c1f83",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-29T06:05:00.000Z",
+    "updated": "2026-07-29T05:53:27.736Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3253",
+        "label": "PAN-3253",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "database",
+      "event-store",
+      "review-status",
+      "storage"
+    ],
+    "narratives": {
+      "Problem": "The primary fix (4b9b740129, landed on main and deployed; DB dropped 1.30 GB → 362 MB) capped review-status history at hydration and on writes, but two measured residual gaps keep review.status_changed the largest single dbstat account (110.6 MB vs cost_events 72.3 MB): (1) the event-store append door persists whatever it is handed, so processes still running pre-fix builds keep inserting uncapped payloads — 191 of the newest 500 payloads exceed the 20-entry cap (max 259 entries, newest 2026-07-29T05:38Z, hours after the deploy; PAN-3260's 25-entry payload exactly matches its 25 status_history rows, proving full-table hydration by a stale build); (2) per-entry notes are unbounded — one 3,697-char testNotes string appears 8x in a single payload, and notes are 0.82 MB of the newest 200 payloads' 2.05 MB.",
+      "Proposal": "Four small items: cap history-entry notes at 500 chars at composition time (push sites + hydration mappings, full notes preserved in the status's own fields and the status_history table); bound review.status_changed payloads inside the event store's append() and appendOnce() via a shared helper so no emitter can reinsert unbounded blobs; extend the boot trim to delegate to that helper so it also truncates notes and stays idempotent; document the invariant in docs/AGENT-STATE-PLANES.md. Full implementation brief with verified line references, before/after snippets, and the circular-ESM fallback is in the PRD draft (.pan/drafts/PAN-3253.md).",
+      "NonGoals": "- No delta-payload refactor of the review.status_changed event contract (the issue's proposed fix #1) — it changes the shape consumed by shared reducers in @overdeck/contracts; the landed bounded-full-status shape stays\n- No changes to status_history table writes or retention — the table intentionally keeps the full uncapped record\n- No change to the 7-day event retention window, the 16 KB oversized threshold, or the 64 MB VACUUM trigger\n- No fix for the upstream MIN-90x status-churn volume (filed separately)\n- No manual VACUUM runbooks or destructive recovery instructions in docs"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Planned only the residual delta on top of the already-landed and deployed fix 4b9b740129 instead of re-planning the whole issue.",
+        "rationale": "The issue comment records the fix as landed and green; discovery verified the commit is in this branch's history and the migration ran on the live DB. Re-doing landed work would churn review for no user value."
+      },
+      {
+        "summary": "Rejected the issue's 'emit only a delta' proposal in favor of hardening the landed bounded-full-status shape.",
+        "rationale": "The operator chose the bounded-full-status approach in the direct fix; a delta contract would ripple through shared reducers and replay consumers, and the acceptance criteria (bounded payload size) are satisfiable without it."
+      },
+      {
+        "summary": "Chose the event-store append door as the enforcement point for the stale-emitter leak, rather than trying to patch every emitter.",
+        "rationale": "Live evidence shows over-cap payloads arriving from processes running pre-fix builds; new code cannot fix stale binaries, so the single write door is the only place the invariant can actually hold."
+      },
+      {
+        "summary": "Set REVIEW_STATUS_NOTE_LIMIT to 500 characters with a trailing ellipsis.",
+        "rationale": "History entries are a timeline affordance; full notes remain in the status object's dedicated fields and the status_history table, and 20 x ~0.7 KB keeps worst-case payloads under the existing 16 KB oversized threshold."
+      }
+    ],
+    "items": [
+      {
+        "id": "notes-cap",
+        "title": "Cap history-entry notes at composition time (REVIEW_STATUS_NOTE_LIMIT = 500)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T06:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/review-status-reconcile.ts",
+            "src/lib/review-status.ts",
+            "src/lib/database/review-status-db.ts",
+            "tests/unit/lib/database/review-status-history-cap.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/database/review-status-history-cap.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "review-status-history-cap.test.ts passes including the new note-truncation cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W1: add REVIEW_STATUS_NOTE_LIMIT = 500 and truncateHistoryNote() next to REVIEW_STATUS_HISTORY_LIMIT in src/lib/review-status-reconcile.ts (line 30); wrap the notes: value at the five history.push sites in src/lib/review-status.ts (lines 252-268, search 'Track status transitions in history'); apply truncateHistoryNote(row.notes) in the three row-to-entry mappings in src/lib/database/review-status-db.ts (getHistoryFromDb plus the two bulk historyByIssue builders), keeping the existing conditional-spread shape. Do NOT touch the INSERT INTO status_history site — the table keeps full notes (hazard H3)."
+        },
+        "items": [
+          {
+            "id": "notes-cap.ac1",
+            "title": "Given a status_history row seeded with a 10,000-char note, hydration returns an entry whose notes has length <= 500 and ends with the ellipsis character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notes-cap.ac2",
+            "title": "Given an update carrying a 10,000-char testNotes, the appended history entry carries truncated notes while status.testNotes itself preserves the full string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "notes-cap.ac3",
+            "title": "The status_history table write in saveStatus persists the full untruncated note (a test reads the raw row back and asserts full length)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "append-door-bound",
+        "title": "Bound review.status_changed payloads inside event-store append() and appendOnce()",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-29T06:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/event-store.ts",
+            "tests/unit/event-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/event-store.test.ts",
+            "npm run typecheck",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "event-store.test.ts passes including the new append-door bounding cases",
+            "typecheck completes without errors",
+            "npm run build completes without a circular-ESM error (D4 checkpoint; on failure apply the leaf-module fallback)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W2: extract boundReviewStatusPayload(payload: string): string in src/dashboard/server/event-store.ts — parse, slice status.history to the newest REVIEW_STATUS_HISTORY_LIMIT entries, truncate each entry's notes via truncateHistoryNote, return the re-serialized string only when something changed, return the original on parse failure. Import both limits from src/lib/review-status-reconcile.js and delete the duplicated local REVIEW_HISTORY_TRIM_LIMIT (line 166). Apply the helper in append() (line ~346) and appendOnce() (line ~449) when event.type === 'review.status_changed', BEFORE any dedup/equality comparison in appendOnce (hazard H2). If npm run build reports an ESM cycle, apply the D4 fallback: new leaf module src/lib/review-status-limits.ts holding both constants, re-exported from review-status-reconcile.ts."
+        },
+        "items": [
+          {
+            "id": "append-door-bound.ac1",
+            "title": "Appending a review.status_changed event whose history has 259 entries with 3,697-char notes persists a row that parses back to exactly 20 entries, each with notes <= 500 chars",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "append-door-bound.ac2",
+            "title": "Appending a non-review event type with a large payload persists the payload byte-identically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "append-door-bound.ac3",
+            "title": "Appending a review.status_changed event with an unparseable payload persists it unchanged instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "append-door-bound.ac4",
+            "title": "appendOnce called twice with the same over-cap event persists exactly one row, with the bounded payload (dedup sees the bounded form)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "boot-trim-notes",
+        "title": "Extend trimReviewStatusHistoryPayloads to delegate to the bounding helper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-29T06:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/event-store.ts",
+            "tests/unit/event-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/event-store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "event-store.test.ts passes including the trim-convergence and notes-truncation cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W3: rewrite the loop body of trimReviewStatusHistoryPayloads (src/dashboard/server/event-store.ts:176) to compute next = boundReviewStatusPayload(row.payload) for each row above OVERSIZED_REVIEW_PAYLOAD_CHARS and update only when next !== row.payload. Remove the now-redundant length-only check; keep the trimmed/savedChars accounting and the VACUUM (>64 MB) / incremental_vacuum decision untouched (D5)."
+        },
+        "items": [
+          {
+            "id": "boot-trim-notes.ac1",
+            "title": "Given a seeded oversized row with 25 entries carrying 3,697-char notes, the trim persists a smaller payload that parses back to <= 20 entries with <= 500-char notes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-trim-notes.ac2",
+            "title": "Running the trim a second time over already-trimmed rows returns trimmed: 0 (converges to a no-op)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-trim-notes.ac3",
+            "title": "An oversized row of a non-review event type survives the trim byte-identically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-bounds",
+        "title": "Document the bounded review-status history invariant in AGENT-STATE-PLANES.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-29T06:05:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3253",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/AGENT-STATE-PLANES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'REVIEW_STATUS_HISTORY_LIMIT\\|REVIEW_STATUS_NOTE_LIMIT' docs/AGENT-STATE-PLANES.md"
+          ],
+          "expected_outputs": [
+            "grep prints lines naming both limit constants inside the new subsection"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ],
+          "acJustification": "A docs-only item: one criterion per documented fact cluster; two ACs cover the full FR-4 surface."
+        },
+        "narrative": {
+          "Action": "Per PRD W4: in the runtime-plane section of docs/AGENT-STATE-PLANES.md (the part describing ~/.overdeck/overdeck.db and the events table), add a 'Bounded review-status history (PAN-3253)' subsection stating: review.status_changed payloads embed at most REVIEW_STATUS_HISTORY_LIMIT (20) history entries with notes capped at REVIEW_STATUS_NOTE_LIMIT (500 chars); the bound is enforced at status write, DB hydration, the event-store append door, and a boot-time trim that VACUUMs when it frees > 64 MB; the status_history table intentionally retains the full record."
+        },
+        "items": [
+          {
+            "id": "docs-bounds.ac1",
+            "title": "The new subsection contains both limit constants with their values (20 and 500) and covers all four enforcement points (write, hydration, append door, boot trim + VACUUM)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-bounds.ac2",
+            "title": "The subsection states that the status_history table intentionally preserves the full uncapped record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "notes-cap",
+        "to": "append-door-bound",
+        "type": "blocks"
+      },
+      {
+        "from": "append-door-bound",
+        "to": "boot-trim-notes",
+        "type": "blocks"
+      },
+      {
+        "from": "notes-cap",
+        "to": "docs-bounds",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-29-PAN-3253-bound-review-status-changed-payloads-at-every-door-residual-hardening-after-4b9b740129.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
