@@ -382,7 +382,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T06:09:38.453Z",
+  "updated": "2026-07-29T06:10:29.700Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "passed",
@@ -391,9 +391,14 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T06:09:33.519Z",
-    "testNotes": "Gates run from workspace feature-pan-3232 (HEAD 3f05c046f6, review passed, reviewedAtCommit matches). npm run typecheck PASSED (root, hooks, evals, dashboard-types guard 58 known/0 new, frontend-types guard 0 known/0 new). npm run lint PASSED (eslint + all custom guards, exit 0). npm test PASSED: root vitest suite 1285 files / 12044 tests passed (3 skipped); frontend targeted subset (issueActions.test.ts, issueActions.no-actions-lost.test.ts, issueActions.parity.test.tsx, fr7-conversation-pending-input.test.tsx) 4 files / 59 tests passed, including the previously-failing AC-3 ConversationDock case in fr7-conversation-pending-input.test.tsx, now fixed by commit 3f05c046f6 (scoped the ambiguous 'agent-test-1' query). No browser UAT performed: the PRD (drafts/PAN-3232.md) and GitHub issue #3232 do not request live/browser verification; verify_commands across all xBRIEF items specify only vitest/typecheck/grep; the two items requiring live runtime behavior (live-tree-delta, specialist-pending-input) were deliberately cancelled/deferred as out of this branch's shipped scope, and the shipped rendering-layer fixes are fully covered by component-level unit tests mocking the exact prop shapes named in the issue's acceptance criteria.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-29T06:10:29.654Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-07-29T06:10:29.653Z"
+      }
+    ],
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
       "detectedAt": "2026-07-29T05:03:44.105Z",
@@ -434,10 +439,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 108,
-            "output": 15157,
-            "cacheRead": 5548228,
-            "cacheWrite": 290608
+            "input": 110,
+            "output": 15340,
+            "cacheRead": 5731878,
+            "cacheWrite": 291449
           }
         },
         "work": {
@@ -469,15 +474,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 108,
-          "output": 15157,
-          "cacheRead": 5548228,
-          "cacheWrite": 290608
+          "input": 110,
+          "output": 15340,
+          "cacheRead": 5731878,
+          "cacheWrite": 291449
         }
       },
       "costAtCloseOut": {
-        "usd": 321.190425,
-        "pricingAsOf": "2026-07-29T06:09:38.449Z"
+        "usd": 321.231092,
+        "pricingAsOf": "2026-07-29T06:10:29.692Z"
       }
     },
     "merges": [
