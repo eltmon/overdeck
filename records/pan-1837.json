@@ -322,7 +322,7 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T03:27:14.264Z",
+  "updated": "2026-07-29T03:27:19.789Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "blocked",
@@ -333,7 +333,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T03:27:13.444Z",
+    "updatedAt": "2026-07-29T03:27:19.773Z",
     "reviewNotes": "Kimi session capture is mutexed only for conversations; concurrent same-cwd work spawn/restart/recovery can pin another process's session and expose the wrong transcript/cost. See .pan/review/agent-pan-1837-review-aa65ccfa/review.md.",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
@@ -344,7 +344,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
-    "reviewedAtCommit": "a91349119598898b09353f75fe2c0a4fdeed599c",
+    "reviewedAtCommit": "aa65ccfa54a4ed05f33764fbbf6c15de3508f913",
     "lastVerifiedCommit": "aa65ccfa54a4ed05f33764fbbf6c15de3508f913",
     "reviewSpawnedAt": "2026-07-29T03:25:56.580Z"
   },
@@ -398,7 +398,7 @@
       },
       "costAtCloseOut": {
         "usd": 356.287282,
-        "pricingAsOf": "2026-07-29T03:27:13.463Z"
+        "pricingAsOf": "2026-07-29T03:27:19.782Z"
       }
     },
     "merges": [
