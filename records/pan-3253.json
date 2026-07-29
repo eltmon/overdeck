@@ -148,17 +148,17 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T09:16:33.568Z",
+  "updated": "2026-07-29T09:16:35.511Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T09:16:33.518Z",
-    "reviewNotes": "Production fixes now look correct, but append-door-bound.ac3/ac4 and notes-cap.ac2/ac3 remain unproved: the appendOnce/malformed cases were removed instead of fixing fixtures, and no test exercises setReviewStatusSync through raw status_history preservation.",
+    "updatedAt": "2026-07-29T09:16:34.200Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3253-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewedAtCommit": "902ef5c2c866310648762b466c9d39d6fef2ea42",
     "lastVerifiedCommit": "902ef5c2c866310648762b466c9d39d6fef2ea42",
@@ -247,7 +247,7 @@
       },
       "costAtCloseOut": {
         "usd": 92.044863,
-        "pricingAsOf": "2026-07-29T09:16:33.553Z"
+        "pricingAsOf": "2026-07-29T09:16:35.508Z"
       }
     },
     "merges": [
