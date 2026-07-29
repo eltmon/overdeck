@@ -16,8 +16,35 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      ".husky/_/pre-rebase"
+    ],
+    "declaredScopeUntouched": [
+      "docs/AGENT-STATE-PLANES.md",
+      "src/dashboard/server/event-store.ts",
+      "src/lib/database/review-status-db.ts",
+      "src/lib/review-status-reconcile.ts",
+      "src/lib/review-status.ts",
+      "tests/unit/event-store.test.ts",
+      "tests/unit/lib/database/review-status-history-cap.test.ts"
+    ],
+    "declaredScope": [
+      "docs/AGENT-STATE-PLANES.md",
+      "src/dashboard/server/event-store.ts",
+      "src/lib/database/review-status-db.ts",
+      "src/lib/review-status-reconcile.ts",
+      "src/lib/review-status.ts",
+      "tests/unit/event-store.test.ts",
+      "tests/unit/lib/database/review-status-history-cap.test.ts"
+    ],
+    "actualChangedFiles": [
+      ".husky/_/pre-rebase"
+    ],
+    "recordedAt": "2026-07-29T06:18:50.753Z"
+  },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T06:18:53.953Z",
+  "updated": "2026-07-29T06:18:57.792Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -26,7 +53,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T06:18:53.952Z",
+    "updatedAt": "2026-07-29T06:18:57.753Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewRequestedAt": "2026-07-29T06:18:53.952Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -54,8 +82,7 @@
         ".husky/_/pre-rebase"
       ],
       "recordedAt": "2026-07-29T06:18:50.753Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3279"
+    }
   },
   "closeOut": {
     "usage": {
@@ -67,6 +94,14 @@
             "cacheRead": 3978364,
             "cacheWrite": 269290
           }
+        },
+        "work": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 494,
+            "output": 26482,
+            "cacheRead": 11803184,
+            "cacheWrite": 223579
+          }
         }
       },
       "totals": {
@@ -75,14 +110,22 @@
           "output": 46803,
           "cacheRead": 3978364,
           "cacheWrite": 269290
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 494,
+          "output": 26482,
+          "cacheRead": 11803184,
+          "cacheWrite": 223579
         }
       },
       "costAtCloseOut": {
-        "usd": 9.685217,
-        "pricingAsOf": "2026-07-29T06:03:03.941Z"
+        "usd": 11.277912,
+        "pricingAsOf": "2026-07-29T06:18:57.783Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3279"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -134,32 +177,5 @@
     "notes-cap.notes-cap.ac2": "completed",
     "notes-cap.notes-cap.ac3": "completed",
     "append-door-bound": "running"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      ".husky/_/pre-rebase"
-    ],
-    "declaredScopeUntouched": [
-      "docs/AGENT-STATE-PLANES.md",
-      "src/dashboard/server/event-store.ts",
-      "src/lib/database/review-status-db.ts",
-      "src/lib/review-status-reconcile.ts",
-      "src/lib/review-status.ts",
-      "tests/unit/event-store.test.ts",
-      "tests/unit/lib/database/review-status-history-cap.test.ts"
-    ],
-    "declaredScope": [
-      "docs/AGENT-STATE-PLANES.md",
-      "src/dashboard/server/event-store.ts",
-      "src/lib/database/review-status-db.ts",
-      "src/lib/review-status-reconcile.ts",
-      "src/lib/review-status.ts",
-      "tests/unit/event-store.test.ts",
-      "tests/unit/lib/database/review-status-history-cap.test.ts"
-    ],
-    "actualChangedFiles": [
-      ".husky/_/pre-rebase"
-    ],
-    "recordedAt": "2026-07-29T06:18:50.753Z"
   }
 }
