@@ -314,17 +314,17 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:20:47.157Z",
+  "updated": "2026-07-29T05:20:51.234Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:20:45.267Z",
+    "updatedAt": "2026-07-29T05:20:51.209Z",
     "reviewNotes": "Agent re-review request (3/25): Added missing FR-7 acceptance tests: conversation-only SimpleHomePage and agent-backed ConversationDock",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -335,7 +335,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
     "reviewedAtCommit": "95f4c6c751405f1ce84e806a249daf5c848a0829",
-    "reviewSpawnedAt": "2026-07-29T05:13:03.780Z"
+    "reviewSpawnedAt": "2026-07-29T05:20:45.731Z"
   },
   "closeOut": {
     "usage": {
@@ -395,7 +395,7 @@
       },
       "costAtCloseOut": {
         "usd": 279.761528,
-        "pricingAsOf": "2026-07-29T05:20:46.661Z"
+        "pricingAsOf": "2026-07-29T05:20:51.231Z"
       }
     },
     "merges": [
@@ -404,7 +404,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3232",
