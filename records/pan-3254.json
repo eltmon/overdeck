@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:18:00.558Z",
-  "updated": "2026-07-29T03:31:46.074Z",
+  "updated": "2026-07-29T03:31:48.579Z",
   "pipeline": {
     "issueId": "PAN-3254",
     "reviewStatus": "pending",
@@ -20,7 +20,20 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T03:25:51.406Z"
+    "updatedAt": "2026-07-29T03:31:48.578Z",
+    "reviewRequestedAt": "2026-07-29T03:31:48.578Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/REVIEW-AGENT-ARCHITECTURE.md"
+      ],
+      "actualChangedFiles": [
+        "docs/REVIEW-AGENT-ARCHITECTURE.md"
+      ],
+      "recordedAt": "2026-07-29T03:31:46.073Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3275"
   },
   "closeOut": {
     "usage": {
