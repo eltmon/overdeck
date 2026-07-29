@@ -261,14 +261,17 @@ describe('overdeck review status sync', () => {
 
     // Call setReviewStatusSync() with a long testNotes to exercise the composition path
     // This triggers the dbStatus/updated split in review-status.ts
-    const updated = setReviewStatusSync({
-      issueId: 'PAN-COMPOSITION-TEST',
-      reviewStatus: 'passed',
-      testStatus: 'pending',
-      testNotes: longTestNote, // 10,000 chars - should NOT be truncated in returned status
-      updatedAt: new Date().toISOString(),
-      readyForMerge: false,
-    });
+    // Signature: setReviewStatusSync(issueId: string, update: ReviewStatusUpdate, existing?: ReviewStatus)
+    const updated = setReviewStatusSync(
+      'PAN-COMPOSITION-TEST',
+      {
+        reviewStatus: 'passed',
+        testStatus: 'pending',
+        testNotes: longTestNote, // 10,000 chars - should NOT be truncated in returned status
+        updatedAt: new Date().toISOString(),
+        readyForMerge: false,
+      }
+    );
 
     // AC2: Verify returned status.testNotes is complete (≤ 500 rule only applies to history notes, not testNotes)
     expect(updated.testNotes).toBe(longTestNote);
