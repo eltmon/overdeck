@@ -9,7 +9,7 @@ import {
   searchMemory,
 } from '../../lib/memory/cli.js';
 import { backfillMemoryFromTranscripts } from '../../lib/memory/backfill.js';
-import { resolveContainedPinPath } from '../../lib/memory/pin-path.js';
+import { resolveContainedPinPath, verifyPinPathContainment } from '../../lib/memory/pin-path.js';
 import { getProjectByKey, getWorkspaceById, listPinnedDocs } from '../../lib/workspaces/resolver.js';
 import { pinDoc, unpinDoc } from '../../lib/workspaces/writer.js';
 import type { PinScope, ProjectRow } from '../../lib/workspaces/types.js';
@@ -23,7 +23,7 @@ export function createMemoryCommand(): Command {
     .command('search <query>')
     .description('Search memory observations')
     .option('--project <id>', 'Project ID')
-    .option('--workspace <id>', 'Workspace ID')
+    .option('--workspace <id|name>', 'Workspace id or name')
     .option('--issue <id>', 'Issue ID')
     .option('--tag <tag>', 'Filter by tag')
     .option('--sibling', 'Search same-project sibling issues instead of the selected issue')
@@ -32,7 +32,13 @@ export function createMemoryCommand(): Command {
     .option('--limit <n>', 'Maximum results', parseInt)
     .option('--json', 'Output JSON')
     .action(async (query, options) => {
-      const results = await searchMemory(query, options);
+      let results: Awaited<ReturnType<typeof searchMemory>>;
+      try {
+        results = await searchMemory(query, options);
+      } catch (err) {
+        console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+        return exitCli(1);
+      }
       if (options.json) {
         console.log(JSON.stringify(results, null, 2));
         return;
@@ -204,9 +210,12 @@ export async function memoryPinCommand(docPath: string, options: MemoryPinOption
   const resolved = resolvePinTarget(options);
   if (!resolved) return exitCli(1);
   const { scope, scopeId, project } = resolved;
-  const projectRelativePath = resolveContainedPinPath(project.primaryPath, docPath);
+  // Symlink-safe: a lexically-contained path can still point outside the
+  // project root through an in-project symlink, so pin creation must verify
+  // the REAL target, not just the path string.
+  const projectRelativePath = await verifyPinPathContainment(project.primaryPath, docPath);
   if (projectRelativePath === null) {
-    console.error(chalk.red(`Refusing to pin '${docPath}': it resolves outside the project root '${project.primaryPath}'.`));
+    console.error(chalk.red(`Refusing to pin '${docPath}': it must resolve to a real file inside the project root '${project.primaryPath}'.`));
     return exitCli(1);
   }
 

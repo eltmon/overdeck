@@ -86,6 +86,27 @@ export function getWorkspaceByName(projectId: string, name: string): WorkspaceRo
   return row ? rowToWorkspace(row) : null;
 }
 
+export type WorkspaceRefResolution =
+  | { workspace: WorkspaceRow; ambiguous: false }
+  | { workspace: null; ambiguous: true; matches: WorkspaceRow[] }
+  | { workspace: null; ambiguous: false };
+
+/**
+ * Resolve a workspace by id first, falling back to a cross-project name
+ * lookup (D-3: `--workspace <id|name>`). A name is not guaranteed unique
+ * across projects, so more than one match is reported as `ambiguous` rather
+ * than silently picking one — the caller decides how to surface that.
+ */
+export function resolveWorkspaceRef(ref: string): WorkspaceRefResolution {
+  const byId = getWorkspaceById(ref);
+  if (byId) return { workspace: byId, ambiguous: false };
+
+  const matches = listWorkspaces({}).filter((workspace) => workspace.name === ref);
+  if (matches.length === 1) return { workspace: matches[0]!, ambiguous: false };
+  if (matches.length > 1) return { workspace: null, ambiguous: true, matches };
+  return { workspace: null, ambiguous: false };
+}
+
 /** The non-archived kind='issue' workspace row for an issue, or null. */
 export function getWorkspaceForIssue(issueId: string): WorkspaceRow | null {
   const db = getOverdeckDatabaseSync();

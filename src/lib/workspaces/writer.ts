@@ -16,7 +16,7 @@ import { writeWorkspaceIdentity } from '../memory/identity-record.js';
 import { mirrorPin, unmirrorPin } from '../memory/state-mirror.js';
 import type { ProjectConfig } from '../projects.js';
 import type { PinScope, WorkspaceKind } from './types.js';
-import { getMainWorkspace, getProjectByKey, getWorkspaceById } from './resolver.js';
+import { getMainWorkspace, getProjectByKey, getWorkspaceById, listPinnedDocs } from './resolver.js';
 
 // ─── Projects ──────────────────────────────────────────────────────────────
 
@@ -157,6 +157,15 @@ export function unarchiveWorkspace(id: string): void {
  * Project-scoped pins are untouched. Never touches JSONL transcripts or the
  * memory home (memory purge is a separate explicit flag on the CLI destroy
  * verb).
+ *
+ * Review fix (durability): the durable mirror is unmirrored FIRST, before
+ * the SQLite rows are ever touched. If a state-door commit/push fails here,
+ * the function throws and the workspace + pin rows are untouched — a caller
+ * retry re-lists the same pins from the unharmed DB row and re-attempts.
+ * Doing the DB delete first (the previous ordering) would forget the pin
+ * list before the mirror cleanup could be retried, permanently stranding it.
+ * unmirrorPin/removeMemoryStateMirror already no-op on an already-removed
+ * target, so retrying an already-unmirrored pin is safe.
  */
 export async function deleteWorkspace(id: string): Promise<void> {
   const db = getOverdeckDatabaseSync();
@@ -165,8 +174,8 @@ export async function deleteWorkspace(id: string): Promise<void> {
   if (workspace.kind === 'main') {
     throw new Error(`Cannot delete the main workspace for project ${workspace.projectId}`);
   }
-  const workspacePins = db.prepare(`SELECT doc_path FROM pinned_docs WHERE scope = 'workspace' AND scope_id = ?`)
-    .all(id) as Array<{ doc_path: string }>;
+  const workspacePins = listPinnedDocs('workspace', id);
+  await Promise.all(workspacePins.map((pin) => unmirrorPin(workspace.projectId, 'workspace', id, pin.docPath)));
 
   const run = db.transaction(() => {
     db.prepare(`UPDATE conversations SET workspace_id = NULL WHERE workspace_id = ?`).run(id);
@@ -174,8 +183,6 @@ export async function deleteWorkspace(id: string): Promise<void> {
     db.prepare(`DELETE FROM workspaces WHERE id = ?`).run(id);
   });
   run();
-
-  await Promise.all(workspacePins.map((pin) => unmirrorPin(workspace.projectId, 'workspace', id, pin.doc_path)));
 }
 
 // ─── Pinned docs ───────────────────────────────────────────────────────────

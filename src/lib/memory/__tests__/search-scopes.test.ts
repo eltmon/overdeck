@@ -77,6 +77,36 @@ describe('pan memory search --workspace (ac1)', () => {
 
     expect(results.map((r) => r.observation.id)).toEqual(['in-a']);
   });
+
+  it('resolves --workspace by NAME and its owning project, without --project (D-3, review fix cycle 2)', async () => {
+    upsertProjectFromConfig('overdeck', { name: 'Overdeck', path: odb.home });
+    upsertProjectFromConfig('other-project', { name: 'Other', path: join(odb.home, 'other-project') });
+    const workspaceA = await createWorkspace({ projectId: 'overdeck', kind: 'scratch', name: 'by-name-a', path: join(odb.home, 'by-name-a') });
+    const workspaceOther = await createWorkspace({ projectId: 'other-project', kind: 'scratch', name: 'by-name-other', path: join(odb.home, 'by-name-other') });
+
+    await writeObservationRecord(observation(baseIdentity({ projectId: 'overdeck', workspaceId: workspaceA }), { id: 'in-a', summary: 'workspace A memory' }));
+    await writeObservationRecord(observation(baseIdentity({ projectId: 'other-project', workspaceId: workspaceOther }), { id: 'in-other', summary: 'other workspace memory' }));
+
+    // No --project given — resolution must find by-name-a's OWNING project (overdeck) itself.
+    const results = await searchMemory('memory', { workspace: 'by-name-a' });
+
+    expect(results.map((r) => r.observation.id)).toEqual(['in-a']);
+  });
+
+  it('throws a clear ambiguity error when --workspace name matches workspaces in more than one project (D-3)', async () => {
+    upsertProjectFromConfig('overdeck', { name: 'Overdeck', path: odb.home });
+    upsertProjectFromConfig('other-project', { name: 'Other', path: join(odb.home, 'other-project') });
+    await createWorkspace({ projectId: 'overdeck', kind: 'scratch', name: 'shared', path: join(odb.home, 'shared-a') });
+    await createWorkspace({ projectId: 'other-project', kind: 'scratch', name: 'shared', path: join(odb.home, 'shared-b') });
+
+    await expect(searchMemory('memory', { workspace: 'shared' })).rejects.toThrow(/Multiple workspaces named 'shared'/);
+  });
+
+  it('returns no results (not an error) when --workspace matches neither an id nor a name', async () => {
+    upsertProjectFromConfig('overdeck', { name: 'Overdeck', path: odb.home });
+
+    await expect(searchMemory('memory', { project: 'overdeck', workspace: 'does-not-exist' })).resolves.toEqual([]);
+  });
 });
 
 describe('pan memory search --global (ac2, ac3)', () => {

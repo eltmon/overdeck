@@ -11,6 +11,7 @@ import {
   listProjects,
   listWorkspaces,
   resolveWorkspaceForCwd,
+  resolveWorkspaceRef,
 } from '../../../../src/lib/workspaces/resolver.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../../../src/lib/workspaces/writer.js';
 
@@ -38,6 +39,46 @@ describe('workspaces resolver', () => {
     expect(getWorkspaceByName(projectId, 'notes')?.id).toBe(id);
     expect(getWorkspaceById('missing')).toBeNull();
     expect(getWorkspaceByName(projectId, 'missing')).toBeNull();
+  });
+
+  describe('resolveWorkspaceRef (D-3: --workspace <id|name>, review fix cycle 2)', () => {
+    it('resolves by id', async () => {
+      const projectId = seedProject();
+      const id = await createWorkspace({ projectId, kind: 'scratch', name: 'notes', path: '/repo/overdeck-notes' });
+
+      const resolution = resolveWorkspaceRef(id);
+      expect(resolution.ambiguous).toBe(false);
+      expect(resolution.workspace?.id).toBe(id);
+    });
+
+    it('resolves by name when unique across all projects', async () => {
+      const projectId = seedProject();
+      const id = await createWorkspace({ projectId, kind: 'scratch', name: 'unique-name', path: '/repo/overdeck-unique' });
+
+      const resolution = resolveWorkspaceRef('unique-name');
+      expect(resolution.ambiguous).toBe(false);
+      expect(resolution.workspace?.id).toBe(id);
+    });
+
+    it('reports ambiguity instead of guessing when the name matches workspaces in more than one project', async () => {
+      const projectA = seedProject('proj-a', '/repo/a');
+      const projectB = seedProject('proj-b', '/repo/b');
+      await createWorkspace({ projectId: projectA, kind: 'scratch', name: 'shared-name', path: '/repo/a-shared' });
+      await createWorkspace({ projectId: projectB, kind: 'scratch', name: 'shared-name', path: '/repo/b-shared' });
+
+      const resolution = resolveWorkspaceRef('shared-name');
+      expect(resolution.ambiguous).toBe(true);
+      expect(resolution.workspace).toBeNull();
+      if (resolution.ambiguous) {
+        expect(resolution.matches.map((w) => w.projectId).sort()).toEqual(['proj-a', 'proj-b']);
+      }
+    });
+
+    it('reports not-found (not ambiguous) for a ref matching neither an id nor a name', () => {
+      const resolution = resolveWorkspaceRef('does-not-exist');
+      expect(resolution.ambiguous).toBe(false);
+      expect(resolution.workspace).toBeNull();
+    });
   });
 
   it('getWorkspaceForIssue returns the non-archived kind=issue row and ignores archived ones', async () => {

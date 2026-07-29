@@ -5,7 +5,7 @@ import { parse as parseYaml } from 'yaml';
 import type { MemoryIdentity, MemoryStatus, RagDecision, RagDecisionSource } from '@overdeck/contracts';
 import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from './paths.js';
 import { expandMemoryQuery, type QueryExpansionCall, type QueryExpansionResult } from './query-expansion.js';
-import { resolveContainedPinPath } from './pin-path.js';
+import { verifyPinPathContainment } from './pin-path.js';
 import { searchMemory, type MemorySearchHit } from './search.js';
 import { isMemoryKnowledgeIndexEnabled, isMemoryPromptTimeInjectionEnabled } from './settings.js';
 import { findProjectByPathSync, getProjectSync, loadProjectsConfigSync, resolveProjectFromIssueSync, resolveProjectPath } from '../projects.js';
@@ -494,12 +494,14 @@ async function readPinnedDocCandidates(identity: MemoryIdentity): Promise<Candid
 
   const candidates: CandidateContext[] = [];
   for (const pin of pins) {
-    // Defense in depth: pin creation (memory.ts) already rejects a doc_path
-    // that resolves outside the project root, but never trust a stored value
-    // as pre-validated — a stale row from before that guard, or any other
-    // writer of the pinned_docs table, must not be able to read arbitrary
-    // local files (e.g. ~/.ssh/id_rsa) into prompt-time context.
-    const containedPath = resolveContainedPinPath(projectPath, pin.docPath);
+    // Defense in depth: pin creation (memory.ts) already verifies real-path
+    // containment, but never trust a stored value as pre-validated — a stale
+    // row from before that guard, or any other writer of the pinned_docs
+    // table, must not be able to read arbitrary local files (e.g.
+    // ~/.ssh/id_rsa) into prompt-time context. Symlink-safe: resolves the
+    // REAL target, not just the path string, so an in-project symlink
+    // pointing outside the project is refused too.
+    const containedPath = await verifyPinPathContainment(projectPath, pin.docPath);
     if (containedPath === null) continue;
     try {
       const text = await readFile(resolve(projectPath, containedPath), 'utf8');

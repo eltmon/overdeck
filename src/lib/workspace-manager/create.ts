@@ -34,7 +34,7 @@ import {
 } from './worktree-ops.js';
 import type { WorkspaceCreateOptions, WorkspaceCreateResult } from './types.js';
 import { getProjectByPath, getWorkspaceForIssue } from '../workspaces/resolver.js';
-import { createWorkspace, upsertProjectFromConfig } from '../workspaces/writer.js';
+import { createWorkspace, deleteWorkspace, upsertProjectFromConfig } from '../workspaces/writer.js';
 import { listProjectsSync } from '../projects.js';
 import {
   createWorkspacePlaceholdersSync as createPlaceholders,
@@ -210,6 +210,11 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
   // row always exists ahead of the worktree rather than waiting on a later
   // backfill to retroactively guess it from the directory.
   const issueId = featureName.toUpperCase();
+  // Non-blocking review fix: track the row WE created here so it can be
+  // compensated (deleted) if anything below fails — otherwise a failed
+  // worktree creation leaves an active-looking issue workspace row whose
+  // path was never actually created.
+  let createdWorkspaceRowId: string | null = null;
   if (!getWorkspaceForIssue(issueId)) {
     let project = getProjectByPath(projectConfig.path);
     if (!project) {
@@ -222,7 +227,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
       upsertProjectFromConfig(projectKey, projectConfig);
       project = getProjectByPath(projectConfig.path);
     }
-    await createWorkspace({
+    createdWorkspaceRowId = await createWorkspace({
       projectId: project!.id,
       kind: 'issue',
       name: featureFolder,
@@ -232,6 +237,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     });
   }
 
+  const outcome = await (async (): Promise<WorkspaceCreateResult> => {
   // A failed auto-plan/start can leave only orchestration metadata at the
   // future workspace path. Stage it so `git worktree add` sees a clean target,
   // then merge it back into the real worktree after creation.
@@ -766,4 +772,14 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
 
   result.success = result.errors.length === 0;
   return result;
+  })();
+
+  if (!outcome.success && createdWorkspaceRowId) {
+    try {
+      await deleteWorkspace(createdWorkspaceRowId);
+    } catch (err) {
+      outcome.errors.push(`Also failed to compensate the pre-created workspace row: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return outcome;
 }

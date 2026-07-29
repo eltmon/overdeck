@@ -526,14 +526,18 @@ void startTtsPlayback().catch(err => console.warn('[tts-playback] start failed:'
 // PAN-1990: seed the projects/workspaces runtime tables from projects.yaml +
 // existing feature-* worktrees. Idempotent; never removes or modifies rows.
 seedProjectsFromYaml();
-void backfillIssueWorkspaces().catch(err => console.warn('[workspaces] issue-worktree backfill failed:', err?.message ?? err));
 console.log('[overdeck] Workspaces boot seeding started');
 
-// PAN-1990 WI-6: one-time, marker-gated migration of legacy issue-keyed memory
-// homes onto their workspace UUID. No-ops after the first successful boot
+// PAN-1990 WI-6 review fix: migration reads issue-workspace rows that
+// backfillIssueWorkspaces() creates, so it must not start until backfill has
+// finished — two independent fire-and-forget promises let migration reach
+// getWorkspaceForIssue() first and permanently mark still-unbackfilled
+// legacy homes as unresolvable. No-ops after the first successful boot
 // (migrateMemoryHomesToWorkspacesOnce's own marker file), so this never
 // re-scans every project's memory home on a normal restart.
-void migrateMemoryHomesToWorkspacesOnce()
+void backfillIssueWorkspaces()
+  .catch(err => console.warn('[workspaces] issue-worktree backfill failed:', err?.message ?? err))
+  .then(() => migrateMemoryHomesToWorkspacesOnce())
   .then((result) => {
     if (result) console.log(`[memory-migration] migrated ${result.migrated}/${result.scanned} legacy memory home(s), ${result.unresolvable.length} unresolvable`);
   })

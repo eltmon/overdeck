@@ -24,6 +24,11 @@ import { getOverdeckDatabaseSync } from '../../lib/overdeck/infra.js';
 import { getWorkspaceForIssue } from '../../lib/workspaces/resolver.js';
 import type { DomainEvent } from '@overdeck/contracts';
 
+/** Default workspace-id resolver: the real workspaces resolver against the global overdeck.db. */
+function defaultResolveWorkspaceId(issueId: string): string | undefined {
+  return getWorkspaceForIssue(issueId)?.id;
+}
+
 /**
  * PAN-1990 D-10/WI-11: stamp `workspaceId` onto any issue-bearing event
  * payload that omits it, so a producer that only knows `issueId` still
@@ -31,13 +36,28 @@ import type { DomainEvent } from '@overdeck/contracts';
  * lookup itself. Never overwrites a payload that already carries a
  * `workspaceId` — some producers (e.g. operatorInterventionEvent) resolve it
  * themselves at construction time and that value wins.
+ *
+ * Review fix (non-blocking, test isolation/perf): the resolver is injected
+ * (defaulting to the real one) so a store built with a mock DbAdapter for
+ * unit tests can opt out of touching the global overdeck.db, and resolution
+ * is wrapped in try/catch so a resolver failure — e.g. a test DB that isn't
+ * in a state this lookup expects — degrades to "no stamp" rather than
+ * breaking the append itself.
  */
-function withWorkspaceId(event: Omit<DomainEvent, 'sequence'>): Omit<DomainEvent, 'sequence'> {
+function withWorkspaceId(
+  event: Omit<DomainEvent, 'sequence'>,
+  resolveWorkspaceId: (issueId: string) => string | undefined,
+): Omit<DomainEvent, 'sequence'> {
   const payload = (event as Record<string, unknown>)['payload'];
   if (!payload || typeof payload !== 'object') return event;
   const record = payload as Record<string, unknown>;
   if (record['workspaceId'] !== undefined || typeof record['issueId'] !== 'string') return event;
-  const workspaceId = getWorkspaceForIssue(record['issueId'] as string)?.id;
+  let workspaceId: string | undefined;
+  try {
+    workspaceId = resolveWorkspaceId(record['issueId'] as string);
+  } catch {
+    return event;
+  }
   if (!workspaceId) return event;
   return { ...event, payload: { ...record, workspaceId } } as Omit<DomainEvent, 'sequence'>;
 }
@@ -223,7 +243,13 @@ export function trimReviewStatusHistoryPayloads(
  * Create an EventStore from a pre-opened DbAdapter.
  * Call openEventDb() first to get the adapter.
  */
-export function createEventStore(db: DbAdapter): EventStore {
+export interface CreateEventStoreOptions {
+  /** Override the workspaceId lookup used by withWorkspaceId — defaults to the real resolver against the global overdeck.db. Pass a stub in unit tests to avoid touching it. */
+  resolveWorkspaceId?: (issueId: string) => string | undefined;
+}
+
+export function createEventStore(db: DbAdapter, options?: CreateEventStoreOptions): EventStore {
+  const resolveWorkspaceId = options?.resolveWorkspaceId ?? defaultResolveWorkspaceId;
   const emitter = new EventEmitter();
   // Allow many subscribers (one per WebSocket connection)
   emitter.setMaxListeners(0);
@@ -363,7 +389,7 @@ export function createEventStore(db: DbAdapter): EventStore {
   }
 
   function append(event: Omit<DomainEvent, 'sequence'>): number {
-    event = withWorkspaceId(event);
+    event = withWorkspaceId(event, resolveWorkspaceId);
     const timestamp = eventTimestampMillis(event);
     const payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
 
@@ -387,7 +413,7 @@ export function createEventStore(db: DbAdapter): EventStore {
   }
 
   function appendAsync(event: Omit<DomainEvent, 'sequence'>): Promise<number> {
-    event = withWorkspaceId(event);
+    event = withWorkspaceId(event, resolveWorkspaceId);
     return new Promise((resolve) => {
       const timestamp = eventTimestampMillis(event);
       const payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
@@ -406,7 +432,7 @@ export function createEventStore(db: DbAdapter): EventStore {
   }
 
   function emitOnly(event: Omit<DomainEvent, 'sequence'>): void {
-    event = withWorkspaceId(event);
+    event = withWorkspaceId(event, resolveWorkspaceId);
     const timestamp = eventTimestampMillis(event);
     const stored: StoredEvent = {
       sequence: -1, // sentinel: in-memory only, not persisted
@@ -472,7 +498,7 @@ export function createEventStore(db: DbAdapter): EventStore {
     event: Omit<DomainEvent, 'sequence'>,
     idempotencyKey: string,
   ): { outcome: 'appended' | 'duplicate'; sequence: number } {
-    event = withWorkspaceId(event);
+    event = withWorkspaceId(event, resolveWorkspaceId);
     const stmts = getIdempotencyStmts();
     const timestamp = eventTimestampMillis(event);
     const payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});

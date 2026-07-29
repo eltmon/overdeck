@@ -157,11 +157,19 @@ async function pathExists(path: string): Promise<boolean> {
  *
  * A same-named subdirectory at the destination is merged recursively rather
  * than renamed over — a flat `rename` onto an existing non-empty directory
- * fails with ENOTEMPTY. A same-named file at the destination has its legacy
- * content appended rather than silently dropped or overwritten (memory
- * observation/summary files are append-only JSONL/markdown logs, so this
- * preserves both sides).
+ * fails with ENOTEMPTY. A same-named file's handling depends on its kind:
+ * only `.jsonl` files (observations/, rag-runs/) are append-only logs, safe
+ * to concatenate. Everything else — status.json, health.json, pending/*.json,
+ * daily summary markdown — is a single snapshot or per-record document that
+ * gets fully REWRITTEN in place, not appended to; concatenating two of those
+ * produces invalid JSON (or a corrupted markdown file). For those, the legacy
+ * copy is preserved alongside the destination's as `<name>.legacy` rather
+ * than corrupting or silently dropping it.
  */
+function isAppendOnlyLog(fileName: string): boolean {
+  return fileName.endsWith('.jsonl');
+}
+
 async function mergeDirectoryEntries(oldPath: string, newPath: string): Promise<void> {
   await mkdir(newPath, { recursive: true });
   const entries = await readdir(oldPath, { withFileTypes: true });
@@ -176,9 +184,13 @@ async function mergeDirectoryEntries(oldPath: string, newPath: string): Promise<
     }
 
     if (await pathExists(newEntryPath)) {
-      const legacyContent = await readFile(oldEntryPath, 'utf8');
-      await appendFile(newEntryPath, legacyContent, 'utf8');
-      await unlink(oldEntryPath);
+      if (isAppendOnlyLog(entry.name)) {
+        const legacyContent = await readFile(oldEntryPath, 'utf8');
+        await appendFile(newEntryPath, legacyContent, 'utf8');
+        await unlink(oldEntryPath);
+      } else {
+        await rename(oldEntryPath, `${newEntryPath}.legacy`);
+      }
       continue;
     }
 
@@ -270,6 +282,15 @@ export async function migrateMemoryHomesToWorkspaces(): Promise<MigrateMemoryHom
  * gated by a marker file, so a dashboard restart never re-scans every
  * project's memory home. No-ops (zero directory or FTS changes) once the
  * marker exists.
+ *
+ * Review fix: the marker is written ONLY when every scanned legacy home was
+ * resolved (`unresolvable` is empty). Writing it unconditionally would let a
+ * migration that raced ahead of backfillIssueWorkspaces() (whose issue rows
+ * this migration depends on) classify still-unbackfilled legacy homes as
+ * permanently unresolvable — every later boot would then return at the
+ * marker and never retry them. Caller (main.ts) also awaits backfill before
+ * calling this, closing the race at its source; the marker gate is the
+ * second, independent line of defense.
  */
 export async function migrateMemoryHomesToWorkspacesOnce(): Promise<MigrateMemoryHomesResult | null> {
   const markerPath = join(resolveMemoryBase(), '.workspace-keyed');
@@ -277,6 +298,7 @@ export async function migrateMemoryHomesToWorkspacesOnce(): Promise<MigrateMemor
   if (marked) return null;
 
   const result = await migrateMemoryHomesToWorkspaces();
+  if (result.unresolvable.length > 0) return result;
   await ensureParentDir(markerPath);
   await writeFile(markerPath, `${new Date().toISOString()}\n`, 'utf8').catch(() => {});
   return result;

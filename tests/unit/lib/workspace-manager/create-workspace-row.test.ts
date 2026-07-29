@@ -129,4 +129,24 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
     expect(getWorkspaceForIssue('PAN-4001')).toBeNull();
     expect(mockExecAsync).not.toHaveBeenCalled();
   });
+
+  it('deletes the pre-created workspace row when git worktree add fails (non-blocking review fix)', async () => {
+    upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (typeof command === 'string' && command.includes('git worktree add')) {
+        throw new Error('fatal: could not create worktree');
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await createWorkspacePromise({
+      projectConfig: { name: 'Test', path: tempDir },
+      featureName: 'pan-5000',
+    });
+
+    expect(result.success).toBe(false);
+    // The row created before the worktree attempt must not survive a failure —
+    // otherwise the registry advertises a workspace whose path was never created.
+    expect(getWorkspaceForIssue('PAN-5000')).toBeNull();
+  });
 });

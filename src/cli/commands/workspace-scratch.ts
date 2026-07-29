@@ -8,6 +8,7 @@ import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
 import { getDefaultWorkspaceConfigSync } from '../../lib/workspace-config.js';
 import { getMainWorkspace, resolveWorkspaceForCwd } from '../../lib/workspaces/resolver.js';
 import { createWorkspace, touchWorkspaceAccessed, upsertProjectFromConfig } from '../../lib/workspaces/writer.js';
+import { validateFeatureName } from '../../lib/workspace-manager/worktree-ops.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -57,6 +58,14 @@ export interface WorkspaceNewOptions {
 
 export async function workspaceNewCommand(name: string, options: WorkspaceNewOptions): Promise<void> {
   try {
+    // Non-blocking review fix: name becomes a literal path segment
+    // (`scratch-<name>`) and git ref fragment (`scratch/<name>`) for an
+    // isolated workspace — reject separators, `..`, spaces, and other
+    // ref-invalid characters up front instead of letting them create a
+    // nested/unexpected target path or fail late inside git.
+    if (!validateFeatureName(name)) {
+      throw new Error(`Invalid workspace name '${name}'. Use alphanumeric and hyphens only.`);
+    }
     const project = resolveProjectByKey(options.project);
     ensureProjectSeeded(project);
 

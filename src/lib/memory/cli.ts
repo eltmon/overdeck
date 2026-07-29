@@ -17,7 +17,7 @@ import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';
 import { mirrorDailySummary } from './state-mirror.js';
 import { readCurrentStatus } from './rollup.js';
 import { getAgentStateSync } from '../agents.js';
-import { getWorkspaceById, getWorkspaceForIssue, listProjects, listWorkspaces } from '../workspaces/resolver.js';
+import { getWorkspaceForIssue, listProjects, listWorkspaces, resolveWorkspaceRef } from '../workspaces/resolver.js';
 import { searchMemory as searchMemoryFts, type MemorySearchHit } from './search.js';
 
 const DEFAULT_PROJECT_ID = 'overdeck';
@@ -77,16 +77,35 @@ export interface MemoryDoctorResult {
  * result set (limit), not with total history. Reset-marker filtering also
  * moves into the FTS query itself (search.ts already does this in SQL).
  *
- * `--workspace <id>` resolves its OWNING project (D-3) before searching, so a
+ * `--workspace <id|name>` (D-3) resolves either a workspace UUID or a
+ * workspace name, then uses ITS OWNING project before searching, so a
  * workspace registered under a project other than `overdeck` is actually
  * searched instead of silently querying the default project and finding
- * nothing.
+ * nothing. A name that matches more than one workspace across projects is
+ * reported as an ambiguity error rather than guessing.
  */
 export async function searchMemory(query: string, options: MemorySearchOptions = {}): Promise<MemorySearchResult[]> {
-  const workspaceProjectId = options.workspace ? getWorkspaceById(options.workspace)?.projectId : undefined;
+  let resolvedWorkspaceId: string | undefined;
+  let resolvedWorkspaceProjectId: string | undefined;
+  if (options.workspace) {
+    const resolution = resolveWorkspaceRef(options.workspace);
+    if (resolution.ambiguous) {
+      throw new Error(`Multiple workspaces named '${options.workspace}' found (projects: ${resolution.matches.map((w) => w.projectId).join(', ')}); use the workspace id instead.`);
+    }
+    if (resolution.workspace) {
+      resolvedWorkspaceId = resolution.workspace.id;
+      resolvedWorkspaceProjectId = resolution.workspace.projectId;
+    } else {
+      // Matches neither an id nor a name — keep filtering by the literal ref
+      // (which then matches no FTS rows) rather than throwing or silently
+      // searching the whole project unfiltered.
+      resolvedWorkspaceId = options.workspace;
+    }
+  }
+
   const projectIds = options.global
     ? listProjects().map((project) => project.id)
-    : [workspaceProjectId ?? options.project ?? DEFAULT_PROJECT_ID];
+    : [resolvedWorkspaceProjectId ?? options.project ?? DEFAULT_PROJECT_ID];
   const limit = options.limit ?? 20;
   // sibling mode needs a workspaceId to exclude even when the caller only
   // passed --issue (the CLI's usual sibling invocation) — resolve it the same
@@ -97,11 +116,16 @@ export async function searchMemory(query: string, options: MemorySearchOptions =
     const hits = await searchMemoryFts({
       query,
       projectId,
-      workspaceId: options.workspace ?? workspaceIdForIssue,
+      workspaceId: resolvedWorkspaceId ?? workspaceIdForIssue,
       issueId: options.issue,
       sibling: options.sibling,
       includeArchived: options.includeArchived,
       tags: options.tag ? [options.tag] : undefined,
+      // The shared FTS index also carries daily-summary hits (doc_type
+      // 'summary'), which this command can't resolve back to a
+      // MemoryObservation — restrict to observations so a summary ranked
+      // above matching observations doesn't consume the limit and vanish.
+      docType: 'observation',
       limit,
     });
 

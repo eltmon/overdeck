@@ -80,6 +80,33 @@ describe('pan workspace new (PAN-1990)', () => {
       expect.objectContaining({ cwd: projectRoot }),
     );
   });
+
+  it('rejects a name containing a path separator before touching git or the filesystem (non-blocking review fix)', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit:${code}`);
+    }) as never);
+
+    try {
+      await expect(workspaceNewCommand('bad/name', { isolated: true })).rejects.toThrow('process.exit:1');
+    } finally {
+      exitSpy.mockRestore();
+    }
+
+    expect(mockExecAsync).not.toHaveBeenCalled();
+    expect(getWorkspaceByName('test-project', 'bad/name')).toBeNull();
+  });
+
+  it('rejects a name containing spaces', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit:${code}`);
+    }) as never);
+
+    try {
+      await expect(workspaceNewCommand('bad name', {})).rejects.toThrow('process.exit:1');
+    } finally {
+      exitSpy.mockRestore();
+    }
+  });
 });
 
 describe('pan workspace main (PAN-1990)', () => {

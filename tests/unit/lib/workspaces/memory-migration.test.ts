@@ -10,7 +10,7 @@ import {
 } from '../../../../src/lib/workspaces/rebuild.js';
 import { getWorkspaceForIssue } from '../../../../src/lib/workspaces/resolver.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../../../src/lib/workspaces/writer.js';
-import { resolveMemoryRoot } from '../../../../src/lib/memory/paths.js';
+import { resolveMemoryBase, resolveMemoryRoot } from '../../../../src/lib/memory/paths.js';
 import { withMemoryFtsDatabase, closeMemoryFtsDatabases } from '../../../../src/lib/memory/fts-db.js';
 
 let odb: OverdeckTestDb;
@@ -108,6 +108,29 @@ describe('migrateMemoryHomesToWorkspaces (PAN-1990)', () => {
     expect(rows).toEqual({ c: 1 });
   });
 
+  it('does not write the completion marker while an entry remains unresolvable, so a later boot retries it (review fix, cycle 2)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    // No workspace row for PAN-8888 yet — simulates migration racing ahead of
+    // backfillIssueWorkspaces(), which would otherwise have created it.
+    const legacyDir = await writeLegacyIssueHome('PAN-8888', 'obs-race');
+
+    const first = await migrateMemoryHomesToWorkspacesOnce();
+    expect(first?.unresolvable).toEqual(['overdeck/PAN-8888']);
+    // The marker must NOT exist — a second call must still attempt migration
+    // rather than silently no-op forever.
+    expect(existsSync(join(resolveMemoryBase(), '.workspace-keyed'))).toBe(false);
+
+    // Now the race resolves itself (backfill runs, creates the row) —
+    // the retry on the next boot must actually migrate it.
+    await createWorkspace({
+      projectId: 'overdeck', kind: 'issue', name: 'feature-pan-8888', path: '/repo/overdeck/workspaces/feature-pan-8888', issueId: 'PAN-8888',
+    });
+    const second = await migrateMemoryHomesToWorkspacesOnce();
+    expect(second?.migrated).toBe(1);
+    expect(existsSync(legacyDir)).toBe(false);
+    warnSpy.mockRestore();
+  });
+
   it('an unresolvable directory survives in place and is logged, never deleted (ac4)', async () => {
     const legacyDir = await writeLegacyIssueHome('PAN-9999', 'obs-orphan');
     expect(getWorkspaceForIssue('PAN-9999')).toBeNull();
@@ -147,6 +170,28 @@ describe('migrateMemoryHomesToWorkspaces (PAN-1990)', () => {
     expect(readFileSync(join(newDir, 'observations', '2026-07-28.jsonl'), 'utf-8')).toBe('{"turn":2}\n{"turn":1}\n');
     // File that only existed at the destination is untouched.
     expect(readFileSync(join(newDir, 'observations', '2026-07-29.jsonl'), 'utf-8')).toBe('{"turn":3}\n');
+  });
+
+  it('preserves a colliding non-JSONL snapshot file (status.json) alongside the destination instead of corrupting it (review fix, cycle 2)', async () => {
+    const workspaceId = await createWorkspace({
+      projectId: 'overdeck', kind: 'issue', name: 'feature-pan-2105', path: '/repo/overdeck/workspaces/feature-pan-2105', issueId: 'PAN-2105',
+    });
+    const legacyDir = await writeLegacyIssueHome('PAN-2105', 'obs-legacy-2105');
+    await writeFile(join(legacyDir, 'status.json'), JSON.stringify({ headline: 'legacy status' }), 'utf-8');
+
+    const newDir = join(resolveMemoryRoot('overdeck'), workspaceId);
+    await mkdir(newDir, { recursive: true });
+    await writeFile(join(newDir, 'status.json'), JSON.stringify({ headline: 'current status' }), 'utf-8');
+
+    const result = await migrateMemoryHomesToWorkspaces();
+
+    expect(result.migrated).toBe(1);
+    // The destination's own snapshot survives untouched and remains valid JSON
+    // — a naive text append here would have concatenated two JSON objects
+    // into one unparseable file.
+    expect(JSON.parse(readFileSync(join(newDir, 'status.json'), 'utf-8'))).toEqual({ headline: 'current status' });
+    // The legacy snapshot is preserved alongside, not silently dropped.
+    expect(JSON.parse(readFileSync(join(newDir, 'status.json.legacy'), 'utf-8'))).toEqual({ headline: 'legacy status' });
   });
 
   it('skips a directory that already carries a metadata.json identity record', async () => {

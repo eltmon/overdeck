@@ -232,6 +232,25 @@ describe('pan memory CLI service', () => {
     })]);
   });
 
+  it('search still returns observations when a matching daily summary also exists in the shared FTS index (non-blocking review fix, cycle 2)', async () => {
+    for (let index = 0; index < 3; index += 1) {
+      await writeObservationRecord(observation({
+        id: `summary-search-${index}`,
+        summary: `Summary-ready observation ${index}`,
+        timestamp: `2026-05-16T20:0${index}:00.000Z`,
+      }));
+    }
+
+    await generateDailySummary({ projectId: 'overdeck', issueId: 'PAN-1052', date: '2026-05-16' });
+
+    // The FTS index now contains 3 observation rows AND 1 summary row that
+    // all match "summary-ready" — the summary must never displace or
+    // silently drop a real observation from the result set.
+    const results = await searchMemory('summary-ready', { project: 'overdeck', issue: 'PAN-1052', limit: 3 });
+
+    expect(results.map((r) => r.observation.id).sort()).toEqual(['summary-search-0', 'summary-search-1', 'summary-search-2']);
+  });
+
   it('regenerates an existing daily summary only after twenty new observations', async () => {
     for (let index = 0; index < 3; index += 1) {
       await writeObservationRecord(observation({
