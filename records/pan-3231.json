@@ -34,15 +34,7 @@
       "timestamp": "2026-07-29T03:01:00.834Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-29T03:01:00Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3231\n\n# Review — PAN-3231 — 2026-07-29\n\n## Verdict: CHANGES REQUESTED\n\nTwo in-scope acceptance gaps remain: the new tasks-dialog integration does not expose xBRIEF sub-items in its default list view, and the new PRD modal does not move keyboard focus into the dialog as NFR-5 requires. No security blocker was found.\n\n## Context\n\n- Branch: `feature/pan-3231`\n- HEAD reviewed: `09c31761ff9b5a90e33908ea02aef6805fa5f5fa`\n- Merge base: `8ad7d847e89431613f798ed8d0f65131e4034230`\n- PR: `#3273`\n- Manifest: `.pan/review/agent-pan-3231-review-09c31761/context.json`\n\n## Blocking Findings\n\n### ! The tasks dialog drops xBRIEF sub-items from the default list view — `src/dashboard/frontend/src/components/TasksDialog.tsx:38`\n\n**Dimension:** requirements / correctness  \n**Scope:** in_pr_scope  \n**Evidence tier:** Tier 1 — static\n\n**Requirement:** FR-3 and `tasks-viewer.ac1` require the dialog opened from the tasks chip to render xBRIEF items **and sub-items with their merged statuses**.\n\n**Problem:** The changed dialog delegates the feature to `<TasksPanel issueId={issueId} />`, but the real tasks endpoint returns xBRIEF items directly, preserving each item's raw `id` and `title`. `TasksPanel` still looks up the corresponding plan item only by the removed beads-era title shape ``${plan.id}: ${item.title}`` (`TasksPanel.tsx:210-214`). `getIssueTasks()` does not add that prefix, so `planItem` is undefined for normal xBRIEF responses and the acceptance-criterion count, expander, sub-item titles, and sub-item statuses never render in the default list view.\n\n**Runtime impact:** Clicking the newly wired tasks chip shows top-level items, but an item with acceptance-criterion sub-items has no AC badge or expansion control. The main-path viewer therefore omits the required sub-item/status information. The new test only supplies `subItems: []`, so it cannot detect this gap.\n\n**Fix:** Match plan items by stable ID first (`item.id === task.id`), retaining a title fallback only for legacy payloads. Add a `TasksDialog` test fixture with at least one acceptance-criterion sub-item and assert its count, expansion, title, and merged status.\n\n### ! The PRD modal leaves keyboard focus behind the overlay — `src/dashboard/frontend/src/components/PrdViewer.tsx:42`\n\n**Dimension:** requirements / accessibility correctness  \n**Scope:** in_pr_scope  \n**Evidence tier:** Tier 1 — static\n\n**Requirement:** NFR-5, traced to `prd-chip-viewer`, requires every new overlay to have dialog semantics, close on Escape/scrim click, and move focus inside the dialog when opened.\n\n**Problem:** `PrdViewer` adds `role=\"dialog\"` and `aria-modal=\"true\"`, but the dialog has no ref, no programmatic focus target, and no opening effect that calls `focus()`. Unlike `XBriefFullscreen`, it cannot receive focus itself.\n\n**Runtime impact:** A keyboard user activates the PRD chip and focus remains on the now-obscured chip behind the modal. The first subsequent keyboard interaction starts from background content rather than the active dialog, contradicting the modal's accessibility contract.\n\n**Fix:** Give the dialog a ref and `tabIndex={-1}`, focus it when the viewer mounts or the issue changes, and extend `PrdViewer.test.tsx` with a `toHaveFocus()` assertion.\n\n## Non-blocking Findings\n\n### ≉ PRD discovery performs synchronous filesystem probes once per discovered issue — `src/dashboard/server/services/resource-discovery.ts:693`\n\n`findDraftPrd` is an `Effect.sync` wrapper around up to two `existsSync` calls, so wrapping it in `Promise.all` does not make the probes asynchronous. This runs during reactive project refreshes and the five-minute convergence pass. The current work is small and bounded, so this is not a blocker without measured latency, but a future cleanup should use the existing async filesystem door or a per-project batched draft inventory rather than adding more per-issue synchronous probes.\n\n## Security Review\n\nNo blocker found. The route validates the issue ID before project resolution, PRD reads stay behind `prd-locations`, the viewer reuses `ChatMarkdown` rather than introducing an HTML renderer, no new credentials or unsafe evaluation were added, and mutation behavior remains on the existing guarded plan-policy endpoint.\n\n## Requirements / No-loss Review\n\n- The xBRIEF chip, drawer Plan panel, and cockpit plan card all route to the global full-screen viewer without URL integration.\n- The existing kanban `XBriefDialog` entry point is unchanged.\n- The dedicated PRD endpoint returns an honest 404 when no PRD exists and does not substitute continue state.\n- PRD presence is projected through the resource-discovery read path and sanitized DTO.\n- No `pan task` semantics, xBRIEF statuses, or markdown-renderer ownership changed.\n- Operator approval of the mockup is recorded as decision D9 in `.overdeck/continue.json`.\n- Documentation and route no-loss inventories were updated.\n\n## Verification Run\n\n- `git diff --check origin/main...HEAD` — passed.\n- `npm run typecheck` — passed; dashboard guard reported 61 known errors with none new, frontend guard reported 0 errors.\n- Targeted frontend tests — 6 files, 109 tests passed.\n- Targeted server/no-loss tests — 4 files, 39 tests passed.\n\nThe passing tests do not cover the two blockers above: the tasks fixture has no sub-items, and the PRD viewer test checks close behavior but not focus handoff.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3231/.pan/review/agent-pan-3231-review-09c31761/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3231 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-allowlist.txt",
@@ -122,23 +114,23 @@
     "recordedAt": "2026-07-29T02:53:51.344Z"
   },
   "created": "2026-07-28T17:08:34.539Z",
-  "updated": "2026-07-29T03:25:40.076Z",
+  "updated": "2026-07-29T03:26:13.894Z",
   "pipeline": {
     "issueId": "PAN-3231",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T03:25:38.481Z",
+    "updatedAt": "2026-07-29T03:26:13.817Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed test",
     "verificationNotes": "Verification FAILED at test (188927ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3231\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3231/src/dashboard/frontend\n\n ❯ src/App.test.tsx (40 tests | 1 failed) 2609ms\n     × redirects direct experimental routes to Home when experimental features are off 1018ms\n\n Test Files  1 failed | 92 passed (93)\n      Tests  1 failed | 1143 passed (1144)\n     Errors  4 errors\n   Start at  23:07:27\n   Duration  16.35s (transform 56.50s, setup 27.65s, import 164.38s, tests 52.02s, environment 59.25s)\n\n[global-setup] packages/contracts/dist/index.mjs missing — building contracts...\n\n> @overdeck/core@0.47.1 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.47.1 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3231/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m Cleaning 4 files\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m360.76 kB\u001b[22m \u001b[2m│ gzip: 58.65 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 360.76 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m4203ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m330.75 kB\u001b[22m \u001b[2m│ gzip: 56.48 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m545.34 kB\u001b[22m \u001b[2m│ gzip: 87.87 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 46.34 kB\u001b[22m \u001b[2m│ gzip:  5.67 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m767.30 kB\u001b[22m \u001b[2m│ gzip: 76.34 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 \n…(1955 chars elided)…\nFound workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-xmgZGW/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-xmgZGW/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-xmgZGW/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-xmgZGW/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent\n...(truncated)",
     "inspectNotes": "All 5 ACs met. AC5 gaps from the prior review are closed: identity block with 'xBRIEF · active plan' eyebrow + mono issue id + plan title (XBriefFullscreen.tsx:154-171), controlled List/DAG/Raw tablist moved into the topbar per mockup lines 332-345 (XBriefFullscreen.tsx:173-196), summary strip with N/M complete + progress track + happening-now/ready/waiting-on-edges + execution lanes per mockup lines 358-369 (XBriefFullscreen.tsx:211-247), and the esc-hinted close per mockup lines 351-354. AC1/AC2 intact: role=dialog + aria-modal=true, focus on the panel, Escape and scrim close, inner clicks stopPropagation; the toggle is preserved, relocated to the shell, and XBriefViewer's own bar is suppressed via showTabBar=false. AC3 unchanged - useWorkspacePlanQuery plus the same canonical ['workspace-plan', issueId] key for setQueryData. AC4 unchanged - DAG pane still flex-1 min-h-0 with a 400px floor, and the three pre-existing mounts keep the uncontrolled path (showTabBar defaults true, initialTab honored, selectTab only writes internal state when activeTab is undefined). Non-blocking observations: the third tab is labelled 'Raw' (matches the approved mockup; FR-1 prose says 'Raw JSON'); the mockup's 'Click any item for its acceptance criteria and file scope' hint line is not rendered; and the shared localStorage tab key now also records the shell-controlled tab, so a fullscreen tab change seeds other mounts' initial tab.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3273",
     "reviewedAtCommit": "09c31761ff9b5a90e33908ea02aef6805fa5f5fa",
-    "reviewSpawnedAt": "2026-07-29T02:54:40.566Z",
+    "reviewSpawnedAt": "2026-07-29T03:26:13.815Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt",
@@ -239,9 +231,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 9947786,
-            "output": 549851,
-            "cacheRead": 253484032,
+            "input": 9980910,
+            "output": 551949,
+            "cacheRead": 256303104,
             "cacheWrite": 0
           }
         }
@@ -254,15 +246,15 @@
           "cacheWrite": 379189
         },
         "openai/gpt-5.6-sol": {
-          "input": 11334176,
-          "output": 652014,
-          "cacheRead": 272291328,
+          "input": 11367300,
+          "output": 654112,
+          "cacheRead": 275110400,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 227.703493,
-        "pricingAsOf": "2026-07-29T03:25:40.071Z"
+        "usd": 229.341589,
+        "pricingAsOf": "2026-07-29T03:26:13.843Z"
       }
     },
     "merges": [
