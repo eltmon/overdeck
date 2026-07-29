@@ -86,7 +86,7 @@
     "recordedAt": "2026-07-29T07:45:29.088Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T08:07:30.029Z",
+  "updated": "2026-07-29T08:07:36.109Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "reviewing",
@@ -96,7 +96,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T07:47:05.835Z",
-    "updatedAt": "2026-07-29T08:07:24.746Z",
+    "updatedAt": "2026-07-29T08:07:30.043Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed all review findings: canonical limits module, FR-2 note truncation, append-door tests, and documentation",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewedAtCommit": "cde48b2488a78f423607d229f8a86c0c7d286085",
@@ -177,7 +177,7 @@
       },
       "costAtCloseOut": {
         "usd": 39.260366,
-        "pricingAsOf": "2026-07-29T08:07:26.371Z"
+        "pricingAsOf": "2026-07-29T08:07:36.106Z"
       }
     },
     "merges": [
@@ -186,7 +186,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3253",
