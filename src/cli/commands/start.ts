@@ -941,7 +941,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // --fresh drops the saved session and, since PAN-3150, cycles a live one
     // itself. See start-fresh-session.ts for the full contract.
     if (options.fresh) {
-      const fresh = await prepareFreshWorkAgentSession(id);
+      const fresh = await prepareFreshWorkAgentSession(id, { force: options.force });
       for (const line of fresh.messages) console.log(chalk.dim(line));
       if (!fresh.ok) {
         console.error(chalk.red(fresh.error));

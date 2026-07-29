@@ -6,7 +6,7 @@
  * Callers still reserve their role-specific concurrency slot after admission.
  */
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import {
   decideResumeGate,
   getAgentResumeGateBlockReason,
@@ -14,6 +14,10 @@ import {
   type ResumeGateContext,
   type ResumeGateDecision,
 } from '../agents/agent-state.js';
+import {
+  detectPendingOperatorDecision,
+  type PendingOperatorDecision,
+} from '../agents/pending-decision-gate.js';
 import { getCachedMemoryVerdict } from './memory-verdict-cache.js';
 
 export const REDRIVE_ENTRY_POINTS = ['dead-session-rework', 'swarm-slot-requeue'] as const;
@@ -42,12 +46,31 @@ export function decideAutonomousRedrive(
   return { decision: 'proceed', gateDecision };
 }
 
-export function decideAgentAutonomousRedrive(
+export interface AgentAutonomousRedriveDeps {
+  detectPendingOperatorDecision?: (agentId: string) => Promise<PendingOperatorDecision | null>;
+}
+
+export async function decideAgentAutonomousRedrive(
   state: Pick<AgentState, 'paused' | 'pausedReason' | 'yieldedByScheduler' | 'troubled' | 'troubledAt' | 'stoppedByUser' | 'consecutiveFailures'>,
   agentDir: string,
   owesRework: boolean,
-): RedriveGateDecision {
+  deps: AgentAutonomousRedriveDeps = {},
+): Promise<RedriveGateDecision> {
   const hasCompletedHandoff = existsSync(join(agentDir, 'completed'))
     || existsSync(join(agentDir, 'completed.processed'));
-  return decideAutonomousRedrive(state, { hasCompletedHandoff, owesRework });
+  const admission = decideAutonomousRedrive(state, { hasCompletedHandoff, owesRework });
+  if (admission.decision === 'defer') return admission;
+
+  const agentId = basename(agentDir);
+  const detectPendingDecision = deps.detectPendingOperatorDecision ?? detectPendingOperatorDecision;
+  const pendingDecision = await detectPendingDecision(agentId);
+  if (pendingDecision) {
+    return {
+      decision: 'defer',
+      reason: `agent is waiting on an operator decision (${pendingDecision.reason})`,
+      needsYou: true,
+    };
+  }
+
+  return admission;
 }

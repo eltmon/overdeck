@@ -17,7 +17,7 @@ at read time) enumerates the active blocking surfaces. Labels live in one map:
 | `askUserQuestion` | JSONL tool_use + PAN-1520 deny-hook tool_result | `pendingAskUserQuestion` (questions/options) | `AskUserQuestionDialog` → `POST /api/agents/:id/answer-question` (agents) / conversation message (convs) |
 | `exitPlanMode` | JSONL `ExitPlanMode` tool_use without tool_result | `pendingProposedPlan { toolUseId, askedAt, plan }` | `PlanApprovalDialog` → `POST /api/agents/:id/plan-action` (agents) / `POST /api/conversations/:name/plan-action` (convs) — native plan-menu keystrokes |
 | `enterPlanMode` | JSONL `EnterPlanMode` without a subsequent `ExitPlanMode` | — (plan being drafted) | none — informational until `exitPlanMode` fires |
-| `permissionRequest` | Two sources. (a) Channel permission event stream (server-side), merged at read time by `selectPendingInputSubjects` / `selectPendingPermissionAgentIds`. (b) PAN-3070: pane/runtime detection with `pendingQuestionReason === 'tool_permission'`, folded into `pendingInputKinds` by `appendPaneDetectionKind` — the only source that fires when the Channels bridge is off (the default under the PTY supervisor) | request details (source a only) | `ChannelPermissionDialog` → permission response route; terminal otherwise |
+| `permissionRequest` | Two sources. (a) Channel permission event stream (server-side), merged at read time by `selectPendingInputSubjects` / `selectPendingPermissionAgentIds`. (b) PAN-3070: pane/runtime detection with `pendingQuestionReason === 'tool_permission'`, folded into `pendingInputKinds` by `appendPaneDetectionKind` — the only source that fires when the Channels bridge is off (the default under the PTY supervisor) | request details (source a only); pane menu via `GET /api/agents/:id/pane-choice` | Channel request: `ChannelPermissionDialog` → permission response route. Pane-detected prompt: `pan answer <id>` or `POST /api/agents/:id/pane-choice` |
 | `sessionResume` | Pane pattern detection | — | terminal only |
 | `rateLimit` | Pane pattern detection (PAN-1834) | — | auto-dismissed by the deacon modal handler; terminal otherwise |
 
@@ -41,6 +41,21 @@ at read time) enumerates the active blocking surfaces. Labels live in one map:
 - **Notification** — pending AUQs *and* pending plans fire the same toast +
   desktop notification; clicking re-opens the correct dialog via the same
   reopen routing.
+
+## Destructive-recovery gate
+
+`detectPendingOperatorDecision()` blocks fresh starts, restarts, recovery,
+and autonomous re-drive when live pane detection reports `tool_permission`,
+`user_question`, `disambiguation`, `confirmation`, `planning_done`, or
+`session_resume`, or when the agent's current session generation has an
+unanswered JSONL AskUserQuestion. Historical transcripts remain intact, but an
+unpinned transcript older than the replacement agent's `startedAt` boundary is
+excluded after a forced fresh start. `rate_limit` is excluded because it is not
+an operator decision. Operator restart surfaces may pass explicit `--force` or
+`{ force: true }` to discard the pending decision deliberately; autonomous
+actors must park the agent and emit needs-you instead. Detection errors fail
+open with a warning so a broken tmux capture cannot permanently close the
+recovery door.
 
 ## Invariants
 
