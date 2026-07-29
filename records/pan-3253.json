@@ -148,6 +148,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-29T10:08:38.887Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-29T10:10:30.847Z"
     }
   ],
   "feedback": [],
@@ -185,21 +190,21 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T10:10:28.711Z",
+  "updated": "2026-07-29T10:10:30.909Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T09:16:42.721Z",
-    "updatedAt": "2026-07-29T10:10:28.689Z",
+    "updatedAt": "2026-07-29T10:10:29.426Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "lastVerifiedCommit": "7d4c9e95bfe58d87dd42e7b33ced7901a8bf6503",
-    "reviewSpawnedAt": "2026-07-29T10:08:37.536Z",
+    "reviewSpawnedAt": "2026-07-29T10:10:29.425Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt",
@@ -284,7 +289,7 @@
       },
       "costAtCloseOut": {
         "usd": 117.966676,
-        "pricingAsOf": "2026-07-29T10:10:28.707Z"
+        "pricingAsOf": "2026-07-29T10:10:30.905Z"
       }
     },
     "merges": [
