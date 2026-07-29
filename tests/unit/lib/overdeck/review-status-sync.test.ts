@@ -140,6 +140,9 @@ describe('overdeck review status sync', () => {
       const now = Date.now();
       const db = odb.raw();
 
+      // Ensure issue exists for foreign key constraint
+      db.prepare('INSERT OR IGNORE INTO issues (id, stage, updated_at) VALUES (?, ?, ?)').run('PAN-HISTORY-LIMIT', 'working', now);
+
       // Insert 30 history entries with notes exceeding 500 chars each
       const longNote = 'x'.repeat(600);
       for (let i = 0; i < 30; i++) {
@@ -166,6 +169,9 @@ describe('overdeck review status sync', () => {
       const now = Date.now();
       const db = odb.raw();
 
+      // Ensure issue exists for foreign key constraint
+      db.prepare('INSERT OR IGNORE INTO issues (id, stage, updated_at) VALUES (?, ?, ?)').run('PAN-RAW-NOTES', 'working', now);
+
       const longNote = 'x'.repeat(600);
       db.prepare(
         'INSERT INTO status_history (issue_id, type, status, timestamp, notes) VALUES (?, ?, ?, ?, ?)',
@@ -187,6 +193,9 @@ describe('overdeck review status sync', () => {
     it('applies SQL LIMIT to prevent loading all history rows before bounding', () => {
       const now = Date.now();
       const db = odb.raw();
+
+      // Ensure issue exists for foreign key constraint
+      db.prepare('INSERT OR IGNORE INTO issues (id, stage, updated_at) VALUES (?, ?, ?)').run('PAN-SQL-LIMIT', 'working', now);
 
       // Insert 500+ history entries
       const longNote = 'x'.repeat(100);
