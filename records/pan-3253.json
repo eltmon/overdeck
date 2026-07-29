@@ -91,7 +91,7 @@
     "recordedAt": "2026-07-29T07:39:51.971Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T07:41:00.784Z",
+  "updated": "2026-07-29T07:41:04.720Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -100,7 +100,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T07:40:01.212Z",
+    "panDoneRecoveredAt": "2026-07-29T07:41:00.406Z",
+    "updatedAt": "2026-07-29T07:41:00.769Z",
     "reviewNotes": "Verification failed at vbrief-ac — fix and resubmit",
     "verificationNotes": "Acceptance criteria check FAILED — 3/12 AC incomplete:\n\n### Extend trimReviewStatusHistoryPayloads to delegate to the bounding helper (3/3 incomplete)\n  - [ ] Given a seeded oversized row with 25 entries carrying 3,697-char notes, the trim persists a smaller payload that parses back to <= 20 entries with <= 500-char notes\n  - [ ] Running the trim a second time over already-trimmed rows returns trimmed: 0 (converges to a no-op)\n  - [ ] An oversized row of a non-review event type survives the trim byte-identically",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
@@ -130,8 +131,7 @@
         "tests/unit/event-store.test.ts"
       ],
       "recordedAt": "2026-07-29T07:39:51.971Z"
-    },
-    "panDoneRecoveredAt": "2026-07-29T07:41:00.406Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -154,10 +154,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1256,
-            "output": 57916,
-            "cacheRead": 27189547,
-            "cacheWrite": 1107515
+            "input": 1269,
+            "output": 58279,
+            "cacheRead": 27489325,
+            "cacheWrite": 1108373
           }
         }
       },
@@ -175,15 +175,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1256,
-          "output": 57916,
-          "cacheRead": 27189547,
-          "cacheWrite": 1107515
+          "input": 1269,
+          "output": 58279,
+          "cacheRead": 27489325,
+          "cacheWrite": 1108373
         }
       },
       "costAtCloseOut": {
-        "usd": 32.486277,
-        "pricingAsOf": "2026-07-29T07:40:01.242Z"
+        "usd": 32.519155,
+        "pricingAsOf": "2026-07-29T07:41:04.718Z"
       }
     },
     "merges": [
