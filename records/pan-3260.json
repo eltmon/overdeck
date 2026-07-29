@@ -68,7 +68,7 @@
     "recordedAt": "2026-07-29T01:09:34.738Z"
   },
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-29T01:24:15.746Z",
+  "updated": "2026-07-29T01:24:21.353Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "blocked",
@@ -79,10 +79,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T01:11:05.562Z",
-    "updatedAt": "2026-07-29T01:24:15.016Z",
+    "updatedAt": "2026-07-29T01:24:21.338Z",
     "reviewNotes": "Line-addressed markdown chips pass invalid paths to the internal editor; four additional blockers are documented.",
     "inspectNotes": "AC1-3 verified: WS_METHODS.readFileAtPath/writeFileAtPath exported and both Rpcs registered in PanRpcGroup (36 requests, both present in dist .d.ts as literal-typed Rpc members); ReadFileAtPathResult rejects decode when mtimeMs or totalLines is missing and accepts the full struct; WriteFileAtPathInput decodes with and without expectedMtimeMs; contracts build + workspace root npm run typecheck exit 0 with no new dashboard/frontend ratchet errors.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3268",
+    "reviewedAtCommit": "d53875d75409a9dfd7cad0f9294517c28bd2180d",
     "reviewSpawnedAt": "2026-07-29T01:12:25.878Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -179,7 +180,7 @@
       },
       "costAtCloseOut": {
         "usd": 46.660528,
-        "pricingAsOf": "2026-07-29T01:24:15.038Z"
+        "pricingAsOf": "2026-07-29T01:24:21.345Z"
       }
     },
     "merges": [
