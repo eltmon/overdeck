@@ -299,18 +299,18 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:06:57.923Z",
+  "updated": "2026-07-29T05:12:59.208Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:06:57.808Z",
-    "reviewNotes": "Agent re-review request (1/25): Synced with latest main and resolved file-size-allowlist.txt. Ready for review.",
+    "updatedAt": "2026-07-29T05:12:59.128Z",
+    "reviewNotes": "Agent re-review request (2/25): FR-7 test coverage complete. Branch has 3 auto-commits for file-size-allowlist sync. Ready for review.",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
       "detectedAt": "2026-07-29T05:03:44.105Z",
@@ -343,27 +343,27 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 27744257,
-            "output": 825102,
-            "cacheRead": 138090496,
+            "input": 28457927,
+            "output": 865240,
+            "cacheRead": 153122304,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 4820,
-            "output": 234940,
-            "cacheRead": 93154563,
-            "cacheWrite": 5801129
+            "input": 5028,
+            "output": 241216,
+            "cacheRead": 96781093,
+            "cacheWrite": 5889632
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 5254,
-          "output": 262813,
-          "cacheRead": 103275766,
-          "cacheWrite": 6110942
+          "input": 5462,
+          "output": 269089,
+          "cacheRead": 106902296,
+          "cacheWrite": 6199445
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -372,15 +372,15 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 27744257,
-          "output": 825102,
-          "cacheRead": 138090496,
+          "input": 28457927,
+          "output": 865240,
+          "cacheRead": 153122304,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 262.013662,
-        "pricingAsOf": "2026-07-29T05:06:57.866Z"
+        "usd": 274.806928,
+        "pricingAsOf": "2026-07-29T05:12:59.182Z"
       }
     },
     "merges": [
