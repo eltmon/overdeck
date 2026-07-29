@@ -2,7 +2,7 @@
   "issueId": "PAN-3254",
   "schemaVersion": 2,
   "created": "2026-07-29T00:18:00.558Z",
-  "updated": "2026-07-29T00:18:00.558Z",
+  "updated": "2026-07-29T00:18:13.114Z",
   "pipeline": {
     "issueId": "PAN-3254",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3254: Review/test pipeline re-drove one issue 426 times in 19.5 hours, every cycle reporting 'no code changed'",
       "timestamp": "2026-07-29T00:18:00.558Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
