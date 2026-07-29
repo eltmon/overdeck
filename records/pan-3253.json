@@ -53,6 +53,11 @@
       "reason": "feedback",
       "note": "[2026-07-29T07:56Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-29T07:56:43.460Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-29T08:07:25.939Z"
     }
   ],
   "feedback": [],
@@ -81,22 +86,22 @@
     "recordedAt": "2026-07-29T07:45:29.088Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T08:07:24.725Z",
+  "updated": "2026-07-29T08:07:26.373Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T07:47:05.835Z",
-    "updatedAt": "2026-07-29T08:07:24.352Z",
+    "updatedAt": "2026-07-29T08:07:24.746Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed all review findings: canonical limits module, FR-2 note truncation, append-door tests, and documentation",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewedAtCommit": "cde48b2488a78f423607d229f8a86c0c7d286085",
     "lastVerifiedCommit": "58b23fbb019a2efab08d55a90124d0b4615a0b9f",
-    "reviewSpawnedAt": "2026-07-29T07:49:57.932Z",
+    "reviewSpawnedAt": "2026-07-29T08:07:24.745Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [
@@ -172,7 +177,7 @@
       },
       "costAtCloseOut": {
         "usd": 39.260366,
-        "pricingAsOf": "2026-07-29T08:07:24.421Z"
+        "pricingAsOf": "2026-07-29T08:07:26.371Z"
       }
     },
     "merges": [
