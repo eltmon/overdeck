@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import type { MemoryObservation } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardStore } from '../../../lib/store';
+import { useAskUserQuestionUiStore } from '../../../lib/askUserQuestionUiStore';
 import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
 import { SESSION_FEED_TAB_STORAGE_KEY, SessionFeedSidebar } from '../SessionFeedSidebar';
 import type { ConversationSessionFeedEntry, GitSessionFeedEntry } from '../types';
@@ -407,6 +408,85 @@ describe('SessionFeedSidebar', () => {
 
     expect(screen.getByText('PAN-3097 — Add question context')).toBeTruthy();
     expect(screen.getAllByText('Which option should I use?')).toHaveLength(1);
+  });
+
+  // PAN-3276 — a "Needs you" row used to only call requestReopen, which is a
+  // no-op for kinds carrying no dialog payload (a question typed into the
+  // terminal, a permission prompt). Clicking those rows appeared to do nothing.
+  it('navigates to the issue when an agent needs-you row is clicked', async () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-1837': {
+          id: 'agent-pan-1837',
+          issueId: 'PAN-1837',
+          // paneQuestion carries no answerable payload — the navigation IS the fix.
+          pendingInputKinds: ['paneQuestion'],
+        },
+      },
+      issuesRaw: [{ id: 'PAN-1837', title: 'Stop stranding review rework' }],
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('needs-you-row-agent-pan-1837'));
+    });
+
+    expect(window.location.pathname).toBe('/issues/PAN-1837');
+  });
+
+  it('navigates to the conversation when a conversation needs-you row is clicked', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/conversations/pending-input') {
+        return Response.json([
+          {
+            name: 'conv-20260728-5277',
+            title: 'Web app deployment fixed and live',
+            pendingInputKinds: ['permissionRequest'],
+          },
+        ]);
+      }
+      return undefined;
+    });
+
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+
+    const row = await screen.findByTestId('needs-you-row-conv-20260728-5277');
+    await act(async () => {
+      fireEvent.click(row);
+    });
+
+    // A conversation is not a row in the agents table, so it must route to
+    // /conv/<name> rather than an issue.
+    expect(window.location.pathname).toBe('/conv/conv-20260728-5277');
+  });
+
+  it('still requests the dialog reopen so a payload-carrying question keeps answering in place', async () => {
+    const askedAt = '2026-05-23T01:04:00.000Z';
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-3231': {
+          id: 'agent-pan-3231',
+          issueId: 'PAN-3231',
+          pendingInputKinds: ['askUserQuestion'],
+          pendingAskUserQuestion: {
+            toolUseId: 'toolu-reopen',
+            askedAt,
+            questions: [{ question: 'Which option should I use?', options: [{ label: 'A' }] }],
+          },
+        },
+      },
+      issuesRaw: [{ id: 'PAN-3231', title: 'A question with a payload' }],
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('needs-you-row-agent-pan-3231'));
+    });
+
+    expect(useAskUserQuestionUiStore.getState().reopenId).toBe('agent-pan-3231');
+    expect(window.location.pathname).toBe('/issues/PAN-3231');
   });
 
   it('falls back to the agent id for an unbound pending-input subject', () => {
