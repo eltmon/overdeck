@@ -643,6 +643,30 @@ describe('selectPendingInputSubjects', () => {
 
     expect(selectPendingInputSubjects(state)).toEqual([])
   })
+
+  /**
+   * PAN-3233 — a question-family pane/runtime detection (no structured payload)
+   * promotes to the 'paneQuestion' kind and must surface as a decision, unlike
+   * the kind-less 'other' fallback above.
+   */
+  it('surfaces an agent whose only kind is paneQuestion', () => {
+    const state: DashboardState = {
+      ...emptyState,
+      agentsById: {
+        'agent-1': {
+          ...baseAgent,
+          hasPendingQuestion: true,
+          pendingQuestionReason: 'user_question',
+          pendingInputKinds: ['paneQuestion'],
+        },
+      },
+      channelPermissionRequestsById: {},
+    }
+
+    const subjects = selectPendingInputSubjects(state)
+    expect(subjects).toHaveLength(1)
+    expect(subjects[0]!.kinds).toEqual(['paneQuestion'])
+  })
 })
 
 // ─── selectIssues / selectIssuesByCycle ───────────────────────────────────────

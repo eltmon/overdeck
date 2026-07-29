@@ -50,7 +50,7 @@ export interface SettledTtlPromiseCache<K, V> {
 }
 
 /** Cache settled values for a TTL while preserving single-flight for pending work regardless of age. */
-export function createSettledTtlPromiseCache<K, V>(ttlMs: number, now: () => number = Date.now): SettledTtlPromiseCache<K, V> {
+export function createSettledTtlPromiseCache<K, V>(ttlMs: number, now: () => number = () => Date.now()): SettledTtlPromiseCache<K, V> {
   const entries = new Map<K, SettledTtlEntry<V>>();
   const get = (key: K, load: () => Promise<V>): Promise<V> => {
     const cached = entries.get(key);

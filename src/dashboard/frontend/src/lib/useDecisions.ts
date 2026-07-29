@@ -88,6 +88,10 @@ const BLOCKING_KINDS = new Set([
   'paneChoice',
   'agentTurnEnded',
   'permissionRequest',
+  // PAN-3233 review fix — a paneQuestion (terminal prompt with no structured
+  // payload) halts the turn exactly like an askUserQuestion; omitting it here
+  // sorted these genuinely frozen agents into the non-blocking "Waiting" group.
+  'paneQuestion',
 ]);
 
 export function isBlockingDecision(kinds: ReadonlyArray<string>): boolean {

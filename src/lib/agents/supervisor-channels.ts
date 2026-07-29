@@ -1,4 +1,4 @@
-import { readFile } from 'fs/promises';
+import { readFile, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { dirname, join } from 'path';
@@ -9,6 +9,7 @@ import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
+import { getOverdeckHome } from '../paths.js';
 import { getProviderForModelSync } from '../providers.js';
 import { writePtyToken } from '../pty-token.js';
 import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
@@ -182,21 +183,28 @@ export async function prepareSupervisorForRelaunch(
   model: string,
   harness: RuntimeName,
 ): Promise<{ useSupervisor: boolean; supervisorScriptPath?: string }> {
-  if (state.supervisorEnabled !== true) {
-    return { useSupervisor: false };
-  }
-
+  // PAN-3257: decide eligibility fresh, exactly like a new spawn — never gate
+  // on the persisted supervisorEnabled flag. A state write that lost the flag
+  // (observed after the PAN-1837 crash-resume) would otherwise permanently
+  // downgrade the agent to tmux-only delivery while its stale supervisor
+  // socket kept refusing every connection. Eligibility itself is cheap and
+  // deterministic (role, harness, docker), so re-deriving it cannot drift.
   const relaunchState: AgentState = { ...state, model, harness };
   const supervisorDecision = decideSupervisorForWorkAgent(agentId, {
     issueId: state.issueId || agentId.replace(/^agent-/, '').toUpperCase(),
     workspace: state.workspace,
-    role: 'work',
+    role: state.role,
     model,
     harness,
     allowHost: state.hostOverride,
   }, relaunchState);
   if (!supervisorDecision.eligible) {
     delete state.supervisorEnabled;
+    // A supervisor-less relaunch must not leave a dead socket behind: the
+    // delivery tiers probe the socket path first, and a stale file turns
+    // every probe into ECONNREFUSED instead of a clean socket-missing
+    // fall-through to tmux.
+    await removeStaleSupervisorSocket(agentId);
     return { useSupervisor: false };
   }
 
@@ -204,6 +212,15 @@ export async function prepareSupervisorForRelaunch(
   await writePtyToken(agentId);
   state.supervisorEnabled = true;
   return { useSupervisor: true, supervisorScriptPath };
+}
+
+/** Remove a dead supervisor socket so delivery probes fail fast to the next tier (PAN-3257). */
+async function removeStaleSupervisorSocket(agentId: string): Promise<void> {
+  const socketPath = join(getOverdeckHome(), 'sockets', `pty-${agentId}.sock`);
+  try {
+    await unlink(socketPath);
+    console.log(`[${agentId}] removed stale supervisor socket at ${socketPath}`);
+  } catch { /* absent — nothing to clean */ }
 }
 
 /**

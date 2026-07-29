@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   spawnReview: vi.fn(),
   logDeaconEvent: vi.fn(),
   issueClosed: vi.fn(),
+  recordDeadEnd: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/workspace-anchor-drift.js', () => ({
@@ -119,7 +120,7 @@ vi.mock('../../../../src/lib/cloister/orphan-proposed-reconciler.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/cloister/dead-end-trip.js', () => ({
-  recordDeadEndNeedsYou: vi.fn(),
+  recordDeadEndNeedsYou: (...args: unknown[]) => mocks.recordDeadEnd(...args),
 }));
 
 describe('checkPostReviewCommits blocked review drift', () => {
@@ -132,6 +133,7 @@ describe('checkPostReviewCommits blocked review drift', () => {
     mocks.spawnReview.mockReset().mockResolvedValue({ success: true, message: 'spawned' });
     mocks.logDeaconEvent.mockReset();
     mocks.issueClosed.mockReset().mockResolvedValue(false);
+    mocks.recordDeadEnd.mockReset();
     mocks.setReviewStatus.mockReset().mockImplementation(
       (issueId: string, update: Record<string, unknown>) => {
         mocks.statuses[issueId] = { ...mocks.statuses[issueId], ...update };
@@ -263,5 +265,82 @@ describe('checkPostReviewCommits blocked review drift', () => {
 
     await checkPostReviewCommits();
     expect(mocks.spawnReview).toHaveBeenCalledOnce();
+  });
+});
+
+describe('checkPostReviewCommits repeat-reset bound (PAN-3254)', () => {
+  let checkPostReviewCommits: () => Promise<string[]>;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    for (const issueId of Object.keys(mocks.statuses)) delete mocks.statuses[issueId];
+    mocks.evaluateDrift.mockReset();
+    mocks.spawnReview.mockReset().mockResolvedValue({ success: true, message: 'spawned' });
+    mocks.logDeaconEvent.mockReset();
+    mocks.issueClosed.mockReset().mockResolvedValue(false);
+    mocks.recordDeadEnd.mockReset();
+    mocks.setReviewStatus.mockReset().mockImplementation(
+      (issueId: string, update: Record<string, unknown>) => {
+        mocks.statuses[issueId] = { ...mocks.statuses[issueId], ...update };
+        return mocks.statuses[issueId];
+      },
+    );
+
+    ({ checkPostReviewCommits } = await import('../../../../src/lib/cloister/deacon.js'));
+  });
+
+  function passedStatus() {
+    return {
+      issueId: 'MIN-901',
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      reviewedAtCommit: 'fe@aaa api@bbb',
+      readyForMerge: false,
+    };
+  }
+
+  it('resets once for a static current anchor, then suppresses and escalates instead of looping', async () => {
+    mocks.statuses['MIN-901'] = passedStatus();
+    // The producer keeps reporting the identical current anchor — the MIN-901
+    // signature (425 resets, one distinct anchor over 19.5 hours).
+    mocks.evaluateDrift.mockResolvedValue({ kind: 'drifted', currentAnchor: 'wrapper-head' });
+
+    const first = await checkPostReviewCommits();
+    expect(first.some((a) => a.includes('Reset review for MIN-901'))).toBe(true);
+    expect(mocks.spawnReview).toHaveBeenCalledTimes(1);
+
+    // Review re-passes at the same workspace state; the drift verdict repeats.
+    mocks.statuses['MIN-901'] = passedStatus();
+    const second = await checkPostReviewCommits();
+    expect(second).toEqual([]);
+    expect(mocks.spawnReview).toHaveBeenCalledTimes(1);
+    expect(mocks.recordDeadEnd).toHaveBeenCalledTimes(1);
+    expect(mocks.recordDeadEnd).toHaveBeenCalledWith(
+      'MIN-901',
+      'review-reset-loop',
+      'wrapper-head',
+      expect.stringContaining('review reset suppressed'),
+    );
+
+    // Further patrols stay suppressed without duplicate escalations.
+    const third = await checkPostReviewCommits();
+    expect(third).toEqual([]);
+    expect(mocks.spawnReview).toHaveBeenCalledTimes(1);
+    expect(mocks.recordDeadEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('a genuinely new current anchor still resets and re-dispatches after suppression', async () => {
+    mocks.statuses['MIN-901'] = passedStatus();
+    mocks.evaluateDrift.mockResolvedValue({ kind: 'drifted', currentAnchor: 'wrapper-head' });
+    await checkPostReviewCommits();
+    mocks.statuses['MIN-901'] = passedStatus();
+    await checkPostReviewCommits(); // suppressed
+
+    // A real push moves the current anchor — the bound must not mask it.
+    mocks.evaluateDrift.mockResolvedValue({ kind: 'drifted', currentAnchor: 'fe@ccc api@ddd' });
+    const actions = await checkPostReviewCommits();
+
+    expect(actions.some((a) => a.includes('Reset review for MIN-901'))).toBe(true);
+    expect(mocks.spawnReview).toHaveBeenCalledTimes(2);
   });
 });
