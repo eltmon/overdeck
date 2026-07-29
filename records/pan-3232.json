@@ -382,7 +382,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T06:41:52.301Z",
+  "updated": "2026-07-29T06:42:19.749Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -392,7 +392,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T06:12:06.508Z",
-    "updatedAt": "2026-07-29T06:41:52.270Z",
+    "updatedAt": "2026-07-29T06:42:19.722Z",
     "reviewNotes": "Verification infrastructure error: Verification worker bundle missing at /home/eltmon/.overdeck/deployments/dashboard/.pan-reload-generation-a/dist/verification-worker.js; run npm run build",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
     "reviewRequestedAt": "2026-07-29T06:12:06.508Z",
@@ -470,7 +470,7 @@
       },
       "costAtCloseOut": {
         "usd": 321.650068,
-        "pricingAsOf": "2026-07-29T06:41:52.294Z"
+        "pricingAsOf": "2026-07-29T06:42:19.740Z"
       }
     },
     "merges": [
