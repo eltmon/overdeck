@@ -122,7 +122,7 @@
     "lint:dist-externals": "node scripts/lint-dist-externals.mjs",
     "lint:ratchet-audit": "bash scripts/lint-ratchet-audit.sh",
     "pretest": "npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli",
-    "test": "vitest run --configLoader runner && npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx",
+    "test": "vitest run --configLoader runner && npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx src/__tests__/fr7-conversation-pending-input.test.tsx",
     "test:unit": "vitest run --configLoader runner tests/unit",
     "test:integration": "vitest run --configLoader runner tests/integration",
     "test:e2e": "vitest run --configLoader runner tests/e2e",
