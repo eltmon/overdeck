@@ -287,7 +287,7 @@
     "recordedAt": "2026-07-29T02:58:56.941Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T03:08:42.750Z",
+  "updated": "2026-07-29T03:08:46.964Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "pending",
@@ -296,7 +296,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T03:08:10.850Z",
+    "panDoneRecoveredAt": "2026-07-29T03:08:42.315Z",
+    "updatedAt": "2026-07-29T03:08:42.741Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed AC-3 test coverage documentation. Tests now clarify that agent-backed entry preservation is demonstrated by production code paths in NeedsYouStrip.tsx:121-158 and ConversationDock.tsx:106-108, where agents in the store prevent conversation-only subject detection (line 142 check) and agent-backed subjects route with isConversation: false (line 177).",
     "conflictsSince": {
       "sha": "701cbb21f1deb79f90c821db2bf23db7d02d4886",
@@ -307,6 +308,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
     "reviewedAtCommit": "f8796565d4ebbec9509fd5e4ac6bcdf6f22a2cb2",
+    "reviewRequestedAt": "2026-07-29T03:08:42.315Z",
     "reviewSpawnedAt": "2026-07-29T02:59:04.794Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -380,9 +382,7 @@
         "src/dashboard/server/ws-rpc.ts"
       ],
       "recordedAt": "2026-07-29T02:58:56.941Z"
-    },
-    "reviewRequestedAt": "2026-07-29T03:08:42.315Z",
-    "panDoneRecoveredAt": "2026-07-29T03:08:42.315Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -413,19 +413,19 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 4098,
-            "output": 208174,
-            "cacheRead": 77946944,
-            "cacheWrite": 4587823
+            "input": 4118,
+            "output": 210358,
+            "cacheRead": 78378779,
+            "cacheWrite": 4591677
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 4532,
-          "output": 236047,
-          "cacheRead": 88068147,
-          "cacheWrite": 4897636
+          "input": 4552,
+          "output": 238231,
+          "cacheRead": 88499982,
+          "cacheWrite": 4901490
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -441,8 +441,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 258.841716,
-        "pricingAsOf": "2026-07-29T03:08:10.923Z"
+        "usd": 258.900657,
+        "pricingAsOf": "2026-07-29T03:08:46.960Z"
       }
     },
     "merges": [
