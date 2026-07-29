@@ -325,7 +325,7 @@
     "recordedAt": "2026-07-29T05:44:27.078Z"
   },
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T11:39:35.549Z",
+  "updated": "2026-07-29T11:39:38.536Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "passed",
@@ -333,11 +333,11 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
-    "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "skipped",
+    "mergeStep": "merged",
+    "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T05:45:20.146Z",
-    "updatedAt": "2026-07-29T11:39:35.062Z",
+    "updatedAt": "2026-07-29T11:39:35.786Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -646,7 +646,7 @@
       },
       "costAtCloseOut": {
         "usd": 433.473311,
-        "pricingAsOf": "2026-07-29T11:39:35.401Z"
+        "pricingAsOf": "2026-07-29T11:39:38.238Z"
       }
     },
     "merges": [
@@ -655,7 +655,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-fable-5",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-1990",
