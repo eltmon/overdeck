@@ -242,14 +242,18 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
     const target = getMarkdownOpenTarget();
     if (target === 'internal') {
       if (deck) {
-        deck.openOrFocusEditorPane(targetPath, basename);
+        // PAN-3260 review fix: the internal editor pane reads/writes by the
+        // real file path — targetPath may carry a trailing `:line[:column]`
+        // suffix for external-editor goto syntax, which would make
+        // extname() see e.g. ".md:12" and reject the file as unsupported.
+        deck.openOrFocusEditorPane(filePath, basename);
         return;
       }
       handleOpen();
       return;
     }
     openWithExternalEditor(target);
-  }, [deck, targetPath, basename, handleOpen, openWithExternalEditor]);
+  }, [deck, filePath, basename, handleOpen, openWithExternalEditor]);
 
   const closeQuickview = useCallback(() => {
     requestIdRef.current++;
@@ -320,7 +324,9 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
           label: 'Open in internal editor',
           onClick: () => {
             setMarkdownOpenTarget('internal');
-            if (deck) deck.openOrFocusEditorPane(targetPath, basename);
+            // PAN-3260 review fix: use filePath, not targetPath — see the
+            // matching note in handleMarkdownClick.
+            if (deck) deck.openOrFocusEditorPane(filePath, basename);
             else handleOpen();
           },
         },
@@ -336,7 +342,7 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
       ];
       showContextMenu({ x, y, items });
     });
-  }, [deck, targetPath, basename, handleOpen, openWithExternalEditor, displayPath, copyPath]);
+  }, [deck, filePath, targetPath, basename, handleOpen, openWithExternalEditor, displayPath, copyPath]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

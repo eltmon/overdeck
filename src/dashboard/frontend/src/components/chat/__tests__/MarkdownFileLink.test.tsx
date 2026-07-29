@@ -57,6 +57,19 @@ const flywheelBriefMeta = {
   basename: 'flywheel-brief.md',
 };
 
+// PAN-3260 review fix — a markdown chip with line/column metadata: targetPath
+// (used for external-editor goto syntax) carries a trailing `:12:5` that
+// filePath (the real path) does not. The internal editor pane must read
+// filePath, not targetPath, or extname() sees ".md:12:5" and rejects it.
+const positionedMarkdownMeta = {
+  filePath: '/home/eltmon/project/docs/README.md',
+  targetPath: '/home/eltmon/project/docs/README.md:12:5',
+  displayPath: 'project/docs/README.md:12:5',
+  basename: 'README.md',
+  line: 12,
+  column: 5,
+};
+
 function renderWithDeck(ui: React.ReactElement, deck: StageDeckContextValue | null) {
   return render(<StageDeckProvider value={deck}>{ui}</StageDeckProvider>);
 }
@@ -294,7 +307,7 @@ describe('MarkdownFileLink', () => {
 
       fireEvent.click(screen.getByRole('link'));
 
-      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.targetPath, markdownMeta.basename);
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename);
       expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
     });
 
@@ -304,7 +317,18 @@ describe('MarkdownFileLink', () => {
 
       fireEvent.click(screen.getByRole('link'));
 
-      expect(openOrFocusEditorPane).toHaveBeenCalledWith(flywheelBriefMeta.targetPath, flywheelBriefMeta.basename);
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(flywheelBriefMeta.filePath, flywheelBriefMeta.basename);
+      expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
+    });
+
+    it('opens the internal editor pane with the real file path, not the line-suffixed targetPath, for a positioned chip', () => {
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...positionedMarkdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.click(screen.getByRole('link'));
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(positionedMarkdownMeta.filePath, positionedMarkdownMeta.basename);
+      expect(openOrFocusEditorPane).not.toHaveBeenCalledWith(positionedMarkdownMeta.targetPath, expect.anything());
       expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
     });
 
@@ -423,9 +447,20 @@ describe('MarkdownFileLink', () => {
       const internalItem = await screen.findByRole('menuitem', { name: 'Open in internal editor' });
       fireEvent.click(internalItem);
 
-      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.targetPath, markdownMeta.basename);
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename);
       expect(localStorage.getItem('overdeck:markdown-open-target')).toBe('internal');
       expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
+    });
+
+    it('opens the internal editor pane with the real file path from the context menu for a positioned chip', async () => {
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...positionedMarkdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+      const internalItem = await screen.findByRole('menuitem', { name: 'Open in internal editor' });
+      fireEvent.click(internalItem);
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(positionedMarkdownMeta.filePath, positionedMarkdownMeta.basename);
     });
 
     it('renders exactly the three original items for a non-markdown chip', () => {
