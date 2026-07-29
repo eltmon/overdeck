@@ -1,0 +1,31 @@
+{
+  "issueId": "PAN-1106",
+  "schemaVersion": 2,
+  "created": "2026-07-29T20:32:20.093Z",
+  "updated": "2026-07-29T20:32:20.093Z",
+  "pipeline": {
+    "issueId": "PAN-1106",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-29T20:32:20.093Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "Edwards-MacBook-Air.local"
+  },
+  "recoveryTrips": [
+    {
+      "issue": "PAN-1106",
+      "recoveryPath": "orphan-proposed-pickup-gate",
+      "obligationGeneration": "proposed",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-29T20:32:20.089Z"
+    }
+  ]
+}
