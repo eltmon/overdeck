@@ -82,18 +82,17 @@
     "recordedAt": "2026-07-28T20:52:11.749Z"
   },
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-29T05:52:08.760Z",
+  "updated": "2026-07-29T05:52:12.842Z",
   "pipeline": {
     "issueId": "PAN-3242",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:52:32.420Z",
-    "updatedAt": "2026-07-29T05:52:08.720Z",
-    "reviewNotes": "The keyed cross-book fix still changes OrderBookPage.tsx despite the unrevised must-not constraint",
+    "updatedAt": "2026-07-29T05:52:12.816Z",
     "conflictsSince": {
       "sha": "3e981e26c497dc13d6dad0f66cd114112ce68983",
       "detectedAt": "2026-07-29T01:16:19.128Z",
@@ -158,7 +157,7 @@
       },
       "costAtCloseOut": {
         "usd": 64.475846,
-        "pricingAsOf": "2026-07-29T05:52:08.754Z"
+        "pricingAsOf": "2026-07-29T05:52:12.838Z"
       }
     },
     "merges": [
