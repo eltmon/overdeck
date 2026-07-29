@@ -17,7 +17,8 @@ export type PendingInputKind =
   | 'sessionResume'
   | 'rateLimit'
   | 'paneChoice'
-  | 'agentTurnEnded';
+  | 'agentTurnEnded'
+  | 'paneQuestion';
 
 /** Short label for a single kind (used in tooltips, joined by comma). */
 export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
@@ -29,6 +30,7 @@ export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
   rateLimit: 'Rate-limit modal — pick a model',
   paneChoice: 'Choice menu waiting — pick an option',
   agentTurnEnded: 'Answer the agent',
+  paneQuestion: 'Question in terminal — answer the agent',
 };
 
 /**

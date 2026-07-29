@@ -38,7 +38,6 @@ import { XBriefMergeConflictError } from '../xbrief/io.js';
 import { isXBriefFilename } from '../xbrief/lifecycle.js';
 import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
 import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
-import { readPendingDeploy } from '../deploy/deploy-queue.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 import type { HeadAnchor } from '../git-utils.js';
 
@@ -384,16 +383,6 @@ async function runVerificationForIssuePromise(
   options: VerificationRunnerOptions = {},
 ): Promise<VerificationRunnerOutcome> {
   const currentStatus = getReviewStatusSync(issueId);
-  const pendingDeploy = await readPendingDeploy();
-  if (pendingDeploy && currentStatus?.verificationStatus !== 'running') {
-    const reason = `Verification deferred: a dashboard deploy is queued (requested ${pendingDeploy.requestedAt} by ${pendingDeploy.requestedBy.join(', ')}). It re-runs automatically after the deploy.`;
-    setReviewStatusSync(issueId, {
-      verificationStatus: 'pending',
-      verificationNotes: reason,
-    });
-    return { outcome: 'deferred', reason };
-  }
-
   const mergedOutcome = skipMergedVerification(issueId, logPrefix, currentStatus);
   if (mergedOutcome) return mergedOutcome;
 

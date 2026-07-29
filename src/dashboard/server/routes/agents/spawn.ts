@@ -29,7 +29,7 @@ import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/pro
 import { clearWorkspaceStuck, getReviewStatusSync } from '../../../../lib/review-status.js';
 import { isStateMigrated } from '../../../../lib/state-home.js';
 import { shouldCommitLegacyWorkspaceArtifacts } from '../../../../lib/state-read-home.js';
-import { parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
+import { isOverdeckWorkspaceRuntimePath, parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
 import { assertWorkspaceStackHealthyForSpawn } from '../../../../lib/agents/spawn-prep.js';
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
 import { writeAutoStartXBrief } from '../../../../lib/xbrief/auto-synthesize.js';
@@ -103,20 +103,7 @@ export function emitDirtyWorkspaceRefusalActivity(issueId: string, porcelain: st
   } catch { /* non-fatal — activity emit should not block the response */ }
 }
 
-/**
- * Both workspace runtime directories are Overdeck-owned in full, so both get a
- * blanket prefix match. The legacy `.pan/` allowlist only matched the collapsed
- * `?? .pan/` porcelain form plus a closed set of files — but this gate always
- * runs with `--untracked-files=all`, which expands untracked directories into
- * individual paths. A pipeline-authored `.pan/drafts/<ISSUE>.md` therefore read
- * as operator dirt and 409'd the planning→work auto-handoff (PAN-3042).
- */
-function isOverdeckWorkspaceRuntimePath(path: string): boolean {
-  if (path === '.overdeck' || path.startsWith('.overdeck/')) return true;
-  return path === '.pan' || path === '.pan/' || path.startsWith('.pan/');
-}
-
-/** True when git porcelain contains only Overdeck-owned workspace runtime files. */
+/** True when git porcelain contains only Overdeck-owned workspace runtime files (PAN-3042; shared predicate since PAN-3245). */
 export function isOnlyOverdeckRuntimeWorkspaceChanges(porcelain: string): boolean {
   return parsePorcelainStatusPaths(porcelain).every(isOverdeckWorkspaceRuntimePath);
 }

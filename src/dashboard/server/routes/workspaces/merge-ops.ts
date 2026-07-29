@@ -28,7 +28,7 @@ import { extractNumberSync, extractPrefixSync, parseIssueIdSync } from '../../..
 import { enqueueMerge, getCurrentMerge, markMergeProcessing, dequeueMerge, getAllActiveQueues } from '../../../../lib/overdeck/merge.js';
 import { findProjectByTeamSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync as setReviewStatusBase, type ReviewStatus } from '../../../../lib/review-status.js';
-import { isStatePlaneOnlyStatus } from '../../../../lib/state-plane.js';
+import { isOverdeckOwnedOnlyStatus } from '../../../../lib/state-plane.js';
 import { findPlan } from '../../../../lib/xbrief/io.js';
 import { isIntegrationPermissionError, verifyAppCanMerge, type GitHubPullRequestState } from '../../../../lib/github-app.js';
 import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../../lib/tracker-utils.js';
@@ -45,7 +45,7 @@ import { activeStrikeMerge, mergeCompletionStatus, mergeVerificationOptions, nor
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 export const shouldBlockApproveForDirtyStatus = (status: string): boolean =>
-  status.trim() !== '' && !isStatePlaneOnlyStatus(status);
+  status.trim() !== '' && !isOverdeckOwnedOnlyStatus(status);
 
 /**
  * Check whether origin/branchName already contains origin/targetBranch.

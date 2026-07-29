@@ -420,4 +420,63 @@ describe('deacon-swarm failed-merge recovery', () => {
     expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
     expect(nextDoc.plan.items.find(i => i.id === 'wi-b')?.status).toBe('running');
   });
+
+  it('parks a pending-decision slot and emits one durable needs-you trip', async () => {
+    const recordRecoveryFailure = vi.fn(async () => ({
+      trip: {
+        issue: 'PAN-2203',
+        recoveryPath: 'swarm-slot-pending-operator-decision',
+        obligationGeneration: 'wi-b:agent-pan-2203-slot-2',
+        tripCount: 1,
+        open: true,
+        needsYouEmittedAt: '2026-07-28T00:00:00.000Z',
+      },
+      emitNeedsYou: true,
+    }));
+    const fakeDeps = {
+      ...recoveryDeps(),
+      runGitCommand: vi.fn(async () => undefined),
+      decideAgentAutonomousRedrive: vi.fn(async () => ({
+        decision: 'defer' as const,
+        reason: 'agent is waiting on an operator decision (tool_permission)',
+        needsYou: true as const,
+      })),
+      recordRecoveryFailure,
+      acknowledgeRecoveryTrip: vi.fn(async () => undefined),
+    };
+
+    const { doc: nextDoc, actions } = await requeueFailedSwarmSlots(
+      'PAN-2203',
+      workspacePath,
+      [failedSlotAt(2, 'wi-b')],
+      doc(item('wi-b')),
+      {
+        issueId: 'PAN-2203',
+        merged: [],
+        inFlight: [failedSlotAt(2, 'wi-b')],
+        pending: [],
+        branches: [],
+        agents: [],
+      },
+      fakeDeps,
+    );
+
+    expect(recordRecoveryFailure).toHaveBeenCalledTimes(1);
+    expect(recordRecoveryFailure).toHaveBeenCalledWith(
+      workspacePath,
+      'PAN-2203',
+      'swarm-slot-pending-operator-decision',
+      'wi-b:agent-pan-2203-slot-2',
+      1,
+    );
+    expect(actions).toEqual([
+      '[swarm] needs-you PAN-2203: failed slot 2 agent is waiting on an operator decision (tool_permission)',
+      '[swarm] deferred failed slot 2: agent is waiting on an operator decision (tool_permission)',
+    ]);
+    expect(fakeDeps.runGitCommand).not.toHaveBeenCalled();
+    expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
+    expect(fakeDeps.applyTaskOperationToPlanFile).not.toHaveBeenCalled();
+    expect(fakeDeps.acknowledgeRecoveryTrip).not.toHaveBeenCalled();
+    expect(nextDoc.plan.items.find(i => i.id === 'wi-b')?.status).toBe('running');
+  });
 });

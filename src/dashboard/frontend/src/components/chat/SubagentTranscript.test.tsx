@@ -62,6 +62,17 @@ describe('SubagentTranscript', () => {
     expect(hookMocks.useSubagentTranscript).toHaveBeenLastCalledWith(conversation, 'alpha');
   });
 
+  it('gives the timeline a flex-column parent so it can scroll', () => {
+    render(<SubagentTranscript conversation={conversation} subagent={subagent} onBack={vi.fn()} />);
+
+    // jsdom has no layout, so assert the contract instead: MessagesTimeline sizes
+    // itself with `flex: 1`, which resolves to nothing under a plain block parent —
+    // the transcript then renders clipped with no scrolling and no Bottom button.
+    const parent = screen.getByTestId('subagent-timeline').parentElement;
+    expect(parent?.className).toContain('flex-col');
+    expect(parent?.className).toContain('flex-1');
+  });
+
   it('returns to the main agent from the back button', async () => {
     const user = userEvent.setup();
     const onBack = vi.fn();
