@@ -317,7 +317,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:17:30.501Z",
+  "updated": "2026-07-29T05:17:36.102Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "blocked",
@@ -327,7 +327,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:17:29.603Z",
+    "updatedAt": "2026-07-29T05:17:36.093Z",
     "reviewNotes": "FR-7 still lacks conversation-only SimpleHomePage and agent-backed ConversationDock regression coverage",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -337,7 +337,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
-    "reviewedAtCommit": "f62d4793235ea6644a96ca02a4706437d687b54d",
+    "reviewedAtCommit": "95f4c6c751405f1ce84e806a249daf5c848a0829",
     "reviewSpawnedAt": "2026-07-29T05:13:03.780Z"
   },
   "closeOut": {
@@ -398,7 +398,7 @@
       },
       "costAtCloseOut": {
         "usd": 279.185158,
-        "pricingAsOf": "2026-07-29T05:17:29.623Z"
+        "pricingAsOf": "2026-07-29T05:17:36.098Z"
       }
     },
     "merges": [
