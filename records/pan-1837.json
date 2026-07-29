@@ -274,10 +274,10 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-29T00:51:04.624Z",
+  "updated": "2026-07-29T00:53:00.706Z",
   "pipeline": {
     "issueId": "PAN-1837",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -285,8 +285,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-29T00:50:58.301Z",
-    "reviewNotes": "Reviewed fixes are not pushed to PR #3255; native Kimi conversations also lack deterministic wire-session resolution, incompatible dashboard selections are silently coerced, artifact provenance omits kimi-code, and committed HEAD fails the file-size gate.",
+    "updatedAt": "2026-07-29T00:53:00.654Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "conflictsSince": {
       "sha": "c109ed6adb07e58f4ba6b566dbeea64f59126b22",
       "detectedAt": "2026-07-29T00:03:35.975Z",
@@ -311,18 +311,18 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4310700,
-            "output": 189190,
-            "cacheRead": 71555072,
+            "input": 4800992,
+            "output": 209945,
+            "cacheRead": 78907904,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 2924,
-            "output": 603761,
-            "cacheRead": 770643373,
-            "cacheWrite": 3864031
+            "input": 2930,
+            "output": 604477,
+            "cacheRead": 773099843,
+            "cacheWrite": 3868848
           }
         }
       },
@@ -334,21 +334,21 @@
           "cacheWrite": 187167
         },
         "openai/gpt-5.6-sol": {
-          "input": 4310700,
-          "output": 189190,
-          "cacheRead": 71555072,
+          "input": 4800992,
+          "output": 209945,
+          "cacheRead": 78907904,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2924,
-          "output": 603761,
-          "cacheRead": 770643373,
-          "cacheWrite": 3864031
+          "input": 2930,
+          "output": 604477,
+          "cacheRead": 773099843,
+          "cacheWrite": 3868848
         }
       },
       "costAtCloseOut": {
-        "usd": 240.512032,
-        "pricingAsOf": "2026-07-29T00:51:00.013Z"
+        "usd": 247.773066,
+        "pricingAsOf": "2026-07-29T00:53:00.702Z"
       }
     },
     "merges": [
@@ -357,7 +357,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-1837",
