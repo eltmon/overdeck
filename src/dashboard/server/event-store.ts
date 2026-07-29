@@ -443,9 +443,6 @@ export function createEventStore(db: DbAdapter, options?: CreateEventStoreOption
     const row = lastRowIdStmt.get();
     const sequence = row?.sequence ?? 0;
 
-    const row = lastRowIdStmt.get();
-    const sequence = row?.sequence ?? 0;
-
     const stored: StoredEvent = {
       sequence,
       type: event.type,
