@@ -158,7 +158,7 @@
     "recordedAt": "2026-07-29T09:08:42.655Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-29T09:37:44.631Z",
+  "updated": "2026-07-29T09:37:50.214Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "blocked",
@@ -168,10 +168,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T09:16:42.721Z",
-    "updatedAt": "2026-07-29T09:37:43.870Z",
+    "updatedAt": "2026-07-29T09:37:50.204Z",
     "reviewNotes": "Production code looks correct, but the new malformed-JSON test is below the 16 KiB trim threshold and never reaches parsing, while the notes-cap test still bypasses setReviewStatusSync and cannot prove the raw/bounded composition split.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
-    "reviewedAtCommit": "902ef5c2c866310648762b466c9d39d6fef2ea42",
+    "reviewedAtCommit": "14703dbb3871a0e90db6fb10d370b144c231ac3a",
     "lastVerifiedCommit": "14703dbb3871a0e90db6fb10d370b144c231ac3a",
     "reviewSpawnedAt": "2026-07-29T09:34:55.307Z",
     "scopeDrift": {
@@ -258,7 +258,7 @@
       },
       "costAtCloseOut": {
         "usd": 93.935102,
-        "pricingAsOf": "2026-07-29T09:37:43.889Z"
+        "pricingAsOf": "2026-07-29T09:37:50.210Z"
       }
     },
     "merges": [
