@@ -293,7 +293,7 @@
     "recordedAt": "2026-07-29T05:44:27.078Z"
   },
   "created": "2026-07-28T18:06:28.687Z",
-  "updated": "2026-07-29T07:31:21.925Z",
+  "updated": "2026-07-29T07:31:27.445Z",
   "pipeline": {
     "issueId": "PAN-1990",
     "reviewStatus": "blocked",
@@ -304,12 +304,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T05:45:20.146Z",
-    "updatedAt": "2026-07-29T07:31:21.261Z",
+    "updatedAt": "2026-07-29T07:31:27.428Z",
     "reviewNotes": "boot migration can permanently mark unresolved legacy memory as migrated before workspace backfill completes",
     "verificationNotes": "Verification FAILED at test (711221ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1990\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1990/src/dashboard/frontend\n\n ❯ |root| tests/fixtures/synced-skills.test.ts (1 test | 1 failed) 11ms\n     × matches the committed fixture line-for-line 10ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/no-loss-matrix.test.ts (5 tests | 1 failed) 37ms\n     × AC1/AC2: every enumerated HTTP route is present in the matrix 30ms (retry x1)\n ❯ |root| tests/unit/telemetry-docs.test.ts (5 tests | 1 failed) 34ms\n     × keeps every event, property, and allowed value domain in exact contract sync 26ms (retry x1)\n\n Test Files  283 passed (283)\n      Tests  2603 passed (2603)\n   Start at  01:58:00\n   Duration  24.60s (transform 46.07s, setup 60.00s, import 172.63s, tests 75.19s, environment 145.26s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-AHFk5O/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest mai\n…(1034 chars elided)…\nre-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-cZHzLx/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-cZHzLx/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0\n...(truncated)",
     "inspectNotes": "AC1: MemoryIdentity/MemoryObservation issueId -> Schema.NullOr(IssueId) in packages/contracts/src/memory.ts; new contracts memory.test.ts passes 4/4 (decodes null and a real PAN-1990 for both structs). AC2: src/lib/memory/injection.ts:110 replaces the sibling search with Promise.resolve([]) when issueId is null, so the branch is skipped rather than widened; tests/lib/memory/injection.test.ts 18/18 pass including the new null-issueId case, which seeds the same PAN-999 sibling row the positive test retrieves and asserts hitCounts.sibling===0 and no sibling docType. AC3: npm run typecheck exits 0 - contracts dts rebuild, root tsc --noEmit, hooks, evals, dashboard ratchet (61 known, none new), frontend ratchet (0). New imports verified real: getProjectSync src/lib/projects.ts:601, resolveProjectPath src/lib/projects.ts:508. Non-blocking note: the ?? workspaceId fallbacks for paths/event keys are documented as deferred to memory-paths-rekey and events-workspaceid, but updateMemoryHealth returning EMPTY_HEALTH on a null issueId drops health tracking for main/scratch turns rather than relocating it - confirm a follow-on bead owns that.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3277",
-    "reviewedAtCommit": "ae1895419650db87d0d01d9f3d2c41d6f8febe8c",
+    "reviewedAtCommit": "326c48a75815bda5dee42508b62ccf3959b93759",
     "reviewSpawnedAt": "2026-07-29T07:14:36.349Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -611,7 +611,7 @@
       },
       "costAtCloseOut": {
         "usd": 336.332509,
-        "pricingAsOf": "2026-07-29T07:31:21.281Z"
+        "pricingAsOf": "2026-07-29T07:31:27.438Z"
       }
     },
     "merges": [
