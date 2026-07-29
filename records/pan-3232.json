@@ -292,9 +292,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-29T05:56:23.889Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-29T05:58Z] test-agent → FAILED — seq 1",
+      "timestamp": "2026-07-29T05:58:19.693Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "test-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-29T05:58:19Z",
+      "markdownBody": "# Test failure\n\nGates run from workspace feature-pan-3232 (HEAD d814ebec88): npm run typecheck PASSED (root, hooks, evals, dashboard, frontend). npm run lint PASSED (eslint + all custom guards, exit 0). npm test FAILED: root vitest suite passed cleanly (1285 files / 12044 tests, 3 skipped), but the frontend targeted subset failed 1 of 59 tests. FAILING TEST: src/__tests__/fr7-conversation-pending-input.test.tsx > FR-7: Conversation-only pending input surfaces > ConversationDock: AC-3 > 'AC-3: preserves agent-backed dock panel when agent exists for docked issue' (line 450). TestingLibraryElementError: screen.getByText('agent-test-1') matches two elements - the panel header's agent-id label (div.truncate.font-mono) and the mocked DrawerAgentSession component body, which also renders the literal text 'agent-test-1'. This is a query-ambiguity bug in the test itself (needs getAllByText or a scoped query), introduced by this branch's own fix(fr7) commits at HEAD (d814ebec88, b3c3ac68c5, 0450d10a8e). No browser UAT was performed: the PRD (drafts/PAN-3232.md) and GitHub issue #3232 do not request live/browser verification, verify_commands across all xBRIEF items specify only vitest/typecheck/grep, and the two items requiring live runtime behavior (live-tree-delta, specialist-pending-input) were explicitly cancelled/deferred per PR comments as out of this branch's shipped scope - the shipped rendering fixes are fully covered by component-level unit tests mocking the exact prop shapes in the issue's acceptance criteria. Blocking this failure: work agent must fix the ambiguous query in fr7-conversation-pending-input.test.tsx:450 (e.g. scope to within(screen.getByTestId('drawer-agent-session')) or use getAllByText) and re-run npm test.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-3232`."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "package.json",
@@ -369,17 +382,18 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T05:56:27.703Z",
+  "updated": "2026-07-29T05:58:19.693Z",
   "pipeline": {
     "issueId": "PAN-3232",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T03:32:32.610Z",
-    "updatedAt": "2026-07-29T05:56:22.578Z",
+    "updatedAt": "2026-07-29T05:58:19.487Z",
+    "reviewNotes": "Scoped DrawerAgentSession assertion is correct and all eight FR-7 regression tests pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "ed7d6766f3ef2a788daf4d9ead51139fc4ef1a65",
@@ -389,6 +403,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
+    "reviewedAtCommit": "3f05c046f609446b5f5023e3234c179e8aac99ce",
     "reviewSpawnedAt": "2026-07-29T05:56:22.577Z"
   },
   "closeOut": {
@@ -412,9 +427,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 32793879,
-            "output": 934197,
-            "cacheRead": 180751872,
+            "input": 33521356,
+            "output": 941679,
+            "cacheRead": 182245888,
             "cacheWrite": 0
           }
         },
@@ -428,19 +443,19 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 5377,
-            "output": 259827,
-            "cacheRead": 105613128,
-            "cacheWrite": 6482233
+            "input": 5387,
+            "output": 260204,
+            "cacheRead": 105836448,
+            "cacheWrite": 6547946
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 5811,
-          "output": 287700,
-          "cacheRead": 115734331,
-          "cacheWrite": 6792046
+          "input": 5821,
+          "output": 288077,
+          "cacheRead": 115957651,
+          "cacheWrite": 6857759
         },
         "anthropic/claude-fable-5": {
           "input": 1888,
@@ -449,9 +464,9 @@
           "cacheWrite": 193438
         },
         "openai/gpt-5.6-sol": {
-          "input": 32793879,
-          "output": 934197,
-          "cacheRead": 180751872,
+          "input": 33521356,
+          "output": 941679,
+          "cacheRead": 182245888,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -462,8 +477,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 315.289219,
-        "pricingAsOf": "2026-07-29T05:56:24.216Z"
+        "usd": 320.004441,
+        "pricingAsOf": "2026-07-29T05:58:19.600Z"
       }
     },
     "merges": [
@@ -472,7 +487,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3232",
