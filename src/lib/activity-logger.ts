@@ -33,7 +33,8 @@ export type ActivitySource =
   | 'deploy-script'
   | 'plan-finalize'
   | 'complete-planning'
-  | 'start-agent';
+  | 'start-agent'
+  | 'state-door';
 
 export interface EmitActivityOptions {
   id?: string;

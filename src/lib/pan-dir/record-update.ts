@@ -5,10 +5,12 @@ import { relative } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
+import { emitActivityEntry } from '../activity-logger.js';
 import type { ProjectConfig } from '../projects.js';
 import { resolveStateReadHomeSync, STATE_BRANCH } from '../state-read-home.js';
 import { flushAutoCommits } from './auto-commit.js';
 import { withRecordFsLock } from './fs-lock.js';
+import { recordReconcileFailure, recordReconcileSuccess } from './push-health.js';
 import {
   ensureIssueRecordSync,
   getIssueRecordPath,
@@ -137,6 +139,13 @@ interface GitOptions {
   timeoutMs?: number;
 }
 
+class StateMergeConflictError extends Error {
+  constructor(message: string, readonly conflictedPaths: string[]) {
+    super(message);
+    this.name = 'StateMergeConflictError';
+  }
+}
+
 async function git(gitRoot: string, args: string[], options: GitOptions = {}): Promise<string> {
   const result = await execFileAsync('git', args, {
     cwd: gitRoot,
@@ -204,28 +213,33 @@ async function resolveMergeConflicts(
     .filter(Boolean);
   if (conflicts.length === 0) throw new Error(gitFailureMessage(mergeError));
 
-  const nonRecordConflicts = conflicts.filter((path) => !path.startsWith('records/'));
-  if (nonRecordConflicts.length > 0) {
-    throw new Error(`state merge conflicted outside records/: ${nonRecordConflicts.join(', ')}`);
-  }
+  try {
+    const nonRecordConflicts = conflicts.filter((path) => !path.startsWith('records/'));
+    if (nonRecordConflicts.length > 0) {
+      throw new Error(`state merge conflicted outside records/: ${nonRecordConflicts.join(', ')}`);
+    }
 
-  for (const conflictPath of conflicts) {
-    await git(gitRoot, ['checkout', '--theirs', '--', conflictPath], { signal });
-    await git(gitRoot, ['add', '--', conflictPath], { signal });
-  }
+    for (const conflictPath of conflicts) {
+      await git(gitRoot, ['checkout', '--theirs', '--', conflictPath], { signal });
+      await git(gitRoot, ['add', '--', conflictPath], { signal });
+    }
 
-  throwIfDurabilityAborted(signal);
-  if (conflicts.includes(relativeRecordPath)) {
-    const remoteRecord = readIssueRecordSync(project, issueId);
-    if (!remoteRecord) throw new Error(`Remote ${issueId} state record is unreadable`);
-    const result = await mutator(remoteRecord);
     throwIfDurabilityAborted(signal);
-    writeIssueRecordSync(project, issueId, result ?? remoteRecord);
-    await git(gitRoot, ['add', '--', relativeRecordPath], { signal });
-  }
+    if (conflicts.includes(relativeRecordPath)) {
+      const remoteRecord = readIssueRecordSync(project, issueId);
+      if (!remoteRecord) throw new Error(`Remote ${issueId} state record is unreadable`);
+      const result = await mutator(remoteRecord);
+      throwIfDurabilityAborted(signal);
+      writeIssueRecordSync(project, issueId, result ?? remoteRecord);
+      await git(gitRoot, ['add', '--', relativeRecordPath], { signal });
+    }
 
-  throwIfDurabilityAborted(signal);
-  await git(gitRoot, ['-c', 'core.editor=true', 'commit', '--no-edit'], { signal });
+    throwIfDurabilityAborted(signal);
+    await git(gitRoot, ['-c', 'core.editor=true', 'commit', '--no-edit'], { signal });
+  } catch (error) {
+    if (error instanceof StateMergeConflictError) throw error;
+    throw new StateMergeConflictError(gitFailureMessage(error), conflicts);
+  }
 }
 
 async function restoreRetryableRecord(
@@ -283,6 +297,28 @@ async function restoreRetryableRecord(
   ], { signal });
 }
 
+async function recordReconcileFailureHealth(
+  project: ProjectConfig,
+  issueId: string,
+  error: unknown,
+  conflictedPaths: string[],
+): Promise<void> {
+  try {
+    const reason = gitFailureMessage(error);
+    const { health, crossedThreshold } = recordReconcileFailure(project, { reason, conflictedPaths });
+    if (!crossedThreshold) return;
+    await Effect.runPromise(emitActivityEntry({
+      source: 'state-door',
+      level: 'error',
+      issueId,
+      message: `State pushes for ${project.name} have failed ${health.consecutiveReconcileFailures} times in a row and automatic reconciliation cannot resolve them.`,
+      details: `Conflicted paths: ${conflictedPaths.join(', ') || 'unknown'}. The overdeck-state branch is diverging from origin; run "pan doctor" to see ahead/behind counts, then resolve the conflicted files manually (git merge origin/overdeck-state in the state worktree). Until resolved, durable state written on this machine does not reach other machines.`,
+    }));
+  } catch (healthError) {
+    console.warn(`[pan-dir/records] Failed to record reconcile health for ${issueId}: ${gitFailureMessage(healthError)}`);
+  }
+}
+
 async function reconcileStatePush(
   project: ProjectConfig,
   issueId: string,
@@ -291,43 +327,58 @@ async function reconcileStatePush(
   signal?: AbortSignal,
 ): Promise<PanIssueRecord> {
   const gitRoot = resolveStateReadHomeSync(project).root;
-  await abortMerge(gitRoot, { signal });
-  await abortRebase(gitRoot, { signal });
+  let conflictedPaths: string[] = [];
 
-  for (let attempt = 0; attempt < MAX_STATE_PUSH_RECONCILIATIONS; attempt += 1) {
-    throwIfDurabilityAborted(signal);
-    await git(gitRoot, ['fetch', 'origin', STATE_BRANCH], { signal });
-    try {
-      await git(gitRoot, ['merge', '--no-edit', `origin/${STATE_BRANCH}`], { signal });
-    } catch (error) {
+  try {
+    await abortMerge(gitRoot, { signal });
+    await abortRebase(gitRoot, { signal });
+
+    for (let attempt = 0; attempt < MAX_STATE_PUSH_RECONCILIATIONS; attempt += 1) {
       throwIfDurabilityAborted(signal);
+      await git(gitRoot, ['fetch', 'origin', STATE_BRANCH], { signal });
       try {
-        await resolveMergeConflicts(project, issueId, mutator, gitRoot, recordPath, error, signal);
-      } catch (resolveError) {
-        await abortMerge(gitRoot, { signal });
-        await abortRebase(gitRoot, { signal });
-        throw new Error(
-          `Failed to reconcile ${issueId} state after push race: ${gitFailureMessage(resolveError)}`,
-          { cause: error },
-        );
+        await git(gitRoot, ['merge', '--no-edit', `origin/${STATE_BRANCH}`], { signal });
+      } catch (error) {
+        throwIfDurabilityAborted(signal);
+        try {
+          await resolveMergeConflicts(project, issueId, mutator, gitRoot, recordPath, error, signal);
+        } catch (resolveError) {
+          if (resolveError instanceof StateMergeConflictError) {
+            conflictedPaths = resolveError.conflictedPaths;
+          }
+          await abortMerge(gitRoot, { signal });
+          await abortRebase(gitRoot, { signal });
+          throw new Error(
+            `Failed to reconcile ${issueId} state after push race: ${gitFailureMessage(resolveError)}`,
+            { cause: error },
+          );
+        }
+      }
+
+      try {
+        await git(gitRoot, ['push', 'origin', STATE_BRANCH], { signal });
+        const record = readIssueRecordSync(project, issueId);
+        if (!record) throw new Error(`Reconciled ${issueId} state record is unreadable`);
+        try {
+          recordReconcileSuccess(project);
+        } catch (healthError) {
+          console.warn(`[pan-dir/records] Failed to reset reconcile health for ${issueId}: ${gitFailureMessage(healthError)}`);
+        }
+        return record;
+      } catch (error) {
+        throwIfDurabilityAborted(signal);
+        const message = gitFailureMessage(error);
+        if (!isRemoteRefRaceError(message)) {
+          throw new Error(`Failed to push reconciled ${issueId} state: ${message}`, { cause: error });
+        }
       }
     }
 
-    try {
-      await git(gitRoot, ['push', 'origin', STATE_BRANCH], { signal });
-      const record = readIssueRecordSync(project, issueId);
-      if (!record) throw new Error(`Reconciled ${issueId} state record is unreadable`);
-      return record;
-    } catch (error) {
-      throwIfDurabilityAborted(signal);
-      const message = gitFailureMessage(error);
-      if (!isRemoteRefRaceError(message)) {
-        throw new Error(`Failed to push reconciled ${issueId} state: ${message}`, { cause: error });
-      }
-    }
+    throw new Error(`Failed to push ${issueId} state after ${MAX_STATE_PUSH_RECONCILIATIONS} reconciliation attempts`);
+  } catch (error) {
+    await recordReconcileFailureHealth(project, issueId, error, conflictedPaths);
+    throw error;
   }
-
-  throw new Error(`Failed to push ${issueId} state after ${MAX_STATE_PUSH_RECONCILIATIONS} reconciliation attempts`);
 }
 
 export async function updateIssueRecord(

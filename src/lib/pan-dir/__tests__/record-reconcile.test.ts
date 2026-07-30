@@ -3,10 +3,13 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { DomainEvent } from '@overdeck/contracts';
 
+import { setActivityEventStoreProvider } from '../../activity-logger.js';
 import type { ProjectConfig } from '../../projects.js';
 import { STATE_BRANCH } from '../../state-read-home.js';
 import type { PanIssueRecord } from '../record.js';
+import { readPushHealth, recordReconcileFailure } from '../push-health.js';
 import { updateIssueRecord } from '../record-update.js';
 
 const ISSUE_ID = 'DURABLE-1';
@@ -53,6 +56,7 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
   let stateRoot: string;
   let remote: string;
   let project: ProjectConfig;
+  let activityEvents: Array<Omit<DomainEvent, 'sequence'>>;
   const originalHome = process.env.OVERDECK_HOME;
 
   beforeEach(() => {
@@ -63,6 +67,17 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
     mkdirSync(stateRoot, { recursive: true });
     mkdirSync(remote, { recursive: true });
     project = { name: 'Reconcile', path: stateRoot };
+    activityEvents = [];
+    setActivityEventStoreProvider(() => ({
+      append(event) {
+        activityEvents.push(event);
+        return activityEvents.length;
+      },
+      async appendAsync(event) {
+        activityEvents.push(event);
+        return activityEvents.length;
+      },
+    }));
 
     git(stateRoot, 'init', '-q');
     git(stateRoot, 'config', 'user.email', 'test@overdeck.local');
@@ -90,6 +105,7 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
   });
 
   afterEach(() => {
+    setActivityEventStoreProvider(null);
     if (originalHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = originalHome;
     rmSync(sandbox, { recursive: true, force: true });
@@ -180,12 +196,22 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
     git(other, 'commit', '-q', '-m', 'origin spec update');
     git(other, 'push', '-q', 'origin', STATE_BRANCH);
 
-    await expect(updateIssueRecord(project, ISSUE_ID, (current) => {
-      current.statusOverrides = { 'wi-1': 'completed' };
-    })).rejects.toThrow('specs/shared.json');
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      await expect(updateIssueRecord(project, ISSUE_ID, (current) => {
+        current.statusOverrides = { [`wi-${attempt}`]: 'completed' };
+      })).rejects.toThrow('specs/shared.json');
+    }
 
     expect(existsSync(join(stateRoot, '.git', 'MERGE_HEAD'))).toBe(false);
     expect(git(stateRoot, 'status', '--porcelain')).toBe('');
+    expect(readPushHealth(project).consecutiveReconcileFailures).toBe(4);
+    const stateDoorEntries = activityEvents.filter((event) =>
+      event.type === 'activity.entry' && event.payload.source === 'state-door',
+    );
+    expect(stateDoorEntries).toHaveLength(1);
+    expect(stateDoorEntries[0]?.payload.level).toBe('error');
+    expect(stateDoorEntries[0]?.payload.details).toContain('specs/shared.json');
+    expect(stateDoorEntries[0]?.payload.message).toContain('failed 3 times in a row');
 
     git(stateRoot, 'fetch', '-q', 'origin', STATE_BRANCH);
     expect(() => git(stateRoot, 'merge', `origin/${STATE_BRANCH}`)).toThrow();
@@ -193,11 +219,62 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
     git(stateRoot, 'add', 'specs/shared.json');
     git(stateRoot, 'commit', '-q', '--no-edit');
 
+    const remoteSpare = readRecord(other, 'SPARE-1');
+    remoteSpare.decisions = [{ id: 'D1', summary: 'force a successful reconcile', recordedAt: '2026-07-30T00:05:00.000Z' }];
+    writeRecord(other, remoteSpare);
+    git(other, 'add', 'records/spare-1.json');
+    git(other, 'commit', '-q', '-m', 'advance origin after conflict resolution');
+    git(other, 'push', '-q', 'origin', STATE_BRANCH);
+
     await updateIssueRecord(project, ISSUE_ID, (current) => {
-      current.statusOverrides = { 'wi-2': 'completed' };
+      current.statusOverrides = { 'wi-resolved': 'completed' };
     });
     expect(readRecordAtRef(stateRoot, `origin/${STATE_BRANCH}`, ISSUE_ID).statusOverrides)
-      .toEqual({ 'wi-2': 'completed' });
+      .toEqual({ 'wi-resolved': 'completed' });
+    expect(readPushHealth(project).consecutiveReconcileFailures).toBe(0);
+  });
+
+  it('preserves the reconcile error when push-health persistence fails', async () => {
+    const other = cloneState('health-failure-remote-writer');
+    writeFileSync(join(stateRoot, 'specs', 'shared.json'), JSON.stringify({ value: 'local' }, null, 2));
+    git(stateRoot, 'add', 'specs/shared.json');
+    git(stateRoot, 'commit', '-q', '-m', 'local spec update');
+    writeFileSync(join(other, 'specs', 'shared.json'), JSON.stringify({ value: 'origin' }, null, 2));
+    git(other, 'add', 'specs/shared.json');
+    git(other, 'commit', '-q', '-m', 'origin spec update');
+    git(other, 'push', '-q', 'origin', STATE_BRANCH);
+
+    mkdirSync(join(process.env.OVERDECK_HOME!, 'push-health', 'reconcile.json'), { recursive: true });
+    await expect(updateIssueRecord(project, ISSUE_ID, (current) => {
+      current.statusOverrides = { 'wi-1': 'completed' };
+    })).rejects.toThrow('specs/shared.json');
+  });
+
+  it('preserves the reconcile error when threshold activity emission fails', async () => {
+    const other = cloneState('activity-failure-remote-writer');
+    writeFileSync(join(stateRoot, 'specs', 'shared.json'), JSON.stringify({ value: 'local' }, null, 2));
+    git(stateRoot, 'add', 'specs/shared.json');
+    git(stateRoot, 'commit', '-q', '-m', 'local spec update');
+    writeFileSync(join(other, 'specs', 'shared.json'), JSON.stringify({ value: 'origin' }, null, 2));
+    git(other, 'add', 'specs/shared.json');
+    git(other, 'commit', '-q', '-m', 'origin spec update');
+    git(other, 'push', '-q', 'origin', STATE_BRANCH);
+
+    recordReconcileFailure(project, { reason: 'seed failure 1', conflictedPaths: [] });
+    recordReconcileFailure(project, { reason: 'seed failure 2', conflictedPaths: [] });
+    setActivityEventStoreProvider(() => ({
+      append() {
+        throw new Error('simulated activity failure');
+      },
+      async appendAsync() {
+        throw new Error('simulated activity failure');
+      },
+    }));
+
+    await expect(updateIssueRecord(project, ISSUE_ID, (current) => {
+      current.statusOverrides = { 'wi-1': 'completed' };
+    })).rejects.toThrow('specs/shared.json');
+    expect(readPushHealth(project).consecutiveReconcileFailures).toBe(3);
   });
 
   it('rejects a delete-modify record conflict and leaves no merge in progress', async () => {
