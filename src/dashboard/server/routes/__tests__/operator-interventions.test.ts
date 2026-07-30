@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Context, Effect, Layer, Stream } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { EventStoreService } from '../../services/domain-services.js';
 import { IssueLifecycle } from '../../services/issue-lifecycle.js';
 import { ReadModelService, type ReadModelServiceShape } from '../../read-model.js';
@@ -279,6 +279,20 @@ async function requestAgents(path: string, init: RequestInit = {}) {
   return runRoute(agentsRouteLayer, path, init);
 }
 
+// This suite flakes only under full-suite load (409 became 500 once during a
+// release preflight, PAN-2421 family) and the response body that names the
+// underlying error is otherwise discarded — surface it in the assertion
+// message so the next occurrence is diagnosable.
+async function responseBodyForDiagnostics(
+  response: HttpServerResponse.HttpServerResponse,
+): Promise<string> {
+  try {
+    return await HttpServerResponse.toWeb(response).text();
+  } catch (error) {
+    return `<unreadable body: ${error instanceof Error ? error.message : String(error)}>`;
+  }
+}
+
 async function requestIssues(path: string, init: RequestInit = {}) {
   return runRoute(issuesRouteLayer, path, init);
 }
@@ -436,7 +450,10 @@ describe('operator.intervention dashboard routes', () => {
       body: JSON.stringify({ issueId: 'PAN-1' }),
     });
 
-    expect(response.status).toBe(409);
+    expect(
+      response.status,
+      response.status === 409 ? '' : await responseBodyForDiagnostics(response),
+    ).toBe(409);
     expect(agentMocks.clearAgentPausedSync).not.toHaveBeenCalled();
     expect(agentMocks.clearAgentTroubledSync).not.toHaveBeenCalled();
   });
