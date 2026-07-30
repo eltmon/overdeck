@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T03:53:24.965Z",
+  "updated": "2026-07-30T03:54:16.416Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "pending",
@@ -67,5 +67,20 @@
       "needsYouEmittedAt": "2026-07-30T03:52:41.096Z"
     }
   ],
-  "workModel": "gpt-5.6-sol"
+  "workModel": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "start-cli-flip-through-door": {
+        "writerId": "agent-pan-3296",
+        "agentId": "agent-pan-3296",
+        "pid": 1996095,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T03:54:16.416Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "start-cli-flip-through-door": "running"
+  }
 }
