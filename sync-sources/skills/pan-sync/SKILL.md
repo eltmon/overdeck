@@ -86,6 +86,33 @@ Output:
 
 Manual `pan sync` always runs a full sync, even when startup sync would skip.
 
+### Which tree sync distributes from
+
+Hooks, bundled rules, skills, and templates all ship from `sync-sources/`. Sync
+names the tree it read and how many files actually changed:
+
+```
+✔ Synced 23 hooks to ~/.overdeck/bin/ (2 updated, 21 unchanged)
+  from /home/you/Projects/overdeck/sync-sources/hooks
+```
+
+`0 updated` means the deploy was a no-op — the deployed copies already matched.
+
+The global `pan` symlink resolves into a `pan reload` deployment generation,
+which is a detached worktree frozen at the commit it was built from. Sync
+redirects to the checkout that generation was built from, and says so:
+
+```
+This `pan` is running from a `pan reload` deployment generation, which is frozen at the commit it was built from:
+  /home/you/.overdeck/deployments/dashboard/.pan-reload-generation-b
+  Syncing from the checkout it was built from: /home/you/Projects/overdeck/sync-sources
+```
+
+If no checkout is recorded, sync warns that it is about to distribute the frozen
+copy and that merged fixes will not deploy — run `pan reload` first. To check
+deployed hooks against the source tree at any time, run `pan doctor` and read the
+**Deployed Hooks** row.
+
 ### Startup Sync (Skip When Unchanged)
 
 ```bash

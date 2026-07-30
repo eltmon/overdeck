@@ -1,6 +1,6 @@
 import { homedir } from 'os';
-import { join, sep } from 'path';
-import { existsSync } from 'fs';
+import { basename, join, sep } from 'path';
+import { existsSync, readFileSync } from 'fs';
 
 // Overdeck home directory (can be overridden for testing)
 export const OVERDECK_HOME = process.env.OVERDECK_HOME || join(homedir(), '.overdeck');
@@ -155,8 +155,80 @@ export function resolvePiExtensionPath(): string | null {
  * at sprawled top-level dirs. That sprawl let the stale top-level `rules/`
  * silently rot while the maintained rules accumulated elsewhere (#1359):
  * nothing in the repo layout signalled which dirs were sync sources.
+ *
+ * Which copy of that directory is authoritative is decided by
+ * {@link resolveSyncSourcesRoot} — usually the package's own, but the checkout
+ * when the CLI is running from a `pan reload` generation (PAN-3327).
  */
-export const SYNC_SOURCES_ROOT = join(packageRoot, 'sync-sources');
+
+/**
+ * Directory names `pan reload` builds its detached `origin/main` worktrees into,
+ * under `${OVERDECK_HOME}/deployments/dashboard/` (see `dashboardDeploymentRoots()`
+ * in `deploy/build-from-origin.ts`).
+ */
+const DEPLOYMENT_GENERATION_DIR_RE = /^\.pan-reload-generation-[a-z]$/;
+
+/** True when `dir` is a `pan reload` deployment generation root. */
+export function isDeploymentGenerationRoot(dir: string): boolean {
+  return DEPLOYMENT_GENERATION_DIR_RE.test(basename(dir));
+}
+
+/**
+ * The checkout the active `pan reload` deployment was built from, or null.
+ *
+ * The validated door for this marker is `readActiveDashboardBundleSync()` in
+ * `deploy/active-dashboard-bundle.ts`. This module cannot import it — that
+ * module imports `getOverdeckHome` from here, and paths.ts is the most widely
+ * imported module in the repo, so the edge would put a cycle in every bundle.
+ * Only the `repoRoot` field is read here, and both readers agree on it.
+ */
+function activeDeploymentRepoRoot(): string | null {
+  try {
+    const marker = join(getOverdeckHome(), 'active-dashboard-bundle.json');
+    const parsed: unknown = JSON.parse(readFileSync(marker, 'utf8'));
+    const repoRoot = (parsed as { repoRoot?: unknown } | null)?.repoRoot;
+    return typeof repoRoot === 'string' && repoRoot.length > 0 ? repoRoot : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve the tree `pan sync` distributes from (PAN-3327).
+ *
+ * Normally that is the package's own `sync-sources/`. But `pan reload` builds a
+ * detached `origin/main` worktree under
+ * `${OVERDECK_HOME}/deployments/dashboard/.pan-reload-generation-{a,b}` and
+ * activation points the global `pan` symlink into it, so `packageRoot` — and
+ * with it `sync-sources/` — freezes at whatever commit that generation was
+ * built from. Every later `pan sync` then copies the frozen snapshot over the
+ * identical stale files already on disk and reports success, which makes any
+ * merged hook, bundled rule, or skill fix undeployable through the sanctioned
+ * command with no error, warning, or diff.
+ *
+ * So when the CLI is executing from inside a generation, prefer the checkout
+ * that generation was built from — the same fallback PAN-3172 uses for the PTY
+ * supervisor. That tree tracks `main`; the frozen generation does not.
+ */
+export function resolveSyncSourcesRoot(
+  pkgRoot: string = packageRoot,
+  deps: {
+    repoRoot?: () => string | null;
+    exists?: (path: string) => boolean;
+  } = {},
+): string {
+  const exists = deps.exists ?? existsSync;
+  const bundled = join(pkgRoot, 'sync-sources');
+  if (!isDeploymentGenerationRoot(pkgRoot)) return bundled;
+
+  const repoRoot = (deps.repoRoot ?? activeDeploymentRepoRoot)();
+  if (!repoRoot) return bundled;
+
+  const fromCheckout = join(repoRoot, 'sync-sources');
+  return exists(fromCheckout) ? fromCheckout : bundled;
+}
+
+export const SYNC_SOURCES_ROOT = resolveSyncSourcesRoot();
 
 /** Resolved sub-paths under {@link SYNC_SOURCES_ROOT}. */
 export const SYNC_SOURCES = {
