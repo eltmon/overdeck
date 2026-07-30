@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T04:09:44.246Z",
+  "updated": "2026-07-30T04:17:28.285Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -57,16 +57,8 @@
     }
   ],
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "mem-read": {
-        "writerId": "agent-pan-3286",
-        "agentId": "agent-pan-3286",
-        "pid": 2647542,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T04:09:44.246Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3286",
@@ -133,6 +125,17 @@
         "outcome": "completed",
         "reason": "pan memory timeline with --workspace/cwd addressing, --days window (default 7), --limit cap (default 50), --json; readObservationsSince added to rollup.ts with readRecentObservations delegating to it. 7 tests in tests/unit/lib/memory/timeline-read.test.ts.",
         "releasedAt": "2026-07-30T04:09:36.640Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 2647542,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:09:44.246Z",
+        "itemId": "mem-read",
+        "outcome": "completed",
+        "reason": "pan memory read <path> with --workspace/cwd addressing and --from/--lines slicing; containment delegated to pin-path.ts (lexical + realpath + O_NOFOLLOW), absolute paths refused outright. 9 read tests added to tests/unit/lib/memory/timeline-read.test.ts including the ~/.claude JSONL unreachability matrix.",
+        "releasedAt": "2026-07-30T04:17:28.284Z"
       }
     ],
     "statusReasons": {
@@ -159,6 +162,10 @@
       "mem-timeline": {
         "reason": "pan memory timeline with --workspace/cwd addressing, --days window (default 7), --limit cap (default 50), --json; readObservationsSince added to rollup.ts with readRecentObservations delegating to it. 7 tests in tests/unit/lib/memory/timeline-read.test.ts.",
         "updatedAt": "2026-07-30T04:09:36.640Z"
+      },
+      "mem-read": {
+        "reason": "pan memory read <path> with --workspace/cwd addressing and --from/--lines slicing; containment delegated to pin-path.ts (lexical + realpath + O_NOFOLLOW), absolute paths refused outright. 9 read tests added to tests/unit/lib/memory/timeline-read.test.ts including the ~/.claude JSONL unreachability matrix.",
+        "updatedAt": "2026-07-30T04:17:28.284Z"
       }
     }
   },
@@ -191,6 +198,9 @@
     "mem-timeline.mem-timeline.ac1": "completed",
     "mem-timeline.mem-timeline.ac2": "completed",
     "mem-timeline.mem-timeline.ac3": "completed",
-    "mem-read": "running"
+    "mem-read": "completed",
+    "mem-read.mem-read.ac1": "completed",
+    "mem-read.mem-read.ac2": "completed",
+    "mem-read.mem-read.ac3": "completed"
   }
 }
