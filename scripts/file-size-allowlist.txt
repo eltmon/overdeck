@@ -1,5 +1,6 @@
 # Audited growth exceptions: <lines> <path> # <ISSUE-REF>
 1004 src/lib/overdeck/merge.ts # PAN-3166
+1002 src/cli/commands/doctor.ts # PAN-3291
 1766 src/lib/database/schema.ts # PAN-3092
 1008 src/lib/pan-dir/record.ts # PAN-3092
 1006 src/lib/review-status.ts # PAN-3253
@@ -9,7 +10,7 @@
 1315 src/lib/tmux.ts # PAN-3212
 1116 src/lib/lifecycle/workflows.ts # PAN-3215
 1025 src/lib/config-yaml/schema.ts # PAN-1837
-1012 src/lib/launcher-generator.ts # PAN-1837
+1018 src/lib/launcher-generator.ts # PAN-1837
 1211 src/lib/sync.ts # PAN-1837
 1060 src/lib/agents/spawn.ts # PAN-1837
 1016 src/lib/agents/runtime-command.ts # PAN-1837
