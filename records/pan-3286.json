@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T02:56:22.428Z",
+  "updated": "2026-07-30T03:04:40.118Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -57,16 +57,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "mem-target-search": {
-        "writerId": "agent-pan-3286",
-        "agentId": "agent-pan-3286",
-        "pid": 88523,
-        "host": "Edwards-MacBook-Air.local",
-        "claimedAt": "2026-07-30T02:56:22.428Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3286",
@@ -100,6 +92,17 @@
         "outcome": "completed",
         "reason": "Added relocateWorkspace() to writer.ts (guards: refuses kind=issue/archived, requires --force for kind=main) plus pan workspace relocate CLI command and a memoryHome line on pan workspace get (touched workspace-lifecycle.ts, outside declared files_scope, to satisfy ac3). 10 new tests in relocate.test.ts, all passing; typecheck and guard-workspace-doors.sh clean.",
         "releasedAt": "2026-07-30T02:56:10.587Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 88523,
+        "host": "Edwards-MacBook-Air.local",
+        "claimedAt": "2026-07-30T02:56:22.428Z",
+        "itemId": "mem-target-search",
+        "outcome": "completed",
+        "reason": "Added listWorkspacesForPath (resolver), target fan-out in searchMemory (cli.ts), and --target [path] on pan memory search (memory.ts) with mutual-exclusivity/bare-cwd-default/zero-match-note behavior. Refactored the search action into exported memorySearchCommand for testability. 8 new tests in target-search.test.ts, all passing; typecheck and guard-workspace-doors.sh clean.",
+        "releasedAt": "2026-07-30T03:04:40.118Z"
       }
     ],
     "statusReasons": {
@@ -114,6 +117,10 @@
       "ws-relocate": {
         "reason": "Added relocateWorkspace() to writer.ts (guards: refuses kind=issue/archived, requires --force for kind=main) plus pan workspace relocate CLI command and a memoryHome line on pan workspace get (touched workspace-lifecycle.ts, outside declared files_scope, to satisfy ac3). 10 new tests in relocate.test.ts, all passing; typecheck and guard-workspace-doors.sh clean.",
         "updatedAt": "2026-07-30T02:56:10.587Z"
+      },
+      "mem-target-search": {
+        "reason": "Added listWorkspacesForPath (resolver), target fan-out in searchMemory (cli.ts), and --target [path] on pan memory search (memory.ts) with mutual-exclusivity/bare-cwd-default/zero-match-note behavior. Refactored the search action into exported memorySearchCommand for testability. 8 new tests in target-search.test.ts, all passing; typecheck and guard-workspace-doors.sh clean.",
+        "updatedAt": "2026-07-30T03:04:40.118Z"
       }
     }
   },
@@ -132,6 +139,10 @@
     "ws-relocate.ws-relocate.ac2": "completed",
     "ws-relocate.ws-relocate.ac3": "completed",
     "ws-relocate.ws-relocate.ac4": "completed",
-    "mem-target-search": "running"
+    "mem-target-search": "completed",
+    "mem-target-search.mem-target-search.ac1": "completed",
+    "mem-target-search.mem-target-search.ac2": "completed",
+    "mem-target-search.mem-target-search.ac3": "completed",
+    "mem-target-search.mem-target-search.ac4": "completed"
   }
 }
